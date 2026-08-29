@@ -44,11 +44,11 @@ if ! grep -q "^commit=$COMMIT$" <(unzip -p "$ZIP_PATH" dispo/REVIEW-MANIFEST.txt
     echo "FAIL: Manifest-Commit stimmt nicht"
     fail=1
 fi
-if ! unzip -l "$ZIP_PATH" | grep -q 'dispo/\.env\.example'; then
+if ! unzip -l "$ZIP_PATH" 'dispo/.env.example' >/dev/null 2>&1; then
     echo "FAIL: .env.example fehlt"
     fail=1
 fi
-if unzip -l "$ZIP_PATH" | grep -qE 'dispo/\.env$'; then
+if unzip -l "$ZIP_PATH" 'dispo/.env' >/dev/null 2>&1; then
     echo "FAIL: .env enthalten"
     fail=1
 fi
