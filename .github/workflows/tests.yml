@@ -1,0 +1,134 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+          extensions: mbstring, bcmath, pdo_sqlite, pdo_mysql
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare SQLite environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p database
+          touch database/database.sqlite
+          php -r "
+            \$env = file_get_contents('.env');
+            \$env = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=sqlite', \$env);
+            \$env = preg_replace('/^DB_DATABASE=.*/m', 'DB_DATABASE=database/database.sqlite', \$env);
+            file_put_contents('.env', \$env);
+          "
+          php artisan migrate --force
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Canonical frontend check
+        run: npm run check
+
+      - name: TypeScript and Vitest
+        run: |
+          npm run types:check
+          npm run test:unit
+
+      - name: Pint, PHPStan and Pest
+        run: |
+          vendor/bin/pint --test
+          vendor/bin/phpstan analyse --memory-limit=1G
+          php artisan test
+
+      - name: Composer audit
+        run: composer audit
+
+      - name: npm audit (production)
+        run: npm audit --omit=dev
+
+      - name: Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke tests
+        run: npx playwright test
+
+  mysql:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: dispo_test
+          MYSQL_ROOT_PASSWORD: password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+          extensions: mbstring, bcmath, pdo_mysql
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Migrate and test on MySQL
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: dispo_test
+          DB_USERNAME: root
+          DB_PASSWORD: password
+          QUEUE_CONNECTION: database
+          CACHE_STORE: database
+          SESSION_DRIVER: database
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          php artisan migrate --force
+          vendor/bin/pest --configuration=phpunit.mysql.xml

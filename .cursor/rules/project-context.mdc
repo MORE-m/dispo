@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+
+# Projektkontext
+
+Dieses Repository implementiert das interne Kalkulations- und Dispositionssystem
+von more Marketing.
+
+- Lies vor fachlichen Änderungen `@AGENTS.md` und `@docs/README.md`.
+- Verbindliche Anforderungen stehen in `@docs/anforderungskatalog.md`.
+- Implementiere ausschließlich bestätigten V1-Umfang.
+- Nenne vor der Umsetzung die betroffenen Anforderungs-IDs.
+- Erfinde keine Fachregeln oder Initialdaten.
+- Autoritative Berechnung, Validierung und Berechtigung liegen auf dem Server.
+- Snapshots, Freigaben, Historien und kaufmännische Werte sind besonders schützenswert.
+- Aktualisiere Tests und Dokumentation gemeinsam mit fachlichem Verhalten.
+- Vorgeschlagene ADRs sind noch keine akzeptierten Entscheidungen.
+- Akzeptierte ADRs nicht stillschweigend ändern.
+- Arbeitsstand: `@docs/fortschritt.md` und `@docs/backlog-v1.md`.
