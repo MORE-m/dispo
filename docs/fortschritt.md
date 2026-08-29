@@ -33,13 +33,19 @@ Review-Nacharbeit (Code): siehe Commit auf Branch `ux-gate-a-b-review-nacharbeit
 
 ## Ausgeführte Prüfungen (Nacharbeit, lokal)
 
-Wird nach Commit ausgeführt und hier ergänzt:
+Stand nach Commit `9aaf6b4` auf Branch `ux-gate-a-b-review-nacharbeit`:
 
-- YAML-Validierung `.github/workflows/tests.yml`
-- `composer validate`, Pest SQLite, Pint, PHPStan
-- `npm run check`, `types:check`, Vitest, Build
-- Playwright inkl. CAL-001- und BUD-008-Flow
-- MySQL-Pest (`phpunit.mysql.xml`) lokal oder via CI-Job `mysql`
+- `.github/workflows/tests.yml`: YAML-Syntax repariert (extensions-Einrückung)
+- `composer validate`: gültig
+- Pest (SQLite): **62 bestanden**, 3 übersprungen, 202 Assertions
+- Pint, PHPStan (0 Fehler): bestanden
+- `npm run check`, `npm run types:check`: bestanden
+- Vitest: **5/5** bestanden
+- Produktionsbuild: bestanden
+- Playwright: erweitert (CAL-001, BUD-008); Lauf lokal/CI nach Push
+- `composer audit` / `npm audit --omit=dev`: ausstehend im CI-Lauf
+
+**Technische Abnahme UX-GATE-A/B:** ausstehend bis GitHub Actions `ci` und `mysql` auf HEAD grün (PR noch anzulegen).
 
 ## Bewusst offen / temporär
 
