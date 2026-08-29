@@ -1,14 +1,18 @@
 import { cn } from '@/lib/utils';
 
+type LogoSlotProps = {
+    name: string;
+    logoPath?: string | null;
+    className?: string;
+    variant?: 'inline' | 'card';
+};
+
 export function LogoSlot({
     name,
     logoPath,
     className,
-}: {
-    name: string;
-    logoPath?: string | null;
-    className?: string;
-}) {
+    variant = 'inline',
+}: LogoSlotProps) {
     const initials = name
         .split(/\s+/)
         .filter(Boolean)
@@ -17,17 +21,44 @@ export function LogoSlot({
         .join('');
 
     if (logoPath) {
-        return (
+        const image = (
             <img
                 src={logoPath}
-                alt=""
-                aria-hidden="true"
+                alt={name}
+                width={240}
+                height={96}
+                loading="lazy"
+                decoding="async"
                 className={cn(
-                    'inline-flex size-8 shrink-0 rounded-md object-contain',
+                    'max-h-full max-w-full object-contain',
+                    variant === 'inline' && 'size-8',
+                    variant === 'card' && 'h-11 w-auto max-w-full',
+                )}
+            />
+        );
+
+        if (variant === 'card') {
+            return (
+                <span
+                    className={cn(
+                        'bg-background border-border/70 flex h-14 w-full shrink-0 items-center justify-center rounded-lg border p-2.5',
+                        className,
+                    )}
+                >
+                    {image}
+                </span>
+            );
+        }
+
+        return (
+            <span
+                className={cn(
+                    'inline-flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md',
                     className,
                 )}
-                title={name}
-            />
+            >
+                {image}
+            </span>
         );
     }
 
@@ -35,7 +66,9 @@ export function LogoSlot({
         <span
             aria-hidden="true"
             className={cn(
-                'bg-muted text-muted-foreground inline-flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-semibold',
+                'bg-muted text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-md text-xs font-semibold',
+                variant === 'inline' && 'size-8',
+                variant === 'card' && 'h-14 w-full text-sm',
                 className,
             )}
             title={name}

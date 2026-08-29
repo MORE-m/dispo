@@ -899,6 +899,7 @@ export default function CalculationWizard({
                                                                                     logoPath={
                                                                                         item.logo_path
                                                                                     }
+                                                                                    variant="card"
                                                                                     className="mb-2"
                                                                                 />
                                                                                 <span className="text-sm font-medium">

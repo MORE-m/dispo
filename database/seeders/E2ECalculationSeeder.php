@@ -37,12 +37,17 @@ class E2ECalculationSeeder extends Seeder
         $organization = Organization::factory()->create(['name' => 'E2E Sendergruppe']);
         $medium = AdvertisingMedium::factory()->create(['code' => 'spot_classic']);
 
-        foreach ([['RH', 'Radio Hamburg', 1], ['RAH', 'ROCK ANTENNE Hamburg', 2]] as [$code, $name, $sort]) {
+        foreach ([
+            ['RH', 'Radio Hamburg', 1, '/images/senders/radio-hamburg.png'],
+            ['RAH', 'ROCK ANTENNE Hamburg', 2, null],
+            ['OAH', '80er 90er OLDIE ANTENNE Hamburg', 3, '/images/senders/80er-90er-oldie-antenne-hamburg.png'],
+        ] as [$code, $name, $sort, $logoPath]) {
             $inventory = Inventory::factory()->create([
                 'organization_id' => $organization->id,
                 'name' => $name,
                 'code' => $code,
                 'sort' => $sort,
+                'logo_path' => $logoPath,
             ]);
 
             InventoryMediumRule::factory()->create([
