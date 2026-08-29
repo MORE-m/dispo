@@ -8,16 +8,20 @@ use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-$runId = $argv[1] ?? '';
+$runDir = $argv[1] ?? '';
 $workerId = (int) ($argv[2] ?? -1);
 $hamburgId = (int) ($argv[3] ?? 0);
 $mediumId = (int) ($argv[4] ?? 0);
 
-if ($runId === '' || $workerId < 0 || $hamburgId <= 0 || $mediumId <= 0) {
-    fwrite(STDERR, "Usage: calculation_create_worker.php <run_id> <worker_id> <hamburg_id> <medium_id>\n");
+if ($runDir === '' || $workerId < 0 || $hamburgId <= 0 || $mediumId <= 0) {
+    fwrite(STDERR, "Usage: calculation_create_worker.php <run_dir> <worker_id> <hamburg_id> <medium_id>\n");
+    exit(1);
+}
+
+if (! is_dir($runDir) && ! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
+    fwrite(STDERR, "Run directory could not be created: {$runDir}\n");
     exit(1);
 }
 
@@ -27,13 +31,13 @@ require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-DB::table('calc_number_concurrency_barrier')->updateOrInsert(
-    ['run_id' => $runId, 'worker_id' => $workerId],
-    ['status' => 'ready', 'updated_at' => now()],
-);
+$readyFile = $runDir.'/worker-'.$workerId.'.ready';
+$resultFile = $runDir.'/worker-'.$workerId.'.result';
+
+file_put_contents($readyFile, '1');
 
 $deadline = microtime(true) + 30.0;
-while (DB::table('calc_number_concurrency_barrier')->where('run_id', $runId)->where('status', 'ready')->count() < 2) {
+while (count(glob($runDir.'/worker-*.ready')) < 2) {
     if (microtime(true) > $deadline) {
         fwrite(STDERR, "Barrier timeout for worker {$workerId}\n");
         exit(2);
@@ -63,19 +67,9 @@ try {
 
     $persisted = Calculation::query()->whereKey($calculation->id)->firstOrFail();
 
-    DB::table('calc_number_concurrency_results')->insert([
-        'run_id' => $runId,
-        'worker_id' => $workerId,
-        'number' => $persisted->number,
-        'created_at' => now(),
-    ]);
+    file_put_contents($resultFile, $persisted->number);
 } catch (Throwable $exception) {
-    DB::table('calc_number_concurrency_results')->insert([
-        'run_id' => $runId,
-        'worker_id' => $workerId,
-        'number' => 'ERROR:'.Str::limit($exception->getMessage(), 200),
-        'created_at' => now(),
-    ]);
+    file_put_contents($resultFile, 'ERROR:'.Str::limit($exception->getMessage(), 200));
 
     exit(3);
 }

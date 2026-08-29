@@ -95,12 +95,13 @@ Leistungsoptimierung (`BUD-008`, `BUD-009`).
 
 ### Spot Classic und Konditionen
 
-Review-Nacharbeit v4 (technisch, ohne Gate-Erweiterung):
+Review-Nacharbeit v5/v6 (technisch, ohne Gate-Erweiterung):
 
 - unveränderte Positionen bleiben bei deaktivierten Stammdaten speicherbar
   (`PRI-004`, `VER-002`);
 - gespeicherter Spotlängenindex bei unveränderter Länge (`SPT-009`);
 - Budgetvorschlag nur einmal übernehmbar (`BUD-008`);
+- atomare Nummernvergabe ohne Lücken bei fehlgeschlagenem Create (`TEC-001`, v6);
 - Anzeigenamen historischer Sender/Werbemittel: Referenz auf Stammdaten, kein
   dedizierter Namens-Snapshot in Gate B (Grenze dokumentiert).
 

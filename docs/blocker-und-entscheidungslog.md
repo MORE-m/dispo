@@ -32,7 +32,8 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | Spot-Classic-Zeilen | Durchschnitt: eindeutige Preisstunden + Gesamtspotanzahl; kein Kalender in Gate B | SPT-001–SPT-004, SPT-016 |
 | 29.08.2026 | Historische Snapshots | Unveränderte Positionen nutzen gespeicherte Preise/Regeln auch bei deaktivierten Stammdaten; Wechsel nur über aktive Kombinationen | PRI-004, VER-002, Review v4 |
 | 29.08.2026 | Spotlängenindex | Gespeicherter `length_index` bei unveränderter Länge; Neuberechnung bei Längenänderung | SPT-009, Review v4 |
-| 29.08.2026 | client_key nullable | Schema nullable aus Migrationskompatibilität; Writer setzt UUID verbindlich | Review v4 |
+| 29.08.2026 | client_key nullable | Schema nullable aus Migrationskompatibilität; Writer setzt UUID verbindlich | Review v4/v5 |
+| 29.08.2026 | Atomare Nummernvergabe | Sequenz und Kalkulation in einer Transaktion; Retries auf äußerer Transaktion (`TEC-001`) | Review v6 |
 
 ## Offene Blocker
 

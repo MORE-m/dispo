@@ -4,56 +4,34 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:-v5}"
+VERSION="${1:-v6}"
 COMMIT="$(git rev-parse HEAD)"
 SHORT="$(git rev-parse --short HEAD)"
-EXPORT_DIR="$(mktemp -d /tmp/dispo-review-export.XXXXXX)"
-ZIP_NAME="dispo-phase0-review-${VERSION}-${SHORT}.zip"
-ZIP_PATH="$ROOT/$ZIP_NAME"
+PARENT="$(dirname "$ROOT")"
+EXPORT_BASE="$(mktemp -d /tmp/dispo-review-export.XXXXXX)"
+EXPORT_DIR="$EXPORT_BASE/dispo"
+ZIP_PATH="$PARENT/dispo-ux-gate-a-b-review-${VERSION}-${SHORT}.zip"
 
-RSYNC_EXCLUDES=(
-    --exclude '.git'
-    --exclude '.env'
-    --exclude '.env.*'
-    --exclude 'vendor'
-    --exclude 'node_modules'
-    --exclude 'public/build'
-    --exclude 'public/hot'
-    --exclude 'bootstrap/cache/*.php'
-    --exclude 'storage/framework/cache'
-    --exclude 'storage/framework/sessions'
-    --exclude 'storage/framework/views'
-    --exclude 'storage/logs'
-    --exclude 'storage/inertia-devtools'
-    --exclude 'storage/app'
-    --exclude 'database/*.sqlite'
-    --exclude 'database/*.sqlite-journal'
-    --exclude 'resources/js/actions'
-    --exclude 'resources/js/routes'
-    --exclude 'resources/js/wayfinder'
-    --exclude 'test-results'
-    --exclude 'playwright-report'
-    --exclude 'blob-report'
-    --exclude '.phpunit.cache'
-    --exclude '.phpunit.result.cache'
-    --exclude 'dispo-phase0-review-*.zip'
-)
+cleanup() {
+    rm -rf "$EXPORT_BASE"
+}
 
-rsync -a "${RSYNC_EXCLUDES[@]}" ./ "$EXPORT_DIR/dispo/"
+trap cleanup EXIT INT TERM
+
+mkdir -p "$EXPORT_DIR"
+git archive HEAD | tar -x -C "$EXPORT_DIR"
 
 {
     echo "commit=$COMMIT"
     echo "branch=$(git branch --show-current)"
     echo "exported_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "version=$VERSION"
-} > "$EXPORT_DIR/dispo/REVIEW-MANIFEST.txt"
+} > "$EXPORT_DIR/REVIEW-MANIFEST.txt"
 
 (
-    cd "$EXPORT_DIR"
+    cd "$EXPORT_BASE"
     zip -rq "$ZIP_PATH" dispo
 )
-
-rm -rf "$EXPORT_DIR"
 
 SHA256="$(shasum -a 256 "$ZIP_PATH" | awk '{print $1}')"
 
@@ -64,6 +42,14 @@ echo "COMMIT: $COMMIT"
 fail=0
 if ! grep -q "^commit=$COMMIT$" <(unzip -p "$ZIP_PATH" dispo/REVIEW-MANIFEST.txt); then
     echo "FAIL: Manifest-Commit stimmt nicht"
+    fail=1
+fi
+if ! unzip -l "$ZIP_PATH" | grep -q 'dispo/\.env\.example'; then
+    echo "FAIL: .env.example fehlt"
+    fail=1
+fi
+if unzip -l "$ZIP_PATH" | grep -qE 'dispo/\.env$'; then
+    echo "FAIL: .env enthalten"
     fail=1
 fi
 if unzip -l "$ZIP_PATH" | grep -qE '\.git/'; then
@@ -88,6 +74,10 @@ if unzip -l "$ZIP_PATH" | grep -qE 'resources/js/(actions|routes|wayfinder)/'; t
 fi
 if unzip -l "$ZIP_PATH" | grep -qE 'bootstrap/cache/(packages|services)\.php'; then
     echo "FAIL: bootstrap/cache generierte Dateien enthalten"
+    fail=1
+fi
+if unzip -l "$ZIP_PATH" | grep -qE 'database/.*\.sqlite'; then
+    echo "FAIL: SQLite-Datenbank enthalten"
     fail=1
 fi
 

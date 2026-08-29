@@ -5,9 +5,8 @@ namespace Tests\Feature\Calculation;
 use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -16,36 +15,7 @@ use Tests\TestCase;
 class CalculationNumberConcurrencyTest extends TestCase
 {
     use CreatesSpotClassicCatalog;
-    use RefreshDatabase;
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        if (DB::connection()->getDriverName() !== 'mysql') {
-            return;
-        }
-
-        Schema::dropIfExists('calc_number_concurrency_results');
-        Schema::dropIfExists('calc_number_concurrency_barrier');
-
-        Schema::create('calc_number_concurrency_barrier', function ($table): void {
-            $table->string('run_id');
-            $table->unsignedTinyInteger('worker_id');
-            $table->string('status', 16);
-            $table->timestamp('updated_at')->nullable();
-            $table->primary(['run_id', 'worker_id']);
-        });
-
-        Schema::create('calc_number_concurrency_results', function ($table): void {
-            $table->id();
-            $table->string('run_id');
-            $table->unsignedTinyInteger('worker_id');
-            $table->string('number');
-            $table->timestamp('created_at')->nullable();
-            $table->index('run_id');
-        });
-    }
+    use DatabaseMigrations;
 
     public function test_gen_001_mysql_parallel_workers_create_calculations_with_unique_numbers(): void
     {
@@ -56,53 +26,69 @@ class CalculationNumberConcurrencyTest extends TestCase
         $catalog = $this->createSpotClassicCatalog();
         User::factory()->role(Role::Sales)->create();
 
-        $runId = (string) Str::uuid();
-        $script = base_path('tests/concurrency/calculation_create_worker.php');
-        $env = $this->workerEnvironment();
-
-        $worker0 = new Process([
-            PHP_BINARY,
-            $script,
-            $runId,
-            '0',
-            (string) $catalog['hamburg']->id,
-            (string) $catalog['medium']->id,
-        ], null, $env);
-        $worker1 = new Process([
-            PHP_BINARY,
-            $script,
-            $runId,
-            '1',
-            (string) $catalog['hamburg']->id,
-            (string) $catalog['medium']->id,
-        ], null, $env);
-
-        $worker0->start();
-        $worker1->start();
-
-        $this->assertSame(0, $worker0->wait()->getExitCode(), $worker0->getErrorOutput());
-        $this->assertSame(0, $worker1->wait()->getExitCode(), $worker1->getErrorOutput());
-
-        $numbers = DB::table('calc_number_concurrency_results')
-            ->where('run_id', $runId)
-            ->orderBy('worker_id')
-            ->pluck('number')
-            ->all();
-
-        $this->assertCount(2, $numbers);
-        $this->assertSame(2, count(array_unique($numbers)));
-        foreach ($numbers as $number) {
-            $this->assertDoesNotMatchRegularExpression('/^ERROR:/', $number);
-            $this->assertMatchesRegularExpression('/^K-\d{4}-\d{5}$/', $number);
+        $runDir = sys_get_temp_dir().'/dispo-concurrency-'.Str::uuid();
+        if (! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
+            $this->fail('Temporäres Barrier-Verzeichnis konnte nicht erstellt werden.');
         }
 
-        preg_match('/^K-(\d{4})-(\d{5})$/', $numbers[0], $first);
-        preg_match('/^K-(\d{4})-(\d{5})$/', $numbers[1], $second);
-        $this->assertSame($first[1], $second[1], 'Beide Nummern müssen im selben Jahr liegen.');
-        $this->assertSame(1, abs((int) $first[2] - (int) $second[2]), 'Sequenz muss fortlaufend ohne Doppelvergabe sein.');
+        try {
+            $script = base_path('tests/concurrency/calculation_create_worker.php');
+            $env = $this->workerEnvironment();
 
-        $persisted = Calculation::query()->whereIn('number', $numbers)->orderBy('number')->get();
-        $this->assertCount(2, $persisted);
+            $worker0 = new Process([
+                PHP_BINARY,
+                $script,
+                $runDir,
+                '0',
+                (string) $catalog['hamburg']->id,
+                (string) $catalog['medium']->id,
+            ], null, $env);
+            $worker1 = new Process([
+                PHP_BINARY,
+                $script,
+                $runDir,
+                '1',
+                (string) $catalog['hamburg']->id,
+                (string) $catalog['medium']->id,
+            ], null, $env);
+
+            $worker0->start();
+            $worker1->start();
+
+            $this->assertSame(0, $worker0->wait()->getExitCode(), $worker0->getErrorOutput());
+            $this->assertSame(0, $worker1->wait()->getExitCode(), $worker1->getErrorOutput());
+
+            $numbers = [];
+            foreach (glob($runDir.'/worker-*.result') ?: [] as $resultFile) {
+                $numbers[] = trim((string) file_get_contents($resultFile));
+            }
+
+            usort($numbers);
+
+            $this->assertCount(2, $numbers);
+            $this->assertSame(2, count(array_unique($numbers)));
+            foreach ($numbers as $number) {
+                $this->assertDoesNotMatchRegularExpression('/^ERROR:/', $number);
+                $this->assertMatchesRegularExpression('/^K-\d{4}-\d{5}$/', $number);
+            }
+
+            preg_match('/^K-(\d{4})-(\d{5})$/', $numbers[0], $first);
+            preg_match('/^K-(\d{4})-(\d{5})$/', $numbers[1], $second);
+            $this->assertSame($first[1], $second[1], 'Beide Nummern müssen im selben Jahr liegen.');
+            $this->assertSame(1, abs((int) $first[2] - (int) $second[2]), 'Sequenz muss fortlaufend ohne Doppelvergabe sein.');
+
+            $persisted = Calculation::query()->whereIn('number', $numbers)->orderBy('number')->get();
+            $this->assertCount(2, $persisted);
+        } finally {
+            foreach (glob($runDir.'/*') ?: [] as $file) {
+                if (is_file($file)) {
+                    unlink($file);
+                }
+            }
+            if (is_dir($runDir)) {
+                rmdir($runDir);
+            }
+        }
     }
 
     /**

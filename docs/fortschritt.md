@@ -1,6 +1,6 @@
 # Fortschritt V1
 
-Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v4)
+Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v6)
 
 ## Aktuelle Phase
 
@@ -10,14 +10,16 @@ dem finalen Nacharbeit-HEAD gebunden.
 
 ## Aktuelle Aufgabe
 
-Review-Nacharbeit v4: historische Snapshots bei deaktivierten Stammdaten,
-`length_index`-Snapshot, Traceability PRI-004/PRI-006, echter MySQL-Paralleltest,
-Budget-Doppelübernahme. Commit/Push/PR und grüne CI ausstehend.
+Review-Nacharbeit v6: atomare Nummernvergabe (`TEC-001`), isolierter MySQL-Paralleltest,
+Review-Export per `git archive`, Doku-Stand v5/v6. Commit/Push/PR und grüne CI
+ausstehend.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Review-Nacharbeit v3: BLK-007, Durchschnittspreis-Snapshot, Sequenznummern,
-Review-ZIP v3 (Commit `5f71013`).
+Review-Nacharbeit v5: Playwright CAL-001/BUD-008, `length_index` im Budgetpfad,
+historische Katalogdarstellung, Snapshot-/Negativtests, `client_key`-Backfill,
+deterministische Migration, MySQL-Paralleltest über `CalculationWriter::create()`
+(Commit `bab2477`).
 
 ## Technische Abnahme UX-GATE-A/B
 
@@ -28,22 +30,23 @@ Review-ZIP v3 (Commit `5f71013`).
 | Kalenderplaner (SPT-005–SPT-008) | bewusst offen |
 | Festpreis Spot | bewusst offen (kein Gate-B-Umfang) |
 | Preislisten-Snapshot / keine Rückwirkung (`PRI-004`) | umgesetzt |
-| Historische Positionen bei deaktivierten Stammdaten | umgesetzt (v4) |
-| `length_index`-Snapshot (`SPT-009`) | umgesetzt (v4) |
+| Historische Positionen bei deaktivierten Stammdaten | umgesetzt (v4/v5) |
+| `length_index`-Snapshot (`SPT-009`) | umgesetzt (v4/v5) |
 | Budgetvorschlag + Übernahme + lock_version | umgesetzt |
+| Atomare Nummernvergabe (`TEC-001`) | umgesetzt (v6) |
 | Read-only-Zusammenfassung | umgesetzt |
 | GitHub Actions `tests.yml` gültig | repariert |
 | CI `ci` + `mysql` auf HEAD | **ausstehend bis Push/PR grün** |
 
-## Ausgeführte Prüfungen (Nacharbeit v4, lokal)
+## Ausgeführte Prüfungen (Nacharbeit v6, lokal)
 
 - `composer validate`: gültig
 - `vendor/bin/pint --test`: bestanden
-- Pest (SQLite): **79 bestanden**, 4 übersprungen
+- Pest (SQLite): siehe Abschlusslauf
 - PHPStan: 0 Fehler
-- `npm run check`, `npm run types:check`, Vitest **5/5**, Build: bestanden
-- MySQL-Pest + Paralleltest: im GitHub-Job `mysql` (lokal ohne MySQL-Server)
-- Playwright: nach Commit/CI
+- `npm run check`, `npm run types:check`, Vitest, Build: bestanden
+- Playwright: 5/5 lokal
+- MySQL-Paralleltest: im GitHub-Job `mysql` (lokal ohne MySQL-Server übersprungen)
 
 **Technische Abnahme UX-GATE-A/B:** ausstehend bis GitHub Actions `ci` und `mysql`
 auf finalem HEAD grün.
@@ -54,10 +57,9 @@ auf finalem HEAD grün.
 |---|---|
 | `2026_08_29_140000_calculation_review_nacharbeit.php` | `client_key`, `spot_method`, `total_spot_count` |
 | `2026_08_29_150000_calculation_snapshot_and_sequences.php` | Snapshot-Spalten, Sequenztabelle, Backfill |
-| `2026_08_29_160000_backfill_length_index.php` | `length_index` aus gespeicherter Länge |
+| `2026_08_29_160000_backfill_length_index.php` | deterministischer `length_index`-Backfill |
 
-`client_key` bleibt schema-seitig nullable (kein `doctrine/dbal` für sicheres
-`NOT NULL` nach Backfill auf SQLite/MySQL); Writer erzwingt Werte für alle neuen
+`client_key` bleibt schema-seitig nullable; Writer erzwingt Werte für alle neuen
 und aktualisierten Positionen.
 
 ## Bewusst offen / temporär
@@ -82,5 +84,5 @@ und aktualisierten Positionen.
 
 ## Exakt nächste ausführbare Aufgabe
 
-Commit, Push, PR gegen `phase-0-abschluss`, grüne CI abwarten, Review-ZIP v4
-mit Manifest = HEAD.
+Commit, Push, PR gegen `phase-0-abschluss`, grüne CI abwarten, Review-ZIP v6
+außerhalb des Repos mit Manifest = HEAD.

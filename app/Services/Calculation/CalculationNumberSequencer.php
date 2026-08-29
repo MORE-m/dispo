@@ -15,32 +15,37 @@ final class CalculationNumberSequencer
     {
         $year = (int) now('Europe/Berlin')->format('Y');
 
-        return DB::transaction(function () use ($year): array {
-            $sequence = CalculationNumberSequence::query()
-                ->where('year', $year)
-                ->lockForUpdate()
-                ->first();
+        if (DB::transactionLevel() === 0) {
+            return DB::transaction(fn (): array => $this->allocate($year));
+        }
 
-            if ($sequence === null) {
-                CalculationNumberSequence::query()->create([
-                    'year' => $year,
-                    'last_seq' => 0,
-                ]);
+        return $this->allocate($year);
+    }
 
-                $sequence = CalculationNumberSequence::query()
-                    ->where('year', $year)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-            }
+    /**
+     * @return array{0: int, 1: int, 2: string}
+     */
+    private function allocate(int $year): array
+    {
+        DB::table('calculation_number_sequences')->insertOrIgnore([
+            'year' => $year,
+            'last_seq' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
-            $seq = $sequence->last_seq + 1;
-            $sequence->last_seq = $seq;
-            $sequence->save();
+        $sequence = CalculationNumberSequence::query()
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->firstOrFail();
 
-            $number = sprintf('K-%d-%05d', $year, $seq);
+        $seq = $sequence->last_seq + 1;
+        $sequence->last_seq = $seq;
+        $sequence->save();
 
-            return [$year, $seq, $number];
-        });
+        $number = sprintf('K-%d-%05d', $year, $seq);
+
+        return [$year, $seq, $number];
     }
 
     public function isRetryable(QueryException $exception): bool

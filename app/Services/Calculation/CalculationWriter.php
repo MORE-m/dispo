@@ -12,7 +12,6 @@ use App\Models\CalculationPosition;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -41,36 +40,24 @@ final class CalculationWriter
      */
     public function create(array $payload, User $user): Calculation
     {
-        for ($attempt = 0; $attempt < self::MAX_DEADLOCK_RETRIES; $attempt++) {
-            try {
-                [$year, $seq, $number] = $this->numbers->next();
+        return DB::transaction(function () use ($payload, $user): Calculation {
+            [$year, $seq, $number] = $this->numbers->next();
 
-                return DB::transaction(function () use ($payload, $user, $year, $seq, $number): Calculation {
-                    $calculation = new Calculation;
-                    $calculation->number = $number;
-                    $calculation->number_year = $year;
-                    $calculation->number_seq = $seq;
-                    $calculation->status = CalculationStatus::Draft;
-                    $calculation->advisor_id = $user->id;
-                    $calculation->lock_version = 1;
+            $calculation = new Calculation;
+            $calculation->number = $number;
+            $calculation->number_year = $year;
+            $calculation->number_seq = $seq;
+            $calculation->status = CalculationStatus::Draft;
+            $calculation->advisor_id = $user->id;
+            $calculation->lock_version = 1;
 
-                    $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
+            $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
 
-                    $fresh = $this->reloadCalculation($calculation);
-                    $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
+            $fresh = $this->reloadCalculation($calculation);
+            $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
 
-                    return $fresh;
-                });
-            } catch (QueryException $exception) {
-                if ($this->numbers->isRetryable($exception) && $attempt < self::MAX_DEADLOCK_RETRIES - 1) {
-                    continue;
-                }
-
-                throw $exception;
-            }
-        }
-
-        throw new \RuntimeException('Kalkulation konnte nicht erstellt werden.');
+            return $fresh;
+        }, self::MAX_DEADLOCK_RETRIES);
     }
 
     /**
