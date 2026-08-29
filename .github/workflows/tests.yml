@@ -131,4 +131,4 @@ jobs:
           cp .env.example .env
           php artisan key:generate
           php artisan migrate --force
-          php artisan test --configuration=phpunit.mysql.xml
+          vendor/bin/pest --configuration=phpunit.mysql.xml

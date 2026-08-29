@@ -79,7 +79,7 @@ npm audit --omit=dev
 ```
 
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
-MySQL-Integrationssuite: `php artisan test --configuration=phpunit.mysql.xml`
+MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
 (benötigt eine Datenbank `dispo_test` und die Zugangsdaten aus `phpunit.mysql.xml`).
 
 ## Produktion (nicht lokal)
