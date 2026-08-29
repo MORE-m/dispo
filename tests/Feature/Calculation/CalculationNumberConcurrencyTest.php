@@ -2,15 +2,20 @@
 
 namespace Tests\Feature\Calculation;
 
+use App\Enums\Role;
+use App\Models\Calculation;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
 
 class CalculationNumberConcurrencyTest extends TestCase
 {
+    use CreatesSpotClassicCatalog;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -42,18 +47,35 @@ class CalculationNumberConcurrencyTest extends TestCase
         });
     }
 
-    public function test_gen_001_mysql_parallel_workers_assign_unique_sequential_numbers(): void
+    public function test_gen_001_mysql_parallel_workers_create_calculations_with_unique_numbers(): void
     {
         if (DB::connection()->getDriverName() !== 'mysql') {
-            $this->markTestSkipped('Paralleler Sequenztest erfordert MySQL (GitHub-Job mysql).');
+            $this->markTestSkipped('Paralleler Writer-Test erfordert MySQL (GitHub-Job mysql).');
         }
 
+        $catalog = $this->createSpotClassicCatalog();
+        User::factory()->role(Role::Sales)->create();
+
         $runId = (string) Str::uuid();
-        $script = base_path('tests/concurrency/calculation_number_worker.php');
+        $script = base_path('tests/concurrency/calculation_create_worker.php');
         $env = $this->workerEnvironment();
 
-        $worker0 = new Process([PHP_BINARY, $script, $runId, '0'], null, $env);
-        $worker1 = new Process([PHP_BINARY, $script, $runId, '1'], null, $env);
+        $worker0 = new Process([
+            PHP_BINARY,
+            $script,
+            $runId,
+            '0',
+            (string) $catalog['hamburg']->id,
+            (string) $catalog['medium']->id,
+        ], null, $env);
+        $worker1 = new Process([
+            PHP_BINARY,
+            $script,
+            $runId,
+            '1',
+            (string) $catalog['hamburg']->id,
+            (string) $catalog['medium']->id,
+        ], null, $env);
 
         $worker0->start();
         $worker1->start();
@@ -78,6 +100,9 @@ class CalculationNumberConcurrencyTest extends TestCase
         preg_match('/^K-(\d{4})-(\d{5})$/', $numbers[1], $second);
         $this->assertSame($first[1], $second[1], 'Beide Nummern müssen im selben Jahr liegen.');
         $this->assertSame(1, abs((int) $first[2] - (int) $second[2]), 'Sequenz muss fortlaufend ohne Doppelvergabe sein.');
+
+        $persisted = Calculation::query()->whereIn('number', $numbers)->orderBy('number')->get();
+        $this->assertCount(2, $persisted);
     }
 
     /**

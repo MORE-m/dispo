@@ -228,6 +228,48 @@ class CalculationReviewNacharbeitTest extends TestCase
         );
     }
 
+    public function test_null_client_key_on_existing_position_is_backfilled_on_update(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->basePayload($catalog, totalSpots: 2);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $position = $calculation->positions()->firstOrFail();
+        $position->update(['client_key' => null]);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ])->assertRedirect();
+
+        $position->refresh();
+        $this->assertNotNull($position->client_key);
+        $this->assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $position->client_key,
+        );
+    }
+
+    public function test_new_position_client_key_is_assigned_server_side(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->basePayload($catalog, totalSpots: 1);
+        $payload['positions'][0]['client_key'] = '550e8400-e29b-41d4-a716-446655440099';
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $position = Calculation::query()->firstOrFail()->positions()->firstOrFail();
+
+        $this->assertNotSame('550e8400-e29b-41d4-a716-446655440099', $position->client_key);
+        $this->assertMatchesRegularExpression(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $position->client_key,
+        );
+    }
+
     /**
      * @param  array{hamburg: mixed, rock: mixed, medium: mixed}  $catalog
      * @return array<string, mixed>

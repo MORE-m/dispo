@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\BudgetStrategy;
-use App\Enums\SpotCalculationMethod;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
 use App\Models\AdvertisingMedium;
 use App\Models\BudgetProposal;
@@ -14,7 +13,6 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetProposalService;
 use App\Services\Calculation\CalculationWriter;
-use App\Services\Calculation\PositionInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -129,7 +127,7 @@ class CalculationController extends Controller
         }
 
         $proposal = $this->proposals->propose(
-            $this->positionInputs($payload, $existing),
+            $this->writer->positionInputsFromPayload($payload, $existing),
             (string) $payload['target_budget_nn'],
             (string) ($payload['order_discount_percent'] ?? '0'),
             BudgetStrategy::from((string) ($payload['budget_strategy'] ?? 'equal_budget')),
@@ -175,26 +173,96 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $inventories = Inventory::query()
+        $calculation?->loadMissing('positions');
+
+        $activeInventories = Inventory::query()
             ->where('is_active', true)
             ->orderBy('sort')
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'type', 'logo_path']);
+            ->get(['id', 'name', 'code', 'type', 'logo_path', 'is_active']);
 
-        $media = AdvertisingMedium::query()
+        $historicalInventoryIds = $calculation !== null
+            ? $calculation->positions->pluck('inventory_id')->unique()->values()
+            : collect();
+
+        $historicalInventories = Inventory::query()
+            ->whereIn('id', $historicalInventoryIds)
+            ->where('is_active', false)
+            ->orderBy('sort')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'type', 'logo_path', 'is_active']);
+
+        $inventories = $activeInventories->concat($historicalInventories)->values();
+
+        $activeMedia = AdvertisingMedium::query()
             ->where('is_active', true)
-            ->get(['id', 'name', 'code', 'kind', 'default_length_seconds', 'is_discountable', 'is_ae_eligible']);
+            ->get(['id', 'name', 'code', 'kind', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
 
-        $rules = InventoryMediumRule::query()
+        $historicalMediumIds = $calculation !== null
+            ? $calculation->positions->pluck('advertising_medium_id')->unique()->values()
+            : collect();
+
+        $historicalMedia = AdvertisingMedium::query()
+            ->whereIn('id', $historicalMediumIds)
+            ->where('is_active', false)
+            ->get(['id', 'name', 'code', 'kind', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
+
+        $media = $activeMedia->concat($historicalMedia)->values();
+
+        $activeRules = InventoryMediumRule::query()
             ->where('is_active', true)
             ->get([
+                'id',
                 'inventory_id',
                 'advertising_medium_id',
                 'default_length_seconds',
                 'surcharge_percent',
                 'is_discountable',
                 'is_ae_eligible',
+                'is_active',
             ]);
+
+        $historicalRuleIds = $calculation !== null
+            ? $calculation->positions->pluck('inventory_medium_rule_id')->filter()->unique()->values()
+            : collect();
+
+        $historicalCombos = $calculation !== null
+            ? $calculation->positions->map(fn ($position): array => [
+                'inventory_id' => $position->inventory_id,
+                'advertising_medium_id' => $position->advertising_medium_id,
+            ])->unique()->values()
+            : collect();
+
+        $historicalRules = collect();
+
+        if ($calculation !== null && ($historicalRuleIds->isNotEmpty() || $historicalCombos->isNotEmpty())) {
+            $historicalRules = InventoryMediumRule::query()
+                ->where('is_active', false)
+                ->where(function ($query) use ($historicalRuleIds, $historicalCombos): void {
+                    if ($historicalRuleIds->isNotEmpty()) {
+                        $query->whereIn('id', $historicalRuleIds);
+                    }
+
+                    foreach ($historicalCombos as $combo) {
+                        $query->orWhere(function ($nested) use ($combo): void {
+                            $nested->where('inventory_id', $combo['inventory_id'])
+                                ->where('advertising_medium_id', $combo['advertising_medium_id']);
+                        });
+                    }
+                })
+                ->get([
+                    'id',
+                    'inventory_id',
+                    'advertising_medium_id',
+                    'default_length_seconds',
+                    'surcharge_percent',
+                    'is_discountable',
+                    'is_ae_eligible',
+                    'is_active',
+                ]);
+        }
+
+        $rules = $activeRules->concat($historicalRules)->unique('id')->values();
 
         $canEdit = $calculation === null
             ? ($request->user()?->can('create', Calculation::class) ?? false)
@@ -239,40 +307,6 @@ class CalculationController extends Controller
             'savedSummary' => $savedSummary,
             'canEdit' => $canEdit,
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return list<PositionInput>
-     */
-    private function positionInputs(array $payload, ?Calculation $existing = null): array
-    {
-        $resolved = $this->writer->resolvedPositions($payload, $existing);
-        $inputs = [];
-
-        foreach ($resolved as $index => $item) {
-            $payloadPosition = $payload['positions'][$index] ?? [];
-            $positionKey = isset($payloadPosition['id'])
-                ? 'id:'.((int) $payloadPosition['id'])
-                : ((string) ($payloadPosition['client_key'] ?? 'new:'.$index));
-
-            $inputs[] = new PositionInput(
-                inventoryId: $item['inventory']->id,
-                inventoryName: $item['inventory']->name,
-                positionKey: $positionKey,
-                lengthSeconds: (int) $item['length_seconds'],
-                surchargePercent: (string) $item['surcharge_percent'],
-                positionDiscountPercent: $item['is_discountable'] ? (string) $item['position_discount_percent'] : '0',
-                aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
-                isDiscountable: $item['is_discountable'],
-                isAeEligible: $item['is_ae_eligible'],
-                totalSpotCount: 0,
-                spotMethod: SpotCalculationMethod::Average,
-                rows: $item['rows'],
-            );
-        }
-
-        return $inputs;
     }
 
     /**

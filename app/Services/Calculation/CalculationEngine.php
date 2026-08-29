@@ -185,6 +185,7 @@ final class CalculationEngine
             totalSpotCount: 1,
             spotMethod: SpotCalculationMethod::Average,
             rows: $uniqueRows,
+            lengthIndex: $position->lengthIndex,
         );
 
         return $this->calculateAveragePosition($averagePosition, $orderDiscountPercent)->nnInvest;
@@ -205,6 +206,7 @@ final class CalculationEngine
             totalSpotCount: 1,
             spotMethod: SpotCalculationMethod::Average,
             rows: [$row],
+            lengthIndex: $position->lengthIndex,
         );
 
         $result = $this->calculateAveragePosition($averagePosition, $orderDiscountPercent);
@@ -259,12 +261,14 @@ final class CalculationEngine
 
     private function emptyPositionResult(PositionInput $position, string $orderDiscountPercent): PositionResult
     {
+        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+
         return $this->finalizePosition(
             $position,
             $orderDiscountPercent,
             '0',
             0,
-            SpotLengthIndex::forSeconds($position->lengthSeconds),
+            $index,
             [],
             '0',
         );

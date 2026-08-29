@@ -85,7 +85,12 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         InventoryMediumRule::query()
             ->where('inventory_id', $catalog['hamburg']->id)
-            ->update(['surcharge_percent' => 99, 'is_discountable' => false, 'is_ae_eligible' => false]);
+            ->update([
+                'is_active' => false,
+                'surcharge_percent' => 99,
+                'is_discountable' => false,
+                'is_ae_eligible' => false,
+            ]);
 
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             ...$payload,
@@ -398,6 +403,220 @@ class CalculationSnapshotBlockerTest extends TestCase
             'calculation' => $calculation->fresh(),
             'proposal' => $proposalId,
         ]))->assertStatus(422);
+    }
+
+    public function test_pri_004_new_position_rejects_inactive_medium(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $catalog['medium']->update(['is_active' => false]);
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), $this->payload($catalog, hours: [8], totalSpots: 1, length: 30))
+            ->assertSessionHasErrors('positions');
+    }
+
+    public function test_pri_004_new_position_rejects_inactive_rule(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->update(['is_active' => false]);
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), $this->payload($catalog, hours: [8], totalSpots: 1, length: 30))
+            ->assertSessionHasErrors('positions');
+    }
+
+    public function test_pri_004_change_to_inactive_medium_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $mediumB = AdvertisingMedium::factory()->create([
+            'code' => 'spot_classic_alt',
+            'is_active' => false,
+            'default_length_seconds' => 30,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'advertising_medium_id' => $mediumB->id,
+            'is_active' => true,
+        ]);
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['advertising_medium_id'] = $mediumB->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ])->assertSessionHasErrors('positions');
+    }
+
+    public function test_pri_004_change_to_inactive_rule_combination_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $mediumB = AdvertisingMedium::factory()->create([
+            'code' => 'spot_classic_alt',
+            'is_active' => true,
+            'default_length_seconds' => 30,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'advertising_medium_id' => $mediumB->id,
+            'is_active' => false,
+        ]);
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['advertising_medium_id'] = $mediumB->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ])->assertSessionHasErrors('positions');
+    }
+
+    public function test_ver_002_deactivated_rule_keeps_snapshot_on_unchanged_position(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $position = $calculation->positions()->firstOrFail();
+        $surchargeBefore = (string) $position->surcharge_percent;
+
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->update(['is_active' => false]);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'campaign' => 'Historisch',
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ])->assertRedirect();
+
+        $position->refresh();
+        $this->assertSame($surchargeBefore, (string) $position->surcharge_percent);
+    }
+
+    public function test_historical_wizard_includes_inactive_inventory_for_display(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $catalog['hamburg']->update(['is_active' => false]);
+        $catalog['medium']->update(['is_active' => false]);
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->update(['is_active' => false]);
+
+        $this->actingAs($user)->get(route('calculations.edit', $calculation))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('calculations/wizard')
+                ->where('catalog.inventories', function ($inventories): bool {
+                    $hamburg = collect($inventories)->firstWhere('name', 'Radio Hamburg');
+
+                    return $hamburg !== null
+                        && $hamburg['is_active'] === false;
+                })
+                ->where('catalog.media', function ($media): bool {
+                    $classic = collect($media)->firstWhere('code', 'spot_classic');
+
+                    return $classic !== null
+                        && $classic['is_active'] === false;
+                }));
+    }
+
+    public function test_bud_proposal_and_apply_use_snapshot_length_index(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 1, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $position = $calculation->positions()->firstOrFail();
+        $position->update(['length_index' => 110]);
+
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$payload,
+            'planning_mode' => 'budget',
+            'target_budget_nn' => '500',
+            'budget_strategy' => 'equal_budget',
+            'calculation_id' => $calculation->id,
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ]);
+
+        $usedNnSnapshot = $propose->json('proposal.used_nn');
+        $proposalId = $propose->json('proposal.id');
+
+        $position->update(['length_index' => 100]);
+        $proposeFresh = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$payload,
+            'planning_mode' => 'budget',
+            'target_budget_nn' => '500',
+            'budget_strategy' => 'equal_budget',
+            'calculation_id' => $calculation->id,
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ]);
+        $usedNnFresh = $proposeFresh->json('proposal.used_nn');
+
+        $this->assertNotSame($usedNnSnapshot, $usedNnFresh);
+
+        $position->update(['length_index' => 110]);
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation,
+            'proposal' => $proposalId,
+        ]))->assertRedirect();
+
+        $calculation->refresh();
+        $position->refresh();
+        $this->assertSame(110, $position->length_index);
+        $this->assertSame($usedNnSnapshot, (string) $calculation->nn_invest);
+    }
+
+    public function test_unimplemented_spot_method_change_is_not_treated_as_header_only(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $mediaBefore = (string) $calculation->media_gross;
+
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['spot_method'] = 'calendar';
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'briefing' => 'Nur Kopf',
+            'positions' => $positions,
+        ])->assertSessionHasErrors('positions');
+
+        $calculation->refresh();
+        $this->assertSame($mediaBefore, (string) $calculation->media_gross);
     }
 
     /**

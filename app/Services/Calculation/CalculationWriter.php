@@ -12,12 +12,15 @@ use App\Models\CalculationPosition;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class CalculationWriter
 {
+    private const MAX_DEADLOCK_RETRIES = 5;
+
     public function __construct(
         private readonly CatalogResolver $catalog,
         private readonly CalculationEngine $engine,
@@ -38,24 +41,36 @@ final class CalculationWriter
      */
     public function create(array $payload, User $user): Calculation
     {
-        return DB::transaction(function () use ($payload, $user): Calculation {
-            [$year, $seq, $number] = $this->numbers->next();
+        for ($attempt = 0; $attempt < self::MAX_DEADLOCK_RETRIES; $attempt++) {
+            try {
+                [$year, $seq, $number] = $this->numbers->next();
 
-            $calculation = new Calculation;
-            $calculation->number = $number;
-            $calculation->number_year = $year;
-            $calculation->number_seq = $seq;
-            $calculation->status = CalculationStatus::Draft;
-            $calculation->advisor_id = $user->id;
-            $calculation->lock_version = 1;
+                return DB::transaction(function () use ($payload, $user, $year, $seq, $number): Calculation {
+                    $calculation = new Calculation;
+                    $calculation->number = $number;
+                    $calculation->number_year = $year;
+                    $calculation->number_seq = $seq;
+                    $calculation->status = CalculationStatus::Draft;
+                    $calculation->advisor_id = $user->id;
+                    $calculation->lock_version = 1;
 
-            $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
+                    $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
 
-            $fresh = $this->reloadCalculation($calculation);
-            $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
+                    $fresh = $this->reloadCalculation($calculation);
+                    $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
 
-            return $fresh;
-        });
+                    return $fresh;
+                });
+            } catch (QueryException $exception) {
+                if ($this->numbers->isRetryable($exception) && $attempt < self::MAX_DEADLOCK_RETRIES - 1) {
+                    continue;
+                }
+
+                throw $exception;
+            }
+        }
+
+        throw new \RuntimeException('Kalkulation konnte nicht erstellt werden.');
     }
 
     /**
@@ -75,7 +90,7 @@ final class CalculationWriter
             $locked->load(['positions.planRows']);
             $before = $this->calculationSnapshot($locked);
 
-            if ($this->isHeaderOnlyChange($payload, $locked)) {
+            if ($this->isHeaderOnlyChange($payload, $locked) && ! $this->hasPositionsWithMissingClientKey($locked)) {
                 $this->applyHeaderFields($locked, $payload);
                 $totals = $this->totalsFromExisting($locked, $payload, $user);
                 $this->applyTotals($locked, $totals);
@@ -163,15 +178,7 @@ final class CalculationWriter
                 $existing = $existingByClient->get((string) $payloadPosition['client_key']);
             }
 
-            $clientKey = $existing !== null
-                ? $existing->client_key
-                : ($payloadPosition['client_key'] ?? (string) Str::uuid());
-
-            if ($clientKey === null || $clientKey === '') {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.client_key" => 'Positions-Schlüssel fehlt.',
-                ]);
-            }
+            $clientKey = $this->resolveClientKey($existing);
 
             $position = $existing ?? new CalculationPosition;
             $position->fill([
@@ -245,8 +252,9 @@ final class CalculationWriter
 
     /**
      * @param  array<string, mixed>  $payload
+     * @return list<PositionInput>
      */
-    public function totalsFromPayload(array $payload, User $user, ?Calculation $existing = null): CalculationTotals
+    public function positionInputsFromPayload(array $payload, ?Calculation $existing = null): array
     {
         $resolved = $this->resolvedPositions($payload, $existing);
         $inputs = [];
@@ -284,6 +292,15 @@ final class CalculationWriter
             );
         }
 
+        return $inputs;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function totalsFromPayload(array $payload, User $user, ?Calculation $existing = null): CalculationTotals
+    {
+        $inputs = $this->positionInputsFromPayload($payload, $existing);
         $target = $payload['target_budget_nn'] ?? null;
 
         return $this->engine->calculate(
@@ -408,6 +425,7 @@ final class CalculationWriter
                 'client_key' => $position['client_key'] ?? null,
                 'inventory_id' => (int) ($position['inventory_id'] ?? 0),
                 'advertising_medium_id' => (int) ($position['advertising_medium_id'] ?? 0),
+                'spot_method' => (string) ($position['spot_method'] ?? 'average'),
                 'length_seconds' => (int) ($position['length_seconds'] ?? 0),
                 'total_spot_count' => (int) ($position['total_spot_count'] ?? 0),
                 'position_discount_percent' => (string) ($position['position_discount_percent'] ?? '0'),
@@ -560,6 +578,13 @@ final class CalculationWriter
         return $merged;
     }
 
+    private function hasPositionsWithMissingClientKey(Calculation $calculation): bool
+    {
+        return $calculation->positions->contains(
+            fn (CalculationPosition $position): bool => $position->client_key === null || $position->client_key === '',
+        );
+    }
+
     private function resolveLengthIndex(int $lengthSeconds, ?CalculationPosition $existing): ?int
     {
         if ($existing === null) {
@@ -571,5 +596,20 @@ final class CalculationWriter
         }
 
         return null;
+    }
+
+    private function resolveClientKey(?CalculationPosition $existing): string
+    {
+        if ($existing !== null) {
+            $stored = $existing->client_key;
+
+            if ($stored !== null && $stored !== '') {
+                return $stored;
+            }
+
+            return (string) Str::uuid();
+        }
+
+        return (string) Str::uuid();
     }
 }

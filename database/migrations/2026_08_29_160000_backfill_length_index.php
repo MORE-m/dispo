@@ -1,6 +1,5 @@
 <?php
 
-use App\Services\Calculation\SpotLengthIndex;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -13,21 +12,33 @@ return new class extends Migration
             return;
         }
 
-        $positions = DB::table('calculation_positions')
-            ->select('id', 'length_seconds', 'length_index')
+        DB::table('calculation_positions')
+            ->select('id')
             ->whereNull('length_index')
-            ->get();
+            ->where('length_seconds', '>', 0)
+            ->orderBy('id')
+            ->chunkById(500, function ($positions): void {
+                $ids = $positions->pluck('id')->all();
 
-        foreach ($positions as $position) {
-            $seconds = (int) $position->length_seconds;
-            if ($seconds <= 0) {
-                continue;
-            }
+                if ($ids === []) {
+                    return;
+                }
 
-            DB::table('calculation_positions')
-                ->where('id', $position->id)
-                ->update(['length_index' => SpotLengthIndex::forSeconds($seconds)]);
-        }
+                DB::table('calculation_positions')
+                    ->whereIn('id', $ids)
+                    ->whereNull('length_index')
+                    ->update([
+                        'length_index' => DB::raw(
+                            'CASE
+                                WHEN length_seconds BETWEEN 1 AND 15 THEN 110
+                                WHEN length_seconds BETWEEN 16 AND 24 THEN 105
+                                WHEN length_seconds BETWEEN 25 AND 34 THEN 100
+                                WHEN length_seconds >= 35 THEN 95
+                                ELSE NULL
+                            END',
+                        ),
+                    ]);
+            });
     }
 
     public function down(): void

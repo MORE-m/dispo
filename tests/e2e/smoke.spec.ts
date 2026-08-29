@@ -33,33 +33,38 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await page.goto('/kalkulationen/neu');
 
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await page.locator('section').first().getByLabel('Spotanzahl gesamt').fill('10');
-    await page.locator('section').first().getByLabel('Spotlänge (Sek.)').fill('30');
-    await page.locator('section').first().getByRole('checkbox', { name: '8' }).check();
-    await page.locator('section').first().getByRole('checkbox', { name: '10' }).check();
-
-    await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
+    await page.locator('[data-test="position-total-spots-0"]').fill('10');
+    await page.locator('[data-test="position-length-seconds-0"]').fill('30');
     await page
         .locator('section')
-        .nth(1)
-        .getByRole('combobox')
         .first()
-        .selectOption({ label: 'ROCK ANTENNE Hamburg' });
-    await page.locator('section').nth(1).getByLabel('Spotanzahl gesamt').fill('5');
-    await page.locator('section').nth(1).getByLabel('Spotlänge (Sek.)').fill('20');
-    await page.locator('section').nth(1).getByRole('checkbox', { name: '10' }).check();
+        .getByRole('button', { name: 'Preisstunde hinzufügen' })
+        .click();
+    await page.locator('#hour-0-1').fill('10');
+
+    await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
+    await page.locator('[data-test="position-inventory-1"]').selectOption({
+        label: 'ROCK ANTENNE Hamburg',
+    });
+    await page.locator('[data-test="position-total-spots-1"]').fill('5');
+    await page.locator('[data-test="position-length-seconds-1"]').fill('20');
+    await page.locator('#hour-1-0').fill('10');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Speichern' }).click();
 
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
-    await expect(page.getByText('Radio Hamburg')).toBeVisible();
-    await expect(page.getByText('ROCK ANTENNE Hamburg')).toBeVisible();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(
+        page.locator('[data-test="position-inventory-0"] option:checked'),
+    ).toHaveText('Radio Hamburg');
+    await expect(
+        page.locator('[data-test="position-inventory-1"] option:checked'),
+    ).toHaveText('ROCK ANTENNE Hamburg');
 });
 
 test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     page,
-    request,
 }) => {
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
@@ -68,27 +73,14 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     await page.getByLabel('Zielbudget N/N').fill('500');
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-    await page.locator('section').first().getByLabel('Spotanzahl gesamt').fill('1');
+    await page.locator('[data-test="position-total-spots-0"]').fill('1');
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page
-        .locator('section')
-        .nth(1)
-        .getByRole('combobox')
-        .first()
-        .selectOption({ label: 'ROCK ANTENNE Hamburg' });
-    await page.locator('section').nth(1).getByLabel('Spotanzahl gesamt').fill('1');
+    await page.locator('[data-test="position-inventory-1"]').selectOption({
+        label: 'ROCK ANTENNE Hamburg',
+    });
+    await page.locator('[data-test="position-total-spots-1"]').fill('1');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-
-    const proposeResponse = page.waitForResponse(
-        (response) =>
-            response.url().includes('budget-vorschlag') &&
-            response.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
-    const proposalJson = await (await proposeResponse).json();
-    const proposalId = proposalJson.proposal.id as number;
-
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
 
@@ -97,16 +89,35 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     expect(calculationId).toBeTruthy();
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await expect(page.getByRole('button', { name: 'Vorschlag übernehmen' })).toBeVisible();
-    await page.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
-    await expect(page.getByText('Vorschlag übernommen')).toBeVisible();
-    await expect(
-        page.getByRole('button', { name: 'Vorschlag übernehmen' }),
-    ).toHaveCount(0);
 
-    const secondApply = await request.post(
+    const proposeResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
+    await page.locator('[data-test="budget-propose"]').click();
+    const proposalJson = await (await proposeResponse).json();
+    const proposalId = proposalJson.proposal.id;
+    expect(typeof proposalId).toBe('number');
+    expect(proposalId).toBeGreaterThan(0);
+
+    await expect(page.locator('[data-test="budget-apply"]')).toBeVisible();
+    await page.locator('[data-test="budget-apply"]').click();
+    await expect(page.getByText('Vorschlag übernommen')).toBeVisible();
+    await expect(page.locator('[data-test="budget-apply"]')).toHaveCount(0);
+
+    const cookies = await page.context().cookies();
+    const xsrfCookie = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
+    expect(xsrfCookie).toBeTruthy();
+
+    const secondApply = await page.request.post(
         `/kalkulationen/${calculationId}/budget-vorschlaege/${proposalId}/uebernehmen`,
-        { maxRedirects: 0 },
+        {
+            maxRedirects: 0,
+            headers: {
+                'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie!.value),
+            },
+        },
     );
     expect(secondApply.status()).toBe(422);
 });

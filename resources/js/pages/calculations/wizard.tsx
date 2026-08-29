@@ -40,6 +40,7 @@ type Catalog = {
         code: string;
         type: string;
         logo_path: string | null;
+        is_active: boolean;
     }[];
     media: {
         id: number;
@@ -48,13 +49,16 @@ type Catalog = {
         default_length_seconds: number;
         is_discountable: boolean;
         is_ae_eligible: boolean;
+        is_active: boolean;
     }[];
     rules: {
+        id: number;
         inventory_id: number;
         advertising_medium_id: number;
         default_length_seconds: number | null;
         is_discountable: boolean;
         is_ae_eligible: boolean;
+        is_active: boolean;
     }[];
 };
 
@@ -166,13 +170,19 @@ function ruleFor(catalog: Catalog, inventoryId: number, mediumId: number) {
     );
 }
 
+function catalogLabel(name: string, isActive: boolean): string {
+    return isActive ? name : `${name} (inaktiv – historisch)`;
+}
+
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
-    for (const inventory of catalog.inventories) {
+    for (const inventory of catalog.inventories.filter(
+        (item) => item.is_active,
+    )) {
         for (const medium of catalog.media.filter(
-            (item) => item.code === 'spot_classic',
+            (item) => item.code === 'spot_classic' && item.is_active,
         )) {
             const rule = ruleFor(catalog, inventory.id, medium.id);
-            if (!rule) {
+            if (!rule || !rule.is_active) {
                 continue;
             }
 
@@ -359,13 +369,18 @@ export default function CalculationWizard({
     function allowedMediaFor(inventoryId: number) {
         const mediumIds = new Set(
             catalog.rules
-                .filter((rule) => rule.inventory_id === inventoryId)
+                .filter(
+                    (rule) =>
+                        rule.inventory_id === inventoryId && rule.is_active,
+                )
                 .map((rule) => rule.advertising_medium_id),
         );
 
         return catalog.media.filter(
             (medium) =>
-                medium.code === 'spot_classic' && mediumIds.has(medium.id),
+                medium.code === 'spot_classic' &&
+                medium.is_active &&
+                mediumIds.has(medium.id),
         );
     }
 
@@ -501,6 +516,7 @@ export default function CalculationWizard({
                 `/kalkulationen/${calculation.id}/budget-vorschlaege/${proposal.id}/uebernehmen`,
                 {},
                 {
+                    onSuccess: () => setProposal(null),
                     onFinish: () => setBusy(false),
                     onError: () => {
                         setError('Übernahme nicht möglich.');
@@ -538,10 +554,12 @@ export default function CalculationWizard({
 
     const displayTotals = canEdit ? totals : null;
     const summary = !canEdit && savedSummary ? savedSummary : null;
-    const catalogMissing =
-        catalog.inventories.length === 0 ||
-        catalog.media.length === 0 ||
-        positions.length === 0;
+    const hasActiveCatalog =
+        catalog.inventories.some((item) => item.is_active) &&
+        catalog.media.some(
+            (item) => item.code === 'spot_classic' && item.is_active,
+        );
+    const catalogMissing = positions.length === 0 && !hasActiveCatalog;
 
     return (
         <>
@@ -725,12 +743,18 @@ export default function CalculationWizard({
                                         <div className="flex flex-wrap items-end gap-3">
                                             <LogoSlot
                                                 name={
-                                                    inventory?.name ?? 'Sender'
+                                                    inventory
+                                                        ? catalogLabel(
+                                                              inventory.name,
+                                                              inventory.is_active,
+                                                          )
+                                                        : 'Sender'
                                                 }
                                             />
                                             <FormField label="Sender / Kombi">
                                                 <select
                                                     className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+                                                    data-test={`position-inventory-${index}`}
                                                     value={
                                                         position.inventory_id
                                                     }
@@ -750,8 +774,16 @@ export default function CalculationWizard({
                                                             <option
                                                                 key={item.id}
                                                                 value={item.id}
+                                                                disabled={
+                                                                    !item.is_active &&
+                                                                    item.id !==
+                                                                        position.inventory_id
+                                                                }
                                                             >
-                                                                {item.name}
+                                                                {catalogLabel(
+                                                                    item.name,
+                                                                    item.is_active,
+                                                                )}
                                                             </option>
                                                         ),
                                                     )}
@@ -775,6 +807,7 @@ export default function CalculationWizard({
                                             >
                                                 <Input
                                                     id={`spots-${index}`}
+                                                    data-test={`position-total-spots-${index}`}
                                                     type="number"
                                                     min={0}
                                                     step={1}
@@ -799,6 +832,7 @@ export default function CalculationWizard({
                                             >
                                                 <Input
                                                     id={`length-${index}`}
+                                                    data-test={`position-length-seconds-${index}`}
                                                     type="number"
                                                     min={1}
                                                     value={
@@ -1130,6 +1164,7 @@ export default function CalculationWizard({
                                 <div className="flex flex-wrap gap-2">
                                     <Button
                                         type="button"
+                                        data-test="budget-propose"
                                         onClick={() => void createProposal()}
                                         disabled={busy}
                                     >
@@ -1140,6 +1175,7 @@ export default function CalculationWizard({
                                             <Button
                                                 type="button"
                                                 variant="secondary"
+                                                data-test="budget-apply"
                                                 onClick={takeProposal}
                                                 disabled={busy}
                                             >
