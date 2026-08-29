@@ -74,7 +74,7 @@ class CalculationNumberConcurrencyTest extends TestCase
                 $numbers[] = trim((string) file_get_contents($resultFile));
             }
 
-            usort($numbers);
+            sort($numbers);
 
             $this->assertCount(2, $numbers);
             $this->assertSame(2, count(array_unique($numbers)));
