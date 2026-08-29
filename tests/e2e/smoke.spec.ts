@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 async function loginAsSales(page: import('@playwright/test').Page) {
     await page.goto('/login');
-    await page.getByLabel('Email address').fill('sales@example.com');
-    await page.getByLabel('Password').fill('password');
+    await page.locator('#email').fill('sales@example.com');
+    await page.locator('#password').fill('password');
     await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page).not.toHaveURL(/login/);
 }
