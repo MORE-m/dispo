@@ -55,8 +55,19 @@ class CalculationNumberConcurrencyTest extends TestCase
             $worker0->start();
             $worker1->start();
 
-            $this->assertSame(0, $worker0->wait()->getExitCode(), $worker0->getErrorOutput());
-            $this->assertSame(0, $worker1->wait()->getExitCode(), $worker1->getErrorOutput());
+            $worker0ExitCode = $worker0->wait();
+            $worker1ExitCode = $worker1->wait();
+
+            $this->assertSame(
+                0,
+                $worker0ExitCode,
+                $worker0->getErrorOutput() ?: $worker0->getOutput(),
+            );
+            $this->assertSame(
+                0,
+                $worker1ExitCode,
+                $worker1->getErrorOutput() ?: $worker1->getOutput(),
+            );
 
             $numbers = [];
             foreach (glob($runDir.'/worker-*.result') ?: [] as $resultFile) {
