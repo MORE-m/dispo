@@ -4,8 +4,12 @@ async function loginAsSales(page: import('@playwright/test').Page) {
     await page.goto('/login');
     await page.locator('#email').fill('sales@example.com');
     await page.locator('#password').fill('password');
-    await page.getByRole('button', { name: 'Log in' }).click();
-    await expect(page).not.toHaveURL(/login/);
+    await page.locator('[data-test="login-button"]').click();
+    await page.waitForFunction(
+        () => !window.location.pathname.includes('/login'),
+        undefined,
+        { timeout: 30_000 },
+    );
 }
 
 test('Health-Endpunkt antwortet', async ({ request }) => {
@@ -24,6 +28,19 @@ test('Startseite ist erreichbar', async ({ page }) => {
 test('Kalkulationen erfordern Anmeldung', async ({ page }) => {
     await page.goto('/kalkulationen');
     await expect(page).toHaveURL(/login/);
+});
+
+test('Wizard markiert Kalkulationen in der Navigation als aktiv', async ({
+    page,
+}) => {
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    const navLink = page.locator('[data-sidebar="menu-button"]', {
+        hasText: 'Kalkulationen',
+    });
+    await expect(navLink).toHaveAttribute('aria-current', 'page');
+    await expect(navLink).toHaveClass(/bg-primary/);
 });
 
 test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
