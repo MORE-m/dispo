@@ -23,9 +23,14 @@ Keine stillschweigenden ADR-Änderungen.
 | BLK-003 | BL-GATE-UXUI, Phase-1-Oberflächen | Visuelles Designsystem, App-Shell, Muster, Wizard, Assistenten, Zustände und UX-Abnahme mit Product Owner ausstehend | Keine endgültigen Fachseiten; Phase 0 ist davon nicht betroffen |
 | BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
-| BLK-004 | BL-P0-04 | GitHub-Actions-Jobs `ci` und `mysql` nach Push/PR noch nicht als grün nachgewiesen | Phase 0 nicht endgültig abgenommen |
 
-Phase 0 ist lokal nachgearbeitet, aber **nicht endgültig abgenommen** (BLK-004).
-Phase-1-Fachoberflächen warten auf BLK-003. Headless-Technik darf vorbereitet werden,
-ersetzt das Gate nicht.
+## Erledigte Blocker
+
+| ID | Betrifft | Auflösung |
+|---|---|---|
+| BLK-004 | BL-P0-04 | GitHub-Actions-Jobs `ci` und `mysql` auf Branch `phase-0-abschluss` (Lauf [33232656289](https://github.com/MORE-m/dispo/actions/runs/33232656289), Commit `4915baa`) beide `success` |
+
+Phase 0 ist **technisch endgültig abgenommen**. `BL-GATE-UXUI` / BLK-003 bleiben
+blockiert. Phase-1-Fachoberflächen warten auf BLK-003. Headless-Technik darf
+vorbereitet werden, ersetzt das Gate nicht.
 

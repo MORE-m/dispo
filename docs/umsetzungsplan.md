@@ -16,7 +16,8 @@ Ergebnisse:
 - Umgebungsvariablen dokumentiert, keine Secrets im Repository.
 
 Abnahme: Ein neuer Entwickler kann das Projekt anhand der README starten und einen
-Smoke-Test ausführen.
+Smoke-Test ausführen. Technisch endgültig abgenommen, sobald GitHub Actions
+`ci` und `mysql` grün sind (29.08.2026, BLK-004 erledigt).
 
 Visuelles Designsystem, App-Shell und UI-Muster sind **nicht** Teil von Phase 0.
 Sie liegen im verbindlichen UX/UI-Gate vor Phase 1

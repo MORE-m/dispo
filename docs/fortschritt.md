@@ -4,19 +4,18 @@ Stand: 29. August 2026
 
 ## Aktuelle Phase
 
-Phase 0 ist lokal nachgearbeitet, aber **nicht endgültig abgenommen**.
-Endgültige Abnahme setzt voraus, dass nach Push/PR die GitHub-Actions-Jobs
-`ci` und `mysql` grün sind. **Halt vor Phase 1** wegen `BL-GATE-UXUI`.
+Phase 0 ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und
+`mysql` grün). **Halt vor Phase 1** wegen `BL-GATE-UXUI`.
 
 ## Aktuelle Aufgabe
 
-Keine Implementierungsaufgabe. Nächster Schritt: Push/PR für GitHub Actions;
-danach Product-Owner-Freigabe des UX/UI-Gates. Keine Fachseiten.
+Keine Implementierungsaufgabe. Nächster Schritt: Product-Owner-Freigabe des
+UX/UI-Gates. Keine Phase-1-Fachoberflächen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Phase-0-Nacharbeit: Kontoselbstlöschung entfernt, PrivateFileStorage-Tests
-isoliert, Traceability korrigiert.
+BLK-004: GitHub Actions `ci` und `mysql` auf PR #1 nachgewiesen; Phase 0
+technisch abgenommen.
 
 ## Technisch vorbereitet, noch nicht fachlich vollständig erfüllt
 
@@ -48,7 +47,9 @@ Frische Kopie `/tmp/dispo-fresh-clone-p0-v3` (nach `composer install`, `npm ci`,
 - `composer audit` / `npm audit --omit=dev`: keine Advisories / 0 Schwachstellen
 - nach Pest keine Datei `storage/app/private/health-check/smoke.txt`
 
-GitHub Actions (`ci`, `mysql`) auf GitHub: noch nicht ausgeführt.
+GitHub Actions auf Branch `phase-0-abschluss`, Lauf
+https://github.com/MORE-m/dispo/actions/runs/33232656289 (Commit `4915baa`):
+Jobs `ci` und `mysql` beide `success`.
 
 ## Bekannte technische Schulden
 
@@ -67,9 +68,8 @@ GitHub Actions (`ci`, `mysql`) auf GitHub: noch nicht ausgeführt.
 | BLK-003 | UX/UI-Gate: Product-Owner-Freigabe und Artefakte fehlen – **blockiert Phase-1-Fachoberflächen** |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy, inkl. PHP-CLI-Pfad |
-| BLK-004 | Phase-0-Abnahme: GitHub-Actions-Jobs `ci` und `mysql` nach Push/PR noch nicht grün nachgewiesen |
 
 ## Exakt nächste ausführbare Aufgabe
 
-Push oder Pull Request, damit `ci` und `mysql` auf GitHub laufen. Fachoberflächen
-erst nach `BL-GATE-UXUI`.
+Product-Owner-Workshop und Artefakte für `BL-GATE-UXUI`. Fachoberflächen erst
+nach Gate-Freigabe. Keine Phase-1-Fachseiten bis dahin.

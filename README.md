@@ -6,8 +6,8 @@ Social-Media-, Event- und Sonderwerbeaufträgen an die Disposition.
 ## Projektstatus
 
 V1-Fachlichkeit und Technologie-ADRs sind verbindlich. Phase 0 (Projektbasis)
-ist lokal nachgearbeitet, endgültige Abnahme erst nach grünen GitHub-Actions-Jobs
-`ci` und `mysql`. Vor Phase-1-Fachoberflächen steht das UX/UI-Gate
+ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und `mysql`).
+Vor Phase-1-Fachoberflächen steht das UX/UI-Gate
 ([`docs/ux-ui-gate.md`](docs/ux-ui-gate.md)).
 
 ## Start

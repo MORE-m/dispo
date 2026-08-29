@@ -44,8 +44,8 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 - **Anforderungen:** Kapitel 24, `GEN-001`
 - **Abhängigkeiten:** BL-P0-03
 - **Ergebnis:** Pint, PHPStan/Larastan, Pest (SQLite und MySQL-CI), Vitest, TypeScript, kanonisches `npm run check`, Playwright-Smoke, GitHub Actions inkl. MySQL-Job, Dependabot, Composer-/npm-Audit
-- **Akzeptanz:** CI-Workflow läuft lokal nachbildbar und ist dokumentiert
-- **Tests:** `pint --test`, PHPStan, Pest (SQLite/MySQL), `npm run check`, Vitest, `tsc`, Asset-Build; GitHub Actions `ci`/`mysql` zur endgültigen Phase-0-Abnahme
+- **Akzeptanz:** CI-Workflow läuft lokal nachbildbar und ist dokumentiert; GitHub-Actions-Jobs `ci` und `mysql` auf PR #1 grün nachgewiesen (BLK-004 erledigt)
+- **Tests:** `pint --test`, PHPStan, Pest (SQLite/MySQL), `npm run check`, Vitest, `tsc`, Asset-Build; GitHub Actions `ci`/`mysql`
 
 ## UX/UI-Gate (zwischen Phase 0 und Phase 1)
 
