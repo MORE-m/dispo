@@ -1,0 +1,22 @@
+---
+description: "Verbindliche Regeln für Kalkulationen, Preise, Snapshots, Freigaben, Status und Audit"
+alwaysApply: false
+---
+
+# Sicherheit der Fachlogik
+
+Bei Änderungen an Kalkulation, Preislogik, Disposition oder Administration:
+
+1. Lies die betroffenen Kapitel aus `@docs/anforderungskatalog.md`.
+2. Lies je nach Aufgabe `@docs/berechnungslogik.md`,
+   `@docs/workflows-und-berechtigungen.md` oder
+   `@docs/dynamisches-feldsystem.md`.
+3. Prüfe die Auswirkung auf Snapshots, Freigabeinvalidierung und Audit.
+4. Nutze Dezimalarithmetik und dokumentierte Rundung.
+5. Führe Statuswechsel ausschließlich über eine zentrale Transition-/Policy-Schicht aus.
+6. Verändere historische Snapshots, Kommentare und Auditereignisse niemals in-place.
+7. Blockiere ungültige Aktionen serverseitig, auch wenn die UI sie ausblendet.
+8. Ergänze mindestens einen positiven und einen negativen Test.
+
+Eine unklare Fachregel ist ein Stoppsignal: Frage nach, statt eine plausible Regel
+zu erfinden.

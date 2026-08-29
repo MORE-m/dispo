@@ -1,0 +1,16 @@
+---
+globs: "docs/**/*.md,README.md,AGENTS.md,.cursor/rules/**/*.mdc"
+alwaysApply: false
+---
+
+# Dokumentationsregeln
+
+- Schreibe fachliche Dokumentation auf Deutsch.
+- Behalte vorhandene Anforderungs-IDs stabil; Nummern nicht neu verwenden.
+- Vermeide doppelte widersprüchliche Regeltexte. Verweise auf die kanonische Quelle.
+- Kennzeichne technische Entscheidungen als Vorgeschlagen, Akzeptiert, Ersetzt oder Verworfen.
+- Ändere akzeptierte ADRs nicht rückwirkend; erstelle bei Richtungswechsel ein neues ADR.
+- Konkretisierungen offener Punkte im selben ADR nur mit Änderungsprotokoll.
+- Nutze relative Links und prüfe sie nach Umbenennungen.
+- Beispiele müssen mit den dokumentierten Formeln und Initialwerten übereinstimmen.
+- V2-Inhalte klar vom V1-Umfang trennen.

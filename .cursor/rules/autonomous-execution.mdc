@@ -1,0 +1,47 @@
+---
+description: "Autonome Umsetzung von V1 ohne Rückfragen nach jedem Schritt"
+alwaysApply: true
+---
+
+# Autonome Ausführung
+
+Nach einem Auftrag wie „Setze V1 weiter um“ oder gleichwertig:
+
+1. Lies `docs/fortschritt.md`, `docs/backlog-v1.md`, `docs/blocker-und-entscheidungslog.md`,
+   akzeptierte ADRs und die für die Aufgabe relevanten Fachdokumente.
+2. Wähle die nächste nicht blockierte Aufgabe mit erfüllten Abhängigkeiten.
+3. Erstelle einen kurzen internen Plan (Ziel, Anforderungs-IDs, Dateien, Risiken).
+4. Implementiere unmittelbar. Warte nicht auf Bestätigung des Plans.
+5. Führe Tests, Formatierung, statische Analyse und relevanten Build aus.
+6. Untersuche und behebe Fehler selbst.
+7. Aktualisiere Dokumentation, Backlog-Status und `docs/fortschritt.md`.
+8. Fahre mit der nächsten abhängigen, nicht blockierten Aufgabe fort.
+
+Nicht nach jedem Teilabschnitt fragen, ob weitergemacht werden soll.
+
+## Halt nur bei echter fachlicher Lücke
+
+Stoppe und frage nur, wenn eine fachliche Entscheidung weder dokumentiert noch
+eindeutig ableitbar ist (Status, Rechte, Gastfluss, Preise, Pflichtfelder,
+Freigaben). Technische Detailentscheidungen innerhalb akzeptierter ADRs selbst
+treffen und im Entscheidungslog festhalten.
+
+Akzeptierte ADRs nicht stillschweigend ändern. Richtungswechsel: neues ADR.
+
+Solange `BL-GATE-UXUI` nicht freigegeben ist: keine endgültigen Fachseiten
+gestalten. Nach Abschluss von Phase 0 anhalten, wenn das Gate blockiert ist.
+Technische Grundlagen und Headless-Komponenten sind zulässig.
+
+## Blocker
+
+- Blocker konkret in `docs/blocker-und-entscheidungslog.md` und im Backlog
+  dokumentieren.
+- Keine Werte oder Fachregeln erfinden.
+- Mit einer anderen unabhängigen, nicht blockierten Aufgabe fortfahren.
+
+## Git
+
+Nach einem vollständig grünen Arbeitspaket darf ein kleiner lokaler Commit
+erstellt werden, sofern der Nutzer Commits nicht untersagt hat. Nicht direkt nach
+`main` pushen und nicht produktiv deployen, sofern nicht ausdrücklich beauftragt.
+Bewahre vorhandene Nutzeränderungen; überschreibe sie nicht.

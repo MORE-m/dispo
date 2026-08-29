@@ -1,0 +1,19 @@
+---
+description: "Arbeitsablauf für neue Features und größere Codeänderungen"
+alwaysApply: false
+---
+
+# Implementierungsablauf
+
+Bei einem neuen Feature oder einer größeren Änderung:
+
+1. Formuliere Ziel, Anforderungs-IDs und Nicht-Ziele.
+2. Untersuche vorhandene Architektur, Codepfade, Migrationen und Tests.
+3. Erstelle einen kleinen Plan mit Dateien, Datenänderungen und Risiken.
+4. Implementiere einen vollständigen vertikalen Schritt.
+5. Führe fokussierte Tests, danach relevante Gesamttests und statische Prüfungen aus.
+6. Prüfe Berechtigung, Audit, Benachrichtigung, Snapshot und Exportauswirkungen.
+7. Aktualisiere Dokumentation und liste verbleibende Punkte klar auf.
+
+Nimm keine großflächige Umstrukturierung nebenbei vor. Bewahre unabhängige
+Änderungen im Arbeitsbaum und überschreibe sie nicht.

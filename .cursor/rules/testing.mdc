@@ -1,0 +1,18 @@
+---
+description: "Teststrategie und Traceability für fachlich relevante Änderungen"
+alwaysApply: false
+---
+
+# Tests und Abnahme
+
+Lies `@docs/test-und-abnahmekatalog.md` vor Änderungen an Fachlogik oder Workflows.
+
+- Jeder fachliche Test nennt mindestens eine Anforderungs-ID.
+- Formeln erhalten feste Zahlenbeispiele einschließlich Rundungsgrenzen.
+- Berechtigungen benötigen Erfolgs- und Verweigerungstests.
+- Statusübergänge testen erlaubte und verbotene Kanten sowie Pflichtbegründungen.
+- Snapshottests beweisen, dass neue Adminversionen alte Vorgänge nicht verändern.
+- Importtests beweisen atomare Aktivierung und verständliche Fehlerberichte.
+- Zeitabhängige Tests fixieren Uhrzeit und verwenden `Europe/Berlin`.
+- Fehlerkorrekturen erhalten einen Regressionstest, der vor dem Fix fehlschlagen würde.
+- Änderungen sind nicht fertig, solange relevante Tests fehlen oder fehlschlagen.
