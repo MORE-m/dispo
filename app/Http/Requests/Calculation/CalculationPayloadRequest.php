@@ -46,7 +46,6 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.plan_rows' => ['array', 'min:1'],
             'positions.*.plan_rows.*.hour' => ['required', 'integer', 'min:0', 'max:23'],
             'positions.*.plan_rows.*.day_group' => ['required', Rule::enum(DayGroup::class)],
-            'positions.*.plan_rows.*.second_price' => ['nullable', 'numeric', 'min:0'],
         ];
     }
 

@@ -164,6 +164,32 @@ final class CalculationEngine
         return Decimal::roundPrice(Decimal::div($sum, (string) count($rows), 4));
     }
 
+    public function nnPerSpotFromAverage(PositionInput $position, string $orderDiscountPercent): string
+    {
+        $uniqueRows = $this->uniqueHourRows($position->rows);
+
+        if ($uniqueRows === []) {
+            return '0';
+        }
+
+        $averagePosition = new PositionInput(
+            inventoryId: $position->inventoryId,
+            inventoryName: $position->inventoryName,
+            positionKey: $position->positionKey,
+            lengthSeconds: $position->lengthSeconds,
+            surchargePercent: $position->surchargePercent,
+            positionDiscountPercent: $position->positionDiscountPercent,
+            aePercent: $position->aePercent,
+            isDiscountable: $position->isDiscountable,
+            isAeEligible: $position->isAeEligible,
+            totalSpotCount: 1,
+            spotMethod: SpotCalculationMethod::Average,
+            rows: $uniqueRows,
+        );
+
+        return $this->calculateAveragePosition($averagePosition, $orderDiscountPercent)->nnInvest;
+    }
+
     public function nnPerSpot(PositionInput $position, string $orderDiscountPercent, PlanRowInput $row): string
     {
         $averagePosition = new PositionInput(
@@ -214,11 +240,6 @@ final class CalculationEngine
 
         $effectiveFactor = Decimal::mul($positionFactor, $orderFactor);
         $effectiveDiscount = Decimal::mul(Decimal::sub('1', $effectiveFactor), '100');
-
-        if ($rowResults !== [] && $spotCount > 0) {
-            $rowResults[0]['line_gross'] = Decimal::roundMoney($mediaGrossInternal);
-            $rowResults[0]['second_price'] = Decimal::roundPrice($averageSecondPrice);
-        }
 
         return new PositionResult(
             mediaGross: Decimal::roundMoney($mediaGrossInternal),

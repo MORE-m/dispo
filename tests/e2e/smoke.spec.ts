@@ -26,45 +26,64 @@ test('Kalkulationen erfordern Anmeldung', async ({ page }) => {
     await expect(page).toHaveURL(/login/);
 });
 
-test('CAL-001 Wizard: zwei Sender, Konditionen, Speichern', async ({
+test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     page,
 }) => {
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
 
-    await page.getByLabel('1. Grunddaten').click();
-    await page.getByLabel('Kunde').fill('E2E Kunde');
-    await page.getByRole('button', { name: 'Weiter' }).click();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-    await page.getByLabel('Spotanzahl gesamt').first().fill('10');
+    const firstSection = page.locator('section').first();
+    await firstSection.getByLabel('Spotanzahl gesamt').fill('10');
+    await firstSection.getByLabel('Länge (Sekunden)').fill('30');
+    await page.getByRole('button', { name: 'Preisstunde hinzufügen' }).click();
+
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page.getByLabel('Spotanzahl gesamt').nth(1).fill('5');
-    await page.getByRole('button', { name: 'Weiter' }).click();
+    const secondSection = page.locator('section').nth(1);
+    await secondSection
+        .getByRole('combobox')
+        .first()
+        .selectOption({ label: 'ROCK ANTENNE Hamburg' });
+    await secondSection.getByLabel('Spotanzahl gesamt').fill('5');
+    await secondSection.getByLabel('Länge (Sekunden)').fill('20');
 
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByLabel('Positionsrabatt %').first().fill('5');
     await page.getByLabel('Zusätzlicher Auftragsrabatt %').fill('0');
-    await page.getByRole('button', { name: 'Weiter' }).click();
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
 
     await expect(page.getByText('N/N-Invest')).toBeVisible();
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.getByText('Radio Hamburg')).toBeVisible();
+    await expect(page.getByText('ROCK ANTENNE Hamburg')).toBeVisible();
 });
 
-test('BUD-008 Budgetvorschlag und explizite Übernahme', async ({ page }) => {
+test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
+    page,
+}) => {
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
 
     await page.getByLabel('Mit Budget planen').check();
     await page.getByLabel('Zielbudget N/N').fill('500');
-    await page.getByRole('button', { name: 'Weiter' }).click();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-    await page.getByLabel('Spotanzahl gesamt').first().fill('1');
+    await page.locator('section').first().getByLabel('Spotanzahl gesamt').fill('1');
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page.getByLabel('Spotanzahl gesamt').nth(1).fill('1');
-    await page.getByRole('button', { name: 'Weiter' }).click();
+    await page
+        .locator('section')
+        .nth(1)
+        .getByRole('combobox')
+        .first()
+        .selectOption({ label: 'ROCK ANTENNE Hamburg' });
+    await page.locator('section').nth(1).getByLabel('Spotanzahl gesamt').fill('1');
 
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
     await expect(page.getByText('Verbrauch')).toBeVisible();
+
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
 
@@ -72,4 +91,8 @@ test('BUD-008 Budgetvorschlag und explizite Übernahme', async ({ page }) => {
     await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
     await page.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
     await expect(page.getByText(/übernommen|gespeichert/i)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
+    await page.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
+    await expect(page.getByText(/bereits übernommen|Übernahme nicht möglich/i)).toBeVisible();
 });

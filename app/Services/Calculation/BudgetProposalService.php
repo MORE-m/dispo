@@ -5,11 +5,7 @@ namespace App\Services\Calculation;
 use App\Enums\BudgetStrategy;
 
 /**
- * BUD-001–BUD-009 – deterministischer Vorschlag; Übernahme separat.
- *
- * BLK-007: Innerhalb eines Senders verteilt der Vorschlag Spots derzeit
- * ausschließlich auf die günstigste gewählte Preisstunde (Greedy). Das ist
- * kein ausgewogener Stundenplan.
+ * BUD-001–BUD-009 – Durchschnitts-Budgetvorschlag ohne Stundenverteilung.
  */
 final class BudgetProposalService
 {
@@ -24,7 +20,7 @@ final class BudgetProposalService
      *     target_budget_nn: string,
      *     used_nn: string,
      *     remainder: string,
-     *     positions: list<array{position_key: string, inventory_id: int, inventory_name: string, length_seconds: int, rows: list<array{hour: int, day_group: string, spot_count: int, second_price: string}>}>,
+     *     positions: list<array{position_key: string, inventory_id: int, inventory_name: string, length_seconds: int, total_spot_count: int}>,
      *     explanation: string
      * }
      */
@@ -35,28 +31,26 @@ final class BudgetProposalService
         BudgetStrategy $strategy,
     ): array {
         $target = Decimal::roundMoney($targetBudgetNn);
-        $slots = $this->slots($positions, $orderDiscountPercent);
+        $entries = $this->positionEntries($positions, $orderDiscountPercent);
 
-        $counts = [];
-        foreach ($slots as $index => $slot) {
-            $counts[$index] = 0;
-        }
+        $counts = array_fill(0, count($entries), 0);
 
         if ($strategy === BudgetStrategy::EqualBudget) {
-            $this->fillEqualBudget($slots, $counts, $target);
-            $explanation = 'Zielbudget N/N wird je ausgewähltem Sender in gleiche Anteile geteilt. '
-                .'Innerhalb jedes Senders werden Spots derzeit nur in die günstigste gewählte Preisstunde gelegt (Greedy, BLK-007). '
-                .'Das ist keine ausgewogene Stundenverteilung.';
+            $this->fillEqualBudget($entries, $counts, $target);
+            $explanation = 'Zielbudget N/N wird gleich auf alle Positionen verteilt. '
+                .'Je Position wird der gleichgewichtete Stunden-Durchschnitt als Preisbasis verwendet. '
+                .'Es entsteht nur eine Gesamtspotanzahl je Position, keine Verteilung auf einzelne Stunden.';
         } else {
-            $this->fillMaximize($slots, $counts, $target);
-            $explanation = 'Ganzzahlige Spotanzahl wird maximiert, indem zuerst die günstigsten gewählten Preisstunden befüllt werden (Greedy). '
-                .'Keine ausgewogene Verteilung über alle Stunden (BLK-007).';
+            $this->fillMaximize($entries, $counts, $target);
+            $explanation = 'Spotanzahl wird maximiert, indem das Budget vorrangig der günstigsten Position '
+                .'(Stunden-Durchschnitt inkl. Konditionen) zugewiesen wird. '
+                .'Positionen ohne Budget erhalten null Spots. Keine Stundenverteilung.';
         }
 
         $usedNn = '0.00';
-        $grouped = [];
+        $resultPositions = [];
 
-        foreach ($slots as $index => $slot) {
+        foreach ($entries as $index => $entry) {
             $count = $counts[$index];
             if ($count < 1) {
                 continue;
@@ -64,22 +58,15 @@ final class BudgetProposalService
 
             $usedNn = Decimal::roundMoney(Decimal::add(
                 $usedNn,
-                Decimal::mul($slot['nn_per_spot'], (string) $count),
+                Decimal::mul($entry['nn_per_spot'], (string) $count),
             ));
 
-            $key = $slot['position_key'];
-            $grouped[$key] ??= [
-                'position_key' => $key,
-                'inventory_id' => $slot['inventory_id'],
-                'inventory_name' => $slot['inventory_name'],
-                'length_seconds' => $slot['length_seconds'],
-                'rows' => [],
-            ];
-            $grouped[$key]['rows'][] = [
-                'hour' => $slot['hour'],
-                'day_group' => $slot['day_group'],
-                'spot_count' => $count,
-                'second_price' => $slot['second_price'],
+            $resultPositions[] = [
+                'position_key' => $entry['position_key'],
+                'inventory_id' => $entry['inventory_id'],
+                'inventory_name' => $entry['inventory_name'],
+                'length_seconds' => $entry['length_seconds'],
+                'total_spot_count' => $count,
             ];
         }
 
@@ -90,77 +77,52 @@ final class BudgetProposalService
             'target_budget_nn' => $target,
             'used_nn' => $usedNn,
             'remainder' => $remainder,
-            'positions' => array_values($grouped),
+            'positions' => $resultPositions,
             'explanation' => $explanation,
         ];
     }
 
     /**
      * @param  list<PositionInput>  $positions
-     * @return list<array<string, mixed>>
+     * @return list<array{position_key: string, inventory_id: int, inventory_name: string, length_seconds: int, nn_per_spot: string}>
      */
-    private function slots(array $positions, string $orderDiscountPercent): array
+    private function positionEntries(array $positions, string $orderDiscountPercent): array
     {
-        $slots = [];
+        $entries = [];
 
         foreach ($positions as $position) {
-            $uniqueRows = $this->engine->uniqueHourRows($position->rows);
-            $positionKey = $position->positionKey ?? ('inventory:'.$position->inventoryId);
-
-            foreach ($uniqueRows as $row) {
-                $nn = $this->engine->nnPerSpot($position, $orderDiscountPercent, $row);
-
-                if (Decimal::cmp($nn, '0') <= 0) {
-                    continue;
-                }
-
-                $slots[] = [
-                    'position_key' => $positionKey,
-                    'inventory_id' => $position->inventoryId,
-                    'inventory_name' => $position->inventoryName,
-                    'length_seconds' => $position->lengthSeconds,
-                    'hour' => $row->hour,
-                    'day_group' => $row->dayGroup->value,
-                    'second_price' => $row->secondPrice,
-                    'nn_per_spot' => $nn,
-                ];
-            }
-        }
-
-        usort($slots, function (array $left, array $right): int {
-            $price = Decimal::cmp($left['nn_per_spot'], $right['nn_per_spot']);
-            if ($price !== 0) {
-                return $price;
-            }
-
-            if ($left['inventory_id'] !== $right['inventory_id']) {
-                return $left['inventory_id'] <=> $right['inventory_id'];
-            }
-
-            if ($left['hour'] !== $right['hour']) {
-                return $left['hour'] <=> $right['hour'];
-            }
-
-            return strcmp((string) $left['day_group'], (string) $right['day_group']);
-        });
-
-        return $slots;
-    }
-
-    /**
-     * @param  array<int, array<string, mixed>>  $slots
-     * @param  array<int, int>  $counts
-     */
-    private function fillMaximize(array $slots, array &$counts, string $budget): void
-    {
-        $remaining = $budget;
-
-        foreach ($slots as $index => $slot) {
-            $nn = $slot['nn_per_spot'];
+            $nn = $this->engine->nnPerSpotFromAverage($position, $orderDiscountPercent);
             if (Decimal::cmp($nn, '0') <= 0) {
                 continue;
             }
 
+            $entries[] = [
+                'position_key' => $position->positionKey ?? ('inventory:'.$position->inventoryId),
+                'inventory_id' => $position->inventoryId,
+                'inventory_name' => $position->inventoryName,
+                'length_seconds' => $position->lengthSeconds,
+                'nn_per_spot' => $nn,
+            ];
+        }
+
+        usort($entries, fn (array $left, array $right): int => Decimal::cmp(
+            $left['nn_per_spot'],
+            $right['nn_per_spot'],
+        ));
+
+        return $entries;
+    }
+
+    /**
+     * @param  list<array{nn_per_spot: string}>  $entries
+     * @param  array<int, int>  $counts
+     */
+    private function fillMaximize(array $entries, array &$counts, string $budget): void
+    {
+        $remaining = $budget;
+
+        foreach ($entries as $index => $entry) {
+            $nn = $entry['nn_per_spot'];
             $max = (int) Decimal::div($remaining, $nn, 0);
             if ($max < 1) {
                 continue;
@@ -172,39 +134,25 @@ final class BudgetProposalService
     }
 
     /**
-     * @param  list<array<string, mixed>>  $slots
+     * @param  list<array{nn_per_spot: string}>  $entries
      * @param  array<int, int>  $counts
      */
-    private function fillEqualBudget(array $slots, array &$counts, string $budget): void
+    private function fillEqualBudget(array $entries, array &$counts, string $budget): void
     {
-        $inventoryIds = [];
-        foreach ($slots as $slot) {
-            $inventoryIds[$slot['inventory_id']] = true;
-        }
-
-        $ids = array_keys($inventoryIds);
-        sort($ids);
-        $n = count($ids);
-
+        $n = count($entries);
         if ($n === 0) {
             return;
         }
 
         $allocated = '0.00';
-        foreach ($ids as $i => $inventoryId) {
-            $share = $i === $n - 1
+        foreach ($entries as $index => $entry) {
+            $share = $index === $n - 1
                 ? Decimal::roundMoney(Decimal::sub($budget, $allocated))
                 : Decimal::roundMoney(Decimal::div($budget, (string) $n));
             $allocated = Decimal::roundMoney(Decimal::add($allocated, $share));
 
-            $inventorySlots = [];
-            foreach ($slots as $index => $slot) {
-                if ($slot['inventory_id'] === $inventoryId) {
-                    $inventorySlots[$index] = $slot;
-                }
-            }
-
-            $this->fillMaximize($inventorySlots, $counts, $share);
+            $max = (int) Decimal::div($share, $entry['nn_per_spot'], 0);
+            $counts[$index] = max(0, $max);
         }
     }
 }

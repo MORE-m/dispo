@@ -87,12 +87,7 @@ type Proposal = {
         position_key: string;
         inventory_id: number;
         length_seconds: number;
-        rows: {
-            hour: number;
-            day_group: string;
-            spot_count: number;
-            second_price: string;
-        }[];
+        total_spot_count: number;
     }[];
 };
 
@@ -531,20 +526,10 @@ export default function CalculationWizard({
                     return { ...position, total_spot_count: 0 };
                 }
 
-                const total = match.rows.reduce(
-                    (sum, row) => sum + row.spot_count,
-                    0,
-                );
-
                 return {
                     ...position,
                     length_seconds: match.length_seconds,
-                    total_spot_count: total,
-                    plan_rows: match.rows.map((row) => ({
-                        hour: row.hour,
-                        day_group: row.day_group,
-                        second_price: row.second_price,
-                    })),
+                    total_spot_count: match.total_spot_count,
                 };
             }),
         );

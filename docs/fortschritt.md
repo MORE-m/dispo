@@ -1,6 +1,6 @@
 # Fortschritt V1
 
-Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B)
+Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B, v3 ausstehend)
 
 ## Aktuelle Phase
 
@@ -10,12 +10,13 @@ dem Nacharbeit-Commit gebunden (siehe unten).
 
 ## Aktuelle Aufgabe
 
-Review-Nacharbeit UX-GATE-A/B: Durchschnittskalkulation, Preislisten-Snapshot,
-Budgetvorschlag, Read-only, Audit, Tests und Workflow-Korrektur.
+Review-Nacharbeit v3 (UX-GATE-B): BLK-007 umgesetzt (Budgetvorschlag nur
+`total_spot_count`; Stunden nur Preisbasis), Preislisten-Snapshot, Kalkulationsnummern.
+Commit/Push/PR und grüne CI ausstehend.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Review-Nacharbeit (Code): siehe Commit auf Branch `ux-gate-a-b-review-nacharbeit`.
+BLK-007 aufgelöst (PO 29.08.2026). Review-Nacharbeit v2: Commit `9aaf6b4` / Testdoku `f065509`.
 
 ## Technische Abnahme UX-GATE-A/B
 
@@ -54,7 +55,6 @@ Stand nach Commit `9aaf6b4` auf Branch `ux-gate-a-b-review-nacharbeit`:
 | CRM-001 | **nicht erfüllt** – Kalkulation nutzt Freitextfelder Kunde/Agentur (Slice) |
 | SPT-005–SPT-008 Kalenderplaner | offen (UX-GATE-B nicht freigegeben für Planer-UI) |
 | Festpreis Spot | offen, nicht vortäuschen |
-| BLK-007 Budget-Stundenverteilung innerhalb Sender | PO-Entscheidung ausstehend |
 | Headless-Stammdaten, Benachrichtigungen | nicht begonnen (Auftrag) |
 | UX-GATE-C/D | blockiert (BLK-005/006) |
 
@@ -64,11 +64,10 @@ Stand nach Commit `9aaf6b4` auf Branch `ux-gate-a-b-review-nacharbeit`:
 |---|---|
 | BLK-005 | UX-GATE-C |
 | BLK-006 | UX-GATE-D |
-| BLK-007 | Budgetvorschlag: sinnvolle Stundenverteilung innerhalb Sender (Greedy dokumentiert) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
 
 ## Exakt nächste ausführbare Aufgabe
 
-Nach grüner CI: technische Abnahme UX-GATE-A/B markieren. Anschließend erst
-Headless-Stammdaten oder BL-P1-05 – nicht vor grüner Nacharbeit-CI.
+Review-Nacharbeit v3: Commit, Push, PR gegen `phase-0-abschluss`. Nach grüner CI:
+technische Abnahme UX-GATE-A/B markieren; Review-Zip v3 (noch nicht erstellt).

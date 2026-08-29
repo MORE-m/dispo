@@ -6,6 +6,7 @@ use App\Enums\BudgetStrategy;
 use App\Enums\CalculationKind;
 use App\Enums\CalculationStatus;
 use App\Enums\PlanningMode;
+use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\SpotClassicPlanRow;
@@ -21,6 +22,7 @@ final class CalculationWriter
         private readonly CatalogResolver $catalog,
         private readonly CalculationEngine $engine,
         private readonly AuditLogger $audit,
+        private readonly CalculationNumberSequencer $numbers,
     ) {}
 
     /**
@@ -37,7 +39,7 @@ final class CalculationWriter
     public function create(array $payload, User $user): Calculation
     {
         return DB::transaction(function () use ($payload, $user): Calculation {
-            [$year, $seq, $number] = $this->nextNumber();
+            [$year, $seq, $number] = $this->numbers->next();
 
             $calculation = new Calculation;
             $calculation->number = $number;
@@ -49,9 +51,10 @@ final class CalculationWriter
 
             $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
 
-            $this->audit->record($calculation, 'calculation.created', $user, null, $this->calculationSnapshot($calculation));
+            $fresh = $this->reloadCalculation($calculation);
+            $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
 
-            return $calculation->fresh(['positions.planRows', 'positions.inventory', 'positions.priceList']) ?? $calculation;
+            return $fresh;
         });
     }
 
@@ -75,22 +78,59 @@ final class CalculationWriter
             if ($this->isHeaderOnlyChange($payload, $locked)) {
                 $this->applyHeaderFields($locked, $payload);
                 $totals = $this->totalsFromExisting($locked, $payload, $user);
-                $this->applyTotals($locked, $totals, $payload);
+                $this->applyTotals($locked, $totals);
                 $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();
-
-                $this->audit->record($locked, 'calculation.updated', $user, $before, $this->calculationSnapshot($locked));
-
-                return $locked->fresh(['positions.planRows', 'positions.inventory', 'positions.priceList']) ?? $locked;
+            } else {
+                $this->fillAndPersist($locked, $payload, $user, isCreate: false);
+                $locked->lock_version = $locked->lock_version + 1;
+                $locked->save();
             }
 
-            $this->fillAndPersist($locked, $payload, $user, isCreate: false);
-            $locked->lock_version = $locked->lock_version + 1;
-            $locked->save();
+            $fresh = $this->reloadCalculation($locked);
+            $this->audit->record($fresh, 'calculation.updated', $user, $before, $this->calculationSnapshot($fresh));
 
-            $this->audit->record($locked, 'calculation.updated', $user, $before, $this->calculationSnapshot($locked));
+            return $fresh;
+        });
+    }
 
-            return $locked->fresh(['positions.planRows', 'positions.inventory', 'positions.priceList']) ?? $locked;
+    public function applyBudgetProposal(Calculation $calculation, BudgetProposal $proposal, User $user): Calculation
+    {
+        return DB::transaction(function () use ($calculation, $proposal, $user): Calculation {
+            $lockedCalculation = Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
+            $lockedProposal = BudgetProposal::query()->whereKey($proposal->id)->lockForUpdate()->firstOrFail();
+
+            abort_unless($lockedProposal->calculation_id === $lockedCalculation->id, 404);
+            abort_if($lockedProposal->applied_at !== null, 422, 'Der Vorschlag wurde bereits übernommen.');
+
+            if ($lockedProposal->lock_version !== null && $lockedProposal->lock_version !== $lockedCalculation->lock_version) {
+                throw ValidationException::withMessages([
+                    'lock_version' => 'Der Vorschlag basiert auf einer älteren Version der Kalkulation. Bitte neuen Vorschlag erzeugen.',
+                ]);
+            }
+
+            $before = $this->calculationSnapshot($this->reloadCalculation($lockedCalculation));
+
+            $payload = $this->payloadFromCalculation($lockedCalculation);
+            $payload['planning_mode'] = $lockedCalculation->planning_mode->value;
+            $payload['order_discount_percent'] = (string) $lockedCalculation->order_discount_percent;
+            $payload['target_budget_nn'] = (string) $lockedProposal->target_budget_nn;
+            $payload['budget_strategy'] = $lockedProposal->strategy->value;
+            $payload['lock_version'] = $lockedCalculation->lock_version;
+            $payload['positions'] = $this->mergeProposalTotals($payload['positions'], $lockedProposal->payload['positions'] ?? []);
+
+            $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false);
+            $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
+            $lockedCalculation->save();
+
+            $lockedProposal->applied_at = now();
+            $lockedProposal->applied_by = $user->id;
+            $lockedProposal->save();
+
+            $fresh = $this->reloadCalculation($lockedCalculation);
+            $this->audit->record($fresh, 'budget.applied', $user, $before, $this->calculationSnapshot($fresh));
+
+            return $fresh;
         });
     }
 
@@ -107,7 +147,7 @@ final class CalculationWriter
         $resolved = $this->resolvedPositions($payload, $isCreate ? null : $calculation);
 
         $this->applyHeaderFields($calculation, $payload);
-        $this->applyTotals($calculation, $totals, $payload);
+        $this->applyTotals($calculation, $totals);
         $calculation->save();
 
         $seenIds = [];
@@ -132,12 +172,15 @@ final class CalculationWriter
                 'client_key' => $clientKey,
                 'inventory_id' => $item['inventory']->id,
                 'advertising_medium_id' => $item['medium']->id,
+                'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
                 'price_list_id' => $item['priceList']->id,
                 'kind' => CalculationKind::SpotClassic,
                 'spot_method' => $item['spot_method'],
                 'length_seconds' => (int) $item['length_seconds'],
                 'total_spot_count' => (int) $item['total_spot_count'],
-                'surcharge_percent' => $item['rule']->surcharge_percent,
+                'average_second_price' => $result->averageSecondPrice,
+                'length_index' => $result->lengthIndex,
+                'surcharge_percent' => $item['surcharge_percent'],
                 'position_discount_percent' => $item['is_discountable'] ? $item['position_discount_percent'] : 0,
                 'ae_percent' => $item['is_ae_eligible'] ? $item['ae_percent'] : 0,
                 'is_discountable' => $item['is_discountable'],
@@ -181,7 +224,7 @@ final class CalculationWriter
                 'day_group' => $row['day_group'],
                 'spot_count' => 0,
                 'second_price' => $row['second_price'],
-                'line_gross' => $row['line_gross'],
+                'line_gross' => '0.00',
             ]);
             $planRow->position()->associate($position);
             $planRow->save();
@@ -213,7 +256,7 @@ final class CalculationWriter
                 inventoryName: $item['inventory']->name,
                 positionKey: (string) $positionKey,
                 lengthSeconds: (int) $item['length_seconds'],
-                surchargePercent: (string) $item['rule']->surcharge_percent,
+                surchargePercent: (string) $item['surcharge_percent'],
                 positionDiscountPercent: $item['is_discountable'] ? (string) $item['position_discount_percent'] : '0',
                 aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
                 isDiscountable: $item['is_discountable'],
@@ -255,16 +298,12 @@ final class CalculationWriter
 
             $catalog = $this->catalog->resolvePosition($position, $existingPosition);
             $length = (int) ($position['length_seconds'] ?? $catalog['rule']->default_length_seconds ?? $catalog['medium']->default_length_seconds);
-            $isDiscountable = (bool) $catalog['rule']->is_discountable && (bool) $catalog['medium']->is_discountable;
-            $isAeEligible = (bool) $catalog['rule']->is_ae_eligible && (bool) $catalog['medium']->is_ae_eligible;
 
             $resolved[] = [
                 ...$catalog,
                 'length_seconds' => $length,
                 'position_discount_percent' => $position['position_discount_percent'] ?? 0,
                 'ae_percent' => $position['ae_percent'] ?? 15,
-                'is_discountable' => $isDiscountable,
-                'is_ae_eligible' => $isAeEligible,
             ];
         }
 
@@ -289,12 +328,8 @@ final class CalculationWriter
             : null;
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     */
-    private function applyTotals(Calculation $calculation, CalculationTotals $totals, array $payload): void
+    private function applyTotals(Calculation $calculation, CalculationTotals $totals): void
     {
-        unset($payload);
         $calculation->media_gross = $totals->mediaGross;
         $calculation->position_discount_total = $totals->positionDiscountTotal;
         $calculation->order_discount_total = $totals->orderDiscountTotal;
@@ -325,10 +360,8 @@ final class CalculationWriter
             return true;
         }
 
-        $normalizedIncoming = $this->normalizePositionsForCompare($payload['positions']);
-        $normalizedExisting = $this->normalizePositionsForCompare($this->payloadFromCalculation($calculation)['positions']);
-
-        return $normalizedIncoming === $normalizedExisting;
+        return $this->normalizePositionsForCompare($payload['positions'])
+            === $this->normalizePositionsForCompare($this->payloadFromCalculation($calculation)['positions']);
     }
 
     /**
@@ -382,7 +415,6 @@ final class CalculationWriter
                 $rows[] = [
                     'hour' => $row->hour,
                     'day_group' => $row->day_group->value,
-                    'second_price' => (string) $row->second_price,
                 ];
             }
 
@@ -443,8 +475,11 @@ final class CalculationWriter
                     'spot_method' => $position->spot_method->value,
                     'length_seconds' => $position->length_seconds,
                     'total_spot_count' => $position->total_spot_count,
+                    'average_second_price' => $position->average_second_price === null ? null : (string) $position->average_second_price,
+                    'length_index' => $position->length_index,
                     'price_list_id' => $position->price_list_id,
                     'price_list_version' => $position->price_list_version,
+                    'inventory_medium_rule_id' => $position->inventory_medium_rule_id,
                     'surcharge_percent' => (string) $position->surcharge_percent,
                     'position_discount_percent' => (string) $position->position_discount_percent,
                     'ae_percent' => (string) $position->ae_percent,
@@ -462,18 +497,45 @@ final class CalculationWriter
         ];
     }
 
-    /**
-     * @return array{0: int, 1: int, 2: string}
-     */
-    private function nextNumber(): array
+    private function reloadCalculation(Calculation $calculation): Calculation
     {
-        $year = (int) now('Europe/Berlin')->format('Y');
-        $seq = (int) Calculation::query()
-            ->where('number_year', $year)
-            ->lockForUpdate()
-            ->max('number_seq');
-        $seq++;
+        $calculation->refresh();
+        $calculation->load(['positions.planRows', 'positions.inventory', 'positions.priceList']);
 
-        return [$year, $seq, sprintf('K-%d-%05d', $year, $seq)];
+        return $calculation;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $positions
+     * @param  list<array<string, mixed>>  $proposed
+     * @return list<array<string, mixed>>
+     */
+    public function mergeProposalTotals(array $positions, array $proposed): array
+    {
+        $proposedByKey = collect($proposed)->keyBy(
+            fn (array $item): string => (string) ($item['position_key'] ?? 'inventory:'.($item['inventory_id'] ?? 0)),
+        );
+
+        $merged = [];
+
+        foreach ($positions as $index => $position) {
+            $positionKey = isset($position['id'])
+                ? 'id:'.$position['id']
+                : ((string) ($position['client_key'] ?? 'new:'.$index));
+
+            $item = $proposedByKey->get($positionKey)
+                ?? $proposedByKey->get('inventory:'.($position['inventory_id'] ?? 0));
+
+            if ($item === null) {
+                $position['total_spot_count'] = 0;
+            } else {
+                $position['total_spot_count'] = (int) ($item['total_spot_count'] ?? 0);
+                $position['length_seconds'] = $item['length_seconds'] ?? $position['length_seconds'];
+            }
+
+            $merged[] = $position;
+        }
+
+        return $merged;
     }
 }

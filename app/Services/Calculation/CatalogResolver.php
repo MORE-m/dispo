@@ -21,11 +21,16 @@ final class CatalogResolver
      * @return array{
      *     inventory: Inventory,
      *     medium: AdvertisingMedium,
-     *     rule: InventoryMediumRule,
+     *     rule: InventoryMediumRule|null,
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     total_spot_count: int,
-     *     spot_method: SpotCalculationMethod
+     *     spot_method: SpotCalculationMethod,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool
      * }
      */
     public function resolvePosition(array $position, ?CalculationPosition $existing = null): array
@@ -74,22 +79,39 @@ final class CatalogResolver
             ]);
         }
 
-        $priceList = $existing?->price_list_id !== null
-            ? PriceList::query()->with('items')->find($existing->price_list_id)
-            : null;
+        $inventoryChanged = $existing !== null
+            && (int) ($position['inventory_id'] ?? 0) !== $existing->inventory_id;
 
-        if ($priceList === null) {
+        $useSnapshot = $existing !== null && ! $inventoryChanged;
+
+        if ($useSnapshot) {
+            $priceList = PriceList::query()->with('items')->find($existing->price_list_id);
+            if ($priceList === null || $priceList->inventory_id !== $inventory->id) {
+                throw ValidationException::withMessages([
+                    'positions' => 'Die gespeicherte Preisliste der Position ist ungültig.',
+                ]);
+            }
+
+            $surchargePercent = (string) $existing->surcharge_percent;
+            $isDiscountable = (bool) $existing->is_discountable;
+            $isAeEligible = (bool) $existing->is_ae_eligible;
+            $ruleId = $existing->inventory_medium_rule_id;
+        } else {
             $priceList = $this->activePriceList($inventory->id);
-        }
+            if ($priceList === null) {
+                throw ValidationException::withMessages([
+                    'positions' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+                ]);
+            }
 
-        if ($priceList === null) {
-            throw ValidationException::withMessages([
-                'positions' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
-            ]);
+            $surchargePercent = (string) $rule->surcharge_percent;
+            $isDiscountable = (bool) $rule->is_discountable && (bool) $medium->is_discountable;
+            $isAeEligible = (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible;
+            $ruleId = $rule->id;
         }
 
         $totalSpotCount = (int) ($position['total_spot_count'] ?? ($existing !== null ? $existing->total_spot_count : 0));
-        $rows = $this->resolveRows($position, $priceList, $existing);
+        $rows = $this->resolveRows($position, $priceList, $existing, $useSnapshot);
 
         return [
             'inventory' => $inventory,
@@ -99,6 +121,11 @@ final class CatalogResolver
             'rows' => $rows,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $spotMethod,
+            'surcharge_percent' => $surchargePercent,
+            'is_discountable' => $isDiscountable,
+            'is_ae_eligible' => $isAeEligible,
+            'inventory_medium_rule_id' => $ruleId,
+            'inventory_changed' => $inventoryChanged,
         ];
     }
 
@@ -124,12 +151,18 @@ final class CatalogResolver
      * @param  array<string, mixed>  $position
      * @return list<PlanRowInput>
      */
-    private function resolveRows(array $position, PriceList $priceList, ?CalculationPosition $existing): array
-    {
+    private function resolveRows(
+        array $position,
+        PriceList $priceList,
+        ?CalculationPosition $existing,
+        bool $useSnapshot,
+    ): array {
         $rows = [];
         $existingRows = $existing?->relationLoaded('planRows')
             ? $existing->planRows->keyBy(fn ($row) => $row->hour.'|'.$row->day_group->value)
-            : collect();
+            : ($existing !== null
+                ? $existing->planRows()->get()->keyBy(fn ($row) => $row->hour.'|'.$row->day_group->value)
+                : collect());
 
         foreach ($position['plan_rows'] ?? [] as $index => $row) {
             $dayGroup = DayGroup::from((string) $row['day_group']);
@@ -142,11 +175,12 @@ final class CatalogResolver
                 ]);
             }
 
-            $secondPrice = isset($row['second_price']) && $row['second_price'] !== ''
-                ? (string) $row['second_price']
-                : ($existingRows->get($key)?->second_price !== null
-                    ? (string) $existingRows->get($key)->second_price
-                    : $this->secondPrice($priceList, $hour, $dayGroup));
+            $stored = $existingRows->get($key);
+            if ($useSnapshot && $stored !== null) {
+                $secondPrice = (string) $stored->second_price;
+            } else {
+                $secondPrice = $this->secondPrice($priceList, $hour, $dayGroup);
+            }
 
             $rows[] = new PlanRowInput(
                 hour: $hour,
@@ -157,7 +191,7 @@ final class CatalogResolver
         }
 
         if ($rows === [] && $existing !== null) {
-            foreach ($existing->planRows as $stored) {
+            foreach ($existingRows as $stored) {
                 $rows[] = new PlanRowInput(
                     hour: $stored->hour,
                     dayGroup: $stored->day_group,

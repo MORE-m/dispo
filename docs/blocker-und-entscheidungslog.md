@@ -25,7 +25,7 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | CRM im Slice | Ohne Kundenstammdaten: optionale Freitextfelder Kunde/Agentur; keine erfundenen CRM-Datensätze | Slice-Abgrenzung, CRM in Phase 2 |
 | 29.08.2026 | Rabattgrenze | `null` am Benutzer = keine persönliche Grenze; Überschreitung markiert `requires_special_approval`, Freigabe-UI bleibt UX-GATE-D | COM-002, COM-003 |
 | 29.08.2026 | Live-Summe | Frontend darf Vorschau anzeigen; autoritativ ist `POST` Preview/Save auf dem Server | GEN-001, GEN-002 |
-| 29.08.2026 | Budget Stundenverteilung | Greedy auf günstigste gewählte Stunde; BLK-007 bis PO-Regeln für innerhalb-Sender-Verteilung | Review-Nacharbeit UX-GATE-B |
+| 29.08.2026 | Budget Stundenverteilung | Stunden nur Preisbasis; Budgetvorschlag setzt nur `total_spot_count` je Position; BLK-007 aufgelöst | PO 29.08.2026, Review-Nacharbeit v3 |
 | 29.08.2026 | Kalkulationsarten | Planungsweg (manual/budget) ≠ Spot-Methode (average/calendar/fixed); Gate B nur Durchschnitt | CAL-002, Review-Nacharbeit |
 | 29.08.2026 | CRM Slice | Freitext Kunde/Agentur temporär; CRM-001 nicht als erledigt markiert | Slice-Abgrenzung |
 | 29.08.2026 | Technische Abnahme UX-GATE-A/B | Erst nach grüner CI auf Nacharbeit-Commit; alte Läufe kein Nachweis | Review-Nacharbeit |
@@ -37,7 +37,6 @@ Keine stillschweigenden ADR-Änderungen.
 |---|---|---|---|
 | BLK-005 | UX-GATE-C | Trailer/SWF, Influencer, Social Media und weitere Werbeelement-Oberflächen nicht freigegeben | Keine Fachseiten für diese Elemente |
 | BLK-006 | UX-GATE-D | Dispo, Freigaben, Standardangebots-Fach-UI, Administration der Initialkataloge nicht freigegeben | Nur Sperrzustände in der Navigation |
-| BLK-007 | UX-GATE-B Budget | Stundenverteilung **innerhalb** eines Senders im Budgetvorschlag: derzeit Greedy auf günstigste gewählte Stunde; keine PO-Freigabe für Gleichverteilung/Gewichtung/Mindestbelegung | Transparent dokumentiert; keine falsche „ausgewogene Verteilung“ |
 | BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung; UI zeigt Leerzustände |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
 
@@ -47,6 +46,7 @@ Keine stillschweigenden ADR-Änderungen.
 |---|---|---|
 | BLK-004 | BL-P0-04 | GitHub-Actions-Jobs `ci` und `mysql` auf Branch `phase-0-abschluss` (Lauf [33232656289](https://github.com/MORE-m/dispo/actions/runs/33232656289), Commit `4915baa`) beide `success` |
 | BLK-003 | BL-GATE-UXUI | Ersetzt durch UX-GATE-A/B/C/D. A und B freigegeben; Rest in BLK-005/BLK-006 |
+| BLK-007 | UX-GATE-B Budget Durchschnitt | PO-Entscheidung 29.08.2026: Stunden nur Preisbasis; Budgetvorschlag setzt nur `total_spot_count` je Position | Review-Nacharbeit v3 |
 
 Phase 0 bleibt technisch endgültig abgenommen. UX-GATE-A/B dürfen Fachoberflächen
 im freigegebenen Umfang umsetzen.

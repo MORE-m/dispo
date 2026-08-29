@@ -18,7 +18,6 @@ use App\Services\Calculation\PositionInput;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -161,35 +160,10 @@ class CalculationController extends Controller
     {
         $this->authorize('update', $calculation);
 
-        abort_unless($proposal->calculation_id === $calculation->id, 404);
-        abort_if($proposal->applied_at !== null, 422, 'Der Vorschlag wurde bereits übernommen.');
-
-        if ($proposal->lock_version !== null && $proposal->lock_version !== $calculation->lock_version) {
-            throw ValidationException::withMessages([
-                'lock_version' => 'Der Vorschlag basiert auf einer älteren Version der Kalkulation. Bitte neuen Vorschlag erzeugen.',
-            ]);
-        }
-
         /** @var User $user */
         $user = $request->user();
 
-        $payload = $this->writer->payloadFromCalculation($calculation);
-        $payload['planning_mode'] = $calculation->planning_mode->value;
-        $payload['order_discount_percent'] = (string) $calculation->order_discount_percent;
-        $payload['target_budget_nn'] = (string) $proposal->target_budget_nn;
-        $payload['budget_strategy'] = $proposal->strategy->value;
-        $payload['lock_version'] = $calculation->lock_version;
-        $payload['positions'] = $this->mergeProposalRows($payload['positions'], $proposal->payload['positions'] ?? []);
-
-        $this->writer->update($calculation, $payload, $user);
-        $proposal->applied_at = now();
-        $proposal->applied_by = $user->id;
-        $proposal->save();
-
-        $this->audit->record($calculation, 'budget.applied', $user, null, [
-            'proposal_id' => $proposal->id,
-            'applied_by' => $user->id,
-        ]);
+        $this->writer->applyBudgetProposal($calculation, $proposal, $user);
 
         return redirect()
             ->route('calculations.edit', $calculation)
@@ -299,53 +273,6 @@ class CalculationController extends Controller
         }
 
         return $inputs;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $positions
-     * @param  list<array<string, mixed>>  $proposed
-     * @return list<array<string, mixed>>
-     */
-    private function mergeProposalRows(array $positions, array $proposed): array
-    {
-        $proposedByKey = collect($proposed)->keyBy(
-            fn (array $item): string => (string) ($item['position_key'] ?? 'inventory:'.($item['inventory_id'] ?? 0)),
-        );
-
-        $merged = [];
-
-        foreach ($positions as $index => $position) {
-            $positionKey = isset($position['id'])
-                ? 'id:'.$position['id']
-                : ((string) ($position['client_key'] ?? 'new:'.$index));
-
-            $item = $proposedByKey->get($positionKey)
-                ?? $proposedByKey->get('inventory:'.($position['inventory_id'] ?? 0));
-
-            if ($item === null) {
-                $position['total_spot_count'] = 0;
-                $position['plan_rows'] = array_map(
-                    fn (array $row): array => [...$row, 'spot_count' => 0],
-                    $position['plan_rows'] ?? [],
-                );
-            } else {
-                $total = array_sum(array_column($item['rows'], 'spot_count'));
-                $position['total_spot_count'] = $total;
-                $position['length_seconds'] = $item['length_seconds'] ?? $position['length_seconds'];
-                $position['plan_rows'] = array_map(
-                    fn (array $row): array => [
-                        'hour' => $row['hour'],
-                        'day_group' => $row['day_group'],
-                        'second_price' => $row['second_price'] ?? null,
-                    ],
-                    $item['rows'],
-                );
-            }
-
-            $merged[] = $position;
-        }
-
-        return $merged;
     }
 
     /**
