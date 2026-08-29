@@ -42,6 +42,29 @@ export function money(value: string | number | null | undefined): string {
     }).format(Number.isFinite(amount) ? amount : 0);
 }
 
+export function formatSecondPrice(
+    value: string | number | null | undefined,
+): string {
+    const amount = Number(value ?? 0);
+
+    if (!Number.isFinite(amount)) {
+        return '–';
+    }
+
+    return `${new Intl.NumberFormat('de-DE', {
+        minimumFractionDigits: 4,
+        maximumFractionDigits: 4,
+    }).format(amount)} €`;
+}
+
+/** Shared class names for native select elements in forms. */
+export const formSelectClass =
+    'border-input focus-visible:border-ring focus-visible:ring-ring/50 disabled:bg-muted/50 disabled:text-muted-foreground h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed';
+
+/** Shared class names for multiline text inputs. */
+export const formTextareaClass =
+    'border-input focus-visible:border-ring focus-visible:ring-ring/50 disabled:bg-muted/50 disabled:text-muted-foreground min-h-24 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed';
+
 export function FieldTable({
     className,
     children,

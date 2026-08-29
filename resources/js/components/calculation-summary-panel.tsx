@@ -1,5 +1,4 @@
 import { money } from '@/components/form-field';
-import { LoadingState } from '@/components/feedback/states';
 import { LogoSlot } from '@/components/logo-slot';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -49,16 +48,24 @@ export function CalculationSummaryPanel({
     className?: string;
 }) {
     const hasPositions = positions.some((p) => p.total_spot_count > 0);
+    const showLoading = Boolean(loading && !totals && hasPositions);
 
     return (
-        <Card className={cn('gap-0 py-0 shadow-xs', className)}>
-            <CardHeader className="border-b py-4">
-                <CardTitle className="text-base">Kalkulation</CardTitle>
+        <Card
+            className={cn(
+                'border-border/70 gap-0 overflow-hidden rounded-xl py-0 shadow-xs',
+                className,
+            )}
+        >
+            <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                <CardTitle className="text-sm font-semibold tracking-tight">
+                    Kalkulation
+                </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4 py-4">
+            <CardContent className="space-y-4 px-5 py-4">
                 {positions.length > 0 ? (
-                    <div className="space-y-2">
-                        <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                    <div className="space-y-2.5">
+                        <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
                             Positionen
                         </p>
                         <ul className="space-y-2">
@@ -72,15 +79,15 @@ export function CalculationSummaryPanel({
                                 return (
                                     <li
                                         key={`${position.inventory_id}-${index}`}
-                                        className="flex items-start gap-2 text-sm"
+                                        className="border-border/60 bg-muted/15 flex items-start gap-3 rounded-lg border p-3"
                                     >
                                         <LogoSlot
                                             name={inventory?.name ?? 'Sender'}
                                             logoPath={inventory?.logo_path}
-                                            className="size-7"
+                                            className="size-8 shrink-0"
                                         />
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate font-medium">
+                                            <p className="truncate text-sm font-medium">
                                                 {inventory?.name ?? 'Sender'}
                                             </p>
                                             {position.total_spot_count > 0 ? (
@@ -96,7 +103,7 @@ export function CalculationSummaryPanel({
                                             )}
                                         </div>
                                         {total?.nn_invest ? (
-                                            <span className="text-muted-foreground shrink-0 text-xs">
+                                            <span className="shrink-0 text-sm font-medium tabular-nums">
                                                 {money(total.nn_invest)}
                                             </span>
                                         ) : null}
@@ -111,9 +118,11 @@ export function CalculationSummaryPanel({
                     </p>
                 )}
 
-                <div className="border-t pt-4">
-                    {loading && !totals ? (
-                        <LoadingState label="Berechnet …" />
+                <div className="border-border/60 border-t pt-4">
+                    {showLoading ? (
+                        <p className="text-muted-foreground animate-pulse text-sm">
+                            Berechnet …
+                        </p>
                     ) : totals ? (
                         <dl className="space-y-2 text-sm">
                             <SummaryRow
@@ -135,7 +144,7 @@ export function CalculationSummaryPanel({
                                 value={money(totals.ae_total)}
                                 muted
                             />
-                            <div className="border-t pt-3">
+                            <div className="border-border/60 border-t pt-3">
                                 <SummaryRow
                                     label="Netto (N/N)"
                                     value={money(totals.nn_invest)}
@@ -150,16 +159,16 @@ export function CalculationSummaryPanel({
                                 />
                             ) : null}
                             {totals.requires_special_approval ? (
-                                <p className="text-primary text-xs font-medium">
+                                <p className="text-primary pt-1 text-xs font-medium">
                                     Sonderfreigabe erforderlich
                                 </p>
                             ) : null}
                         </dl>
-                    ) : hasPositions ? (
-                        <LoadingState label="Berechnet …" />
                     ) : (
                         <p className="text-muted-foreground text-sm">
-                            Summen erscheinen nach Eingabe der Werbeelemente.
+                            {hasPositions
+                                ? 'Summen erscheinen nach Eingabe der Werbeelemente.'
+                                : 'Noch keine Summen verfügbar.'}
                         </p>
                     )}
                 </div>
@@ -180,16 +189,25 @@ function SummaryRow({
     muted?: boolean;
 }) {
     return (
-        <div className="flex items-baseline justify-between gap-2">
-            <dt className={muted ? 'text-muted-foreground' : 'text-foreground'}>
+        <div className="flex items-baseline justify-between gap-3">
+            <dt
+                className={cn(
+                    muted && 'text-muted-foreground text-xs',
+                    !muted && !emphasis && 'text-sm',
+                    emphasis && 'text-sm font-medium',
+                )}
+            >
                 {label}
             </dt>
             <dd
-                className={
+                className={cn(
+                    'tabular-nums',
                     emphasis
-                        ? 'text-primary text-base font-semibold tabular-nums'
-                        : 'font-medium tabular-nums'
-                }
+                        ? 'text-primary text-lg font-bold'
+                        : muted
+                          ? 'text-muted-foreground text-xs font-medium'
+                          : 'text-sm font-medium',
+                )}
             >
                 {value}
             </dd>

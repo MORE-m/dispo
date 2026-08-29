@@ -1,7 +1,13 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
-import { FormField, money } from '@/components/form-field';
+import {
+    FormField,
+    formSelectClass,
+    formTextareaClass,
+    money,
+} from '@/components/form-field';
 import {
     EmptyState,
     ErrorState,
@@ -11,7 +17,18 @@ import {
 } from '@/components/feedback/states';
 import PageHeader from '@/components/heading-page';
 import { LogoSlot } from '@/components/logo-slot';
-import { SelectionCard, SelectionCardGrid } from '@/components/selection-card';
+import {
+    SelectionCard,
+    SelectionCardGrid,
+    SelectionCardOption,
+} from '@/components/selection-card';
+import {
+    PositionPriceSummary,
+    wizardCardClass,
+    wizardCardContentClass,
+    wizardCardHeaderClass,
+    wizardCardTitleClass,
+} from '@/components/wizard-section';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -612,17 +629,23 @@ export default function CalculationWizard({
                     onStepChange={setStep}
                 />
 
-                <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-                    <div className="min-w-0 space-y-6">
+                <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto] lg:items-start">
+                    <div className="order-1 min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
                         {step === 0 ? (
                             <div className="space-y-6">
-                                <Card className="gap-0 py-0 shadow-xs">
-                                    <CardHeader className="border-b py-4">
-                                        <CardTitle className="text-base">
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
                                             Planungsweg
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="py-4">
+                                    <CardContent
+                                        className={wizardCardContentClass}
+                                    >
                                         <SelectionCardGrid className="sm:grid-cols-2">
                                             <SelectionCard
                                                 name="planning_mode"
@@ -634,14 +657,11 @@ export default function CalculationWizard({
                                                     setPlanningMode('manual')
                                                 }
                                             >
-                                                <span className="font-medium">
-                                                    Selbst planen
-                                                </span>
-                                                <span className="text-muted-foreground mt-1 text-sm">
-                                                    Sender, Werbeelemente und
-                                                    Konditionen manuell
-                                                    festlegen.
-                                                </span>
+                                                <SelectionCardOption
+                                                    icon={SlidersHorizontal}
+                                                    title="Selbst planen"
+                                                    description="Sender, Werbeelemente und Konditionen manuell festlegen."
+                                                />
                                             </SelectionCard>
                                             <SelectionCard
                                                 name="planning_mode"
@@ -653,25 +673,29 @@ export default function CalculationWizard({
                                                     setPlanningMode('budget')
                                                 }
                                             >
-                                                <span className="font-medium">
-                                                    Mit Budget planen
-                                                </span>
-                                                <span className="text-muted-foreground mt-1 text-sm">
-                                                    Zielbudget und
-                                                    Verteilungslogik vorgeben.
-                                                </span>
+                                                <SelectionCardOption
+                                                    icon={Wallet}
+                                                    title="Mit Budget planen"
+                                                    description="Zielbudget und Verteilungslogik vorgeben."
+                                                />
                                             </SelectionCard>
                                         </SelectionCardGrid>
                                     </CardContent>
                                 </Card>
 
-                                <Card className="gap-0 py-0 shadow-xs">
-                                    <CardHeader className="border-b py-4">
-                                        <CardTitle className="text-base">
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
                                             Grunddaten
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid gap-4 py-4 sm:grid-cols-2">
+                                    <CardContent
+                                        className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
+                                    >
                                         <FormField
                                             label="Kunde"
                                             htmlFor="customer"
@@ -738,7 +762,7 @@ export default function CalculationWizard({
                                         >
                                             <textarea
                                                 id="briefing"
-                                                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 disabled:bg-muted/40 min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2"
+                                                className={`${formTextareaClass} sm:col-span-2`}
                                                 value={briefing}
                                                 onChange={(event) =>
                                                     setBriefing(
@@ -776,7 +800,7 @@ export default function CalculationWizard({
                                             >
                                                 <select
                                                     id="strategy"
-                                                    className="border-input disabled:bg-muted/40 h-9 w-full rounded-md border bg-transparent px-3 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                                                    className={formSelectClass}
                                                     value={budgetStrategy}
                                                     onChange={(event) =>
                                                         setBudgetStrategy(
@@ -809,42 +833,32 @@ export default function CalculationWizard({
                             ) : (
                                 <div className="space-y-6">
                                     {positions.map((position, index) => {
-                                        const inventory =
-                                            catalog.inventories.find(
-                                                (item) =>
-                                                    item.id ===
-                                                    position.inventory_id,
-                                            );
-
                                         return (
                                             <section
                                                 key={position.client_key}
                                                 aria-labelledby={`pos-${index}`}
                                             >
-                                                <Card className="gap-0 py-0 shadow-xs">
-                                                    <CardHeader className="border-b py-4">
+                                                <Card
+                                                    className={wizardCardClass}
+                                                >
+                                                    <CardHeader
+                                                        className={
+                                                            wizardCardHeaderClass
+                                                        }
+                                                    >
                                                         <CardTitle
                                                             id={`pos-${index}`}
-                                                            className="flex items-center gap-2 text-base"
+                                                            className={
+                                                                wizardCardTitleClass
+                                                            }
                                                         >
-                                                            <LogoSlot
-                                                                name={
-                                                                    inventory
-                                                                        ? catalogLabel(
-                                                                              inventory.name,
-                                                                              inventory.is_active,
-                                                                          )
-                                                                        : 'Sender'
-                                                                }
-                                                                logoPath={
-                                                                    inventory?.logo_path
-                                                                }
-                                                            />
                                                             Werbeelement{' '}
                                                             {index + 1}
                                                         </CardTitle>
                                                     </CardHeader>
-                                                    <CardContent className="space-y-6 py-4">
+                                                    <CardContent
+                                                        className={`${wizardCardContentClass} space-y-6`}
+                                                    >
                                                         <div className="space-y-3">
                                                             <p className="text-sm font-medium">
                                                                 Sender / Kombi
@@ -883,14 +897,22 @@ export default function CalculationWizard({
                                                                                     )
                                                                                 }
                                                                                 className={cn(
-                                                                                    'focus-visible:ring-ring/50 relative flex flex-col items-start rounded-xl border-2 p-4 text-left transition-colors outline-none focus-visible:ring-[3px]',
+                                                                                    'focus-visible:ring-primary/25 relative flex w-full flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all outline-none focus-visible:ring-[3px]',
                                                                                     selected
-                                                                                        ? 'border-primary bg-accent/50'
-                                                                                        : 'border-border bg-card hover:border-primary/40',
+                                                                                        ? 'border-primary bg-accent/70 ring-primary/15 shadow-xs ring-1'
+                                                                                        : 'border-border/80 bg-card hover:border-primary/45 hover:bg-muted/20',
                                                                                     disabled &&
                                                                                         'cursor-not-allowed opacity-50',
                                                                                 )}
                                                                             >
+                                                                                {selected ? (
+                                                                                    <span className="bg-primary text-primary-foreground pointer-events-none absolute top-3 right-3 flex size-5 items-center justify-center rounded-full">
+                                                                                        <Check
+                                                                                            className="size-3"
+                                                                                            aria-hidden="true"
+                                                                                        />
+                                                                                    </span>
+                                                                                ) : null}
                                                                                 <LogoSlot
                                                                                     name={catalogLabel(
                                                                                         item.name,
@@ -900,9 +922,8 @@ export default function CalculationWizard({
                                                                                         item.logo_path
                                                                                     }
                                                                                     variant="card"
-                                                                                    className="mb-2"
                                                                                 />
-                                                                                <span className="text-sm font-medium">
+                                                                                <span className="pr-6 text-sm leading-snug font-semibold">
                                                                                     {catalogLabel(
                                                                                         item.name,
                                                                                         item.is_active,
@@ -971,7 +992,7 @@ export default function CalculationWizard({
                                                                     readOnly
                                                                     value="Durchschnitt"
                                                                     disabled
-                                                                    className="bg-muted/40"
+                                                                    className="bg-muted/50 text-muted-foreground"
                                                                 />
                                                             </FormField>
                                                             <FormField
@@ -1085,7 +1106,7 @@ export default function CalculationWizard({
                                                                     ) => (
                                                                         <div
                                                                             key={`${row.hour}-${row.day_group}-${rowIndex}`}
-                                                                            className="bg-muted/20 flex flex-wrap items-end gap-2 rounded-lg border p-3"
+                                                                            className="border-border/60 bg-muted/15 grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,6rem)_minmax(0,1fr)_auto]"
                                                                         >
                                                                             <FormField
                                                                                 label="Stunde"
@@ -1100,7 +1121,6 @@ export default function CalculationWizard({
                                                                                     max={
                                                                                         23
                                                                                     }
-                                                                                    className="w-20"
                                                                                     value={
                                                                                         row.hour
                                                                                     }
@@ -1135,9 +1155,15 @@ export default function CalculationWizard({
                                                                                     }}
                                                                                 />
                                                                             </FormField>
-                                                                            <FormField label="Tagesgruppe">
+                                                                            <FormField
+                                                                                label="Tagesgruppe"
+                                                                                htmlFor={`day-group-${index}-${rowIndex}`}
+                                                                            >
                                                                                 <select
-                                                                                    className="border-input disabled:bg-muted/40 h-9 rounded-md border bg-transparent px-3 text-sm disabled:cursor-not-allowed disabled:opacity-70"
+                                                                                    id={`day-group-${index}-${rowIndex}`}
+                                                                                    className={
+                                                                                        formSelectClass
+                                                                                    }
                                                                                     value={
                                                                                         row.day_group
                                                                                     }
@@ -1195,20 +1221,22 @@ export default function CalculationWizard({
                                                                                 .plan_rows
                                                                                 .length >
                                                                                 1 ? (
-                                                                                <Button
-                                                                                    type="button"
-                                                                                    variant="outline"
-                                                                                    size="sm"
-                                                                                    onClick={() =>
-                                                                                        removePlanRow(
-                                                                                            index,
-                                                                                            rowIndex,
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Stunde
-                                                                                    entfernen
-                                                                                </Button>
+                                                                                <div className="flex items-end sm:justify-end">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        onClick={() =>
+                                                                                            removePlanRow(
+                                                                                                index,
+                                                                                                rowIndex,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        Stunde
+                                                                                        entfernen
+                                                                                    </Button>
+                                                                                </div>
                                                                             ) : null}
                                                                         </div>
                                                                     ),
@@ -1246,31 +1274,28 @@ export default function CalculationWizard({
                                                             ?.positions[
                                                             index
                                                         ] ? (
-                                                            <p className="text-muted-foreground text-sm">
-                                                                Ø-Sekundenpreis{' '}
-                                                                {displayTotals
-                                                                    .positions[
-                                                                    index
-                                                                ]
-                                                                    .average_second_price ??
-                                                                    '–'}{' '}
-                                                                ·{' '}
-                                                                {money(
+                                                            <PositionPriceSummary
+                                                                averageSecondPrice={
                                                                     displayTotals
                                                                         .positions[
                                                                         index
                                                                     ]
-                                                                        .media_gross,
-                                                                )}{' '}
-                                                                Brutto ·{' '}
-                                                                {money(
+                                                                        .average_second_price
+                                                                }
+                                                                mediaGross={
                                                                     displayTotals
                                                                         .positions[
                                                                         index
-                                                                    ].nn_invest,
-                                                                )}{' '}
-                                                                N/N
-                                                            </p>
+                                                                    ]
+                                                                        .media_gross
+                                                                }
+                                                                nnInvest={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ].nn_invest
+                                                                }
+                                                            />
                                                         ) : canEdit ? (
                                                             <LoadingState label="Berechnet" />
                                                         ) : null}
@@ -1318,10 +1343,16 @@ export default function CalculationWizard({
                                     return (
                                         <Card
                                             key={`cond-${position.client_key}`}
-                                            className="gap-0 py-0 shadow-xs"
+                                            className={wizardCardClass}
                                         >
-                                            <CardHeader className="border-b py-4">
-                                                <CardTitle className="flex items-center gap-2 text-base">
+                                            <CardHeader
+                                                className={
+                                                    wizardCardHeaderClass
+                                                }
+                                            >
+                                                <CardTitle
+                                                    className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                >
                                                     <LogoSlot
                                                         name={
                                                             inventory?.name ??
@@ -1334,7 +1365,9 @@ export default function CalculationWizard({
                                                     {inventory?.name}
                                                 </CardTitle>
                                             </CardHeader>
-                                            <CardContent className="grid gap-4 py-4 sm:grid-cols-2">
+                                            <CardContent
+                                                className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
+                                            >
                                                 <FormField
                                                     label="Positionsrabatt %"
                                                     error={
@@ -1358,7 +1391,7 @@ export default function CalculationWizard({
                                                         className={
                                                             rule?.is_discountable ===
                                                             false
-                                                                ? 'bg-muted/40'
+                                                                ? 'bg-muted/50 text-muted-foreground'
                                                                 : undefined
                                                         }
                                                         onChange={(event) =>
@@ -1390,7 +1423,7 @@ export default function CalculationWizard({
                                                         className={
                                                             rule?.is_ae_eligible ===
                                                             false
-                                                                ? 'bg-muted/40'
+                                                                ? 'bg-muted/50 text-muted-foreground'
                                                                 : undefined
                                                         }
                                                         onChange={(event) =>
@@ -1410,13 +1443,19 @@ export default function CalculationWizard({
                                         </Card>
                                     );
                                 })}
-                                <Card className="gap-0 py-0 shadow-xs">
-                                    <CardHeader className="border-b py-4">
-                                        <CardTitle className="text-base">
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
                                             Auftragskonditionen
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="py-4">
+                                    <CardContent
+                                        className={wizardCardContentClass}
+                                    >
                                         <FormField
                                             label="Zusätzlicher Auftragsrabatt %"
                                             htmlFor="order-discount"
@@ -1438,13 +1477,19 @@ export default function CalculationWizard({
                                     </CardContent>
                                 </Card>
                                 {planningMode === 'budget' && canEdit ? (
-                                    <Card className="gap-0 py-0 shadow-xs">
-                                        <CardHeader className="border-b py-4">
-                                            <CardTitle className="text-base">
+                                    <Card className={wizardCardClass}>
+                                        <CardHeader
+                                            className={wizardCardHeaderClass}
+                                        >
+                                            <CardTitle
+                                                className={wizardCardTitleClass}
+                                            >
                                                 Budgetvorschlag
                                             </CardTitle>
                                         </CardHeader>
-                                        <CardContent className="space-y-3 py-4">
+                                        <CardContent
+                                            className={`${wizardCardContentClass} space-y-3`}
+                                        >
                                             <p className="text-muted-foreground text-sm">
                                                 Konditionen und Verteilungslogik
                                                 müssen vor der
@@ -1507,13 +1552,15 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 3 ? (
-                            <Card className="gap-0 py-0 shadow-xs">
-                                <CardHeader className="border-b py-4">
-                                    <CardTitle className="text-base">
+                            <Card className={wizardCardClass}>
+                                <CardHeader className={wizardCardHeaderClass}>
+                                    <CardTitle className={wizardCardTitleClass}>
                                         Zusammenfassung
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-4 py-4 text-sm">
+                                <CardContent
+                                    className={`${wizardCardContentClass} space-y-4 text-sm`}
+                                >
                                     {summary ? (
                                         <>
                                             <dl className="grid gap-2 sm:grid-cols-2">
@@ -1700,43 +1747,9 @@ export default function CalculationWizard({
                                 </CardContent>
                             </Card>
                         ) : null}
-
-                        <div className="border-border flex flex-wrap gap-3 border-t pt-6">
-                            {step > 0 ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setStep(step - 1)}
-                                >
-                                    Zurück
-                                </Button>
-                            ) : null}
-                            {step < STEPS.length - 1 ? (
-                                <Button
-                                    type="button"
-                                    onClick={() => setStep(step + 1)}
-                                >
-                                    Weiter
-                                </Button>
-                            ) : null}
-                            {canEdit ? (
-                                <Button
-                                    type="button"
-                                    onClick={save}
-                                    disabled={busy}
-                                    variant={
-                                        step === STEPS.length - 1
-                                            ? 'default'
-                                            : 'secondary'
-                                    }
-                                >
-                                    Speichern
-                                </Button>
-                            ) : null}
-                        </div>
                     </div>
 
-                    <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+                    <aside className="order-2 min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
                         <CalculationSummaryPanel
                             totals={summaryTotals}
                             loading={canEdit && !summaryTotals && !error}
@@ -1744,6 +1757,40 @@ export default function CalculationWizard({
                             inventories={catalog.inventories}
                         />
                     </aside>
+
+                    <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
+                        {step > 0 ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStep(step - 1)}
+                            >
+                                Zurück
+                            </Button>
+                        ) : null}
+                        {step < STEPS.length - 1 ? (
+                            <Button
+                                type="button"
+                                onClick={() => setStep(step + 1)}
+                            >
+                                Weiter
+                            </Button>
+                        ) : null}
+                        {canEdit ? (
+                            <Button
+                                type="button"
+                                onClick={save}
+                                disabled={busy}
+                                variant={
+                                    step === STEPS.length - 1
+                                        ? 'default'
+                                        : 'secondary'
+                                }
+                            >
+                                Speichern
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         </>

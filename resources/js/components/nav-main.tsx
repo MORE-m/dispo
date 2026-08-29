@@ -14,7 +14,7 @@ export function NavMain({ items }: { items: NavItem[] }) {
 
     return (
         <SidebarGroup className="px-2 py-0">
-            <SidebarMenu>
+            <SidebarMenu className="gap-1">
                 {items.map((item) => {
                     const active = isCurrentUrl(item.href);
 
@@ -25,19 +25,17 @@ export function NavMain({ items }: { items: NavItem[] }) {
                                 isActive={active}
                                 tooltip={{ children: item.title }}
                                 className={cn(
-                                    active &&
-                                        'border-primary bg-sidebar-accent text-sidebar-accent-foreground border-l-[3px] font-medium',
+                                    'h-10 rounded-lg px-3 transition-colors',
+                                    active
+                                        ? '!bg-primary !text-primary-foreground hover:!bg-primary/90 [&_svg]:!text-primary-foreground shadow-xs'
+                                        : 'text-sidebar-foreground hover:bg-muted/80',
                                 )}
                             >
                                 <Link href={item.href} prefetch>
-                                    {item.icon && (
-                                        <item.icon
-                                            className={cn(
-                                                active && 'text-primary',
-                                            )}
-                                        />
-                                    )}
-                                    <span>{item.title}</span>
+                                    {item.icon && <item.icon />}
+                                    <span className="font-medium">
+                                        {item.title}
+                                    </span>
                                 </Link>
                             </SidebarMenuButton>
                         </SidebarMenuItem>

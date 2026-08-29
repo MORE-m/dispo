@@ -32,7 +32,7 @@ export function LogoSlot({
                 className={cn(
                     'max-h-full max-w-full object-contain',
                     variant === 'inline' && 'size-8',
-                    variant === 'card' && 'h-11 w-auto max-w-full',
+                    variant === 'card' && 'h-12 w-auto max-w-[92%]',
                 )}
             />
         );
@@ -41,7 +41,7 @@ export function LogoSlot({
             return (
                 <span
                     className={cn(
-                        'bg-background border-border/70 flex h-14 w-full shrink-0 items-center justify-center rounded-lg border p-2.5',
+                        'bg-background border-border/70 flex h-16 w-full shrink-0 items-center justify-center rounded-lg border p-3',
                         className,
                     )}
                 >
@@ -66,9 +66,9 @@ export function LogoSlot({
         <span
             aria-hidden="true"
             className={cn(
-                'bg-muted text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-md text-xs font-semibold',
+                'bg-muted text-muted-foreground inline-flex shrink-0 items-center justify-center rounded-lg text-xs font-semibold',
                 variant === 'inline' && 'size-8',
-                variant === 'card' && 'h-14 w-full text-sm',
+                variant === 'card' && 'h-16 w-full text-sm',
                 className,
             )}
             title={name}
