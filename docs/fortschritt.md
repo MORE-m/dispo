@@ -1,31 +1,27 @@
 # Fortschritt V1
 
-Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v6)
+Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v7)
 
 ## Aktuelle Phase
 
 Phase 0 bleibt technisch abgenommen. `UX-GATE-A` und `UX-GATE-B` sind **fachlich
-freigegeben**. Die **technische Abnahme** von UX-GATE-A/B bleibt an grüne CI auf
-dem finalen Nacharbeit-HEAD gebunden.
+und technisch abgenommen** (Commit `976aae5`, Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)).
 
 ## Aktuelle Aufgabe
 
-Review-Nacharbeit v6: atomare Nummernvergabe (`TEC-001`), isolierter MySQL-Paralleltest,
-Review-Export per `git archive`, Doku-Stand v5/v6. Commit/Push/PR und grüne CI
-ausstehend.
+Review-Nacharbeit abgeschlossen. PR #2 offen gegen `phase-0-abschluss`; kein Merge.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Review-Nacharbeit v5: Playwright CAL-001/BUD-008, `length_index` im Budgetpfad,
-historische Katalogdarstellung, Snapshot-/Negativtests, `client_key`-Backfill,
-deterministische Migration, MySQL-Paralleltest über `CalculationWriter::create()`
-(Commit `bab2477`).
+MySQL-Paralleltest-Fix (`Process::wait()` Exit-Code, `sort()`), technische Abnahme
+UX-GATE-A/B nach grünen Jobs `ci` und `mysql` (Commit `976aae5`).
 
 ## Technische Abnahme UX-GATE-A/B
 
 | Kriterium | Status |
 |---|---|
 | Fachliche Freigabe PO | **freigegeben** (UX-GATE-A/B) |
+| Technische Abnahme | **abgenommen** (29.08.2026, HEAD `976aae5`) |
 | Durchschnittskalkulation (SPT-001–SPT-004, SPT-016) | umgesetzt |
 | Kalenderplaner (SPT-005–SPT-008) | bewusst offen |
 | Festpreis Spot | bewusst offen (kein Gate-B-Umfang) |
@@ -34,22 +30,27 @@ deterministische Migration, MySQL-Paralleltest über `CalculationWriter::create(
 | `length_index`-Snapshot (`SPT-009`) | umgesetzt (v4/v5) |
 | Budgetvorschlag + Übernahme + lock_version | umgesetzt |
 | Atomare Nummernvergabe (`TEC-001`) | umgesetzt (v6) |
+| MySQL-Paralleltest (`CalculationWriter::create`) | ausgeführt und grün (v7) |
 | Read-only-Zusammenfassung | umgesetzt |
-| GitHub Actions `tests.yml` gültig | repariert |
-| CI `ci` + `mysql` auf HEAD | **ausstehend bis Push/PR grün** |
+| GitHub Actions `ci` + `mysql` auf Abnahme-HEAD | **grün** ([Run 33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)) |
 
-## Ausgeführte Prüfungen (Nacharbeit v6, lokal)
+## Nachweis CI (technische Abnahme)
 
-- `composer validate`: gültig
-- `vendor/bin/pint --test`: bestanden
-- Pest (SQLite): siehe Abschlusslauf
-- PHPStan: 0 Fehler
-- `npm run check`, `npm run types:check`, Vitest, Build: bestanden
-- Playwright: 5/5 lokal
-- MySQL-Paralleltest: im GitHub-Job `mysql` (lokal ohne MySQL-Server übersprungen)
+| Job | Ergebnis | Link |
+|---|---|---|
+| `ci` | success (1m37s) | [Job 99100268479](https://github.com/MORE-m/dispo/actions/runs/33252415668/job/99100268479) |
+| `mysql` | success (58s), **95 passed** | [Job 99100268408](https://github.com/MORE-m/dispo/actions/runs/33252415668/job/99100268408) |
 
-**Technische Abnahme UX-GATE-A/B:** ausstehend bis GitHub Actions `ci` und `mysql`
-auf finalem HEAD grün.
+MySQL-Paralleltest `gen_001_mysql_parallel_workers_create_calculations_with_unique_numbers`:
+ausgeführt (2,06s), nicht übersprungen.
+
+## Review-Nacharbeit (v5/v6/v7, Kurzüberblick)
+
+| Version | Inhalt |
+|---|---|
+| v5 | Playwright, `length_index`, historische Kataloge, Snapshot-Tests, `client_key`, deterministische Migration |
+| v6 | Atomare Nummernvergabe (`TEC-001`), isolierter MySQL-Paralleltest, Export per `git archive` |
+| v7 | MySQL-Paralleltest Process-API-Fix, technische Abnahme dokumentiert |
 
 ## Migrationen (Nacharbeit)
 
@@ -58,9 +59,6 @@ auf finalem HEAD grün.
 | `2026_08_29_140000_calculation_review_nacharbeit.php` | `client_key`, `spot_method`, `total_spot_count` |
 | `2026_08_29_150000_calculation_snapshot_and_sequences.php` | Snapshot-Spalten, Sequenztabelle, Backfill |
 | `2026_08_29_160000_backfill_length_index.php` | deterministischer `length_index`-Backfill |
-
-`client_key` bleibt schema-seitig nullable; Writer erzwingt Werte für alle neuen
-und aktualisierten Positionen.
 
 ## Bewusst offen / temporär
 
@@ -84,5 +82,4 @@ und aktualisierten Positionen.
 
 ## Exakt nächste ausführbare Aufgabe
 
-Commit, Push, PR gegen `phase-0-abschluss`, grüne CI abwarten, Review-ZIP v6
-außerhalb des Repos mit Manifest = HEAD.
+PR #2 mergen (nach PO-Freigabe); UX-GATE-C/D und BLK-001/002 weiterhin offen.

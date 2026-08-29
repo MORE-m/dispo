@@ -3,6 +3,8 @@
 - **Stand:** 29. August 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C und UX-GATE-D blockiert
+- **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
+  Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 
 Das frühere Einzelgate `BL-GATE-UXUI` ist durch vier Teil-Gates ersetzt.
 [`ui-ux-konzept.md`](ui-ux-konzept.md) bleibt die fachliche Navigations- und
@@ -13,8 +15,8 @@ dürfen.
 
 | Gate | Umfang | Status |
 |---|---|---|
-| `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · technische Abnahme nach grüner CI |
-| `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · technische Abnahme nach grüner CI |
+| `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
+| `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
 | `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | blockiert |
 

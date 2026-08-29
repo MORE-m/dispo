@@ -34,6 +34,7 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | Spotlängenindex | Gespeicherter `length_index` bei unveränderter Länge; Neuberechnung bei Längenänderung | SPT-009, Review v4 |
 | 29.08.2026 | client_key nullable | Schema nullable aus Migrationskompatibilität; Writer setzt UUID verbindlich | Review v4/v5 |
 | 29.08.2026 | Atomare Nummernvergabe | Sequenz und Kalkulation in einer Transaktion; Retries auf äußerer Transaktion (`TEC-001`) | Review v6 |
+| 29.08.2026 | Technische Abnahme UX-GATE-A/B | Abgenommen nach grünen Jobs `ci` und `mysql` auf HEAD `976aae5` (Run [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)); MySQL-Paralleltest ausgeführt | Review v7 |
 
 ## Offene Blocker
 
