@@ -11,7 +11,9 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
-            sidebarOpen: boolean;
+            navigation: import('./auth').NavigationItem[];
+            flash: { success: string | null; error: string | null };
+            sidebarOpen: boolean | null;
             [key: string]: unknown;
         };
     }

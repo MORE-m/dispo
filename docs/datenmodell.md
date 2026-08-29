@@ -19,6 +19,8 @@ erDiagram
     PRICE_LIST ||--o{ PRICE_LIST_ITEM : contains
     CUSTOMER ||--o{ CALCULATION : orders
     AGENCY o|--o{ CALCULATION : mediates
+    STANDARD_OFFER ||--|{ STANDARD_OFFER_VERSION : versions
+    STANDARD_OFFER_VERSION ||--o{ CALCULATION : origins
     CALCULATION ||--|{ CALCULATION_POSITION : contains
     CALCULATION_POSITION ||--o{ POSITION_COMPONENT : contains
     CALCULATION_POSITION ||--o{ PRICE_COMPONENT : prices
@@ -81,7 +83,26 @@ Preisliste. Importdatei und Validierungsbericht werden referenziert.
 - `Contact`: mehrere Ansprechpartner je Kunde oder Agentur.
 - Rechnungsempfänger: polymorphe Auswahl ausschließlich Kunde oder Agentur.
 
-Eine Kalkulation gehört genau einem Kunden und optional einer Agentur.
+Eine Kundenkalkulation gehört genau einem Kunden und optional einer Agentur.
+Ein Standardangebot hat keine CRM-Bindung.
+
+## Standardangebot
+
+`StandardOffer` ist die kundenlose, sender- bzw. kombibezogene Vorlage.
+
+`StandardOfferVersion` speichert mindestens:
+
+- Versionsnummer,
+- Status Entwurf, veröffentlicht oder archiviert,
+- Autor,
+- Veröffentlichungszeitpunkt bei Veröffentlichung,
+- Positions- und Preis-/Produkt-Snapshot,
+- Auditbezug.
+
+Vertrieb erzeugt durch Übernahme eine neue `Calculation` mit optionaler Referenz
+auf die Ursprungsversion. Die Referenz dient der Nachvollziehbarkeit, nicht der
+Synchronisation (`STD-005`). Ein `DispoOrder` darf nur von `Calculation` ausgehen,
+nicht von `StandardOffer` (`DSP-007`).
 
 ## Kalkulation
 
@@ -89,12 +110,22 @@ Eine Kalkulation gehört genau einem Kunden und optional einer Agentur.
 
 - technische ID und sichtbare Kalkulationsnummer,
 - Kunde, Agentur, Mediaberater,
+- optionale Herkunfts-ID der Standardangebotsversion,
 - Kampagne/Produkt/Titel,
 - kalkulationsweiter Rabatt/AE,
-- Summen,
+- Summen, live aus allen Positionen,
 - Konfigurationssnapshot-ID,
 - Bearbeitungs-/Archivstatus,
 - optimistische Versionsnummer.
+
+Eine Kalkulation kann beliebig viele Positionen unterschiedlicher Inventare
+(Sender und Kombis) enthalten (`CAL-001`).
+
+Optionale Budgetdaten (Zielbudget N/N, letzte Verteilungslogik) dürfen an der
+Kalkulation gespeichert werden; sie sind keine autoritative Preistabelle. Ein
+unstrukturiertes Budget-Textfeld ist unzulässig (`BUD-001`). Der Vorschlag liegt
+in `BudgetProposal` und wird erst nach expliziter Übernahme in die Positionen
+geschrieben (`BUD-008`).
 
 ### CalculationPosition
 
@@ -102,7 +133,7 @@ Eine Kalkulation gehört genau einem Kunden und optional einer Agentur.
 - unveränderbare Kalkulationsart,
 - Preislisten- und Regelversion,
 - Zeitraum/offen,
-- Mengen und tatsächliche Länge,
+- Mengen und tatsächliche Länge (Spot Classic: frei editierbares Sekundenfeld je Position, `SPT-015`),
 - Preis-, Rabatt-, AE- und Payfaktorwerte,
 - Berechnungserklärung,
 - Snapshotdaten.
@@ -110,7 +141,8 @@ Eine Kalkulation gehört genau einem Kunden und optional einer Agentur.
 Unterobjekte werden typbezogen normalisiert:
 
 - `PositionComponent` für Spot/SWF-Komponenten,
-- `PlannerEntry` für Datum, Stunde und Anzahl,
+- `SpotClassicPlanRow` für Preisstunde, Tagesgruppe und Anzahl (dieser Slice
+  ohne Kalenderdatum; volle Datumszellen später `PlannerEntry`),
 - `PlatformAllocation` für Online-Audio-Mengen,
 - `TargetingSelection` für technische/DMP-Targetings,
 - `SocialElement` und `InfluencerItem`,
@@ -118,8 +150,11 @@ Unterobjekte werden typbezogen normalisiert:
 
 ## Dispoauftrag
 
-`DispoOrder` referenziert die Ursprungskalkulation nur zur Navigation. Sein Inhalt
-stammt aus eigenen `DispoPositionSnapshot`-Datensätzen und wird nicht synchronisiert.
+`DispoOrder` referenziert die Ursprungs-**Kundenkalkulation** nur zur Navigation.
+Sein Inhalt stammt aus eigenen `DispoPositionSnapshot`-Datensätzen und wird nicht
+synchronisiert. Die tatsächliche Spotlänge ist Teil des Positionssnapshots.
+Ein Dispoauftrag ohne Kundenkalkulation bzw. direkt aus einem Standardangebot
+ist unzulässig.
 
 Zusätzlich:
 
@@ -150,6 +185,13 @@ Vorgangsdaten:
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.
+
+## Benutzer und Rollen
+
+Neben Admin, Vertrieb, Disposition und Geschäftsführung existiert die Rolle
+Produktmanagement (`AUTH-006`). Rollen- und Extra-Rechte werden serverseitig
+geprüft. Produktmanagement ohne Extra-Recht hat keine Fremdschlüssel-Sicht auf
+Kundenkalkulationen oder Dispoaufträge (`AUTH-007`).
 
 ## Workflow und Historie
 

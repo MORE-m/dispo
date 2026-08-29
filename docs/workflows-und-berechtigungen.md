@@ -2,20 +2,46 @@
 
 ## Rollen
 
-| Fähigkeit | Admin | Vertrieb | Disposition | Geschäftsführung |
-|---|:---:|:---:|:---:|:---:|
-| Alle Kalkulationen und Aufträge sehen | ✓ | ✓ | ✓ | ✓ |
-| Kalkulationen anlegen/bearbeiten | ✓ | ✓ | – | ✓ |
-| Dispoentwurf anlegen/bearbeiten | ✓ | ✓ | operativ | ✓ |
-| Vier-Augen-Freigabe | ✓ | berechtigt, nie eigener Auftrag | – | ✓ |
-| Kaufmännische Sonderfreigabe | mit Sonderrecht | nur mit Sonderrecht | – | ✓ |
-| Operative Disposition | optional | – | ✓ | ✓ |
-| Stammdaten und Regeln administrieren | ✓ | – | – | ✓ |
-| Abschluss erzwingen | ✓ | – | – | ✓ |
-| Auswerten/exportieren | ✓ | ✓ | rollenbezogen | ✓ |
+| Fähigkeit | Admin | Vertrieb | Disposition | Geschäftsführung | Produktmanagement |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Alle Kundenkalkulationen und Aufträge sehen | ✓ | ✓ | ✓ | ✓ | nur mit Extra-Recht |
+| Kalkulationen anlegen/bearbeiten | ✓ | ✓ | – | ✓ | nur mit Extra-Recht |
+| Standardangebote sehen (veröffentlicht) | ✓ | ✓ | – | ✓ | ✓ |
+| Standardangebote anlegen/bearbeiten/versionieren | ✓ | – | – | ✓ | ✓ |
+| Standardangebote veröffentlichen/archivieren | ✓ | – | – | ✓ | ✓ |
+| Standardangebot in Kundenkalkulation übernehmen | ✓ | ✓ | – | ✓ | nur mit Extra-Recht |
+| Dispoentwurf anlegen/bearbeiten | ✓ | ✓ | operativ | ✓ | nur mit Extra-Recht |
+| Vier-Augen-Freigabe | ✓ | berechtigt, nie eigener Auftrag | – | ✓ | nur mit Extra-Recht |
+| Kaufmännische Sonderfreigabe | mit Sonderrecht | nur mit Sonderrecht | – | ✓ | nur mit Extra-Recht |
+| Operative Disposition | optional | – | ✓ | ✓ | – |
+| Stammdaten und Regeln administrieren | ✓ | – | – | ✓ | Preis-/Produkt-Snapshots für Standardangebote |
+| Abschluss erzwingen | ✓ | – | – | ✓ | – |
+| Auswerten/exportieren | ✓ | ✓ | rollenbezogen | ✓ | rollenbezogen |
 
 Berechtigungen werden serverseitig über Rollen und zusätzliche Nutzerrechte
-geprüft. Geschäftsführung darf alle Vorgänge bearbeiten (`AUTH-003`).
+geprüft. Geschäftsführung darf alle Vorgänge bearbeiten (`AUTH-003`). Admin und
+Geschäftsführung behalten umfassende Rechte. Produktmanagement erhält die
+Standardangebotsrechte aus `AUTH-006`, aber nicht automatisch Zugriff auf
+Kundenkalkulationen oder Dispoaufträge (`AUTH-007`).
+
+## Standardangebote
+
+Status: Entwurf → veröffentlicht → archiviert. Nur veröffentlichte Versionen
+sind für Vertrieb zur Übernahme sichtbar (`STD-002`, `STD-004`).
+
+```mermaid
+flowchart TD
+    A[Entwurf Standardangebot] --> B[Veröffentlicht]
+    B --> C[Vertrieb übernimmt]
+    C --> D[Eigenständige Kundenkalkulation]
+    D --> E[Dispoauftrag]
+    B --> F[Archiviert]
+    A --> F
+    B -. nicht erlaubt .-> E
+```
+
+Übernahme erzeugt einen Snapshot. Änderungen fließen nicht zurück (`STD-005`).
+Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
 ## Vier-Augen-Prinzip
 

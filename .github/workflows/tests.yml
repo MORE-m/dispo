@@ -25,7 +25,7 @@ jobs:
           php-version: '8.3'
           tools: composer:v2
           coverage: none
-          extensions: mbstring, pdo_sqlite, pdo_mysql
+          extensions: mbstring, bcmath, pdo_sqlite, pdo_mysql
 
       - name: Setup Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -111,7 +111,7 @@ jobs:
           php-version: '8.3'
           tools: composer:v2
           coverage: none
-          extensions: mbstring, pdo_mysql
+          extensions: mbstring, bcmath, pdo_mysql
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --no-progress

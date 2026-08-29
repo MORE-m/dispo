@@ -2,7 +2,7 @@
 
 ## Strategie
 
-Die fachliche Mindestabnahme besteht aus den Szenarien `AT-01` bis `AT-22`.
+Die fachliche Mindestabnahme besteht aus den Szenarien `AT-01` bis `AT-31`.
 Zusätzlich benötigt jede Umsetzung:
 
 - Unit-Tests für Formeln, Regelauswertung und Statusentscheidungen,
@@ -40,6 +40,15 @@ Zufallswerte werden kontrolliert, damit Ergebnisse reproduzierbar bleiben.
 | AT-20 | AUD-001–AUD-004 | Änderung, Download, Export und Kommentar | Aktionen protokolliert; reine Ansicht nicht protokolliert |
 | AT-21 | PRI-001–PRI-006 | Fehlerhafte Preisimportdatei | Vorschau und Fehlerbericht; keine Teilaktivierung |
 | AT-22 | AUTH-001, STA-003 | Disposition versucht Rabatt zu ändern | Server blockiert; Rückfrage an Vertrieb bleibt möglich |
+| AT-23 | CAL-001, CAL-005 | 10 Spot Classic Radio Hamburg und 5 ROCK ANTENNE Hamburg, abweichende Längen/Stunden/Rabatte | Eine Kalkulation; Live-Gesamtsumme; Positionen separat editierbar |
+| AT-24 | SPT-015 | Standardlänge vorbelegt, dann abweichende Sekunden | Feld sichtbar und frei; Preis und Dispo-Snapshot nutzen die tatsächliche Länge |
+| AT-25 | BUD-003–BUD-006 | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Mehrsender-Vorschlag ohne bestehendes Senderverhältnis; editierbar |
+| AT-26 | BUD-007 | Zielbudget, das sich nicht ganzzahlig teilt | Ganzzahlige Mengen; Rest oder Überschreitung transparent |
+| AT-27 | BUD-008 | Vorschlag anzeigen, verwerfen, dann explizit übernehmen | Ohne Übernahme unverändert; nach Übernahme Mengen gesetzt und weiter editierbar |
+| AT-28 | STD-004, STD-005 | Veröffentlichung, Vertrieb übernimmt und ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert |
+| AT-29 | STD-007, DSP-007 | Dispoauftrag direkt am Standardangebot | Serverseitig unzulässig; nur aus Kundenkalkulation |
+| AT-30 | AUTH-006, AUTH-007 | Nutzer nur Produktmanagement | Standardangebote erlaubt; Kundenkalkulationen/Dispo ohne Extra-Recht verweigert |
+| AT-31 | STD-002, STD-008 | Entwurf veröffentlichen, archivieren | Status, Autor, Veröffentlichungszeitpunkt und Audit vollständig |
 
 ## Pflichtklassen für Negativtests
 
@@ -75,7 +84,7 @@ test_VER_005_new_fieldset_version_does_not_mutate_existing_snapshot
 
 V1 ist fachlich abnahmefähig, wenn:
 
-- alle 22 Mindestfälle erfolgreich sind,
+- alle 31 Mindestfälle erfolgreich sind,
 - alle MUSS-Anforderungen tracebar abgedeckt sind,
 - keine offenen Fehler der Schwere kritisch/hoch bestehen,
 - Preislisten- und Kombinationsinitialdaten abgenommen wurden,

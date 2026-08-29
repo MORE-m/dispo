@@ -19,39 +19,40 @@ Abnahme: Ein neuer Entwickler kann das Projekt anhand der README starten und ein
 Smoke-Test ausführen. Technisch endgültig abgenommen, sobald GitHub Actions
 `ci` und `mysql` grün sind (29.08.2026, BLK-004 erledigt).
 
-Visuelles Designsystem, App-Shell und UI-Muster sind **nicht** Teil von Phase 0.
-Sie liegen im verbindlichen UX/UI-Gate vor Phase 1
-([`ux-ui-gate.md`](ux-ui-gate.md), Backlog `BL-GATE-UXUI`).
+Visuelles Designsystem, App-Shell und UI-Muster liegen in den gestuften
+UX/UI-Gates ([`ux-ui-gate.md`](ux-ui-gate.md)). `UX-GATE-A` und `UX-GATE-B`
+sind freigegeben. `UX-GATE-C` und `UX-GATE-D` bleiben blockiert.
 
-## UX/UI-Gate – vor Phase-1-Oberflächen
+## UX/UI-Gates
 
-Mit dem Product Owner festzulegen, bevor endgültige Fachseiten gestaltet werden:
+Vier Teil-Gates ersetzen das frühere `BL-GATE-UXUI`. Details:
+[`ux-ui-gate.md`](ux-ui-gate.md).
 
-- visuelles Designsystem; Farben, Typografie, Abstände, Oberflächen
-- Navigation und App-Shell
-- Tabellen-, Formular- und Filtermuster
-- Statusdarstellung
-- Kalkulations-Wizard
-- kontextbezogene Assistenten-/Pop-up-Logik
-- Desktop- und Tabletverhalten
-- Lade-, Leer-, Fehler- und Erfolgszustände
-- UX-Abnahmekriterien
+| Gate | Inhalt | Status |
+|---|---|---|
+| UX-GATE-A | Designsystem, App-Shell, Navigation, gemeinsame Komponenten | freigegeben |
+| UX-GATE-B | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic | freigegeben |
+| UX-GATE-C | Trailer/SWF, Influencer, Social, weitere Werbeelemente | blockiert |
+| UX-GATE-D | Dispo, Freigaben, Standardangebote, Administration, Abschluss-UI | blockiert |
 
-Bis zur Freigabe: technische Grundlagen und Headless-Komponenten zulässig;
-keine endgültigen Fachseiten.
+Freigegebene Gates werden als vertikale Pakete umgesetzt, nicht als komplette
+Phasen 1–11 auf einmal. Blockierte Gates erzeugen nur Sperrzustände.
 
 ## Phase 1 – Anmeldung, Benutzer und Auditfundament
 
 Umfang:
 
 - lokaler Login und Passwort-Reset,
-- Rollen Admin, Vertrieb, Disposition, Geschäftsführung,
+- Rollen Admin, Vertrieb, Disposition, Geschäftsführung, Produktmanagement,
 - nutzerbezogene Rabattgrenze und Sonderfreigaberechte,
 - Policy-/Autorisierungsgrundlage,
 - append-only Auditereignisse,
 - In-App-Benachrichtigungsgrundlage.
 
 Relevante Anforderungen: `AUTH-*`, `AUD-*`, `GEN-001`, `GEN-003`.
+
+Rolle Produktmanagement (`AUTH-006`, `AUTH-007`) gehört zur Policy-Grundlage und
+erhält nicht automatisch Kundenkalkulations- oder Disporechte.
 
 ## Phase 2 – Stammdaten und Kombinationstabelle
 
@@ -88,19 +89,23 @@ Umfang:
 - Excel-Import mit Vorschau und atomarer Aktivierung,
 - Tagesgruppenableitung,
 - Durchschnittskalkulation mit mehreren Zeitfenstern,
-- Kalenderplaner,
+- Kalenderplaner mit einzelnen Preisstunden (keine gruppierten Zeitschienen),
+- frei editierbare tatsächliche Spotlänge je Sender-/Kombinationsposition,
+- Mehrsender-/Kombipositionen und Live-Gesamtsumme,
 - Spotlängenindex, Aufschläge und Komponenten,
-- nachvollziehbare Rechenerklärung.
+- nachvollziehbare Rechenerklärung,
+- Standardangebote als versionierte Vorlagen mit Übernahme in Kundenkalkulationen.
 
-Relevante Anforderungen: `PRI-*`, `CAL-*`, `SPT-*`.
+Relevante Anforderungen: `PRI-*`, `CAL-*`, `SPT-*`, `STD-*`.
 
-Abnahme: `AT-01` bis `AT-04` und `AT-21`.
+Abnahme: `AT-01` bis `AT-04`, `AT-21`, `AT-23`, `AT-24`, `AT-28` bis `AT-31`.
 
 ## Phase 5 – SWF, Produktion und freie Preisbestandteile
 
 Umfang:
 
 - SWF-Durchschnitt, Planer und Festpreis ohne Spotlängenindex,
+- gruppierte Zeitschienen und Standardlängen für Trailer/Allongen/weitere SWF zulässig,
 - RHH-Initialregeln und CityLife-Variante,
 - Produktionspreislisten,
 - Produktion/Sonstiges und Überschreibungsfreigabe.
@@ -131,11 +136,12 @@ Umfang:
 - AE-Hierarchie und AE-fähige Basen,
 - Festpreisrückrechnung,
 - drei Payfaktoren,
-- Freigabeauslöser und Freigabeinvalidierung.
+- Freigabeauslöser und Freigabeinvalidierung,
+- Budget-Assistent mit expliziter Übernahme.
 
-Relevante Anforderungen: `COM-*`, `APR-*`, `AUTH-004`, `AUTH-005`.
+Relevante Anforderungen: `COM-*`, `APR-*`, `AUTH-004`, `AUTH-005`, `BUD-*`.
 
-Abnahme: `AT-06`, `AT-07`, `AT-09`, `AT-12`, `AT-13`.
+Abnahme: `AT-06`, `AT-07`, `AT-09`, `AT-12`, `AT-13`, `AT-25` bis `AT-27`.
 
 ## Phase 8 – Dispoauftrag und Statusworkflow
 
@@ -150,7 +156,7 @@ Umfang:
 
 Relevante Anforderungen: `DSP-*`, `STA-*`, `UPL-001` bis `UPL-003`, `TEC-*`.
 
-Abnahme: `AT-12` bis `AT-19`.
+Abnahme: `AT-12` bis `AT-19`, `AT-29`. Dispoaufträge nur aus Kundenkalkulationen.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen
 
@@ -188,7 +194,7 @@ Umfang:
 - Initialdatenimport und fachliche Abnahme,
 - Betriebsdokumentation und Monitoring.
 
-Abnahme: gesamter `AT-01` bis `AT-22`-Katalog und nichtfunktionale Anforderungen.
+Abnahme: gesamter `AT-01` bis `AT-31`-Katalog und nichtfunktionale Anforderungen.
 
 Die ausführbare Aufgabenliste mit Status steht in [`backlog-v1.md`](backlog-v1.md).
 Der aktuelle Stand steht in [`fortschritt.md`](fortschritt.md).

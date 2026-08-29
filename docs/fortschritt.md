@@ -1,75 +1,85 @@
 # Fortschritt V1
 
-Stand: 29. August 2026
+Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v7)
 
 ## Aktuelle Phase
 
-Phase 0 ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und
-`mysql` grün). **Halt vor Phase 1** wegen `BL-GATE-UXUI`.
+Phase 0 bleibt technisch abgenommen. `UX-GATE-A` und `UX-GATE-B` sind **fachlich
+und technisch abgenommen** (Commit `976aae5`, Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)).
 
 ## Aktuelle Aufgabe
 
-Keine Implementierungsaufgabe. Nächster Schritt: Product-Owner-Freigabe des
-UX/UI-Gates. Keine Phase-1-Fachoberflächen.
+Review-Nacharbeit abgeschlossen. PR #2 offen gegen `phase-0-abschluss`; kein Merge.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-BLK-004: GitHub Actions `ci` und `mysql` auf PR #1 nachgewiesen; Phase 0
-technisch abgenommen.
+MySQL-Paralleltest-Fix (`Process::wait()` Exit-Code, `sort()`), technische Abnahme
+UX-GATE-A/B nach grünen Jobs `ci` und `mysql` (Commit `976aae5`).
 
-## Technisch vorbereitet, noch nicht fachlich vollständig erfüllt
+## Technische Abnahme UX-GATE-A/B
 
-Diese IDs sind in der Projektbasis angelegt oder vorbereitet. Die vollständige
-fachliche Erfüllung erfolgt erst in den späteren Backlog-Paketen:
+| Kriterium | Status |
+|---|---|
+| Fachliche Freigabe PO | **freigegeben** (UX-GATE-A/B) |
+| Technische Abnahme | **abgenommen** (29.08.2026, HEAD `976aae5`) |
+| Durchschnittskalkulation (SPT-001–SPT-004, SPT-016) | umgesetzt |
+| Kalenderplaner (SPT-005–SPT-008) | bewusst offen |
+| Festpreis Spot | bewusst offen (kein Gate-B-Umfang) |
+| Preislisten-Snapshot / keine Rückwirkung (`PRI-004`) | umgesetzt |
+| Historische Positionen bei deaktivierten Stammdaten | umgesetzt (v4/v5) |
+| `length_index`-Snapshot (`SPT-009`) | umgesetzt (v4/v5) |
+| Budgetvorschlag + Übernahme + lock_version | umgesetzt |
+| Atomare Nummernvergabe (`TEC-001`) | umgesetzt (v6) |
+| MySQL-Paralleltest (`CalculationWriter::create`) | ausgeführt und grün (v7) |
+| Read-only-Zusammenfassung | umgesetzt |
+| GitHub Actions `ci` + `mysql` auf Abnahme-HEAD | **grün** ([Run 33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)) |
 
-- `AUTH-001` / `AUTH-003` – Headless-Rollen und Gate `access-administration`;
-  vollständig in `BL-P1-02` (und Folgepakete)
-- `UPL-005` – physisches Löschen nur für temporäre Pfade in `PrivateFileStorage`;
-  Upload-Archivierung vollständig in `BL-P9-01`
-- Kapitel 24 (Sicherheit, Betrieb, Dateien ohne öffentliche URL) in der Projektbasis
-- `GEN-003` intern UTC, Anzeige `Europe/Berlin` (Konfiguration)
-- Zugang V1 (Headless): Login E-Mail/Passwort, Logout, Passwort-Reset,
-  Passwortänderung; keine öffentliche Registrierung; keine Passkeys/2FA;
-  kein E-Mail-Verifizierungsflow; keine Kontoselbstlöschung
+## Nachweis CI (technische Abnahme)
 
-## Ausgeführte Prüfungen und Ergebnisse
+| Job | Ergebnis | Link |
+|---|---|---|
+| `ci` | success (1m37s) | [Job 99100268479](https://github.com/MORE-m/dispo/actions/runs/33252415668/job/99100268479) |
+| `mysql` | success (58s), **95 passed** | [Job 99100268408](https://github.com/MORE-m/dispo/actions/runs/33252415668/job/99100268408) |
 
-Frische Kopie `/tmp/dispo-fresh-clone-p0-v3` (nach `composer install`, `npm ci`,
-`npm run build` und vorhandenen Laravel-Storage-Platzhaltern):
+MySQL-Paralleltest `gen_001_mysql_parallel_workers_create_calculations_with_unique_numbers`:
+ausgeführt (2,06s), nicht übersprungen.
 
-- SQLite: alle vier Migrationen; Pest 39 Tests, **36 bestanden**, 3 übersprungen, 95 Assertions
-- MySQL: alle vier Migrationen; Pest **39/39**, 98 Assertions
-- Pint, PHPStan (0 Fehler): bestanden
-- `npm run check`: bestanden
-- `npm run types:check` (nach Build/Wayfinder): bestanden
-- Vitest: 2 Tests bestanden
-- Playwright: 2/2 bestanden
-- `composer audit` / `npm audit --omit=dev`: keine Advisories / 0 Schwachstellen
-- nach Pest keine Datei `storage/app/private/health-check/smoke.txt`
+## Review-Nacharbeit (v5/v6/v7, Kurzüberblick)
 
-GitHub Actions auf Branch `phase-0-abschluss`, Lauf
-https://github.com/MORE-m/dispo/actions/runs/33232656289 (Commit `4915baa`):
-Jobs `ci` und `mysql` beide `success`.
+| Version | Inhalt |
+|---|---|
+| v5 | Playwright, `length_index`, historische Kataloge, Snapshot-Tests, `client_key`, deterministische Migration |
+| v6 | Atomare Nummernvergabe (`TEC-001`), isolierter MySQL-Paralleltest, Export per `git archive` |
+| v7 | MySQL-Paralleltest Process-API-Fix, technische Abnahme dokumentiert |
 
-## Bekannte technische Schulden
+## Migrationen (Nacharbeit)
 
-- Starter-Kit-Login und Welcome sind **provisorisch**, kein abgenommenes Fach-UI
-- Factory-Default-Rolle `sales` nur für Tests, keine produktive Nutzeranlage
-- PHPStan lokal mit `--memory-limit=1G` (CI ebenso)
-- Speedit-Betriebsparameter (inkl. PHP-CLI-Pfad) und Initialkataloge weiterhin
-  vor Produktivsetzung zu verifizieren (BLK-001, BLK-002)
-- `laravel/passkeys` bleibt Composer-Transitivabhängigkeit von Fortify, wird
-  nicht auto-discovered und registriert keine Routen
+| Migration | Zweck |
+|---|---|
+| `2026_08_29_140000_calculation_review_nacharbeit.php` | `client_key`, `spot_method`, `total_spot_count` |
+| `2026_08_29_150000_calculation_snapshot_and_sequences.php` | Snapshot-Spalten, Sequenztabelle, Backfill |
+| `2026_08_29_160000_backfill_length_index.php` | deterministischer `length_index`-Backfill |
+
+## Bewusst offen / temporär
+
+| Thema | Status |
+|---|---|
+| CRM-001 | **nicht erfüllt** – Freitext Kunde/Agentur |
+| Anzeigenamen-Snapshot auf Position | Gate-B-Grenze dokumentiert |
+| SPT-005–SPT-008 Kalenderplaner | offen |
+| Festpreis Spot | offen |
+| Headless-Stammdaten, Benachrichtigungen | nicht begonnen |
+| UX-GATE-C/D | blockiert (BLK-005/006) |
 
 ## Echte Blocker
 
 | ID | Thema |
 |---|---|
-| BLK-003 | UX/UI-Gate: Product-Owner-Freigabe und Artefakte fehlen – **blockiert Phase-1-Fachoberflächen** |
+| BLK-005 | UX-GATE-C |
+| BLK-006 | UX-GATE-D |
 | BLK-001 | Initialkataloge Kapitel 27 |
-| BLK-002 | Speedit-Parameter vor Produktiv-Deploy, inkl. PHP-CLI-Pfad |
+| BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
 
 ## Exakt nächste ausführbare Aufgabe
 
-Product-Owner-Workshop und Artefakte für `BL-GATE-UXUI`. Fachoberflächen erst
-nach Gate-Freigabe. Keine Phase-1-Fachseiten bis dahin.
+PR #2 mergen (nach PO-Freigabe); UX-GATE-C/D und BLK-001/002 weiterhin offen.

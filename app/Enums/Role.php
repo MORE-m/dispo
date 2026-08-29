@@ -8,6 +8,7 @@ enum Role: string
     case Sales = 'sales';
     case Disposition = 'disposition';
     case Management = 'management';
+    case ProductManagement = 'product_management';
 
     public function label(): string
     {
@@ -16,6 +17,7 @@ enum Role: string
             self::Sales => 'Vertrieb',
             self::Disposition => 'Disposition',
             self::Management => 'Geschäftsführung',
+            self::ProductManagement => 'Produktmanagement',
         };
     }
 }

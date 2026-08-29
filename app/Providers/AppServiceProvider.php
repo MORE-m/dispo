@@ -2,8 +2,9 @@
 
 namespace App\Providers;
 
-use App\Enums\Role;
+use App\Models\Calculation;
 use App\Models\User;
+use App\Policies\CalculationPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -58,7 +59,9 @@ class AppServiceProvider extends ServiceProvider
     protected function configureAuthorization(): void
     {
         Gate::define('access-administration', function (User $user): bool {
-            return $user->hasAnyRole(Role::Admin, Role::Management);
+            return $user->canAccessAdministration();
         });
+
+        Gate::policy(Calculation::class, CalculationPolicy::class);
     }
 }

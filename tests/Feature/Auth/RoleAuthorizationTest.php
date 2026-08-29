@@ -28,7 +28,7 @@ class RoleAuthorizationTest extends TestCase
 
     public function test_sales_and_disposition_are_denied_administration(): void
     {
-        foreach ([Role::Sales, Role::Disposition] as $role) {
+        foreach ([Role::Sales, Role::Disposition, Role::ProductManagement] as $role) {
             $user = User::factory()->role($role)->create();
 
             $this->actingAs($user)

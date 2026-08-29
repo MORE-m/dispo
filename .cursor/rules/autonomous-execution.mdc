@@ -28,9 +28,10 @@ treffen und im Entscheidungslog festhalten.
 
 Akzeptierte ADRs nicht stillschweigend ändern. Richtungswechsel: neues ADR.
 
-Solange `BL-GATE-UXUI` nicht freigegeben ist: keine endgültigen Fachseiten
-gestalten. Nach Abschluss von Phase 0 anhalten, wenn das Gate blockiert ist.
-Technische Grundlagen und Headless-Komponenten sind zulässig.
+UX-GATE-A und UX-GATE-B sind freigegeben (App-Shell, Wizard, Spot Classic).
+UX-GATE-C und UX-GATE-D bleiben blockiert: keine Trailer/SWF-, Influencer-/Social-,
+Dispo-, Freigabe-, Standardangebots- oder Admin-Fachoberflächen. Gesperrte
+Bereiche nur als Sperr-/Leerzustand.
 
 ## Blocker
 
