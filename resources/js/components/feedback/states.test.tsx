@@ -14,6 +14,20 @@ test('LogoSlot nutzt neutrale Initialen', () => {
     expect(container).toHaveTextContent('RH');
 });
 
+test('LogoSlot rendert Senderlogo mit Alternativtext', () => {
+    render(
+        <LogoSlot
+            name="Radio Hamburg"
+            logoPath="/images/senders/radio-hamburg.png"
+            variant="card"
+        />,
+    );
+    expect(screen.getByRole('img', { name: 'Radio Hamburg' })).toHaveAttribute(
+        'src',
+        '/images/senders/radio-hamburg.png',
+    );
+});
+
 test('money formatiert EUR', () => {
     expect(money('10.5')).toContain('10,50');
 });

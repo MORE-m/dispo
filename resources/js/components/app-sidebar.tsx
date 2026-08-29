@@ -42,7 +42,11 @@ export function AppSidebar() {
     }));
 
     return (
-        <Sidebar collapsible="icon" variant="sidebar">
+        <Sidebar
+            collapsible="icon"
+            variant="sidebar"
+            className="border-sidebar-border border-r"
+        >
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>

@@ -1,6 +1,13 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FormField, money } from '@/components/form-field';
+import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
+import {
+    FormField,
+    formSelectClass,
+    formTextareaClass,
+    money,
+} from '@/components/form-field';
 import {
     EmptyState,
     ErrorState,
@@ -10,9 +17,24 @@ import {
 } from '@/components/feedback/states';
 import PageHeader from '@/components/heading-page';
 import { LogoSlot } from '@/components/logo-slot';
+import {
+    SelectionCard,
+    SelectionCardGrid,
+    SelectionCardOption,
+} from '@/components/selection-card';
+import {
+    PositionPriceSummary,
+    wizardCardClass,
+    wizardCardContentClass,
+    wizardCardHeaderClass,
+    wizardCardTitleClass,
+} from '@/components/wizard-section';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { WizardStepper } from '@/components/wizard-stepper';
+import { cn } from '@/lib/utils';
 
 type PlanRow = {
     hour: number;
@@ -554,6 +576,23 @@ export default function CalculationWizard({
 
     const displayTotals = canEdit ? totals : null;
     const summary = !canEdit && savedSummary ? savedSummary : null;
+    const summaryTotals =
+        displayTotals ??
+        (summary
+            ? {
+                  media_gross: summary.media_gross,
+                  position_discount_total: summary.position_discount_total,
+                  order_discount_total: summary.order_discount_total,
+                  ae_total: summary.ae_total,
+                  nn_invest: summary.nn_invest,
+                  target_budget_nn: summary.target_budget_nn,
+                  requires_special_approval: summary.requires_special_approval,
+                  positions: summary.positions.map((position) => ({
+                      nn_invest: position.nn_invest,
+                      media_gross: position.media_gross,
+                  })),
+              }
+            : null);
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
         catalog.media.some(
@@ -570,7 +609,7 @@ export default function CalculationWizard({
                         : 'Neue Kalkulation'
                 }
             />
-            <div className="flex flex-1 flex-col gap-6 p-6">
+            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
                 <PageHeader
                     title={calculation ? `Kalkulation` : 'Neue Kalkulation'}
                 />
@@ -584,756 +623,1200 @@ export default function CalculationWizard({
                 ) : null}
                 {error ? <ErrorState message={error} /> : null}
 
-                <ol className="flex flex-wrap gap-2" aria-label="Wizard">
-                    {STEPS.map((label, index) => (
-                        <li key={label}>
-                            <Button
-                                type="button"
-                                variant={step === index ? 'default' : 'outline'}
-                                onClick={() => setStep(index)}
-                            >
-                                {index + 1}. {label}
-                            </Button>
-                        </li>
-                    ))}
-                </ol>
+                <WizardStepper
+                    steps={STEPS}
+                    currentStep={step}
+                    onStepChange={setStep}
+                />
 
-                {step === 0 ? (
-                    <div className="grid max-w-3xl gap-4">
-                        <fieldset className="space-y-2">
-                            <legend className="text-sm font-medium">
-                                Planungsweg
-                            </legend>
-                            <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="radio"
-                                    name="planning_mode"
-                                    checked={planningMode === 'manual'}
-                                    onChange={() => setPlanningMode('manual')}
-                                    disabled={!canEdit}
-                                />
-                                Selbst planen
-                            </label>
-                            <label className="flex items-center gap-2 text-sm">
-                                <input
-                                    type="radio"
-                                    name="planning_mode"
-                                    checked={planningMode === 'budget'}
-                                    onChange={() => setPlanningMode('budget')}
-                                    disabled={!canEdit}
-                                />
-                                Mit Budget planen
-                            </label>
-                        </fieldset>
-                        <FormField label="Kunde" htmlFor="customer">
-                            <Input
-                                id="customer"
-                                value={customerName}
-                                onChange={(event) =>
-                                    setCustomerName(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        <FormField label="Agentur" htmlFor="agency">
-                            <Input
-                                id="agency"
-                                value={agencyName}
-                                onChange={(event) =>
-                                    setAgencyName(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        <FormField label="Kampagne" htmlFor="campaign">
-                            <Input
-                                id="campaign"
-                                value={campaign}
-                                onChange={(event) =>
-                                    setCampaign(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        <FormField label="Produkt / Titel" htmlFor="product">
-                            <Input
-                                id="product"
-                                value={productTitle}
-                                onChange={(event) =>
-                                    setProductTitle(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        <FormField
-                            label="Briefing (optional)"
-                            htmlFor="briefing"
-                        >
-                            <textarea
-                                id="briefing"
-                                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 min-h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
-                                value={briefing}
-                                onChange={(event) =>
-                                    setBriefing(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        <FormField
-                            label="Zielbudget N/N"
-                            htmlFor="budget"
-                            hint={
-                                planningMode === 'manual'
-                                    ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                    : undefined
-                            }
-                        >
-                            <Input
-                                id="budget"
-                                inputMode="decimal"
-                                value={targetBudget}
-                                onChange={(event) =>
-                                    setTargetBudget(event.target.value)
-                                }
-                                disabled={!canEdit}
-                            />
-                        </FormField>
-                        {planningMode === 'budget' ? (
-                            <FormField label="Verteilung" htmlFor="strategy">
-                                <select
-                                    id="strategy"
-                                    className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                                    value={budgetStrategy}
-                                    onChange={(event) =>
-                                        setBudgetStrategy(event.target.value)
-                                    }
-                                    disabled={!canEdit}
-                                >
-                                    <option value="equal_budget">
-                                        Budget je Sender gleich verteilen
-                                    </option>
-                                    <option value="maximize_spots">
-                                        Spotanzahl maximieren
-                                    </option>
-                                </select>
-                            </FormField>
-                        ) : null}
-                    </div>
-                ) : null}
-
-                {step === 1 ? (
-                    catalogMissing ? (
-                        <EmptyState
-                            title="Kein Katalog"
-                            description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
-                        />
-                    ) : (
-                        <div className="space-y-6">
-                            {positions.map((position, index) => {
-                                const inventory = catalog.inventories.find(
-                                    (item) => item.id === position.inventory_id,
-                                );
-
-                                return (
-                                    <section
-                                        key={position.client_key}
-                                        className="space-y-4 rounded-xl border p-4"
-                                        aria-labelledby={`pos-${index}`}
+                <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-[auto_auto] lg:items-start">
+                    <div className="order-1 min-w-0 space-y-6 lg:col-start-1 lg:row-start-1">
+                        {step === 0 ? (
+                            <div className="space-y-6">
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
                                     >
-                                        <div className="flex flex-wrap items-end gap-3">
-                                            <LogoSlot
-                                                name={
-                                                    inventory
-                                                        ? catalogLabel(
-                                                              inventory.name,
-                                                              inventory.is_active,
-                                                          )
-                                                        : 'Sender'
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
+                                            Planungsweg
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent
+                                        className={wizardCardContentClass}
+                                    >
+                                        <SelectionCardGrid className="sm:grid-cols-2">
+                                            <SelectionCard
+                                                name="planning_mode"
+                                                checked={
+                                                    planningMode === 'manual'
                                                 }
+                                                disabled={!canEdit}
+                                                onChange={() =>
+                                                    setPlanningMode('manual')
+                                                }
+                                            >
+                                                <SelectionCardOption
+                                                    icon={SlidersHorizontal}
+                                                    title="Selbst planen"
+                                                    description="Sender, Werbeelemente und Konditionen manuell festlegen."
+                                                />
+                                            </SelectionCard>
+                                            <SelectionCard
+                                                name="planning_mode"
+                                                checked={
+                                                    planningMode === 'budget'
+                                                }
+                                                disabled={!canEdit}
+                                                onChange={() =>
+                                                    setPlanningMode('budget')
+                                                }
+                                            >
+                                                <SelectionCardOption
+                                                    icon={Wallet}
+                                                    title="Mit Budget planen"
+                                                    description="Zielbudget und Verteilungslogik vorgeben."
+                                                />
+                                            </SelectionCard>
+                                        </SelectionCardGrid>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
+                                            Grunddaten
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent
+                                        className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
+                                    >
+                                        <FormField
+                                            label="Kunde"
+                                            htmlFor="customer"
+                                        >
+                                            <Input
+                                                id="customer"
+                                                value={customerName}
+                                                onChange={(event) =>
+                                                    setCustomerName(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
                                             />
-                                            <FormField label="Sender / Kombi">
+                                        </FormField>
+                                        <FormField
+                                            label="Agentur"
+                                            htmlFor="agency"
+                                        >
+                                            <Input
+                                                id="agency"
+                                                value={agencyName}
+                                                onChange={(event) =>
+                                                    setAgencyName(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Kampagne"
+                                            htmlFor="campaign"
+                                        >
+                                            <Input
+                                                id="campaign"
+                                                value={campaign}
+                                                onChange={(event) =>
+                                                    setCampaign(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Produkt / Titel"
+                                            htmlFor="product"
+                                        >
+                                            <Input
+                                                id="product"
+                                                value={productTitle}
+                                                onChange={(event) =>
+                                                    setProductTitle(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Briefing (optional)"
+                                            htmlFor="briefing"
+                                        >
+                                            <textarea
+                                                id="briefing"
+                                                className={`${formTextareaClass} sm:col-span-2`}
+                                                value={briefing}
+                                                onChange={(event) =>
+                                                    setBriefing(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
+                                            />
+                                        </FormField>
+                                        <FormField
+                                            label="Zielbudget N/N"
+                                            htmlFor="budget"
+                                            hint={
+                                                planningMode === 'manual'
+                                                    ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
+                                                    : undefined
+                                            }
+                                        >
+                                            <Input
+                                                id="budget"
+                                                inputMode="decimal"
+                                                value={targetBudget}
+                                                onChange={(event) =>
+                                                    setTargetBudget(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                                disabled={!canEdit}
+                                            />
+                                        </FormField>
+                                        {planningMode === 'budget' ? (
+                                            <FormField
+                                                label="Verteilung"
+                                                htmlFor="strategy"
+                                            >
                                                 <select
-                                                    className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
-                                                    data-test={`position-inventory-${index}`}
-                                                    value={
-                                                        position.inventory_id
+                                                    id="strategy"
+                                                    className={formSelectClass}
+                                                    value={budgetStrategy}
+                                                    onChange={(event) =>
+                                                        setBudgetStrategy(
+                                                            event.target.value,
+                                                        )
                                                     }
                                                     disabled={!canEdit}
-                                                    onChange={(event) =>
-                                                        updatePosition(index, {
-                                                            inventory_id:
-                                                                Number(
-                                                                    event.target
-                                                                        .value,
-                                                                ),
-                                                        })
-                                                    }
                                                 >
-                                                    {catalog.inventories.map(
-                                                        (item) => (
-                                                            <option
-                                                                key={item.id}
-                                                                value={item.id}
-                                                                disabled={
-                                                                    !item.is_active &&
-                                                                    item.id !==
-                                                                        position.inventory_id
-                                                                }
-                                                            >
-                                                                {catalogLabel(
-                                                                    item.name,
-                                                                    item.is_active,
-                                                                )}
-                                                            </option>
-                                                        ),
-                                                    )}
+                                                    <option value="equal_budget">
+                                                        Budget je Sender gleich
+                                                        verteilen
+                                                    </option>
+                                                    <option value="maximize_spots">
+                                                        Spotanzahl maximieren
+                                                    </option>
                                                 </select>
                                             </FormField>
-                                            <FormField label="Kalkulationsart">
-                                                <Input
-                                                    readOnly
-                                                    value="Durchschnitt"
-                                                    disabled
-                                                />
-                                            </FormField>
-                                            <FormField
-                                                label="Spotanzahl gesamt"
-                                                htmlFor={`spots-${index}`}
-                                                error={
-                                                    fieldErrors[
-                                                        `positions.${index}.total_spot_count`
-                                                    ]?.[0]
-                                                }
+                                        ) : null}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        ) : null}
+
+                        {step === 1 ? (
+                            catalogMissing ? (
+                                <EmptyState
+                                    title="Kein Katalog"
+                                    description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
+                                />
+                            ) : (
+                                <div className="space-y-6">
+                                    {positions.map((position, index) => {
+                                        return (
+                                            <section
+                                                key={position.client_key}
+                                                aria-labelledby={`pos-${index}`}
                                             >
-                                                <Input
-                                                    id={`spots-${index}`}
-                                                    data-test={`position-total-spots-${index}`}
-                                                    type="number"
-                                                    min={0}
-                                                    step={1}
-                                                    value={
-                                                        position.total_spot_count
-                                                    }
-                                                    disabled={!canEdit}
-                                                    onChange={(event) =>
-                                                        updatePosition(index, {
-                                                            total_spot_count:
-                                                                Number(
-                                                                    event.target
-                                                                        .value,
-                                                                ),
-                                                        })
-                                                    }
-                                                />
-                                            </FormField>
-                                            <FormField
-                                                label="Länge (Sekunden)"
-                                                htmlFor={`length-${index}`}
-                                            >
-                                                <Input
-                                                    id={`length-${index}`}
-                                                    data-test={`position-length-seconds-${index}`}
-                                                    type="number"
-                                                    min={1}
-                                                    value={
-                                                        position.length_seconds
-                                                    }
-                                                    disabled={!canEdit}
-                                                    onChange={(event) =>
-                                                        updatePosition(index, {
-                                                            length_seconds:
-                                                                Number(
-                                                                    event.target
-                                                                        .value,
-                                                                ),
-                                                        })
-                                                    }
-                                                />
-                                            </FormField>
-                                            {canEdit && positions.length > 1 ? (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        removePosition(index)
-                                                    }
+                                                <Card
+                                                    className={wizardCardClass}
                                                 >
-                                                    Werbeelement entfernen
-                                                </Button>
-                                            ) : null}
-                                        </div>
-                                        <input
-                                            type="hidden"
-                                            value={
-                                                position.advertising_medium_id
-                                            }
-                                            readOnly
-                                        />
-                                        <p
-                                            id={`pos-${index}`}
-                                            className="text-sm font-medium"
-                                        >
-                                            Preisstunden (Durchschnitt)
-                                        </p>
-                                        <div className="space-y-2">
-                                            {position.plan_rows.map(
-                                                (row, rowIndex) => (
-                                                    <div
-                                                        key={`${row.hour}-${row.day_group}-${rowIndex}`}
-                                                        className="flex flex-wrap items-end gap-2"
+                                                    <CardHeader
+                                                        className={
+                                                            wizardCardHeaderClass
+                                                        }
                                                     >
-                                                        <FormField
-                                                            label="Stunde"
-                                                            htmlFor={`hour-${index}-${rowIndex}`}
+                                                        <CardTitle
+                                                            id={`pos-${index}`}
+                                                            className={
+                                                                wizardCardTitleClass
+                                                            }
                                                         >
-                                                            <Input
-                                                                id={`hour-${index}-${rowIndex}`}
-                                                                type="number"
-                                                                min={0}
-                                                                max={23}
-                                                                className="w-20"
-                                                                value={row.hour}
-                                                                disabled={
-                                                                    !canEdit
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) => {
-                                                                    const next =
-                                                                        [
-                                                                            ...position.plan_rows,
-                                                                        ];
-                                                                    next[
-                                                                        rowIndex
-                                                                    ] = {
-                                                                        ...row,
-                                                                        hour: Number(
-                                                                            event
-                                                                                .target
-                                                                                .value,
-                                                                        ),
-                                                                    };
-                                                                    updatePosition(
-                                                                        index,
-                                                                        {
-                                                                            plan_rows:
-                                                                                next,
-                                                                        },
-                                                                    );
-                                                                }}
-                                                            />
-                                                        </FormField>
-                                                        <FormField label="Tagesgruppe">
+                                                            Werbeelement{' '}
+                                                            {index + 1}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent
+                                                        className={`${wizardCardContentClass} space-y-6`}
+                                                    >
+                                                        <div className="space-y-3">
+                                                            <p className="text-sm font-medium">
+                                                                Sender / Kombi
+                                                            </p>
+                                                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                                                {catalog.inventories.map(
+                                                                    (item) => {
+                                                                        const selected =
+                                                                            position.inventory_id ===
+                                                                            item.id;
+                                                                        const disabled =
+                                                                            !canEdit ||
+                                                                            (!item.is_active &&
+                                                                                item.id !==
+                                                                                    position.inventory_id);
+
+                                                                        return (
+                                                                            <button
+                                                                                key={
+                                                                                    item.id
+                                                                                }
+                                                                                type="button"
+                                                                                disabled={
+                                                                                    disabled
+                                                                                }
+                                                                                aria-pressed={
+                                                                                    selected
+                                                                                }
+                                                                                onClick={() =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            inventory_id:
+                                                                                                item.id,
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                                className={cn(
+                                                                                    'focus-visible:ring-primary/25 relative flex w-full flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all outline-none focus-visible:ring-[3px]',
+                                                                                    selected
+                                                                                        ? 'border-primary bg-accent/70 ring-primary/15 shadow-xs ring-1'
+                                                                                        : 'border-border/80 bg-card hover:border-primary/45 hover:bg-muted/20',
+                                                                                    disabled &&
+                                                                                        'cursor-not-allowed opacity-50',
+                                                                                )}
+                                                                            >
+                                                                                {selected ? (
+                                                                                    <span className="bg-primary text-primary-foreground pointer-events-none absolute top-3 right-3 flex size-5 items-center justify-center rounded-full">
+                                                                                        <Check
+                                                                                            className="size-3"
+                                                                                            aria-hidden="true"
+                                                                                        />
+                                                                                    </span>
+                                                                                ) : null}
+                                                                                <LogoSlot
+                                                                                    name={catalogLabel(
+                                                                                        item.name,
+                                                                                        item.is_active,
+                                                                                    )}
+                                                                                    logoPath={
+                                                                                        item.logo_path
+                                                                                    }
+                                                                                    variant="card"
+                                                                                />
+                                                                                <span className="pr-6 text-sm leading-snug font-semibold">
+                                                                                    {catalogLabel(
+                                                                                        item.name,
+                                                                                        item.is_active,
+                                                                                    )}
+                                                                                </span>
+                                                                            </button>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
                                                             <select
-                                                                className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+                                                                className="sr-only"
+                                                                data-test={`position-inventory-${index}`}
                                                                 value={
-                                                                    row.day_group
+                                                                    position.inventory_id
                                                                 }
                                                                 disabled={
                                                                     !canEdit
                                                                 }
                                                                 onChange={(
                                                                     event,
-                                                                ) => {
-                                                                    const next =
-                                                                        [
-                                                                            ...position.plan_rows,
-                                                                        ];
-                                                                    next[
-                                                                        rowIndex
-                                                                    ] = {
-                                                                        ...row,
-                                                                        day_group:
-                                                                            event
-                                                                                .target
-                                                                                .value,
-                                                                    };
+                                                                ) =>
                                                                     updatePosition(
                                                                         index,
                                                                         {
-                                                                            plan_rows:
-                                                                                next,
+                                                                            inventory_id:
+                                                                                Number(
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                                ),
                                                                         },
-                                                                    );
-                                                                }}
+                                                                    )
+                                                                }
+                                                                tabIndex={-1}
+                                                                aria-hidden="true"
                                                             >
-                                                                {DAY_GROUPS.map(
-                                                                    (group) => (
+                                                                {catalog.inventories.map(
+                                                                    (item) => (
                                                                         <option
                                                                             key={
-                                                                                group.value
+                                                                                item.id
                                                                             }
                                                                             value={
-                                                                                group.value
+                                                                                item.id
+                                                                            }
+                                                                            disabled={
+                                                                                !item.is_active &&
+                                                                                item.id !==
+                                                                                    position.inventory_id
                                                                             }
                                                                         >
-                                                                            {
-                                                                                group.label
-                                                                            }
+                                                                            {catalogLabel(
+                                                                                item.name,
+                                                                                item.is_active,
+                                                                            )}
                                                                         </option>
                                                                     ),
                                                                 )}
                                                             </select>
-                                                        </FormField>
-                                                        {canEdit &&
-                                                        position.plan_rows
-                                                            .length > 1 ? (
-                                                            <Button
-                                                                type="button"
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() =>
-                                                                    removePlanRow(
-                                                                        index,
-                                                                        rowIndex,
-                                                                    )
+                                                        </div>
+
+                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                                            <FormField label="Kalkulationsart">
+                                                                <Input
+                                                                    readOnly
+                                                                    value="Durchschnitt"
+                                                                    disabled
+                                                                    className="bg-muted/50 text-muted-foreground"
+                                                                />
+                                                            </FormField>
+                                                            <FormField
+                                                                label="Spotanzahl gesamt"
+                                                                htmlFor={`spots-${index}`}
+                                                                error={
+                                                                    fieldErrors[
+                                                                        `positions.${index}.total_spot_count`
+                                                                    ]?.[0]
                                                                 }
                                                             >
-                                                                Stunde entfernen
-                                                            </Button>
+                                                                <Input
+                                                                    id={`spots-${index}`}
+                                                                    data-test={`position-total-spots-${index}`}
+                                                                    type="number"
+                                                                    min={0}
+                                                                    step={1}
+                                                                    value={
+                                                                        position.total_spot_count
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                total_spot_count:
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    ),
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormField>
+                                                            <FormField
+                                                                label="Länge (Sekunden)"
+                                                                htmlFor={`length-${index}`}
+                                                            >
+                                                                <Input
+                                                                    id={`length-${index}`}
+                                                                    data-test={`position-length-seconds-${index}`}
+                                                                    type="number"
+                                                                    min={1}
+                                                                    value={
+                                                                        position.length_seconds
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                length_seconds:
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    ),
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormField>
+                                                            {canEdit &&
+                                                            positions.length >
+                                                                1 ? (
+                                                                <div className="flex items-end">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            removePosition(
+                                                                                index,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Entfernen
+                                                                    </Button>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+
+                                                        <input
+                                                            type="hidden"
+                                                            value={
+                                                                position.advertising_medium_id
+                                                            }
+                                                            readOnly
+                                                        />
+
+                                                        <div className="space-y-3">
+                                                            <p className="text-sm font-medium">
+                                                                Preisstunden
+                                                                (Durchschnitt)
+                                                            </p>
+                                                            <div className="space-y-2">
+                                                                {position.plan_rows.map(
+                                                                    (
+                                                                        row,
+                                                                        rowIndex,
+                                                                    ) => (
+                                                                        <div
+                                                                            key={`${row.hour}-${row.day_group}-${rowIndex}`}
+                                                                            className="border-border/60 bg-muted/15 grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,6rem)_minmax(0,1fr)_auto]"
+                                                                        >
+                                                                            <FormField
+                                                                                label="Stunde"
+                                                                                htmlFor={`hour-${index}-${rowIndex}`}
+                                                                            >
+                                                                                <Input
+                                                                                    id={`hour-${index}-${rowIndex}`}
+                                                                                    type="number"
+                                                                                    min={
+                                                                                        0
+                                                                                    }
+                                                                                    max={
+                                                                                        23
+                                                                                    }
+                                                                                    value={
+                                                                                        row.hour
+                                                                                    }
+                                                                                    disabled={
+                                                                                        !canEdit
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        event,
+                                                                                    ) => {
+                                                                                        const next =
+                                                                                            [
+                                                                                                ...position.plan_rows,
+                                                                                            ];
+                                                                                        next[
+                                                                                            rowIndex
+                                                                                        ] =
+                                                                                            {
+                                                                                                ...row,
+                                                                                                hour: Number(
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                ),
+                                                                                            };
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                plan_rows:
+                                                                                                    next,
+                                                                                            },
+                                                                                        );
+                                                                                    }}
+                                                                                />
+                                                                            </FormField>
+                                                                            <FormField
+                                                                                label="Tagesgruppe"
+                                                                                htmlFor={`day-group-${index}-${rowIndex}`}
+                                                                            >
+                                                                                <select
+                                                                                    id={`day-group-${index}-${rowIndex}`}
+                                                                                    className={
+                                                                                        formSelectClass
+                                                                                    }
+                                                                                    value={
+                                                                                        row.day_group
+                                                                                    }
+                                                                                    disabled={
+                                                                                        !canEdit
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        event,
+                                                                                    ) => {
+                                                                                        const next =
+                                                                                            [
+                                                                                                ...position.plan_rows,
+                                                                                            ];
+                                                                                        next[
+                                                                                            rowIndex
+                                                                                        ] =
+                                                                                            {
+                                                                                                ...row,
+                                                                                                day_group:
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                            };
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                plan_rows:
+                                                                                                    next,
+                                                                                            },
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    {DAY_GROUPS.map(
+                                                                                        (
+                                                                                            group,
+                                                                                        ) => (
+                                                                                            <option
+                                                                                                key={
+                                                                                                    group.value
+                                                                                                }
+                                                                                                value={
+                                                                                                    group.value
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    group.label
+                                                                                                }
+                                                                                            </option>
+                                                                                        ),
+                                                                                    )}
+                                                                                </select>
+                                                                            </FormField>
+                                                                            {canEdit &&
+                                                                            position
+                                                                                .plan_rows
+                                                                                .length >
+                                                                                1 ? (
+                                                                                <div className="flex items-end sm:justify-end">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="outline"
+                                                                                        size="sm"
+                                                                                        onClick={() =>
+                                                                                            removePlanRow(
+                                                                                                index,
+                                                                                                rowIndex,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        Stunde
+                                                                                        entfernen
+                                                                                    </Button>
+                                                                                </div>
+                                                                            ) : null}
+                                                                        </div>
+                                                                    ),
+                                                                )}
+                                                                {canEdit ? (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    plan_rows:
+                                                                                        [
+                                                                                            ...position.plan_rows,
+                                                                                            {
+                                                                                                hour: 9,
+                                                                                                day_group:
+                                                                                                    'mo_fr',
+                                                                                            },
+                                                                                        ],
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Preisstunde
+                                                                        hinzufügen
+                                                                    </Button>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+
+                                                        {displayTotals
+                                                            ?.positions[
+                                                            index
+                                                        ] ? (
+                                                            <PositionPriceSummary
+                                                                averageSecondPrice={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .average_second_price
+                                                                }
+                                                                mediaGross={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .media_gross
+                                                                }
+                                                                nnInvest={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ].nn_invest
+                                                                }
+                                                            />
+                                                        ) : canEdit ? (
+                                                            <LoadingState label="Berechnet" />
                                                         ) : null}
-                                                    </div>
-                                                ),
-                                            )}
-                                            {canEdit ? (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        updatePosition(index, {
-                                                            plan_rows: [
-                                                                ...position.plan_rows,
-                                                                {
-                                                                    hour: 9,
-                                                                    day_group:
-                                                                        'mo_fr',
-                                                                },
-                                                            ],
-                                                        })
-                                                    }
-                                                >
-                                                    Preisstunde hinzufügen
-                                                </Button>
-                                            ) : null}
-                                        </div>
-                                        {displayTotals?.positions[index] ? (
-                                            <p className="text-muted-foreground text-sm">
-                                                Ø-Sekundenpreis{' '}
-                                                {displayTotals.positions[index]
-                                                    .average_second_price ??
-                                                    '–'}{' '}
-                                                ·{' '}
-                                                {money(
-                                                    displayTotals.positions[
-                                                        index
-                                                    ].media_gross,
-                                                )}{' '}
-                                                Brutto ·{' '}
-                                                {money(
-                                                    displayTotals.positions[
-                                                        index
-                                                    ].nn_invest,
-                                                )}{' '}
-                                                N/N
-                                            </p>
-                                        ) : canEdit ? (
-                                            <LoadingState label="Berechnet" />
-                                        ) : null}
-                                    </section>
-                                );
-                            })}
-                            {canEdit ? (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                        const next =
-                                            firstValidPosition(catalog);
-                                        if (next) {
-                                            setPositions([...positions, next]);
-                                        }
-                                    }}
-                                >
-                                    Werbeelement hinzufügen
-                                </Button>
-                            ) : null}
-                        </div>
-                    )
-                ) : null}
-
-                {step === 2 ? (
-                    <div className="space-y-4">
-                        {positions.map((position, index) => {
-                            const inventory = catalog.inventories.find(
-                                (item) => item.id === position.inventory_id,
-                            );
-                            const rule = ruleFor(
-                                catalog,
-                                position.inventory_id,
-                                position.advertising_medium_id,
-                            );
-
-                            return (
-                                <section
-                                    key={`cond-${position.client_key}`}
-                                    className="grid gap-4 rounded-xl border p-4 md:grid-cols-3"
-                                >
-                                    <div className="flex items-center gap-2 md:col-span-3">
-                                        <LogoSlot
-                                            name={inventory?.name ?? 'Sender'}
-                                        />
-                                        <p className="font-medium">
-                                            {inventory?.name}
-                                        </p>
-                                    </div>
-                                    <FormField
-                                        label="Positionsrabatt %"
-                                        error={
-                                            fieldErrors[
-                                                `positions.${index}.position_discount_percent`
-                                            ]?.[0]
-                                        }
-                                    >
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={
-                                                position.position_discount_percent
-                                            }
-                                            disabled={
-                                                !canEdit ||
-                                                rule?.is_discountable === false
-                                            }
-                                            onChange={(event) =>
-                                                updatePosition(index, {
-                                                    position_discount_percent:
-                                                        event.target.value,
-                                                })
-                                            }
-                                        />
-                                    </FormField>
-                                    <FormField label="AE %">
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={100}
-                                            value={position.ae_percent}
-                                            disabled={
-                                                !canEdit ||
-                                                rule?.is_ae_eligible === false
-                                            }
-                                            onChange={(event) =>
-                                                updatePosition(index, {
-                                                    ae_percent:
-                                                        event.target.value,
-                                                })
-                                            }
-                                        />
-                                    </FormField>
-                                </section>
-                            );
-                        })}
-                        <FormField
-                            label="Zusätzlicher Auftragsrabatt %"
-                            htmlFor="order-discount"
-                        >
-                            <Input
-                                id="order-discount"
-                                type="number"
-                                min={0}
-                                max={100}
-                                value={orderDiscount}
-                                disabled={!canEdit}
-                                onChange={(event) =>
-                                    setOrderDiscount(event.target.value)
-                                }
-                            />
-                        </FormField>
-                        {planningMode === 'budget' && canEdit ? (
-                            <div className="space-y-2 rounded-xl border p-4">
-                                <p className="text-sm font-medium">
-                                    Budgetvorschlag
-                                </p>
-                                <p className="text-muted-foreground text-sm">
-                                    Konditionen und Verteilungslogik müssen vor
-                                    der Vorschlagsberechnung feststehen.
-                                </p>
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        type="button"
-                                        data-test="budget-propose"
-                                        onClick={() => void createProposal()}
-                                        disabled={busy}
-                                    >
-                                        Vorschlag erzeugen
-                                    </Button>
-                                    {proposal ? (
-                                        <>
-                                            <Button
-                                                type="button"
-                                                variant="secondary"
-                                                data-test="budget-apply"
-                                                onClick={takeProposal}
-                                                disabled={busy}
-                                            >
-                                                Vorschlag übernehmen
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setProposal(null)
+                                                    </CardContent>
+                                                </Card>
+                                            </section>
+                                        );
+                                    })}
+                                    {canEdit ? (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="w-full border-dashed"
+                                            onClick={() => {
+                                                const next =
+                                                    firstValidPosition(catalog);
+                                                if (next) {
+                                                    setPositions([
+                                                        ...positions,
+                                                        next,
+                                                    ]);
                                                 }
-                                            >
-                                                Vorschlag verwerfen
-                                            </Button>
-                                        </>
+                                            }}
+                                        >
+                                            Werbeelement hinzufügen
+                                        </Button>
                                     ) : null}
                                 </div>
-                                {proposal ? (
-                                    <StatusBanner>
-                                        {proposal.explanation} Verbrauch{' '}
-                                        {money(proposal.used_nn)}, Rest{' '}
-                                        {money(proposal.remainder)}. Anzeigen
-                                        oder Verwerfen ändert die Kalkulation
-                                        nicht.
-                                    </StatusBanner>
+                            )
+                        ) : null}
+
+                        {step === 2 ? (
+                            <div className="space-y-6">
+                                {positions.map((position, index) => {
+                                    const inventory = catalog.inventories.find(
+                                        (item) =>
+                                            item.id === position.inventory_id,
+                                    );
+                                    const rule = ruleFor(
+                                        catalog,
+                                        position.inventory_id,
+                                        position.advertising_medium_id,
+                                    );
+
+                                    return (
+                                        <Card
+                                            key={`cond-${position.client_key}`}
+                                            className={wizardCardClass}
+                                        >
+                                            <CardHeader
+                                                className={
+                                                    wizardCardHeaderClass
+                                                }
+                                            >
+                                                <CardTitle
+                                                    className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                >
+                                                    <LogoSlot
+                                                        name={
+                                                            inventory?.name ??
+                                                            'Sender'
+                                                        }
+                                                        logoPath={
+                                                            inventory?.logo_path
+                                                        }
+                                                    />
+                                                    {inventory?.name}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent
+                                                className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
+                                            >
+                                                <FormField
+                                                    label="Positionsrabatt %"
+                                                    error={
+                                                        fieldErrors[
+                                                            `positions.${index}.position_discount_percent`
+                                                        ]?.[0]
+                                                    }
+                                                >
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        value={
+                                                            position.position_discount_percent
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            rule?.is_discountable ===
+                                                                false
+                                                        }
+                                                        className={
+                                                            rule?.is_discountable ===
+                                                            false
+                                                                ? 'bg-muted/50 text-muted-foreground'
+                                                                : undefined
+                                                        }
+                                                        onChange={(event) =>
+                                                            updatePosition(
+                                                                index,
+                                                                {
+                                                                    position_discount_percent:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                                <FormField label="AE %">
+                                                    <Input
+                                                        type="number"
+                                                        min={0}
+                                                        max={100}
+                                                        value={
+                                                            position.ae_percent
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            rule?.is_ae_eligible ===
+                                                                false
+                                                        }
+                                                        className={
+                                                            rule?.is_ae_eligible ===
+                                                            false
+                                                                ? 'bg-muted/50 text-muted-foreground'
+                                                                : undefined
+                                                        }
+                                                        onChange={(event) =>
+                                                            updatePosition(
+                                                                index,
+                                                                {
+                                                                    ae_percent:
+                                                                        event
+                                                                            .target
+                                                                            .value,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                </FormField>
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })}
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
+                                            Auftragskonditionen
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent
+                                        className={wizardCardContentClass}
+                                    >
+                                        <FormField
+                                            label="Zusätzlicher Auftragsrabatt %"
+                                            htmlFor="order-discount"
+                                        >
+                                            <Input
+                                                id="order-discount"
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={orderDiscount}
+                                                disabled={!canEdit}
+                                                onChange={(event) =>
+                                                    setOrderDiscount(
+                                                        event.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </FormField>
+                                    </CardContent>
+                                </Card>
+                                {planningMode === 'budget' && canEdit ? (
+                                    <Card className={wizardCardClass}>
+                                        <CardHeader
+                                            className={wizardCardHeaderClass}
+                                        >
+                                            <CardTitle
+                                                className={wizardCardTitleClass}
+                                            >
+                                                Budgetvorschlag
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent
+                                            className={`${wizardCardContentClass} space-y-3`}
+                                        >
+                                            <p className="text-muted-foreground text-sm">
+                                                Konditionen und Verteilungslogik
+                                                müssen vor der
+                                                Vorschlagsberechnung feststehen.
+                                            </p>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button
+                                                    type="button"
+                                                    data-test="budget-propose"
+                                                    onClick={() =>
+                                                        void createProposal()
+                                                    }
+                                                    disabled={busy}
+                                                >
+                                                    Vorschlag erzeugen
+                                                </Button>
+                                                {proposal ? (
+                                                    <>
+                                                        <Button
+                                                            type="button"
+                                                            variant="secondary"
+                                                            data-test="budget-apply"
+                                                            onClick={
+                                                                takeProposal
+                                                            }
+                                                            disabled={busy}
+                                                        >
+                                                            Vorschlag übernehmen
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setProposal(
+                                                                    null,
+                                                                )
+                                                            }
+                                                        >
+                                                            Vorschlag verwerfen
+                                                        </Button>
+                                                    </>
+                                                ) : null}
+                                            </div>
+                                            {proposal ? (
+                                                <StatusBanner>
+                                                    {proposal.explanation}{' '}
+                                                    Verbrauch{' '}
+                                                    {money(proposal.used_nn)},
+                                                    Rest{' '}
+                                                    {money(proposal.remainder)}.
+                                                    Anzeigen oder Verwerfen
+                                                    ändert die Kalkulation
+                                                    nicht.
+                                                </StatusBanner>
+                                            ) : null}
+                                        </CardContent>
+                                    </Card>
                                 ) : null}
                             </div>
                         ) : null}
-                    </div>
-                ) : null}
 
-                {step === 3 ? (
-                    <div className="grid max-w-2xl gap-4 text-sm">
-                        {summary ? (
-                            <>
-                                <p>Media-Brutto {money(summary.media_gross)}</p>
-                                <p>
-                                    Positionsrabatte{' '}
-                                    {money(summary.position_discount_total)}
-                                </p>
-                                <p>
-                                    Auftragsrabatt{' '}
-                                    {money(summary.order_discount_total)}
-                                </p>
-                                <p>AE gesamt {money(summary.ae_total)}</p>
-                                <p className="font-medium">
-                                    N/N-Invest {money(summary.nn_invest)}
-                                </p>
-                                {summary.target_budget_nn ? (
-                                    <p>
-                                        Zielbudget{' '}
-                                        {money(summary.target_budget_nn)}
-                                    </p>
-                                ) : null}
-                                {summary.positions.map((position) => (
-                                    <section
-                                        key={position.inventory_name}
-                                        className="rounded-lg border p-3"
-                                    >
-                                        <p className="font-medium">
-                                            {position.inventory_name} ·{' '}
-                                            {position.spot_method} · Preisliste{' '}
-                                            {position.price_list_version}
-                                        </p>
-                                        <p>
-                                            {position.total_spot_count} Spots à{' '}
-                                            {position.length_seconds}s ·
-                                            Pos.-Rab.{' '}
-                                            {position.position_discount_percent}
-                                            % · AE {position.ae_percent}%
-                                        </p>
-                                        <ul className="mt-1 list-inside list-disc">
-                                            {position.plan_rows.map((row) => (
-                                                <li
-                                                    key={`${row.hour}-${row.day_group}`}
-                                                >
-                                                    Stunde {row.hour},{' '}
-                                                    {row.day_group},{' '}
-                                                    {row.second_price} €/s
-                                                </li>
-                                            ))}
-                                        </ul>
-                                        <p>
-                                            {money(position.media_gross)} Brutto
-                                            · {money(position.nn_invest)} N/N
-                                        </p>
-                                    </section>
-                                ))}
-                            </>
-                        ) : displayTotals ? (
-                            <>
-                                <p>
-                                    Media-Brutto{' '}
-                                    {money(displayTotals.media_gross)}
-                                </p>
-                                <p>
-                                    Positionsrabatte{' '}
-                                    {money(
-                                        displayTotals.position_discount_total,
+                        {step === 3 ? (
+                            <Card className={wizardCardClass}>
+                                <CardHeader className={wizardCardHeaderClass}>
+                                    <CardTitle className={wizardCardTitleClass}>
+                                        Zusammenfassung
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent
+                                    className={`${wizardCardContentClass} space-y-4 text-sm`}
+                                >
+                                    {summary ? (
+                                        <>
+                                            <dl className="grid gap-2 sm:grid-cols-2">
+                                                <SummaryDetail
+                                                    label="Media-Brutto"
+                                                    value={money(
+                                                        summary.media_gross,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="Positionsrabatte"
+                                                    value={money(
+                                                        summary.position_discount_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="Auftragsrabatt"
+                                                    value={money(
+                                                        summary.order_discount_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="AE gesamt"
+                                                    value={money(
+                                                        summary.ae_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="N/N-Invest"
+                                                    value={money(
+                                                        summary.nn_invest,
+                                                    )}
+                                                    emphasis
+                                                />
+                                                {summary.target_budget_nn ? (
+                                                    <SummaryDetail
+                                                        label="Zielbudget"
+                                                        value={money(
+                                                            summary.target_budget_nn,
+                                                        )}
+                                                    />
+                                                ) : null}
+                                            </dl>
+                                            {summary.positions.map(
+                                                (position) => (
+                                                    <section
+                                                        key={
+                                                            position.inventory_name
+                                                        }
+                                                        className="rounded-lg border p-4"
+                                                    >
+                                                        <p className="font-medium">
+                                                            {
+                                                                position.inventory_name
+                                                            }{' '}
+                                                            ·{' '}
+                                                            {
+                                                                position.spot_method
+                                                            }{' '}
+                                                            · Preisliste{' '}
+                                                            {
+                                                                position.price_list_version
+                                                            }
+                                                        </p>
+                                                        <p className="text-muted-foreground mt-1">
+                                                            {
+                                                                position.total_spot_count
+                                                            }{' '}
+                                                            Spots à{' '}
+                                                            {
+                                                                position.length_seconds
+                                                            }
+                                                            s · Pos.-Rab.{' '}
+                                                            {
+                                                                position.position_discount_percent
+                                                            }
+                                                            % · AE{' '}
+                                                            {
+                                                                position.ae_percent
+                                                            }
+                                                            %
+                                                        </p>
+                                                        <ul className="text-muted-foreground mt-2 list-inside list-disc">
+                                                            {position.plan_rows.map(
+                                                                (row) => (
+                                                                    <li
+                                                                        key={`${row.hour}-${row.day_group}`}
+                                                                    >
+                                                                        Stunde{' '}
+                                                                        {
+                                                                            row.hour
+                                                                        }
+                                                                        ,{' '}
+                                                                        {
+                                                                            row.day_group
+                                                                        }
+                                                                        ,{' '}
+                                                                        {
+                                                                            row.second_price
+                                                                        }{' '}
+                                                                        €/s
+                                                                    </li>
+                                                                ),
+                                                            )}
+                                                        </ul>
+                                                        <p className="mt-2">
+                                                            {money(
+                                                                position.media_gross,
+                                                            )}{' '}
+                                                            Brutto ·{' '}
+                                                            {money(
+                                                                position.nn_invest,
+                                                            )}{' '}
+                                                            N/N
+                                                        </p>
+                                                    </section>
+                                                ),
+                                            )}
+                                        </>
+                                    ) : displayTotals ? (
+                                        <>
+                                            <dl className="grid gap-2 sm:grid-cols-2">
+                                                <SummaryDetail
+                                                    label="Media-Brutto"
+                                                    value={money(
+                                                        displayTotals.media_gross,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="Positionsrabatte"
+                                                    value={money(
+                                                        displayTotals.position_discount_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="Auftragsrabatt"
+                                                    value={money(
+                                                        displayTotals.order_discount_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="AE gesamt"
+                                                    value={money(
+                                                        displayTotals.ae_total,
+                                                    )}
+                                                />
+                                                <SummaryDetail
+                                                    label="N/N-Invest"
+                                                    value={money(
+                                                        displayTotals.nn_invest,
+                                                    )}
+                                                    emphasis
+                                                />
+                                                {displayTotals.target_budget_nn ? (
+                                                    <SummaryDetail
+                                                        label="Zielbudget"
+                                                        value={money(
+                                                            displayTotals.target_budget_nn,
+                                                        )}
+                                                    />
+                                                ) : null}
+                                            </dl>
+                                            {displayTotals.target_budget_nn &&
+                                            displayTotals.budget_delta !==
+                                                null ? (
+                                                <p className="text-muted-foreground">
+                                                    {Number(
+                                                        displayTotals.budget_delta,
+                                                    ) >= 0
+                                                        ? `Rest ${money(displayTotals.budget_delta)}`
+                                                        : `Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`}
+                                                </p>
+                                            ) : null}
+                                            {displayTotals.requires_special_approval ? (
+                                                <StatusBanner tone="warning">
+                                                    Die persönliche Rabattgrenze
+                                                    ist überschritten.
+                                                </StatusBanner>
+                                            ) : null}
+                                        </>
+                                    ) : (
+                                        <LoadingState />
                                     )}
-                                </p>
-                                <p>
-                                    Auftragsrabatt{' '}
-                                    {money(displayTotals.order_discount_total)}
-                                </p>
-                                <p>AE gesamt {money(displayTotals.ae_total)}</p>
-                                <p className="font-medium">
-                                    N/N-Invest {money(displayTotals.nn_invest)}
-                                </p>
-                                {displayTotals.target_budget_nn ? (
-                                    <p>
-                                        Zielbudget{' '}
-                                        {money(displayTotals.target_budget_nn)}
-                                        {displayTotals.budget_delta !== null
-                                            ? Number(
-                                                  displayTotals.budget_delta,
-                                              ) >= 0
-                                                ? ` · Rest ${money(displayTotals.budget_delta)}`
-                                                : ` · Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`
-                                            : null}
-                                    </p>
-                                ) : null}
-                                {displayTotals.requires_special_approval ? (
-                                    <StatusBanner tone="warning">
-                                        Die persönliche Rabattgrenze ist
-                                        überschritten.
-                                    </StatusBanner>
-                                ) : null}
-                            </>
-                        ) : (
-                            <LoadingState />
-                        )}
+                                </CardContent>
+                            </Card>
+                        ) : null}
                     </div>
-                ) : null}
 
-                <div className="flex flex-wrap gap-2">
-                    {step > 0 ? (
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setStep(step - 1)}
-                        >
-                            Zurück
-                        </Button>
-                    ) : null}
-                    {step < STEPS.length - 1 ? (
-                        <Button type="button" onClick={() => setStep(step + 1)}>
-                            Weiter
-                        </Button>
-                    ) : null}
-                    {canEdit ? (
-                        <Button type="button" onClick={save} disabled={busy}>
-                            Speichern
-                        </Button>
-                    ) : null}
+                    <aside className="order-2 min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
+                        <CalculationSummaryPanel
+                            totals={summaryTotals}
+                            loading={canEdit && !summaryTotals && !error}
+                            positions={positions}
+                            inventories={catalog.inventories}
+                        />
+                    </aside>
+
+                    <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
+                        {step > 0 ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setStep(step - 1)}
+                            >
+                                Zurück
+                            </Button>
+                        ) : null}
+                        {step < STEPS.length - 1 ? (
+                            <Button
+                                type="button"
+                                onClick={() => setStep(step + 1)}
+                            >
+                                Weiter
+                            </Button>
+                        ) : null}
+                        {canEdit ? (
+                            <Button
+                                type="button"
+                                onClick={save}
+                                disabled={busy}
+                                variant={
+                                    step === STEPS.length - 1
+                                        ? 'default'
+                                        : 'secondary'
+                                }
+                            >
+                                Speichern
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
             </div>
         </>
+    );
+}
+
+function SummaryDetail({
+    label,
+    value,
+    emphasis,
+}: {
+    label: string;
+    value: string;
+    emphasis?: boolean;
+}) {
+    return (
+        <div>
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd
+                className={
+                    emphasis ? 'text-primary font-semibold' : 'font-medium'
+                }
+            >
+                {value}
+            </dd>
+        </div>
     );
 }
 
