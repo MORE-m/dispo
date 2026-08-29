@@ -19,7 +19,7 @@ class CalculationReviewNacharbeitTest extends TestCase
     use CreatesSpotClassicCatalog;
     use RefreshDatabase;
 
-    public function test_pri_006_price_list_change_does_not_alter_saved_calculation(): void
+    public function test_pri_004_price_list_change_does_not_alter_saved_calculation(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -79,7 +79,7 @@ class CalculationReviewNacharbeitTest extends TestCase
         $this->assertSame('Neue Kampagne', $calculation->campaign);
     }
 
-    public function test_pri_006_two_active_price_lists_resolve_deterministically(): void
+    public function test_new_calculation_uses_latest_active_price_list(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         PriceList::factory()->create([
@@ -156,7 +156,7 @@ class CalculationReviewNacharbeitTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_gen_001_parallel_calculation_numbers_are_unique(): void
+    public function test_gen_001_sequential_calculation_numbers_are_unique(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();

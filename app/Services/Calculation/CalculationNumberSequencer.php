@@ -2,7 +2,6 @@
 
 namespace App\Services\Calculation;
 
-use App\Models\Calculation;
 use App\Models\CalculationNumberSequence;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -47,11 +46,7 @@ final class CalculationNumberSequencer
                     return [$year, $seq, $number];
                 });
             } catch (QueryException $exception) {
-                if ($this->isUniqueViolation($exception) && Calculation::query()->where('number', sprintf('K-%d-%05d', $year, $this->guessSeq($year)))->exists()) {
-                    continue;
-                }
-
-                if ($this->isUniqueViolation($exception)) {
+                if ($this->isRetryable($exception)) {
                     continue;
                 }
 
@@ -62,15 +57,10 @@ final class CalculationNumberSequencer
         throw new \RuntimeException('Kalkulationsnummer konnte nicht vergeben werden.');
     }
 
-    private function isUniqueViolation(QueryException $exception): bool
+    private function isRetryable(QueryException $exception): bool
     {
         $code = (string) ($exception->errorInfo[1] ?? $exception->getCode());
 
-        return in_array($code, ['1062', '19', '23000', '23505'], true);
-    }
-
-    private function guessSeq(int $year): int
-    {
-        return (int) CalculationNumberSequence::query()->where('year', $year)->value('last_seq');
+        return in_array($code, ['1062', '1213', '1205', '19', '23000', '23505'], true);
     }
 }

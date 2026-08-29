@@ -95,6 +95,15 @@ Leistungsoptimierung (`BUD-008`, `BUD-009`).
 
 ### Spot Classic und Konditionen
 
+Review-Nacharbeit v4 (technisch, ohne Gate-Erweiterung):
+
+- unveränderte Positionen bleiben bei deaktivierten Stammdaten speicherbar
+  (`PRI-004`, `VER-002`);
+- gespeicherter Spotlängenindex bei unveränderter Länge (`SPT-009`);
+- Budgetvorschlag nur einmal übernehmbar (`BUD-008`);
+- Anzeigenamen historischer Sender/Werbemittel: Referenz auf Stammdaten, kein
+  dedizierter Namens-Snapshot in Gate B (Grenze dokumentiert).
+
 Verbindliche Interaktions- und Fachartefakte:
 
 | Artefakt | Fachbezug |

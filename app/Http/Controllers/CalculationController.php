@@ -261,7 +261,7 @@ class CalculationController extends Controller
                 inventoryName: $item['inventory']->name,
                 positionKey: $positionKey,
                 lengthSeconds: (int) $item['length_seconds'],
-                surchargePercent: (string) $item['rule']->surcharge_percent,
+                surchargePercent: (string) $item['surcharge_percent'],
                 positionDiscountPercent: $item['is_discountable'] ? (string) $item['position_discount_percent'] : '0',
                 aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
                 isDiscountable: $item['is_discountable'],

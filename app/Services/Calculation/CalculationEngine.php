@@ -87,7 +87,7 @@ final class CalculationEngine
         }
 
         $averageSecondPrice = $this->averageSecondPrice($uniqueRows);
-        $index = SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
         $lengthFactor = Decimal::div((string) $index, '100');
         $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
         $spotCount = max(0, $position->totalSpotCount);

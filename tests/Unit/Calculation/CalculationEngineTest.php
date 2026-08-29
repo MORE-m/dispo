@@ -134,6 +134,35 @@ class CalculationEngineTest extends TestCase
         $this->assertSame('1.5000', $engine->averageSecondPrice($unique));
     }
 
+    public function test_pri_006_internal_precision_and_commercial_money_rounding(): void
+    {
+        $engine = new CalculationEngine;
+        $position = $this->position([
+            new PlanRowInput(8, DayGroup::MoFr, 0, '0.3333'),
+        ], totalSpotCount: 9, lengthSeconds: 30);
+
+        $result = $engine->calculatePosition($position, '0');
+
+        $this->assertMatchesRegularExpression('/^\d+\.\d{2}$/', $result->mediaGross);
+        $this->assertMatchesRegularExpression('/^\d+\.\d{4}$/', $result->averageSecondPrice);
+        $this->assertSame('89.99', $result->mediaGross);
+    }
+
+    public function test_spt_009_uses_snapshot_length_index_when_provided(): void
+    {
+        $engine = new CalculationEngine;
+        $rows = [new PlanRowInput(8, DayGroup::MoFr, 0, '1.0000')];
+        $withSnapshot = $this->position($rows, lengthSeconds: 30, lengthIndex: 110);
+        $withoutSnapshot = $this->position($rows, lengthSeconds: 30, lengthIndex: null);
+
+        $snapshotResult = $engine->calculatePosition($withSnapshot, '0');
+        $freshResult = $engine->calculatePosition($withoutSnapshot, '0');
+
+        $this->assertSame(110, $snapshotResult->lengthIndex);
+        $this->assertSame(100, $freshResult->lengthIndex);
+        $this->assertNotSame($snapshotResult->mediaGross, $freshResult->mediaGross);
+    }
+
     /**
      * @param  list<PlanRowInput>  $rows
      */
@@ -145,6 +174,7 @@ class CalculationEngineTest extends TestCase
         int $totalSpotCount = 10,
         string $positionDiscount = '0',
         string $aePercent = '0',
+        ?int $lengthIndex = null,
     ): PositionInput {
         return new PositionInput(
             inventoryId: $inventoryId,
@@ -159,6 +189,7 @@ class CalculationEngineTest extends TestCase
             totalSpotCount: $totalSpotCount,
             spotMethod: SpotCalculationMethod::Average,
             rows: $rows,
+            lengthIndex: $lengthIndex,
         );
     }
 }

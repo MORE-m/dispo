@@ -167,6 +167,12 @@ final class CalculationWriter
                 ? $existing->client_key
                 : ($payloadPosition['client_key'] ?? (string) Str::uuid());
 
+            if ($clientKey === null || $clientKey === '') {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.client_key" => 'Positions-Schlüssel fehlt.',
+                ]);
+            }
+
             $position = $existing ?? new CalculationPosition;
             $position->fill([
                 'client_key' => $clientKey,
@@ -251,11 +257,21 @@ final class CalculationWriter
                 ? 'id:'.((int) $payloadPosition['id'])
                 : ($payloadPosition['client_key'] ?? 'new:'.$index);
 
+            $existingPosition = null;
+            if (isset($payloadPosition['id'])) {
+                $existingPosition = $existing?->positions->firstWhere('id', (int) $payloadPosition['id']);
+            } elseif (isset($payloadPosition['client_key'])) {
+                $existingPosition = $existing?->positions->firstWhere('client_key', (string) $payloadPosition['client_key']);
+            }
+
+            $lengthSeconds = (int) $item['length_seconds'];
+            $lengthIndex = $this->resolveLengthIndex($lengthSeconds, $existingPosition);
+
             $inputs[] = new PositionInput(
                 inventoryId: $item['inventory']->id,
                 inventoryName: $item['inventory']->name,
                 positionKey: (string) $positionKey,
-                lengthSeconds: (int) $item['length_seconds'],
+                lengthSeconds: $lengthSeconds,
                 surchargePercent: (string) $item['surcharge_percent'],
                 positionDiscountPercent: $item['is_discountable'] ? (string) $item['position_discount_percent'] : '0',
                 aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
@@ -264,6 +280,7 @@ final class CalculationWriter
                 totalSpotCount: (int) $item['total_spot_count'],
                 spotMethod: $item['spot_method'],
                 rows: $item['rows'],
+                lengthIndex: $lengthIndex,
             );
         }
 
@@ -297,7 +314,11 @@ final class CalculationWriter
             }
 
             $catalog = $this->catalog->resolvePosition($position, $existingPosition);
-            $length = (int) ($position['length_seconds'] ?? $catalog['rule']->default_length_seconds ?? $catalog['medium']->default_length_seconds);
+            $length = (int) ($position['length_seconds']
+                ?? ($existingPosition !== null ? $existingPosition->length_seconds : null)
+                ?? ($catalog['rule'] !== null ? $catalog['rule']->default_length_seconds : null)
+                ?? $catalog['medium']->default_length_seconds
+                ?? 30);
 
             $resolved[] = [
                 ...$catalog,
@@ -537,5 +558,18 @@ final class CalculationWriter
         }
 
         return $merged;
+    }
+
+    private function resolveLengthIndex(int $lengthSeconds, ?CalculationPosition $existing): ?int
+    {
+        if ($existing === null) {
+            return null;
+        }
+
+        if ($lengthSeconds === (int) $existing->length_seconds && $existing->length_index !== null) {
+            return $existing->length_index;
+        }
+
+        return null;
     }
 }

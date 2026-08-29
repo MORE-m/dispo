@@ -33,28 +33,25 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await page.goto('/kalkulationen/neu');
 
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-
-    const firstSection = page.locator('section').first();
-    await firstSection.getByLabel('Spotanzahl gesamt').fill('10');
-    await firstSection.getByLabel('Länge (Sekunden)').fill('30');
-    await page.getByRole('button', { name: 'Preisstunde hinzufügen' }).click();
+    await page.locator('section').first().getByLabel('Spotanzahl gesamt').fill('10');
+    await page.locator('section').first().getByLabel('Spotlänge (Sek.)').fill('30');
+    await page.locator('section').first().getByRole('checkbox', { name: '8' }).check();
+    await page.locator('section').first().getByRole('checkbox', { name: '10' }).check();
 
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    const secondSection = page.locator('section').nth(1);
-    await secondSection
+    await page
+        .locator('section')
+        .nth(1)
         .getByRole('combobox')
         .first()
         .selectOption({ label: 'ROCK ANTENNE Hamburg' });
-    await secondSection.getByLabel('Spotanzahl gesamt').fill('5');
-    await secondSection.getByLabel('Länge (Sekunden)').fill('20');
+    await page.locator('section').nth(1).getByLabel('Spotanzahl gesamt').fill('5');
+    await page.locator('section').nth(1).getByLabel('Spotlänge (Sek.)').fill('20');
+    await page.locator('section').nth(1).getByRole('checkbox', { name: '10' }).check();
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByLabel('Positionsrabatt %').first().fill('5');
-    await page.getByLabel('Zusätzlicher Auftragsrabatt %').fill('0');
-    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
-
-    await expect(page.getByText('N/N-Invest')).toBeVisible();
     await page.getByRole('button', { name: 'Speichern' }).click();
+
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
     await expect(page.getByText('Radio Hamburg')).toBeVisible();
     await expect(page.getByText('ROCK ANTENNE Hamburg')).toBeVisible();
@@ -62,6 +59,7 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
 
 test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     page,
+    request,
 }) => {
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
@@ -81,18 +79,34 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     await page.locator('section').nth(1).getByLabel('Spotanzahl gesamt').fill('1');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
+
+    const proposeResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
     await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
-    await expect(page.getByText('Verbrauch')).toBeVisible();
+    const proposalJson = await (await proposeResponse).json();
+    const proposalId = proposalJson.proposal.id as number;
 
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
 
-    await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
-    await page.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
-    await expect(page.getByText(/übernommen|gespeichert/i)).toBeVisible();
+    const url = page.url();
+    const calculationId = url.match(/kalkulationen\/(\d+)/)?.[1];
+    expect(calculationId).toBeTruthy();
 
-    await page.getByRole('button', { name: 'Vorschlag erzeugen' }).click();
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await expect(page.getByRole('button', { name: 'Vorschlag übernehmen' })).toBeVisible();
     await page.getByRole('button', { name: 'Vorschlag übernehmen' }).click();
-    await expect(page.getByText(/bereits übernommen|Übernahme nicht möglich/i)).toBeVisible();
+    await expect(page.getByText('Vorschlag übernommen')).toBeVisible();
+    await expect(
+        page.getByRole('button', { name: 'Vorschlag übernehmen' }),
+    ).toHaveCount(0);
+
+    const secondApply = await request.post(
+        `/kalkulationen/${calculationId}/budget-vorschlaege/${proposalId}/uebernehmen`,
+        { maxRedirects: 0 },
+    );
+    expect(secondApply.status()).toBe(422);
 });

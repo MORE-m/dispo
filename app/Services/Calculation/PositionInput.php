@@ -22,5 +22,6 @@ final readonly class PositionInput
         public int $totalSpotCount,
         public SpotCalculationMethod $spotMethod,
         public array $rows,
+        public ?int $lengthIndex = null,
     ) {}
 }

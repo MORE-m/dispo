@@ -42,6 +42,26 @@ P(Mo–So, h) = (5 × P(Mo–Fr, h) + P(Sa, h) + P(So, h)) ÷ 7
 Der Index gilt initial für alle Sender und Spot-Werbemittel. Auch ab 100 Sekunden
 bleibt Index 95 gültig (`SPT-009`).
 
+**Snapshot-Verhalten (UX-GATE-B):**
+
+- Neue Positionen: Index aus `SpotLengthIndex::forSeconds()` zur aktuellen Länge.
+- Unveränderte bestehende Position: gespeicherter `length_index` der Position
+  (kein Browser-Input).
+- Geänderte Spotlänge: Index neu bestimmen und persistieren.
+
+## Preis- und Regel-Snapshot (`PRI-004`, `VER-002`)
+
+- Neue Positionen und echte Inventar-/Werbemittelwechsel: nur aktive, zulässige
+  Kombinationen und aktive Preislisten.
+- Unveränderte bestehende Position: gespeicherte Preisliste (auch archiviert),
+  Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz aus dem
+  Positionssnapshot – auch wenn Stammdaten inzwischen deaktiviert sind.
+- Fehlende oder gelöschte Referenzen führen zu kontrollierter Ablehnung, kein
+  stiller Ersatz durch aktuelle Stammdaten.
+- **Gate-B-Grenze:** Anzeigenamen von Sender/Werbemittel werden bei vorhandenem
+  Datensatz aus der Referenz geladen; dedizierte Namens-Snapshotfelder auf
+  Positionsebene folgen in späteren Gates (nicht UX-GATE-C/D vorwegnehmen).
+
 ## Durchschnittskalkulation Spot
 
 ### Eingaben

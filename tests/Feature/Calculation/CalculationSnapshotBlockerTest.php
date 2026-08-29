@@ -3,13 +3,13 @@
 namespace Tests\Feature\Calculation;
 
 use App\Enums\Role;
+use App\Models\AdvertisingMedium;
 use App\Models\AuditEvent;
 use App\Models\Calculation;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceListItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
 
@@ -54,7 +54,7 @@ class CalculationSnapshotBlockerTest extends TestCase
         $this->assertSame(['1.0000', '3.0000'], $position->planRows->pluck('second_price')->map(fn ($p) => (string) $p)->sort()->values()->all());
     }
 
-    public function test_pri_006_browser_price_manipulation_is_ignored(): void
+    public function test_pri_004_browser_price_manipulation_is_ignored(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -72,7 +72,7 @@ class CalculationSnapshotBlockerTest extends TestCase
         $this->assertSame('1.0000', $price);
     }
 
-    public function test_snapshot_rule_change_does_not_affect_existing_calculation(): void
+    public function test_ver_002_inactive_rule_keeps_snapshot_on_unchanged_position(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -190,7 +190,7 @@ class CalculationSnapshotBlockerTest extends TestCase
         $this->assertGreaterThan(2, (int) $calculation->positions->sum('total_spot_count'));
     }
 
-    public function test_gen_001_sequence_table_assigns_unique_numbers(): void
+    public function test_gen_001_sequential_create_assigns_unique_numbers(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -204,25 +204,200 @@ class CalculationSnapshotBlockerTest extends TestCase
         $this->assertSame(2, count(array_unique($numbers)));
     }
 
-    public function test_gen_001_concurrent_create_retries_without_duplicate_numbers(): void
+    public function test_ver_002_inactive_inventory_unchanged_position_remains_saveable(): void
     {
-        if (DB::connection()->getDriverName() !== 'mysql') {
-            $this->markTestSkipped('Echter Paralleltest nur auf MySQL verfügbar.');
-        }
-
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
-        $payload = $this->payload($catalog, hours: [8], totalSpots: 1, length: 30);
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
 
-        DB::transaction(function () use ($user, $payload): void {
-            $this->actingAs($user)->post(route('calculations.store'), $payload);
-        });
-        DB::transaction(function () use ($user, $payload): void {
-            $this->actingAs($user)->post(route('calculations.store'), $payload);
-        });
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $nnBefore = (string) $calculation->nn_invest;
 
-        $this->assertSame(2, Calculation::query()->count());
-        $this->assertSame(2, Calculation::query()->distinct('number')->count('number'));
+        $catalog['hamburg']->update(['is_active' => false]);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'briefing' => 'Historisch',
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ])->assertRedirect();
+
+        $calculation->refresh();
+        $this->assertSame($nnBefore, (string) $calculation->nn_invest);
+    }
+
+    public function test_ver_002_inactive_medium_unchanged_position_remains_stable(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $mediaBefore = (string) $calculation->media_gross;
+
+        $catalog['medium']->update(['is_active' => false]);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'campaign' => 'Historisch',
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ])->assertRedirect();
+
+        $calculation->refresh();
+        $this->assertSame($mediaBefore, (string) $calculation->media_gross);
+    }
+
+    public function test_pri_004_new_position_rejects_inactive_inventory(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $catalog['hamburg']->update(['is_active' => false]);
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), $this->payload($catalog, hours: [8], totalSpots: 1, length: 30))
+            ->assertSessionHasErrors('positions');
+    }
+
+    public function test_pri_004_change_to_inactive_inventory_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30, inventoryId: $catalog['hamburg']->id);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $catalog['rock']->update(['is_active' => false]);
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['inventory_id'] = $catalog['rock']->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ])->assertSessionHasErrors('positions');
+    }
+
+    public function test_pri_004_medium_change_resolves_active_catalog_rules(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $mediumB = AdvertisingMedium::factory()->create([
+            'code' => 'spot_classic_alt',
+            'is_active' => true,
+            'default_length_seconds' => 30,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'advertising_medium_id' => $mediumB->id,
+            'surcharge_percent' => 50,
+        ]);
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $this->assertSame('0.0000', (string) $calculation->positions()->first()?->surcharge_percent);
+
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['advertising_medium_id'] = $mediumB->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ])->assertRedirect();
+
+        $calculation->refresh();
+        $this->assertSame('50.0000', (string) $calculation->positions()->first()?->surcharge_percent);
+    }
+
+    public function test_spt_009_recalculates_length_index_when_length_changes(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $position = $calculation->positions()->firstOrFail();
+        $this->assertSame(100, $position->length_index);
+
+        $positions = $this->positionsFromCalculation($calculation);
+        $positions[0]['length_seconds'] = 20;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ]);
+
+        $position->refresh();
+        $this->assertSame(105, $position->length_index);
+    }
+
+    public function test_spt_009_uses_stored_length_index_when_length_unchanged(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->payload($catalog, hours: [8], totalSpots: 5, length: 30);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+        $position = $calculation->positions()->firstOrFail();
+        $position->update(['length_index' => 110]);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ]);
+        $calculation->refresh();
+        $nnBefore = (string) $calculation->nn_invest;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            ...$payload,
+            'lock_version' => $calculation->lock_version,
+            'briefing' => 'Index unverändert',
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ]);
+
+        $calculation->refresh();
+        $position->refresh();
+        $this->assertSame(110, $position->length_index);
+        $this->assertSame($nnBefore, (string) $calculation->nn_invest);
+    }
+
+    public function test_bud_008_same_proposal_cannot_be_applied_twice(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->twoPositionPayload($catalog);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$payload,
+            'planning_mode' => 'budget',
+            'target_budget_nn' => '500',
+            'budget_strategy' => 'equal_budget',
+            'calculation_id' => $calculation->id,
+            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+        ]);
+        $proposalId = $propose->json('proposal.id');
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation,
+            'proposal' => $proposalId,
+        ]))->assertRedirect()->assertSessionHas('success');
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation->fresh(),
+            'proposal' => $proposalId,
+        ]))->assertStatus(422);
     }
 
     /**
