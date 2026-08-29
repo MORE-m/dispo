@@ -1,75 +1,68 @@
 # Fortschritt V1
 
-Stand: 29. August 2026
+Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B)
 
 ## Aktuelle Phase
 
-Phase 0 ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und
-`mysql` grün). **Halt vor Phase 1** wegen `BL-GATE-UXUI`.
+Phase 0 bleibt technisch abgenommen. `UX-GATE-A` und `UX-GATE-B` sind **fachlich
+freigegeben**. Die **technische Abnahme** von UX-GATE-A/B bleibt an grüne CI auf
+dem Nacharbeit-Commit gebunden (siehe unten).
 
 ## Aktuelle Aufgabe
 
-Keine Implementierungsaufgabe. Nächster Schritt: Product-Owner-Freigabe des
-UX/UI-Gates. Keine Phase-1-Fachoberflächen.
+Review-Nacharbeit UX-GATE-A/B: Durchschnittskalkulation, Preislisten-Snapshot,
+Budgetvorschlag, Read-only, Audit, Tests und Workflow-Korrektur.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-BLK-004: GitHub Actions `ci` und `mysql` auf PR #1 nachgewiesen; Phase 0
-technisch abgenommen.
+Review-Nacharbeit (Code): siehe Commit auf Branch `ux-gate-a-b-review-nacharbeit`.
 
-## Technisch vorbereitet, noch nicht fachlich vollständig erfüllt
+## Technische Abnahme UX-GATE-A/B
 
-Diese IDs sind in der Projektbasis angelegt oder vorbereitet. Die vollständige
-fachliche Erfüllung erfolgt erst in den späteren Backlog-Paketen:
+| Kriterium | Status |
+|---|---|
+| Fachliche Freigabe PO | **freigegeben** (UX-GATE-A/B) |
+| Durchschnittskalkulation (SPT-001–SPT-004, SPT-016) | umgesetzt |
+| Kalenderplaner (SPT-005–SPT-008) | bewusst offen |
+| Festpreis Spot | bewusst offen (kein Gate-B-Umfang) |
+| Preislisten-Snapshot / keine Rückwirkung | umgesetzt |
+| Budgetvorschlag + Übernahme + lock_version | umgesetzt |
+| Read-only-Zusammenfassung | umgesetzt |
+| GitHub Actions `tests.yml` gültig | repariert |
+| CI `ci` + `mysql` auf HEAD | **ausstehend bis Push/PR grün** |
 
-- `AUTH-001` / `AUTH-003` – Headless-Rollen und Gate `access-administration`;
-  vollständig in `BL-P1-02` (und Folgepakete)
-- `UPL-005` – physisches Löschen nur für temporäre Pfade in `PrivateFileStorage`;
-  Upload-Archivierung vollständig in `BL-P9-01`
-- Kapitel 24 (Sicherheit, Betrieb, Dateien ohne öffentliche URL) in der Projektbasis
-- `GEN-003` intern UTC, Anzeige `Europe/Berlin` (Konfiguration)
-- Zugang V1 (Headless): Login E-Mail/Passwort, Logout, Passwort-Reset,
-  Passwortänderung; keine öffentliche Registrierung; keine Passkeys/2FA;
-  kein E-Mail-Verifizierungsflow; keine Kontoselbstlöschung
+## Ausgeführte Prüfungen (Nacharbeit, lokal)
 
-## Ausgeführte Prüfungen und Ergebnisse
+Wird nach Commit ausgeführt und hier ergänzt:
 
-Frische Kopie `/tmp/dispo-fresh-clone-p0-v3` (nach `composer install`, `npm ci`,
-`npm run build` und vorhandenen Laravel-Storage-Platzhaltern):
+- YAML-Validierung `.github/workflows/tests.yml`
+- `composer validate`, Pest SQLite, Pint, PHPStan
+- `npm run check`, `types:check`, Vitest, Build
+- Playwright inkl. CAL-001- und BUD-008-Flow
+- MySQL-Pest (`phpunit.mysql.xml`) lokal oder via CI-Job `mysql`
 
-- SQLite: alle vier Migrationen; Pest 39 Tests, **36 bestanden**, 3 übersprungen, 95 Assertions
-- MySQL: alle vier Migrationen; Pest **39/39**, 98 Assertions
-- Pint, PHPStan (0 Fehler): bestanden
-- `npm run check`: bestanden
-- `npm run types:check` (nach Build/Wayfinder): bestanden
-- Vitest: 2 Tests bestanden
-- Playwright: 2/2 bestanden
-- `composer audit` / `npm audit --omit=dev`: keine Advisories / 0 Schwachstellen
-- nach Pest keine Datei `storage/app/private/health-check/smoke.txt`
+## Bewusst offen / temporär
 
-GitHub Actions auf Branch `phase-0-abschluss`, Lauf
-https://github.com/MORE-m/dispo/actions/runs/33232656289 (Commit `4915baa`):
-Jobs `ci` und `mysql` beide `success`.
-
-## Bekannte technische Schulden
-
-- Starter-Kit-Login und Welcome sind **provisorisch**, kein abgenommenes Fach-UI
-- Factory-Default-Rolle `sales` nur für Tests, keine produktive Nutzeranlage
-- PHPStan lokal mit `--memory-limit=1G` (CI ebenso)
-- Speedit-Betriebsparameter (inkl. PHP-CLI-Pfad) und Initialkataloge weiterhin
-  vor Produktivsetzung zu verifizieren (BLK-001, BLK-002)
-- `laravel/passkeys` bleibt Composer-Transitivabhängigkeit von Fortify, wird
-  nicht auto-discovered und registriert keine Routen
+| Thema | Status |
+|---|---|
+| CRM-001 | **nicht erfüllt** – Kalkulation nutzt Freitextfelder Kunde/Agentur (Slice) |
+| SPT-005–SPT-008 Kalenderplaner | offen (UX-GATE-B nicht freigegeben für Planer-UI) |
+| Festpreis Spot | offen, nicht vortäuschen |
+| BLK-007 Budget-Stundenverteilung innerhalb Sender | PO-Entscheidung ausstehend |
+| Headless-Stammdaten, Benachrichtigungen | nicht begonnen (Auftrag) |
+| UX-GATE-C/D | blockiert (BLK-005/006) |
 
 ## Echte Blocker
 
 | ID | Thema |
 |---|---|
-| BLK-003 | UX/UI-Gate: Product-Owner-Freigabe und Artefakte fehlen – **blockiert Phase-1-Fachoberflächen** |
+| BLK-005 | UX-GATE-C |
+| BLK-006 | UX-GATE-D |
+| BLK-007 | Budgetvorschlag: sinnvolle Stundenverteilung innerhalb Sender (Greedy dokumentiert) |
 | BLK-001 | Initialkataloge Kapitel 27 |
-| BLK-002 | Speedit-Parameter vor Produktiv-Deploy, inkl. PHP-CLI-Pfad |
+| BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
 
 ## Exakt nächste ausführbare Aufgabe
 
-Product-Owner-Workshop und Artefakte für `BL-GATE-UXUI`. Fachoberflächen erst
-nach Gate-Freigabe. Keine Phase-1-Fachseiten bis dahin.
+Nach grüner CI: technische Abnahme UX-GATE-A/B markieren. Anschließend erst
+Headless-Stammdaten oder BL-P1-05 – nicht vor grüner Nacharbeit-CI.

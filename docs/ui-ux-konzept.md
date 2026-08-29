@@ -13,18 +13,30 @@ Details zu verstecken. Nutzer müssen jederzeit erkennen:
 
 ## Hauptnavigation
 
-1. **Dashboard**
+Die Hauptnavigation liegt dauerhaft links (Desktop: ausgeschriebene Leiste,
+Tablet: Icon-Leiste mit Ausklappen). Es gibt keine obere Hauptnavigation.
+Die Arbeitsfläche nutzt die verfügbare Breite (`UX-GATE-A`).
+
+1. **Übersicht**
 2. **Kalkulationen**
-3. **Dispoaufträge**
-4. **Kunden & Agenturen**
+3. **Standardangebote**
+4. **Dispoaufträge**
 5. **Auswertungen**
-6. **Administration** – nur berechtigte Rollen
+6. **Stammdaten**
+7. **Administration** – nur berechtigte Rollen
 
-Benachrichtigungen und persönliches Profil liegen global in der Kopfzeile.
+Menüpunkte sind rollenabhängig sichtbar (`AUTH-001`, `STD-003`, `AUTH-006`,
+`AUTH-007`). Solange `UX-GATE-C` oder `UX-GATE-D` blockiert sind, führen die
+betroffenen Punkte auf einen Sperr-/Leerzustand, nicht auf eine Schein-Fachseite.
 
-## Dashboard
+**Standardangebote** bleibt ein eigener linker Navigationspunkt (`STD-003`). Die
+Fachoberfläche gehört zu `UX-GATE-D`.
 
-Das Dashboard zeigt rollenbezogene Arbeitsvorräte statt allgemeiner Dekoration:
+Profil und Abmeldung liegen in der linken Leiste.
+
+## Übersicht
+
+Die Übersicht zeigt rollenbezogene Arbeitsvorräte statt allgemeiner Dekoration:
 
 - eigene offene Entwürfe,
 - ausstehende Freigaben,
@@ -52,26 +64,54 @@ Navigation wiederherstellbar sind.
 
 ## Kalkulation bearbeiten
 
+Die Erfassung folgt dem Wizard (`UX-GATE-B`):
+
+1. Grunddaten
+2. Werbeelemente
+3. Konditionen
+4. Zusammenfassung
+
+Briefing ist optional.
+
+Zwei Planungswege: **Selbst planen** und **Mit Budget planen** (siehe
+[`ux-ui-gate.md`](ux-ui-gate.md)).
+
 ### Seitenaufbau
 
-- **Kopfbereich:** Kunde, Agentur, Mediaberater, Kampagne, Produkt/Titel.
-- **Positionsnavigation:** kompakte Karten oder linke Liste aller Positionen.
-- **Arbeitsbereich:** Eingaben der ausgewählten Position.
-- **Rechte Seitenleiste:** Preiszusammenfassung, Pflichtfehler und Rechenerklärung.
-- **Fuß-/Aktionsleiste:** speichern, kopieren, Position hinzufügen, Dispoauftrag erstellen.
+- **Kopfbereich:** Kunde, Agentur, Mediaberater, Kampagne, Produkt/Titel
+  (kundenbezogene Stammdaten folgen mit CRM; im aktuellen Slice Freitextfelder).
+- **Positionsnavigation:** mehrsenderfähige Liste oder Karten aller Positionen
+  (Sender/Kombi, Werbemittel, Menge, Länge, Teilsumme).
+- **Arbeitsbereich:** Eingaben der ausgewählten Position; bei Spot Classic ein
+  **sichtbares, frei editierbares Längenfeld in Sekunden** (`SPT-015`).
+- **Preiszusammenfassung:** Live-Kostensumme je Werbeelement und für die
+  Kalkulation (`CAL-005`); automatisch berechnete Felder ohne Erklärungstext.
+- **Fuß-/Aktionsleiste:** speichern, Werbeelement hinzufügen, bei Budgetpfad
+  Vorschlag erzeugen und ausdrücklich übernehmen.
 
 ### Position anlegen
 
-Empfohlener geführter Ablauf:
+1. Inventar auswählen (Logo-Slot mit Platzhalter, sobald kein Logo vorliegt).
+2. Nur erlaubte Werbemittel anzeigen; in diesem Slice Spot Classic.
+3. Preisstunden einzeln wählen, keine gruppierten Zeitschienen (`SPT-016`).
+4. Spotlänge, Spotanzahl und Konditionen erfassen.
+5. Preis still neu berechnen; Hinweise nur bei fehlenden oder widersprüchlichen Angaben.
 
-1. Inventar auswählen.
-2. Nur erlaubte Werbemittel anzeigen.
-3. Kalkulationsart auswählen.
-4. Fachspezifische Eingaben erfassen.
-5. Preis, Regeln und Hinweise in Echtzeit als Vorschau zeigen.
+Nach Anlage ist die Kalkulationsart sichtbar gesperrt. Für einen Wechsel wird
+eine neue Position benötigt (`CAL-002`).
 
-Nach Anlage ist die Kalkulationsart sichtbar gesperrt. Die Oberfläche erklärt,
-dass für einen Wechsel eine neue Position erstellt werden muss (`CAL-002`).
+Mehrere Sender- und Kombipositionen in einer Kalkulation sind der Normalfall
+(`CAL-001`). Jede Position bleibt einzeln anwählbar und editierbar.
+
+### Mit Budget planen
+
+1. Zielbudget N/N, Sender/Kombis, erlaubte Preisstunden, Spotlänge,
+   Positionsrabatt, AE, Auftragsrabatt und Verteilungslogik vorgeben.
+2. Das System erzeugt einen neuen Vorschlag (gleich verteilen oder Spotanzahl
+   maximieren). Kein bestehendes Senderverhältnis (`BUD-005`).
+3. Rest oder Überschreitung ausweisen (`BUD-007`).
+4. Explizite Übernahme oder Verwerfen (`BUD-008`).
+5. Keine Reichweiten- oder KI-Formulierungen (`BUD-009`).
 
 ### Rechenerklärung
 
@@ -88,9 +128,24 @@ Jede Position bietet eine aufklappbare Erklärung mit:
 ## Durchschnitt und Planer
 
 Zeitfenster werden als wiederholbare Zeilen erfasst. Überschneidungen werden direkt
-markiert und können mit einem Klick zusammengeführt werden. Der Planer bietet
+markiert und können mit einem Klick zu einer eindeutigen Stundenmenge zusammengeführt
+werden; das erzeugt keine gruppierte Zeitschiene (`SPT-016`). Der Planer bietet
 Wochen- und Monatsnavigation, Tastatureingabe, Kopieren über Zellen sowie sichtbare
 Tagesgruppenpreise. Große Zeiträume werden virtuell bzw. seitenweise geladen.
+
+Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen abweichend
+gruppierte Zeitschienen und Standardlängen als Vorbelegung nutzen (`SWF-008`).
+
+## Standardangebote
+
+Flow (verbindliches Interaktionsmuster, nicht implementiert):
+
+1. Liste nach Status, Sender/Kombi, Version und Aktualität filtern.
+2. Entwurf bearbeiten; veröffentlichen setzt Autor und Zeitpunkt.
+3. Vertrieb öffnet eine veröffentlichte Vorlage und wählt Übernehmen.
+4. Es entsteht eine Kundenkalkulation; Kunde/Agentur werden dort ergänzt.
+5. Vertrieb passt Positionen, Längen, Mengen und den Budget-Assistenten an.
+6. Dispoauftrag nur aus dieser Kundenkalkulation, nicht aus der Vorlagenansicht.
 
 ## Dispoauftrag
 
@@ -174,11 +229,16 @@ muss nicht auf kleinen Displays dieselbe Dichte wie Desktop erreichen.
 - Status nicht ausschließlich über Farbe vermitteln,
 - Tabellenüberschriften und Fehlermeldungen semantisch korrekt ausgeben.
 
-## Vor Umsetzung noch zu gestalten
+## Gate-Zuordnung
 
-- finales Navigations- und Seitenraster,
-- Wireframes für Kalkulationsposition und Dispoauftrag,
-- Kalender-/Planerinteraktion,
-- dynamischer Feldeditor und Regelbuilder,
-- PDF-Layouts.
+Freigegeben und umzusetzen: `UX-GATE-A` (Shell, Navigation, Komponenten) und
+`UX-GATE-B` (Wizard, Mehrsender, Spot Classic).
+
+Weiterhin zu gestalten, aber **nicht** umzusetzen, solange `UX-GATE-C`/`UX-GATE-D`
+blockiert sind:
+
+- Trailer/SWF- und Influencer-/Social-Oberflächen
+- Übernahme-Flow Standardangebot → Kundenkalkulation
+- Dispoauftrag, Freigaben, Administration der Initialkataloge
+- Kalenderdichte für große Zeiträume, dynamischer Feldeditor, PDF-Layouts
 

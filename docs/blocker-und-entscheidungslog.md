@@ -13,15 +13,32 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | Hosting | Speedit Apache, Cron-Scheduler, `queue:work --stop-when-empty` ohne Überlappung | ADR-003 |
 | 29.08.2026 | Tests | Pest, Vitest/Testing Library, Playwright-Smoke, GitHub Actions | ADR-002 |
 | 29.08.2026 | Auth | kein öffentliches Self-Registration, keine verpflichtende 2FA | ADR-002, Anforderungskatalog Kap. 3 |
-| 29.08.2026 | UX/UI-Gate | Keine endgültigen Fachseiten vor PO-Freigabe; Headless erlaubt | Auftrag 29.08.2026, BL-GATE-UXUI |
 | 29.08.2026 | Kontoselbstlöschung | Keine DELETE-Route `/settings/profile`; Konten nur administrativ | Phase-0-Nacharbeit, kein Self-Service-Löschen |
+| 29.08.2026 | Spot Classic | Tatsächliche Spotlänge je Position frei editierbar; Standardlänge nur Vorbelegung; keine gruppierten Zeitschienen | SPT-015, SPT-016 |
+| 29.08.2026 | Mehrsender | Eine Kalkulation parallel mehrere Sender/Kombis; Live-Summe; Beispiel 10 RH + 5 ROCK ANTENNE Hamburg | CAL-001, CAL-005 |
+| 29.08.2026 | Produktmanagement | Neue Rolle für Standardangebote; kein automatischer Zugriff auf Kundenkalkulationen/Dispo | AUTH-006, AUTH-007 |
+| 29.08.2026 | Standardangebote | Versionierte Vorlagen ohne Kundenbindung; Übernahme als Snapshot; Dispo nur aus Kundenkalkulation | STD-001–STD-009, DSP-007 |
+| 29.08.2026 | UX/UI-Gates | `BL-GATE-UXUI` durch UX-GATE-A/B/C/D ersetzt; A und B freigegeben, C und D blockiert | Product-Owner-Auftrag 29.08.2026 |
+| 29.08.2026 | Navigation | Linke Navigation: Übersicht, Kalkulationen, Standardangebote, Dispoaufträge, Auswertungen, Stammdaten, Administration; keine obere Hauptnavigation | UX-GATE-A |
+| 29.08.2026 | Budgetpfade | Zwei Wege: Selbst planen (Zielbudget nur Vergleich) und Mit Budget planen (neuer Vorschlag). Kein bestehendes Senderverhältnis. Zielgröße N/N-Invest. V1-Logiken: gleich verteilen, Spotanzahl maximieren. | BUD-001–BUD-009, PO 29.08.2026 |
+| 29.08.2026 | Wizard | Schritte Grunddaten, Werbeelemente, Konditionen, Zusammenfassung; Briefing optional | UX-GATE-B |
+| 29.08.2026 | CRM im Slice | Ohne Kundenstammdaten: optionale Freitextfelder Kunde/Agentur; keine erfundenen CRM-Datensätze | Slice-Abgrenzung, CRM in Phase 2 |
+| 29.08.2026 | Rabattgrenze | `null` am Benutzer = keine persönliche Grenze; Überschreitung markiert `requires_special_approval`, Freigabe-UI bleibt UX-GATE-D | COM-002, COM-003 |
+| 29.08.2026 | Live-Summe | Frontend darf Vorschau anzeigen; autoritativ ist `POST` Preview/Save auf dem Server | GEN-001, GEN-002 |
+| 29.08.2026 | Budget Stundenverteilung | Greedy auf günstigste gewählte Stunde; BLK-007 bis PO-Regeln für innerhalb-Sender-Verteilung | Review-Nacharbeit UX-GATE-B |
+| 29.08.2026 | Kalkulationsarten | Planungsweg (manual/budget) ≠ Spot-Methode (average/calendar/fixed); Gate B nur Durchschnitt | CAL-002, Review-Nacharbeit |
+| 29.08.2026 | CRM Slice | Freitext Kunde/Agentur temporär; CRM-001 nicht als erledigt markiert | Slice-Abgrenzung |
+| 29.08.2026 | Technische Abnahme UX-GATE-A/B | Erst nach grüner CI auf Nacharbeit-Commit; alte Läufe kein Nachweis | Review-Nacharbeit |
+| 29.08.2026 | Spot-Classic-Zeilen | Durchschnitt: eindeutige Preisstunden + Gesamtspotanzahl; kein Kalender in Gate B | SPT-001–SPT-004, SPT-016 |
 
 ## Offene Blocker
 
 | ID | Betrifft | Beschreibung | Wirkung |
 |---|---|---|---|
-| BLK-003 | BL-GATE-UXUI, Phase-1-Oberflächen | Visuelles Designsystem, App-Shell, Muster, Wizard, Assistenten, Zustände und UX-Abnahme mit Product Owner ausstehend | Keine endgültigen Fachseiten; Phase 0 ist davon nicht betroffen |
-| BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung |
+| BLK-005 | UX-GATE-C | Trailer/SWF, Influencer, Social Media und weitere Werbeelement-Oberflächen nicht freigegeben | Keine Fachseiten für diese Elemente |
+| BLK-006 | UX-GATE-D | Dispo, Freigaben, Standardangebots-Fach-UI, Administration der Initialkataloge nicht freigegeben | Nur Sperrzustände in der Navigation |
+| BLK-007 | UX-GATE-B Budget | Stundenverteilung **innerhalb** eines Senders im Budgetvorschlag: derzeit Greedy auf günstigste gewählte Stunde; keine PO-Freigabe für Gleichverteilung/Gewichtung/Mindestbelegung | Transparent dokumentiert; keine falsche „ausgewogene Verteilung“ |
+| BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung; UI zeigt Leerzustände |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
 
 ## Erledigte Blocker
@@ -29,8 +46,7 @@ Keine stillschweigenden ADR-Änderungen.
 | ID | Betrifft | Auflösung |
 |---|---|---|
 | BLK-004 | BL-P0-04 | GitHub-Actions-Jobs `ci` und `mysql` auf Branch `phase-0-abschluss` (Lauf [33232656289](https://github.com/MORE-m/dispo/actions/runs/33232656289), Commit `4915baa`) beide `success` |
+| BLK-003 | BL-GATE-UXUI | Ersetzt durch UX-GATE-A/B/C/D. A und B freigegeben; Rest in BLK-005/BLK-006 |
 
-Phase 0 ist **technisch endgültig abgenommen**. `BL-GATE-UXUI` / BLK-003 bleiben
-blockiert. Phase-1-Fachoberflächen warten auf BLK-003. Headless-Technik darf
-vorbereitet werden, ersetzt das Gate nicht.
-
+Phase 0 bleibt technisch endgültig abgenommen. UX-GATE-A/B dürfen Fachoberflächen
+im freigegebenen Umfang umsetzen.

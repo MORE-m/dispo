@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\AdministrationAccessController;
+use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\OverviewController;
+use App\Http\Controllers\UnavailableModuleController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('health');
@@ -9,7 +12,24 @@ Route::get('/health', HealthController::class)->name('health');
 Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::inertia('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', OverviewController::class)->name('dashboard');
+
+    Route::get('kalkulationen', [CalculationController::class, 'index'])->name('calculations.index');
+    Route::get('kalkulationen/neu', [CalculationController::class, 'create'])->name('calculations.create');
+    Route::post('kalkulationen', [CalculationController::class, 'store'])->name('calculations.store');
+    Route::post('kalkulationen/vorschau', [CalculationController::class, 'preview'])->name('calculations.preview');
+    Route::post('kalkulationen/budget-vorschlag', [CalculationController::class, 'proposeBudget'])->name('calculations.budget-propose');
+    Route::get('kalkulationen/{calculation}', [CalculationController::class, 'edit'])->name('calculations.edit');
+    Route::put('kalkulationen/{calculation}', [CalculationController::class, 'update'])->name('calculations.update');
+    Route::post('kalkulationen/{calculation}/budget-vorschlaege/{proposal}/uebernehmen', [CalculationController::class, 'applyBudget'])
+        ->name('calculations.budget-apply');
+
+    Route::get('standardangebote', UnavailableModuleController::class)->defaults('module', 'standard-offers')->name('standard-offers.index');
+    Route::get('dispoauftraege', UnavailableModuleController::class)->defaults('module', 'dispo-orders')->name('dispo-orders.index');
+    Route::get('auswertungen', UnavailableModuleController::class)->defaults('module', 'reports')->name('reports.index');
+    Route::get('stammdaten', UnavailableModuleController::class)->defaults('module', 'master-data')->name('master-data.index');
+    Route::get('administration', UnavailableModuleController::class)->defaults('module', 'administration')->name('administration.index');
+
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
 });
 

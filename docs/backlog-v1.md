@@ -47,66 +47,105 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 - **Akzeptanz:** CI-Workflow läuft lokal nachbildbar und ist dokumentiert; GitHub-Actions-Jobs `ci` und `mysql` auf PR #1 grün nachgewiesen (BLK-004 erledigt)
 - **Tests:** `pint --test`, PHPStan, Pest (SQLite/MySQL), `npm run check`, Vitest, `tsc`, Asset-Build; GitHub Actions `ci`/`mysql`
 
-## UX/UI-Gate (zwischen Phase 0 und Phase 1)
+## UX/UI-Gates (zwischen Phase 0 und den Fachpaketen)
 
-### BL-GATE-UXUI – Verbindliches UX/UI-Gate
+### UX-GATE-A – Designsystem und App-Shell
 
-- **Phase:** Gate zwischen 0 und 1
-- **Status:** blockiert
-- **Anforderungen:** `GEN-003`, Kapitel 24 Barrierearmut/Browser, [`ui-ux-konzept.md`](ui-ux-konzept.md)
+- **Phase:** Gate
+- **Status:** erledigt (Freigabe Product Owner 29.08.2026; Umsetzung im Slice App-Shell)
+- **Anforderungen:** `GEN-003`, Kapitel 24 Barrierearmut/Browser, [`ui-ux-konzept.md`](ui-ux-konzept.md), [`ux-ui-gate.md`](ux-ui-gate.md)
 - **Abhängigkeiten:** BL-P0-04
-- **Ergebnis:** mit dem Product Owner festgelegtes visuelles Designsystem, Navigation/App-Shell, Muster für Tabellen/Formulare/Filter, Statusdarstellung, Kalkulations-Wizard, Assistenten-/Pop-up-Logik, Desktop-/Tabletverhalten, Lade-/Leer-/Fehler-/Erfolgszustände und UX-Abnahmekriterien
-- **Akzeptanz:** schriftliche Freigabe; Checkliste in [`ux-ui-gate.md`](ux-ui-gate.md)
-- **Tests:** nach Freigabe UI-Abnahme gegen die Gate-Kriterien; bis dahin keine Fachseiten-Gestaltung
-- **Blocker:** Product-Owner-Workshop und Artefakte fehlen (BLK-003)
+- **Ergebnis:** linke Navigation, keine obere Hauptnavigation, volle Breite, Tablet-Icon-Leiste, gemeinsame Komponenten und Zustände, Logo-Slots
+- **Akzeptanz:** Checkliste UX-GATE-A; Menüpunkte rollenabhängig; gesperrte Bereiche ohne Schein-Fachseiten
+- **Tests:** Feature-Tests Navigation/Rechte; Vitest für gemeinsame Komponenten
 
-Bis zur Freigabe: nur technische Grundlagen und Headless-Komponenten. Keine
-endgültigen Fachseiten.
+### UX-GATE-B – Wizard, Mehrsender, Spot Classic
+
+- **Phase:** Gate
+- **Status:** erledigt (Freigabe Product Owner 29.08.2026; Umsetzung im Slice Spot Classic)
+- **Anforderungen:** `CAL-001`–`CAL-005`, `SPT-009`, `SPT-015`, `SPT-016`, `COM-001`–`COM-008`, `BUD-001`–`BUD-009`, `GEN-001`, `GEN-002`
+- **Abhängigkeiten:** UX-GATE-A
+- **Ergebnis:** Wizard Grunddaten/Werbeelemente/Konditionen/Zusammenfassung; Selbst planen und Mit Budget planen; Spot Classic mehrsenderfähig
+- **Akzeptanz:** Live-Summe; Beispiel Radio Hamburg + ROCK ANTENNE Hamburg; Vorschlag nur nach Übernahme; keine KI-/Reichweitenbehauptung
+- **Tests:** Unit-/Feature-Tests Formeln und Budget; Vitest Wizard; Playwright-Ablauf
+
+### UX-GATE-C – Trailer, Influencer, Social, weitere Elemente
+
+- **Phase:** Gate
+- **Status:** blockiert
+- **Anforderungen:** `SWF-*`, `SOC-*` und weitere Elementoberflächen
+- **Abhängigkeiten:** UX-GATE-B
+- **Blocker:** Product-Owner-Freigabe ausstehend (BLK-005)
+
+### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
+
+- **Phase:** Gate
+- **Status:** blockiert
+- **Anforderungen:** `DSP-*`, `APR-*`, `STD-*` (Fachoberflächen), Admin-Kataloge
+- **Abhängigkeiten:** UX-GATE-B
+- **Blocker:** Product-Owner-Freigabe ausstehend (BLK-006)
+
+### BL-P1-A – App-Shell und gemeinsame Grundlage (UX-GATE-A)
+
+- **Phase:** 1 / Gate A
+- **Status:** erledigt
+- **Anforderungen:** `GEN-003`, `AUTH-001`, `STD-003`
+- **Abhängigkeiten:** UX-GATE-A
+- **Ergebnis:** App-Shell, Navigation, gemeinsame UI-Komponenten, Sperrzustände für C/D
+- **Tests:** Navigation je Rolle; keine obere Hauptnavigation
+
+### BL-P1-B – Kalkulation Spot Classic (UX-GATE-B)
+
+- **Phase:** 1 / Gate B
+- **Status:** erledigt
+- **Anforderungen:** `CAL-*`, `SPT-015`, `SPT-016`, `COM-001`–`COM-008`, `BUD-*`, `AUD-001`
+- **Abhängigkeiten:** BL-P1-A
+- **Ergebnis:** Modelle, Berechnungsservice, Wizard, Preview, Budgetvorschlag mit Übernahme
+- **Tests:** `AT-06`/`AT-07`-Vorstufe, `AT-23`, `AT-24`, `AT-25`–`AT-27` für die V1-Logiken dieses Slices
 
 ## Phase 1 – Anmeldung, Benutzer und Auditfundament
 
-Fachliche Oberflächen dieser Phase hängen an `BL-GATE-UXUI`. Headless-Backend
-darf vorbereitet werden, ersetzt das Gate aber nicht.
+Fachoberflächen außerhalb von UX-GATE-A/B bleiben an C/D gebunden. Login existiert
+headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 ### BL-P1-01 – Lokaler Login und Passwort-Reset
 
 - **Phase:** 1
-- **Status:** blockiert
+- **Status:** erledigt
 - **Anforderungen:** `AUTH-*` (Zugang), Kapitel 24 Sicherheit, kein öffentliches Self-Registration, keine verpflichtende 2FA
-- **Abhängigkeiten:** BL-P0-04, BL-GATE-UXUI (für endgültige Login-/Reset-Oberfläche)
-- **Ergebnis:** E-Mail/Passwort-Login, Logout, Passwort-Reset-Flow; Registrierung unerreichbar
-- **Akzeptanz:** Unauthentifizierte Nutzer sehen interne Seiten nicht; Reset erzeugt kein Secret im Repo; UI erst nach Gate-Freigabe final
-- **Tests:** Pest Feature-Tests Login Erfolg/Fehler, Reset, fehlende Registrierungsroute; UI-Smoke nach Gate
-- **Blocker:** BL-GATE-UXUI
+- **Abhängigkeiten:** BL-P0-04, UX-GATE-A (für die Anwendungs-Hülle)
+- **Ergebnis:** E-Mail/Passwort-Login, Logout, Passwort-Reset-Flow; Registrierung unerreichbar; Anmeldung führt in die App-Shell
+- **Akzeptanz:** Unauthentifizierte Nutzer sehen interne Seiten nicht; Reset erzeugt kein Secret im Repo
+- **Tests:** Pest Feature-Tests Login Erfolg/Fehler, Reset, fehlende Registrierungsroute
 
 ### BL-P1-02 – Rollen und Policy-Grundlage
 
 - **Phase:** 1
-- **Status:** offen
-- **Anforderungen:** `AUTH-001` bis `AUTH-003`
-- **Abhängigkeiten:** BL-P1-01 (Headless möglich vor UI-Freigabe)
-- **Ergebnis:** Rollen Admin, Vertrieb, Disposition, Geschäftsführung; serverseitige Policies; **keine** Admin-Fachoberfläche vor Gate-Freigabe
-- **Akzeptanz:** jede Rolle positiv und negativ getestet
-- **Tests:** Pest Policies Erlaubnis/Verweigerung
+- **Status:** erledigt (Slice-Umfang: Rolle Produktmanagement, Gates, Kalkulations-Policy)
+- **Anforderungen:** `AUTH-001` bis `AUTH-003`, `AUTH-006`, `AUTH-007`
+- **Abhängigkeiten:** BL-P1-01
+- **Ergebnis:** Rollen inkl. Produktmanagement; serverseitige Policies für Kalkulationen; **keine** Admin-Fachoberfläche (`UX-GATE-D`)
+- **Akzeptanz:** Produktmanagement ohne Extra-Recht sieht keine Kundenkalkulationen/Dispoaufträge
+- **Tests:** Pest Policies Erlaubnis/Verweigerung inkl. `AT-30`-Vorstufe
 
 ### BL-P1-03 – Rabattgrenze und Sonderfreigaberecht
 
 - **Phase:** 1
-- **Status:** offen
-- **Anforderungen:** `AUTH-001`, `COM-002`, `COM-003`, Sonderfreigabe Kapitel 4.2
+- **Status:** erledigt (Datenfelder und Erkennung; Freigabe-UI bleibt UX-GATE-D)
+- **Anforderungen:** `AUTH-001`, `COM-002`, `COM-003`
 - **Abhängigkeiten:** BL-P1-02
-- **Ergebnis:** nutzerbezogene Rabattgrenze und Sonderfreigabe-Flag am Benutzer
-- **Akzeptanz:** Werte nur admin-pflegbar; keine erfundenen Default-Grenzen außer dokumentiert offen
-- **Tests:** Pest Lesen/Schreiben berechtigt vs. unberechtigt
+- **Ergebnis:** nutzerbezogene Rabattgrenze und Sonderfreigabe-Flag; Überschreitung wird markiert, nicht umgangen
+- **Akzeptanz:** keine erfundenen Default-Grenzen; `null` bedeutet keine persönliche Grenze
+- **Tests:** Pest Lesen der Markierung berechtigt vs. Grenze überschritten
 
 ### BL-P1-04 – Append-only-Audit
 
 - **Phase:** 1
-- **Status:** offen
+- **Status:** erledigt (Fundament für Kalkulationsänderungen)
 - **Anforderungen:** `AUD-001` bis `AUD-004`
 - **Abhängigkeiten:** BL-P1-01
 - **Ergebnis:** Auditereignisse unveränderbar; keine View-Logs
-- **Akzeptanz:** Update/Delete am Audit serverseitig unmöglich bzw. ungenutzt
+- **Akzeptanz:** Update/Delete am Audit serverseitig unmöglich
 - **Tests:** Pest Schreiben, Unveränderbarkeit, keine View-Ereignisse
 
 ### BL-P1-05 – In-App-Benachrichtigungsgrundlage
@@ -189,11 +228,22 @@ darf vorbereitet werden, ersetzt das Gate aber nicht.
 
 - **Phase:** 4
 - **Status:** offen
-- **Anforderungen:** `CAL-001` bis `CAL-004`, `SPT-001` bis `SPT-015`
+- **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
-- **Ergebnis:** Spotkalkulation mit Rechenerklärung
-- **Akzeptanz:** `AT-01` bis `AT-04`
-- **Tests:** Pest Formeln inkl. Rundung; UI an Serverregeln
+- **Ergebnis:** Spotkalkulation mit frei editierbarer Länge, Mehrsender-Positionen, Live-Summe und Rechenerklärung
+- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24`
+- **Tests:** Pest Formeln inkl. Rundung; UI an Serverregeln; Mehrsender-Beispiel Radio Hamburg + ROCK ANTENNE Hamburg
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Dieses Paket bleibt für Durchschnitt, Kalenderplaner, Komponenten und Preisimport.
+
+### BL-P4-03 – Standardangebote
+
+- **Phase:** 4
+- **Status:** offen
+- **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`
+- **Abhängigkeiten:** BL-P4-02, UX-GATE-D
+- **Ergebnis:** versionierte Vorlagen ohne Kundenbindung; Navigation; Übernahme als Kundenkalkulations-Snapshot; Historie/Audit
+- **Akzeptanz:** `AT-28` bis `AT-31`; Dispo nur aus übernommener Kundenkalkulation; Änderungen isoliert
+- **Tests:** Pest Statuswechsel, Snapshot-Isolation, Rechte Produktmanagement vs. Vertrieb
 
 ## Phase 5 – SWF, Produktion und freie Preisbestandteile
 
@@ -201,11 +251,11 @@ darf vorbereitet werden, ersetzt das Gate aber nicht.
 
 - **Phase:** 5
 - **Status:** offen
-- **Anforderungen:** `SWF-001` bis `SWF-007`, `ADM-003`
-- **Abhängigkeiten:** BL-P4-02
+- **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
+- **Abhängigkeiten:** BL-P4-02, UX-GATE-C
 - **Ergebnis:** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
-- **Tests:** Pest Formel ohne Index
+- **Tests:** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
 ### BL-P5-02 – Produktion/Sonstiges
 
@@ -261,16 +311,27 @@ darf vorbereitet werden, ersetzt das Gate aber nicht.
 - **Akzeptanz:** `AT-09`, `AT-12`, `AT-13`
 - **Tests:** Pest Ersteller ≠ Freigeber; Invalidierung mit Auditgrund
 
+### BL-P7-03 – Budget-Assistent
+
+- **Phase:** 7
+- **Status:** offen
+- **Anforderungen:** `BUD-001` bis `BUD-009`
+- **Abhängigkeiten:** BL-P7-01, BL-P4-02, UX-GATE-B
+- **Ergebnis:** optionales EUR-Zielbudget N/N, V1-Logiken gleich verteilen / Spotanzahl maximieren, Rest/Überschreitung, explizite Übernahme
+- **Akzeptanz:** `AT-25` bis `AT-27`; kein automatisches Schreiben; keine Reichweiten-/KI-Behauptung
+- **Hinweis:** Der Slice UX-GATE-B enthält die V1-Logiken bereits für Spot Classic; dieses Paket bleibt für die vollständige Assistenten-UI späterer Elemente.
+- **Tests:** Pest Determinismus Mehrsender-Vorschlag, Restausweis, Übernahme vs. Verwerfen
+
 ## Phase 8 – Dispoauftrag und Statusworkflow
 
 ### BL-P8-01 – Snapshot, Nummerierung, Positionsübernahme
 
 - **Phase:** 8
 - **Status:** offen
-- **Anforderungen:** `DSP-001` bis `DSP-006`, `TEC-001`, `TEC-002`
+- **Anforderungen:** `DSP-001` bis `DSP-007`, `TEC-001`, `TEC-002`
 - **Abhängigkeiten:** BL-P7-02, BL-P3-02
-- **Ergebnis:** unabhängiger Dispo-Snapshot, Nummernvergabe
-- **Akzeptanz:** `AT-15`; keine Sync zurück zur Kalkulation
+- **Ergebnis:** unabhängiger Dispo-Snapshot, Nummernvergabe, tatsächliche Spotlänge im Snapshot
+- **Akzeptanz:** `AT-15`, `AT-29`; keine Sync zurück zur Kalkulation; kein Dispo aus Standardangebot
 - **Tests:** Pest Nummer transaktionssicher, erneute Positionsauswahl
 
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
@@ -313,8 +374,8 @@ darf vorbereitet werden, ersetzt das Gate aber nicht.
 - **Status:** offen
 - **Anforderungen:** `REP-001` bis `REP-004`
 - **Abhängigkeiten:** BL-P8-02
-- **Ergebnis:** Suche, Filter, Sortierung, Spalten, Umsatzdimensionen
-- **Akzeptanz:** inventarspezifisch und übergreifend
+- **Ergebnis:** Suche, Filter, Sortierung, Spalten, Umsatzdimensionen; Listen auch für Standardangebote
+- **Akzeptanz:** inventarspezifisch und übergreifend; rollenbezogene Sicht auf Standardangebote
 - **Tests:** Pest Filterkombinationen, Rollen-Sichtbarkeit
 
 ### BL-P10-02 – PDF, Excel, CSV
@@ -333,7 +394,7 @@ darf vorbereitet werden, ersetzt das Gate aber nicht.
 
 - **Phase:** 11
 - **Status:** blockiert
-- **Anforderungen:** `AT-01` bis `AT-22`, Kapitel 24, Kapitel 27
+- **Anforderungen:** `AT-01` bis `AT-31`, Kapitel 24, Kapitel 27
 - **Abhängigkeiten:** BL-P10-02; Initialdaten Kapitel 27; ADR-003-Verifikation
 - **Ergebnis:** Berechtigungs-/Negativtests, Performance, Backup-Restore, Browser, Initialimport, Monitoring
 - **Akzeptanz:** gesamter Abnahmekatalog

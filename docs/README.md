@@ -18,18 +18,18 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 
 | Datei | Inhalt |
 |---|---|
-| [`anforderungskatalog.md`](anforderungskatalog.md) | Konsolidiertes Lastenheft mit stabilen Anforderungs-IDs |
+| [`anforderungskatalog.md`](anforderungskatalog.md) | Konsolidiertes Lastenheft mit stabilen Anforderungs-IDs (inkl. `BUD-*`, `STD-*`, Rolle Produktmanagement) |
 | [`fachmodell.md`](fachmodell.md) | Begriffe, Aggregate und fachliche Invarianten |
 | [`berechnungslogik.md`](berechnungslogik.md) | Formeln, Reihenfolgen und Rundung |
 | [`workflows-und-berechtigungen.md`](workflows-und-berechtigungen.md) | Rollen, Freigaben, Status und Sperren |
 | [`dynamisches-feldsystem.md`](dynamisches-feldsystem.md) | Felddefinitionen, Regeln, Versionen und Snapshots |
 | [`datenmodell.md`](datenmodell.md) | Konzeptuelles Datenmodell und technische Leitplanken |
 | [`ui-ux-konzept.md`](ui-ux-konzept.md) | Navigation, zentrale Ansichten und Interaktionsprinzipien |
-| [`ux-ui-gate.md`](ux-ui-gate.md) | Verbindliches UX/UI-Gate vor Phase-1-Oberflächen |
+| [`ux-ui-gate.md`](ux-ui-gate.md) | Gestufte UX/UI-Gates A–D; A/B freigegeben, C/D blockiert |
 | [`test-und-abnahmekatalog.md`](test-und-abnahmekatalog.md) | Fachliche Mindestabnahme und Teststrategie |
 | [`initialdaten.md`](initialdaten.md) | Startkataloge und noch bereitzustellende Daten |
 | [`umsetzungsplan.md`](umsetzungsplan.md) | Empfohlene vertikale Umsetzungsschritte |
-| [`backlog-v1.md`](backlog-v1.md) | Ausführbare Arbeitspakete mit Status |
+| [`backlog-v1.md`](backlog-v1.md) | Ausführbare Arbeitspakete mit Status (`BL-P4-03` Standardangebote, `BL-P7-03` Budget-Assistent) |
 | [`fortschritt.md`](fortschritt.md) | Aktueller Umsetzungsstand |
 | [`entwicklung-lokal.md`](entwicklung-lokal.md) | Lokales Setup, Prüfungen, Produktionshinweise |
 | [`blocker-und-entscheidungslog.md`](blocker-und-entscheidungslog.md) | Blocker und technische Detailentscheidungen |

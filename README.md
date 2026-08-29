@@ -7,7 +7,8 @@ Social-Media-, Event- und Sonderwerbeaufträgen an die Disposition.
 
 V1-Fachlichkeit und Technologie-ADRs sind verbindlich. Phase 0 (Projektbasis)
 ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und `mysql`).
-Vor Phase-1-Fachoberflächen steht das UX/UI-Gate
+UX-GATE-A und UX-GATE-B sind freigegeben (App-Shell, Kalkulations-Wizard,
+Spot Classic). UX-GATE-C und UX-GATE-D bleiben blockiert
 ([`docs/ux-ui-gate.md`](docs/ux-ui-gate.md)).
 
 ## Start
@@ -44,13 +45,14 @@ dokumentiert werden.
 - [Dynamisches Feldsystem](docs/dynamisches-feldsystem.md)
 - [Fachliches Datenmodell](docs/datenmodell.md)
 - [UI-/UX-Konzept](docs/ui-ux-konzept.md)
-- [UX/UI-Gate](docs/ux-ui-gate.md)
+- [UX/UI-Gates](docs/ux-ui-gate.md)
 - [Test- und Abnahmekatalog](docs/test-und-abnahmekatalog.md)
 - [Initialdaten](docs/initialdaten.md)
 - [Umsetzungsplan](docs/umsetzungsplan.md)
 - [Backlog V1](docs/backlog-v1.md)
 - [Fortschritt](docs/fortschritt.md)
 - [Lokale Entwicklung](docs/entwicklung-lokal.md)
+- [Blocker und Entscheidungslog](docs/blocker-und-entscheidungslog.md)
 
 ## Arbeitsweise mit Cursor
 
@@ -69,4 +71,5 @@ Beispielauftrag:
 - Jahres-, Produktions- und Digitalpreislisten
 - produktive Infrastruktur- und Zugangsdaten
 - produktives Deployment
-- endgültige Fachoberflächen (warten auf UX/UI-Gate)
+- Trailer/SWF-, Influencer-/Social-, Dispo-, Freigabe-, Standardangebots- und
+  Admin-Fachoberflächen (UX-GATE-C/D)

@@ -4,7 +4,7 @@
 
 Dieses Dokument ist die technische Lesefassung der kaufmännischen Anforderungen.
 Verbindlich sind insbesondere `GEN-002`, `PRI-005`, `PRI-006`, `SPT-*`, `SWF-*`,
-`OA-*` und `COM-*` aus dem [Anforderungskatalog](anforderungskatalog.md).
+`OA-*`, `COM-*`, `CAL-001`, `CAL-005` und `BUD-*` aus dem [Anforderungskatalog](anforderungskatalog.md).
 
 Alle Formeln werden autoritativ auf dem Server ausgeführt. Eingaben, Zwischenwerte,
 verwendete Versionen und Rundung müssen für Support, Audit und PDF-Ausgabe
@@ -51,12 +51,13 @@ bleibt Index 95 gültig (`SPT-009`).
 - Tagesgruppe,
 - mindestens ein Zeitfenster,
 - Gesamtanzahl Spots,
-- tatsächliche Länge oder Komponenten,
+- tatsächliche Länge oder Komponenten; die Länge ist je Sender-/Kombinationsposition frei editierbar (`SPT-015`),
 - konfigurierter Werbemittelaufschlag.
 
 Ein Zeitfenster `10–23 Uhr` umfasst die Preisstunden 10 bis einschließlich 22.
-Mehrere Zeitfenster werden zu einer eindeutigen Stundenmenge vereinigt. Überlappende
-Stunden dürfen nur einmal zählen.
+Mehrere Zeitfenster werden für den Durchschnitt zu einer eindeutigen Stundenmenge
+vereinigt. Überlappende Stunden dürfen nur einmal zählen (`SPT-003`). Das ist keine
+gruppierte Zeitschiene: klassische Spotplanung bleibt stundenweise (`SPT-016`).
 
 ```text
 Stunden = eindeutige Vereinigung aller gewählten Stunden
@@ -70,6 +71,14 @@ Positionsbrutto = Spotpreis × Spotanzahl
 
 Der Mittelwert ist immer gleichgewichtet. Eine gewünschte Verteilungsgewichtung
 wird ausschließlich über den Planer abgebildet (`SPT-004`).
+
+Die tatsächliche Spotlänge ist je Position sichtbar und geht direkt in
+`Spotpreis` und `Positionsbrutto` ein. Standardlängen sind nur Vorbelegungen.
+
+Eine Kalkulation summiert live alle Positionsbrutto- und Nettoergebnisse
+(`CAL-005`). Beispiel: 10 Spot-Classic-Positionen Radio Hamburg und 5 Spot-Classic-
+Positionen ROCK ANTENNE Hamburg mit jeweils eigenen Längen, Mengen, Preisstunden
+und Rabatten in derselben Kalkulation (`CAL-001`).
 
 ## Kalenderplaner Spot
 
@@ -110,8 +119,10 @@ Positionsbrutto = Anzahl × Einzelpreis
 ```
 
 Für Durchschnitt und Planer gelten dieselben Zeit- und Verteilungsprinzipien wie
-bei Spots. Premium-, Tages-, Abend- und Wochenend-Trailer werden aus Tagesgruppe
-und Uhrzeit abgeleitet und nicht als eigene Werbemittel gespeichert.
+bei Spots, soweit nicht `SWF-008` eingreift: Trailer, Allongen und weitere SWF aus
+der Trailerkalkulation dürfen konfigurierte Standardlängen und gruppierte
+Zeitschienen verwenden. Premium-, Tages-, Abend- und Wochenend-Trailer werden aus
+Tagesgruppe und Uhrzeit abgeleitet und nicht als eigene Werbemittel gespeichert.
 
 ## Online Audio und Podcast
 
@@ -215,6 +226,37 @@ Auszuweisen sind:
 
 Bei Mediabrutto null wird kein künstlicher Wert ausgegeben, sondern
 `nicht berechenbar` (`COM-011`).
+
+## Budgetplanung
+
+Der Vorschlag ist nicht autoritativ. Autoritative Speicherung bleibt die
+Kalkulation nach expliziter Übernahme (`BUD-008`).
+
+Zwei Planungswege:
+
+- **Selbst planen:** optionales Zielbudget N/N nur als Vergleich mit dem
+  aktuellen N/N-Invest.
+- **Mit Budget planen:** Zielbudget N/N, Sender/Kombis, Preisstunden, Längen
+  und Konditionen zuerst; danach ein **neuer** Vorschlag. Kein bestehendes
+  Senderverhältnis (`BUD-005`).
+
+Eingaben für den Vorschlag:
+
+- optionales numerisches Zielbudget N/N in EUR (`BUD-001`, `BUD-002`),
+- ausgewählte Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und
+  Auftragsrabatt (`BUD-003`),
+- Verteilungslogik (`BUD-006`): Budget je Sender gleich verteilen oder
+  Spotanzahl innerhalb der gewählten Preisstunden maximieren.
+
+Regeln:
+
+- Berechnung deterministisch und nachvollziehbar; Ergebnis immer editierbar (`BUD-004`).
+- Spotmengen ganzzahlig; Rest unter Zielbudget oder Überschreitung durch
+  Ganzzahligkeit transparent ausweisen (`BUD-007`).
+- Keine Reichweiten-, Leistungs- oder KI-Optimierung (`BUD-009`).
+
+Die Positionspreise folgen unverändert der verbindlichen Rechenreihenfolge unten.
+Der Vorschlag ändert nur Mengen nach Übernahme, nicht die Formel selbst.
 
 ## Verbindliche Rechenreihenfolge
 

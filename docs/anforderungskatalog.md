@@ -1,7 +1,7 @@
 # Anforderungskatalog – Kalkulation und Disposition
 
 > **Status:** Verbindlicher V1-Fachstand  
-> **Stand:** 28. August 2026  
+> **Stand:** 29. August 2026  
 > **Pflege:** Änderungen nur mit betroffenen Anforderungs-IDs und angepassten Akzeptanztests.
 
 Fachliches Lastenheft für das interne Websystem von more Marketing.
@@ -11,7 +11,7 @@ Fachliches Lastenheft für das interne Websystem von more Marketing.
 | **Dokument**    | **Festlegung**                                                                                               |
 |-----------------|--------------------------------------------------------------------------------------------------------------|
 | Version         | 1.0 - konsolidierter V1-Fachstand                                                                            |
-| Stand           | 28\. August 2026                                                                                             |
+| Stand           | 29\. August 2026                                                                                             |
 | Zweck           | Grundlage für Aufwandsschätzung, technische Konzeption, Umsetzung und Abnahme                                |
 | Quellen         | Fachworkshop und Antworten 1-99; Dispositionsauftrag 2026; Spotkalkulation 2026; RHH Trailerkalkulation 2026 |
 | Geltungsbereich | Eine Organisation mit mehreren Sendern, Kombis und Inventaren                                                |
@@ -37,7 +37,7 @@ Die folgende Übersicht bildet die Hauptkapitel ab. Für die Arbeit in Cursor k�
 
 - 7\. Preislisten und Preisversionen
 
-- 8\. Kalkulation: Objekt, Lebenszyklus und Summen
+- 8\. Kalkulation: Objekt, Lebenszyklus und Summen (inkl. Mehrsender, Budget-Assistent, Standardangebote)
 
 - 9\. Spotkalkulation
 
@@ -126,9 +126,9 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 
 ## 2.3 End-to-End-Prozess
 
-1.  Vertrieb legt eine Kalkulation mit Kunde, optionaler Agentur und mindestens einer Werbemittelposition an.
+1.  Vertrieb legt eine Kalkulation mit Kunde, optionaler Agentur und mindestens einer Werbemittelposition an. Optional entsteht die Kalkulation durch Übernahme eines veröffentlichten Standardangebots (`STD-004`, `STD-005`).
 
-2.  Das System berechnet Listenpreise, Aufschläge, Rabatte, AE, N/N-Invest und Payfaktoren; Sonderfreigaben werden erkannt.
+2.  Das System berechnet Listenpreise, Aufschläge, Rabatte, AE, N/N-Invest und Payfaktoren; Sonderfreigaben werden erkannt. Optional erzeugt der Pfad „Mit Budget planen“ Mengenvorschläge, die erst nach expliziter Übernahme gelten (`BUD-008`).
 
 3.  Vertrieb wählt Kalkulationspositionen aus und erzeugt daraus einen nummerierten Dispoauftrag als Snapshot.
 
@@ -154,6 +154,8 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 | Dokumente           | Interne Kalkulationsübersicht, Dispoauftrag und Reports           | Kundenangebot und Kundenportal bei späterem Bedarf           |
 | Rechnung per Ende   | Monate mehrfach wählbar, keine Betragsaufteilung                  | Betragsaufteilung nach Monaten                               |
 | Vertretung          | Keine Abwesenheits-/Vertreterregel                                | Delegation und Abwesenheitslogik                             |
+| Budgetplanung       | Deterministische Mengenvorschläge ohne Reichweite/KI (`BUD-009`)  | Reichweiten- oder KI-Optimierung                             |
+| Standardangebote    | Interne Vorlagen ohne Kundenbindung; Übernahme in Kundenkalkulation | Kein Kundenangebot; bleibt durch `SCP-001` ausgeschlossen    |
 | Audio               | Abspielen/Download, Länge manuell prüfen                          | Automatische Audiolängenprüfung                              |
 | Weitere Teams       | Disposition/Projektmanagement koordiniert zentral                 | Direkte Zugänge für OAP, PDM, Redaktion, Moderatoren, Events |
 
@@ -165,12 +167,13 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 
 ## 4.1 Rollen
 
-| **Rolle**        | **Kernrechte in V1**                                                                                                                                                                   |
-|------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Admin            | Gesamte Administration; alle Vorgänge sehen/bearbeiten; Freigaben; erzwingende Aktionen mit Begründung; Uploads archivieren.                                                           |
-| Vertrieb         | Alle Kalkulationen und Dispoaufträge sehen; Kalkulationen erstellen/bearbeiten; Dispoaufträge anlegen; Freigaben im Rahmen der Berechtigungen; Rückfragen beantworten.                 |
-| Disposition      | Freigegebene Dispoaufträge operativ bearbeiten; operative Felder, Materialstatus, Rechnung-per-Ende, Kommentare und Status pflegen; keine eigenständige Änderung kaufmännischer Werte. |
-| Geschäftsführung | Alle Vorgänge sehen/bearbeiten; alle Freigaben erteilen; auswerten; abgeschlossene Vorgänge mit Begründung wieder öffnen.                                                              |
+| **Rolle**         | **Kernrechte in V1**                                                                                                                                                                   |
+|-------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Admin             | Gesamte Administration; alle Vorgänge sehen/bearbeiten; Freigaben; erzwingende Aktionen mit Begründung; Uploads archivieren; Standardangebote vollständig.                              |
+| Vertrieb          | Alle Kalkulationen und Dispoaufträge sehen; Kalkulationen erstellen/bearbeiten; veröffentlichte Standardangebote ansehen und übernehmen; Dispoaufträge anlegen; Freigaben im Rahmen der Berechtigungen; Rückfragen beantworten. |
+| Disposition       | Freigegebene Dispoaufträge operativ bearbeiten; operative Felder, Materialstatus, Rechnung-per-Ende, Kommentare und Status pflegen; keine eigenständige Änderung kaufmännischer Werte. |
+| Geschäftsführung  | Alle Vorgänge sehen/bearbeiten; alle Freigaben erteilen; auswerten; abgeschlossene Vorgänge mit Begründung wieder öffnen; Standardangebote vollständig.                                |
+| Produktmanagement | Standardangebote erstellen, bearbeiten, versionieren, veröffentlichen, archivieren und dafür Preis-/Produkt-Snapshots verwenden. Kein automatischer Zugriff auf Kundenkalkulationen oder Dispoaufträge. |
 
 **AUTH-001** Berechtigungen werden rollenbasiert und für Sonderrechte zusätzlich nutzerbezogen geprüft.
 
@@ -193,6 +196,10 @@ Eine Sonderfreigabe ist ein eigener Freigabetyp und nicht mit der allgemeinen Vi
 - Gewöhnliche Vertriebsmitarbeiter ohne Sonderrecht sind nicht berechtigt.
 
 **AUTH-005** Eine Person mit beiden Rechten darf Sonderfreigabe und Vier-Augen-Freigabe in einem Bedienvorgang erteilen, sofern sie nicht Ersteller ist. Das System speichert dennoch zwei getrennte Freigabeprotokolle.
+
+**AUTH-006** Die Rolle Produktmanagement darf Standardangebote erstellen, bearbeiten, versionieren, veröffentlichen, archivieren und die dafür benötigten Preis-/Produkt-Snapshots verwenden. Admin und Geschäftsführung behalten umfassende Rechte einschließlich dieser Funktionen.
+
+**AUTH-007** Produktmanagement erhält nicht automatisch Zugriff auf Kundenkalkulationen oder Dispoaufträge. Solche Rechte müssen gesondert über die vorhandene Berechtigungslogik erteilt werden.
 
 # 5. Organisation, Sender, Kombis und Inventare
 
@@ -328,13 +335,15 @@ Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und
 
 - Summenblock mit Mediabrutto, Rabatt, AE, N/N-Invest und Payfaktoren
 
-**CAL-001** Eine Kalkulation darf mehrere Inventare, Werbemittel und Kalkulationsarten enthalten.
+**CAL-001** Eine Kalkulation kann parallel mehrere Sender und/oder Kombis mit unterschiedlichen Werbemitteln, Spotlängen, Mengen, Preisstunden und Rabatten enthalten. Mehrere Inventare, Werbemittel und Kalkulationsarten in einer Kalkulation bleiben zulässig. Akzeptanzbeispiel: 10 Spot-Classic-Spots bei Radio Hamburg und 5 Spot-Classic-Spots bei ROCK ANTENNE Hamburg in derselben Kalkulation.
 
 **CAL-002** Die Kalkulationsart wird je Position gewählt. Ein späterer Wechsel ist nicht frei erlaubt; der Nutzer legt bei Bedarf eine neue Position an.
 
 **CAL-003** Kalkulationen können gespeichert, bearbeitet, kopiert, archiviert, gefiltert und wieder geöffnet werden.
 
-**CAL-004** Aus einer Kalkulation können mehrere Dispoaufträge entstehen, ohne dass die Kalkulation formal als bestätigt markiert sein muss.
+**CAL-004** Aus einer Kalkulation können mehrere Dispoaufträge entstehen, ohne dass die Kalkulation formal als bestätigt markiert sein muss. Das gilt nur für reguläre Kundenkalkulationen, nicht für Standardangebote (`STD-007`, `DSP-007`).
+
+**CAL-005** Die Gesamtsumme der Kalkulation wird live aus allen Positionen gebildet. Jede Position bleibt separat editierbar und in der Rechenerklärung nachvollziehbar.
 
 ## 8.2 Positionsstruktur
 
@@ -365,6 +374,50 @@ Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und
 
 8.  Intern vier Dezimalstellen halten; Position und Auftrag auf zwei Cent runden.
 
+## 8.4 Budget-Assistent
+
+Der Budget-Assistent ist eine optionale Hilfe in der Kundenkalkulation. Er erzeugt deterministische Mengenvorschläge, ändert aber nichts ohne explizite Übernahme.
+
+**BUD-001** Ein Zielbudget ist optional. Wird es gesetzt, muss es ein numerisches EUR-Feld mit Validierung sein; ein unstrukturiertes Textfeld ist unzulässig.
+
+**BUD-002** Das Zielbudget in V1 ist N/N-Invest. Beim Pfad „Selbst planen“ dient es nur dem Vergleich mit dem aktuellen N/N-Invest. Beim Pfad „Mit Budget planen“ ist es die Vorgabe für den Vorschlag.
+
+**BUD-003** Der Vorschlag berücksichtigt die ausgewählten Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und den zusätzlichen Auftragsrabatt.
+
+**BUD-004** Vorschläge sind deterministisch, nachvollziehbar und immer editierbar.
+
+**BUD-005** Der Pfad „Mit Budget planen“ erzeugt einen neuen Vorschlag. Ein „bestehendes Senderverhältnis“ wird nicht verwendet, weil keine manuelle Vorplanung vorausgesetzt wird.
+
+**BUD-006** V1-Verteilungslogiken: Budget je ausgewähltem Sender/Kombi gleich verteilen; ganzzahlige Spotanzahl innerhalb der gewählten Preisstunden maximieren.
+
+**BUD-007** Spotmengen im Vorschlag sind ganzzahlig. Ein Rest unter dem Zielbudget oder eine geringfügige Überschreitung durch Ganzzahligkeit wird transparent ausgewiesen.
+
+**BUD-008** Der Vorschlag verändert die Kalkulation nicht automatisch. Erst eine explizite Übernahme schreibt die Mengen in die Positionen; danach bleiben sie frei editierbar.
+
+**BUD-009** V1 behauptet keine Reichweiten- oder KI-Optimierung. Belastbare Reichweiten- oder Leistungsdaten sind nicht Teil der Berechnungsgrundlage.
+
+## 8.5 Standardangebote
+
+Ein Standardangebot ist eine versionierte, sender- bzw. kombibezogene Kalkulationsvorlage ohne Kundenbindung. Es besitzt einen eigenen Navigationspunkt und ist kein Kundenangebot im Sinne von `SCP-001`.
+
+**STD-001** Ein Standardangebot ist an Sender und/oder Kombis gebunden, besitzt keine Kunden- oder Agenturzuordnung und dient als Vorlage für spätere Kundenkalkulationen.
+
+**STD-002** Zulässige Status sind Entwurf, veröffentlicht und archiviert. Nur veröffentlichte Versionen sind für Vertrieb zur Übernahme sichtbar.
+
+**STD-003** Die linke Navigation enthält den eigenen Punkt Standardangebote. Sichtbarkeit richtet sich nach Rolle (`AUTH-006`, `AUTH-007`).
+
+**STD-004** Vertrieb darf veröffentlichte Standardangebote ansehen und die Aktion Übernehmen ausführen.
+
+**STD-005** Übernehmen erzeugt eine eigenständige Kundenkalkulation als Snapshot der veröffentlichten Version. Änderungen an der Kundenkalkulation verändern niemals das Standardangebot; Änderungen am Standardangebot verändern niemals bereits übernommene Kalkulationen.
+
+**STD-006** Vertrieb darf die übernommene Kundenkalkulation anpassen, Senderpositionen ändern, Spotmengen skalieren und den Budget-Assistenten verwenden.
+
+**STD-007** Ein Dispoauftrag darf nur aus der übernommenen regulären Kundenkalkulation entstehen, niemals direkt aus dem Standardangebot (`DSP-007`).
+
+**STD-008** Jede Version speichert Autor, Veröffentlichungszeitpunkt sofern veröffentlicht, vollständige Versionshistorie und ist auditierbar (`AUD-001`, `AUD-002`).
+
+**STD-009** Produktmanagement, Admin und Geschäftsführung dürfen Standardangebote anlegen, bearbeiten, versionieren, veröffentlichen und archivieren und dafür Preis-/Produkt-Snapshots verwenden.
+
 # 9. Spotkalkulation
 
 ## 9.1 Zulässige Kalkulationsarten
@@ -381,7 +434,7 @@ Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und
 
 **SPT-002** Ein Zeitfenster 10-23 Uhr umfasst die Stunden 10:00 bis 22:59. Mehrere getrennte Zeitfenster in einer Position sind erlaubt.
 
-**SPT-003** Überlappende Zeitfenster dürfen eine Stunde nur einmal in den Durchschnitt einbeziehen; die UI soll Überschneidungen vermeiden oder transparent zusammenführen.
+**SPT-003** Überlappende Zeitfenster dürfen eine Stunde nur einmal in den Durchschnitt einbeziehen; die UI soll Überschneidungen vermeiden oder transparent zu einer eindeutigen Stundenmenge zusammenführen. Das ist keine gruppierte Zeitschiene im Sinne von `SPT-016`.
 
 **SPT-004** Der Durchschnitt ist gleichgewichtet. Eine gewichtete Verteilung wird ausschließlich über den Planer abgebildet.
 
@@ -421,7 +474,9 @@ Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und
 
 **SPT-014** Admin kann je Kombination für Allonge/Komponenten die Berechnungsart 'einzeln berechnen' oder 'gemeinsame Gesamtlänge' festlegen.
 
-**SPT-015** Admin pflegt Standardlängen. Vertrieb darf die Länge ändern; ausschließlich die tatsächliche Länge wird berechnet und im Dispoauftrag ausgewiesen.
+**SPT-015** Jede Spot-Classic-Position besitzt eine frei editierbare tatsächliche Spotlänge in Sekunden. Sie ist kein gesperrter Standardwert. Administrativ gepflegte Standardlängen sind ausschließlich Vorbelegungen und keine Beschränkung. Die Länge ist in der Kalkulation direkt bei jeder Sender- bzw. Kombinationsposition sichtbar, wird in der Preisberechnung verwendet und im Dispo-Snapshot ausgewiesen.
+
+**SPT-016** Klassische Spotplanung plant einzelne Preisstunden und fasst Zeitfenster nicht zu gruppierten Zeitschienen zusammen. Überlappende Stunden dürfen weiterhin nur einmal in den Durchschnitt einfließen (`SPT-003`). Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen abweichend konfigurierte Standardlängen und gruppierte Zeitschienen verwenden (`SWF-004`, `SWF-008`).
 
 # 10. SWF- und Trailerkalkulation
 
@@ -443,6 +498,8 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 **SWF-006** CityLife ist eine Radio-Hamburg-spezifische Produktvariante des Werbemittels Veranstaltungstipp mit eigenen Standardzeiten, Beschreibungen und Regeln.
 
 **SWF-007** Event-Tipp wird als zusätzliches Werbemittel übernommen.
+
+**SWF-008** Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen konfigurierte Standardlängen und gruppierte Zeitschienen verwenden. Das ist ausdrücklich abweichend von der klassischen Spotplanung (`SPT-016`).
 
 ## 10.1 Keine Excel-Begrenzungen übernehmen
 
@@ -637,7 +694,7 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 | **Bereich**    | **Inhalte**                                                                                                                                         |
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
 | Kopfdaten      | Kunde, Rechnungsempfänger, Meridian-Nr., Agentur, Kontakte, Kampagne, Mediaberater, Prüf-/Payfaktorfelder, Rechnungs- und Dispohinweise             |
-| Positionen     | Inventar, enthaltene Sender bei Kombi, Werbemittel, Kategorie, Buchungskennzeichen, Einplanung durch, Zeitraum, Invest, dynamische Felder, Hinweise |
+| Positionen     | Inventar, enthaltene Sender bei Kombi, Werbemittel, Kategorie, Buchungskennzeichen, Einplanung durch, Zeitraum, tatsächliche Spotlänge, Invest, dynamische Felder, Hinweise |
 | Uploads        | Zentrale Uploadliste einschließlich Dateien aus dynamischen Datei-Feldern                                                                           |
 | Abrechnung     | Mediabrutto, Rabatte, AE, N/N, Payfaktoren, Rechnung per Ende                                                                                       |
 | Zusammenarbeit | Kommentare, Rückfragen/Antworten, Status-, Freigabe- und Änderungshistorie                                                                          |
@@ -669,6 +726,8 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 **DSP-005** Weitere Kopffelder können über das dynamische Feldsystem durch Admin ergänzt werden.
 
 **DSP-006** Es gibt keine Felder für gewünschte Auftragsbestätigung oder Versandart, da V1 nur die interne Dispo-Zusammenfassung erzeugt.
+
+**DSP-007** Ein Dispoauftrag darf ausschließlich aus einer regulären Kundenkalkulation erzeugt werden. Die direkte Erstellung aus einem Standardangebot ist unzulässig (`STD-007`).
 
 # 17. Statusmodell und operative Bearbeitung
 
@@ -824,7 +883,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 
 **VER-003** Beim Anlegen einer Kalkulationsposition werden aus der Kalkulations-Snapshotbasis die relevanten Werbemittel-, Kombinations- und Felddefinitionen sowie die ausgewählte Preislistenversion unveränderbar zugeordnet.
 
-**VER-004** Beim Erstellen eines Dispoauftrags wird ein eigener Snapshot des gewählten Kalkulationsstands gespeichert.
+**VER-004** Beim Erstellen eines Dispoauftrags wird ein eigener Snapshot des gewählten Kalkulationsstands gespeichert. Beim Übernehmen eines Standardangebots wird ein eigener Snapshot der veröffentlichten Vorlagenversion in der neuen Kundenkalkulation gespeichert (`STD-005`).
 
 **VER-005** Änderungen aktiver Feldsets erzeugen eine neue Version. Neue Regeln gelten ausschließlich für danach erzeugte Kalkulationen/Snapshots.
 
@@ -845,8 +904,9 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 | Produktionspreise      | Inventar-/Typpreise, Gültigkeit, Rabatt-/AE-Eigenschaften                         |
 | Online Audio           | TKP-Listen, Mindest-TKP, Targetings, Aufschläge, Plattformen                      |
 | Dynamische Felder      | Felder, Gruppen, Feldsets, Regeln, Validierung, Vorschau, Versionen               |
-| Benutzer/Rollen        | Konten, Rollen, Rabattgrenzen, Sonderfreigaberechte, Aktivstatus                  |
+| Benutzer/Rollen        | Konten, Rollen (inkl. Produktmanagement), Rabattgrenzen, Sonderfreigaberechte, Aktivstatus |
 | Stammdaten             | Kunden, Agenturen, Kontakte, Meridian-Nummern                                     |
+| Standardangebote       | Vorlagen ohne Kundenbindung; Versionen, Veröffentlichung, Archiv; Übernahme nur in Kundenkalkulation |
 
 **ADM-001** Jede Adminänderung ist mit altem Wert, neuem Wert, Benutzer, Zeit und betroffener Version zu protokollieren.
 
@@ -869,7 +929,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 
 # 21. Suche, Listen, Reports und Exporte
 
-**REP-001** Listen für Kalkulationen und Dispoaufträge unterstützen Volltextsuche, kombinierbare Filter, Sortierung, Pagination und benutzerbezogene Spaltenauswahl.
+**REP-001** Listen für Kalkulationen, Standardangebote und Dispoaufträge unterstützen Volltextsuche, kombinierbare Filter, Sortierung, Pagination und benutzerbezogene Spaltenauswahl.
 
 **REP-002** V1 wertet Umsatz mindestens nach Mediaberater, Kunde, Sender/Inventar, Werbemittel, Oberkategorie, Monat, Status, Rabatt und AE aus.
 
@@ -887,7 +947,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 
 ## 22.1 Audit
 
-**AUD-001** Alle Änderungen an Kalkulationen und Dispoaufträgen werden auf Feld- und Objektebene mit Benutzer, Zeitpunkt, altem/neuem Wert und Kontext protokolliert.
+**AUD-001** Alle Änderungen an Kalkulationen, Standardangeboten und Dispoaufträgen werden auf Feld- und Objektebene mit Benutzer, Zeitpunkt, altem/neuem Wert und Kontext protokolliert.
 
 **AUD-002** Zusätzlich werden Statuswechsel, Freigaben, Ablehnungen, Rückfragen/Antworten, Kommentare, Uploads, Downloads, Exporte, Archivierungen und erzwungene Aktionen protokolliert.
 
@@ -915,8 +975,9 @@ E-Mail und In-App-Benachrichtigungen werden ausgelöst bei: Freigabe angefordert
 | Inventar-Werbemittel-Regel                    | n:m              | Whitelist, Buchungskennzeichen, Einplanung, Hinweis, Aufschlag  |
 | Preisliste / Preiszeile / Version             | n                | Jahr, Gültigkeit, Tagesgruppe, Stunde, Sekunden-/Fix-/TKP-Preis |
 | Kunde / Agentur / Kontakt                     | n                | Stammdaten, Meridian-Nr., AE-Standard                           |
-| Benutzer / Rolle / Rabattgrenze               | n                | Zugriff und Freigaberechte                                      |
-| Kalkulation / Position                        | 1:n              | Kopfdaten, Summen, Kalkulationsarten                            |
+| Benutzer / Rolle / Rabattgrenze               | n                | Zugriff und Freigaberechte, inkl. Produktmanagement             |
+| Standardangebot / Version                     | 1:n              | kundenlose Kalkulationsvorlage, Status, Snapshot                |
+| Kalkulation / Position                        | 1:n              | Kopfdaten, Summen, Kalkulationsarten; optional Herkunft aus Standardangebot |
 | Komponente / Plattformanteil / Social-Element | n                | fachspezifische Unterobjekte                                    |
 | Produktions-/Zusatzzeile                      | n                | Preisbestandteile und Buchungskennzeichen S                     |
 | Dispoauftrag / Dispoposition-Snapshot         | 1:n              | unabhängige Übergabeversion                                     |
@@ -946,7 +1007,7 @@ E-Mail und In-App-Benachrichtigungen werden ausgelöst bei: Freigabe angefordert
 
 ## 23.3 Nummerierung
 
-**TEC-001** Kalkulation und Dispoauftrag besitzen interne unveränderbare IDs sowie lesbare fortlaufende Nummern. Nummern werden transaktionssicher und ohne Dubletten vergeben.
+**TEC-001** Kalkulation, Standardangebot und Dispoauftrag besitzen interne unveränderbare IDs sowie lesbare fortlaufende Nummern. Nummern werden transaktionssicher und ohne Dubletten vergeben.
 
 **TEC-002** Eine Dispoauftragsnummer besteht mindestens aus Präfix, Jahr, organisationsweiter Sequenz und laufender Nummer innerhalb der Kalkulation, z. B. DA-2026-000123-01.
 
@@ -993,6 +1054,15 @@ Die folgenden Szenarien bilden die Mindestabnahme. Zusätzlich sind Unit-, Integ
 | AT-20  | Audit                 | Änderung, Download, Export, Kommentar           | Alle Aktionen protokolliert; reine Ansicht nicht                            |
 | AT-21  | Preisimport           | Fehlerhafte Excel-Datei                         | Vorschau/Fehlerbericht; keine Teilaktivierung                               |
 | AT-22  | Berechtigung          | Dispo ändert Rabatt                             | Blockiert; Rückfrage an Vertrieb erforderlich                               |
+| AT-23  | Mehrsender-Kalkulation | 10 Spot Classic Radio Hamburg, 5 ROCK ANTENNE Hamburg, unterschiedliche Längen/Stunden/Rabatte | Eine Kalkulation; Live-Gesamtsumme; jede Position separat editierbar (`CAL-001`, `CAL-005`) |
+| AT-24  | Spotlänge Classic     | Standardlänge vorbelegt, dann auf abweichende Sekunden ändern | Feld sichtbar und frei editierbar; Preis und Dispo-Snapshot nutzen die tatsächliche Länge (`SPT-015`) |
+| AT-25  | Budget Mehrsender     | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Vorschlag ohne bestehendes Senderverhältnis; editierbar (`BUD-003`–`BUD-006`) |
+| AT-26  | Budgetrest            | Zielbudget, das sich nicht ganzzahlig aufteilen lässt | Ganzzahlige Mengen; Rest oder Überschreitung transparent ausgewiesen (`BUD-007`) |
+| AT-27  | Budget-Übernahme      | Vorschlag anzeigen, nicht übernehmen, dann explizit übernehmen | Ohne Übernahme unveränderte Positionen; nach Übernahme Mengen übernommen und weiter editierbar (`BUD-008`) |
+| AT-28  | Standardangebot übernehmen | Veröffentlichung, Vertrieb übernimmt, ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert (`STD-004`, `STD-005`) |
+| AT-29  | Dispo aus Vorlage     | Dispoauftrag direkt am Standardangebot          | Aktion unzulässig; Dispo nur aus Kundenkalkulation (`STD-007`, `DSP-007`) |
+| AT-30  | Rolle Produktmanagement | Nutzer nur Produktmanagement                    | Standardangebote erlaubt; Kundenkalkulationen und Dispoaufträge ohne Extra-Recht verweigert (`AUTH-006`, `AUTH-007`) |
+| AT-31  | Standardangebot Version | Entwurf veröffentlichen, archivieren, Historie  | Statuswechsel, Autor, Veröffentlichungszeitpunkt und Audit vollständig (`STD-002`, `STD-008`) |
 
 # 26. Initialkataloge
 
@@ -1032,7 +1102,8 @@ Die kombinierten Werbemittel 'Pre-/In-Stream' und 'Pre-/In-Stream Influencer' en
 | Einplanung durch  | Disposition; OAP; PDM-Digital / Niklas Farin; Redaktion; Moderator; Events; darf nicht geplant werden; kombinierte Sonderhinweise |
 | Upload-Kategorien | Kundenbestätigung; Audio-Motiv; Briefing; Skript/Text; Layout/Grafik; Event-Unterlagen; Sonstiges                                 |
 | Priorität         | normal; dringend                                                                                                                  |
-| Feldset-Status    | Entwurf; Aktiv; Archiviert                                                                                                        |
+| Feldset-Status          | Entwurf; Aktiv; Archiviert                                                                                                  |
+| Standardangebot-Status  | Entwurf; veröffentlicht; archiviert                                                                                         |
 
 # 27. Liefergegenstände vor Produktivsetzung
 
@@ -1050,7 +1121,7 @@ Die folgenden Punkte sind keine offenen Grundsatzentscheidungen. Sie sind konkre
 
 - initiale Kunden-, Agentur- und Kontaktstammdaten, soweit zum Start benötigt
 
-- Nutzerliste mit Rollen, persönlichen Rabattgrenzen und Sonderfreigaberechten
+- Nutzerliste mit Rollen (einschließlich Produktmanagement), persönlichen Rabattgrenzen und Sonderfreigaberechten
 
 - Text und Ausprägung der initialen Sonderhinweise (Krane & Raabe, HR, Wetter, Chartshow, St. Pauli, RMS, Spotify/Adserver)
 

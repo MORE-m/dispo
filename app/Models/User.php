@@ -16,12 +16,14 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $email
  * @property Role $role
+ * @property string|null $discount_limit_percent
+ * @property bool $can_special_approve
  * @property string $password
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'email', 'password', 'role', 'discount_limit_percent', 'can_special_approve'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -36,6 +38,8 @@ class User extends Authenticatable
         return [
             'password' => 'hashed',
             'role' => Role::class,
+            'discount_limit_percent' => 'decimal:4',
+            'can_special_approve' => 'boolean',
         ];
     }
 
@@ -47,5 +51,60 @@ class User extends Authenticatable
     public function hasAnyRole(Role ...$roles): bool
     {
         return in_array($this->role, $roles, true);
+    }
+
+    public function canAccessCalculations(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Disposition,
+            Role::Management,
+        );
+    }
+
+    public function canManageCalculations(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Sales, Role::Management);
+    }
+
+    public function canViewStandardOffers(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Management,
+            Role::ProductManagement,
+        );
+    }
+
+    public function canViewDispoOrders(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Disposition,
+            Role::Management,
+        );
+    }
+
+    public function canViewReports(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Disposition,
+            Role::Management,
+        );
+    }
+
+    public function canViewMasterData(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Management, Role::ProductManagement);
+    }
+
+    public function canAccessAdministration(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Management);
     }
 }

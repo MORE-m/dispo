@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\Navigation\AppNavigation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -39,9 +40,24 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $request->user() ? [
+                    'id' => $request->user()->id,
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role' => $request->user()->role->value,
+                    'role_label' => $request->user()->role->label(),
+                ] : null,
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'navigation' => $request->user()
+                ? app(AppNavigation::class)->itemsFor($request->user())
+                : [],
+            'flash' => [
+                'success' => $request->session()->get('success'),
+                'error' => $request->session()->get('error'),
+            ],
+            'sidebarOpen' => $request->hasCookie('sidebar_state')
+                ? $request->cookie('sidebar_state') === 'true'
+                : null,
         ];
     }
 }

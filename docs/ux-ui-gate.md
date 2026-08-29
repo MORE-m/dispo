@@ -1,54 +1,139 @@
-# UX/UI-Gate (verbindlich vor Phase-1-Oberflächen)
+# UX/UI-Gates (gestuft)
 
-- **Backlog-ID:** `BL-GATE-UXUI`
-- **Status:** blockiert – Freigabe durch Product Owner ausstehend
 - **Stand:** 29. August 2026
+- **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
+  UX-GATE-C und UX-GATE-D blockiert
 
-Dieses Gate liegt **zwischen Phase 0 und Phase 1**. Es ist keine V2-Idee und keine
-offene Grundsatzfrage der Fachlogik. Ohne Freigabe werden **keine endgültigen
-Fachseiten** gestaltet.
-
+Das frühere Einzelgate `BL-GATE-UXUI` ist durch vier Teil-Gates ersetzt.
 [`ui-ux-konzept.md`](ui-ux-konzept.md) bleibt die fachliche Navigations- und
-Interaktionsbasis. Dieses Gate konkretisiert visuelles System, Muster und
-Abnahmekriterien gemeinsam mit dem Product Owner.
+Interaktionsbasis. Die Teil-Gates steuern, welche Oberflächen umgesetzt werden
+dürfen.
 
-## Erlaubt bis zur Freigabe
+## Übersicht
 
-- technische Grundlagen (Auth-Flow serverseitig, Rollen, Audit, Schema)
-- Headless-Komponenten ohne festgelegtes Enddesign
-- Starter-Kit-Seiten nur als provisorische Hülle (Login/Health), nicht als
-  abgenommenes Fach-UI
+| Gate | Umfang | Status |
+|---|---|---|
+| `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · technische Abnahme nach grüner CI |
+| `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · technische Abnahme nach grüner CI |
+| `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | blockiert |
 
-## Nicht erlaubt bis zur Freigabe
+Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
+dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
+Sperrzustand führen.
 
-- endgültige Gestaltung von Kalkulation, Dispo, Admin, Listen, Wizard, Assistenten
-- Festlegen von Farben, Typografie und App-Shell als verbindliches Design
+## UX-GATE-A – Anwendungsgrundlage
 
-## Mit dem Product Owner festzulegen
+### Verbindliche Vorgaben
 
-1. visuelles Designsystem
-2. Farben, Typografie, Abstände und Oberflächen
-3. Navigation und App-Shell
-4. Tabellen-, Formular- und Filtermuster
-5. Statusdarstellung
-6. Kalkulations-Wizard
-7. kontextbezogene Assistenten-/Pop-up-Logik
-8. Desktop- und Tabletverhalten
-9. Lade-, Leer-, Fehler- und Erfolgszustände
-10. UX-Abnahmekriterien
+- dauerhaft linke Navigation auf Desktop
+- auf Tablet schmale linke Icon-Leiste mit ausklappbarer Navigation
+- keine obere Hauptnavigation
+- gesamte verfügbare Bildschirmbreite nutzen
+- responsive Desktop- und Tabletdarstellung
+- gemeinsame App-Shell
+- einheitliche Formular-, Tabellen-, Button-, Dialog-, Status- und
+  Rückmeldungskomponenten
+- verständliche Lade-, Leer-, Fehler- und Erfolgszustände
+- barrierearme Tastaturbedienung und sichtbare Fokuszustände
+- keine unnötigen Erklärungstexte
+- automatisch berechnete Felder rechnen still
+- Hinweise nur bei fehlenden, widersprüchlichen oder handlungsrelevanten Angaben
+- Logo-Slots für Sender, Kombis und Plattformen, zunächst mit neutralen Platzhaltern
+- bestehendes visuelles Grundkonzept: modern, ruhig, großzügig
 
-## Erwartete Artefakte zur Freigabe
+### Navigation (linke Leiste)
 
-| Artefakt | Zweck |
+1. Übersicht
+2. Kalkulationen
+3. Standardangebote
+4. Dispoaufträge
+5. Auswertungen
+6. Stammdaten
+7. Administration
+
+Sichtbarkeit richtet sich nach Rolle (`AUTH-001`, `STD-003`, `AUTH-006`,
+`AUTH-007`). Profil und Abmeldung liegen in der linken Leiste, nicht in einer
+oberen Hauptnavigation.
+
+### Abnahme
+
+Gemeinsame Shell, Navigation, Zustände und Komponenten sind gegen diese Liste
+prüfbar. Fachmodule außerhalb von UX-GATE-B bleiben hinter Sperrzuständen.
+
+## UX-GATE-B – Kalkulation und Spot Classic
+
+### Wizard
+
+1. Grunddaten
+2. Werbeelemente
+3. Konditionen
+4. Zusammenfassung
+
+Briefing ist optional. Eine Kalkulation muss ohne Briefing angelegt werden können.
+
+### Planungswege
+
+**Selbst planen:** Sender/Kombis, Werbeelemente, Preisstunden, Spotlängen,
+Spotanzahlen und Konditionen legt der Benutzer fest. Ein optionales Zielbudget
+N/N dient nur als Vergleich mit dem aktuellen N/N-Invest.
+
+**Mit Budget planen:** Zuerst Zielbudget N/N, Sender/Kombis, erlaubte Preisstunden,
+Spotlänge je Spot-Classic-Werbeelement, Positionsrabatt, AE, zusätzlicher
+Auftragsrabatt und Verteilungslogik. Danach erzeugt das System einen **neuen**
+Vorschlag. Es gibt kein „bestehendes Senderverhältnis“, weil keine manuelle
+Vorplanung vorausgesetzt wird.
+
+V1-Verteilungslogiken:
+
+- Budget je ausgewähltem Sender gleich verteilen
+- Spotanzahl innerhalb der gewählten Preisstunden maximieren
+
+Der Vorschlag wird erst nach ausdrücklicher Übernahme Teil der Kalkulation und
+bleibt anschließend vollständig editierbar. Keine KI-, Reichweiten- oder
+Leistungsoptimierung (`BUD-008`, `BUD-009`).
+
+### Spot Classic und Konditionen
+
+Verbindliche Interaktions- und Fachartefakte:
+
+| Artefakt | Fachbezug |
 |---|---|
-| Designsystem (Token: Farbe, Typo, Abstand, Radius, Schatten) | verbindliche visuelle Quelle |
-| App-Shell-Skizze (Desktop + Tablet) | Navigation, Kopfzeile, Arbeitsfläche |
-| Musterkatalog Tabelle / Formular / Filter | wiederkehrende Listen und Eingaben |
-| Status- und Pflichtanzeige | Prozessklarheit (`STA-*`, Pflichtfelder) |
-| Wizard- und Assistentenfluss Kalkulation | geführte Positionserfassung |
-| Pop-up-/Kontext-Assistent-Regeln | wann overlay, was blockiert, was informiert |
-| Zustände: Laden, Leer, Fehler, Erfolg | konsistente Rückmeldung |
-| UX-Abnahmekriterien (checkliste) | Freigabe und spätere UI-Tests |
+| Sichtbares, frei editierbares Längenfeld in Sekunden | `SPT-015` |
+| Mehrere Sender/Kombis und unterschiedliche Werbeelemente | `CAL-001` |
+| Einzelne Preisstunden, keine gruppierten Zeitschienen | `SPT-016` |
+| Live-Summe je Werbeelement und für die Kalkulation | `CAL-005` |
+| Beispiel 10 Spots Radio Hamburg und 5 Spots ROCK ANTENNE Hamburg | `CAL-001` |
+| Konditionen je Werbeelement plus kalkulationsweiter Auftragsrabatt | `COM-001`–`COM-008` |
+| Budgetvorschlag nur nach Übernahme | `BUD-001`–`BUD-009` |
 
-Die bestehende Datei `ui-ux-konzept.md` darf referenziert und nach Freigabe
-ergänzt werden; sie ersetzt dieses Gate nicht.
+Rabattgrenzen und Sonderfreigabeerkennung dürfen nicht umgangen werden (`COM-002`).
+Freigabeoberflächen selbst gehören zu UX-GATE-D.
+
+## UX-GATE-C – weitere Werbeelemente (blockiert)
+
+Nicht umsetzen, bis der Product Owner freigibt:
+
+- Trailer-/SWF-Fachoberflächen
+- Influencer-/Social-Media-Fachoberflächen
+- weitere Werbeelemente außerhalb Spot Classic
+
+## UX-GATE-D – Abschlussprozesse (blockiert)
+
+Nicht umsetzen, bis der Product Owner freigibt:
+
+- Dispo-Fachoberflächen
+- abschließende Freigabeoberflächen
+- Standardangebots-Fachoberflächen (Navigation darf vorbereitet sein)
+- Administration der Initialkataloge
+- übrige abschließende Fachoberflächen
+
+## Erlaubt / nicht erlaubt
+
+| Gate-Status | Erlaubt |
+|---|---|
+| A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
+| C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
+
+Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
+unabhängig von den Gates unzulässig.
