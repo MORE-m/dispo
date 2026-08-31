@@ -936,10 +936,10 @@ final class CalculationWriter
 
         $kept = array_values(array_filter(
             $ranges,
-            fn (array $range): bool => (int) ($range['spot_count'] ?? 0) >= 1,
+            fn (array $range): bool => (int) $range['spot_count'] >= 1,
         ));
 
-        if ($kept === [] && $targetTotal >= 1) {
+        if ($kept === []) {
             $ranges[0]['spot_count'] = $targetTotal;
 
             return [$ranges[0]];

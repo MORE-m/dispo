@@ -25,11 +25,18 @@ export function EmptyState({
     );
 }
 
-export function ErrorState({ message }: { message: string }) {
+export function ErrorState({
+    message,
+    'data-test': dataTest,
+}: {
+    message: string;
+    'data-test'?: string;
+}) {
     return (
         <div
             className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm"
             role="alert"
+            data-test={dataTest}
         >
             {message}
         </div>
@@ -47,11 +54,18 @@ export function SuccessState({ message }: { message: string }) {
     );
 }
 
-export function LoadingState({ label = 'Wird geladen' }: { label?: string }) {
+export function LoadingState({
+    label = 'Wird geladen',
+    'data-test': dataTest,
+}: {
+    label?: string;
+    'data-test'?: string;
+}) {
     return (
         <div
             className="text-muted-foreground flex items-center gap-2 text-sm"
             role="status"
+            data-test={dataTest}
         >
             <span className="border-muted-foreground size-4 animate-spin rounded-full border-2 border-t-transparent" />
             {label}

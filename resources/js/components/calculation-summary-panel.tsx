@@ -51,12 +51,14 @@ type InventoryRef = {
 export function CalculationSummaryPanel({
     totals,
     loading,
+    aeEnabled = false,
     positions,
     inventories,
     className,
 }: {
     totals: SummaryTotals | null;
     loading?: boolean;
+    aeEnabled?: boolean;
     positions: {
         inventory_id: number;
         total_spot_count: number;
@@ -66,7 +68,8 @@ export function CalculationSummaryPanel({
     className?: string;
 }) {
     const hasPositions = positions.some((p) => p.total_spot_count > 0);
-    const showLoading = Boolean(loading && !totals && hasPositions);
+    const showLoading = Boolean(loading && hasPositions);
+    const showAe = aeEnabled || Number(totals?.ae_total ?? 0) > 0;
 
     return (
         <Card
@@ -201,7 +204,10 @@ export function CalculationSummaryPanel({
 
                 <div className="border-border/60 border-t pt-4">
                     {showLoading ? (
-                        <p className="text-muted-foreground animate-pulse text-sm">
+                        <p
+                            className="text-muted-foreground animate-pulse text-sm"
+                            data-test="preview-loading"
+                        >
                             Berechnet …
                         </p>
                     ) : totals ? (
@@ -232,16 +238,19 @@ export function CalculationSummaryPanel({
                                 value={money(totals.order_discount_total)}
                                 muted
                             />
-                            <SummaryRow
-                                label="AE"
-                                value={money(totals.ae_total)}
-                                muted
-                            />
+                            {showAe ? (
+                                <SummaryRow
+                                    label="AE"
+                                    value={money(totals.ae_total)}
+                                    muted
+                                />
+                            ) : null}
                             <div className="border-border/60 border-t pt-3">
                                 <SummaryRow
                                     label="Netto (N/N)"
                                     value={money(totals.nn_invest)}
                                     emphasis
+                                    data-test="preview-net-total"
                                 />
                             </div>
                             {totals.target_budget_nn ? (
@@ -275,14 +284,19 @@ function SummaryRow({
     value,
     emphasis,
     muted,
+    'data-test': dataTest,
 }: {
     label: string;
     value: string;
     emphasis?: boolean;
     muted?: boolean;
+    'data-test'?: string;
 }) {
     return (
-        <div className="flex items-baseline justify-between gap-3">
+        <div
+            className="flex items-baseline justify-between gap-3"
+            data-test={dataTest}
+        >
             <dt
                 className={cn(
                     muted && 'text-muted-foreground text-xs',

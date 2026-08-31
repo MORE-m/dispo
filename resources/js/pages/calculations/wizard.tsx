@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import {
     DiscountListEditor,
@@ -45,8 +45,10 @@ import {
     wizardCardHeaderClass,
     wizardCardTitleClass,
 } from '@/components/wizard-section';
+import { useCalculationPreview } from '@/hooks/use-calculation-preview';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { WizardStepper } from '@/components/wizard-stepper';
@@ -452,14 +454,12 @@ export default function CalculationWizard({
         const first = firstValidPosition(catalog);
         return first ? [first] : [];
     });
-    const [totals, setTotals] = useState<Totals | null>(null);
     const [proposal, setProposal] = useState<Proposal | null>(null);
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>(
-        {},
-    );
-    const previewSeq = useRef(0);
+    const [saveError, setSaveError] = useState<string | null>(null);
+    const [saveFieldErrors, setSaveFieldErrors] = useState<
+        Record<string, string[]>
+    >({});
 
     const payload = useMemo(
         () => ({
@@ -526,60 +526,22 @@ export default function CalculationWizard({
         ],
     );
 
-    useEffect(() => {
-        if (!canEdit || busy) {
-            return;
-        }
-
-        const seq = ++previewSeq.current;
-        const controller = new AbortController();
-
-        const handle = window.setTimeout(() => {
-            void jsonPost<{ totals: Totals }>(
-                '/kalkulationen/vorschau',
-                payload,
-                controller.signal,
-            )
-                .then((data) => {
-                    if (seq !== previewSeq.current) {
-                        return;
-                    }
-
-                    setTotals(data.totals);
-                    setError(null);
-                    setFieldErrors({});
-                })
-                .catch((caught: unknown) => {
-                    if (
-                        caught instanceof DOMException &&
-                        caught.name === 'AbortError'
-                    ) {
-                        return;
-                    }
-
-                    if (seq !== previewSeq.current) {
-                        return;
-                    }
-
-                    if (caught instanceof JsonPostError) {
-                        setFieldErrors(caught.fieldErrors);
-                        setError(caught.message);
-                        return;
-                    }
-
-                    setError(
-                        caught instanceof Error
-                            ? caught.message
-                            : 'Berechnung nicht möglich.',
-                    );
-                });
-        }, 280);
-
-        return () => {
-            window.clearTimeout(handle);
-            controller.abort();
-        };
-    }, [payload, canEdit, busy]);
+    const {
+        totals,
+        previewLoading,
+        error: previewError,
+        fieldErrors: previewFieldErrors,
+    } = useCalculationPreview<Totals>({
+        url: '/kalkulationen/vorschau',
+        payload,
+        enabled: canEdit,
+        blocked: busy,
+    });
+    const error = previewError ?? saveError;
+    const fieldErrors = {
+        ...previewFieldErrors,
+        ...saveFieldErrors,
+    };
 
     function allowedMediaFor(inventoryId: number) {
         const mediumIds = new Set(
@@ -655,6 +617,8 @@ export default function CalculationWizard({
 
     function save() {
         setBusy(true);
+        setSaveError(null);
+        setSaveFieldErrors({});
         const url = calculation
             ? `/kalkulationen/${calculation.id}`
             : '/kalkulationen';
@@ -670,8 +634,8 @@ export default function CalculationWizard({
                         ? value
                         : [String(value)];
                 }
-                setFieldErrors(mapped);
-                setError('Speichern nicht möglich. Angaben prüfen.');
+                setSaveFieldErrors(mapped);
+                setSaveError('Speichern nicht möglich. Angaben prüfen.');
                 setBusy(false);
             },
         };
@@ -685,20 +649,20 @@ export default function CalculationWizard({
 
     async function createProposal() {
         setBusy(true);
+        setSaveError(null);
+        setSaveFieldErrors({});
         try {
             const data = await jsonPost<{ proposal: Proposal }>(
                 '/kalkulationen/budget-vorschlag',
                 payload,
             );
             setProposal(data.proposal);
-            setError(null);
-            setFieldErrors({});
         } catch (caught) {
             if (caught instanceof JsonPostError) {
-                setFieldErrors(caught.fieldErrors);
-                setError(caught.message);
+                setSaveFieldErrors(caught.fieldErrors);
+                setSaveError(caught.message);
             } else {
-                setError(
+                setSaveError(
                     caught instanceof Error
                         ? caught.message
                         : 'Vorschlag nicht möglich.',
@@ -724,7 +688,7 @@ export default function CalculationWizard({
                     onSuccess: () => setProposal(null),
                     onFinish: () => setBusy(false),
                     onError: () => {
-                        setError('Übernahme nicht möglich.');
+                        setSaveError('Übernahme nicht möglich.');
                         setBusy(false);
                     },
                 },
@@ -845,7 +809,9 @@ export default function CalculationWizard({
                 {flash.success ? (
                     <SuccessState message={flash.success} />
                 ) : null}
-                {error ? <ErrorState message={error} /> : null}
+                {error ? (
+                    <ErrorState message={error} data-test="preview-error" />
+                ) : null}
 
                 <WizardStepper
                     steps={STEPS}
@@ -1326,7 +1292,7 @@ export default function CalculationWizard({
                                                         {displayTotals
                                                             ?.positions[
                                                             index
-                                                        ] ? (
+                                                        ] && !previewLoading ? (
                                                             <PositionPriceSummary
                                                                 averageSecondPrice={
                                                                     displayTotals
@@ -1349,8 +1315,11 @@ export default function CalculationWizard({
                                                                     ].nn_invest
                                                                 }
                                                             />
-                                                        ) : canEdit ? (
-                                                            <LoadingState label="Berechnet" />
+                                                        ) : previewLoading ? (
+                                                            <LoadingState
+                                                                label="Berechnet"
+                                                                data-test="preview-loading"
+                                                            />
                                                         ) : null}
                                                     </CardContent>
                                                 </Card>
@@ -1426,7 +1395,9 @@ export default function CalculationWizard({
                                                 <p className="text-muted-foreground text-sm">
                                                     Bruttoausgangswert{' '}
                                                     <span className="text-foreground font-medium">
-                                                        {displayTotals
+                                                        {displayTotals &&
+                                                        !previewLoading &&
+                                                        displayTotals
                                                             ?.positions[index]
                                                             ?.media_gross
                                                             ? money(
@@ -1435,7 +1406,9 @@ export default function CalculationWizard({
                                                                       index
                                                                   ].media_gross,
                                                               )
-                                                            : '–'}
+                                                            : previewLoading
+                                                              ? '…'
+                                                              : '–'}
                                                     </span>
                                                 </p>
                                                 <DiscountListEditor
@@ -1513,17 +1486,17 @@ export default function CalculationWizard({
                                                 onChange={setOrderDiscounts}
                                             />
                                             <label className="flex items-start gap-3 text-sm">
-                                                <input
+                                                <Checkbox
                                                     id="ae-enabled"
                                                     data-test="ae-enabled"
-                                                    type="checkbox"
-                                                    className="mt-1 size-4"
+                                                    className="mt-0.5"
                                                     checked={aeEnabled}
                                                     disabled={!canEdit}
-                                                    onChange={(event) =>
+                                                    onCheckedChange={(
+                                                        checked,
+                                                    ) =>
                                                         setAeEnabled(
-                                                            event.target
-                                                                .checked,
+                                                            checked === true,
                                                         )
                                                     }
                                                 />
@@ -1543,6 +1516,56 @@ export default function CalculationWizard({
                                                     </span>
                                                 </span>
                                             </label>
+                                            {displayTotals &&
+                                            !previewLoading ? (
+                                                <div
+                                                    className="border-border/60 space-y-2 border-t pt-4 text-sm"
+                                                    data-test="step-3-totals"
+                                                >
+                                                    <p>
+                                                        Ausgangssumme für
+                                                        Auftragsrabatte{' '}
+                                                        <span className="font-medium">
+                                                            {money(
+                                                                displayTotals.after_position_discount_total ??
+                                                                    displayTotals.media_gross,
+                                                            )}
+                                                        </span>
+                                                    </p>
+                                                    {aeEnabled ||
+                                                    Number(
+                                                        displayTotals.ae_total,
+                                                    ) > 0 ? (
+                                                        <p>
+                                                            AE-Abzug{' '}
+                                                            <span
+                                                                className="font-medium"
+                                                                data-test="ae-deduction"
+                                                            >
+                                                                {money(
+                                                                    displayTotals.ae_total,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                    ) : null}
+                                                    <p className="font-medium">
+                                                        Netto-Endsumme{' '}
+                                                        <span
+                                                            className="text-primary text-base"
+                                                            data-test="preview-net-total"
+                                                        >
+                                                            {money(
+                                                                displayTotals.nn_invest,
+                                                            )}
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                            ) : previewLoading ? (
+                                                <LoadingState
+                                                    label="Berechnet"
+                                                    data-test="preview-loading"
+                                                />
+                                            ) : null}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -1941,7 +1964,8 @@ export default function CalculationWizard({
                     <aside className="order-2 min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
                         <CalculationSummaryPanel
                             totals={summaryTotals}
-                            loading={canEdit && !summaryTotals && !error}
+                            loading={canEdit && previewLoading}
+                            aeEnabled={aeEnabled}
                             positions={positions}
                             inventories={catalog.inventories}
                         />

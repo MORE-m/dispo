@@ -347,7 +347,8 @@ final class CatalogResolver
     ): array {
         $timeRanges = [];
         $rows = [];
-        $missing = [];
+        /** @var array<string, list<string>> $missingByDayGroup */
+        $missingByDayGroup = [];
 
         foreach ($ranges as $range) {
             $dayGroup = DayGroup::from($range['day_group']);
@@ -356,7 +357,7 @@ final class CatalogResolver
             foreach (TimeRangeHours::expand($range['start_hour'], $range['end_hour_exclusive']) as $hour) {
                 $price = $this->resolveHourPrice($priceList, $hour, $dayGroup, $existingRows, $useSnapshot);
                 if ($price === null) {
-                    $missing[] = $dayGroup->label().', '.TimeRangeHours::formatHour($hour);
+                    $missingByDayGroup[$dayGroup->label()][] = TimeRangeHours::formatHour($hour);
 
                     continue;
                 }
@@ -376,9 +377,9 @@ final class CatalogResolver
             );
         }
 
-        if ($missing !== []) {
+        if ($missingByDayGroup !== []) {
             throw ValidationException::withMessages([
-                'positions' => 'Für '.$inventoryName.' fehlen Preislistenwerte: '.implode('; ', array_unique($missing)).'.',
+                'positions' => $this->formatMissingPriceMessage($inventoryName, $missingByDayGroup),
             ]);
         }
 
@@ -398,7 +399,8 @@ final class CatalogResolver
         string $inventoryName,
     ): array {
         $rows = [];
-        $missing = [];
+        /** @var array<string, list<string>> $missingByDayGroup */
+        $missingByDayGroup = [];
 
         foreach ($position['plan_rows'] ?? [] as $index => $row) {
             $dayGroup = DayGroup::from((string) $row['day_group']);
@@ -412,7 +414,7 @@ final class CatalogResolver
 
             $price = $this->resolveHourPrice($priceList, $hour, $dayGroup, $existingRows, $useSnapshot);
             if ($price === null) {
-                $missing[] = $dayGroup->label().', '.TimeRangeHours::formatHour($hour);
+                $missingByDayGroup[$dayGroup->label()][] = TimeRangeHours::formatHour($hour);
 
                 continue;
             }
@@ -431,13 +433,29 @@ final class CatalogResolver
             }
         }
 
-        if ($missing !== []) {
+        if ($missingByDayGroup !== []) {
             throw ValidationException::withMessages([
-                'positions' => 'Für '.$inventoryName.' fehlen Preislistenwerte: '.implode('; ', array_unique($missing)).'.',
+                'positions' => $this->formatMissingPriceMessage($inventoryName, $missingByDayGroup),
             ]);
         }
 
         return $rows;
+    }
+
+    /**
+     * @param  array<string, list<string>>  $missingByDayGroup
+     */
+    private function formatMissingPriceMessage(string $inventoryName, array $missingByDayGroup): string
+    {
+        $parts = [];
+
+        foreach ($missingByDayGroup as $dayGroupLabel => $hours) {
+            $uniqueHours = array_values(array_unique($hours));
+            sort($uniqueHours);
+            $parts[] = $dayGroupLabel.' in den Stunden '.implode(', ', $uniqueHours);
+        }
+
+        return 'Für '.$inventoryName.' fehlen Preise für '.implode(' und ', $parts).'.';
     }
 
     /**

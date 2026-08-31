@@ -251,13 +251,19 @@ export function PriceTimeRanges({
                                         <>
                                             {' '}
                                             Ø{' '}
-                                            <span className="text-foreground font-medium">
+                                            <span
+                                                className="text-foreground font-medium"
+                                                data-test={`range-avg-${positionIndex}-${rangeIndex}`}
+                                            >
                                                 {formatSecondPrice(
                                                     totals.average_second_price,
                                                 )}
                                             </span>
                                             /s · Zeitraumssumme{' '}
-                                            <span className="text-foreground font-medium">
+                                            <span
+                                                className="text-foreground font-medium"
+                                                data-test={`range-gross-${positionIndex}-${rangeIndex}`}
+                                            >
                                                 {money(totals.range_gross)}
                                             </span>
                                         </>

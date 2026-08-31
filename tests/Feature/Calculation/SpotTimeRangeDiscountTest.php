@@ -138,6 +138,7 @@ class SpotTimeRangeDiscountTest extends TestCase
         $this->assertStringContainsString('Radio Hamburg', $response->json('message') ?? json_encode($response->json('errors')));
         $this->assertStringContainsString('Mo–Fr', $response->json('message') ?? json_encode($response->json('errors')));
         $this->assertStringContainsString('09:00', $response->json('message') ?? json_encode($response->json('errors')));
+        $this->assertStringContainsString('fehlen Preise für', $response->json('message') ?? json_encode($response->json('errors')));
     }
 
     public function test_layered_discounts_and_ae_checkbox_round_like_the_engine(): void
