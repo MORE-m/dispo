@@ -68,29 +68,52 @@ bleibt Index 95 gültig (`SPT-009`).
 
 - Inventar und Werbemittel,
 - Preislistenversion,
-- Tagesgruppe,
-- mindestens ein Zeitfenster,
-- Gesamtanzahl Spots,
+- mindestens ein Preiszeitraum (Beginn, exklusives Ende, Tagesgruppe, Spotanzahl),
 - tatsächliche Länge oder Komponenten; die Länge ist je Sender-/Kombinationsposition frei editierbar (`SPT-015`),
 - konfigurierter Werbemittelaufschlag.
 
-Ein Zeitfenster `10–23 Uhr` umfasst die Preisstunden 10 bis einschließlich 22.
-Mehrere Zeitfenster werden für den Durchschnitt zu einer eindeutigen Stundenmenge
-vereinigt. Überlappende Stunden dürfen nur einmal zählen (`SPT-003`). Das ist keine
-gruppierte Zeitschiene: klassische Spotplanung bleibt stundenweise (`SPT-016`).
+Das Ende eines Zeitraums ist **exklusiv**. `08:00–18:00` speichert
+`start_hour = 8` und `end_hour_exclusive = 18` und umfasst die Preisstunden
+8 bis einschließlich 17, angezeigt als `08:00 bis 17:59 Uhr`. Stunde 18 gehört
+nicht zum Zeitraum.
+
+Die Spotanzahl gilt für den gesamten Zeitraum, nicht je Stunde.
+`Gesamtspotzahl = Summe der Spots aller Preiszeiträume` einer Position.
+Es gibt keine zweite, unabhängig editierbare Spotanzahl.
+
+Mehrere Zeiträume derselben Tagesgruppe dürfen sich nicht überschneiden.
+Direkt angrenzende Zeiträume (`08:00–12:00` und `12:00–18:00`) sind erlaubt.
+Gleiche Uhrzeiten in unterschiedlichen Tagesgruppen sind erlaubt.
+
+Jeder Zeitraum wird **separat** kalkuliert und anschließend addiert.
+Ein ungewichteter Durchschnitt über alle Zeiträume, danach multipliziert mit
+der Gesamtspotzahl, ist unzulässig.
 
 ```text
-Stunden = eindeutige Vereinigung aller gewählten Stunden
-Ø-Sekundenpreis = Σ Sekundenpreis(Stunde) ÷ Anzahl(Stunden)
+Stunden(Zeitraum) = start_hour … end_hour_exclusive − 1
+Ø-Sekundenpreis(Zeitraum) = Σ Sekundenpreis(Stunde) ÷ Anzahl(Stunden des Zeitraums)
 Längenfaktor = Spotlängenindex ÷ 100
 Aufschlagsfaktor = 1 + Aufschlag
 
-Spotpreis = Ø-Sekundenpreis × tatsächliche Gesamtlänge × Längenfaktor × Aufschlagsfaktor
-Positionsbrutto = Spotpreis × Spotanzahl
+Zeitraumssumme = Ø-Sekundenpreis(Zeitraum)
+                 × tatsächliche Gesamtlänge
+                 × Längenfaktor
+                 × Aufschlagsfaktor
+                 × Spots(Zeitraum)
+
+Brutto Werbeelement = Σ Zeitraumssummen
+Gesamtspots = Σ Spots(Zeitraum)
 ```
 
-Der Mittelwert ist immer gleichgewichtet. Eine gewünschte Verteilungsgewichtung
-wird ausschließlich über den Planer abgebildet (`SPT-004`).
+Fehlende Preislistenwerte dürfen nicht ignoriert werden. Die Meldung nennt
+Sender, Tagesgruppe und betroffene Stunden.
+
+**Bestandskalkulationen:** Genau eine gespeicherte Preisstunde wird zu
+`Stunde–Stunde+1` mit der bisherigen Gesamtspotzahl migriert; das Ergebnis
+bleibt identisch. Mehrere Preisstunden mit nur einer gemeinsamen Gesamtspotzahl
+werden nicht automatisch verteilt. Sie bleiben mit der bisherigen
+Durchschnittslogik lesbar, bis die bisherigen Gesamtspots exakt auf Zeiträume
+verteilt sind.
 
 Die tatsächliche Spotlänge ist je Position sichtbar und geht direkt in
 `Spotpreis` und `Positionsbrutto` ein. Standardlängen sind nur Vorbelegungen.
@@ -186,38 +209,45 @@ bepreist werden. Zusatzzeilen sind initial nicht rabattierbar und nicht AE-fähi
 
 ## Rabattreihenfolge
 
-Seien `r_pos` und `r_auftrag` Dezimalwerte zwischen 0 und 1:
+Rabatte einer Ebene werden **nacheinander** angewendet, nicht addiert.
+Positionsrabatte kommen vor Auftragsrabatten.
 
 ```text
-Nettofaktor = (1 - r_pos) × (1 - r_auftrag)
-Effektiver Rabatt = 1 - Nettofaktor
-Rabattierter Betrag = rabattfähiges Brutto × Nettofaktor
+nach Rabatt n = Betrag vor Rabatt n × (1 − r_n)
+Effektiver Nachlass = 1 − Produkt aller (1 − r)
 ```
 
-Beispiel: 10 Prozent Position und 10 Prozent Auftrag:
+Beispiel 1.000,00 €, dann 10 % Mengenrabatt, dann 5 % Sonderrabatt:
 
 ```text
-Nettofaktor = 0,90 × 0,90 = 0,81
-Effektiver Rabatt = 1 - 0,81 = 0,19 = 19 Prozent
+1.000,00 × 0,90 = 900,00
+900,00 × 0,95 = 855,00
+Effektiver Nachlass = 14,5 %
 ```
 
-Die persönliche Rabattgrenze wird je Position gegen den effektiven Rabatt geprüft.
-Nicht rabattierbare Preiszeilen werden unverändert ergänzt.
+Ein anschließender Auftragsrabatt von 10 % ergibt 769,50 €.
+
+Die persönliche Rabattgrenze wird je Position gegen den **kumulierten
+effektiven Nachlass** aller Positions- und Auftragsrabatte geprüft. Mehrere
+kleine Rabatte dürfen die Grenze nicht umgehen. AE zählt nicht zur Rabattgrenze.
+Nicht rabattierbare Beträge bleiben von Rabatten ausgenommen.
 
 ## AE
 
-Der Standardwert beträgt 15 Prozent. Die Wertauflösung lautet:
+AE ist eine Auftragskondition: Checkbox `15 % AE berücksichtigen`,
+standardmäßig deaktiviert. Aktiviert = 15 %, deaktiviert = kein AE-Abzug.
+Ein frei editierbarer AE-Prozentsatz gehört nicht zu diesem Slice.
 
 ```text
-Positionswert > Kalkulationswert > Agenturstandard
+AE-Betrag = rabattierter AE-fähiger Betrag × 15 %
+N/N nach AE = rabattierter Betrag − AE-Betrag
 ```
 
-```text
-AE-Betrag = rabattierter AE-fähiger Betrag × AE-Satz
-N/N nach AE = rabattierter Betrag - AE-Betrag
-```
+AE folgt nach allen Positions- und Auftragsrabatten. Nicht AE-fähige Beträge
+bleiben unverändert; die Berechnungsbasis ist der AE-fähige Restbetrag.
 
-Nicht AE-fähige Preiszeilen werden nicht in die AE-Basis einbezogen.
+Bestehende Kalkulationen mit explizitem AE-Wert größer 0 behalten ihre
+bisherige Wirkung. Neue Kalkulationen starten mit deaktiviertem AE.
 
 ## Festpreis
 
@@ -280,14 +310,16 @@ Der Vorschlag ändert nur Mengen nach Übernahme, nicht die Formel selbst.
 
 ## Verbindliche Rechenreihenfolge
 
-1. Grund-/Listenpreis und Menge bestimmen.
-2. Länge, Index und Werbemittelaufschläge anwenden.
-3. Rabattierbare und nicht rabattierbare Bestandteile trennen.
-4. Positionsrabatt anwenden.
-5. Auftragsrabatt auf den bereits rabattierten Betrag anwenden.
-6. AE auf die rabattierte, AE-fähige Basis anwenden.
-7. N/N-Invest, Zusatzzeilen und Payfaktoren bestimmen.
-8. Position und Auftrag auf zwei Cent runden.
+1. Zeitraumssummen eines Werbeelements berechnen.
+2. Zeitraumssummen zum Brutto des Werbeelements addieren.
+3. Länge, Index und Werbemittelaufschläge sind Teil jeder Zeitraumssumme.
+4. Rabattierbare und nicht rabattierbare Bestandteile trennen.
+5. Rabatte des Werbeelements nacheinander anwenden.
+6. Rabattierte Werbeelemente zur Auftragssumme addieren.
+7. Auftragsrabatte nacheinander auf den verbleibenden Betrag anwenden.
+8. AE auf den AE-fähigen verbleibenden Betrag anwenden.
+9. N/N-Invest, Zusatzzeilen und Payfaktoren bestimmen.
+10. Position und Auftrag auf zwei Cent runden.
 
 Jede Änderung dieser Reihenfolge ist eine Fachänderung und benötigt angepasste
 Anforderungen sowie Regressionstests.

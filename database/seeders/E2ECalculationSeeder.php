@@ -62,13 +62,14 @@ class E2ECalculationSeeder extends Seeder
                 'valid_from' => now()->toDateString(),
             ]);
 
-            foreach ([8, 10] as $hour) {
+            foreach (range(0, 23) as $hour) {
                 foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                    $base = $code === 'RH' ? '1.0000' : '0.8000';
                     PriceListItem::factory()->create([
                         'price_list_id' => $list->id,
                         'hour' => $hour,
                         'day_group' => $group,
-                        'second_price' => $code === 'RH' ? '1.0000' : '0.8000',
+                        'second_price' => $hour >= 14 ? ($code === 'RH' ? '1.5000' : '1.2000') : $base,
                     ]);
                 }
             }

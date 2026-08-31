@@ -42,6 +42,37 @@ export function money(value: string | number | null | undefined): string {
     }).format(Number.isFinite(amount) ? amount : 0);
 }
 
+/** Formats a deduction with a leading minus sign, e.g. `−120,00 €`. */
+export function moneyDeduction(
+    value: string | number | null | undefined,
+): string {
+    const amount = Number(value ?? 0);
+
+    if (!Number.isFinite(amount) || amount === 0) {
+        return money(0);
+    }
+
+    return `−${money(amount)}`;
+}
+
+/** Formats stored decimal percents for display, e.g. `10.0000` → `10 %`. */
+export function formatPercent(
+    value: string | number | null | undefined,
+): string {
+    const amount = Number(value ?? 0);
+
+    if (!Number.isFinite(amount)) {
+        return '–';
+    }
+
+    const formatted = new Intl.NumberFormat('de-DE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 4,
+    }).format(amount);
+
+    return `${formatted} %`;
+}
+
 export function formatSecondPrice(
     value: string | number | null | undefined,
 ): string {

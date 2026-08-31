@@ -25,6 +25,7 @@ class CalculationFactory extends Factory
             'planning_mode' => PlanningMode::Manual,
             'advisor_id' => User::factory(),
             'order_discount_percent' => 0,
+            'ae_enabled' => false,
         ];
     }
 }

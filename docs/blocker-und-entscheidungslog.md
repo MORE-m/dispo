@@ -35,6 +35,10 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | client_key nullable | Schema nullable aus Migrationskompatibilität; Writer setzt UUID verbindlich | Review v4/v5 |
 | 29.08.2026 | Atomare Nummernvergabe | Sequenz und Kalkulation in einer Transaktion; Retries auf äußerer Transaktion (`TEC-001`) | Review v6 |
 | 29.08.2026 | Technische Abnahme UX-GATE-A/B | Abgenommen nach grünen Jobs `ci` und `mysql` auf HEAD `976aae5` (Run [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)); MySQL-Paralleltest ausgeführt | Review v7 |
+| 31.08.2026 | Preiszeiträume | Einzelstunden durch Zeiträume mit exklusivem Ende ersetzt; Spots je Zeitraum; Gesamtspots nur als Summe; jeder Zeitraum separat gerechnet | SPT-001–SPT-004, SPT-016 |
+| 31.08.2026 | Gestaffelte Rabatte | Mehrere Positions- und Auftragsrabatte nacheinander, nicht addiert; kumulierte Wirkung für Rabattgrenzen | COM-001, COM-002 |
+| 31.08.2026 | AE-Checkbox | AE als 15-%-Checkbox, standardmäßig aus; bestehende explizite AE-Werte bleiben wirksam | COM-005–COM-007 |
+| 31.08.2026 | Bestandsverteilung | Eine Preisstunde wird 1:1 zu Stunde–Stunde+1; mehrere Stunden ohne erfundene Spotverteilung | Migration, SPT-004 |
 
 ## Offene Blocker
 

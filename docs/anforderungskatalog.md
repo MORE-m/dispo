@@ -358,15 +358,15 @@ Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und
 
 ## 8.3 Rechen- und Rundungsreihenfolge
 
-1.  Listenpreis/Grundpreis und Mengenwert ermitteln.
+1.  Zeitraumssummen eines Werbeelements berechnen (Stunden, Ø-Preis, Länge, Index, Aufschlag, Zeitraum-Spots).
 
-2.  Längenlogik und Werbemittelaufschläge anwenden.
+2.  Zeitraumssummen zum Brutto des Werbeelements addieren.
 
 3.  Rabattierbare und nicht rabattierbare Preiszeilen trennen.
 
-4.  Positionsrabatt anwenden.
+4.  Rabatte des Werbeelements nacheinander anwenden.
 
-5.  Auftragsrabatt auf den bereits rabattierten Betrag anwenden.
+5.  Rabattierte Werbeelemente zur Auftragssumme addieren; Auftragsrabatte nacheinander anwenden.
 
 6.  AE auf den rabattierten, AE-fähigen Betrag anwenden.
 
@@ -424,21 +424,21 @@ Ein Standardangebot ist eine versionierte, sender- bzw. kombibezogene Kalkulatio
 
 | **Kalkulationsart** | **Eingabe**                                               | **Preisermittlung**                                                |
 |---------------------|-----------------------------------------------------------|--------------------------------------------------------------------|
-| Durchschnitt        | Tagesgruppe, ein/mehrere Zeitfenster, Gesamtanzahl, Länge | Gleichgewichteter Mittelwert aller eindeutig ausgewählten Stunden  |
+| Durchschnitt        | Tagesgruppe, ein/mehrere Preiszeiträume mit Spotanzahl je Zeitraum, Länge | Jeder Zeitraum separat (Ø der enthaltenen Stunden × Zeitraum-Spots); Summe der Zeitraumssummen |
 | Planer/Kalender     | Reale Daten; Spotzahl je Datum und Stunde; Länge          | Jeder Spot zum Stundenpreis des automatisch ermittelten Wochentags |
 | Festpreis           | Vereinbarter N/N-Endpreis                                 | Effektiver Rabatt und Payfaktor werden rückwärts ermittelt         |
 
 ## 9.2 Durchschnittskalkulation
 
-**SPT-001** Vertrieb wählt eine Tagesgruppe (Mo-Fr, Sa, So, Mo-Sa oder Mo-So) und mindestens ein Zeitfenster.
+**SPT-001** Vertrieb erfasst je Werbeelement mindestens einen Preiszeitraum: Beginn, Ende, Tagesgruppe (Mo-Fr, Sa, So, Mo-Sa oder Mo-So) und Spotanzahl. Die Gesamtspotzahl ist die Summe der Zeitraum-Spots und nicht unabhängig editierbar.
 
-**SPT-002** Ein Zeitfenster 10-23 Uhr umfasst die Stunden 10:00 bis 22:59. Mehrere getrennte Zeitfenster in einer Position sind erlaubt.
+**SPT-002** Das Ende ist exklusiv. Ein Zeitraum 08:00-18:00 umfasst die Preisstunden 8 bis einschließlich 17 (Anzeige bis 17:59). Stunde 18 gehört nicht zum Zeitraum. 08:00-09:00 entspricht der bisherigen einzelnen Preisstunde 8.
 
-**SPT-003** Überlappende Zeitfenster dürfen eine Stunde nur einmal in den Durchschnitt einbeziehen; die UI soll Überschneidungen vermeiden oder transparent zu einer eindeutigen Stundenmenge zusammenführen. Das ist keine gruppierte Zeitschiene im Sinne von `SPT-016`.
+**SPT-003** Innerhalb derselben Tagesgruppe sind Überschneidungen unzulässig. Direkt angrenzende Zeiträume sind erlaubt. Gleiche Uhrzeiten in unterschiedlichen Tagesgruppen sind erlaubt.
 
-**SPT-004** Der Durchschnitt ist gleichgewichtet. Eine gewichtete Verteilung wird ausschließlich über den Planer abgebildet.
+**SPT-004** Jeder Zeitraum wird separat aus dem gleichgewichteten Durchschnitt seiner Stunden berechnet und mit der Spotanzahl dieses Zeitraums multipliziert. Die Zeitraumssummen werden addiert. Ein ungewichteter Durchschnitt über alle Zeiträume, danach multipliziert mit der Gesamtspotzahl, ist unzulässig.
 
-| **Formel Durchschnitt** Sekundenpreis_avg = Summe der Sekundenpreise aller ausgewählten Stunden / Anzahl eindeutig ausgewählter Stunden. Spotpreis = Sekundenpreis_avg x tatsächliche Gesamtlänge x Spotlängenindex / 100 x (1 + Aufschlag). Positionsbrutto = Spotpreis x Spotanzahl. |
+| **Formel Durchschnitt** Je Zeitraum: Sekundenpreis_avg = Summe der Sekundenpreise der Stunden start … Ende exklusiv − 1 / Anzahl dieser Stunden. Zeitraumssumme = Sekundenpreis_avg x tatsächliche Gesamtlänge x Spotlängenindex / 100 x (1 + Aufschlag) x Spots des Zeitraums. Brutto Werbeelement = Summe der Zeitraumssummen. |
 |----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 
 ## 9.3 Planer/Kalender
@@ -476,7 +476,7 @@ Ein Standardangebot ist eine versionierte, sender- bzw. kombibezogene Kalkulatio
 
 **SPT-015** Jede Spot-Classic-Position besitzt eine frei editierbare tatsächliche Spotlänge in Sekunden. Sie ist kein gesperrter Standardwert. Administrativ gepflegte Standardlängen sind ausschließlich Vorbelegungen und keine Beschränkung. Die Länge ist in der Kalkulation direkt bei jeder Sender- bzw. Kombinationsposition sichtbar, wird in der Preisberechnung verwendet und im Dispo-Snapshot ausgewiesen.
 
-**SPT-016** Klassische Spotplanung plant einzelne Preisstunden und fasst Zeitfenster nicht zu gruppierten Zeitschienen zusammen. Überlappende Stunden dürfen weiterhin nur einmal in den Durchschnitt einfließen (`SPT-003`). Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen abweichend konfigurierte Standardlängen und gruppierte Zeitschienen verwenden (`SWF-004`, `SWF-008`).
+**SPT-016** Klassische Spot-Durchschnittsplanung verwendet Preiszeiträume mit exklusivem Ende und Spotanzahl je Zeitraum (`SPT-001`–`SPT-004`). Der Kalenderplaner bleibt stunden- und datumsbezogen (`SPT-005`–`SPT-008`). Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen abweichend konfigurierte Standardlängen und gruppierte Zeitschienen verwenden (`SWF-004`, `SWF-008`).
 
 # 10. SWF- und Trailerkalkulation
 
@@ -622,12 +622,12 @@ Weitere Festpreise, z. B. für Podcast, Online Audio und Events, werden vor Prod
 
 ## 14.1 Rabatt
 
-**COM-001** Positions- und Auftragsrabatt werden konsekutiv angewendet: Nettofaktor = (1 - Positionsrabatt) x (1 - Auftragsrabatt).
+**COM-001** Rabatte einer Ebene werden nacheinander angewendet, nicht addiert. Zuerst alle Rabatte des Werbeelements in ihrer Reihenfolge, danach die Auftragsrabatte auf die verbleibende Summe. Nettofaktor = Produkt aller (1 - r).
 
-| **Beispiel** 10 % Positionsrabatt und 10 % Auftragsrabatt ergeben 19 % effektiven Rabatt, nicht 20 %. |
-|-------------------------------------------------------------------------------------------------------|
+| **Beispiel** 10 % Mengenrabatt und danach 5 % Sonderrabatt ergeben 14,5 % effektiven Nachlass, nicht 15 %. 10 % plus 10 % Auftrag bleiben 19 %. |
+|-----------------------------------------------------------------------------------------------------------------------------------------------|
 
-**COM-002** Die persönliche Rabattgrenze wird je Werbemittelposition gegen den effektiven kumulierten Rabatt geprüft. AE zählt nicht zur Rabattgrenze.
+**COM-002** Die persönliche Rabattgrenze wird je Werbemittelposition gegen den effektiven kumulierten Nachlass aller Positions- und Auftragsrabatte geprüft. Mehrere kleine Rabatte dürfen die Grenze nicht umgehen. AE zählt nicht zur Rabattgrenze.
 
 **COM-003** Rabattgrenzen sind nutzerabhängig, nicht zusätzlich sender-, kategorie- oder werbemittelabhängig.
 
@@ -635,9 +635,9 @@ Weitere Festpreise, z. B. für Podcast, Online Audio und Events, werden vor Prod
 
 ## 14.2 AE
 
-**COM-005** Der AE-Standardsatz beträgt 15 %.
+**COM-005** Der AE-Standardsatz beträgt 15 %. In der Spotkalkulation wird AE als Checkbox `15 % AE berücksichtigen` angeboten, standardmäßig deaktiviert. Ein frei editierbarer AE-Prozentsatz gehört nicht zu diesem Slice.
 
-**COM-006** Die Hierarchie lautet: Positionswert überschreibt Kalkulationswert; Kalkulationswert überschreibt Agenturstandard.
+**COM-006** Für neue Kalkulationen gilt: aktiviert = 15 %, deaktiviert = 0 %. Bestehende Kalkulationen mit explizitem AE-Wert größer 0 behalten ihre bisherige Wirkung. Die spätere Hierarchie Position > Kalkulation > Agenturstandard bleibt für Folge-Slices vorgesehen.
 
 **COM-007** AE wird nach Abzug der Rabatte auf den AE-fähigen Betrag berechnet.
 

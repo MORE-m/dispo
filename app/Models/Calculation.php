@@ -6,6 +6,7 @@ use App\Enums\BudgetStrategy;
 use App\Enums\CalculationStatus;
 use App\Enums\PlanningMode;
 use Database\Factories\CalculationFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $product_title
  * @property string|null $briefing
  * @property string $order_discount_percent
+ * @property bool $ae_enabled
+ * @property-read Collection<int, CalculationOrderDiscount> $orderDiscounts
  * @property string|null $target_budget_nn
  * @property BudgetStrategy|null $budget_strategy
  * @property string $media_gross
@@ -56,6 +59,7 @@ class Calculation extends Model
         'product_title',
         'briefing',
         'order_discount_percent',
+        'ae_enabled',
         'target_budget_nn',
         'budget_strategy',
         'media_gross',
@@ -77,6 +81,7 @@ class Calculation extends Model
             'planning_mode' => PlanningMode::class,
             'budget_strategy' => BudgetStrategy::class,
             'order_discount_percent' => 'decimal:4',
+            'ae_enabled' => 'boolean',
             'target_budget_nn' => 'decimal:2',
             'media_gross' => 'decimal:2',
             'position_discount_total' => 'decimal:2',
@@ -110,5 +115,13 @@ class Calculation extends Model
     public function budgetProposals(): HasMany
     {
         return $this->hasMany(BudgetProposal::class);
+    }
+
+    /**
+     * @return HasMany<CalculationOrderDiscount, $this>
+     */
+    public function orderDiscounts(): HasMany
+    {
+        return $this->hasMany(CalculationOrderDiscount::class)->orderBy('sort')->orderBy('id');
     }
 }

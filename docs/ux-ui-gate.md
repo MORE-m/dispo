@@ -76,15 +76,16 @@ Briefing ist optional. Eine Kalkulation muss ohne Briefing angelegt werden könn
 
 ### Planungswege
 
-**Selbst planen:** Sender/Kombis, Werbeelemente, Preisstunden, Spotlängen,
-Spotanzahlen und Konditionen legt der Benutzer fest. Ein optionales Zielbudget
-N/N dient nur als Vergleich mit dem aktuellen N/N-Invest.
+**Selbst planen:** Sender/Kombis, Werbeelemente, Preiszeiträume, Spotlängen
+und Konditionen legt der Benutzer fest. Die Gesamtspotzahl ergibt sich aus
+den Zeiträumen. Ein optionales Zielbudget N/N dient nur als Vergleich mit dem
+aktuellen N/N-Invest.
 
-**Mit Budget planen:** Zuerst Zielbudget N/N, Sender/Kombis, erlaubte Preisstunden,
-Spotlänge je Spot-Classic-Werbeelement, Positionsrabatt, AE, zusätzlicher
-Auftragsrabatt und Verteilungslogik. Danach erzeugt das System einen **neuen**
-Vorschlag. Es gibt kein „bestehendes Senderverhältnis“, weil keine manuelle
-Vorplanung vorausgesetzt wird.
+**Mit Budget planen:** Zuerst Zielbudget N/N, Sender/Kombis, erlaubte
+Preiszeiträume, Spotlänge je Spot-Classic-Werbeelement, Rabatte der
+Werbeelemente, Auftragsrabatte, AE-Checkbox und Verteilungslogik. Danach
+erzeugt das System einen **neuen** Vorschlag. Es gibt kein „bestehendes
+Senderverhältnis“, weil keine manuelle Vorplanung vorausgesetzt wird.
 
 V1-Verteilungslogiken:
 
@@ -94,6 +95,13 @@ V1-Verteilungslogiken:
 Der Vorschlag wird erst nach ausdrücklicher Übernahme Teil der Kalkulation und
 bleibt anschließend vollständig editierbar. Keine KI-, Reichweiten- oder
 Leistungsoptimierung (`BUD-008`, `BUD-009`).
+
+Aktuelle Screenshots: Schritt 2
+[`wizard-step-2-time-ranges-desktop.png`](screenshots/wizard-step-2-time-ranges-desktop.png),
+Schritt 3 Desktop
+[`wizard-step-3-conditions-desktop.png`](screenshots/wizard-step-3-conditions-desktop.png)
+und Mobil
+[`wizard-step-3-conditions-mobile.png`](screenshots/wizard-step-3-conditions-mobile.png).
 
 ### Spot Classic und Konditionen
 
@@ -113,7 +121,7 @@ Verbindliche Interaktions- und Fachartefakte:
 |---|---|
 | Sichtbares, frei editierbares Längenfeld in Sekunden | `SPT-015` |
 | Mehrere Sender/Kombis und unterschiedliche Werbeelemente | `CAL-001` |
-| Einzelne Preisstunden, keine gruppierten Zeitschienen | `SPT-016` |
+| Preiszeiträume mit exklusivem Ende und Spots je Zeitraum | `SPT-001`–`SPT-004`, `SPT-016` |
 | Live-Summe je Werbeelement und für die Kalkulation | `CAL-005` |
 | Beispiel 10 Spots Radio Hamburg und 5 Spots ROCK ANTENNE Hamburg | `CAL-001` |
 | Konditionen je Werbeelement plus kalkulationsweiter Auftragsrabatt | `COM-001`–`COM-008` |

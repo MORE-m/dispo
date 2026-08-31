@@ -6,6 +6,9 @@ final readonly class PositionResult
 {
     /**
      * @param  list<array{hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $rows
+     * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, average_second_price: string, range_gross: string, hours: list<int>}>  $timeRanges
+     * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $positionDiscounts
+     * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $orderDiscounts
      */
     public function __construct(
         public string $mediaGross,
@@ -20,6 +23,11 @@ final readonly class PositionResult
         public int $lengthIndex,
         public array $rows,
         public ?string $averageSecondPrice = null,
+        public array $timeRanges = [],
+        public array $positionDiscounts = [],
+        public array $orderDiscounts = [],
+        public bool $needsSpotRedistribution = false,
+        public ?int $legacyTotalSpotCount = null,
     ) {}
 
     /**
@@ -40,6 +48,11 @@ final readonly class PositionResult
             'length_index' => $this->lengthIndex,
             'average_second_price' => $this->averageSecondPrice,
             'rows' => $this->rows,
+            'time_ranges' => $this->timeRanges,
+            'position_discounts' => $this->positionDiscounts,
+            'order_discounts' => $this->orderDiscounts,
+            'needs_spot_redistribution' => $this->needsSpotRedistribution,
+            'legacy_total_spot_count' => $this->legacyTotalSpotCount,
         ];
     }
 }

@@ -1,20 +1,24 @@
 # Fortschritt V1
 
-Stand: 29. August 2026 (Review-Nacharbeit UX-GATE-A/B v7)
+Stand: 31. August 2026 (Preiszeiträume, gestaffelte Rabatte, AE-Checkbox)
 
 ## Aktuelle Phase
 
-Phase 0 bleibt technisch abgenommen. `UX-GATE-A` und `UX-GATE-B` sind **fachlich
-und technisch abgenommen** (Commit `976aae5`, Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668)).
+Phase 0 und UX-GATE-A/B bleiben abgenommen. Branch `feat/spot-time-ranges-discounts`
+setzt den nächsten fachlichen Slice auf aktuellem `main` (PR #8 gemergt) um.
 
 ## Aktuelle Aufgabe
 
-Review-Nacharbeit abgeschlossen. PR #2 offen gegen `phase-0-abschluss`; kein Merge.
+Preiszeiträume, Spotverteilung, flexible Rabatte und AE-Checkbox sind auf
+`feat/spot-time-ranges-discounts` umgesetzt. Noch kein PR, kein Merge nach `main`.
+
+Lokale Prüfung: Pint, PHPStan, TypeScript, `npm run check`, Pest 122 passed /
+4 skipped, Playwright 7/7. Frische SQLite-Migration inkl. neuer Tabellen erfolgreich.
+MySQL-Suite lokal nicht ausgeführt (Port 3306 Connection refused).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-MySQL-Paralleltest-Fix (`Process::wait()` Exit-Code, `sort()`), technische Abnahme
-UX-GATE-A/B nach grünen Jobs `ci` und `mysql` (Commit `976aae5`).
+UX-GATE-A/B Visual Alignment (PR #8, Commit `7edd8fb` in `main`).
 
 ## Technische Abnahme UX-GATE-A/B
 
@@ -59,6 +63,7 @@ ausgeführt (2,06s), nicht übersprungen.
 | `2026_08_29_140000_calculation_review_nacharbeit.php` | `client_key`, `spot_method`, `total_spot_count` |
 | `2026_08_29_150000_calculation_snapshot_and_sequences.php` | Snapshot-Spalten, Sequenztabelle, Backfill |
 | `2026_08_29_160000_backfill_length_index.php` | deterministischer `length_index`-Backfill |
+| `2026_08_31_100000_add_spot_time_ranges_and_layered_discounts.php` | Preiszeiträume, Rabattzeilen, AE-Flag, Bestands-Backfill |
 
 ## Bewusst offen / temporär
 

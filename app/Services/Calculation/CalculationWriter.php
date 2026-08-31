@@ -5,10 +5,14 @@ namespace App\Services\Calculation;
 use App\Enums\BudgetStrategy;
 use App\Enums\CalculationKind;
 use App\Enums\CalculationStatus;
+use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
+use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
+use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -74,7 +78,7 @@ final class CalculationWriter
                 ]);
             }
 
-            $locked->load(['positions.planRows']);
+            $locked->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
             $before = $this->calculationSnapshot($locked);
 
             if ($this->isHeaderOnlyChange($payload, $locked) && ! $this->hasPositionsWithMissingClientKey($locked)) {
@@ -141,12 +145,20 @@ final class CalculationWriter
      */
     private function fillAndPersist(Calculation $calculation, array $payload, User $user, bool $isCreate): void
     {
-        $calculation->loadMissing(['positions.planRows']);
+        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
         $existingById = $calculation->positions->keyBy('id');
         $existingByClient = $calculation->positions->keyBy('client_key');
 
         $totals = $this->totalsFromPayload($payload, $user, $isCreate ? null : $calculation);
         $resolved = $this->resolvedPositions($payload, $isCreate ? null : $calculation);
+
+        foreach ($resolved as $index => $item) {
+            if ($item['needs_spot_redistribution'] && $item['time_ranges'] !== []) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.time_ranges" => 'Bitte verteile die bisherige Gesamtspotzahl auf die Preiszeiträume.',
+                ]);
+            }
+        }
 
         $this->applyHeaderFields($calculation, $payload);
         $this->applyTotals($calculation, $totals);
@@ -178,10 +190,13 @@ final class CalculationWriter
                 'spot_method' => $item['spot_method'],
                 'length_seconds' => (int) $item['length_seconds'],
                 'total_spot_count' => (int) $item['total_spot_count'],
+                'needs_spot_redistribution' => $item['needs_spot_redistribution'] && $item['time_ranges'] === [],
                 'average_second_price' => $result->averageSecondPrice,
                 'length_index' => $result->lengthIndex,
                 'surcharge_percent' => $item['surcharge_percent'],
-                'position_discount_percent' => $item['is_discountable'] ? $item['position_discount_percent'] : 0,
+                'position_discount_percent' => $item['is_discountable']
+                    ? $this->effectivePercentFromDiscounts($item['position_discounts'])
+                    : 0,
                 'ae_percent' => $item['is_ae_eligible'] ? $item['ae_percent'] : 0,
                 'is_discountable' => $item['is_discountable'],
                 'is_ae_eligible' => $item['is_ae_eligible'],
@@ -198,7 +213,11 @@ final class CalculationWriter
             $seenIds[] = $position->id;
 
             $this->syncPlanRows($position, $result);
+            $this->syncTimeRanges($position, $result);
+            $this->syncPositionDiscounts($position, $item['position_discounts']);
         }
+
+        $this->syncOrderDiscounts($calculation, $this->orderDiscountInputs($payload));
 
         if (! $isCreate) {
             CalculationPosition::query()
@@ -206,6 +225,8 @@ final class CalculationWriter
                 ->whereNotIn('id', $seenIds)
                 ->each(function (CalculationPosition $orphan): void {
                     $orphan->planRows()->delete();
+                    $orphan->timeRanges()->delete();
+                    $orphan->discounts()->delete();
                     $orphan->delete();
                 });
         }
@@ -268,7 +289,9 @@ final class CalculationWriter
                 positionKey: (string) $positionKey,
                 lengthSeconds: $lengthSeconds,
                 surchargePercent: (string) $item['surcharge_percent'],
-                positionDiscountPercent: $item['is_discountable'] ? (string) $item['position_discount_percent'] : '0',
+                positionDiscountPercent: $item['is_discountable']
+                    ? $this->effectivePercentFromDiscounts($item['position_discounts'])
+                    : '0',
                 aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
                 isDiscountable: $item['is_discountable'],
                 isAeEligible: $item['is_ae_eligible'],
@@ -276,6 +299,9 @@ final class CalculationWriter
                 spotMethod: $item['spot_method'],
                 rows: $item['rows'],
                 lengthIndex: $lengthIndex,
+                timeRanges: $item['time_ranges'],
+                positionDiscounts: $item['is_discountable'] ? $item['position_discounts'] : [],
+                needsSpotRedistribution: $item['needs_spot_redistribution'],
             );
         }
 
@@ -290,11 +316,15 @@ final class CalculationWriter
         $inputs = $this->positionInputsFromPayload($payload, $existing);
         $target = $payload['target_budget_nn'] ?? null;
 
+        $orderDiscounts = $this->orderDiscountInputs($payload);
+
         return $this->engine->calculate(
             $inputs,
-            (string) ($payload['order_discount_percent'] ?? '0'),
+            $this->effectivePercentFromDiscounts($orderDiscounts),
             $target === null || $target === '' ? null : (string) $target,
             $user->discount_limit_percent === null ? null : (string) $user->discount_limit_percent,
+            $orderDiscounts,
+            (bool) ($payload['ae_enabled'] ?? false),
         );
     }
 
@@ -328,7 +358,8 @@ final class CalculationWriter
                 ...$catalog,
                 'length_seconds' => $length,
                 'position_discount_percent' => $position['position_discount_percent'] ?? 0,
-                'ae_percent' => $position['ae_percent'] ?? 15,
+                'position_discounts' => $this->positionDiscountInputs($position),
+                'ae_percent' => $this->resolveAePercent($payload, $position, $catalog['is_ae_eligible'], $existingPosition),
             ];
         }
 
@@ -346,7 +377,11 @@ final class CalculationWriter
         $calculation->campaign = $payload['campaign'] ?? null;
         $calculation->product_title = $payload['product_title'] ?? null;
         $calculation->briefing = $payload['briefing'] ?? null;
-        $calculation->order_discount_percent = $payload['order_discount_percent'] ?? 0;
+        $orderDiscounts = $this->orderDiscountInputs($payload);
+        $calculation->order_discount_percent = $this->effectivePercentFromDiscounts($orderDiscounts);
+        if (array_key_exists('ae_enabled', $payload)) {
+            $calculation->ae_enabled = (bool) $payload['ae_enabled'];
+        }
         $calculation->target_budget_nn = $payload['target_budget_nn'] ?? null;
         $calculation->budget_strategy = isset($payload['budget_strategy'])
             ? BudgetStrategy::from((string) $payload['budget_strategy'])
@@ -370,6 +405,8 @@ final class CalculationWriter
     {
         $payloadFromDb = $this->payloadFromCalculation($calculation);
         $payloadFromDb['order_discount_percent'] = $payload['order_discount_percent'] ?? $payloadFromDb['order_discount_percent'];
+        $payloadFromDb['order_discounts'] = $payload['order_discounts'] ?? $payloadFromDb['order_discounts'];
+        $payloadFromDb['ae_enabled'] = $payload['ae_enabled'] ?? $payloadFromDb['ae_enabled'];
         $payloadFromDb['target_budget_nn'] = $payload['target_budget_nn'] ?? $payloadFromDb['target_budget_nn'];
         $payloadFromDb['budget_strategy'] = $payload['budget_strategy'] ?? $payloadFromDb['budget_strategy'];
 
@@ -407,6 +444,25 @@ final class CalculationWriter
             }
             usort($rows, fn (array $a, array $b): int => $a['hour'] <=> $b['hour'] ?: strcmp($a['day_group'], $b['day_group']));
 
+            $ranges = [];
+            foreach ($position['time_ranges'] ?? [] as $range) {
+                $ranges[] = [
+                    'start_hour' => (int) ($range['start_hour'] ?? 0),
+                    'end_hour_exclusive' => (int) ($range['end_hour_exclusive'] ?? 0),
+                    'day_group' => (string) ($range['day_group'] ?? ''),
+                    'spot_count' => (int) ($range['spot_count'] ?? 0),
+                ];
+            }
+
+            $discounts = [];
+            foreach ($position['position_discounts'] ?? [] as $discount) {
+                $discounts[] = [
+                    'type' => (string) ($discount['type'] ?? ''),
+                    'custom_label' => $discount['custom_label'] ?? null,
+                    'percent' => (string) ($discount['percent'] ?? '0'),
+                ];
+            }
+
             $normalized[] = [
                 'id' => isset($position['id']) ? (int) $position['id'] : null,
                 'client_key' => $position['client_key'] ?? null,
@@ -418,6 +474,8 @@ final class CalculationWriter
                 'position_discount_percent' => (string) ($position['position_discount_percent'] ?? '0'),
                 'ae_percent' => (string) ($position['ae_percent'] ?? '0'),
                 'plan_rows' => $rows,
+                'time_ranges' => $ranges,
+                'position_discounts' => $discounts,
             ];
         }
 
@@ -431,7 +489,7 @@ final class CalculationWriter
      */
     public function payloadFromCalculation(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.planRows']);
+        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
 
         $positions = [];
 
@@ -452,9 +510,21 @@ final class CalculationWriter
                 'spot_method' => $position->spot_method->value,
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,
+                'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
                 'position_discount_percent' => (string) $position->position_discount_percent,
                 'ae_percent' => (string) $position->ae_percent,
                 'plan_rows' => $rows,
+                'time_ranges' => $position->timeRanges->map(fn (CalculationPositionTimeRange $range): array => [
+                    'start_hour' => $range->start_hour,
+                    'end_hour_exclusive' => $range->end_hour_exclusive,
+                    'day_group' => $range->day_group->value,
+                    'spot_count' => $range->spot_count,
+                ])->all(),
+                'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ])->all(),
             ];
         }
 
@@ -466,6 +536,12 @@ final class CalculationWriter
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,
             'order_discount_percent' => (string) $calculation->order_discount_percent,
+            'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
+                'type' => $discount->type->value,
+                'custom_label' => $discount->custom_label,
+                'percent' => (string) $discount->percent,
+            ])->all(),
+            'ae_enabled' => (bool) $calculation->ae_enabled,
             'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
             'budget_strategy' => $calculation->budget_strategy?->value,
             'positions' => $positions,
@@ -477,7 +553,7 @@ final class CalculationWriter
      */
     public function calculationSnapshot(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.planRows', 'positions.priceList']);
+        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.priceList', 'orderDiscounts']);
 
         return [
             'number' => $calculation->number,
@@ -488,10 +564,18 @@ final class CalculationWriter
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,
             'order_discount_percent' => (string) $calculation->order_discount_percent,
+            'ae_enabled' => (bool) $calculation->ae_enabled,
             'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
             'budget_strategy' => $calculation->budget_strategy?->value,
             'media_gross' => (string) $calculation->media_gross,
             'nn_invest' => (string) $calculation->nn_invest,
+            'order_discounts' => $calculation->orderDiscounts->map(
+                fn (CalculationOrderDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ]
+            )->all(),
             'positions' => $calculation->positions->map(function (CalculationPosition $position): array {
                 return [
                     'id' => $position->id,
@@ -501,6 +585,7 @@ final class CalculationWriter
                     'spot_method' => $position->spot_method->value,
                     'length_seconds' => $position->length_seconds,
                     'total_spot_count' => $position->total_spot_count,
+                    'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
                     'average_second_price' => $position->average_second_price === null ? null : (string) $position->average_second_price,
                     'length_index' => $position->length_index,
                     'price_list_id' => $position->price_list_id,
@@ -518,6 +603,23 @@ final class CalculationWriter
                             'second_price' => (string) $row->second_price,
                         ]
                     )->all()),
+                    'time_ranges' => $position->timeRanges->map(
+                        fn (CalculationPositionTimeRange $range): array => [
+                            'start_hour' => $range->start_hour,
+                            'end_hour_exclusive' => $range->end_hour_exclusive,
+                            'day_group' => $range->day_group->value,
+                            'spot_count' => $range->spot_count,
+                            'average_second_price' => $range->average_second_price === null ? null : (string) $range->average_second_price,
+                            'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
+                        ]
+                    )->all(),
+                    'position_discounts' => $position->discounts->map(
+                        fn (CalculationPositionDiscount $discount): array => [
+                            'type' => $discount->type->value,
+                            'custom_label' => $discount->custom_label,
+                            'percent' => (string) $discount->percent,
+                        ]
+                    )->all(),
                 ];
             })->values()->all(),
         ];
@@ -526,7 +628,7 @@ final class CalculationWriter
     private function reloadCalculation(Calculation $calculation): Calculation
     {
         $calculation->refresh();
-        $calculation->load(['positions.planRows', 'positions.inventory', 'positions.priceList']);
+        $calculation->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'positions.priceList', 'orderDiscounts']);
 
         return $calculation;
     }
@@ -554,9 +656,14 @@ final class CalculationWriter
 
             if ($item === null) {
                 $position['total_spot_count'] = 0;
+                $position['time_ranges'] = $this->scaleTimeRangeSpots($position['time_ranges'] ?? [], 0);
             } else {
                 $position['total_spot_count'] = (int) ($item['total_spot_count'] ?? 0);
                 $position['length_seconds'] = $item['length_seconds'] ?? $position['length_seconds'];
+                $position['time_ranges'] = $this->scaleTimeRangeSpots(
+                    $position['time_ranges'] ?? [],
+                    (int) $position['total_spot_count'],
+                );
             }
 
             $merged[] = $position;
@@ -598,5 +705,246 @@ final class CalculationWriter
         }
 
         return (string) Str::uuid();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $position
+     */
+    private function resolveAePercent(array $payload, array $position, bool $isAeEligible, ?CalculationPosition $existing): string
+    {
+        if (! $isAeEligible) {
+            return '0';
+        }
+
+        if (array_key_exists('ae_enabled', $payload)) {
+            if (! (bool) $payload['ae_enabled']) {
+                return '0';
+            }
+
+            if ($existing !== null && Decimal::cmp((string) $existing->ae_percent, '0') > 0) {
+                return (string) $existing->ae_percent;
+            }
+
+            return '15';
+        }
+
+        return (string) ($position['ae_percent'] ?? '15');
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return list<DiscountInput>
+     */
+    private function positionDiscountInputs(array $position): array
+    {
+        $raw = $position['position_discounts'] ?? [];
+        if (! is_array($raw) || $raw === []) {
+            $legacy = (string) ($position['position_discount_percent'] ?? '0');
+            if (Decimal::cmp($legacy, '0') <= 0) {
+                return [];
+            }
+
+            return [new DiscountInput(DiscountType::Quantity, $legacy)];
+        }
+
+        return $this->discountInputsFromRows($raw);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<DiscountInput>
+     */
+    private function orderDiscountInputs(array $payload): array
+    {
+        $raw = $payload['order_discounts'] ?? [];
+        if (! is_array($raw) || $raw === []) {
+            $legacy = (string) ($payload['order_discount_percent'] ?? '0');
+            if (Decimal::cmp($legacy, '0') <= 0) {
+                return [];
+            }
+
+            return [new DiscountInput(DiscountType::Quantity, $legacy)];
+        }
+
+        return $this->discountInputsFromRows($raw);
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $rows
+     * @return list<DiscountInput>
+     */
+    private function discountInputsFromRows(array $rows): array
+    {
+        $validated = (new DiscountValidator)->validated($rows, 'discounts');
+        $inputs = [];
+
+        foreach ($validated as $row) {
+            $inputs[] = new DiscountInput(
+                type: DiscountType::from($row['type']),
+                percent: $row['percent'],
+                customLabel: $row['custom_label'],
+                sort: $row['sort'],
+            );
+        }
+
+        return $inputs;
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function effectivePercentFromDiscounts(array $discounts): string
+    {
+        if ($discounts === []) {
+            return '0';
+        }
+
+        $factor = '1';
+        foreach ($discounts as $discount) {
+            $factor = Decimal::mul($factor, Decimal::oneMinusPercent($discount->percent));
+        }
+
+        return Decimal::roundPrice(Decimal::mul(Decimal::sub('1', $factor), '100'));
+    }
+
+    private function syncTimeRanges(CalculationPosition $position, PositionResult $result): void
+    {
+        $existing = $position->timeRanges()->get()->values();
+        $seen = [];
+
+        foreach ($result->timeRanges as $index => $range) {
+            $model = $existing->get($index) ?? new CalculationPositionTimeRange;
+            $model->fill([
+                'start_hour' => $range['start_hour'],
+                'end_hour_exclusive' => $range['end_hour_exclusive'],
+                'day_group' => $range['day_group'],
+                'spot_count' => $range['spot_count'],
+                'sort' => $index,
+                'average_second_price' => $range['average_second_price'],
+                'range_gross' => $range['range_gross'],
+            ]);
+            $model->position()->associate($position);
+            $model->save();
+            $seen[] = $model->id;
+        }
+
+        CalculationPositionTimeRange::query()
+            ->where('calculation_position_id', $position->id)
+            ->when($seen !== [], fn ($query) => $query->whereNotIn('id', $seen))
+            ->delete();
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function syncPositionDiscounts(CalculationPosition $position, array $discounts): void
+    {
+        $existing = $position->discounts()->get()->values();
+        $seen = [];
+
+        foreach ($discounts as $index => $discount) {
+            $model = $existing->get($index) ?? new CalculationPositionDiscount;
+            $model->fill([
+                'type' => $discount->type,
+                'custom_label' => $discount->customLabel,
+                'percent' => $discount->percent,
+                'sort' => $index,
+            ]);
+            $model->position()->associate($position);
+            $model->save();
+            $seen[] = $model->id;
+        }
+
+        CalculationPositionDiscount::query()
+            ->where('calculation_position_id', $position->id)
+            ->when($seen !== [], fn ($query) => $query->whereNotIn('id', $seen))
+            ->delete();
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function syncOrderDiscounts(Calculation $calculation, array $discounts): void
+    {
+        $existing = $calculation->orderDiscounts()->get()->values();
+        $seen = [];
+
+        foreach ($discounts as $index => $discount) {
+            $model = $existing->get($index) ?? new CalculationOrderDiscount;
+            $model->fill([
+                'type' => $discount->type,
+                'custom_label' => $discount->customLabel,
+                'percent' => $discount->percent,
+                'sort' => $index,
+            ]);
+            $model->calculation()->associate($calculation);
+            $model->save();
+            $seen[] = $model->id;
+        }
+
+        CalculationOrderDiscount::query()
+            ->where('calculation_id', $calculation->id)
+            ->when($seen !== [], fn ($query) => $query->whereNotIn('id', $seen))
+            ->delete();
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $ranges
+     * @return list<array<string, mixed>>
+     */
+    private function scaleTimeRangeSpots(array $ranges, int $targetTotal): array
+    {
+        if ($ranges === []) {
+            return $ranges;
+        }
+
+        $current = 0;
+        foreach ($ranges as $range) {
+            $current += max(0, (int) ($range['spot_count'] ?? 0));
+        }
+
+        if ($targetTotal < 1) {
+            foreach ($ranges as $index => $range) {
+                $ranges[$index]['spot_count'] = $index === 0 ? 0 : 0;
+            }
+
+            return $ranges;
+        }
+
+        if ($current < 1) {
+            $ranges[0]['spot_count'] = $targetTotal;
+            for ($index = 1, $count = count($ranges); $index < $count; $index++) {
+                $ranges[$index]['spot_count'] = 0;
+            }
+
+            return $ranges;
+        }
+
+        $assigned = 0;
+        $last = count($ranges) - 1;
+        foreach ($ranges as $index => $range) {
+            if ($index === $last) {
+                $ranges[$index]['spot_count'] = max(0, $targetTotal - $assigned);
+                break;
+            }
+
+            $share = (int) floor(((int) ($range['spot_count'] ?? 0) / $current) * $targetTotal);
+            $ranges[$index]['spot_count'] = $share;
+            $assigned += $share;
+        }
+
+        $kept = array_values(array_filter(
+            $ranges,
+            fn (array $range): bool => (int) $range['spot_count'] >= 1,
+        ));
+
+        if ($kept === []) {
+            $ranges[0]['spot_count'] = $targetTotal;
+
+            return [$ranges[0]];
+        }
+
+        return $kept;
     }
 }

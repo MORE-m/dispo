@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 
 /**
@@ -11,17 +12,21 @@ final class CalculationEngine
 {
     /**
      * @param  list<PositionInput>  $positions
+     * @param  list<DiscountInput>  $orderDiscounts
      */
     public function calculate(
         array $positions,
         string $orderDiscountPercent,
         ?string $targetBudgetNn,
         ?string $personalDiscountLimitPercent,
+        array $orderDiscounts = [],
+        bool $aeEnabled = false,
     ): CalculationTotals {
+        $resolvedOrderDiscounts = $this->resolveDiscountList($orderDiscounts, $orderDiscountPercent);
         $results = [];
 
         foreach ($positions as $position) {
-            $results[] = $this->calculatePosition($position, $orderDiscountPercent);
+            $results[] = $this->calculatePosition($position, $orderDiscountPercent, $resolvedOrderDiscounts);
         }
 
         $mediaGross = '0.00';
@@ -29,6 +34,9 @@ final class CalculationEngine
         $orderDiscountTotal = '0.00';
         $aeTotal = '0.00';
         $nnInvest = '0.00';
+        $afterPositionTotal = '0.00';
+        $afterOrderTotal = '0.00';
+        $aeEligibleBase = '0';
         $requiresSpecialApproval = false;
 
         foreach ($results as $result) {
@@ -37,11 +45,21 @@ final class CalculationEngine
             $orderDiscountTotal = Decimal::roundMoney(Decimal::add($orderDiscountTotal, $result->orderDiscountAmount));
             $aeTotal = Decimal::roundMoney(Decimal::add($aeTotal, $result->aeAmount));
             $nnInvest = Decimal::roundMoney(Decimal::add($nnInvest, $result->nnInvest));
+            $afterPositionTotal = Decimal::roundMoney(Decimal::add($afterPositionTotal, $result->afterPositionDiscount));
+            $afterOrderTotal = Decimal::roundMoney(Decimal::add($afterOrderTotal, $result->afterOrderDiscount));
 
             if ($this->exceedsDiscountLimit($result->effectiveDiscountPercent, $personalDiscountLimitPercent)) {
                 $requiresSpecialApproval = true;
             }
         }
+
+        foreach ($positions as $index => $position) {
+            if ($position->isAeEligible) {
+                $aeEligibleBase = Decimal::add($aeEligibleBase, $results[$index]->afterOrderDiscount);
+            }
+        }
+
+        $orderDiscountBreakdown = $this->applyDiscountSequence($afterPositionTotal, $resolvedOrderDiscounts);
 
         $budgetDelta = null;
         $roundedTarget = $targetBudgetNn === null || $targetBudgetNn === ''
@@ -62,13 +80,28 @@ final class CalculationEngine
             budgetDelta: $budgetDelta,
             requiresSpecialApproval: $requiresSpecialApproval,
             positions: $results,
+            aeEnabled: $aeEnabled,
+            orderDiscounts: $orderDiscountBreakdown,
+            afterPositionDiscountTotal: $afterPositionTotal,
+            afterOrderDiscountTotal: $afterOrderTotal,
+            aeEligibleBase: Decimal::roundMoney($aeEligibleBase),
         );
     }
 
-    public function calculatePosition(PositionInput $position, string $orderDiscountPercent): PositionResult
-    {
+    /**
+     * @param  list<DiscountInput>  $orderDiscounts
+     */
+    public function calculatePosition(
+        PositionInput $position,
+        string $orderDiscountPercent,
+        array $orderDiscounts = [],
+    ): PositionResult {
         return match ($position->spotMethod) {
-            SpotCalculationMethod::Average => $this->calculateAveragePosition($position, $orderDiscountPercent),
+            SpotCalculationMethod::Average => $this->calculateAveragePosition(
+                $position,
+                $orderDiscountPercent,
+                $this->resolveDiscountList($orderDiscounts, $orderDiscountPercent),
+            ),
             SpotCalculationMethod::Calendar, SpotCalculationMethod::FixedPrice => throw new \InvalidArgumentException(
                 'Kalkulationsart '.$position->spotMethod->value.' ist in UX-GATE-B noch nicht implementiert.',
             ),
@@ -76,29 +109,27 @@ final class CalculationEngine
     }
 
     /**
-     * SPT-001–SPT-004: gleichgewichteter Durchschnitt eindeutiger Stunden × Gesamtspotanzahl.
+     * @param  list<DiscountInput>  $orderDiscounts
      */
-    private function calculateAveragePosition(PositionInput $position, string $orderDiscountPercent): PositionResult
-    {
+    private function calculateAveragePosition(
+        PositionInput $position,
+        string $orderDiscountPercent,
+        array $orderDiscounts,
+    ): PositionResult {
+        if ($position->timeRanges !== []) {
+            return $this->calculateTimeRangePosition($position, $orderDiscountPercent, $orderDiscounts);
+        }
+
         $uniqueRows = $this->uniqueHourRows($position->rows);
 
         if ($uniqueRows === []) {
-            return $this->emptyPositionResult($position, $orderDiscountPercent);
+            return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
         }
 
         $averageSecondPrice = $this->averageSecondPrice($uniqueRows);
         $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
-        $lengthFactor = Decimal::div((string) $index, '100');
-        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
         $spotCount = max(0, $position->totalSpotCount);
-
-        $spotPrice = Decimal::mulMany([
-            $averageSecondPrice,
-            (string) $position->lengthSeconds,
-            $lengthFactor,
-            $surchargeFactor,
-        ]);
-        $mediaGrossInternal = Decimal::mul($spotPrice, (string) $spotCount);
+        $mediaGrossInternal = $this->spotPrice($averageSecondPrice, $position, $index, $spotCount);
 
         $rowResults = [];
         foreach ($uniqueRows as $row) {
@@ -114,12 +145,128 @@ final class CalculationEngine
         return $this->finalizePosition(
             $position,
             $orderDiscountPercent,
+            $orderDiscounts,
             $mediaGrossInternal,
             $spotCount,
             $index,
             $rowResults,
             $averageSecondPrice,
         );
+    }
+
+    /**
+     * Jeder Zeitraum wird separat gerechnet und anschließend addiert.
+     *
+     * @param  list<DiscountInput>  $orderDiscounts
+     */
+    private function calculateTimeRangePosition(
+        PositionInput $position,
+        string $orderDiscountPercent,
+        array $orderDiscounts,
+    ): PositionResult {
+        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $mediaGrossInternal = '0';
+        $totalSpots = 0;
+        $rangeResults = [];
+        $rowResults = [];
+        $priceSum = '0';
+        $hourCount = 0;
+
+        foreach ($position->timeRanges as $range) {
+            if ($range->hours === [] || $range->spotCount < 1) {
+                continue;
+            }
+
+            $averageSecondPrice = $this->averageSecondPrice($range->hours);
+            $rangeGross = $this->spotPrice($averageSecondPrice, $position, $index, $range->spotCount);
+            $mediaGrossInternal = Decimal::add($mediaGrossInternal, $rangeGross);
+            $totalSpots += $range->spotCount;
+
+            $hours = [];
+            foreach ($range->hours as $row) {
+                $hours[] = $row->hour;
+                $priceSum = Decimal::add($priceSum, $row->secondPrice);
+                $hourCount++;
+                $rowResults[] = [
+                    'hour' => $row->hour,
+                    'day_group' => $row->dayGroup->value,
+                    'spot_count' => 0,
+                    'second_price' => Decimal::roundPrice($row->secondPrice),
+                    'line_gross' => '0.00',
+                ];
+            }
+
+            $rangeResults[] = [
+                'start_hour' => $range->startHour,
+                'end_hour_exclusive' => $range->endHourExclusive,
+                'day_group' => $range->dayGroup->value,
+                'spot_count' => $range->spotCount,
+                'average_second_price' => Decimal::roundPrice($averageSecondPrice),
+                'range_gross' => Decimal::roundMoney($rangeGross),
+                'hours' => $hours,
+            ];
+        }
+
+        if ($rangeResults === []) {
+            return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
+        }
+
+        $displayAverage = $this->weightedAverageSecondPrice($mediaGrossInternal, $position, $index, $totalSpots);
+        if ($displayAverage === null && $hourCount > 0) {
+            $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $hourCount, 4));
+        }
+
+        return $this->finalizePosition(
+            $position,
+            $orderDiscountPercent,
+            $orderDiscounts,
+            $mediaGrossInternal,
+            $totalSpots,
+            $index,
+            $rowResults,
+            $displayAverage ?? '0',
+            $rangeResults,
+        );
+    }
+
+    private function spotPrice(string $averageSecondPrice, PositionInput $position, int $index, int $spotCount): string
+    {
+        $lengthFactor = Decimal::div((string) $index, '100');
+        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
+
+        return Decimal::mulMany([
+            $averageSecondPrice,
+            (string) $position->lengthSeconds,
+            $lengthFactor,
+            $surchargeFactor,
+            (string) max(0, $spotCount),
+        ]);
+    }
+
+    private function weightedAverageSecondPrice(
+        string $mediaGrossInternal,
+        PositionInput $position,
+        int $index,
+        int $spotCount,
+    ): ?string {
+        if ($spotCount < 1 || $position->lengthSeconds < 1) {
+            return null;
+        }
+
+        $lengthFactor = Decimal::div((string) $index, '100');
+        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
+        $divisor = Decimal::mulMany([
+            (string) $spotCount,
+            (string) $position->lengthSeconds,
+            $lengthFactor,
+            $surchargeFactor,
+        ]);
+
+        if (Decimal::cmp($divisor, '0') === 0) {
+            return null;
+        }
+
+        return Decimal::roundPrice(Decimal::div($mediaGrossInternal, $divisor, 4));
     }
 
     /**
@@ -166,6 +313,21 @@ final class CalculationEngine
 
     public function nnPerSpotFromAverage(PositionInput $position, string $orderDiscountPercent): string
     {
+        if ($position->timeRanges !== []) {
+            $totalSpots = 0;
+            foreach ($position->timeRanges as $range) {
+                $totalSpots += max(0, $range->spotCount);
+            }
+
+            if ($totalSpots < 1) {
+                return '0';
+            }
+
+            $result = $this->calculatePosition($position, $orderDiscountPercent);
+
+            return Decimal::div($result->nnInvest, (string) $totalSpots);
+        }
+
         $uniqueRows = $this->uniqueHourRows($position->rows);
 
         if ($uniqueRows === []) {
@@ -186,9 +348,15 @@ final class CalculationEngine
             spotMethod: SpotCalculationMethod::Average,
             rows: $uniqueRows,
             lengthIndex: $position->lengthIndex,
+            timeRanges: [],
+            positionDiscounts: $position->positionDiscounts,
         );
 
-        return $this->calculateAveragePosition($averagePosition, $orderDiscountPercent)->nnInvest;
+        return $this->calculateAveragePosition(
+            $averagePosition,
+            $orderDiscountPercent,
+            $this->resolveDiscountList([], $orderDiscountPercent),
+        )->nnInvest;
     }
 
     public function nnPerSpot(PositionInput $position, string $orderDiscountPercent, PlanRowInput $row): string
@@ -207,41 +375,61 @@ final class CalculationEngine
             spotMethod: SpotCalculationMethod::Average,
             rows: [$row],
             lengthIndex: $position->lengthIndex,
+            timeRanges: [],
+            positionDiscounts: $position->positionDiscounts,
         );
 
-        $result = $this->calculateAveragePosition($averagePosition, $orderDiscountPercent);
-
-        return $result->nnInvest;
+        return $this->calculateAveragePosition(
+            $averagePosition,
+            $orderDiscountPercent,
+            $this->resolveDiscountList([], $orderDiscountPercent),
+        )->nnInvest;
     }
 
     /**
+     * @param  list<DiscountInput>  $orderDiscounts
      * @param  list<array{hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $rowResults
+     * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, average_second_price: string, range_gross: string, hours: list<int>}>  $timeRanges
      */
     private function finalizePosition(
         PositionInput $position,
         string $orderDiscountPercent,
+        array $orderDiscounts,
         string $mediaGrossInternal,
         int $spotCount,
         int $index,
         array $rowResults,
         string $averageSecondPrice,
+        array $timeRanges = [],
     ): PositionResult {
-        $positionFactor = $position->isDiscountable
-            ? Decimal::oneMinusPercent($position->positionDiscountPercent)
-            : '1';
-        $orderFactor = $position->isDiscountable
-            ? Decimal::oneMinusPercent($orderDiscountPercent)
-            : '1';
+        $positionDiscounts = $position->isDiscountable
+            ? $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent)
+            : [];
+        $appliedOrderDiscounts = $position->isDiscountable
+            ? $orderDiscounts
+            : [];
 
-        $afterPosition = Decimal::mul($mediaGrossInternal, $positionFactor);
-        $afterOrder = Decimal::mul($afterPosition, $orderFactor);
+        $positionSequence = $this->applyDiscountSequence($mediaGrossInternal, $positionDiscounts);
+        $afterPosition = $positionSequence === []
+            ? $mediaGrossInternal
+            : $positionSequence[array_key_last($positionSequence)]['remaining'];
+        $orderSequence = $this->applyDiscountSequence($afterPosition, $appliedOrderDiscounts);
+        $afterOrder = $orderSequence === []
+            ? $afterPosition
+            : $orderSequence[array_key_last($orderSequence)]['remaining'];
+
         $aeAmountInternal = $position->isAeEligible
             ? Decimal::mul($afterOrder, Decimal::percentFactor($position->aePercent))
             : '0';
         $nnInternal = Decimal::sub($afterOrder, $aeAmountInternal);
 
-        $effectiveFactor = Decimal::mul($positionFactor, $orderFactor);
-        $effectiveDiscount = Decimal::mul(Decimal::sub('1', $effectiveFactor), '100');
+        $effectiveDiscount = '0';
+        if (Decimal::cmp($mediaGrossInternal, '0') !== 0) {
+            $effectiveDiscount = Decimal::mul(
+                Decimal::sub('1', Decimal::div($afterOrder, $mediaGrossInternal)),
+                '100',
+            );
+        }
 
         return new PositionResult(
             mediaGross: Decimal::roundMoney($mediaGrossInternal),
@@ -256,22 +444,73 @@ final class CalculationEngine
             lengthIndex: $index,
             rows: $rowResults,
             averageSecondPrice: Decimal::roundPrice($averageSecondPrice),
+            timeRanges: $timeRanges,
+            positionDiscounts: $positionSequence,
+            orderDiscounts: $orderSequence,
+            needsSpotRedistribution: $position->needsSpotRedistribution,
+            legacyTotalSpotCount: $position->needsSpotRedistribution ? $position->totalSpotCount : null,
         );
     }
 
-    private function emptyPositionResult(PositionInput $position, string $orderDiscountPercent): PositionResult
+    /**
+     * @param  list<DiscountInput>  $orderDiscounts
+     */
+    private function emptyPositionResult(PositionInput $position, string $orderDiscountPercent, array $orderDiscounts): PositionResult
     {
         $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
 
         return $this->finalizePosition(
             $position,
             $orderDiscountPercent,
+            $orderDiscounts,
             '0',
             0,
             $index,
             [],
             '0',
         );
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     * @return list<DiscountInput>
+     */
+    private function resolveDiscountList(array $discounts, string $legacyPercent): array
+    {
+        if ($discounts !== []) {
+            return $discounts;
+        }
+
+        if (Decimal::cmp($legacyPercent, '0') <= 0) {
+            return [];
+        }
+
+        return [new DiscountInput(DiscountType::Quantity, $legacyPercent)];
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     * @return list<array{type: string, label: string, percent: string, amount: string, remaining: string}>
+     */
+    private function applyDiscountSequence(string $startAmount, array $discounts): array
+    {
+        $remaining = $startAmount;
+        $rows = [];
+
+        foreach ($discounts as $discount) {
+            $next = Decimal::mul($remaining, Decimal::oneMinusPercent($discount->percent));
+            $amount = Decimal::sub($remaining, $next);
+            $rows[] = [
+                'type' => $discount->type->value,
+                'label' => $discount->displayName(),
+                'percent' => Decimal::roundPrice($discount->percent),
+                'amount' => Decimal::roundMoney($amount),
+                'remaining' => Decimal::roundMoney($next),
+            ];
+            $remaining = $next;
+        }
+
+        return $rows;
     }
 
     private function exceedsDiscountLimit(string $effectiveDiscountPercent, ?string $personalLimitPercent): bool

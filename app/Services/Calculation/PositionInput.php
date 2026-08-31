@@ -8,6 +8,8 @@ final readonly class PositionInput
 {
     /**
      * @param  list<PlanRowInput>  $rows
+     * @param  list<TimeRangeInput>  $timeRanges
+     * @param  list<DiscountInput>  $positionDiscounts
      */
     public function __construct(
         public int $inventoryId,
@@ -23,5 +25,8 @@ final readonly class PositionInput
         public SpotCalculationMethod $spotMethod,
         public array $rows,
         public ?int $lengthIndex = null,
+        public array $timeRanges = [],
+        public array $positionDiscounts = [],
+        public bool $needsSpotRedistribution = false,
     ) {}
 }

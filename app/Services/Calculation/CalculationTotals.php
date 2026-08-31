@@ -6,6 +6,7 @@ final readonly class CalculationTotals
 {
     /**
      * @param  list<PositionResult>  $positions
+     * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $orderDiscounts
      */
     public function __construct(
         public string $mediaGross,
@@ -17,6 +18,11 @@ final readonly class CalculationTotals
         public ?string $budgetDelta,
         public bool $requiresSpecialApproval,
         public array $positions,
+        public bool $aeEnabled = false,
+        public array $orderDiscounts = [],
+        public string $afterPositionDiscountTotal = '0.00',
+        public string $afterOrderDiscountTotal = '0.00',
+        public string $aeEligibleBase = '0.00',
     ) {}
 
     /**
@@ -33,6 +39,11 @@ final readonly class CalculationTotals
             'target_budget_nn' => $this->targetBudgetNn,
             'budget_delta' => $this->budgetDelta,
             'requires_special_approval' => $this->requiresSpecialApproval,
+            'ae_enabled' => $this->aeEnabled,
+            'order_discounts' => $this->orderDiscounts,
+            'after_position_discount_total' => $this->afterPositionDiscountTotal,
+            'after_order_discount_total' => $this->afterOrderDiscountTotal,
+            'ae_eligible_base' => $this->aeEligibleBase,
             'positions' => array_map(
                 fn (PositionResult $position): array => $position->toArray(),
                 $this->positions,

@@ -18,12 +18,12 @@ Zufallswerte werden kontrolliert, damit Ergebnisse reproduzierbar bleiben.
 
 | ID | Betroffene Anforderungen | Szenario | Erwartung |
 |---|---|---|---|
-| AT-01 | SPT-001–SPT-004, SPT-009, PRI-006 | Mo–Fr, zwei Zeitfenster, 10 Spots, 20 s | Gleichgewichteter eindeutiger Stundenmittelwert; Index 105; korrekte Aufschläge und Rundung |
+| AT-01 | SPT-001–SPT-004, SPT-009, PRI-006 | Mo–Fr, zwei Preiszeiträume mit eigener Spotanzahl | Jeder Zeitraum separat; Summe der Zeitraumssummen; Index und Rundung unverändert |
 | AT-02 | SPT-005–SPT-008 | Planer über Mo–Fr, Samstag und Sonntag | Datum bestimmt Tagesgruppe; jede Zelle nutzt richtigen Stundenpreis |
 | AT-03 | SPT-009, SPT-010 | Single-Spots mit 46 s und 100 s | 46 s erzeugt nur Hinweis; beide berechenbar mit Index 95 |
 | AT-04 | SPT-012–SPT-014 | Hauptspot plus Allonge | Komponenten sichtbar; je Regel einzeln oder über Gesamtlänge gerechnet |
 | AT-05 | SWF-001–SWF-005 | Trailer 20 s, +30 %, Zeitfenster | Sekundenpreis × 20 × 1,30; kein Spotlängenindex |
-| AT-06 | COM-001–COM-004 | 10 % Positions- und 10 % Auftragsrabatt | Effektiver Rabatt 19 %; Grenze wird gegen 19 % geprüft |
+| AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
 | AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt |
 | AT-09 | OA-001–OA-003 | Basis-TKP unter Minimum | Speichern möglich; Übergabe ohne Begründung/Sonderfreigabe blockiert |
