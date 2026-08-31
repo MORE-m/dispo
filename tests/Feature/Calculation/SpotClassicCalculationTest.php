@@ -111,7 +111,19 @@ class SpotClassicCalculationTest extends TestCase
             ]),
             'planning_mode' => 'budget',
             'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_budget',
+            'budget_strategy' => 'equal_spot_count',
+            'budget_wish_inventory_ids' => [
+                $catalog['hamburg']->id,
+                $catalog['rock']->id,
+            ],
+            'budget_spot_length_seconds' => 30,
+            'budget_distribution_ranges' => [
+                [
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => 'mo_fr',
+                ],
+            ],
             'calculation_id' => $calculation->id,
             'positions' => $calculation->load('positions')->positions->map(fn ($position): array => [
                 'id' => $position->id,

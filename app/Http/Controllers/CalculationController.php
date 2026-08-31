@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
+use App\Enums\PlanningMode;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
 use App\Models\AdvertisingMedium;
 use App\Models\BudgetProposal;
@@ -19,6 +21,7 @@ use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetProposalService;
+use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -30,7 +33,8 @@ class CalculationController extends Controller
 {
     public function __construct(
         private readonly CalculationWriter $writer,
-        private readonly BudgetProposalService $proposals,
+        private readonly BudgetProposalService $legacyProposals,
+        private readonly BudgetSpotProposalService $spotProposals,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -135,24 +139,43 @@ class CalculationController extends Controller
             ], 422);
         }
 
-        $proposal = $this->proposals->propose(
-            $this->writer->positionInputsFromPayload($payload, $existing),
-            (string) $payload['target_budget_nn'],
-            (string) ($payload['order_discount_percent'] ?? '0'),
-            BudgetStrategy::from((string) ($payload['budget_strategy'] ?? 'equal_budget')),
-        );
+        $planningMode = (string) ($payload['planning_mode'] ?? PlanningMode::Manual->value);
+        $strategy = BudgetStrategy::tryFrom((string) ($payload['budget_strategy'] ?? ''));
+        $wishIds = $payload['budget_wish_inventory_ids'] ?? [];
+        $useSpotAllocator = $strategy === BudgetStrategy::EqualSpotCount
+            || (is_array($wishIds) && count($wishIds) > 0);
+
+        if ($useSpotAllocator) {
+            $proposal = $this->spotProposals->propose($payload, $existing);
+        } else {
+            $proposal = $this->legacyProposals->propose(
+                $this->writer->positionInputsFromPayload($payload, $existing),
+                (string) $payload['target_budget_nn'],
+                (string) ($payload['order_discount_percent'] ?? '0'),
+                BudgetStrategy::from((string) ($payload['budget_strategy'] ?? 'equal_budget')),
+            );
+        }
 
         if ($existing !== null) {
             $stored = BudgetProposal::query()->create([
                 'calculation_id' => $existing->id,
-                'strategy' => $proposal['strategy'],
+                'strategy' => BudgetStrategy::from($proposal['strategy']),
+                'status' => BudgetProposalStatus::from($proposal['status'] ?? BudgetProposalStatus::Current->value),
+                'algorithm_version' => $proposal['algorithm_version'] ?? null,
+                'input_fingerprint' => $proposal['input_fingerprint'] ?? null,
                 'target_budget_nn' => $proposal['target_budget_nn'],
                 'lock_version' => $existing->lock_version,
                 'payload' => $proposal,
+                'calculated_at' => now(),
                 'created_by' => $user->id,
             ]);
             $proposal['id'] = $stored->id;
             $proposal['lock_version'] = $existing->lock_version;
+
+            $existing->budget_proposal_status = BudgetProposalStatus::Current;
+            $existing->budget_strategy = BudgetStrategy::from($proposal['strategy']);
+            $existing->save();
+
             $this->audit->record($existing, 'budget.proposed', $user, null, [
                 'proposal_id' => $stored->id,
                 'strategy' => $proposal['strategy'],
@@ -357,6 +380,7 @@ class CalculationController extends Controller
                 'ae_enabled' => (bool) $calculation->ae_enabled,
                 'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
                 'budget_strategy' => $calculation->budget_strategy?->value,
+                'budget_proposal_status' => $calculation->budget_proposal_status?->value,
                 'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
                     'type' => $discount->type->value,
                     'custom_label' => $discount->custom_label,

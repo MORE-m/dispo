@@ -3,6 +3,12 @@ import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import {
+    BudgetProposalPanel,
+    BudgetWishSenders,
+    type BudgetSpotProposal,
+} from '@/components/budget-proposal-panel';
+import { BudgetDistributionRanges } from '@/components/budget-distribution-ranges';
+import {
     DiscountListEditor,
     payloadDiscounts,
     type DiscountDraft,
@@ -18,7 +24,10 @@ import {
 } from '@/components/form-field';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
+    emptyDistributionRange,
     emptyTimeRange,
+    payloadDistributionRanges,
+    type DistributionRangeDraft,
     formatHour,
     formatInclusiveEnd,
     payloadTimeRanges,
@@ -149,21 +158,7 @@ type Totals = {
     }[];
 };
 
-type Proposal = {
-    id?: number;
-    lock_version?: number;
-    strategy: string;
-    target_budget_nn: string;
-    used_nn: string;
-    remainder: string;
-    explanation: string;
-    positions: {
-        position_key: string;
-        inventory_id: number;
-        length_seconds: number;
-        total_spot_count: number;
-    }[];
-};
+type Proposal = BudgetSpotProposal;
 
 type SavedSummary = {
     media_gross: string;
@@ -219,6 +214,7 @@ type SavedCalculation = {
     ae_enabled?: boolean;
     target_budget_nn: string | null;
     budget_strategy: string | null;
+    budget_proposal_status?: string | null;
     order_discounts?: Array<{
         type: string;
         custom_label: string | null;
@@ -425,8 +421,37 @@ export default function CalculationWizard({
         calculation?.target_budget_nn ?? '',
     );
     const [budgetStrategy, setBudgetStrategy] = useState(
-        calculation?.budget_strategy ?? 'equal_budget',
+        calculation?.budget_strategy ?? 'equal_spot_count',
     );
+    const spotClassicMedium = catalog.media.find(
+        (item) => item.code === 'spot_classic' && item.is_active,
+    );
+    const defaultSpotLength =
+        catalog.rules.find(
+            (rule) =>
+                rule.is_active &&
+                rule.advertising_medium_id === spotClassicMedium?.id,
+        )?.default_length_seconds ??
+        spotClassicMedium?.default_length_seconds ??
+        30;
+    const [wishInventoryIds, setWishInventoryIds] = useState<number[]>(() => {
+        if (calculation?.positions?.length) {
+            return calculation.positions.map((p) => p.inventory_id);
+        }
+
+        const active = catalog.inventories.filter((item) => item.is_active);
+        return active.slice(0, 1).map((item) => item.id);
+    });
+    const [budgetSpotLength, setBudgetSpotLength] = useState(
+        calculation?.positions[0]?.length_seconds ?? defaultSpotLength,
+    );
+    const [budgetDistributionRanges, setBudgetDistributionRanges] = useState<
+        DistributionRangeDraft[]
+    >([emptyDistributionRange()]);
+    const [proposalSnapshot, setProposalSnapshot] = useState<string | null>(
+        null,
+    );
+    const [proposalError, setProposalError] = useState<string | null>(null);
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
             return calculation.positions.map((position) => ({
@@ -477,10 +502,23 @@ export default function CalculationWizard({
             order_discounts: payloadDiscounts(orderDiscounts),
             ae_enabled: aeEnabled,
             target_budget_nn: targetBudget === '' ? null : targetBudget,
-            budget_strategy: planningMode === 'budget' ? budgetStrategy : null,
+            budget_strategy:
+                planningMode === 'budget' ? 'equal_spot_count' : null,
+            budget_wish_inventory_ids:
+                planningMode === 'budget' ? wishInventoryIds : undefined,
+            budget_spot_length_seconds:
+                planningMode === 'budget' ? budgetSpotLength : undefined,
+            budget_distribution_ranges:
+                planningMode === 'budget'
+                    ? payloadDistributionRanges(budgetDistributionRanges)
+                    : undefined,
+            budget_proposal_manual: false,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            positions: positions.map((position) => {
+            positions:
+                planningMode === 'budget'
+                    ? []
+                    : positions.map((position) => {
                 const ranges = payloadTimeRanges(position.time_ranges);
 
                 return {
@@ -524,7 +562,10 @@ export default function CalculationWizard({
             orderDiscounts,
             aeEnabled,
             targetBudget,
-            budgetStrategy,
+            targetBudget,
+            wishInventoryIds,
+            budgetSpotLength,
+            budgetDistributionRanges,
             calculation,
             positions,
         ],
@@ -541,7 +582,7 @@ export default function CalculationWizard({
         enabled: canEdit,
         blocked: busy,
     });
-    const error = previewError ?? saveError;
+    const error = previewError ?? saveError ?? proposalError;
     const fieldErrors = {
         ...previewFieldErrors,
         ...saveFieldErrors,
@@ -651,8 +692,25 @@ export default function CalculationWizard({
         }
     }
 
+    function proposalInputSnapshot(): string {
+        return JSON.stringify({
+            targetBudget,
+            orderDiscounts,
+            aeEnabled,
+            wishInventoryIds,
+            budgetSpotLength,
+            budgetDistributionRanges,
+        });
+    }
+
+    const proposalStatus =
+        proposal && proposalSnapshot !== proposalInputSnapshot()
+            ? 'stale'
+            : (proposal?.status ?? calculation?.budget_proposal_status ?? 'current');
+
     async function createProposal() {
         setBusy(true);
+        setProposalError(null);
         setSaveError(null);
         setSaveFieldErrors({});
         try {
@@ -661,12 +719,13 @@ export default function CalculationWizard({
                 payload,
             );
             setProposal(data.proposal);
+            setProposalSnapshot(proposalInputSnapshot());
         } catch (caught) {
             if (caught instanceof JsonPostError) {
                 setSaveFieldErrors(caught.fieldErrors);
-                setSaveError(caught.message);
+                setProposalError(caught.message);
             } else {
-                setSaveError(
+                setProposalError(
                     caught instanceof Error
                         ? caught.message
                         : 'Vorschlag nicht möglich.',
@@ -700,62 +759,40 @@ export default function CalculationWizard({
             return;
         }
 
-        setPositions((current) =>
-            current.map((position, index) => {
-                const key = positionKey(position, index);
-                const match =
-                    proposal.positions.find(
-                        (item) => item.position_key === key,
-                    ) ??
-                    proposal.positions.find(
-                        (item) => item.inventory_id === position.inventory_id,
-                    );
-
-                if (!match) {
-                    return {
-                        ...position,
-                        total_spot_count: 0,
-                        time_ranges: position.time_ranges.map(
-                            (range, index) => ({
-                                ...range,
-                                spot_count: index === 0 ? '' : range.spot_count,
-                            }),
-                        ),
-                    };
-                }
-
-                const current = totalSpotCount(position.time_ranges);
-                const target = match.total_spot_count;
-                let assigned = 0;
+        setPositions(
+            proposal.positions.map((item) => {
+                const existing = positions.find(
+                    (position) => position.inventory_id === item.inventory_id,
+                );
+                const mediumId =
+                    spotClassicMedium?.id ??
+                    existing?.advertising_medium_id ??
+                    0;
 
                 return {
-                    ...position,
-                    length_seconds: match.length_seconds,
-                    total_spot_count: target,
-                    time_ranges: position.time_ranges.map(
-                        (range, index, all) => {
-                            const last = index === all.length - 1;
-                            const source =
-                                typeof range.spot_count === 'number'
-                                    ? range.spot_count
-                                    : 0;
-                            const share =
-                                current < 1
-                                    ? index === 0
-                                        ? target
-                                        : 0
-                                    : last
-                                      ? Math.max(0, target - assigned)
-                                      : Math.floor((source / current) * target);
-                            assigned += last ? 0 : share;
-
-                            return { ...range, spot_count: share };
-                        },
-                    ),
+                    id: existing?.id,
+                    client_key: existing?.client_key ?? newClientKey(),
+                    inventory_id: item.inventory_id,
+                    advertising_medium_id: mediumId,
+                    spot_method: 'average',
+                    length_seconds: item.length_seconds ?? budgetSpotLength,
+                    total_spot_count: item.total_spot_count,
+                    needs_spot_redistribution: false,
+                    position_discount_percent: '0',
+                    ae_percent: '0',
+                    time_ranges: (item.time_ranges ?? []).map((range) => ({
+                        start_hour: range.start_hour,
+                        end_hour_exclusive: range.end_hour_exclusive,
+                        day_group: range.day_group,
+                        spot_count: range.spot_count,
+                    })),
+                    position_discounts: existing?.position_discounts ?? [],
+                    plan_rows: [],
                 };
             }),
         );
         setProposal(null);
+        setProposalSnapshot(null);
     }
 
     const displayTotals = canEdit ? totals : null;
@@ -948,7 +985,7 @@ export default function CalculationWizard({
                                             hint={
                                                 planningMode === 'manual'
                                                     ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                                    : undefined
+                                                    : 'Das System ermittelt einen Spotvorschlag, der unter dem Zielbudget bleibt.'
                                             }
                                         >
                                             <Input
@@ -963,32 +1000,6 @@ export default function CalculationWizard({
                                                 disabled={!canEdit}
                                             />
                                         </FormField>
-                                        {planningMode === 'budget' ? (
-                                            <FormField
-                                                label="Verteilung"
-                                                htmlFor="strategy"
-                                            >
-                                                <select
-                                                    id="strategy"
-                                                    className={formSelectClass}
-                                                    value={budgetStrategy}
-                                                    onChange={(event) =>
-                                                        setBudgetStrategy(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                >
-                                                    <option value="equal_budget">
-                                                        Budget je Sender gleich
-                                                        verteilen
-                                                    </option>
-                                                    <option value="maximize_spots">
-                                                        Spotanzahl maximieren
-                                                    </option>
-                                                </select>
-                                            </FormField>
-                                        ) : null}
                                     </CardContent>
                                 </Card>
                             </div>
@@ -1000,6 +1011,122 @@ export default function CalculationWizard({
                                     title="Kein Katalog"
                                     description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
                                 />
+                            ) : planningMode === 'budget' ? (
+                                <div className="space-y-6">
+                                    <Card className={wizardCardClass}>
+                                        <CardHeader
+                                            className={wizardCardHeaderClass}
+                                        >
+                                            <CardTitle
+                                                className={wizardCardTitleClass}
+                                            >
+                                                Budgetplanung
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent
+                                            className={`${wizardCardContentClass} space-y-6`}
+                                        >
+                                            <BudgetWishSenders
+                                                inventories={
+                                                    catalog.inventories
+                                                }
+                                                selectedIds={wishInventoryIds}
+                                                canEdit={canEdit}
+                                                onChange={setWishInventoryIds}
+                                            />
+                                            <FormField
+                                                label="Spotlänge (Sekunden)"
+                                                htmlFor="budget-spot-length"
+                                            >
+                                                <Input
+                                                    id="budget-spot-length"
+                                                    type="number"
+                                                    min={1}
+                                                    value={budgetSpotLength}
+                                                    disabled={!canEdit}
+                                                    onChange={(event) =>
+                                                        setBudgetSpotLength(
+                                                            Number(
+                                                                event.target
+                                                                    .value,
+                                                            ),
+                                                        )
+                                                    }
+                                                />
+                                            </FormField>
+                                            <BudgetDistributionRanges
+                                                ranges={
+                                                    budgetDistributionRanges
+                                                }
+                                                dayGroups={dayGroups}
+                                                canEdit={canEdit}
+                                                fieldErrors={fieldErrors}
+                                                onChange={
+                                                    setBudgetDistributionRanges
+                                                }
+                                            />
+                                            <p className="text-muted-foreground text-sm">
+                                                Gleiche Spotanzahl je
+                                                Wunschsender, gleichmäßige
+                                                Stundenverteilung. Keine
+                                                Reichweitenoptimierung.
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                data-test="budget-propose"
+                                                onClick={() =>
+                                                    void createProposal()
+                                                }
+                                                disabled={busy}
+                                            >
+                                                Budgetvorschlag berechnen
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                    {proposal ? (
+                                        <Card className={wizardCardClass}>
+                                            <CardHeader
+                                                className={
+                                                    wizardCardHeaderClass
+                                                }
+                                            >
+                                                <CardTitle
+                                                    className={
+                                                        wizardCardTitleClass
+                                                    }
+                                                >
+                                                    Budgetvorschlag
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent
+                                                className={
+                                                    wizardCardContentClass
+                                                }
+                                            >
+                                                <BudgetProposalPanel
+                                                    proposal={proposal}
+                                                    proposalStatus={
+                                                        proposalStatus
+                                                    }
+                                                    busy={busy}
+                                                    canApply={
+                                                        !proposal.insufficient_budget
+                                                    }
+                                                    onApply={takeProposal}
+                                                    onDiscard={() => {
+                                                        setProposal(null);
+                                                        setProposalSnapshot(
+                                                            null,
+                                                        );
+                                                    }}
+                                                    onRecalculate={() =>
+                                                        void createProposal()
+                                                    }
+                                                />
+                                            </CardContent>
+                                        </Card>
+                                    ) : null}
+                                </div>
                             ) : (
                                 <div className="space-y-6">
                                     {positions.map((position, index) => {
@@ -1549,77 +1676,13 @@ export default function CalculationWizard({
                                         </div>
                                     </CardContent>
                                 </Card>
-                                {planningMode === 'budget' && canEdit ? (
-                                    <Card className={wizardCardClass}>
-                                        <CardHeader
-                                            className={wizardCardHeaderClass}
-                                        >
-                                            <CardTitle
-                                                className={wizardCardTitleClass}
-                                            >
-                                                Budgetvorschlag
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent
-                                            className={`${wizardCardContentClass} space-y-3`}
-                                        >
-                                            <p className="text-muted-foreground text-sm">
-                                                Konditionen und Verteilungslogik
-                                                müssen vor der
-                                                Vorschlagsberechnung feststehen.
-                                            </p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <Button
-                                                    type="button"
-                                                    data-test="budget-propose"
-                                                    onClick={() =>
-                                                        void createProposal()
-                                                    }
-                                                    disabled={busy}
-                                                >
-                                                    Vorschlag erzeugen
-                                                </Button>
-                                                {proposal ? (
-                                                    <>
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            data-test="budget-apply"
-                                                            onClick={
-                                                                takeProposal
-                                                            }
-                                                            disabled={busy}
-                                                        >
-                                                            Vorschlag übernehmen
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setProposal(
-                                                                    null,
-                                                                )
-                                                            }
-                                                        >
-                                                            Vorschlag verwerfen
-                                                        </Button>
-                                                    </>
-                                                ) : null}
-                                            </div>
-                                            {proposal ? (
-                                                <StatusBanner>
-                                                    {proposal.explanation}{' '}
-                                                    Verbrauch{' '}
-                                                    {money(proposal.used_nn)},
-                                                    Rest{' '}
-                                                    {money(proposal.remainder)}.
-                                                    Anzeigen oder Verwerfen
-                                                    ändert die Kalkulation
-                                                    nicht.
-                                                </StatusBanner>
-                                            ) : null}
-                                        </CardContent>
-                                    </Card>
+                                {planningMode === 'budget' &&
+                                proposalStatus === 'stale' ? (
+                                    <StatusBanner data-test="budget-stale-hint">
+                                        Die Konditionen haben sich geändert.
+                                        Optimiere den Vorschlag erneut, um das
+                                        Zielbudget bestmöglich auszuschöpfen.
+                                    </StatusBanner>
                                 ) : null}
                             </div>
                         ) : null}

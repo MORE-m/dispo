@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\CalculationStatus;
 use App\Enums\PlanningMode;
@@ -30,6 +31,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, CalculationOrderDiscount> $orderDiscounts
  * @property string|null $target_budget_nn
  * @property BudgetStrategy|null $budget_strategy
+ * @property BudgetProposalStatus|null $budget_proposal_status
  * @property string $media_gross
  * @property string $position_discount_total
  * @property string $order_discount_total
@@ -62,6 +64,7 @@ class Calculation extends Model
         'ae_enabled',
         'target_budget_nn',
         'budget_strategy',
+        'budget_proposal_status',
         'media_gross',
         'position_discount_total',
         'order_discount_total',
@@ -80,6 +83,7 @@ class Calculation extends Model
             'status' => CalculationStatus::class,
             'planning_mode' => PlanningMode::class,
             'budget_strategy' => BudgetStrategy::class,
+            'budget_proposal_status' => BudgetProposalStatus::class,
             'order_discount_percent' => 'decimal:4',
             'ae_enabled' => 'boolean',
             'target_budget_nn' => 'decimal:2',
