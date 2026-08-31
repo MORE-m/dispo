@@ -25,6 +25,7 @@ class CalculationPositionFactory extends Factory
             'spot_method' => SpotCalculationMethod::Average,
             'length_seconds' => 30,
             'total_spot_count' => 0,
+            'needs_spot_redistribution' => false,
             'surcharge_percent' => 0,
             'position_discount_percent' => 0,
             'ae_percent' => 15,

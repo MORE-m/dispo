@@ -25,6 +25,8 @@ final class CatalogResolver
      *     rule: InventoryMediumRule|null,
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
      *     surcharge_percent: string,
@@ -60,6 +62,8 @@ final class CatalogResolver
      *     rule: InventoryMediumRule|null,
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
      *     surcharge_percent: string,
@@ -122,8 +126,13 @@ final class CatalogResolver
             ]);
         }
 
-        $totalSpotCount = (int) ($position['total_spot_count'] ?? $existing->total_spot_count);
-        $rows = $this->resolveRows($position, $priceList, $existing, useSnapshot: true);
+        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+            $position,
+            $priceList,
+            $inventory->name,
+            $existing,
+            useSnapshot: true,
+        );
 
         return [
             'inventory' => $inventory,
@@ -131,6 +140,8 @@ final class CatalogResolver
             'rule' => $rule,
             'priceList' => $priceList,
             'rows' => $rows,
+            'time_ranges' => $timeRanges,
+            'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $spotMethod,
             'surcharge_percent' => (string) $existing->surcharge_percent,
@@ -150,6 +161,8 @@ final class CatalogResolver
      *     rule: InventoryMediumRule,
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
      *     surcharge_percent: string,
@@ -218,8 +231,13 @@ final class CatalogResolver
             ]);
         }
 
-        $totalSpotCount = (int) ($position['total_spot_count'] ?? 0);
-        $rows = $this->resolveRows($position, $priceList, null, useSnapshot: false);
+        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+            $position,
+            $priceList,
+            $inventory->name,
+            null,
+            useSnapshot: false,
+        );
 
         return [
             'inventory' => $inventory,
@@ -227,6 +245,8 @@ final class CatalogResolver
             'rule' => $rule,
             'priceList' => $priceList,
             'rows' => $rows,
+            'time_ranges' => $timeRanges,
+            'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $spotMethod,
             'surcharge_percent' => (string) $rule->surcharge_percent,
@@ -258,25 +278,131 @@ final class CatalogResolver
 
     /**
      * @param  array<string, mixed>  $position
-     * @return list<PlanRowInput>
+     * @return array{0: list<PlanRowInput>, 1: list<TimeRangeInput>, 2: int, 3: bool}
      */
-    private function resolveRows(
+    private function resolvePlan(
         array $position,
         PriceList $priceList,
+        string $inventoryName,
         ?CalculationPosition $existing,
         bool $useSnapshot,
     ): array {
+        $existingRows = $this->existingPlanRows($existing);
+        $payloadRanges = $position['time_ranges'] ?? null;
+
+        if (is_array($payloadRanges) && $payloadRanges !== []) {
+            $ranges = (new TimeRangeValidator)->validated(
+                $payloadRanges,
+                'positions',
+                requireAtLeastOne: false,
+            );
+
+            if ($ranges !== []) {
+                [$timeRanges, $rows] = $this->hydrateTimeRanges(
+                    $ranges,
+                    $priceList,
+                    $inventoryName,
+                    $existingRows,
+                    $useSnapshot,
+                );
+                $totalSpots = array_sum(array_map(fn (TimeRangeInput $range): int => $range->spotCount, $timeRanges));
+                $needsRedistribution = $this->redistributionStillOpen($existing, $totalSpots);
+
+                return [$rows, $timeRanges, $totalSpots, $needsRedistribution];
+            }
+        }
+
+        $rows = $this->resolveHourRows($position, $priceList, $existingRows, $useSnapshot, $inventoryName);
+        $legacyTotal = (int) ($position['total_spot_count'] ?? ($existing !== null ? $existing->total_spot_count : 0));
+        $uniqueKeys = $this->uniqueHourKeys($rows);
+        $legacyAmbiguous = count($uniqueKeys) > 1;
+
+        if (count($uniqueKeys) === 1 && $rows !== []) {
+            $row = $rows[0];
+            $timeRanges = [new TimeRangeInput(
+                startHour: $row->hour,
+                endHourExclusive: $row->hour + 1,
+                dayGroup: $row->dayGroup,
+                spotCount: max(0, $legacyTotal),
+                hours: [$row],
+            )];
+
+            return [$rows, $timeRanges, $legacyTotal, false];
+        }
+
+        return [$rows, [], $legacyTotal, $legacyAmbiguous];
+    }
+
+    /**
+     * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, sort: int}>  $ranges
+     * @param  Collection<string, mixed>  $existingRows
+     * @return array{0: list<TimeRangeInput>, 1: list<PlanRowInput>}
+     */
+    private function hydrateTimeRanges(
+        array $ranges,
+        PriceList $priceList,
+        string $inventoryName,
+        Collection $existingRows,
+        bool $useSnapshot,
+    ): array {
+        $timeRanges = [];
         $rows = [];
-        $existingRows = $existing?->relationLoaded('planRows')
-            ? $existing->planRows->keyBy(fn ($row) => $row->hour.'|'.$row->day_group->value)
-            : ($existing !== null
-                ? $existing->planRows()->get()->keyBy(fn ($row) => $row->hour.'|'.$row->day_group->value)
-                : collect());
+        $missing = [];
+
+        foreach ($ranges as $range) {
+            $dayGroup = DayGroup::from($range['day_group']);
+            $hours = [];
+
+            foreach (TimeRangeHours::expand($range['start_hour'], $range['end_hour_exclusive']) as $hour) {
+                $price = $this->resolveHourPrice($priceList, $hour, $dayGroup, $existingRows, $useSnapshot);
+                if ($price === null) {
+                    $missing[] = $dayGroup->label().', '.TimeRangeHours::formatHour($hour);
+
+                    continue;
+                }
+
+                $row = new PlanRowInput($hour, $dayGroup, 0, $price);
+                $hours[] = $row;
+                $rows[] = $row;
+            }
+
+            $timeRanges[] = new TimeRangeInput(
+                startHour: $range['start_hour'],
+                endHourExclusive: $range['end_hour_exclusive'],
+                dayGroup: $dayGroup,
+                spotCount: $range['spot_count'],
+                hours: $hours,
+                sort: $range['sort'],
+            );
+        }
+
+        if ($missing !== []) {
+            throw ValidationException::withMessages([
+                'positions' => 'Für '.$inventoryName.' fehlen Preislistenwerte: '.implode('; ', array_unique($missing)).'.',
+            ]);
+        }
+
+        return [$timeRanges, $rows];
+    }
+
+    /**
+     * @param  Collection<string, mixed>  $existingRows
+     * @param  array<string, mixed>  $position
+     * @return list<PlanRowInput>
+     */
+    private function resolveHourRows(
+        array $position,
+        PriceList $priceList,
+        Collection $existingRows,
+        bool $useSnapshot,
+        string $inventoryName,
+    ): array {
+        $rows = [];
+        $missing = [];
 
         foreach ($position['plan_rows'] ?? [] as $index => $row) {
             $dayGroup = DayGroup::from((string) $row['day_group']);
             $hour = (int) $row['hour'];
-            $key = $hour.'|'.$dayGroup->value;
 
             if ($hour < 0 || $hour > 23) {
                 throw ValidationException::withMessages([
@@ -284,22 +410,17 @@ final class CatalogResolver
                 ]);
             }
 
-            $stored = $existingRows->get($key);
-            if ($useSnapshot && $stored !== null) {
-                $secondPrice = (string) $stored->second_price;
-            } else {
-                $secondPrice = $this->secondPrice($priceList, $hour, $dayGroup);
+            $price = $this->resolveHourPrice($priceList, $hour, $dayGroup, $existingRows, $useSnapshot);
+            if ($price === null) {
+                $missing[] = $dayGroup->label().', '.TimeRangeHours::formatHour($hour);
+
+                continue;
             }
 
-            $rows[] = new PlanRowInput(
-                hour: $hour,
-                dayGroup: $dayGroup,
-                spotCount: 0,
-                secondPrice: $secondPrice,
-            );
+            $rows[] = new PlanRowInput($hour, $dayGroup, 0, $price);
         }
 
-        if ($rows === [] && $existing !== null) {
+        if ($rows === [] && $existingRows->isNotEmpty()) {
             foreach ($existingRows as $stored) {
                 $rows[] = new PlanRowInput(
                     hour: $stored->hour,
@@ -310,10 +431,85 @@ final class CatalogResolver
             }
         }
 
+        if ($missing !== []) {
+            throw ValidationException::withMessages([
+                'positions' => 'Für '.$inventoryName.' fehlen Preislistenwerte: '.implode('; ', array_unique($missing)).'.',
+            ]);
+        }
+
         return $rows;
     }
 
+    /**
+     * @return Collection<string, mixed>
+     */
+    private function existingPlanRows(?CalculationPosition $existing): Collection
+    {
+        if ($existing === null) {
+            return collect();
+        }
+
+        $rows = $existing->relationLoaded('planRows')
+            ? $existing->planRows
+            : $existing->planRows()->get();
+
+        return $rows->keyBy(fn ($row) => $row->hour.'|'.$row->day_group->value);
+    }
+
+    /**
+     * @param  Collection<string, mixed>  $existingRows
+     */
+    private function resolveHourPrice(
+        PriceList $priceList,
+        int $hour,
+        DayGroup $dayGroup,
+        Collection $existingRows,
+        bool $useSnapshot,
+    ): ?string {
+        $stored = $existingRows->get($hour.'|'.$dayGroup->value);
+        if ($useSnapshot && $stored !== null) {
+            return (string) $stored->second_price;
+        }
+
+        return $this->findSecondPrice($priceList, $hour, $dayGroup);
+    }
+
+    private function redistributionStillOpen(?CalculationPosition $existing, int $assignedSpots): bool
+    {
+        if ($existing === null || ! $existing->needs_spot_redistribution) {
+            return false;
+        }
+
+        return $assignedSpots !== (int) $existing->total_spot_count;
+    }
+
+    /**
+     * @param  list<PlanRowInput>  $rows
+     * @return list<string>
+     */
+    private function uniqueHourKeys(array $rows): array
+    {
+        $keys = [];
+        foreach ($rows as $row) {
+            $keys[$row->hour.'|'.$row->dayGroup->value] = true;
+        }
+
+        return array_keys($keys);
+    }
+
     public function secondPrice(PriceList $priceList, int $hour, DayGroup $dayGroup): string
+    {
+        $price = $this->findSecondPrice($priceList, $hour, $dayGroup);
+        if ($price === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Kein Sekundenpreis für Stunde '.$hour.' ('.$dayGroup->label().').',
+            ]);
+        }
+
+        return $price;
+    }
+
+    public function findSecondPrice(PriceList $priceList, int $hour, DayGroup $dayGroup): ?string
     {
         $base = [];
 
@@ -324,9 +520,7 @@ final class CatalogResolver
             );
 
             if ($item === null) {
-                throw ValidationException::withMessages([
-                    'positions' => 'Kein Sekundenpreis für Stunde '.$hour.' ('.$group->label().').',
-                ]);
+                return null;
             }
 
             $base[$group->value] = (string) $item->second_price;

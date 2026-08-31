@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CalculationKind;
 use App\Enums\SpotCalculationMethod;
 use Database\Factories\CalculationPositionFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $client_key
  * @property SpotCalculationMethod $spot_method
  * @property int $total_spot_count
+ * @property bool $needs_spot_redistribution
  * @property int $advertising_medium_id
+ * @property-read Collection<int, CalculationPositionTimeRange> $timeRanges
+ * @property-read Collection<int, CalculationPositionDiscount> $discounts
  * @property int $length_seconds
  * @property string $position_discount_percent
  * @property string $ae_percent
@@ -35,6 +39,7 @@ class CalculationPosition extends Model
         'spot_method',
         'length_seconds',
         'total_spot_count',
+        'needs_spot_redistribution',
         'average_second_price',
         'length_index',
         'surcharge_percent',
@@ -66,6 +71,7 @@ class CalculationPosition extends Model
             'ae_percent' => 'decimal:4',
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
+            'needs_spot_redistribution' => 'boolean',
             'media_gross' => 'decimal:2',
             'position_discount_amount' => 'decimal:2',
             'order_discount_amount' => 'decimal:2',
@@ -112,5 +118,21 @@ class CalculationPosition extends Model
     public function planRows(): HasMany
     {
         return $this->hasMany(SpotClassicPlanRow::class);
+    }
+
+    /**
+     * @return HasMany<CalculationPositionTimeRange, $this>
+     */
+    public function timeRanges(): HasMany
+    {
+        return $this->hasMany(CalculationPositionTimeRange::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<CalculationPositionDiscount, $this>
+     */
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(CalculationPositionDiscount::class)->orderBy('sort')->orderBy('id');
     }
 }

@@ -3,12 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Enums\BudgetStrategy;
+use App\Enums\DayGroup;
+use App\Enums\DiscountType;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
 use App\Models\AdvertisingMedium;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
+use App\Models\CalculationOrderDiscount;
+use App\Models\CalculationPosition;
+use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionTimeRange;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
+use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetProposalService;
@@ -67,7 +74,7 @@ class CalculationController extends Controller
     {
         $this->authorize('view', $calculation);
 
-        $calculation->load(['positions.planRows', 'positions.inventory', 'positions.advertisingMedium', 'positions.priceList']);
+        $calculation->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'positions.advertisingMedium', 'positions.priceList', 'orderDiscounts']);
 
         return Inertia::render('calculations/wizard', $this->wizardProps($request, $calculation));
     }
@@ -92,7 +99,9 @@ class CalculationController extends Controller
         $existing = null;
 
         if ($request->integer('calculation_id') > 0) {
-            $existing = Calculation::query()->findOrFail($request->integer('calculation_id'));
+            $existing = Calculation::query()
+                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts'])
+                ->findOrFail($request->integer('calculation_id'));
             $this->authorize('view', $existing);
         } else {
             $this->authorize('create', Calculation::class);
@@ -112,7 +121,7 @@ class CalculationController extends Controller
 
         if ($request->integer('calculation_id') > 0) {
             $existing = Calculation::query()
-                ->with('positions')
+                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts'])
                 ->findOrFail($request->integer('calculation_id'));
             $this->authorize('update', $existing);
             $payload = $this->enrichPayloadWithExistingPositions($payload, $existing);
@@ -173,7 +182,7 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing('positions');
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts']);
 
         $activeInventories = Inventory::query()
             ->where('is_active', true)
@@ -293,7 +302,26 @@ class CalculationController extends Controller
                         'day_group' => $row->day_group->value,
                         'second_price' => (string) $row->second_price,
                     ])->all(),
+                    'time_ranges' => $position->timeRanges->map(fn (CalculationPositionTimeRange $range): array => [
+                        'start_hour' => $range->start_hour,
+                        'end_hour_exclusive' => $range->end_hour_exclusive,
+                        'day_group' => $range->day_group->value,
+                        'spot_count' => $range->spot_count,
+                        'average_second_price' => $range->average_second_price === null ? null : (string) $range->average_second_price,
+                        'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
+                    ])->all(),
+                    'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
+                        'type' => $discount->type->value,
+                        'custom_label' => $discount->custom_label,
+                        'percent' => (string) $discount->percent,
+                    ])->all(),
                 ])->all(),
+                'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ])->all(),
+                'ae_enabled' => (bool) $calculation->ae_enabled,
             ];
         }
 
@@ -303,7 +331,55 @@ class CalculationController extends Controller
                 'media' => $media,
                 'rules' => $rules,
             ],
-            'calculation' => $calculation,
+            'dayGroups' => DayGroup::options(),
+            'discountTypes' => DiscountType::options(),
+            'calculation' => $calculation === null ? null : [
+                'id' => $calculation->id,
+                'lock_version' => $calculation->lock_version,
+                'planning_mode' => $calculation->planning_mode->value,
+                'customer_name' => $calculation->customer_name,
+                'agency_name' => $calculation->agency_name,
+                'campaign' => $calculation->campaign,
+                'product_title' => $calculation->product_title,
+                'briefing' => $calculation->briefing,
+                'order_discount_percent' => (string) $calculation->order_discount_percent,
+                'ae_enabled' => (bool) $calculation->ae_enabled,
+                'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
+                'budget_strategy' => $calculation->budget_strategy?->value,
+                'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ])->all(),
+                'positions' => $calculation->positions->map(fn (CalculationPosition $position): array => [
+                    'id' => $position->id,
+                    'client_key' => $position->client_key,
+                    'inventory_id' => $position->inventory_id,
+                    'advertising_medium_id' => $position->advertising_medium_id,
+                    'spot_method' => $position->spot_method->value,
+                    'length_seconds' => $position->length_seconds,
+                    'total_spot_count' => $position->total_spot_count,
+                    'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
+                    'position_discount_percent' => (string) $position->position_discount_percent,
+                    'ae_percent' => (string) $position->ae_percent,
+                    'plan_rows' => $position->planRows->map(fn (SpotClassicPlanRow $row): array => [
+                        'hour' => $row->hour,
+                        'day_group' => $row->day_group->value,
+                        'second_price' => (string) $row->second_price,
+                    ])->all(),
+                    'time_ranges' => $position->timeRanges->map(fn (CalculationPositionTimeRange $range): array => [
+                        'start_hour' => $range->start_hour,
+                        'end_hour_exclusive' => $range->end_hour_exclusive,
+                        'day_group' => $range->day_group->value,
+                        'spot_count' => $range->spot_count,
+                    ])->all(),
+                    'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
+                        'type' => $discount->type->value,
+                        'custom_label' => $discount->custom_label,
+                        'percent' => (string) $discount->percent,
+                    ])->all(),
+                ])->all(),
+            ],
             'savedSummary' => $savedSummary,
             'canEdit' => $canEdit,
         ];

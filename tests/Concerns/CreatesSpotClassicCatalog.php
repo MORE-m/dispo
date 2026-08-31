@@ -47,7 +47,7 @@ trait CreatesSpotClassicCatalog
                 'valid_from' => now()->toDateString(),
             ]);
 
-            foreach ([6, 8, 10, 18] as $hour) {
+            foreach (range(0, 23) as $hour) {
                 foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
                     $price = $inventory->code === 'RH' ? '1.0000' : '0.8000';
                     PriceListItem::factory()->create([
