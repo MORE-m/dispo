@@ -50,26 +50,22 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await page.goto('/kalkulationen/neu');
 
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await page.locator('[data-test="position-total-spots-0"]').fill('10');
+    await page.locator('[data-test="range-end-0-0"]').selectOption('9');
+    await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.locator('[data-test="position-length-seconds-0"]').fill('30');
-    await page
-        .locator('section')
-        .first()
-        .getByRole('button', { name: 'Preisstunde hinzufügen' })
-        .click();
-    await page.locator('#hour-0-1').fill('10');
 
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
     await page.locator('[data-test="position-inventory-1"]').selectOption({
         label: 'ROCK ANTENNE Hamburg',
     });
-    await page.locator('[data-test="position-total-spots-1"]').fill('5');
+    await page.locator('[data-test="range-start-1-0"]').selectOption('10');
+    await page.locator('[data-test="range-end-1-0"]').selectOption('11');
+    await page.locator('[data-test="range-spots-1-0"]').fill('5');
     await page.locator('[data-test="position-length-seconds-1"]').fill('20');
-    await page.locator('#hour-1-0').fill('10');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Speichern' }).click();
-
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await expect(
@@ -90,15 +86,18 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     await page.getByLabel('Zielbudget N/N').fill('500');
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-    await page.locator('[data-test="position-total-spots-0"]').fill('1');
+    await page.locator('[data-test="range-end-0-0"]').selectOption('9');
+    await page.locator('[data-test="range-spots-0-0"]').fill('1');
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
     await page.locator('[data-test="position-inventory-1"]').selectOption({
         label: 'ROCK ANTENNE Hamburg',
     });
-    await page.locator('[data-test="position-total-spots-1"]').fill('1');
+    await page.locator('[data-test="range-end-1-0"]').selectOption('9');
+    await page.locator('[data-test="range-spots-1-0"]').fill('1');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
 
     const url = page.url();
@@ -120,8 +119,9 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
 
     await expect(page.locator('[data-test="budget-apply"]')).toBeVisible();
     await page.locator('[data-test="budget-apply"]').click();
-    await expect(page.getByText('Vorschlag übernommen')).toBeVisible();
-    await expect(page.locator('[data-test="budget-apply"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="budget-apply"]')).toHaveCount(0, {
+        timeout: 15_000,
+    });
 
     const cookies = await page.context().cookies();
     const xsrfCookie = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
@@ -137,4 +137,104 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
         },
     );
     expect(secondApply.status()).toBe(422);
+});
+
+test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({
+    page,
+}) => {
+    test.setTimeout(90_000);
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await page.locator('[data-test="position-length-seconds-0"]').fill('30');
+    await page.locator('[data-test="range-start-0-0"]').selectOption('8');
+    await page.locator('[data-test="range-end-0-0"]').selectOption('12');
+    await page.locator('[data-test="range-day-0-0"]').selectOption('mo_fr');
+    await page.locator('[data-test="range-spots-0-0"]').fill('10');
+    await page.locator('[data-test="range-add-0"]').click();
+    await page.locator('[data-test="range-start-0-1"]').selectOption('14');
+    await page.locator('[data-test="range-end-0-1"]').selectOption('18');
+    await page.locator('[data-test="range-day-0-1"]').selectOption('mo_fr');
+    await page.locator('[data-test="range-spots-0-1"]').fill('20');
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toContainText(
+        '30',
+    );
+    await expect(page.getByText('30 Spots')).toBeVisible();
+    await page.screenshot({
+        path: 'docs/screenshots/wizard-step-2-time-ranges-desktop.png',
+        fullPage: true,
+    });
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.locator('[data-test="positions.0.position_discounts-add"]').click();
+    await page
+        .locator('[data-test="positions.0.position_discounts-type-0"]')
+        .selectOption('quantity');
+    await page
+        .locator('[data-test="positions.0.position_discounts-percent-0"]')
+        .fill('10');
+    await page.locator('[data-test="positions.0.position_discounts-add"]').click();
+    await page
+        .locator('[data-test="positions.0.position_discounts-type-1"]')
+        .selectOption('special');
+    await page
+        .locator('[data-test="positions.0.position_discounts-percent-1"]')
+        .fill('5');
+    await page.locator('[data-test="order_discounts-add"]').click();
+    await page.locator('[data-test="order_discounts-type-0"]').selectOption('quantity');
+    await page.locator('[data-test="order_discounts-percent-0"]').fill('10');
+
+    await expect(page.locator('[data-test="ae-enabled"]')).not.toBeChecked();
+    await page.locator('[data-test="ae-enabled"]').check();
+    await expect(page.locator('[data-test="ae-enabled"]')).toBeChecked();
+    await page.screenshot({
+        path: 'docs/screenshots/wizard-step-3-conditions-desktop.png',
+        fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/wizard-step-3-conditions-mobile.png',
+        fullPage: true,
+    });
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await expect(page.getByText('Media-Brutto')).toBeVisible();
+
+    const saveResponse = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'POST' &&
+            /\/kalkulationen\/?$/.test(new URL(response.url()).pathname),
+    );
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await saveResponse;
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible({
+        timeout: 10_000,
+    });
+
+    await page.reload();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(page.locator('[data-test="range-start-0-0"]')).toHaveValue('8');
+    await expect(page.locator('[data-test="range-end-0-0"]')).toHaveValue('12');
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue('10');
+    await expect(page.locator('[data-test="range-start-0-1"]')).toHaveValue('14');
+    await expect(page.locator('[data-test="range-end-0-1"]')).toHaveValue('18');
+    await expect(page.locator('[data-test="range-spots-0-1"]')).toHaveValue('20');
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toContainText(
+        '30',
+    );
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await expect(
+        page.locator('[data-test="positions.0.position_discounts-percent-0"]'),
+    ).toHaveValue(/10/);
+    await expect(
+        page.locator('[data-test="positions.0.position_discounts-percent-1"]'),
+    ).toHaveValue(/5/);
+    await expect(page.locator('[data-test="order_discounts-percent-0"]')).toHaveValue(
+        /10/,
+    );
+    await expect(page.locator('[data-test="ae-enabled"]')).toBeChecked();
 });

@@ -1,7 +1,22 @@
 import { money } from '@/components/form-field';
 import { LogoSlot } from '@/components/logo-slot';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import { cn } from '@/lib/utils';
+
+type SummaryRange = {
+    start_hour: number;
+    end_hour_exclusive: number;
+    day_group?: string;
+    spot_count: number;
+    range_gross?: string | null;
+};
+
+type SummaryDiscount = {
+    label?: string;
+    percent?: string;
+    amount?: string;
+};
 
 type SummaryPosition = {
     inventory_name?: string;
@@ -10,6 +25,8 @@ type SummaryPosition = {
     length_seconds?: number;
     media_gross?: string;
     nn_invest?: string;
+    time_ranges?: SummaryRange[];
+    position_discounts?: SummaryDiscount[];
 };
 
 type SummaryTotals = {
@@ -21,6 +38,7 @@ type SummaryTotals = {
     target_budget_nn?: string | null;
     budget_delta?: string | null;
     requires_special_approval?: boolean;
+    order_discounts?: SummaryDiscount[];
     positions?: SummaryPosition[];
 };
 
@@ -75,37 +93,100 @@ export function CalculationSummaryPanel({
                                 );
                                 const total =
                                     totals?.positions?.[index] ?? null;
+                                const ranges = total?.time_ranges ?? [];
+                                const discounts =
+                                    total?.position_discounts ?? [];
 
                                 return (
                                     <li
                                         key={`${position.inventory_id}-${index}`}
-                                        className="border-border/60 bg-muted/15 flex items-start gap-3 rounded-lg border p-3"
+                                        className="border-border/60 bg-muted/15 rounded-lg border p-3"
                                     >
-                                        <LogoSlot
-                                            name={inventory?.name ?? 'Sender'}
-                                            logoPath={inventory?.logo_path}
-                                            className="size-8 shrink-0"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">
-                                                {inventory?.name ?? 'Sender'}
-                                            </p>
-                                            {position.total_spot_count > 0 ? (
-                                                <p className="text-muted-foreground text-xs">
-                                                    {position.total_spot_count}{' '}
-                                                    Spots ·{' '}
-                                                    {position.length_seconds}s
+                                        <div className="flex items-start gap-3">
+                                            <LogoSlot
+                                                name={
+                                                    inventory?.name ?? 'Sender'
+                                                }
+                                                logoPath={inventory?.logo_path}
+                                                className="size-8 shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium">
+                                                    {inventory?.name ??
+                                                        'Sender'}
                                                 </p>
-                                            ) : (
-                                                <p className="text-muted-foreground text-xs">
-                                                    Noch keine Menge
-                                                </p>
-                                            )}
+                                                {position.total_spot_count >
+                                                0 ? (
+                                                    <p className="text-muted-foreground text-xs">
+                                                        {
+                                                            position.total_spot_count
+                                                        }{' '}
+                                                        Spots ·{' '}
+                                                        {
+                                                            position.length_seconds
+                                                        }
+                                                        s
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-muted-foreground text-xs">
+                                                        Noch keine Menge
+                                                    </p>
+                                                )}
+                                            </div>
+                                            {total?.nn_invest ? (
+                                                <span className="shrink-0 text-sm font-medium tabular-nums">
+                                                    {money(total.nn_invest)}
+                                                </span>
+                                            ) : null}
                                         </div>
-                                        {total?.nn_invest ? (
-                                            <span className="shrink-0 text-sm font-medium tabular-nums">
-                                                {money(total.nn_invest)}
-                                            </span>
+                                        {ranges.length > 0 ? (
+                                            <details className="mt-2">
+                                                <summary className="text-muted-foreground cursor-pointer text-xs">
+                                                    Zeiträume
+                                                </summary>
+                                                <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
+                                                    {ranges.map((range) => (
+                                                        <li
+                                                            key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}-${range.spot_count}`}
+                                                        >
+                                                            {formatHour(
+                                                                range.start_hour,
+                                                            )}
+                                                            –
+                                                            {formatInclusiveEnd(
+                                                                range.end_hour_exclusive,
+                                                            )}{' '}
+                                                            · {range.spot_count}{' '}
+                                                            Spots
+                                                            {range.range_gross
+                                                                ? ` · ${money(range.range_gross)}`
+                                                                : ''}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </details>
+                                        ) : null}
+                                        {discounts.length > 0 ? (
+                                            <ul className="text-muted-foreground mt-1 space-y-0.5 text-xs">
+                                                {discounts.map(
+                                                    (
+                                                        discount,
+                                                        discountIndex,
+                                                    ) => (
+                                                        <li
+                                                            key={`${discount.label}-${discountIndex}`}
+                                                        >
+                                                            {discount.label}
+                                                            {discount.percent
+                                                                ? ` ${discount.percent} %`
+                                                                : ''}
+                                                            {discount.amount
+                                                                ? ` · ${money(discount.amount)}`
+                                                                : ''}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
                                         ) : null}
                                     </li>
                                 );
@@ -130,12 +211,24 @@ export function CalculationSummaryPanel({
                                 value={money(totals.media_gross)}
                             />
                             <SummaryRow
-                                label="Positionsrabatt"
+                                label="Rabatte Werbeelemente"
                                 value={money(totals.position_discount_total)}
                                 muted
                             />
+                            {totals.order_discounts?.map((discount, index) => (
+                                <SummaryRow
+                                    key={`order-discount-${index}`}
+                                    label={
+                                        discount.label
+                                            ? `Auftrag: ${discount.label}`
+                                            : 'Rabatt Auftrag'
+                                    }
+                                    value={money(discount.amount ?? '0')}
+                                    muted
+                                />
+                            ))}
                             <SummaryRow
-                                label="Auftragsrabatt"
+                                label="Rabatte Auftrag"
                                 value={money(totals.order_discount_total)}
                                 muted
                             />

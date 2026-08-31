@@ -3,11 +3,27 @@ import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import {
+    DiscountListEditor,
+    payloadDiscounts,
+    type DiscountDraft,
+    type DiscountTypeOption,
+} from '@/components/discount-list-editor';
+import {
     FormField,
     formSelectClass,
     formTextareaClass,
     money,
 } from '@/components/form-field';
+import { PriceTimeRanges } from '@/components/price-time-ranges';
+import {
+    emptyTimeRange,
+    formatHour,
+    formatInclusiveEnd,
+    payloadTimeRanges,
+    totalSpotCount,
+    type DayGroupOption,
+    type TimeRangeDraft,
+} from '@/lib/pricing-time';
 import {
     EmptyState,
     ErrorState,
@@ -50,9 +66,12 @@ type PositionDraft = {
     spot_method: string;
     length_seconds: number;
     total_spot_count: number;
+    needs_spot_redistribution?: boolean;
     position_discount_percent: string;
     ae_percent: string;
     plan_rows: PlanRow[];
+    time_ranges: TimeRangeDraft[];
+    position_discounts: DiscountDraft[];
 };
 
 type Catalog = {
@@ -93,11 +112,36 @@ type Totals = {
     target_budget_nn: string | null;
     budget_delta: string | null;
     requires_special_approval: boolean;
+    after_position_discount_total?: string;
+    after_order_discount_total?: string;
+    ae_eligible_base?: string;
+    ae_enabled?: boolean;
+    order_discounts?: Array<{
+        label: string;
+        percent: string;
+        amount: string;
+        remaining: string;
+    }>;
     positions: {
         media_gross: string;
         nn_invest: string;
         spot_count: number;
         average_second_price?: string | null;
+        after_position_discount?: string;
+        time_ranges?: Array<{
+            start_hour: number;
+            end_hour_exclusive: number;
+            day_group: string;
+            spot_count: number;
+            average_second_price: string;
+            range_gross: string;
+        }>;
+        position_discounts?: Array<{
+            label: string;
+            percent: string;
+            amount: string;
+            remaining: string;
+        }>;
     }[];
 };
 
@@ -125,6 +169,12 @@ type SavedSummary = {
     nn_invest: string;
     target_budget_nn: string | null;
     requires_special_approval: boolean;
+    ae_enabled?: boolean;
+    order_discounts?: Array<{
+        type: string;
+        custom_label: string | null;
+        percent: string;
+    }>;
     positions: {
         inventory_name: string;
         spot_method: string;
@@ -136,6 +186,19 @@ type SavedSummary = {
         position_discount_percent: string;
         ae_percent: string;
         plan_rows: PlanRow[];
+        time_ranges?: Array<{
+            start_hour: number;
+            end_hour_exclusive: number;
+            day_group: string;
+            spot_count: number;
+            average_second_price?: string | null;
+            range_gross?: string | null;
+        }>;
+        position_discounts?: Array<{
+            type: string;
+            custom_label: string | null;
+            percent: string;
+        }>;
     }[];
 };
 
@@ -149,8 +212,14 @@ type SavedCalculation = {
     product_title: string | null;
     briefing: string | null;
     order_discount_percent: string;
+    ae_enabled?: boolean;
     target_budget_nn: string | null;
     budget_strategy: string | null;
+    order_discounts?: Array<{
+        type: string;
+        custom_label: string | null;
+        percent: string;
+    }>;
     positions: {
         id: number;
         client_key: string | null;
@@ -159,9 +228,21 @@ type SavedCalculation = {
         spot_method: string;
         length_seconds: number;
         total_spot_count: number;
+        needs_spot_redistribution?: boolean;
         position_discount_percent: string;
         ae_percent: string;
         plan_rows: PlanRow[];
+        time_ranges?: Array<{
+            start_hour: number;
+            end_hour_exclusive: number;
+            day_group: string;
+            spot_count: number;
+        }>;
+        position_discounts?: Array<{
+            type: string;
+            custom_label: string | null;
+            percent: string;
+        }>;
     }[];
 };
 
@@ -171,14 +252,6 @@ const STEPS = [
     'Konditionen',
     'Zusammenfassung',
 ] as const;
-
-const DAY_GROUPS = [
-    { value: 'mo_fr', label: 'Mo–Fr' },
-    { value: 'sa', label: 'Sa' },
-    { value: 'so', label: 'So' },
-    { value: 'mo_sa', label: 'Mo–Sa' },
-    { value: 'mo_so', label: 'Mo–So' },
-];
 
 function newClientKey(): string {
     return crypto.randomUUID();
@@ -218,8 +291,10 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                     medium.default_length_seconds,
                 total_spot_count: 0,
                 position_discount_percent: '0',
-                ae_percent: medium.is_ae_eligible ? '15' : '0',
-                plan_rows: [{ hour: 8, day_group: 'mo_fr' }],
+                ae_percent: '0',
+                plan_rows: [],
+                time_ranges: [emptyTimeRange()],
+                position_discounts: [],
             };
         }
     }
@@ -233,13 +308,84 @@ function positionKey(position: PositionDraft, index: number): string {
         : position.client_key || `new:${index}`;
 }
 
+function draftDiscounts(
+    discounts?: Array<{
+        type: string;
+        custom_label: string | null;
+        percent: string;
+    }>,
+    fallbackPercent?: string,
+): DiscountDraft[] {
+    if (discounts?.length) {
+        return discounts.map((discount) => ({
+            type: discount.type,
+            custom_label: discount.custom_label ?? '',
+            percent: discount.percent,
+        }));
+    }
+
+    if (fallbackPercent && Number(fallbackPercent) > 0) {
+        return [
+            {
+                type: 'other',
+                custom_label: 'Positionsrabatt',
+                percent: fallbackPercent,
+            },
+        ];
+    }
+
+    return [];
+}
+
+function draftTimeRanges(
+    position: SavedCalculation['positions'][number],
+): TimeRangeDraft[] {
+    if (position.time_ranges?.length) {
+        return position.time_ranges.map((range) => ({
+            start_hour: range.start_hour,
+            end_hour_exclusive: range.end_hour_exclusive,
+            day_group: range.day_group,
+            spot_count: range.spot_count,
+        }));
+    }
+
+    if (
+        position.plan_rows.length === 1 &&
+        !position.needs_spot_redistribution
+    ) {
+        return [
+            {
+                start_hour: position.plan_rows[0].hour,
+                end_hour_exclusive: position.plan_rows[0].hour + 1,
+                day_group: position.plan_rows[0].day_group,
+                spot_count: position.total_spot_count,
+            },
+        ];
+    }
+
+    if (position.plan_rows.length > 0) {
+        return position.plan_rows.map((row) => ({
+            start_hour: row.hour,
+            end_hour_exclusive: row.hour + 1,
+            day_group: row.day_group,
+            spot_count: '' as const,
+        }));
+    }
+
+    return [emptyTimeRange()];
+}
+
 export default function CalculationWizard({
     catalog,
+    dayGroups,
+    discountTypes,
     calculation,
     savedSummary,
     canEdit,
 }: {
     catalog: Catalog;
+    dayGroups: DayGroupOption[];
+    discountTypes: DiscountTypeOption[];
     calculation: SavedCalculation | null;
     savedSummary: SavedSummary | null;
     canEdit: boolean;
@@ -260,8 +406,14 @@ export default function CalculationWizard({
         calculation?.product_title ?? '',
     );
     const [briefing, setBriefing] = useState(calculation?.briefing ?? '');
-    const [orderDiscount, setOrderDiscount] = useState(
-        calculation?.order_discount_percent ?? '0',
+    const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
+        draftDiscounts(
+            calculation?.order_discounts,
+            calculation?.order_discount_percent,
+        ),
+    );
+    const [aeEnabled, setAeEnabled] = useState(
+        calculation?.ae_enabled ?? false,
     );
     const [targetBudget, setTargetBudget] = useState(
         calculation?.target_budget_nn ?? '',
@@ -279,6 +431,7 @@ export default function CalculationWizard({
                 spot_method: position.spot_method ?? 'average',
                 length_seconds: position.length_seconds,
                 total_spot_count: position.total_spot_count,
+                needs_spot_redistribution: position.needs_spot_redistribution,
                 position_discount_percent: String(
                     position.position_discount_percent,
                 ),
@@ -288,6 +441,11 @@ export default function CalculationWizard({
                     day_group: row.day_group,
                     second_price: row.second_price,
                 })),
+                time_ranges: draftTimeRanges(position),
+                position_discounts: draftDiscounts(
+                    position.position_discounts,
+                    position.position_discount_percent,
+                ),
             }));
         }
 
@@ -311,12 +469,46 @@ export default function CalculationWizard({
             campaign: campaign || null,
             product_title: productTitle || null,
             briefing: briefing || null,
-            order_discount_percent: orderDiscount,
+            order_discount_percent: '0',
+            order_discounts: payloadDiscounts(orderDiscounts),
+            ae_enabled: aeEnabled,
             target_budget_nn: targetBudget === '' ? null : targetBudget,
             budget_strategy: planningMode === 'budget' ? budgetStrategy : null,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            positions,
+            positions: positions.map((position) => {
+                const ranges = payloadTimeRanges(position.time_ranges);
+
+                return {
+                    id: position.id,
+                    client_key: position.client_key,
+                    inventory_id: position.inventory_id,
+                    advertising_medium_id: position.advertising_medium_id,
+                    spot_method: position.spot_method,
+                    length_seconds: position.length_seconds,
+                    total_spot_count: totalSpotCount(position.time_ranges),
+                    needs_spot_redistribution:
+                        position.needs_spot_redistribution ?? false,
+                    position_discount_percent: '0',
+                    ae_percent: '0',
+                    time_ranges: ranges,
+                    position_discounts: payloadDiscounts(
+                        position.position_discounts,
+                    ),
+                    plan_rows: ranges.flatMap((range) =>
+                        Array.from(
+                            {
+                                length:
+                                    range.end_hour_exclusive - range.start_hour,
+                            },
+                            (_, offset) => ({
+                                hour: range.start_hour + offset,
+                                day_group: range.day_group,
+                            }),
+                        ),
+                    ),
+                };
+            }),
         }),
         [
             planningMode,
@@ -325,7 +517,8 @@ export default function CalculationWizard({
             campaign,
             productTitle,
             briefing,
-            orderDiscount,
+            orderDiscounts,
+            aeEnabled,
             targetBudget,
             budgetStrategy,
             calculation,
@@ -334,7 +527,7 @@ export default function CalculationWizard({
     );
 
     useEffect(() => {
-        if (!canEdit) {
+        if (!canEdit || busy) {
             return;
         }
 
@@ -386,7 +579,7 @@ export default function CalculationWizard({
             window.clearTimeout(handle);
             controller.abort();
         };
-    }, [payload, canEdit]);
+    }, [payload, canEdit, busy]);
 
     function allowedMediaFor(inventoryId: number) {
         const mediumIds = new Set(
@@ -441,8 +634,10 @@ export default function CalculationWizard({
                             rule?.default_length_seconds ??
                             medium.default_length_seconds,
                         position_discount_percent: '0',
-                        ae_percent: medium.is_ae_eligible ? '15' : '0',
-                        plan_rows: [{ hour: 8, day_group: 'mo_fr' }],
+                        ae_percent: '0',
+                        plan_rows: [],
+                        time_ranges: [emptyTimeRange()],
+                        position_discounts: [],
                         total_spot_count: 0,
                     };
                 }
@@ -458,36 +653,17 @@ export default function CalculationWizard({
         );
     }
 
-    function removePlanRow(positionIndex: number, rowIndex: number) {
-        setPositions((current) =>
-            current.map((position, itemIndex) => {
-                if (itemIndex !== positionIndex) {
-                    return position;
-                }
-
-                const rows = position.plan_rows.filter(
-                    (_, index) => index !== rowIndex,
-                );
-
-                return {
-                    ...position,
-                    plan_rows: rows.length ? rows : position.plan_rows,
-                };
-            }),
-        );
-    }
-
     function save() {
         setBusy(true);
         const url = calculation
             ? `/kalkulationen/${calculation.id}`
             : '/kalkulationen';
 
-        router.visit(url, {
-            method: calculation ? 'put' : 'post',
-            data: payload,
+        const options = {
+            preserveState: false,
+            preserveScroll: true,
             onFinish: () => setBusy(false),
-            onError: (errors) => {
+            onError: (errors: Record<string, string | string[]>) => {
                 const mapped: Record<string, string[]> = {};
                 for (const [key, value] of Object.entries(errors)) {
                     mapped[key] = Array.isArray(value)
@@ -498,7 +674,13 @@ export default function CalculationWizard({
                 setError('Speichern nicht möglich. Angaben prüfen.');
                 setBusy(false);
             },
-        });
+        };
+
+        if (calculation) {
+            router.put(url, payload, options);
+        } else {
+            router.post(url, payload, options);
+        }
     }
 
     async function createProposal() {
@@ -538,6 +720,7 @@ export default function CalculationWizard({
                 `/kalkulationen/${calculation.id}/budget-vorschlaege/${proposal.id}/uebernehmen`,
                 {},
                 {
+                    preserveState: false,
                     onSuccess: () => setProposal(null),
                     onFinish: () => setBusy(false),
                     onError: () => {
@@ -561,13 +744,46 @@ export default function CalculationWizard({
                     );
 
                 if (!match) {
-                    return { ...position, total_spot_count: 0 };
+                    return {
+                        ...position,
+                        total_spot_count: 0,
+                        time_ranges: position.time_ranges.map(
+                            (range, index) => ({
+                                ...range,
+                                spot_count: index === 0 ? '' : range.spot_count,
+                            }),
+                        ),
+                    };
                 }
+
+                const current = totalSpotCount(position.time_ranges);
+                const target = match.total_spot_count;
+                let assigned = 0;
 
                 return {
                     ...position,
                     length_seconds: match.length_seconds,
-                    total_spot_count: match.total_spot_count,
+                    total_spot_count: target,
+                    time_ranges: position.time_ranges.map(
+                        (range, index, all) => {
+                            const last = index === all.length - 1;
+                            const source =
+                                typeof range.spot_count === 'number'
+                                    ? range.spot_count
+                                    : 0;
+                            const share =
+                                current < 1
+                                    ? index === 0
+                                        ? target
+                                        : 0
+                                    : last
+                                      ? Math.max(0, target - assigned)
+                                      : Math.floor((source / current) * target);
+                            assigned += last ? 0 : share;
+
+                            return { ...range, spot_count: share };
+                        },
+                    ),
                 };
             }),
         );
@@ -590,6 +806,14 @@ export default function CalculationWizard({
                   positions: summary.positions.map((position) => ({
                       nn_invest: position.nn_invest,
                       media_gross: position.media_gross,
+                      spot_count: position.total_spot_count,
+                      time_ranges: position.time_ranges,
+                      position_discounts: position.position_discounts?.map(
+                          (discount) => ({
+                              label: discount.custom_label ?? discount.type,
+                              percent: discount.percent,
+                          }),
+                      ),
                   })),
               }
             : null);
@@ -986,51 +1210,13 @@ export default function CalculationWizard({
                                                             </select>
                                                         </div>
 
-                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                             <FormField label="Kalkulationsart">
                                                                 <Input
                                                                     readOnly
                                                                     value="Durchschnitt"
                                                                     disabled
                                                                     className="bg-muted/50 text-muted-foreground"
-                                                                />
-                                                            </FormField>
-                                                            <FormField
-                                                                label="Spotanzahl gesamt"
-                                                                htmlFor={`spots-${index}`}
-                                                                error={
-                                                                    fieldErrors[
-                                                                        `positions.${index}.total_spot_count`
-                                                                    ]?.[0]
-                                                                }
-                                                            >
-                                                                <Input
-                                                                    id={`spots-${index}`}
-                                                                    data-test={`position-total-spots-${index}`}
-                                                                    type="number"
-                                                                    min={0}
-                                                                    step={1}
-                                                                    value={
-                                                                        position.total_spot_count
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                total_spot_count:
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    ),
-                                                                            },
-                                                                        )
-                                                                    }
                                                                 />
                                                             </FormField>
                                                             <FormField
@@ -1093,182 +1279,49 @@ export default function CalculationWizard({
                                                             readOnly
                                                         />
 
-                                                        <div className="space-y-3">
-                                                            <p className="text-sm font-medium">
-                                                                Preisstunden
-                                                                (Durchschnitt)
-                                                            </p>
-                                                            <div className="space-y-2">
-                                                                {position.plan_rows.map(
-                                                                    (
-                                                                        row,
-                                                                        rowIndex,
-                                                                    ) => (
-                                                                        <div
-                                                                            key={`${row.hour}-${row.day_group}-${rowIndex}`}
-                                                                            className="border-border/60 bg-muted/15 grid gap-3 rounded-lg border p-3 sm:grid-cols-[minmax(0,6rem)_minmax(0,1fr)_auto]"
-                                                                        >
-                                                                            <FormField
-                                                                                label="Stunde"
-                                                                                htmlFor={`hour-${index}-${rowIndex}`}
-                                                                            >
-                                                                                <Input
-                                                                                    id={`hour-${index}-${rowIndex}`}
-                                                                                    type="number"
-                                                                                    min={
-                                                                                        0
-                                                                                    }
-                                                                                    max={
-                                                                                        23
-                                                                                    }
-                                                                                    value={
-                                                                                        row.hour
-                                                                                    }
-                                                                                    disabled={
-                                                                                        !canEdit
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) => {
-                                                                                        const next =
-                                                                                            [
-                                                                                                ...position.plan_rows,
-                                                                                            ];
-                                                                                        next[
-                                                                                            rowIndex
-                                                                                        ] =
-                                                                                            {
-                                                                                                ...row,
-                                                                                                hour: Number(
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                                ),
-                                                                                            };
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                plan_rows:
-                                                                                                    next,
-                                                                                            },
-                                                                                        );
-                                                                                    }}
-                                                                                />
-                                                                            </FormField>
-                                                                            <FormField
-                                                                                label="Tagesgruppe"
-                                                                                htmlFor={`day-group-${index}-${rowIndex}`}
-                                                                            >
-                                                                                <select
-                                                                                    id={`day-group-${index}-${rowIndex}`}
-                                                                                    className={
-                                                                                        formSelectClass
-                                                                                    }
-                                                                                    value={
-                                                                                        row.day_group
-                                                                                    }
-                                                                                    disabled={
-                                                                                        !canEdit
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        event,
-                                                                                    ) => {
-                                                                                        const next =
-                                                                                            [
-                                                                                                ...position.plan_rows,
-                                                                                            ];
-                                                                                        next[
-                                                                                            rowIndex
-                                                                                        ] =
-                                                                                            {
-                                                                                                ...row,
-                                                                                                day_group:
-                                                                                                    event
-                                                                                                        .target
-                                                                                                        .value,
-                                                                                            };
-                                                                                        updatePosition(
-                                                                                            index,
-                                                                                            {
-                                                                                                plan_rows:
-                                                                                                    next,
-                                                                                            },
-                                                                                        );
-                                                                                    }}
-                                                                                >
-                                                                                    {DAY_GROUPS.map(
-                                                                                        (
-                                                                                            group,
-                                                                                        ) => (
-                                                                                            <option
-                                                                                                key={
-                                                                                                    group.value
-                                                                                                }
-                                                                                                value={
-                                                                                                    group.value
-                                                                                                }
-                                                                                            >
-                                                                                                {
-                                                                                                    group.label
-                                                                                                }
-                                                                                            </option>
-                                                                                        ),
-                                                                                    )}
-                                                                                </select>
-                                                                            </FormField>
-                                                                            {canEdit &&
-                                                                            position
-                                                                                .plan_rows
-                                                                                .length >
-                                                                                1 ? (
-                                                                                <div className="flex items-end sm:justify-end">
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="outline"
-                                                                                        size="sm"
-                                                                                        onClick={() =>
-                                                                                            removePlanRow(
-                                                                                                index,
-                                                                                                rowIndex,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Stunde
-                                                                                        entfernen
-                                                                                    </Button>
-                                                                                </div>
-                                                                            ) : null}
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                                {canEdit ? (
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    plan_rows:
-                                                                                        [
-                                                                                            ...position.plan_rows,
-                                                                                            {
-                                                                                                hour: 9,
-                                                                                                day_group:
-                                                                                                    'mo_fr',
-                                                                                            },
-                                                                                        ],
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Preisstunde
-                                                                        hinzufügen
-                                                                    </Button>
-                                                                ) : null}
-                                                            </div>
-                                                        </div>
+                                                        <PriceTimeRanges
+                                                            positionIndex={
+                                                                index
+                                                            }
+                                                            ranges={
+                                                                position.time_ranges
+                                                            }
+                                                            dayGroups={
+                                                                dayGroups
+                                                            }
+                                                            canEdit={canEdit}
+                                                            fieldErrors={
+                                                                fieldErrors
+                                                            }
+                                                            rangeTotals={
+                                                                displayTotals
+                                                                    ?.positions[
+                                                                    index
+                                                                ]?.time_ranges
+                                                            }
+                                                            legacyTotalSpotCount={
+                                                                position.needs_spot_redistribution
+                                                                    ? position.total_spot_count
+                                                                    : null
+                                                            }
+                                                            needsRedistribution={
+                                                                position.needs_spot_redistribution
+                                                            }
+                                                            onChange={(
+                                                                time_ranges,
+                                                            ) =>
+                                                                updatePosition(
+                                                                    index,
+                                                                    {
+                                                                        time_ranges,
+                                                                        total_spot_count:
+                                                                            totalSpotCount(
+                                                                                time_ranges,
+                                                                            ),
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
 
                                                         {displayTotals
                                                             ?.positions[
@@ -1362,83 +1415,72 @@ export default function CalculationWizard({
                                                             inventory?.logo_path
                                                         }
                                                     />
-                                                    {inventory?.name}
+                                                    Rabatte für{' '}
+                                                    {inventory?.name ??
+                                                        'dieses Werbeelement'}
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent
-                                                className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
+                                                className={`${wizardCardContentClass} space-y-4`}
                                             >
-                                                <FormField
-                                                    label="Positionsrabatt %"
-                                                    error={
-                                                        fieldErrors[
-                                                            `positions.${index}.position_discount_percent`
-                                                        ]?.[0]
+                                                <p className="text-muted-foreground text-sm">
+                                                    Bruttoausgangswert{' '}
+                                                    <span className="text-foreground font-medium">
+                                                        {displayTotals
+                                                            ?.positions[index]
+                                                            ?.media_gross
+                                                            ? money(
+                                                                  displayTotals
+                                                                      .positions[
+                                                                      index
+                                                                  ].media_gross,
+                                                              )
+                                                            : '–'}
+                                                    </span>
+                                                </p>
+                                                <DiscountListEditor
+                                                    title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
+                                                    description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
+                                                    discounts={
+                                                        position.position_discounts
                                                     }
-                                                >
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        max={100}
-                                                        value={
-                                                            position.position_discount_percent
-                                                        }
-                                                        disabled={
-                                                            !canEdit ||
-                                                            rule?.is_discountable ===
-                                                                false
-                                                        }
-                                                        className={
-                                                            rule?.is_discountable ===
-                                                            false
-                                                                ? 'bg-muted/50 text-muted-foreground'
-                                                                : undefined
-                                                        }
-                                                        onChange={(event) =>
-                                                            updatePosition(
-                                                                index,
-                                                                {
-                                                                    position_discount_percent:
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                </FormField>
-                                                <FormField label="AE %">
-                                                    <Input
-                                                        type="number"
-                                                        min={0}
-                                                        max={100}
-                                                        value={
-                                                            position.ae_percent
-                                                        }
-                                                        disabled={
-                                                            !canEdit ||
-                                                            rule?.is_ae_eligible ===
-                                                                false
-                                                        }
-                                                        className={
-                                                            rule?.is_ae_eligible ===
-                                                            false
-                                                                ? 'bg-muted/50 text-muted-foreground'
-                                                                : undefined
-                                                        }
-                                                        onChange={(event) =>
-                                                            updatePosition(
-                                                                index,
-                                                                {
-                                                                    ae_percent:
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                },
-                                                            )
-                                                        }
-                                                    />
-                                                </FormField>
+                                                    types={discountTypes}
+                                                    canEdit={canEdit}
+                                                    disabled={
+                                                        rule?.is_discountable ===
+                                                        false
+                                                    }
+                                                    fieldPrefix={`positions.${index}.position_discounts`}
+                                                    fieldErrors={fieldErrors}
+                                                    breakdown={
+                                                        displayTotals
+                                                            ?.positions[index]
+                                                            ?.position_discounts
+                                                    }
+                                                    onChange={(
+                                                        position_discounts,
+                                                    ) =>
+                                                        updatePosition(index, {
+                                                            position_discounts,
+                                                        })
+                                                    }
+                                                />
+                                                {displayTotals?.positions[index]
+                                                    ?.after_position_discount ? (
+                                                    <p className="text-sm">
+                                                        Verbleibende
+                                                        Positionssumme{' '}
+                                                        <span className="font-medium">
+                                                            {money(
+                                                                displayTotals
+                                                                    .positions[
+                                                                    index
+                                                                ]
+                                                                    .after_position_discount,
+                                                            )}
+                                                        </span>
+                                                    </p>
+                                                ) : null}
                                             </CardContent>
                                         </Card>
                                     );
@@ -1456,24 +1498,52 @@ export default function CalculationWizard({
                                     <CardContent
                                         className={wizardCardContentClass}
                                     >
-                                        <FormField
-                                            label="Zusätzlicher Auftragsrabatt %"
-                                            htmlFor="order-discount"
-                                        >
-                                            <Input
-                                                id="order-discount"
-                                                type="number"
-                                                min={0}
-                                                max={100}
-                                                value={orderDiscount}
-                                                disabled={!canEdit}
-                                                onChange={(event) =>
-                                                    setOrderDiscount(
-                                                        event.target.value,
-                                                    )
+                                        <div className="space-y-4">
+                                            <DiscountListEditor
+                                                title="Rabatte auf den Gesamtauftrag"
+                                                description="Diese Rabatte werden nach den Rabatten der einzelnen Werbeelemente auf die verbleibende Auftragssumme angewendet."
+                                                discounts={orderDiscounts}
+                                                types={discountTypes}
+                                                canEdit={canEdit}
+                                                fieldPrefix="order_discounts"
+                                                fieldErrors={fieldErrors}
+                                                breakdown={
+                                                    displayTotals?.order_discounts
                                                 }
+                                                onChange={setOrderDiscounts}
                                             />
-                                        </FormField>
+                                            <label className="flex items-start gap-3 text-sm">
+                                                <input
+                                                    id="ae-enabled"
+                                                    data-test="ae-enabled"
+                                                    type="checkbox"
+                                                    className="mt-1 size-4"
+                                                    checked={aeEnabled}
+                                                    disabled={!canEdit}
+                                                    onChange={(event) =>
+                                                        setAeEnabled(
+                                                            event.target
+                                                                .checked,
+                                                        )
+                                                    }
+                                                />
+                                                <span>
+                                                    <span className="font-medium">
+                                                        15 % AE berücksichtigen
+                                                    </span>
+                                                    <span className="text-muted-foreground mt-1 block text-xs">
+                                                        AE wird nach allen
+                                                        Positions- und
+                                                        Auftragsrabatten nur auf
+                                                        den AE-fähigen Anteil
+                                                        angewendet.
+                                                        {displayTotals?.ae_eligible_base
+                                                            ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
+                                                            : ''}
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        </div>
                                     </CardContent>
                                 </Card>
                                 {planningMode === 'budget' && canEdit ? (
@@ -1571,13 +1641,13 @@ export default function CalculationWizard({
                                                     )}
                                                 />
                                                 <SummaryDetail
-                                                    label="Positionsrabatte"
+                                                    label="Rabatte Werbeelemente"
                                                     value={money(
                                                         summary.position_discount_total,
                                                     )}
                                                 />
                                                 <SummaryDetail
-                                                    label="Auftragsrabatt"
+                                                    label="Rabatte Auftrag"
                                                     value={money(
                                                         summary.order_discount_total,
                                                     )}
@@ -1644,27 +1714,43 @@ export default function CalculationWizard({
                                                             %
                                                         </p>
                                                         <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                            {position.plan_rows.map(
-                                                                (row) => (
-                                                                    <li
-                                                                        key={`${row.hour}-${row.day_group}`}
-                                                                    >
-                                                                        Stunde{' '}
-                                                                        {
-                                                                            row.hour
-                                                                        }
-                                                                        ,{' '}
-                                                                        {
-                                                                            row.day_group
-                                                                        }
-                                                                        ,{' '}
-                                                                        {
-                                                                            row.second_price
-                                                                        }{' '}
-                                                                        €/s
-                                                                    </li>
-                                                                ),
-                                                            )}
+                                                            {(position
+                                                                .time_ranges
+                                                                ?.length
+                                                                ? position.time_ranges
+                                                                : []
+                                                            ).map((range) => (
+                                                                <li
+                                                                    key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                                >
+                                                                    {String(
+                                                                        range.start_hour,
+                                                                    ).padStart(
+                                                                        2,
+                                                                        '0',
+                                                                    )}
+                                                                    :00–
+                                                                    {String(
+                                                                        range.end_hour_exclusive -
+                                                                            1,
+                                                                    ).padStart(
+                                                                        2,
+                                                                        '0',
+                                                                    )}
+                                                                    :59,{' '}
+                                                                    {
+                                                                        range.day_group
+                                                                    }
+                                                                    ,{' '}
+                                                                    {
+                                                                        range.spot_count
+                                                                    }{' '}
+                                                                    Spots
+                                                                    {range.range_gross
+                                                                        ? ` · ${money(range.range_gross)}`
+                                                                        : ''}
+                                                                </li>
+                                                            ))}
                                                         </ul>
                                                         <p className="mt-2">
                                                             {money(
@@ -1690,13 +1776,13 @@ export default function CalculationWizard({
                                                     )}
                                                 />
                                                 <SummaryDetail
-                                                    label="Positionsrabatte"
+                                                    label="Rabatte Werbeelemente"
                                                     value={money(
                                                         displayTotals.position_discount_total,
                                                     )}
                                                 />
                                                 <SummaryDetail
-                                                    label="Auftragsrabatt"
+                                                    label="Rabatte Auftrag"
                                                     value={money(
                                                         displayTotals.order_discount_total,
                                                     )}
@@ -1740,6 +1826,109 @@ export default function CalculationWizard({
                                                     ist überschritten.
                                                 </StatusBanner>
                                             ) : null}
+                                            {positions.map(
+                                                (position, index) => {
+                                                    const result =
+                                                        displayTotals.positions[
+                                                            index
+                                                        ];
+                                                    const inventory =
+                                                        catalog.inventories.find(
+                                                            (item) =>
+                                                                item.id ===
+                                                                position.inventory_id,
+                                                        );
+
+                                                    return (
+                                                        <section
+                                                            key={
+                                                                position.client_key
+                                                            }
+                                                            className="rounded-lg border p-4"
+                                                        >
+                                                            <p className="font-medium">
+                                                                {inventory?.name ??
+                                                                    'Sender'}
+                                                            </p>
+                                                            <p className="text-muted-foreground mt-1">
+                                                                {
+                                                                    position.total_spot_count
+                                                                }{' '}
+                                                                Spots à{' '}
+                                                                {
+                                                                    position.length_seconds
+                                                                }
+                                                                s
+                                                            </p>
+                                                            <ul className="text-muted-foreground mt-2 list-inside list-disc">
+                                                                {(
+                                                                    result?.time_ranges ??
+                                                                    []
+                                                                ).map(
+                                                                    (range) => (
+                                                                        <li
+                                                                            key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                                        >
+                                                                            {formatHour(
+                                                                                range.start_hour,
+                                                                            )}
+                                                                            –
+                                                                            {formatInclusiveEnd(
+                                                                                range.end_hour_exclusive,
+                                                                            )}
+                                                                            ,{' '}
+                                                                            {
+                                                                                range.spot_count
+                                                                            }{' '}
+                                                                            Spots
+                                                                            {range.range_gross
+                                                                                ? ` · ${money(range.range_gross)}`
+                                                                                : ''}
+                                                                        </li>
+                                                                    ),
+                                                                )}
+                                                            </ul>
+                                                            {(
+                                                                result?.position_discounts ??
+                                                                []
+                                                            ).map(
+                                                                (
+                                                                    discount,
+                                                                    discountIndex,
+                                                                ) => (
+                                                                    <p
+                                                                        key={`${discount.label}-${discountIndex}`}
+                                                                        className="text-muted-foreground mt-1"
+                                                                    >
+                                                                        {
+                                                                            discount.label
+                                                                        }{' '}
+                                                                        {
+                                                                            discount.percent
+                                                                        }{' '}
+                                                                        % ·{' '}
+                                                                        {money(
+                                                                            discount.amount,
+                                                                        )}
+                                                                    </p>
+                                                                ),
+                                                            )}
+                                                            {result?.media_gross ? (
+                                                                <p className="mt-2">
+                                                                    {money(
+                                                                        result.media_gross,
+                                                                    )}{' '}
+                                                                    Brutto ·{' '}
+                                                                    {money(
+                                                                        result.nn_invest,
+                                                                    )}{' '}
+                                                                    N/N
+                                                                </p>
+                                                            ) : null}
+                                                        </section>
+                                                    );
+                                                },
+                                            )}
                                         </>
                                     ) : (
                                         <LoadingState />
