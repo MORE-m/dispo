@@ -25,7 +25,8 @@ Keine stillschweigenden ADR-Änderungen.
 | 29.08.2026 | CRM im Slice | Ohne Kundenstammdaten: optionale Freitextfelder Kunde/Agentur; keine erfundenen CRM-Datensätze | Slice-Abgrenzung, CRM in Phase 2 |
 | 29.08.2026 | Rabattgrenze | `null` am Benutzer = keine persönliche Grenze; Überschreitung markiert `requires_special_approval`, Freigabe-UI bleibt UX-GATE-D | COM-002, COM-003 |
 | 29.08.2026 | Live-Summe | Frontend darf Vorschau anzeigen; autoritativ ist `POST` Preview/Save auf dem Server | GEN-001, GEN-002 |
-| 29.08.2026 | Budget Stundenverteilung | Stunden nur Preisbasis; Budgetvorschlag setzt nur `total_spot_count` je Position; BLK-007 aufgelöst | PO 29.08.2026, Review-Nacharbeit v3 |
+| 31.08.2026 | Budget Spotvorschlag | Gleiche Spotanzahl je Wunschsender, gleichmäßige Stundenverteilung, volle N/N-Kette, explizite Übernahme/Neuoptimierung | BUD-* |
+| 29.08.2026 | Budget Stundenverteilung (Legacy) | V1-Durchschnittsvorschlag ohne Stundenverteilung; abgelöst durch `equal_spot_count` | Review-Nacharbeit v3 |
 | 29.08.2026 | Kalkulationsarten | Planungsweg (manual/budget) ≠ Spot-Methode (average/calendar/fixed); Gate B nur Durchschnitt | CAL-002, Review-Nacharbeit |
 | 29.08.2026 | CRM Slice | Freitext Kunde/Agentur temporär; CRM-001 nicht als erledigt markiert | Slice-Abgrenzung |
 | 29.08.2026 | Technische Abnahme UX-GATE-A/B | Erst nach grüner CI auf Nacharbeit-Commit; alte Läufe kein Nachweis | Review-Nacharbeit |

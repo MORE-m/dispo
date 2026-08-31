@@ -519,38 +519,44 @@ export default function CalculationWizard({
                 planningMode === 'budget'
                     ? []
                     : positions.map((position) => {
-                const ranges = payloadTimeRanges(position.time_ranges);
+                          const ranges = payloadTimeRanges(
+                              position.time_ranges,
+                          );
 
-                return {
-                    id: position.id,
-                    client_key: position.client_key,
-                    inventory_id: position.inventory_id,
-                    advertising_medium_id: position.advertising_medium_id,
-                    spot_method: position.spot_method,
-                    length_seconds: position.length_seconds,
-                    total_spot_count: totalSpotCount(position.time_ranges),
-                    needs_spot_redistribution:
-                        position.needs_spot_redistribution ?? false,
-                    position_discount_percent: '0',
-                    ae_percent: '0',
-                    time_ranges: ranges,
-                    position_discounts: payloadDiscounts(
-                        position.position_discounts,
-                    ),
-                    plan_rows: ranges.flatMap((range) =>
-                        Array.from(
-                            {
-                                length:
-                                    range.end_hour_exclusive - range.start_hour,
-                            },
-                            (_, offset) => ({
-                                hour: range.start_hour + offset,
-                                day_group: range.day_group,
-                            }),
-                        ),
-                    ),
-                };
-            }),
+                          return {
+                              id: position.id,
+                              client_key: position.client_key,
+                              inventory_id: position.inventory_id,
+                              advertising_medium_id:
+                                  position.advertising_medium_id,
+                              spot_method: position.spot_method,
+                              length_seconds: position.length_seconds,
+                              total_spot_count: totalSpotCount(
+                                  position.time_ranges,
+                              ),
+                              needs_spot_redistribution:
+                                  position.needs_spot_redistribution ?? false,
+                              position_discount_percent: '0',
+                              ae_percent: '0',
+                              time_ranges: ranges,
+                              position_discounts: payloadDiscounts(
+                                  position.position_discounts,
+                              ),
+                              plan_rows: ranges.flatMap((range) =>
+                                  Array.from(
+                                      {
+                                          length:
+                                              range.end_hour_exclusive -
+                                              range.start_hour,
+                                      },
+                                      (_, offset) => ({
+                                          hour: range.start_hour + offset,
+                                          day_group: range.day_group,
+                                      }),
+                                  ),
+                              ),
+                          };
+                      }),
         }),
         [
             planningMode,
@@ -706,7 +712,9 @@ export default function CalculationWizard({
     const proposalStatus =
         proposal && proposalSnapshot !== proposalInputSnapshot()
             ? 'stale'
-            : (proposal?.status ?? calculation?.budget_proposal_status ?? 'current');
+            : (proposal?.status ??
+              calculation?.budget_proposal_status ??
+              'current');
 
     async function createProposal() {
         setBusy(true);

@@ -279,34 +279,47 @@ Bei Mediabrutto null wird kein künstlicher Wert ausgegeben, sondern
 
 ## Budgetplanung
 
-Der Vorschlag ist nicht autoritativ. Autoritative Speicherung bleibt die
+Der Budgetvorschlag ist **preis- und verteilungsbasiert, nicht reichweitenoptimiert**
+(`BUD-009`). Er ist nicht autoritativ. Autoritative Speicherung bleibt die
 Kalkulation nach expliziter Übernahme (`BUD-008`).
 
-Zwei Planungswege:
+### Planungsweg „Mit Budget planen“
 
-- **Selbst planen:** optionales Zielbudget N/N nur als Vergleich mit dem
-  aktuellen N/N-Invest.
-- **Mit Budget planen:** Zielbudget N/N, Sender/Kombis, Preisstunden, Längen
-  und Konditionen zuerst; danach ein **neuer** Vorschlag. Kein bestehendes
-  Senderverhältnis (`BUD-005`).
+Eingaben:
 
-Eingaben für den Vorschlag:
+- Zielbudget N/N (Pflicht, > 0),
+- Wunschsender (Mehrfachauswahl),
+- Spotlänge,
+- erlaubte Verteilungszeiträume (Beginn, exklusives Ende, Tagesgruppe).
 
-- optionales numerisches Zielbudget N/N in EUR (`BUD-001`, `BUD-002`),
-- ausgewählte Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und
-  Auftragsrabatt (`BUD-003`),
-- Verteilungslogik (`BUD-006`): Budget je Sender gleich verteilen oder
-  Spotanzahl innerhalb der gewählten Preisstunden maximieren.
+Der Vorschlag wird nur nach ausdrücklicher Aktion „Budgetvorschlag berechnen“ erzeugt.
 
-Regeln:
+### Strategie `equal_spot_count`
 
-- Berechnung deterministisch und nachvollziehbar; Ergebnis immer editierbar (`BUD-004`).
-- Spotmengen ganzzahlig; Rest unter Zielbudget oder Überschreitung durch
-  Ganzzahligkeit transparent ausweisen (`BUD-007`).
-- Keine Reichweiten-, Leistungs- oder KI-Optimierung (`BUD-009`).
+- Alle Wunschsender erhalten **dieselbe** Gesamtspotanzahl `S`.
+- Optimierung in vollständigen Spotpaketen: `+1 Spot je Wunschsender`.
+- Binäre Suche auf maximales `S` mit `N/N(S) ≤ Zielbudget`.
+- Keine Bevorzugung günstiger Sender oder Stunden.
 
-Die Positionspreise folgen unverändert der verbindlichen Rechenreihenfolge unten.
-Der Vorschlag ändert nur Mengen nach Übernahme, nicht die Formel selbst.
+### Verteilung `even_distribution` (Algorithmusversion `1.0.0`)
+
+- Buckets: `Sender × Tagesgruppe × einzelne Uhrstunde`.
+- Stabil sortiert nach Tagesgruppe und Uhrstunde.
+- Gleichmäßige Verteilung der Spots je Sender über alle Buckets (Differenz ≤ 1).
+- Weniger Spots als Buckets: zeitliche Streuung über den gesamten Zeitraum.
+
+### Berechnung
+
+Vollständige Serverkette über `CalculationEngine`: Stundenpreise → Spotlänge →
+Zeitraumssummen → Positionsrabatte → Auftragssumme → Auftragsrabatte → AE 15 % → N/N.
+
+### Übernahme
+
+- Einstündige `calculation_position_time_ranges` je belegter Uhrstunde.
+- Keine proportionale Skalierung im Pfad `equal_spot_count`.
+- Status/Fingerprint für Aktualität (`current`, `stale`, `manual`).
+
+Legacy-Strategien `equal_budget` und `maximize_spots` bleiben für Bestandsvorschläge lesbar.
 
 ## Verbindliche Rechenreihenfolge
 

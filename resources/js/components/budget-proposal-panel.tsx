@@ -83,8 +83,14 @@ export function BudgetProposalPanel({
     return (
         <div className="space-y-4" data-test="budget-proposal-result">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <Metric label="Zielbudget N/N" value={money(proposal.target_budget_nn)} />
-                <Metric label="Vorgeschlagener N/N" value={money(proposal.used_nn)} />
+                <Metric
+                    label="Zielbudget N/N"
+                    value={money(proposal.target_budget_nn)}
+                />
+                <Metric
+                    label="Vorgeschlagener N/N"
+                    value={money(proposal.used_nn)}
+                />
                 <Metric label="Restbudget" value={money(proposal.remainder)} />
                 <Metric
                     label="Spots je Sender"
@@ -103,19 +109,27 @@ export function BudgetProposalPanel({
             </div>
 
             {proposal.insufficient_budget ? (
-                <p className="text-destructive text-sm" data-test="budget-insufficient">
+                <p
+                    className="text-destructive text-sm"
+                    data-test="budget-insufficient"
+                >
                     Für mindestens einen Spot auf jedem Wunschsender werden{' '}
                     {money(proposal.minimum_budget_nn ?? '0')} N/N benötigt. Das
-                    Zielbudget liegt{' '}
-                    {money(proposal.budget_shortfall ?? '0')} darunter.
+                    Zielbudget liegt {money(proposal.budget_shortfall ?? '0')}{' '}
+                    darunter.
                 </p>
             ) : null}
 
-            <p className="text-muted-foreground text-sm">{proposal.explanation}</p>
+            <p className="text-muted-foreground text-sm">
+                {proposal.explanation}
+            </p>
 
             <p className="text-sm">
                 Status:{' '}
-                <span className="font-medium" data-test="budget-proposal-status">
+                <span
+                    className="font-medium"
+                    data-test="budget-proposal-status"
+                >
                     {statusLabel}
                 </span>
             </p>
@@ -255,7 +269,9 @@ export function BudgetWishSenders({
                             onClick={() => {
                                 if (selected) {
                                     onChange(
-                                        selectedIds.filter((id) => id !== item.id),
+                                        selectedIds.filter(
+                                            (id) => id !== item.id,
+                                        ),
                                     );
                                 } else {
                                     onChange([...selectedIds, item.id]);
@@ -269,8 +285,14 @@ export function BudgetWishSenders({
                                 disabled && 'cursor-not-allowed opacity-50',
                             )}
                         >
-                            <LogoSlot name={item.name} logoPath={item.logo_path} variant="card" />
-                            <span className="text-sm font-semibold">{item.name}</span>
+                            <LogoSlot
+                                name={item.name}
+                                logoPath={item.logo_path}
+                                variant="card"
+                            />
+                            <span className="text-sm font-semibold">
+                                {item.name}
+                            </span>
                         </button>
                     );
                 })}

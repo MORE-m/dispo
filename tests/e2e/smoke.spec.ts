@@ -109,16 +109,19 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     await page.getByLabel('Zielbudget N/N').fill('500');
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
-    await page.locator('[data-test="range-end-0-0"]').selectOption('9');
-    await page.locator('[data-test="range-spots-0-0"]').fill('1');
-    await waitForCalculationPreview(page);
-    await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page.locator('[data-test="position-inventory-1"]').selectOption({
-        label: 'ROCK ANTENNE Hamburg',
-    });
-    await page.locator('[data-test="range-end-1-0"]').selectOption('9');
-    await page.locator('[data-test="range-spots-1-0"]').fill('1');
-    await waitForCalculationPreview(page);
+    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
+    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
+
+    const proposeResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
+    await page.locator('[data-test="budget-propose"]').click();
+    const proposalJson = await (await proposeResponse).json();
+    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible();
+
+    await page.locator('[data-test="budget-apply"]').click();
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     await page.getByRole('button', { name: 'Speichern' }).click();
@@ -129,22 +132,22 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     const calculationId = url.match(/kalkulationen\/(\d+)/)?.[1];
     expect(calculationId).toBeTruthy();
 
-    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
+    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
 
-    const proposeResponse = page.waitForResponse(
+    const secondPropose = page.waitForResponse(
         (response) =>
             response.url().includes('budget-vorschlag') &&
             response.request().method() === 'POST',
     );
     await page.locator('[data-test="budget-propose"]').click();
-    const proposalJson = await (await proposeResponse).json();
-    const proposalId = proposalJson.proposal.id;
+    const secondJson = await (await secondPropose).json();
+    const proposalId = secondJson.proposal.id;
     expect(typeof proposalId).toBe('number');
-    expect(proposalId).toBeGreaterThan(0);
 
-    await expect(page.locator('[data-test="budget-apply"]')).toBeVisible();
     await page.locator('[data-test="budget-apply"]').click();
-    await expect(page.locator('[data-test="budget-apply"]')).toHaveCount(0, {
+    await expect(page.getByText('Vorschlag übernommen')).toBeVisible({
         timeout: 15_000,
     });
 

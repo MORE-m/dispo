@@ -1,7 +1,4 @@
-import {
-    FormField,
-    formSelectClass,
-} from '@/components/form-field';
+import { FormField, formSelectClass } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import {
     END_HOURS,
@@ -25,7 +22,10 @@ export function BudgetDistributionRanges({
     fieldErrors: Record<string, string[]>;
     onChange: (ranges: DistributionRangeDraft[]) => void;
 }) {
-    function updateRange(index: number, patch: Partial<DistributionRangeDraft>) {
+    function updateRange(
+        index: number,
+        patch: Partial<DistributionRangeDraft>,
+    ) {
         onChange(
             ranges.map((range, current) =>
                 current === index ? { ...range, ...patch } : range,
