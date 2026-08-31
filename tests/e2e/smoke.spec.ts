@@ -236,11 +236,31 @@ test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({
         /€/,
     );
     await expect(page.locator('[data-test="ae-deduction"]')).toHaveCount(0);
+    await expect(
+        page.locator('[data-test="summary-position-total-0"]'),
+    ).toContainText('1.026,00');
+    await expect(
+        page.locator('[data-test="summary-after-position-total"]'),
+    ).toContainText('1.026,00');
+    await expect(
+        page.locator('[data-test="summary-order-discount-0"]'),
+    ).toContainText('−102,60');
+    await expect(
+        page.locator('[data-test="summary-after-order-total"]'),
+    ).toContainText('923,40');
+    await expect(page.getByText('Rabatte Auftrag')).toHaveCount(0);
+    await expect(page.getByText(/10\.0000/)).toHaveCount(0);
 
     await page.screenshot({
         path: 'docs/screenshots/wizard-step-3-conditions-desktop.png',
     });
     await page.setViewportSize({ width: 390, height: 844 });
+    await page
+        .locator('[data-test="calculation-summary"]')
+        .evaluate((element) => element.scrollIntoView({ block: 'start' }));
+    await expect(
+        page.locator('[data-test="summary-after-order-total"]'),
+    ).toBeVisible();
     await page.screenshot({
         path: 'docs/screenshots/wizard-step-3-conditions-mobile.png',
     });

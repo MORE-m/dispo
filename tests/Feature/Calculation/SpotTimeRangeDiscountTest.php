@@ -141,6 +141,47 @@ class SpotTimeRangeDiscountTest extends TestCase
         $this->assertStringContainsString('fehlen Preise für', $response->json('message') ?? json_encode($response->json('errors')));
     }
 
+    public function test_layered_discount_preview_exposes_display_totals_for_summary(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $list = $catalog['hamburg']->priceLists()->firstOrFail();
+        PriceListItem::query()->where('price_list_id', $list->id)->where('hour', '>=', 14)->update(['second_price' => '1.5000']);
+
+        $payload = $this->rangePayload($catalog, [
+            ['start' => 8, 'end' => 12, 'spots' => 10],
+            ['start' => 14, 'end' => 18, 'spots' => 20],
+        ]);
+        $payload['positions'][0]['position_discounts'] = [
+            ['type' => 'quantity', 'percent' => '10'],
+            ['type' => 'special', 'percent' => '5'],
+        ];
+        $payload['order_discounts'] = [
+            ['type' => 'quantity', 'percent' => '10'],
+        ];
+        $payload['ae_enabled'] = false;
+
+        $preview = $this->actingAs($user)->postJson(route('calculations.preview'), $payload);
+        $preview->assertOk();
+        $this->assertSame('1200.00', $preview->json('totals.media_gross'));
+        $this->assertSame('174.00', $preview->json('totals.position_discount_total'));
+        $this->assertSame('1026.00', $preview->json('totals.after_position_discount_total'));
+        $this->assertSame('102.60', $preview->json('totals.order_discounts.0.amount'));
+        $this->assertSame('923.40', $preview->json('totals.after_order_discount_total'));
+        $this->assertSame('1026.00', $preview->json('totals.positions.0.after_position_discount'));
+        $this->assertSame('923.40', $preview->json('totals.positions.0.nn_invest'));
+        $this->assertSame('923.40', $preview->json('totals.nn_invest'));
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload);
+        $calculation = Calculation::query()->firstOrFail();
+
+        $this->assertSame('923.40', (string) $calculation->nn_invest);
+        $this->assertSame(
+            '1026.00',
+            number_format((float) $calculation->media_gross - (float) $calculation->position_discount_total, 2, '.', ''),
+        );
+    }
+
     public function test_layered_discounts_and_ae_checkbox_round_like_the_engine(): void
     {
         $catalog = $this->createSpotClassicCatalog();

@@ -278,6 +278,7 @@ class CalculationController extends Controller
             : ($request->user()?->can('update', $calculation) ?? false);
 
         $savedSummary = null;
+        $savedDisplayTotals = null;
         if ($calculation !== null) {
             $savedSummary = [
                 'media_gross' => (string) $calculation->media_gross,
@@ -323,6 +324,16 @@ class CalculationController extends Controller
                 ])->all(),
                 'ae_enabled' => (bool) $calculation->ae_enabled,
             ];
+
+            if (! $canEdit) {
+                /** @var User $user */
+                $user = $request->user();
+                $savedDisplayTotals = $this->writer->preview(
+                    $this->writer->payloadFromCalculation($calculation),
+                    $user,
+                    $calculation,
+                )->toArray();
+            }
         }
 
         return [
@@ -381,6 +392,7 @@ class CalculationController extends Controller
                 ])->all(),
             ],
             'savedSummary' => $savedSummary,
+            'savedDisplayTotals' => $savedDisplayTotals,
             'canEdit' => $canEdit,
         ];
     }

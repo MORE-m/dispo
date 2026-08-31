@@ -1,4 +1,10 @@
-import { FormField, formSelectClass, money } from '@/components/form-field';
+import {
+    FormField,
+    formatPercent,
+    formSelectClass,
+    money,
+    moneyDeduction,
+} from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -210,7 +216,10 @@ export function DiscountListEditor({
                             ) : null}
                             {row?.amount ? (
                                 <p className="text-muted-foreground text-xs">
-                                    Abzug {money(row.amount)}
+                                    Abzug {moneyDeduction(row.amount)}
+                                    {row.percent
+                                        ? ` (${formatPercent(row.percent)})`
+                                        : ''}
                                     {row.remaining
                                         ? ` · verbleibend ${money(row.remaining)}`
                                         : ''}

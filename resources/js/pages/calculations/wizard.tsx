@@ -12,7 +12,9 @@ import {
     FormField,
     formSelectClass,
     formTextareaClass,
+    formatPercent,
     money,
+    moneyDeduction,
 } from '@/components/form-field';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
@@ -383,6 +385,7 @@ export default function CalculationWizard({
     discountTypes,
     calculation,
     savedSummary,
+    savedDisplayTotals,
     canEdit,
 }: {
     catalog: Catalog;
@@ -390,6 +393,7 @@ export default function CalculationWizard({
     discountTypes: DiscountTypeOption[];
     calculation: SavedCalculation | null;
     savedSummary: SavedSummary | null;
+    savedDisplayTotals: Totals | null;
     canEdit: boolean;
 }) {
     const flash = usePage().props.flash;
@@ -756,31 +760,7 @@ export default function CalculationWizard({
 
     const displayTotals = canEdit ? totals : null;
     const summary = !canEdit && savedSummary ? savedSummary : null;
-    const summaryTotals =
-        displayTotals ??
-        (summary
-            ? {
-                  media_gross: summary.media_gross,
-                  position_discount_total: summary.position_discount_total,
-                  order_discount_total: summary.order_discount_total,
-                  ae_total: summary.ae_total,
-                  nn_invest: summary.nn_invest,
-                  target_budget_nn: summary.target_budget_nn,
-                  requires_special_approval: summary.requires_special_approval,
-                  positions: summary.positions.map((position) => ({
-                      nn_invest: position.nn_invest,
-                      media_gross: position.media_gross,
-                      spot_count: position.total_spot_count,
-                      time_ranges: position.time_ranges,
-                      position_discounts: position.position_discounts?.map(
-                          (discount) => ({
-                              label: discount.custom_label ?? discount.type,
-                              percent: discount.percent,
-                          }),
-                      ),
-                  })),
-              }
-            : null);
+    const summaryTotals = displayTotals ?? savedDisplayTotals ?? null;
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
         catalog.media.some(
@@ -1926,11 +1906,11 @@ export default function CalculationWizard({
                                                                         {
                                                                             discount.label
                                                                         }{' '}
-                                                                        {
-                                                                            discount.percent
-                                                                        }{' '}
-                                                                        % ·{' '}
-                                                                        {money(
+                                                                        {formatPercent(
+                                                                            discount.percent,
+                                                                        )}{' '}
+                                                                        ·{' '}
+                                                                        {moneyDeduction(
                                                                             discount.amount,
                                                                         )}
                                                                     </p>
