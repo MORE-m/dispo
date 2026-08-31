@@ -89,12 +89,26 @@ Zwei Planungswege: **Selbst planen** und **Mit Budget planen** (siehe
 - **Fuß-/Aktionsleiste:** speichern, Werbeelement hinzufügen, bei Budgetpfad
   Vorschlag erzeugen und ausdrücklich übernehmen.
 
+### Aktuelle Wizard-Oberfläche
+
+Referenzscreenshots nach UX-GATE-A/B (Desktop/Mobil):
+
+- Schritt 2 Preiszeiträume (Desktop):
+  [`docs/screenshots/wizard-step-2-time-ranges-desktop.png`](screenshots/wizard-step-2-time-ranges-desktop.png)
+- Schritt 3 Konditionen (Desktop):
+  [`docs/screenshots/wizard-step-3-conditions-desktop.png`](screenshots/wizard-step-3-conditions-desktop.png)
+- Schritt 3 Konditionen (Mobil):
+  [`docs/screenshots/wizard-step-3-conditions-mobile.png`](screenshots/wizard-step-3-conditions-mobile.png)
+
+Ende ist exklusiv: `08:00–18:00` bedeutet Preisstunden 08:00 bis 17:59 Uhr.
+Gesamtspots sind die Summe der Zeitraum-Spots, nicht ein zweites Eingabefeld.
+
 ### Position anlegen
 
 1. Inventar auswählen (Logo-Slot mit Platzhalter, sobald kein Logo vorliegt).
 2. Nur erlaubte Werbemittel anzeigen; in diesem Slice Spot Classic.
-3. Preisstunden einzeln wählen, keine gruppierten Zeitschienen (`SPT-016`).
-4. Spotlänge, Spotanzahl und Konditionen erfassen.
+3. Preiszeiträume mit Beginn, Ende, Tagesgruppe und Spots erfassen (`SPT-001`–`SPT-004`).
+4. Spotlänge und Konditionen erfassen; Gesamtspots sind die Summe der Zeiträume.
 5. Preis still neu berechnen; Hinweise nur bei fehlenden oder widersprüchlichen Angaben.
 
 Nach Anlage ist die Kalkulationsart sichtbar gesperrt. Für einen Wechsel wird
@@ -105,8 +119,8 @@ Mehrere Sender- und Kombipositionen in einer Kalkulation sind der Normalfall
 
 ### Mit Budget planen
 
-1. Zielbudget N/N, Sender/Kombis, erlaubte Preisstunden, Spotlänge,
-   Positionsrabatt, AE, Auftragsrabatt und Verteilungslogik vorgeben.
+1. Zielbudget N/N, Sender/Kombis, erlaubte Preiszeiträume, Spotlänge,
+   Rabatte der Werbeelemente, Auftragsrabatte, AE-Checkbox und Verteilungslogik vorgeben.
 2. Das System erzeugt einen neuen Vorschlag (gleich verteilen oder Spotanzahl
    maximieren). Kein bestehendes Senderverhältnis (`BUD-005`).
 3. Rest oder Überschreitung ausweisen (`BUD-007`).

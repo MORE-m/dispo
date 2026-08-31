@@ -112,7 +112,7 @@ nicht von `StandardOffer` (`DSP-007`).
 - Kunde, Agentur, Mediaberater,
 - optionale Herkunfts-ID der Standardangebotsversion,
 - Kampagne/Produkt/Titel,
-- kalkulationsweiter Rabatt/AE,
+- kalkulationsweite Auftragsrabatte und AE-Aktivierung,
 - Summen, live aus allen Positionen,
 - Konfigurationssnapshot-ID,
 - Bearbeitungs-/Archivstatus,
@@ -141,8 +141,12 @@ geschrieben (`BUD-008`).
 Unterobjekte werden typbezogen normalisiert:
 
 - `PositionComponent` für Spot/SWF-Komponenten,
-- `SpotClassicPlanRow` für Preisstunde, Tagesgruppe und Anzahl (dieser Slice
-  ohne Kalenderdatum; volle Datumszellen später `PlannerEntry`),
+- `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
+  Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme),
+- `CalculationPositionDiscount` und `CalculationOrderDiscount` für gestaffelte
+  Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
+- `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
+  (ohne Kalenderdatum; volle Datumszellen später `PlannerEntry`),
 - `PlatformAllocation` für Online-Audio-Mengen,
 - `TargetingSelection` für technische/DMP-Targetings,
 - `SocialElement` und `InfluencerItem`,
@@ -211,6 +215,25 @@ autorisierte Controller oder temporär autorisierte Downloads.
 Die Datenbank hält Metadaten, Kategorie, Archivstatus, Prüfsumme, MIME-Typ, Größe,
 Uploader und Verknüpfungen. Eine Datei aus einem dynamischen Uploadfeld erscheint
 über dieselbe Dateiidentität in der zentralen Uploadliste.
+
+## Übergang Preisstunden und Rabatte
+
+Bestehende Spalten (`total_spot_count`, `position_discount_percent`,
+`order_discount_percent`, `ae_percent`, `spot_classic_plan_rows`) bleiben
+erhalten, bis alle Lese- und Schreibpfade auf die neuen Tabellen umgestellt
+sind. Rückweg: neue Tabellen leeren, Flags zurücksetzen, alte Spalten bleiben
+die Quelle.
+
+Migration:
+
+- genau eine Preisstunde → ein Zeitraum `Stunde` bis `Stunde+1` mit der
+  bisherigen Gesamtspotzahl;
+- mehrere Preisstunden → `needs_spot_redistribution`, keine erfundene
+  Spotverteilung, bisherige Durchschnittslogik bis zur manuellen Verteilung;
+- vorhandene Prozentwerte → eine Rabattzeile `Sonstiger Rabatt` mit dem
+  bisherigen Anzeigenamen;
+- explizites AE > 0 → `ae_enabled = true` und gespeicherten Satz behalten;
+- neue Kalkulationen → `ae_enabled = false`.
 
 ## Technische Invarianten
 

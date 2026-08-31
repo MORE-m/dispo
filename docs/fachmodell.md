@@ -90,7 +90,8 @@ Eine Position hält mindestens:
 - Rabatt-/AE-Eigenschaften und Investitionswerte,
 - dynamische Werte und Zusatzpreiszeilen.
 
-Klassische Spotpositionen planen einzelne Preisstunden und keine gruppierten
+Klassische Spotpositionen planen Preiszeiträume mit exklusivem Ende und
+Spotanzahl je Zeitraum. Der Kalenderplaner bleibt stundenweise und keine gruppierten
 Zeitschienen. Trailer, Allongen und weitere SWF aus der Trailerkalkulation dürfen
 Standardlängen und gruppierte Zeitschienen nutzen (`SPT-016`, `SWF-008`).
 
