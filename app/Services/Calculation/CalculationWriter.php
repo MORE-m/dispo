@@ -146,12 +146,12 @@ final class CalculationWriter
 
             $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false);
             $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
-            $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Current;
+            $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Applied;
             $lockedCalculation->save();
 
             $lockedProposal->applied_at = now();
             $lockedProposal->applied_by = $user->id;
-            $lockedProposal->status = BudgetProposalStatus::Current;
+            $lockedProposal->status = BudgetProposalStatus::Applied;
             $lockedProposal->save();
 
             $fresh = $this->reloadCalculation($lockedCalculation);

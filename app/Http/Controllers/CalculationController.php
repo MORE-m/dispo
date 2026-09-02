@@ -192,7 +192,23 @@ class CalculationController extends Controller
         $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
 
         $latestBudgetProposal = null;
+        $appliedBudgetProposal = null;
         if ($calculation !== null && $calculation->planning_mode === PlanningMode::Budget) {
+            $applied = $calculation->budgetProposals
+                ->whereNotNull('applied_at')
+                ->sortByDesc('id')
+                ->first();
+
+            if ($applied !== null) {
+                $appliedBudgetProposal = [
+                    'id' => $applied->id,
+                    'input_fingerprint' => $applied->input_fingerprint,
+                    'status' => $applied->status->value,
+                    'payload' => $applied->payloadArray(),
+                    'applied_at' => $applied->applied_at?->toIso8601String(),
+                ];
+            }
+
             $latest = $calculation->budgetProposals
                 ->whereNull('applied_at')
                 ->sortByDesc('id')
@@ -419,6 +435,7 @@ class CalculationController extends Controller
             'savedSummary' => $savedSummary,
             'savedDisplayTotals' => $savedDisplayTotals,
             'latestBudgetProposal' => $latestBudgetProposal,
+            'appliedBudgetProposal' => $appliedBudgetProposal,
             'canEdit' => $canEdit,
         ];
     }
