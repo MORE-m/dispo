@@ -18,7 +18,7 @@ return [
     'attributes' => [
         'target_budget_nn' => 'Zielbudget N/N',
         'budget_elements' => 'Budget-Werbeelemente',
-        'budget_elements.*.inventory_id' => 'Sender im Budget-Werbeelement',
+        'budget_elements.*.inventory_id' => 'Sender',
         'budget_elements.*.spot_length_seconds' => 'Spotlänge im Budget-Werbeelement',
         'positions' => 'Werbeelemente',
         'positions.*.length_seconds' => 'Spotlänge',

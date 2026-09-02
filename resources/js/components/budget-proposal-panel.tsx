@@ -115,6 +115,16 @@ export function BudgetProposalPanel({
                 ) : null}
             </div>
 
+            {proposal.next_package_exceeds_budget ? (
+                <p
+                    className="text-muted-foreground text-sm"
+                    data-test="budget-next-package-exceeds"
+                >
+                    Das nächste vollständige Spotpaket würde das Zielbudget
+                    überschreiten.
+                </p>
+            ) : null}
+
             {proposal.insufficient_budget ? (
                 <div
                     className="text-destructive space-y-2 text-sm"

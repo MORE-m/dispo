@@ -101,6 +101,17 @@ class CalculationPayloadRequest extends FormRequest
         return (array) trans('validation.attributes', [], 'de');
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'budget_elements.*.inventory_id.min' => 'Bitte wähle einen Sender aus.',
+            'target_budget_nn.min' => 'Das Zielbudget muss größer als 0 sein.',
+        ];
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -167,7 +178,7 @@ class CalculationPayloadRequest extends FormRequest
                 if ($targetBudget === null || $targetBudget === '' || (float) $targetBudget <= 0) {
                     $validator->errors()->add(
                         'target_budget_nn',
-                        'Zielbudget N/N ist im Budgetmodus erforderlich und muss größer als 0 sein.',
+                        'Das Zielbudget muss größer als 0 sein.',
                     );
                 }
             }

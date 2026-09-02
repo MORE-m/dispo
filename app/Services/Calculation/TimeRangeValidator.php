@@ -59,7 +59,7 @@ final class TimeRangeValidator
 
             if ($requireSpotCount) {
                 if ($this->isEmptyValue($spots) || ! $this->isWholeNumber($spots) || (int) $spots < 1) {
-                    $errors[$field.'.spot_count'] = ['Spotanzahl muss eine ganze Zahl von mindestens 1 sein.'];
+                    $errors[$field.'.spot_count'] = ['Die Spotanzahl muss mindestens 1 betragen.'];
                     $valid = false;
                 }
             } elseif (! $this->isEmptyValue($spots) && (! $this->isWholeNumber($spots) || (int) $spots < 0)) {

@@ -73,7 +73,7 @@ export function validateBudgetBasics(targetBudget: string): string | null {
     }
 
     if (Number(targetBudget) <= 0) {
-        return 'Zielbudget N/N muss größer als 0 sein.';
+        return 'Das Zielbudget muss größer als 0 sein.';
     }
 
     return null;
@@ -90,7 +90,7 @@ export function validateBudgetElements(
 
     for (const element of elements) {
         if (!element.inventory_id) {
-            return 'Jedes Werbeelement benötigt einen Sender.';
+            return 'Bitte wähle einen Sender aus.';
         }
 
         if (seenInventoryIds.has(element.inventory_id)) {
@@ -171,13 +171,14 @@ export function buildBudgetProposalPayload({
     lockVersion?: number;
 }) {
     const elementsPayload = payloadBudgetElements(budgetElements).map(
-        (element, index) => ({
+        (element) => ({
             ...element,
             position_discounts:
                 payloadBudgetElementDiscounts(
                     budgetElements,
                     budgetPositionDiscounts,
-                )[index]?.position_discounts ?? [],
+                ).find((row) => row.client_id === element.client_id)
+                    ?.position_discounts ?? [],
         }),
     );
 

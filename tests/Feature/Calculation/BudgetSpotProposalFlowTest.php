@@ -399,8 +399,7 @@ class BudgetSpotProposalFlowTest extends TestCase
         $message = $errors['budget_elements.0.inventory_id'][0] ?? null;
         $this->assertNotNull($message);
         $this->assertStringNotContainsString('validation.', $message);
-        $this->assertStringContainsString('Sender', $message);
-        $this->assertStringContainsString('mindestens', strtolower($message));
+        $this->assertStringContainsString('Bitte wähle einen Sender aus.', $message);
     }
 
     public function test_save_after_apply_without_budget_elements_succeeds(): void
@@ -535,6 +534,102 @@ class BudgetSpotProposalFlowTest extends TestCase
         $message = $spotCountErrors->first();
         $this->assertStringNotContainsString('validation.', $message);
         $this->assertStringContainsString('Spotanzahl', $message);
+    }
+
+    public function test_completion_flow_persists_server_state(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+
+        $calculation = Calculation::query()->firstOrFail();
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'budget_elements' => [
+                [
+                    'client_id' => 'rh',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [
+                        [
+                            'start_hour' => 6,
+                            'end_hour_exclusive' => 12,
+                            'day_group' => DayGroup::MoFr->value,
+                        ],
+                    ],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [
+                        [
+                            'start_hour' => 14,
+                            'end_hour_exclusive' => 18,
+                            'day_group' => DayGroup::MoFr->value,
+                        ],
+                    ],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+            'calculation_id' => $calculation->id,
+        ]);
+        $proposalId = $propose->json('proposal.id');
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation,
+            'proposal' => $proposalId,
+        ]));
+
+        $calculation->refresh()->load(['positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $payload = $this->appliedSavePayload($calculation);
+        $payload['budget_proposal_manual'] = true;
+        $payload['ae_enabled'] = false;
+        $firstRangeSpotCount = (int) $payload['positions'][0]['time_ranges'][0]['spot_count'];
+        $payload['positions'][0]['time_ranges'][0]['spot_count'] = $firstRangeSpotCount + 1;
+
+        $this->actingAs($user)
+            ->put(route('calculations.update', $calculation), $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $calculation->refresh()->load(['positions.timeRanges', 'budgetProposals']);
+        $this->assertSame(PlanningMode::Budget, $calculation->planning_mode);
+        $this->assertSame(BudgetProposalStatus::Manual, $calculation->budget_proposal_status);
+        $this->assertFalse((bool) $calculation->ae_enabled);
+        $this->assertCount(2, $calculation->positions);
+        $this->assertGreaterThan(0, $calculation->budgetProposals->count());
+
+        foreach ($calculation->positions as $position) {
+            $this->assertSame(30, $position->length_seconds);
+            $sum = $position->timeRanges->sum('spot_count');
+            $this->assertSame($sum, $position->total_spot_count);
+            foreach ($position->timeRanges as $range) {
+                $this->assertGreaterThanOrEqual(1, $range->spot_count);
+            }
+        }
+
+        $hamburg = $calculation->positions->firstWhere(
+            'inventory_id',
+            $catalog['hamburg']->id,
+        );
+        $this->assertNotNull($hamburg);
+        $this->assertSame(
+            $firstRangeSpotCount + 1,
+            $hamburg->timeRanges->first()?->spot_count,
+        );
     }
 
     /**

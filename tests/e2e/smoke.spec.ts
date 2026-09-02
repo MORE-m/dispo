@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function loginAsSales(page: Page) {
     await page.goto('/login');
+    await expect(page.locator('[data-test="login-button"]')).toBeEnabled();
     await page.locator('#email').fill('sales@example.com');
     await page.locator('#password').fill('password');
     await page.locator('[data-test="login-button"]').click();
@@ -21,6 +22,35 @@ function waitForNextPreview(page: Page) {
     );
 }
 
+async function fillBudgetElement(
+    page: Page,
+    index: number,
+    config: {
+        name: string;
+        lengthSeconds?: number;
+        startHour: string;
+        endHour: string;
+    },
+) {
+    if (index > 0) {
+        await page.locator('[data-test="add-budget-element"]').click();
+    }
+
+    const card = page.locator(`[data-test="budget-element-${index}"]`);
+    await card.locator(`#budget-element-inventory-${index}`).selectOption({
+        label: config.name,
+    });
+
+    if (config.lengthSeconds !== undefined) {
+        await card
+            .locator(`#budget-element-length-${index}`)
+            .fill(String(config.lengthSeconds));
+    }
+
+    await card.locator('#budget-start-0').selectOption(config.startHour);
+    await card.locator('#budget-end-0').selectOption(config.endHour);
+}
+
 async function fillBudgetElements(
     page: Page,
     senders: Array<{ name: string }>,
@@ -28,13 +58,11 @@ async function fillBudgetElements(
     await expect(page.locator('[data-test="budget-elements-step"]')).toBeVisible();
 
     for (let index = 0; index < senders.length; index++) {
-        if (index > 0) {
-            await page.locator('[data-test="add-budget-element"]').click();
-        }
-
-        await page
-            .locator(`#budget-element-inventory-${index}`)
-            .selectOption({ label: senders[index].name });
+        await fillBudgetElement(page, index, {
+            name: senders[index].name,
+            startHour: '8',
+            endHour: '12',
+        });
     }
 }
 
@@ -247,6 +275,147 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
         path: 'docs/screenshots/budget-after-reload-mobile.png',
     });
     await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
+});
+
+test('BUD-010 Budget-Abschlussablauf mit individuellen Zeiträumen', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    const targetBudget = '5000';
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
+    await page.getByLabel('Zielbudget N/N').fill(targetBudget);
+    await page.getByRole('button', { name: 'Weiter' }).click();
+
+    await fillBudgetElement(page, 0, {
+        name: 'Radio Hamburg',
+        lengthSeconds: 30,
+        startHour: '6',
+        endHour: '12',
+    });
+    await fillBudgetElement(page, 1, {
+        name: 'ROCK ANTENNE Hamburg',
+        lengthSeconds: 30,
+        startHour: '14',
+        endHour: '18',
+    });
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await expect(page.locator('[data-test="ae-enabled"]')).not.toBeChecked();
+
+    const proposeResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
+    await page.locator('[data-test="budget-propose"]').click();
+    const proposalJson = await (await proposeResponse).json();
+    const proposal = proposalJson.proposal;
+
+    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="wizard-save"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="budget-apply-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-next-package-exceeds"]')).toBeVisible();
+
+    expect(proposal.spots_per_sender).toBeGreaterThan(0);
+    expect(proposal.positions[0].total_spot_count).toBe(proposal.positions[1].total_spot_count);
+    expect(Number(proposal.nn_invest)).toBeLessThanOrEqual(Number(targetBudget));
+    expect(Number(proposal.remainder)).toBeGreaterThanOrEqual(0);
+    expect(proposal.next_package_exceeds_budget).toBe(true);
+
+    for (const range of proposal.positions[0].time_ranges ?? []) {
+        expect(range.start_hour).toBeGreaterThanOrEqual(6);
+        expect(range.start_hour).toBeLessThan(12);
+    }
+    for (const range of proposal.positions[1].time_ranges ?? []) {
+        expect(range.start_hour).toBeGreaterThanOrEqual(14);
+        expect(range.start_hour).toBeLessThan(18);
+    }
+
+    await page.locator('[data-test="budget-apply"]').click();
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="position-inventory-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-gross-0-0"]')).toBeVisible();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    const firstSpotField = page.locator('[data-test="range-spots-0-0"]');
+    const originalSpots = Number(await firstSpotField.inputValue());
+    const totalSpotsLocator = page.locator('[data-test="position-total-spots-0"]');
+    const originalTotal = Number(
+        (await totalSpotsLocator.textContent())?.replace(/[^\d]/g, '') ?? '0',
+    );
+    const previewResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('vorschau') &&
+            response.request().method() === 'POST',
+        { timeout: 15_000 },
+    );
+    await firstSpotField.fill(String(originalSpots + 1));
+    await previewResponse;
+    await waitForCalculationPreview(page);
+
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toContainText(
+        'manuell angepasst',
+    );
+    await expect(totalSpotsLocator).toContainText(String(originalTotal + 1));
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-manual-edit-desktop.png',
+    });
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-summary-after-apply-desktop.png',
+    });
+
+    await page.locator('[data-test="wizard-save"]').click();
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
+    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('validation.');
+
+    const savedUrl = page.url();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+    await expect(totalSpotsLocator).toContainText(String(originalTotal + 1));
+
+    await page.goto(savedUrl);
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
+    await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('validation.');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-mobile.png',
+    });
 });
 
 test('BUD-009 Budget-Wizard Screenshots der Eingabeschritte', async ({ page }) => {
