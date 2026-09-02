@@ -164,6 +164,8 @@ final class BudgetSpotProposalService
             'order_discount_total' => $result['order_discount_total'],
             'ae_total' => $result['ae_total'],
             'ae_enabled' => $aeEnabled,
+            'order_discounts' => $payload['order_discounts'] ?? [],
+            'budget_position_discounts_by_inventory' => $payload['budget_position_discounts_by_inventory'] ?? [],
             'explanation' => $this->buildExplanation($spotsPerSender, count($wishInventoryIds)),
         ];
 
@@ -622,9 +624,22 @@ final class BudgetSpotProposalService
     {
         $map = [];
 
+        foreach ($payload['budget_position_discounts_by_inventory'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $inventoryId = (int) ($row['inventory_id'] ?? 0);
+            if ($inventoryId < 1) {
+                continue;
+            }
+
+            $map[$inventoryId] = $this->discountInputsFromRows($row['discounts'] ?? []);
+        }
+
         foreach ($payload['positions'] ?? [] as $position) {
             $inventoryId = (int) ($position['inventory_id'] ?? 0);
-            if ($inventoryId < 1) {
+            if ($inventoryId < 1 || isset($map[$inventoryId])) {
                 continue;
             }
 

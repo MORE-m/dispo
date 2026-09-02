@@ -785,6 +785,10 @@ final class CalculationWriter
         $position['time_ranges'] = $timeRanges;
         $position['plan_rows'] = $planRows;
 
+        if (isset($proposed['position_discounts']) && is_array($proposed['position_discounts'])) {
+            $position['position_discounts'] = $proposed['position_discounts'];
+        }
+
         return $position;
     }
 

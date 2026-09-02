@@ -7,6 +7,7 @@ use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
+use App\Http\Requests\Calculation\BudgetProposalPayloadRequest;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
 use App\Models\AdvertisingMedium;
 use App\Models\BudgetProposal;
@@ -20,7 +21,6 @@ use App\Models\InventoryMediumRule;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use App\Services\Calculation\BudgetProposalService;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +33,6 @@ class CalculationController extends Controller
 {
     public function __construct(
         private readonly CalculationWriter $writer,
-        private readonly BudgetProposalService $legacyProposals,
         private readonly BudgetSpotProposalService $spotProposals,
         private readonly AuditLogger $audit,
     ) {}
@@ -116,7 +115,7 @@ class CalculationController extends Controller
         ]);
     }
 
-    public function proposeBudget(CalculationPayloadRequest $request): JsonResponse
+    public function proposeBudget(BudgetProposalPayloadRequest $request): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -128,35 +127,18 @@ class CalculationController extends Controller
                 ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts'])
                 ->findOrFail($request->integer('calculation_id'));
             $this->authorize('update', $existing);
-            $payload = $this->enrichPayloadWithExistingPositions($payload, $existing);
         } else {
             $this->authorize('create', Calculation::class);
         }
 
-        if (! isset($payload['target_budget_nn']) || $payload['target_budget_nn'] === '') {
-            return response()->json([
-                'message' => 'Zielbudget N/N fehlt.',
-            ], 422);
-        }
-
-        $planningMode = (string) ($payload['planning_mode'] ?? PlanningMode::Manual->value);
-        $strategy = BudgetStrategy::tryFrom((string) ($payload['budget_strategy'] ?? ''));
-        $wishIds = $payload['budget_wish_inventory_ids'] ?? [];
-        $useSpotAllocator = $strategy === BudgetStrategy::EqualSpotCount
-            || (is_array($wishIds) && count($wishIds) > 0);
-
-        if ($useSpotAllocator) {
-            $proposal = $this->spotProposals->propose($payload, $existing);
-        } else {
-            $proposal = $this->legacyProposals->propose(
-                $this->writer->positionInputsFromPayload($payload, $existing),
-                (string) $payload['target_budget_nn'],
-                (string) ($payload['order_discount_percent'] ?? '0'),
-                BudgetStrategy::from((string) ($payload['budget_strategy'] ?? 'equal_budget')),
-            );
-        }
+        $proposal = $this->spotProposals->propose($payload, $existing);
 
         if ($existing !== null) {
+            BudgetProposal::query()
+                ->where('calculation_id', $existing->id)
+                ->whereNull('applied_at')
+                ->update(['status' => BudgetProposalStatus::Stale]);
+
             $stored = BudgetProposal::query()->create([
                 'calculation_id' => $existing->id,
                 'strategy' => BudgetStrategy::from($proposal['strategy']),
@@ -193,6 +175,8 @@ class CalculationController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $proposal->refresh();
+
         $this->writer->applyBudgetProposal($calculation, $proposal, $user);
 
         return redirect()
@@ -205,7 +189,24 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts']);
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+
+        $latestBudgetProposal = null;
+        if ($calculation !== null && $calculation->planning_mode === PlanningMode::Budget) {
+            $latest = $calculation->budgetProposals
+                ->whereNull('applied_at')
+                ->sortByDesc('id')
+                ->first();
+
+            if ($latest !== null) {
+                $latestBudgetProposal = [
+                    'id' => $latest->id,
+                    'input_fingerprint' => $latest->input_fingerprint,
+                    'status' => $latest->status->value,
+                    'payload' => $latest->payloadArray(),
+                ];
+            }
+        }
 
         $activeInventories = Inventory::query()
             ->where('is_active', true)
@@ -417,40 +418,8 @@ class CalculationController extends Controller
             ],
             'savedSummary' => $savedSummary,
             'savedDisplayTotals' => $savedDisplayTotals,
+            'latestBudgetProposal' => $latestBudgetProposal,
             'canEdit' => $canEdit,
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function enrichPayloadWithExistingPositions(array $payload, Calculation $calculation): array
-    {
-        if (! isset($payload['positions']) || ! is_array($payload['positions'])) {
-            return $payload;
-        }
-
-        $byClient = $calculation->positions->keyBy('client_key');
-        $byInventory = $calculation->positions->keyBy('inventory_id');
-
-        foreach ($payload['positions'] as $index => $position) {
-            $existing = null;
-
-            if (isset($position['id'])) {
-                $existing = $calculation->positions->firstWhere('id', (int) $position['id']);
-            } elseif (isset($position['client_key'])) {
-                $existing = $byClient->get((string) $position['client_key']);
-            } else {
-                $existing = $byInventory->get((int) ($position['inventory_id'] ?? 0));
-            }
-
-            if ($existing !== null) {
-                $payload['positions'][$index]['id'] = $existing->id;
-                $payload['positions'][$index]['client_key'] = $existing->client_key;
-            }
-        }
-
-        return $payload;
     }
 }

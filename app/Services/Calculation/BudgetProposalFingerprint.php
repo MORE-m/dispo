@@ -142,9 +142,27 @@ final class BudgetProposalFingerprint
     {
         $map = [];
 
+        foreach ($payload['budget_position_discounts_by_inventory'] ?? [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $inventoryId = (int) ($row['inventory_id'] ?? 0);
+            if ($inventoryId < 1) {
+                continue;
+            }
+
+            $discounts = $row['discounts'] ?? [];
+            if (! is_array($discounts)) {
+                continue;
+            }
+
+            $map[$inventoryId] = $this->normalizeDiscountRows(array_values($discounts));
+        }
+
         foreach ($payload['positions'] ?? [] as $position) {
             $inventoryId = (int) ($position['inventory_id'] ?? 0);
-            if ($inventoryId < 1) {
+            if ($inventoryId < 1 || isset($map[$inventoryId])) {
                 continue;
             }
 
@@ -153,18 +171,27 @@ final class BudgetProposalFingerprint
                 continue;
             }
 
-            $map[$inventoryId] = array_values(array_map(
-                fn (array $row): array => [
-                    'type' => (string) ($row['type'] ?? ''),
-                    'percent' => (string) ($row['percent'] ?? '0'),
-                    'custom_label' => isset($row['custom_label'])
-                        ? (string) $row['custom_label']
-                        : null,
-                ],
-                $discounts,
-            ));
+            $map[$inventoryId] = $this->normalizeDiscountRows(array_values($discounts));
         }
 
         return $map;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $discounts
+     * @return list<array{type: string, percent: string, custom_label: string|null}>
+     */
+    private function normalizeDiscountRows(array $discounts): array
+    {
+        return array_map(
+            fn (array $row): array => [
+                'type' => (string) ($row['type'] ?? ''),
+                'percent' => (string) ($row['percent'] ?? '0'),
+                'custom_label' => isset($row['custom_label'])
+                    ? (string) $row['custom_label']
+                    : null,
+            ],
+            $discounts,
+        );
     }
 }

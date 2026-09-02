@@ -49,6 +49,12 @@ class CalculationPayloadRequest extends FormRequest
             'budget_distribution_ranges.*.start_hour' => ['nullable', 'integer', 'min:0', 'max:23'],
             'budget_distribution_ranges.*.end_hour_exclusive' => ['nullable', 'integer', 'min:1', 'max:24'],
             'budget_distribution_ranges.*.day_group' => ['nullable', Rule::enum(DayGroup::class)],
+            'budget_position_discounts_by_inventory' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.inventory_id' => ['required', 'integer', 'min:1'],
+            'budget_position_discounts_by_inventory.*.discounts' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
+            'budget_position_discounts_by_inventory.*.discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'budget_position_discounts_by_inventory.*.discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'budget_proposal_manual' => ['sometimes', 'boolean'],
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
@@ -119,6 +125,35 @@ class CalculationPayloadRequest extends FormRequest
 
             $isBudgetMode = $this->input('planning_mode') === PlanningMode::Budget->value;
             $positions = $this->input('positions', []);
+
+            foreach ($this->input('budget_position_discounts_by_inventory', []) as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                try {
+                    $discountValidator->validated(
+                        $row['discounts'] ?? [],
+                        "budget_position_discounts_by_inventory.{$index}.discounts",
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+
+            if (! $isPreview && $isBudgetMode) {
+                $targetBudget = $this->input('target_budget_nn');
+                if ($targetBudget === null || $targetBudget === '' || (float) $targetBudget <= 0) {
+                    $validator->errors()->add(
+                        'target_budget_nn',
+                        'Zielbudget N/N ist im Budgetmodus erforderlich und muss größer als 0 sein.',
+                    );
+                }
+            }
 
             foreach ($positions as $index => $position) {
                 $ranges = $position['time_ranges'] ?? [];

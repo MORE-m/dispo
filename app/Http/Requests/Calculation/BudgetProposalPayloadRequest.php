@@ -1,0 +1,131 @@
+<?php
+
+namespace App\Http\Requests\Calculation;
+
+use App\Enums\DayGroup;
+use App\Enums\DiscountType;
+use App\Enums\PlanningMode;
+use App\Services\Calculation\DiscountValidator;
+use App\Services\Calculation\TimeRangeValidator;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator;
+
+/**
+ * Dedizierter Request für Budgetvorschläge ohne manuelle Kalkulationspositionen.
+ */
+class BudgetProposalPayloadRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function rules(): array
+    {
+        return [
+            'planning_mode' => ['required', Rule::enum(PlanningMode::class)],
+            'target_budget_nn' => ['required', 'numeric', 'gt:0', 'max:999999999999.99'],
+            'budget_wish_inventory_ids' => ['required', 'array', 'min:1'],
+            'budget_wish_inventory_ids.*' => ['integer', 'min:1'],
+            'budget_spot_length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
+            'budget_distribution_ranges' => ['required', 'array', 'min:1'],
+            'budget_distribution_ranges.*.start_hour' => ['required', 'integer', 'min:0', 'max:23'],
+            'budget_distribution_ranges.*.end_hour_exclusive' => ['required', 'integer', 'min:1', 'max:24'],
+            'budget_distribution_ranges.*.day_group' => ['required', Rule::enum(DayGroup::class)],
+            'budget_position_discounts_by_inventory' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.inventory_id' => ['required', 'integer', 'min:1'],
+            'budget_position_discounts_by_inventory.*.discounts' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
+            'budget_position_discounts_by_inventory.*.discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'budget_position_discounts_by_inventory.*.discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'order_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'order_discounts' => ['sometimes', 'array'],
+            'order_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
+            'order_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'order_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'ae_enabled' => ['sometimes', 'boolean'],
+            'calculation_id' => ['nullable', 'integer', 'min:1'],
+            'positions' => ['sometimes', 'array'],
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if ($validator->errors()->isNotEmpty()) {
+                return;
+            }
+
+            if ($this->input('planning_mode') !== PlanningMode::Budget->value) {
+                $validator->errors()->add('planning_mode', 'Budgetvorschläge sind nur im Planungsweg „Mit Budget planen“ möglich.');
+            }
+
+            try {
+                (new TimeRangeValidator)->validated(
+                    $this->input('budget_distribution_ranges', []),
+                    'budget_distribution_ranges',
+                    requireAtLeastOne: true,
+                    requireSpotCount: false,
+                );
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $key => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($key, $message);
+                    }
+                }
+            }
+
+            try {
+                (new DiscountValidator)->validated($this->input('order_discounts', []), 'order_discounts');
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $key => $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add($key, $message);
+                    }
+                }
+            }
+
+            foreach ($this->input('budget_position_discounts_by_inventory', []) as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                try {
+                    (new DiscountValidator)->validated(
+                        $row['discounts'] ?? [],
+                        "budget_position_discounts_by_inventory.{$index}.discounts",
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function payload(): array
+    {
+        $payload = $this->validated();
+        $payload['planning_mode'] = PlanningMode::Budget->value;
+        $payload['budget_strategy'] = 'equal_spot_count';
+        $payload['order_discount_percent'] = $payload['order_discount_percent'] ?? '0';
+        $payload['positions'] = [];
+
+        if ($this->exists('ae_enabled')) {
+            $payload['ae_enabled'] = $this->boolean('ae_enabled');
+        }
+
+        return $payload;
+    }
+}
