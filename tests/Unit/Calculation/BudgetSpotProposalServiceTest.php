@@ -6,11 +6,7 @@ use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\PlanningMode;
 use App\Models\PriceListItem;
-use App\Services\Calculation\BudgetProposalFingerprint;
-use App\Services\Calculation\BudgetSpotAllocator;
 use App\Services\Calculation\BudgetSpotProposalService;
-use App\Services\Calculation\CalculationEngine;
-use App\Services\Calculation\CatalogResolver;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -153,6 +149,64 @@ class BudgetSpotProposalServiceTest extends TestCase
         );
     }
 
+    public function test_individual_distribution_ranges_per_element(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $service = $this->service();
+
+        $proposal = $service->propose([
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000.00',
+            'budget_elements' => [
+                [
+                    'client_id' => 'rh',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [
+                        [
+                            'start_hour' => 6,
+                            'end_hour_exclusive' => 12,
+                            'day_group' => DayGroup::MoFr->value,
+                        ],
+                    ],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [
+                        [
+                            'start_hour' => 14,
+                            'end_hour_exclusive' => 18,
+                            'day_group' => DayGroup::MoFr->value,
+                        ],
+                    ],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ], null);
+
+        $this->assertCount(2, $proposal['positions']);
+        $spots = array_column($proposal['positions'], 'total_spot_count');
+        $this->assertSame($spots[0], $spots[1]);
+        $this->assertTrue((float) $proposal['used_nn'] <= 5000.00);
+        $this->assertTrue($proposal['next_package_exceeds_budget']);
+
+        foreach ($proposal['positions'] as $index => $position) {
+            $allowedStart = $index === 0 ? 6 : 14;
+            $allowedEndExclusive = $index === 0 ? 12 : 18;
+            foreach ($position['time_ranges'] as $range) {
+                $this->assertGreaterThanOrEqual($allowedStart, $range['start_hour']);
+                $this->assertLessThan($allowedEndExclusive, $range['start_hour']);
+            }
+        }
+    }
+
     public function test_missing_price_raises_validation_error(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -170,12 +224,7 @@ class BudgetSpotProposalServiceTest extends TestCase
 
     private function service(): BudgetSpotProposalService
     {
-        return new BudgetSpotProposalService(
-            new CalculationEngine,
-            new CatalogResolver,
-            new BudgetSpotAllocator,
-            new BudgetProposalFingerprint,
-        );
+        return app(BudgetSpotProposalService::class);
     }
 
     /**

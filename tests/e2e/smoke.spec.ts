@@ -21,6 +21,23 @@ function waitForNextPreview(page: Page) {
     );
 }
 
+async function fillBudgetElements(
+    page: Page,
+    senders: Array<{ name: string }>,
+) {
+    await expect(page.locator('[data-test="budget-elements-step"]')).toBeVisible();
+
+    for (let index = 0; index < senders.length; index++) {
+        if (index > 0) {
+            await page.locator('[data-test="add-budget-element"]').click();
+        }
+
+        await page
+            .locator(`#budget-element-inventory-${index}`)
+            .selectOption({ label: senders[index].name });
+    }
+}
+
 async function waitForCalculationPreview(page: Page) {
     await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(0, {
         timeout: 15_000,
@@ -110,10 +127,10 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
         page.getByRole('button', { name: '2. Planungsrahmen' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Weiter' }).click();
-    await expect(page.locator('[data-test="budget-planning-frame"]')).toBeVisible();
-
-    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
-    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
+    await fillBudgetElements(page, [
+        { name: 'Radio Hamburg' },
+        { name: 'ROCK ANTENNE Hamburg' },
+    ]);
     await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
@@ -166,10 +183,21 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
     await recalculateResponse;
 
     await page.locator('[data-test="budget-apply"]').click();
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-desktop.png',
+    });
 
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-desktop.png',
+    });
+    await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
 });
 
 test('BUD-009 Budget-Wizard Screenshots der Eingabeschritte', async ({ page }) => {
@@ -186,16 +214,17 @@ test('BUD-009 Budget-Wizard Screenshots der Eingabeschritte', async ({ page }) =
         page.getByRole('button', { name: '2. Planungsrahmen' }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Weiter' }).click();
-    await expect(page.locator('[data-test="budget-planning-frame"]')).toBeVisible();
-    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
-    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
+    await fillBudgetElements(page, [
+        { name: 'Radio Hamburg' },
+        { name: 'ROCK ANTENNE Hamburg' },
+    ]);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
-        path: 'docs/screenshots/budget-step-2-frame-desktop.png',
+        path: 'docs/screenshots/budget-step-2-elements-desktop.png',
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({
-        path: 'docs/screenshots/budget-step-2-frame-mobile.png',
+        path: 'docs/screenshots/budget-step-2-elements-mobile.png',
     });
     await page.setViewportSize({ width: 1440, height: 900 });
 

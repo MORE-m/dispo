@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+    emptyBudgetElement,
     validateBudgetBasics,
-    validateBudgetFrame,
+    validateBudgetElements,
 } from '@/lib/budget-planning';
 
 describe('budget planning validation', () => {
@@ -11,34 +12,64 @@ describe('budget planning validation', () => {
         expect(validateBudgetBasics('500')).toBeNull();
     });
 
-    it('requires senders, spot length and distribution ranges', () => {
-        expect(
-            validateBudgetFrame([], 30, [
-                {
-                    start_hour: 8,
-                    end_hour_exclusive: 12,
-                    day_group: 'mo_fr',
-                },
-            ]),
-        ).toMatch(/Wunschsender/);
+    it('requires budget elements with sender, spot length and ranges', () => {
+        expect(validateBudgetElements([])).toMatch(/Werbeelement/);
 
         expect(
-            validateBudgetFrame([1], 0, [
+            validateBudgetElements([
                 {
-                    start_hour: 8,
-                    end_hour_exclusive: 12,
-                    day_group: 'mo_fr',
+                    ...emptyBudgetElement(30),
+                    inventory_id: null,
+                },
+            ]),
+        ).toMatch(/Sender/);
+
+        expect(
+            validateBudgetElements([
+                {
+                    ...emptyBudgetElement(30),
+                    inventory_id: 1,
+                    spot_length_seconds: 0,
                 },
             ]),
         ).toMatch(/Spotlänge/);
 
-        expect(validateBudgetFrame([1], 30, [])).toMatch(/Verteilungszeitraum/);
         expect(
-            validateBudgetFrame([1], 30, [
+            validateBudgetElements([
                 {
-                    start_hour: 12,
-                    end_hour_exclusive: 8,
-                    day_group: 'mo_fr',
+                    ...emptyBudgetElement(30),
+                    inventory_id: 1,
+                    distribution_ranges: [],
+                },
+            ]),
+        ).toMatch(/Verteilungszeitraum/);
+
+        expect(
+            validateBudgetElements([
+                {
+                    ...emptyBudgetElement(30),
+                    inventory_id: 1,
+                },
+                {
+                    ...emptyBudgetElement(30),
+                    client_id: 'element-2',
+                    inventory_id: 1,
+                },
+            ]),
+        ).toMatch(/bereits in einem Werbeelement/);
+
+        expect(
+            validateBudgetElements([
+                {
+                    ...emptyBudgetElement(30),
+                    inventory_id: 1,
+                    distribution_ranges: [
+                        {
+                            start_hour: 12,
+                            end_hour_exclusive: 8,
+                            day_group: 'mo_fr',
+                        },
+                    ],
                 },
             ]),
         ).toMatch(/Ende/);
