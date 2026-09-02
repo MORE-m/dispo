@@ -69,6 +69,10 @@ import {
     type BudgetElementDraft,
     type BudgetPositionDiscountsByClientId,
 } from '@/lib/budget-planning';
+import {
+    firstValidationMessage,
+    mapValidationErrors,
+} from '@/lib/validation-errors';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -615,19 +619,22 @@ export default function CalculationWizard({
             target_budget_nn: targetBudget === '' ? null : targetBudget,
             budget_strategy:
                 planningMode === 'budget' ? 'equal_spot_count' : null,
-            budget_elements:
-                planningMode === 'budget'
-                    ? payloadBudgetElements(budgetElements).map(
-                          (element, index) => ({
-                              ...element,
-                              position_discounts:
-                                  payloadBudgetElementDiscounts(
-                                      budgetElements,
-                                      budgetPositionDiscounts,
-                                  )[index]?.position_discounts ?? [],
-                          }),
-                      )
-                    : undefined,
+            ...(isBudgetSetup && planningMode === 'budget'
+                ? {
+                      budget_elements: payloadBudgetElements(
+                          budgetElements,
+                      ).map((element) => ({
+                          ...element,
+                          position_discounts:
+                              payloadBudgetElementDiscounts(
+                                  budgetElements,
+                                  budgetPositionDiscounts,
+                              ).find(
+                                  (row) => row.client_id === element.client_id,
+                              )?.position_discounts ?? [],
+                      })),
+                  }
+                : {}),
             budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
@@ -697,6 +704,7 @@ export default function CalculationWizard({
         usesRegularPlanningEditorView &&
         positions.length > 0;
     const showBudgetPlanningSidebar = isBudgetSetup;
+    const showSaveButton = canEdit && !(isBudgetSetup && step === 3);
 
     function markBudgetInputsChanged() {
         setInputsRevision((value) => value + 1);
@@ -812,14 +820,14 @@ export default function CalculationWizard({
             preserveScroll: true,
             onFinish: () => setBusy(false),
             onError: (errors: Record<string, string | string[]>) => {
-                const mapped: Record<string, string[]> = {};
-                for (const [key, value] of Object.entries(errors)) {
-                    mapped[key] = Array.isArray(value)
-                        ? value
-                        : [String(value)];
-                }
+                const mapped = mapValidationErrors(errors);
                 setSaveFieldErrors(mapped);
-                setSaveError('Speichern nicht möglich. Angaben prüfen.');
+                const detail = firstValidationMessage(mapped);
+                setSaveError(
+                    detail
+                        ? `Speichern nicht möglich: ${detail}`
+                        : 'Speichern nicht möglich. Angaben prüfen.',
+                );
                 setBusy(false);
             },
         };
@@ -945,12 +953,14 @@ export default function CalculationWizard({
                     (candidate) => candidate.inventory_id === item.inventory_id,
                 );
 
-                const time_ranges = (item.time_ranges ?? []).map((range) => ({
-                    start_hour: range.start_hour,
-                    end_hour_exclusive: range.end_hour_exclusive,
-                    day_group: range.day_group,
-                    spot_count: range.spot_count,
-                }));
+                const time_ranges = (item.time_ranges ?? [])
+                    .filter((range) => Number(range.spot_count) > 0)
+                    .map((range) => ({
+                        start_hour: range.start_hour,
+                        end_hour_exclusive: range.end_hour_exclusive,
+                        day_group: range.day_group,
+                        spot_count: range.spot_count,
+                    }));
                 const summedSpotCount = time_ranges.reduce(
                     (sum, range) => sum + Number(range.spot_count ?? 0),
                     0,
@@ -1949,6 +1959,7 @@ export default function CalculationWizard({
                                     onApply={takeProposal}
                                     onEditInputs={() => setStep(0)}
                                     onRecalculate={() => void createProposal()}
+                                    showApplyHint={isBudgetSetup}
                                 />
                             ) : (
                                 <Card className={wizardCardClass}>
@@ -2323,7 +2334,7 @@ export default function CalculationWizard({
                                 Budgetvorschlag berechnen
                             </Button>
                         ) : null}
-                        {canEdit ? (
+                        {canEdit && showSaveButton ? (
                             <Button
                                 type="button"
                                 onClick={save}
@@ -2338,6 +2349,7 @@ export default function CalculationWizard({
                                         ? 'default'
                                         : 'secondary'
                                 }
+                                data-test="wizard-save"
                             >
                                 Speichern
                             </Button>

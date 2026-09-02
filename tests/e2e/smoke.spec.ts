@@ -146,6 +146,10 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
     await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible({
         timeout: 15_000,
     });
+    await expect(page.locator('[data-test="budget-proposal-step"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-apply-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="wizard-save"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('validation.');
     expect(proposalJson.proposal.spots_per_sender).toBeGreaterThan(0);
 
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -208,14 +212,32 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
         path: 'docs/screenshots/budget-after-manual-edit-desktop.png',
     });
 
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-summary-after-apply-desktop.png',
+    });
+
+    await page.locator('[data-test="wizard-save"]').click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('validation.');
+    await expect(page.locator('body')).not.toContainText(
+        'validation.min.numeric',
+    );
     await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
     await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue(
         String(Number(originalSpots) + 1),
     );
+    await page.reload();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue(
+        String(Number(originalSpots) + 1),
+    );
+    await expect(page.locator('body')).not.toContainText('validation.');
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
         path: 'docs/screenshots/budget-after-reload-desktop.png',

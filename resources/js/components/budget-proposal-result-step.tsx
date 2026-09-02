@@ -18,6 +18,7 @@ export function BudgetProposalResultStep({
     onApply,
     onEditInputs,
     onRecalculate,
+    showApplyHint = false,
 }: {
     proposal: BudgetSpotProposal | null;
     proposalStatus: string;
@@ -26,6 +27,7 @@ export function BudgetProposalResultStep({
     onApply: () => void;
     onEditInputs: () => void;
     onRecalculate: () => void;
+    showApplyHint?: boolean;
 }) {
     if (proposalLoading) {
         return (
@@ -62,7 +64,16 @@ export function BudgetProposalResultStep({
                     Budgetvorschlag
                 </CardTitle>
             </CardHeader>
-            <CardContent className={wizardCardContentClass}>
+            <CardContent className={`${wizardCardContentClass} space-y-4`}>
+                {showApplyHint ? (
+                    <p
+                        className="text-muted-foreground text-sm"
+                        data-test="budget-apply-hint"
+                    >
+                        Übernimm zuerst den Vorschlag. Danach kannst du die
+                        erzeugte Planung prüfen, bearbeiten und speichern.
+                    </p>
+                ) : null}
                 <BudgetProposalPanel
                     proposal={proposal}
                     proposalStatus={proposalStatus}

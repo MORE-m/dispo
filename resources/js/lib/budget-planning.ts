@@ -33,28 +33,38 @@ export function emptyBudgetElement(
 }
 
 export function payloadBudgetElements(elements: BudgetElementDraft[]) {
-    return elements.map((element) => ({
-        client_id: element.client_id,
-        inventory_id: element.inventory_id ?? 0,
-        spot_length_seconds: element.spot_length_seconds,
-        distribution_ranges: payloadDistributionRanges(
-            element.distribution_ranges,
-        ),
-        position_discounts: [],
-    }));
+    return elements
+        .filter(
+            (element) =>
+                element.inventory_id !== null && element.inventory_id > 0,
+        )
+        .map((element) => ({
+            client_id: element.client_id,
+            inventory_id: element.inventory_id ?? 0,
+            spot_length_seconds: element.spot_length_seconds,
+            distribution_ranges: payloadDistributionRanges(
+                element.distribution_ranges,
+            ),
+            position_discounts: [],
+        }));
 }
 
 export function payloadBudgetElementDiscounts(
     elements: BudgetElementDraft[],
     discountsByClientId: BudgetPositionDiscountsByClientId,
 ) {
-    return elements.map((element) => ({
-        client_id: element.client_id,
-        inventory_id: element.inventory_id ?? 0,
-        position_discounts: payloadDiscounts(
-            discountsByClientId[element.client_id] ?? [],
-        ),
-    }));
+    return elements
+        .filter(
+            (element) =>
+                element.inventory_id !== null && element.inventory_id > 0,
+        )
+        .map((element) => ({
+            client_id: element.client_id,
+            inventory_id: element.inventory_id ?? 0,
+            position_discounts: payloadDiscounts(
+                discountsByClientId[element.client_id] ?? [],
+            ),
+        }));
 }
 
 export function validateBudgetBasics(targetBudget: string): string | null {

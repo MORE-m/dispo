@@ -363,6 +363,180 @@ class BudgetSpotProposalFlowTest extends TestCase
         }
     }
 
+    public function test_invalid_budget_element_inventory_id_returns_german_message(): void
+    {
+        app()->setLocale('de');
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $response = $this->actingAs($user)->postJson(route('calculations.preview'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'budget_elements' => [
+                [
+                    'client_id' => 'invalid',
+                    'inventory_id' => 0,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [
+                        [
+                            'start_hour' => 8,
+                            'end_hour_exclusive' => 12,
+                            'day_group' => DayGroup::MoFr->value,
+                        ],
+                    ],
+                    'position_discounts' => [],
+                ],
+            ],
+            'positions' => [],
+        ]);
+
+        $response->assertUnprocessable();
+        $errors = $response->json('errors');
+        $message = $errors['budget_elements.0.inventory_id'][0] ?? null;
+        $this->assertNotNull($message);
+        $this->assertStringNotContainsString('validation.', $message);
+        $this->assertStringContainsString('Sender', $message);
+        $this->assertStringContainsString('mindestens', strtolower($message));
+    }
+
+    public function test_save_after_apply_without_budget_elements_succeeds(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+
+        $calculation = Calculation::query()->firstOrFail();
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$this->budgetPayload($catalog),
+            'calculation_id' => $calculation->id,
+        ]);
+        $proposalId = $propose->json('proposal.id');
+
+        $this->actingAs($user)
+            ->post(route('calculations.budget-apply', [
+                'calculation' => $calculation,
+                'proposal' => $proposalId,
+            ]))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $calculation->refresh()->load(['positions.timeRanges']);
+
+        $payload = $this->appliedSavePayload($calculation);
+        $this->assertArrayNotHasKey('budget_elements', $payload);
+
+        $this->actingAs($user)
+            ->put(route('calculations.update', $calculation), $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $firstRange = $calculation->positions->first()?->timeRanges->first();
+        $this->assertNotNull($firstRange);
+        $this->assertGreaterThan(0, $firstRange->spot_count);
+    }
+
+    public function test_save_recalculates_total_spot_count_from_time_ranges(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+
+        $calculation = Calculation::query()->firstOrFail();
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$this->budgetPayload($catalog),
+            'calculation_id' => $calculation->id,
+        ]);
+        $proposalId = $propose->json('proposal.id');
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation,
+            'proposal' => $proposalId,
+        ]));
+
+        $calculation->refresh()->load(['positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $payload = $this->appliedSavePayload($calculation);
+        $rangeCount = count($payload['positions'][0]['time_ranges']);
+        $payload['positions'][0]['time_ranges'] = array_map(
+            fn (array $range): array => [...$range, 'spot_count' => 5],
+            $payload['positions'][0]['time_ranges'],
+        );
+        $payload['positions'][0]['total_spot_count'] = 999;
+
+        $this->actingAs($user)
+            ->put(route('calculations.update', $calculation), $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $calculation->refresh()->load('positions');
+        $position = $calculation->positions->first();
+        $this->assertSame(5 * $rangeCount, $position->total_spot_count);
+    }
+
+    public function test_zero_spot_time_ranges_are_rejected_on_save(): void
+    {
+        app()->setLocale('de');
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+
+        $calculation = Calculation::query()->firstOrFail();
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            ...$this->budgetPayload($catalog),
+            'calculation_id' => $calculation->id,
+        ]);
+        $proposalId = $propose->json('proposal.id');
+
+        $this->actingAs($user)->post(route('calculations.budget-apply', [
+            'calculation' => $calculation,
+            'proposal' => $proposalId,
+        ]));
+
+        $calculation->refresh()->load(['positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $payload = $this->appliedSavePayload($calculation);
+        $payload['positions'][0]['time_ranges'][] = [
+            'start_hour' => 14,
+            'end_hour_exclusive' => 15,
+            'day_group' => DayGroup::MoFr->value,
+            'spot_count' => 0,
+        ];
+
+        $response = $this->actingAs($user)
+            ->put(route('calculations.update', $calculation), $payload);
+
+        $response->assertSessionHasErrors();
+        $errors = session('errors')->getMessages();
+        $spotCountErrors = collect($errors)
+            ->filter(fn (array $messages, string $key): bool => str_ends_with($key, 'spot_count'))
+            ->flatten();
+        $this->assertTrue($spotCountErrors->isNotEmpty());
+        $message = $spotCountErrors->first();
+        $this->assertStringNotContainsString('validation.', $message);
+        $this->assertStringContainsString('Spotanzahl', $message);
+    }
+
     /**
      * @param  array{hamburg: mixed, rock: mixed, medium: mixed}  $catalog
      * @param  list<array{inventory_id: int, discounts: list<array{type: string, custom_label: string|null, percent: string}>}>  $positionDiscounts

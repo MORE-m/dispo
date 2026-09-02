@@ -1,3 +1,5 @@
+import { mapValidationErrors } from './validation-errors';
+
 export class JsonPostError extends Error {
     constructor(
         message: string,
@@ -43,7 +45,7 @@ export async function jsonPost<T>(
     if (!response.ok) {
         throw new JsonPostError(
             data.message ?? 'Die Anfrage ist fehlgeschlagen.',
-            data.errors ?? {},
+            mapValidationErrors(data.errors ?? {}),
         );
     }
 

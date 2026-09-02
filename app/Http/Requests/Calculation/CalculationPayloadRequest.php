@@ -40,7 +40,7 @@ class CalculationPayloadRequest extends FormRequest
             'order_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'order_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'ae_enabled' => ['sometimes', 'boolean'],
-            'target_budget_nn' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
+            'target_budget_nn' => ['nullable', 'numeric', 'min:0.01', 'max:999999999999.99'],
             'budget_strategy' => ['nullable', Rule::enum(BudgetStrategy::class)],
             'budget_wish_inventory_ids' => ['sometimes', 'array'],
             'budget_wish_inventory_ids.*' => ['integer', 'min:1'],
@@ -91,6 +91,14 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return (array) trans('validation.attributes', [], 'de');
     }
 
     public function withValidator(Validator $validator): void
