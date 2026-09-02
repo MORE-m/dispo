@@ -58,13 +58,34 @@ process_cwd() {
 
 is_project_artisan_serve_pid() {
     local pid="$1"
-    local cmd cwd
+    local cmd cwd parent_pid parent_cmd parent_cwd
+    local laravel_server="${ROOT}/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
 
     cmd="$(process_command "$pid")"
     cwd="$(process_cwd "$pid")"
 
-    [[ "$cmd" == *"artisan serve"* ]] || return 1
-    [[ "$cwd" == "$ROOT" ]]
+    if [[ "$cmd" == *"artisan serve"* && "$cwd" == "$ROOT" ]]; then
+        return 0
+    fi
+
+    if [[ "$cmd" == *"php -S"* && "$cmd" == *"${ROOT}/vendor/laravel/"* && "$cmd" == *"server.php"* ]]; then
+        return 0
+    fi
+
+    if [[ -f "$laravel_server" && "$cmd" == *"php -S"* && "$cmd" == *"$laravel_server"* ]]; then
+        return 0
+    fi
+
+    parent_pid="$(ps -p "$pid" -o ppid= 2>/dev/null | tr -d ' ' || true)"
+    if [[ -n "$parent_pid" ]]; then
+        parent_cmd="$(process_command "$parent_pid")"
+        parent_cwd="$(process_cwd "$parent_pid")"
+        if [[ "$parent_cmd" == *"artisan serve"* && "$parent_cwd" == "$ROOT" ]]; then
+            return 0
+        fi
+    fi
+
+    return 1
 }
 
 server_responds() {
