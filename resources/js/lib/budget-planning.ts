@@ -321,3 +321,54 @@ export function initBudgetPositionDiscountsByClientId(
 
     return map;
 }
+
+export type BudgetPlanningViewState = {
+    planningMode: string;
+    budgetProposalStatus?: string | null;
+    budgetAppliedLocally: boolean;
+    budgetProposalManual: boolean;
+    positionsCount: number;
+    hasActiveProposal: boolean;
+    budgetReenterSetup: boolean;
+};
+
+export function usesRegularPlanningEditor(
+    state: BudgetPlanningViewState,
+): boolean {
+    if (state.budgetReenterSetup) {
+        return false;
+    }
+
+    if (state.planningMode === 'manual') {
+        return true;
+    }
+
+    if (state.planningMode !== 'budget') {
+        return false;
+    }
+
+    if (state.budgetProposalManual) {
+        return true;
+    }
+
+    if (state.budgetAppliedLocally) {
+        return true;
+    }
+
+    if (
+        state.budgetProposalStatus === 'applied' ||
+        state.budgetProposalStatus === 'manual'
+    ) {
+        return true;
+    }
+
+    if (state.positionsCount > 0 && !state.hasActiveProposal) {
+        return true;
+    }
+
+    return false;
+}
+
+export function isBudgetSetupPhase(state: BudgetPlanningViewState): boolean {
+    return state.planningMode === 'budget' && !usesRegularPlanningEditor(state);
+}

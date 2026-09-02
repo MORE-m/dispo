@@ -186,16 +186,43 @@ test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
     await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible({
         timeout: 15_000,
     });
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="position-inventory-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
         path: 'docs/screenshots/budget-after-apply-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    const firstSpotField = page.locator('[data-test="range-spots-0-0"]');
+    const originalSpots = await firstSpotField.inputValue();
+    await firstSpotField.fill(String(Number(originalSpots) + 1));
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-manual-edit-desktop.png',
     });
 
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
     await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue(
+        String(Number(originalSpots) + 1),
+    );
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.screenshot({
         path: 'docs/screenshots/budget-after-reload-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-mobile.png',
     });
     await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
 });

@@ -60,8 +60,10 @@ import {
     buildBudgetProposalPayload,
     initBudgetElementsFromSources,
     initBudgetPositionDiscountsByClientId,
+    isBudgetSetupPhase,
     payloadBudgetElementDiscounts,
     payloadBudgetElements,
+    usesRegularPlanningEditor,
     validateBudgetBasics,
     validateBudgetElements,
     type BudgetElementDraft,
@@ -439,7 +441,7 @@ export default function CalculationWizard({
     savedSummary,
     savedDisplayTotals,
     latestBudgetProposal,
-    appliedBudgetProposal,
+    appliedBudgetProposal: _appliedBudgetProposal,
     canEdit,
 }: {
     catalog: Catalog;
@@ -584,12 +586,20 @@ export default function CalculationWizard({
         Record<string, string[]>
     >({});
 
-    const budgetEditingApplied =
-        planningMode === 'budget' &&
-        (budgetAppliedLocally ||
-            calculation?.budget_proposal_status === 'applied' ||
-            calculation?.budget_proposal_status === 'manual' ||
-            (positions.length > 0 && !proposal));
+    const [budgetReenterSetup, setBudgetReenterSetup] = useState(false);
+
+    const planningViewState = {
+        planningMode,
+        budgetProposalStatus: calculation?.budget_proposal_status,
+        budgetAppliedLocally,
+        budgetProposalManual,
+        positionsCount: positions.length,
+        hasActiveProposal: proposal !== null,
+        budgetReenterSetup,
+    };
+    const usesRegularPlanningEditorView =
+        usesRegularPlanningEditor(planningViewState);
+    const isBudgetSetup = isBudgetSetupPhase(planningViewState);
 
     const payload = useMemo(
         () => ({
@@ -621,48 +631,44 @@ export default function CalculationWizard({
             budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            positions:
-                planningMode === 'budget' && !budgetEditingApplied
-                    ? []
-                    : positions.map((position) => {
-                          const ranges = payloadTimeRanges(
-                              position.time_ranges,
-                          );
+            positions: isBudgetSetup
+                ? []
+                : positions.map((position) => {
+                      const ranges = payloadTimeRanges(position.time_ranges);
 
-                          return {
-                              id: position.id,
-                              client_key: position.client_key,
-                              inventory_id: position.inventory_id,
-                              advertising_medium_id:
-                                  position.advertising_medium_id,
-                              spot_method: position.spot_method,
-                              length_seconds: position.length_seconds,
-                              total_spot_count: totalSpotCount(
-                                  position.time_ranges,
+                      return {
+                          id: position.id,
+                          client_key: position.client_key,
+                          inventory_id: position.inventory_id,
+                          advertising_medium_id: position.advertising_medium_id,
+                          spot_method: position.spot_method,
+                          length_seconds: position.length_seconds,
+                          total_spot_count: totalSpotCount(
+                              position.time_ranges,
+                          ),
+                          needs_spot_redistribution:
+                              position.needs_spot_redistribution ?? false,
+                          position_discount_percent: '0',
+                          ae_percent: '0',
+                          time_ranges: ranges,
+                          position_discounts: payloadDiscounts(
+                              position.position_discounts,
+                          ),
+                          plan_rows: ranges.flatMap((range) =>
+                              Array.from(
+                                  {
+                                      length:
+                                          range.end_hour_exclusive -
+                                          range.start_hour,
+                                  },
+                                  (_, offset) => ({
+                                      hour: range.start_hour + offset,
+                                      day_group: range.day_group,
+                                  }),
                               ),
-                              needs_spot_redistribution:
-                                  position.needs_spot_redistribution ?? false,
-                              position_discount_percent: '0',
-                              ae_percent: '0',
-                              time_ranges: ranges,
-                              position_discounts: payloadDiscounts(
-                                  position.position_discounts,
-                              ),
-                              plan_rows: ranges.flatMap((range) =>
-                                  Array.from(
-                                      {
-                                          length:
-                                              range.end_hour_exclusive -
-                                              range.start_hour,
-                                      },
-                                      (_, offset) => ({
-                                          hour: range.start_hour + offset,
-                                          day_group: range.day_group,
-                                      }),
-                                  ),
-                              ),
-                          };
-                      }),
+                          ),
+                      };
+                  }),
         }),
         [
             planningMode,
@@ -678,22 +684,19 @@ export default function CalculationWizard({
             budgetElements,
             budgetPositionDiscounts,
             budgetProposalManual,
-            budgetEditingApplied,
+            isBudgetSetup,
+            usesRegularPlanningEditorView,
             calculation,
             positions,
         ],
     );
 
-    const steps =
-        planningMode === 'budget' && !budgetEditingApplied
-            ? BUDGET_STEPS
-            : MANUAL_STEPS;
+    const steps = isBudgetSetup ? BUDGET_STEPS : MANUAL_STEPS;
     const budgetPreviewReady =
         planningMode === 'budget' &&
-        budgetEditingApplied &&
+        usesRegularPlanningEditorView &&
         positions.length > 0;
-    const showBudgetPlanningSidebar =
-        planningMode === 'budget' && !budgetEditingApplied;
+    const showBudgetPlanningSidebar = isBudgetSetup;
 
     function markBudgetInputsChanged() {
         setInputsRevision((value) => value + 1);
@@ -735,7 +738,7 @@ export default function CalculationWizard({
     }
 
     function updatePosition(index: number, patch: Partial<PositionDraft>) {
-        if (budgetEditingApplied) {
+        if (usesRegularPlanningEditorView && planningMode === 'budget') {
             setBudgetProposalManual(true);
         }
 
@@ -787,7 +790,7 @@ export default function CalculationWizard({
     }
 
     function removePosition(index: number) {
-        if (budgetEditingApplied) {
+        if (usesRegularPlanningEditorView && planningMode === 'budget') {
             setBudgetProposalManual(true);
         }
 
@@ -942,6 +945,17 @@ export default function CalculationWizard({
                     (candidate) => candidate.inventory_id === item.inventory_id,
                 );
 
+                const time_ranges = (item.time_ranges ?? []).map((range) => ({
+                    start_hour: range.start_hour,
+                    end_hour_exclusive: range.end_hour_exclusive,
+                    day_group: range.day_group,
+                    spot_count: range.spot_count,
+                }));
+                const summedSpotCount = time_ranges.reduce(
+                    (sum, range) => sum + Number(range.spot_count ?? 0),
+                    0,
+                );
+
                 return {
                     id: existing?.id,
                     client_key: existing?.client_key ?? newClientKey(),
@@ -952,16 +966,14 @@ export default function CalculationWizard({
                         item.length_seconds ??
                         element?.spot_length_seconds ??
                         defaultSpotLength,
-                    total_spot_count: item.total_spot_count,
+                    total_spot_count:
+                        summedSpotCount > 0
+                            ? summedSpotCount
+                            : item.total_spot_count,
                     needs_spot_redistribution: false,
                     position_discount_percent: '0',
                     ae_percent: '0',
-                    time_ranges: (item.time_ranges ?? []).map((range) => ({
-                        start_hour: range.start_hour,
-                        end_hour_exclusive: range.end_hour_exclusive,
-                        day_group: range.day_group,
-                        spot_count: range.spot_count,
-                    })),
+                    time_ranges,
                     position_discounts:
                         proposalDiscounts?.map((discount) => ({
                             type: discount.type,
@@ -978,7 +990,25 @@ export default function CalculationWizard({
         setProposal(null);
         setProposalAtRevision(null);
         setBudgetAppliedLocally(true);
+        setBudgetReenterSetup(false);
         setStep(1);
+    }
+
+    function startBudgetReoptimize() {
+        const confirmed = window.confirm(
+            'Bei einer Neuoptimierung können deine manuellen Änderungen an Spotzahlen und Zeiträumen ersetzt werden.',
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        setBudgetReenterSetup(true);
+        setBudgetAppliedLocally(false);
+        setBudgetProposalManual(false);
+        setProposal(null);
+        setProposalAtRevision(null);
+        setProposalError(null);
+        setStep(0);
     }
 
     const displayTotals = canEdit ? totals : null;
@@ -995,7 +1025,7 @@ export default function CalculationWizard({
         !hasActiveCatalog;
 
     function goNext() {
-        if (planningMode === 'budget') {
+        if (isBudgetSetup) {
             if (step === 0) {
                 const basicsError = validateBudgetBasics(targetBudget);
                 if (basicsError) {
@@ -1018,9 +1048,7 @@ export default function CalculationWizard({
     }
 
     const nextLabel =
-        planningMode === 'budget' && step === 1
-            ? 'Weiter zu Konditionen'
-            : 'Weiter';
+        isBudgetSetup && step === 1 ? 'Weiter zu Konditionen' : 'Weiter';
 
     return (
         <>
@@ -1043,15 +1071,30 @@ export default function CalculationWizard({
                 {flash.success ? (
                     <SuccessState message={flash.success} />
                 ) : null}
-                {planningMode === 'budget' && budgetEditingApplied ? (
-                    <StatusBanner data-test="budget-applied-hint">
-                        Mit Budget geplant · anschließend frei bearbeitbar
-                        {budgetProposalManual
-                            ? ' · Die übernommene Budgetplanung wurde manuell angepasst.'
-                            : appliedBudgetProposal || initialBudgetApplied
-                              ? ' · Aus Budgetvorschlag übernommen'
-                              : ''}
-                    </StatusBanner>
+                {planningMode === 'budget' && usesRegularPlanningEditorView ? (
+                    <div
+                        className="flex flex-wrap items-center gap-3"
+                        data-test="budget-applied-hint"
+                    >
+                        <StatusBanner className="flex-1">
+                            Mit Budget geplant · anschließend frei bearbeitbar
+                            {budgetProposalManual ? ' · manuell angepasst' : ''}
+                            {targetBudget.trim() !== ''
+                                ? ` · Zielbudget: ${money(targetBudget)} N/N`
+                                : ''}
+                        </StatusBanner>
+                        {canEdit ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                data-test="budget-reoptimize"
+                                onClick={startBudgetReoptimize}
+                            >
+                                Budget neu optimieren
+                            </Button>
+                        ) : null}
+                    </div>
                 ) : null}
                 {error ? (
                     <ErrorState message={error} data-test="preview-error" />
@@ -1262,12 +1305,12 @@ export default function CalculationWizard({
 
                         {step === 1 ? (
                             catalogMissing ||
-                            (planningMode === 'budget' && !hasActiveCatalog) ? (
+                            (isBudgetSetup && !hasActiveCatalog) ? (
                                 <EmptyState
                                     title="Kein Katalog"
                                     description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
                                 />
-                            ) : planningMode === 'budget' ? (
+                            ) : isBudgetSetup ? (
                                 <BudgetElementsStep
                                     elements={budgetElements}
                                     inventories={catalog.inventories}
@@ -1609,7 +1652,7 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 2 ? (
-                            planningMode === 'budget' ? (
+                            isBudgetSetup ? (
                                 <div className="space-y-6">
                                     <BudgetConditionsStep
                                         budgetElements={budgetElements}
@@ -1883,7 +1926,7 @@ export default function CalculationWizard({
                                             </div>
                                         </CardContent>
                                     </Card>
-                                    {planningMode === 'budget' &&
+                                    {isBudgetSetup &&
                                     proposalStatus === 'stale' ? (
                                         <StatusBanner data-test="budget-stale-hint">
                                             Die Konditionen haben sich geändert.
@@ -1897,8 +1940,7 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 3 ? (
-                            planningMode === 'budget' &&
-                            !budgetEditingApplied ? (
+                            isBudgetSetup ? (
                                 <BudgetProposalResultStep
                                     proposal={proposal}
                                     proposalStatus={proposalStatus}
@@ -2266,12 +2308,12 @@ export default function CalculationWizard({
                             </Button>
                         ) : null}
                         {step < steps.length - 1 &&
-                        !(planningMode === 'budget' && step === 2) ? (
+                        !(isBudgetSetup && step === 2) ? (
                             <Button type="button" onClick={goNext}>
                                 {nextLabel}
                             </Button>
                         ) : null}
-                        {planningMode === 'budget' && step === 2 ? (
+                        {isBudgetSetup && step === 2 ? (
                             <Button
                                 type="button"
                                 data-test="budget-propose"
@@ -2288,7 +2330,8 @@ export default function CalculationWizard({
                                 disabled={
                                     busy ||
                                     (planningMode === 'budget' &&
-                                        positions.length === 0)
+                                        positions.length === 0 &&
+                                        !isBudgetSetup)
                                 }
                                 variant={
                                     step === steps.length - 1
