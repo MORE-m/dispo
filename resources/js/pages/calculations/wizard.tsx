@@ -2,6 +2,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
+import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
 import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
 import { BudgetConditionsStep } from '@/components/budget-conditions-step';
 import { BudgetElementsStep } from '@/components/budget-elements-step';
@@ -438,6 +439,7 @@ export default function CalculationWizard({
     latestBudgetProposal,
     appliedBudgetProposal: _appliedBudgetProposal,
     canEdit,
+    canCreateDispoOrder = false,
 }: {
     catalog: Catalog;
     dayGroups: DayGroupOption[];
@@ -448,6 +450,7 @@ export default function CalculationWizard({
     latestBudgetProposal: LatestBudgetProposal | null;
     appliedBudgetProposal: AppliedBudgetProposal | null;
     canEdit: boolean;
+    canCreateDispoOrder?: boolean;
 }) {
     const flash = usePage().props.flash;
     const initialBudgetApplied =
@@ -1955,13 +1958,19 @@ export default function CalculationWizard({
                             ) : (
                                 <Card className={wizardCardClass}>
                                     <CardHeader
-                                        className={wizardCardHeaderClass}
+                                        className={`${wizardCardHeaderClass} flex flex-row items-center justify-between gap-3`}
                                     >
                                         <CardTitle
                                             className={wizardCardTitleClass}
                                         >
                                             Zusammenfassung
                                         </CardTitle>
+                                        {calculation?.id &&
+                                        canCreateDispoOrder ? (
+                                            <DispoOrderCreateAction
+                                                calculationId={calculation.id}
+                                            />
+                                        ) : null}
                                     </CardHeader>
                                     <CardContent
                                         className={`${wizardCardContentClass} space-y-4 text-sm`}

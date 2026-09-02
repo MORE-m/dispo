@@ -27,6 +27,21 @@ class NavigationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->component('overview'));
     }
 
+    public function test_dispo_orders_module_is_available_for_authorized_roles(): void
+    {
+        $user = User::factory()->role(Role::Sales)->create();
+        $keys = collect(app(AppNavigation::class)->itemsFor($user));
+
+        $dispo = $keys->firstWhere('key', 'dispo-orders');
+        $this->assertNotNull($dispo);
+        $this->assertTrue($dispo['available']);
+
+        $this->actingAs($user)
+            ->get(route('dispo-orders.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->component('dispo-orders/index'));
+    }
+
     public function test_locked_modules_are_empty_states_not_fake_pages(): void
     {
         $user = User::factory()->role(Role::Admin)->create();

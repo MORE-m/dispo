@@ -88,6 +88,11 @@ class User extends Authenticatable
         );
     }
 
+    public function canManageDispoOrders(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Sales, Role::Management);
+    }
+
     public function canViewReports(): bool
     {
         return $this->hasAnyRole(

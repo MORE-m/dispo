@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
+use App\Http\Controllers\DispoOrderController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\UnavailableModuleController;
@@ -25,7 +26,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('calculations.budget-apply');
 
     Route::get('standardangebote', UnavailableModuleController::class)->defaults('module', 'standard-offers')->name('standard-offers.index');
-    Route::get('dispoauftraege', UnavailableModuleController::class)->defaults('module', 'dispo-orders')->name('dispo-orders.index');
+    Route::get('dispoauftraege', [DispoOrderController::class, 'index'])->name('dispo-orders.index');
+    Route::get('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'show'])->name('dispo-orders.show');
+    Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])
+        ->name('dispo-orders.positions');
+    Route::post('kalkulationen/{calculation}/dispoauftraege', [DispoOrderController::class, 'store'])
+        ->name('dispo-orders.store');
     Route::get('auswertungen', UnavailableModuleController::class)->defaults('module', 'reports')->name('reports.index');
     Route::get('stammdaten', UnavailableModuleController::class)->defaults('module', 'master-data')->name('master-data.index');
     Route::get('administration', UnavailableModuleController::class)->defaults('module', 'administration')->name('administration.index');

@@ -30,6 +30,15 @@ class E2ECalculationSeeder extends Seeder
             ],
         );
 
+        User::query()->updateOrCreate(
+            ['email' => 'disposition@example.com'],
+            [
+                'name' => 'E2E Disposition',
+                'password' => 'password',
+                'role' => Role::Disposition,
+            ],
+        );
+
         if (Organization::query()->exists()) {
             return;
         }

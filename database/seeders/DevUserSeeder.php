@@ -20,6 +20,7 @@ class DevUserSeeder extends Seeder
         foreach ([
             ['email' => 'test@example.com', 'name' => 'Test Benutzer', 'role' => Role::Sales],
             ['email' => 'sales@example.com', 'name' => 'E2E Vertrieb', 'role' => Role::Sales],
+            ['email' => 'disposition@example.com', 'name' => 'E2E Disposition', 'role' => Role::Disposition],
         ] as $attrs) {
             User::query()->updateOrCreate(
                 ['email' => $attrs['email']],

@@ -128,4 +128,12 @@ class Calculation extends Model
     {
         return $this->hasMany(CalculationOrderDiscount::class)->orderBy('sort')->orderBy('id');
     }
+
+    /**
+     * @return HasMany<DispoOrder, $this>
+     */
+    public function dispoOrders(): HasMany
+    {
+        return $this->hasMany(DispoOrder::class);
+    }
 }

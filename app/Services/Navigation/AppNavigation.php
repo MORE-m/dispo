@@ -37,7 +37,7 @@ final class AppNavigation
                 'key' => 'dispo-orders',
                 'title' => 'Dispoaufträge',
                 'href' => '/dispoauftraege',
-                'available' => false,
+                'available' => true,
                 'visible' => $user->canViewDispoOrders(),
             ],
             [

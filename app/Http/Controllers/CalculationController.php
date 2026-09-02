@@ -16,6 +16,7 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
+use App\Models\DispoOrder;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\SpotClassicPlanRow;
@@ -437,6 +438,8 @@ class CalculationController extends Controller
             'latestBudgetProposal' => $latestBudgetProposal,
             'appliedBudgetProposal' => $appliedBudgetProposal,
             'canEdit' => $canEdit,
+            'canCreateDispoOrder' => $calculation !== null
+                && ($request->user()?->can('create', [DispoOrder::class, $calculation]) ?? false),
         ];
     }
 }

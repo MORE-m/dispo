@@ -18,7 +18,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf aus Kalkulation, siehe unten) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -138,7 +138,31 @@ Nicht umsetzen, bis der Product Owner freigibt:
 - Influencer-/Social-Media-Fachoberflächen
 - weitere Werbeelemente außerhalb Spot Classic
 
-## UX-GATE-D – Abschlussprozesse (blockiert)
+## UX-GATE-D – Abschlussprozesse (teilweise freigegeben)
+
+**Product-Owner-Teilfreigabe (September 2026):** Für den Vertical Slice
+„Dispoauftrag-Entwurf aus Kalkulation“ sind folgende UX-GATE-D-Bestandteile
+**freigegeben**:
+
+- Dispoauftrag aus gespeicherter Kalkulation anlegen
+- Positionsauswahl vor der Anlage
+- Dispoauftragsliste und Entwurfs-Detailansicht (read-only Snapshot)
+- Navigation zum Dispoauftragsmodul
+- zugehörige Policies, Persistenz, Auditierung und Tests
+
+**Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
+
+- Einreichen zur Freigabe, Genehmigen/Ablehnen, Vier-Augen-Prinzip
+- operative Bearbeitung durch die Disposition
+- Material, Uploads, Kommentare, Rückfragen
+- vollständiger Statusworkflow über `Entwurf` hinaus
+- Standardangebots-Fachoberflächen
+- Administration der Initialkataloge
+- Auswertungen und abschließende Fachoberflächen
+
+Der Status `Entwurf` ist technisch und fachlich umgesetzt. Die weiteren zehn
+Dispoauftragsstatuswerte sind zentral definiert, aber in V1 noch nicht
+erreichbar.
 
 Nicht umsetzen, bis der Product Owner freigibt:
 
@@ -154,6 +178,7 @@ Nicht umsetzen, bis der Product Owner freigibt:
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
+| D teilweise freigegeben | Dispoauftrag-Entwurf aus Kalkulation (Liste, Detail, Positionsauswahl); Freigabe- und Dispo-Workflow weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.
