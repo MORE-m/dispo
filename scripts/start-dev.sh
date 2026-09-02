@@ -13,6 +13,11 @@ HOST="${DISPO_HOST:-127.0.0.1}"
 MYSQL_BIN="${MYSQL_BIN:-/Applications/XAMPP/xamppfiles/bin/mysql}"
 readonly MAX_STOP_WAIT="${DISPO_STOP_WAIT:-10}"
 
+if [[ ! "$PORT" =~ ^[0-9]+$ ]] || (( PORT < 1 || PORT > 65535 )); then
+    echo "FEHLER: Ungültiger DISPO_PORT: ${PORT} (erwartet 1–65535)."
+    exit 1
+fi
+
 resolve_php_bin() {
     local candidate version_major version_minor
 
@@ -114,6 +119,11 @@ stop_pid_gracefully() {
         return 0
     fi
 
+    if ! is_project_artisan_serve_pid "$pid"; then
+        echo "FEHLER: PID ${pid} ist nicht der Dispo-Server – TERM abgebrochen."
+        exit 1
+    fi
+
     kill -TERM "$pid" 2>/dev/null || return 1
 
     while kill -0 "$pid" 2>/dev/null && [[ "$waited" -lt "$MAX_STOP_WAIT" ]]; do
@@ -122,6 +132,10 @@ stop_pid_gracefully() {
     done
 
     if kill -0 "$pid" 2>/dev/null; then
+        if ! is_project_artisan_serve_pid "$pid"; then
+            echo "FEHLER: PID ${pid} ist nicht mehr der Dispo-Server – KILL abgebrochen."
+            exit 1
+        fi
         echo "Prozess ${pid} reagiert nicht auf TERM – sende KILL …"
         kill -KILL "$pid" 2>/dev/null || true
         sleep 1
