@@ -2,12 +2,11 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
-import {
-    BudgetProposalPanel,
-    BudgetWishSenders,
-    type BudgetSpotProposal,
-} from '@/components/budget-proposal-panel';
-import { BudgetDistributionRanges } from '@/components/budget-distribution-ranges';
+import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
+import { BudgetConditionsStep } from '@/components/budget-conditions-step';
+import { BudgetPlanningFrameStep } from '@/components/budget-planning-frame-step';
+import { BudgetPlanningSidebar } from '@/components/budget-planning-sidebar';
+import { BudgetProposalResultStep } from '@/components/budget-proposal-result-step';
 import {
     DiscountListEditor,
     payloadDiscounts,
@@ -57,6 +56,13 @@ import {
     wizardCardTitleClass,
 } from '@/components/wizard-section';
 import { useCalculationPreview } from '@/hooks/use-calculation-preview';
+import {
+    buildBudgetProposalPayload,
+    payloadBudgetPositionDiscounts,
+    validateBudgetBasics,
+    validateBudgetFrame,
+    type BudgetPositionDiscountsByInventory,
+} from '@/lib/budget-planning';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -246,12 +252,66 @@ type SavedCalculation = {
     }[];
 };
 
-const STEPS = [
+const MANUAL_STEPS = [
     'Grunddaten',
     'Werbeelemente',
     'Konditionen',
     'Zusammenfassung',
 ] as const;
+
+const BUDGET_STEPS = [
+    'Grunddaten',
+    'Planungsrahmen',
+    'Konditionen',
+    'Budgetvorschlag',
+] as const;
+
+function initBudgetPositionDiscounts(
+    latestBudgetProposal: LatestBudgetProposal | null,
+    calculation: SavedCalculation | null,
+): BudgetPositionDiscountsByInventory {
+    const map: BudgetPositionDiscountsByInventory = {};
+
+    for (const row of latestBudgetProposal?.payload
+        .budget_position_discounts_by_inventory ?? []) {
+        map[row.inventory_id] = draftDiscounts(row.discounts);
+    }
+
+    for (const position of calculation?.positions ?? []) {
+        if (!map[position.inventory_id]) {
+            map[position.inventory_id] = draftDiscounts(
+                position.position_discounts,
+                position.position_discount_percent,
+            );
+        }
+    }
+
+    return map;
+}
+
+type LatestBudgetProposal = {
+    id: number;
+    input_fingerprint: string | null;
+    status: string;
+    payload: BudgetSpotProposal & {
+        wish_inventory_ids?: number[];
+        spot_length_seconds?: number;
+        distribution_ranges?: DistributionRangeDraft[];
+        budget_position_discounts_by_inventory?: Array<{
+            inventory_id: number;
+            discounts?: Array<{
+                type: string;
+                custom_label: string | null;
+                percent: string;
+            }>;
+        }>;
+        order_discounts?: Array<{
+            type: string;
+            custom_label: string | null;
+            percent: string;
+        }>;
+    };
+};
 
 function newClientKey(): string {
     return crypto.randomUUID();
@@ -382,6 +442,7 @@ export default function CalculationWizard({
     calculation,
     savedSummary,
     savedDisplayTotals,
+    latestBudgetProposal,
     canEdit,
 }: {
     catalog: Catalog;
@@ -390,10 +451,21 @@ export default function CalculationWizard({
     calculation: SavedCalculation | null;
     savedSummary: SavedSummary | null;
     savedDisplayTotals: Totals | null;
+    latestBudgetProposal: LatestBudgetProposal | null;
     canEdit: boolean;
 }) {
     const flash = usePage().props.flash;
-    const [step, setStep] = useState(0);
+    const [step, setStep] = useState(() => {
+        if (
+            latestBudgetProposal &&
+            calculation?.planning_mode === 'budget' &&
+            (calculation.positions?.length ?? 0) === 0
+        ) {
+            return 3;
+        }
+
+        return 0;
+    });
     const [planningMode, setPlanningMode] = useState(
         calculation?.planning_mode ?? 'manual',
     );
@@ -420,9 +492,6 @@ export default function CalculationWizard({
     const [targetBudget, setTargetBudget] = useState(
         calculation?.target_budget_nn ?? '',
     );
-    const [budgetStrategy, setBudgetStrategy] = useState(
-        calculation?.budget_strategy ?? 'equal_spot_count',
-    );
     const spotClassicMedium = catalog.media.find(
         (item) => item.code === 'spot_classic' && item.is_active,
     );
@@ -435,22 +504,39 @@ export default function CalculationWizard({
         spotClassicMedium?.default_length_seconds ??
         30;
     const [wishInventoryIds, setWishInventoryIds] = useState<number[]>(() => {
+        if (latestBudgetProposal?.payload.wish_inventory_ids?.length) {
+            return latestBudgetProposal.payload.wish_inventory_ids;
+        }
+
         if (calculation?.positions?.length) {
             return calculation.positions.map((p) => p.inventory_id);
         }
 
-        const active = catalog.inventories.filter((item) => item.is_active);
-        return active.slice(0, 1).map((item) => item.id);
+        return [];
     });
     const [budgetSpotLength, setBudgetSpotLength] = useState(
-        calculation?.positions[0]?.length_seconds ?? defaultSpotLength,
+        latestBudgetProposal?.payload.spot_length_seconds ??
+            calculation?.positions[0]?.length_seconds ??
+            defaultSpotLength,
     );
     const [budgetDistributionRanges, setBudgetDistributionRanges] = useState<
         DistributionRangeDraft[]
-    >([emptyDistributionRange()]);
-    const [proposalSnapshot, setProposalSnapshot] = useState<string | null>(
-        null,
+    >(() => {
+        if (latestBudgetProposal?.payload.distribution_ranges?.length) {
+            return latestBudgetProposal.payload.distribution_ranges;
+        }
+
+        return [emptyDistributionRange()];
+    });
+    const [budgetPositionDiscounts, setBudgetPositionDiscounts] =
+        useState<BudgetPositionDiscountsByInventory>(() =>
+            initBudgetPositionDiscounts(latestBudgetProposal, calculation),
+        );
+    const [inputsRevision, setInputsRevision] = useState(0);
+    const [proposalAtRevision, setProposalAtRevision] = useState<number | null>(
+        latestBudgetProposal ? 0 : null,
     );
+    const [proposalLoading, setProposalLoading] = useState(false);
     const [proposalError, setProposalError] = useState<string | null>(null);
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
@@ -480,10 +566,16 @@ export default function CalculationWizard({
             }));
         }
 
+        if (calculation?.planning_mode === 'budget') {
+            return [];
+        }
+
         const first = firstValidPosition(catalog);
         return first ? [first] : [];
     });
-    const [proposal, setProposal] = useState<Proposal | null>(null);
+    const [proposal, setProposal] = useState<Proposal | null>(
+        latestBudgetProposal?.payload ?? null,
+    );
     const [busy, setBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveFieldErrors, setSaveFieldErrors] = useState<
@@ -511,6 +603,13 @@ export default function CalculationWizard({
             budget_distribution_ranges:
                 planningMode === 'budget'
                     ? payloadDistributionRanges(budgetDistributionRanges)
+                    : undefined,
+            budget_position_discounts_by_inventory:
+                planningMode === 'budget'
+                    ? payloadBudgetPositionDiscounts(
+                          budgetPositionDiscounts,
+                          wishInventoryIds,
+                      )
                     : undefined,
             budget_proposal_manual: false,
             lock_version: calculation?.lock_version,
@@ -572,10 +671,21 @@ export default function CalculationWizard({
             wishInventoryIds,
             budgetSpotLength,
             budgetDistributionRanges,
+            budgetPositionDiscounts,
             calculation,
             positions,
         ],
     );
+
+    const steps = planningMode === 'budget' ? BUDGET_STEPS : MANUAL_STEPS;
+    const budgetPreviewReady =
+        planningMode === 'budget' && positions.length > 0;
+    const showBudgetPlanningSidebar =
+        planningMode === 'budget' && !budgetPreviewReady;
+
+    function markBudgetInputsChanged() {
+        setInputsRevision((value) => value + 1);
+    }
 
     const {
         totals,
@@ -585,8 +695,8 @@ export default function CalculationWizard({
     } = useCalculationPreview<Totals>({
         url: '/kalkulationen/vorschau',
         payload,
-        enabled: canEdit,
-        blocked: busy,
+        enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
+        blocked: busy || proposalLoading,
     });
     const error = previewError ?? saveError ?? proposalError;
     const fieldErrors = {
@@ -698,36 +808,64 @@ export default function CalculationWizard({
         }
     }
 
-    function proposalInputSnapshot(): string {
-        return JSON.stringify({
-            targetBudget,
-            orderDiscounts,
-            aeEnabled,
+    const proposalStatus =
+        proposal &&
+        proposalAtRevision !== null &&
+        inputsRevision !== proposalAtRevision
+            ? 'stale'
+            : latestBudgetProposal?.status === 'stale'
+              ? 'stale'
+              : (proposal?.status ??
+                calculation?.budget_proposal_status ??
+                'current');
+
+    async function createProposal() {
+        const basicsError = validateBudgetBasics(targetBudget);
+        if (basicsError) {
+            setProposalError(basicsError);
+            return;
+        }
+
+        const frameError = validateBudgetFrame(
             wishInventoryIds,
             budgetSpotLength,
             budgetDistributionRanges,
-        });
-    }
+        );
+        if (frameError) {
+            setProposalError(frameError);
+            return;
+        }
 
-    const proposalStatus =
-        proposal && proposalSnapshot !== proposalInputSnapshot()
-            ? 'stale'
-            : (proposal?.status ??
-              calculation?.budget_proposal_status ??
-              'current');
-
-    async function createProposal() {
+        setProposalLoading(true);
         setBusy(true);
         setProposalError(null);
         setSaveError(null);
         setSaveFieldErrors({});
         try {
+            const proposalPayload = buildBudgetProposalPayload({
+                planningMode,
+                customerName,
+                agencyName,
+                campaign,
+                productTitle,
+                briefing,
+                orderDiscounts,
+                aeEnabled,
+                targetBudget,
+                wishInventoryIds,
+                budgetSpotLength,
+                budgetDistributionRanges,
+                budgetPositionDiscounts,
+                calculationId: calculation?.id,
+                lockVersion: calculation?.lock_version,
+            });
             const data = await jsonPost<{ proposal: Proposal }>(
                 '/kalkulationen/budget-vorschlag',
-                payload,
+                proposalPayload,
             );
             setProposal(data.proposal);
-            setProposalSnapshot(proposalInputSnapshot());
+            setProposalAtRevision(inputsRevision);
+            setStep(3);
         } catch (caught) {
             if (caught instanceof JsonPostError) {
                 setSaveFieldErrors(caught.fieldErrors);
@@ -740,6 +878,7 @@ export default function CalculationWizard({
                 );
             }
         } finally {
+            setProposalLoading(false);
             setBusy(false);
         }
     }
@@ -776,6 +915,15 @@ export default function CalculationWizard({
                     spotClassicMedium?.id ??
                     existing?.advertising_medium_id ??
                     0;
+                const proposalDiscounts = (
+                    item as Proposal['positions'][number] & {
+                        position_discounts?: Array<{
+                            type: string;
+                            custom_label: string | null;
+                            percent: string;
+                        }>;
+                    }
+                ).position_discounts;
 
                 return {
                     id: existing?.id,
@@ -794,13 +942,20 @@ export default function CalculationWizard({
                         day_group: range.day_group,
                         spot_count: range.spot_count,
                     })),
-                    position_discounts: existing?.position_discounts ?? [],
+                    position_discounts:
+                        proposalDiscounts?.map((discount) => ({
+                            type: discount.type,
+                            custom_label: discount.custom_label ?? '',
+                            percent: discount.percent,
+                        })) ??
+                        budgetPositionDiscounts[item.inventory_id] ??
+                        [],
                     plan_rows: [],
                 };
             }),
         );
         setProposal(null);
-        setProposalSnapshot(null);
+        setProposalAtRevision(null);
     }
 
     const displayTotals = canEdit ? totals : null;
@@ -811,7 +966,42 @@ export default function CalculationWizard({
         catalog.media.some(
             (item) => item.code === 'spot_classic' && item.is_active,
         );
-    const catalogMissing = positions.length === 0 && !hasActiveCatalog;
+    const catalogMissing =
+        planningMode === 'manual' &&
+        positions.length === 0 &&
+        !hasActiveCatalog;
+
+    function goNext() {
+        if (planningMode === 'budget') {
+            if (step === 0) {
+                const basicsError = validateBudgetBasics(targetBudget);
+                if (basicsError) {
+                    setProposalError(basicsError);
+                    return;
+                }
+            }
+
+            if (step === 1) {
+                const frameError = validateBudgetFrame(
+                    wishInventoryIds,
+                    budgetSpotLength,
+                    budgetDistributionRanges,
+                );
+                if (frameError) {
+                    setProposalError(frameError);
+                    return;
+                }
+            }
+        }
+
+        setProposalError(null);
+        setStep(step + 1);
+    }
+
+    const nextLabel =
+        planningMode === 'budget' && step === 1
+            ? 'Weiter zu Konditionen'
+            : 'Weiter';
 
     return (
         <>
@@ -839,7 +1029,7 @@ export default function CalculationWizard({
                 ) : null}
 
                 <WizardStepper
-                    steps={STEPS}
+                    steps={steps}
                     currentStep={step}
                     onStepChange={setStep}
                 />
@@ -868,9 +1058,24 @@ export default function CalculationWizard({
                                                     planningMode === 'manual'
                                                 }
                                                 disabled={!canEdit}
-                                                onChange={() =>
-                                                    setPlanningMode('manual')
-                                                }
+                                                onChange={() => {
+                                                    setPlanningMode('manual');
+                                                    if (
+                                                        positions.length ===
+                                                            0 &&
+                                                        hasActiveCatalog
+                                                    ) {
+                                                        const first =
+                                                            firstValidPosition(
+                                                                catalog,
+                                                            );
+                                                        if (first) {
+                                                            setPositions([
+                                                                first,
+                                                            ]);
+                                                        }
+                                                    }
+                                                }}
                                             >
                                                 <SelectionCardOption
                                                     icon={SlidersHorizontal}
@@ -884,15 +1089,27 @@ export default function CalculationWizard({
                                                     planningMode === 'budget'
                                                 }
                                                 disabled={!canEdit}
-                                                onChange={() =>
-                                                    setPlanningMode('budget')
-                                                }
+                                                onChange={() => {
+                                                    setPlanningMode('budget');
+                                                    if (
+                                                        !calculation?.positions
+                                                            ?.length
+                                                    ) {
+                                                        setPositions([]);
+                                                        setProposal(null);
+                                                        setProposalAtRevision(
+                                                            null,
+                                                        );
+                                                    }
+                                                }}
                                             >
-                                                <SelectionCardOption
-                                                    icon={Wallet}
-                                                    title="Mit Budget planen"
-                                                    description="Zielbudget und Verteilungslogik vorgeben."
-                                                />
+                                                <div data-test="planning-mode-budget">
+                                                    <SelectionCardOption
+                                                        icon={Wallet}
+                                                        title="Mit Budget planen"
+                                                        description="Zielbudget und Verteilungslogik vorgeben."
+                                                    />
+                                                </div>
                                             </SelectionCard>
                                         </SelectionCardGrid>
                                     </CardContent>
@@ -993,18 +1210,19 @@ export default function CalculationWizard({
                                             hint={
                                                 planningMode === 'manual'
                                                     ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                                    : 'Das System ermittelt einen Spotvorschlag, der unter dem Zielbudget bleibt.'
+                                                    : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
                                             }
                                         >
                                             <Input
                                                 id="budget"
                                                 inputMode="decimal"
                                                 value={targetBudget}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setTargetBudget(
                                                         event.target.value,
-                                                    )
-                                                }
+                                                    );
+                                                    markBudgetInputsChanged();
+                                                }}
                                                 disabled={!canEdit}
                                             />
                                         </FormField>
@@ -1014,127 +1232,36 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 1 ? (
-                            catalogMissing ? (
+                            catalogMissing ||
+                            (planningMode === 'budget' && !hasActiveCatalog) ? (
                                 <EmptyState
                                     title="Kein Katalog"
                                     description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
                                 />
                             ) : planningMode === 'budget' ? (
-                                <div className="space-y-6">
-                                    <Card className={wizardCardClass}>
-                                        <CardHeader
-                                            className={wizardCardHeaderClass}
-                                        >
-                                            <CardTitle
-                                                className={wizardCardTitleClass}
-                                            >
-                                                Budgetplanung
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent
-                                            className={`${wizardCardContentClass} space-y-6`}
-                                        >
-                                            <BudgetWishSenders
-                                                inventories={
-                                                    catalog.inventories
-                                                }
-                                                selectedIds={wishInventoryIds}
-                                                canEdit={canEdit}
-                                                onChange={setWishInventoryIds}
-                                            />
-                                            <FormField
-                                                label="Spotlänge (Sekunden)"
-                                                htmlFor="budget-spot-length"
-                                            >
-                                                <Input
-                                                    id="budget-spot-length"
-                                                    type="number"
-                                                    min={1}
-                                                    value={budgetSpotLength}
-                                                    disabled={!canEdit}
-                                                    onChange={(event) =>
-                                                        setBudgetSpotLength(
-                                                            Number(
-                                                                event.target
-                                                                    .value,
-                                                            ),
-                                                        )
-                                                    }
-                                                />
-                                            </FormField>
-                                            <BudgetDistributionRanges
-                                                ranges={
-                                                    budgetDistributionRanges
-                                                }
-                                                dayGroups={dayGroups}
-                                                canEdit={canEdit}
-                                                fieldErrors={fieldErrors}
-                                                onChange={
-                                                    setBudgetDistributionRanges
-                                                }
-                                            />
-                                            <p className="text-muted-foreground text-sm">
-                                                Gleiche Spotanzahl je
-                                                Wunschsender, gleichmäßige
-                                                Stundenverteilung. Keine
-                                                Reichweitenoptimierung.
-                                            </p>
-                                            <Button
-                                                type="button"
-                                                data-test="budget-propose"
-                                                onClick={() =>
-                                                    void createProposal()
-                                                }
-                                                disabled={busy}
-                                            >
-                                                Budgetvorschlag berechnen
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                    {proposal ? (
-                                        <Card className={wizardCardClass}>
-                                            <CardHeader
-                                                className={
-                                                    wizardCardHeaderClass
-                                                }
-                                            >
-                                                <CardTitle
-                                                    className={
-                                                        wizardCardTitleClass
-                                                    }
-                                                >
-                                                    Budgetvorschlag
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent
-                                                className={
-                                                    wizardCardContentClass
-                                                }
-                                            >
-                                                <BudgetProposalPanel
-                                                    proposal={proposal}
-                                                    proposalStatus={
-                                                        proposalStatus
-                                                    }
-                                                    busy={busy}
-                                                    canApply={
-                                                        !proposal.insufficient_budget
-                                                    }
-                                                    onApply={takeProposal}
-                                                    onDiscard={() => {
-                                                        setProposal(null);
-                                                        setProposalSnapshot(
-                                                            null,
-                                                        );
-                                                    }}
-                                                    onRecalculate={() =>
-                                                        void createProposal()
-                                                    }
-                                                />
-                                            </CardContent>
-                                        </Card>
-                                    ) : null}
-                                </div>
+                                <BudgetPlanningFrameStep
+                                    inventories={catalog.inventories}
+                                    wishInventoryIds={wishInventoryIds}
+                                    budgetSpotLength={budgetSpotLength}
+                                    budgetDistributionRanges={
+                                        budgetDistributionRanges
+                                    }
+                                    dayGroups={dayGroups}
+                                    canEdit={canEdit}
+                                    fieldErrors={fieldErrors}
+                                    onWishInventoryChange={(ids) => {
+                                        setWishInventoryIds(ids);
+                                        markBudgetInputsChanged();
+                                    }}
+                                    onSpotLengthChange={(seconds) => {
+                                        setBudgetSpotLength(seconds);
+                                        markBudgetInputsChanged();
+                                    }}
+                                    onDistributionRangesChange={(ranges) => {
+                                        setBudgetDistributionRanges(ranges);
+                                        markBudgetInputsChanged();
+                                    }}
+                                />
                             ) : (
                                 <div className="space-y-6">
                                     {positions.map((position, index) => {
@@ -1465,114 +1592,305 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 2 ? (
-                            <div className="space-y-6">
-                                {positions.map((position, index) => {
-                                    const inventory = catalog.inventories.find(
-                                        (item) =>
-                                            item.id === position.inventory_id,
-                                    );
-                                    const rule = ruleFor(
-                                        catalog,
-                                        position.inventory_id,
-                                        position.advertising_medium_id,
-                                    );
+                            planningMode === 'budget' ? (
+                                <div className="space-y-6">
+                                    <BudgetConditionsStep
+                                        wishInventoryIds={wishInventoryIds}
+                                        inventories={catalog.inventories}
+                                        catalogRules={catalog.rules}
+                                        budgetPositionDiscounts={
+                                            budgetPositionDiscounts
+                                        }
+                                        orderDiscounts={orderDiscounts}
+                                        aeEnabled={aeEnabled}
+                                        discountTypes={discountTypes}
+                                        canEdit={canEdit}
+                                        fieldErrors={fieldErrors}
+                                        onBudgetPositionDiscountsChange={(
+                                            discounts,
+                                        ) => {
+                                            setBudgetPositionDiscounts(
+                                                discounts,
+                                            );
+                                            markBudgetInputsChanged();
+                                        }}
+                                        onOrderDiscountsChange={(discounts) => {
+                                            setOrderDiscounts(discounts);
+                                            markBudgetInputsChanged();
+                                        }}
+                                        onAeEnabledChange={(enabled) => {
+                                            setAeEnabled(enabled);
+                                            markBudgetInputsChanged();
+                                        }}
+                                    />
+                                    {proposalStatus === 'stale' ? (
+                                        <StatusBanner data-test="budget-stale-hint">
+                                            Die Eingaben haben sich geändert.
+                                            Berechne den Vorschlag neu, bevor du
+                                            ihn übernimmst.
+                                        </StatusBanner>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {positions.map((position, index) => {
+                                        const inventory =
+                                            catalog.inventories.find(
+                                                (item) =>
+                                                    item.id ===
+                                                    position.inventory_id,
+                                            );
+                                        const rule = ruleFor(
+                                            catalog,
+                                            position.inventory_id,
+                                            position.advertising_medium_id,
+                                        );
 
-                                    return (
-                                        <Card
-                                            key={`cond-${position.client_key}`}
-                                            className={wizardCardClass}
-                                        >
-                                            <CardHeader
-                                                className={
-                                                    wizardCardHeaderClass
-                                                }
+                                        return (
+                                            <Card
+                                                key={`cond-${position.client_key}`}
+                                                className={wizardCardClass}
                                             >
-                                                <CardTitle
-                                                    className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                <CardHeader
+                                                    className={
+                                                        wizardCardHeaderClass
+                                                    }
                                                 >
-                                                    <LogoSlot
-                                                        name={
-                                                            inventory?.name ??
-                                                            'Sender'
-                                                        }
-                                                        logoPath={
-                                                            inventory?.logo_path
-                                                        }
-                                                    />
-                                                    Rabatte für{' '}
-                                                    {inventory?.name ??
-                                                        'dieses Werbeelement'}
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent
-                                                className={`${wizardCardContentClass} space-y-4`}
-                                            >
-                                                <p className="text-muted-foreground text-sm">
-                                                    Bruttoausgangswert{' '}
-                                                    <span className="text-foreground font-medium">
-                                                        {displayTotals &&
-                                                        !previewLoading &&
-                                                        displayTotals
-                                                            ?.positions[index]
-                                                            ?.media_gross
-                                                            ? money(
-                                                                  displayTotals
-                                                                      .positions[
-                                                                      index
-                                                                  ].media_gross,
-                                                              )
-                                                            : previewLoading
-                                                              ? '…'
-                                                              : '–'}
-                                                    </span>
-                                                </p>
-                                                <DiscountListEditor
-                                                    title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
-                                                    description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
-                                                    discounts={
-                                                        position.position_discounts
-                                                    }
-                                                    types={discountTypes}
-                                                    canEdit={canEdit}
-                                                    disabled={
-                                                        rule?.is_discountable ===
-                                                        false
-                                                    }
-                                                    fieldPrefix={`positions.${index}.position_discounts`}
-                                                    fieldErrors={fieldErrors}
-                                                    breakdown={
-                                                        displayTotals
-                                                            ?.positions[index]
-                                                            ?.position_discounts
-                                                    }
-                                                    onChange={(
-                                                        position_discounts,
-                                                    ) =>
-                                                        updatePosition(index, {
-                                                            position_discounts,
-                                                        })
-                                                    }
-                                                />
-                                                {displayTotals?.positions[index]
-                                                    ?.after_position_discount ? (
-                                                    <p className="text-sm">
-                                                        Verbleibende
-                                                        Positionssumme{' '}
-                                                        <span className="font-medium">
-                                                            {money(
-                                                                displayTotals
-                                                                    .positions[
-                                                                    index
-                                                                ]
-                                                                    .after_position_discount,
-                                                            )}
+                                                    <CardTitle
+                                                        className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                    >
+                                                        <LogoSlot
+                                                            name={
+                                                                inventory?.name ??
+                                                                'Sender'
+                                                            }
+                                                            logoPath={
+                                                                inventory?.logo_path
+                                                            }
+                                                        />
+                                                        Rabatte für{' '}
+                                                        {inventory?.name ??
+                                                            'dieses Werbeelement'}
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent
+                                                    className={`${wizardCardContentClass} space-y-4`}
+                                                >
+                                                    <p className="text-muted-foreground text-sm">
+                                                        Bruttoausgangswert{' '}
+                                                        <span className="text-foreground font-medium">
+                                                            {displayTotals &&
+                                                            !previewLoading &&
+                                                            displayTotals
+                                                                ?.positions[
+                                                                index
+                                                            ]?.media_gross
+                                                                ? money(
+                                                                      displayTotals
+                                                                          .positions[
+                                                                          index
+                                                                      ]
+                                                                          .media_gross,
+                                                                  )
+                                                                : previewLoading
+                                                                  ? '…'
+                                                                  : '–'}
                                                         </span>
                                                     </p>
+                                                    <DiscountListEditor
+                                                        title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
+                                                        description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
+                                                        discounts={
+                                                            position.position_discounts
+                                                        }
+                                                        types={discountTypes}
+                                                        canEdit={canEdit}
+                                                        disabled={
+                                                            rule?.is_discountable ===
+                                                            false
+                                                        }
+                                                        fieldPrefix={`positions.${index}.position_discounts`}
+                                                        fieldErrors={
+                                                            fieldErrors
+                                                        }
+                                                        breakdown={
+                                                            displayTotals
+                                                                ?.positions[
+                                                                index
+                                                            ]
+                                                                ?.position_discounts
+                                                        }
+                                                        onChange={(
+                                                            position_discounts,
+                                                        ) =>
+                                                            updatePosition(
+                                                                index,
+                                                                {
+                                                                    position_discounts,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
+                                                    {displayTotals?.positions[
+                                                        index
+                                                    ]
+                                                        ?.after_position_discount ? (
+                                                        <p className="text-sm">
+                                                            Verbleibende
+                                                            Positionssumme{' '}
+                                                            <span className="font-medium">
+                                                                {money(
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .after_position_discount,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                    ) : null}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                    <Card className={wizardCardClass}>
+                                        <CardHeader
+                                            className={wizardCardHeaderClass}
+                                        >
+                                            <CardTitle
+                                                className={wizardCardTitleClass}
+                                            >
+                                                Auftragskonditionen
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent
+                                            className={wizardCardContentClass}
+                                        >
+                                            <div className="space-y-4">
+                                                <DiscountListEditor
+                                                    title="Rabatte auf den Gesamtauftrag"
+                                                    description="Diese Rabatte werden nach den Rabatten der einzelnen Werbeelemente auf die verbleibende Auftragssumme angewendet."
+                                                    discounts={orderDiscounts}
+                                                    types={discountTypes}
+                                                    canEdit={canEdit}
+                                                    fieldPrefix="order_discounts"
+                                                    fieldErrors={fieldErrors}
+                                                    breakdown={
+                                                        displayTotals?.order_discounts
+                                                    }
+                                                    onChange={setOrderDiscounts}
+                                                />
+                                                <label className="flex items-start gap-3 text-sm">
+                                                    <Checkbox
+                                                        id="ae-enabled"
+                                                        data-test="ae-enabled"
+                                                        className="mt-0.5"
+                                                        checked={aeEnabled}
+                                                        disabled={!canEdit}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            setAeEnabled(
+                                                                checked ===
+                                                                    true,
+                                                            )
+                                                        }
+                                                    />
+                                                    <span>
+                                                        <span className="font-medium">
+                                                            15 % AE
+                                                            berücksichtigen
+                                                        </span>
+                                                        <span className="text-muted-foreground mt-1 block text-xs">
+                                                            AE wird nach allen
+                                                            Positions- und
+                                                            Auftragsrabatten nur
+                                                            auf den AE-fähigen
+                                                            Anteil angewendet.
+                                                            {displayTotals?.ae_eligible_base
+                                                                ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
+                                                                : ''}
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                                {displayTotals &&
+                                                !previewLoading ? (
+                                                    <div
+                                                        className="border-border/60 space-y-2 border-t pt-4 text-sm"
+                                                        data-test="step-3-totals"
+                                                    >
+                                                        <p>
+                                                            Ausgangssumme für
+                                                            Auftragsrabatte{' '}
+                                                            <span className="font-medium">
+                                                                {money(
+                                                                    displayTotals.after_position_discount_total ??
+                                                                        displayTotals.media_gross,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                        {aeEnabled ||
+                                                        Number(
+                                                            displayTotals.ae_total,
+                                                        ) > 0 ? (
+                                                            <p>
+                                                                AE-Abzug{' '}
+                                                                <span
+                                                                    className="font-medium"
+                                                                    data-test="ae-deduction"
+                                                                >
+                                                                    {money(
+                                                                        displayTotals.ae_total,
+                                                                    )}
+                                                                </span>
+                                                            </p>
+                                                        ) : null}
+                                                        <p className="font-medium">
+                                                            Netto-Endsumme{' '}
+                                                            <span
+                                                                className="text-primary text-base"
+                                                                data-test="preview-net-total"
+                                                            >
+                                                                {money(
+                                                                    displayTotals.nn_invest,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                ) : previewLoading ? (
+                                                    <LoadingState
+                                                        label="Berechnet"
+                                                        data-test="preview-loading"
+                                                    />
                                                 ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                    {planningMode === 'budget' &&
+                                    proposalStatus === 'stale' ? (
+                                        <StatusBanner data-test="budget-stale-hint">
+                                            Die Konditionen haben sich geändert.
+                                            Optimiere den Vorschlag erneut, um
+                                            das Zielbudget bestmöglich
+                                            auszuschöpfen.
+                                        </StatusBanner>
+                                    ) : null}
+                                </div>
+                            )
+                        ) : null}
+
+                        {step === 3 ? (
+                            planningMode === 'budget' ? (
+                                <BudgetProposalResultStep
+                                    proposal={proposal}
+                                    proposalStatus={proposalStatus}
+                                    proposalLoading={proposalLoading}
+                                    busy={busy}
+                                    onApply={takeProposal}
+                                    onEditInputs={() => setStep(0)}
+                                    onRecalculate={() => void createProposal()}
+                                />
+                            ) : (
                                 <Card className={wizardCardClass}>
                                     <CardHeader
                                         className={wizardCardHeaderClass}
@@ -1580,349 +1898,75 @@ export default function CalculationWizard({
                                         <CardTitle
                                             className={wizardCardTitleClass}
                                         >
-                                            Auftragskonditionen
+                                            Zusammenfassung
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent
-                                        className={wizardCardContentClass}
+                                        className={`${wizardCardContentClass} space-y-4 text-sm`}
                                     >
-                                        <div className="space-y-4">
-                                            <DiscountListEditor
-                                                title="Rabatte auf den Gesamtauftrag"
-                                                description="Diese Rabatte werden nach den Rabatten der einzelnen Werbeelemente auf die verbleibende Auftragssumme angewendet."
-                                                discounts={orderDiscounts}
-                                                types={discountTypes}
-                                                canEdit={canEdit}
-                                                fieldPrefix="order_discounts"
-                                                fieldErrors={fieldErrors}
-                                                breakdown={
-                                                    displayTotals?.order_discounts
-                                                }
-                                                onChange={setOrderDiscounts}
-                                            />
-                                            <label className="flex items-start gap-3 text-sm">
-                                                <Checkbox
-                                                    id="ae-enabled"
-                                                    data-test="ae-enabled"
-                                                    className="mt-0.5"
-                                                    checked={aeEnabled}
-                                                    disabled={!canEdit}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setAeEnabled(
-                                                            checked === true,
-                                                        )
-                                                    }
-                                                />
-                                                <span>
-                                                    <span className="font-medium">
-                                                        15 % AE berücksichtigen
-                                                    </span>
-                                                    <span className="text-muted-foreground mt-1 block text-xs">
-                                                        AE wird nach allen
-                                                        Positions- und
-                                                        Auftragsrabatten nur auf
-                                                        den AE-fähigen Anteil
-                                                        angewendet.
-                                                        {displayTotals?.ae_eligible_base
-                                                            ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
-                                                            : ''}
-                                                    </span>
-                                                </span>
-                                            </label>
-                                            {displayTotals &&
-                                            !previewLoading ? (
-                                                <div
-                                                    className="border-border/60 space-y-2 border-t pt-4 text-sm"
-                                                    data-test="step-3-totals"
-                                                >
-                                                    <p>
-                                                        Ausgangssumme für
-                                                        Auftragsrabatte{' '}
-                                                        <span className="font-medium">
-                                                            {money(
-                                                                displayTotals.after_position_discount_total ??
-                                                                    displayTotals.media_gross,
+                                        {summary ? (
+                                            <>
+                                                <dl className="grid gap-2 sm:grid-cols-2">
+                                                    <SummaryDetail
+                                                        label="Media-Brutto"
+                                                        value={money(
+                                                            summary.media_gross,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Werbeelemente"
+                                                        value={money(
+                                                            summary.position_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Auftrag"
+                                                        value={money(
+                                                            summary.order_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="AE gesamt"
+                                                        value={money(
+                                                            summary.ae_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="N/N-Invest"
+                                                        value={money(
+                                                            summary.nn_invest,
+                                                        )}
+                                                        emphasis
+                                                    />
+                                                    {summary.target_budget_nn ? (
+                                                        <SummaryDetail
+                                                            label="Zielbudget"
+                                                            value={money(
+                                                                summary.target_budget_nn,
                                                             )}
-                                                        </span>
-                                                    </p>
-                                                    {aeEnabled ||
-                                                    Number(
-                                                        displayTotals.ae_total,
-                                                    ) > 0 ? (
-                                                        <p>
-                                                            AE-Abzug{' '}
-                                                            <span
-                                                                className="font-medium"
-                                                                data-test="ae-deduction"
-                                                            >
-                                                                {money(
-                                                                    displayTotals.ae_total,
-                                                                )}
-                                                            </span>
-                                                        </p>
+                                                        />
                                                     ) : null}
-                                                    <p className="font-medium">
-                                                        Netto-Endsumme{' '}
-                                                        <span
-                                                            className="text-primary text-base"
-                                                            data-test="preview-net-total"
-                                                        >
-                                                            {money(
-                                                                displayTotals.nn_invest,
-                                                            )}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                            ) : previewLoading ? (
-                                                <LoadingState
-                                                    label="Berechnet"
-                                                    data-test="preview-loading"
-                                                />
-                                            ) : null}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                {planningMode === 'budget' &&
-                                proposalStatus === 'stale' ? (
-                                    <StatusBanner data-test="budget-stale-hint">
-                                        Die Konditionen haben sich geändert.
-                                        Optimiere den Vorschlag erneut, um das
-                                        Zielbudget bestmöglich auszuschöpfen.
-                                    </StatusBanner>
-                                ) : null}
-                            </div>
-                        ) : null}
-
-                        {step === 3 ? (
-                            <Card className={wizardCardClass}>
-                                <CardHeader className={wizardCardHeaderClass}>
-                                    <CardTitle className={wizardCardTitleClass}>
-                                        Zusammenfassung
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent
-                                    className={`${wizardCardContentClass} space-y-4 text-sm`}
-                                >
-                                    {summary ? (
-                                        <>
-                                            <dl className="grid gap-2 sm:grid-cols-2">
-                                                <SummaryDetail
-                                                    label="Media-Brutto"
-                                                    value={money(
-                                                        summary.media_gross,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Werbeelemente"
-                                                    value={money(
-                                                        summary.position_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Auftrag"
-                                                    value={money(
-                                                        summary.order_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="AE gesamt"
-                                                    value={money(
-                                                        summary.ae_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="N/N-Invest"
-                                                    value={money(
-                                                        summary.nn_invest,
-                                                    )}
-                                                    emphasis
-                                                />
-                                                {summary.target_budget_nn ? (
-                                                    <SummaryDetail
-                                                        label="Zielbudget"
-                                                        value={money(
-                                                            summary.target_budget_nn,
-                                                        )}
-                                                    />
-                                                ) : null}
-                                            </dl>
-                                            {summary.positions.map(
-                                                (position) => (
-                                                    <section
-                                                        key={
-                                                            position.inventory_name
-                                                        }
-                                                        className="rounded-lg border p-4"
-                                                    >
-                                                        <p className="font-medium">
-                                                            {
-                                                                position.inventory_name
-                                                            }{' '}
-                                                            ·{' '}
-                                                            {
-                                                                position.spot_method
-                                                            }{' '}
-                                                            · Preisliste{' '}
-                                                            {
-                                                                position.price_list_version
-                                                            }
-                                                        </p>
-                                                        <p className="text-muted-foreground mt-1">
-                                                            {
-                                                                position.total_spot_count
-                                                            }{' '}
-                                                            Spots à{' '}
-                                                            {
-                                                                position.length_seconds
-                                                            }
-                                                            s · Pos.-Rab.{' '}
-                                                            {
-                                                                position.position_discount_percent
-                                                            }
-                                                            % · AE{' '}
-                                                            {
-                                                                position.ae_percent
-                                                            }
-                                                            %
-                                                        </p>
-                                                        <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                            {(position
-                                                                .time_ranges
-                                                                ?.length
-                                                                ? position.time_ranges
-                                                                : []
-                                                            ).map((range) => (
-                                                                <li
-                                                                    key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
-                                                                >
-                                                                    {String(
-                                                                        range.start_hour,
-                                                                    ).padStart(
-                                                                        2,
-                                                                        '0',
-                                                                    )}
-                                                                    :00–
-                                                                    {String(
-                                                                        range.end_hour_exclusive -
-                                                                            1,
-                                                                    ).padStart(
-                                                                        2,
-                                                                        '0',
-                                                                    )}
-                                                                    :59,{' '}
-                                                                    {
-                                                                        range.day_group
-                                                                    }
-                                                                    ,{' '}
-                                                                    {
-                                                                        range.spot_count
-                                                                    }{' '}
-                                                                    Spots
-                                                                    {range.range_gross
-                                                                        ? ` · ${money(range.range_gross)}`
-                                                                        : ''}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                        <p className="mt-2">
-                                                            {money(
-                                                                position.media_gross,
-                                                            )}{' '}
-                                                            Brutto ·{' '}
-                                                            {money(
-                                                                position.nn_invest,
-                                                            )}{' '}
-                                                            N/N
-                                                        </p>
-                                                    </section>
-                                                ),
-                                            )}
-                                        </>
-                                    ) : displayTotals ? (
-                                        <>
-                                            <dl className="grid gap-2 sm:grid-cols-2">
-                                                <SummaryDetail
-                                                    label="Media-Brutto"
-                                                    value={money(
-                                                        displayTotals.media_gross,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Werbeelemente"
-                                                    value={money(
-                                                        displayTotals.position_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Auftrag"
-                                                    value={money(
-                                                        displayTotals.order_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="AE gesamt"
-                                                    value={money(
-                                                        displayTotals.ae_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="N/N-Invest"
-                                                    value={money(
-                                                        displayTotals.nn_invest,
-                                                    )}
-                                                    emphasis
-                                                />
-                                                {displayTotals.target_budget_nn ? (
-                                                    <SummaryDetail
-                                                        label="Zielbudget"
-                                                        value={money(
-                                                            displayTotals.target_budget_nn,
-                                                        )}
-                                                    />
-                                                ) : null}
-                                            </dl>
-                                            {displayTotals.target_budget_nn &&
-                                            displayTotals.budget_delta !==
-                                                null ? (
-                                                <p className="text-muted-foreground">
-                                                    {Number(
-                                                        displayTotals.budget_delta,
-                                                    ) >= 0
-                                                        ? `Rest ${money(displayTotals.budget_delta)}`
-                                                        : `Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`}
-                                                </p>
-                                            ) : null}
-                                            {displayTotals.requires_special_approval ? (
-                                                <StatusBanner tone="warning">
-                                                    Die persönliche Rabattgrenze
-                                                    ist überschritten.
-                                                </StatusBanner>
-                                            ) : null}
-                                            {positions.map(
-                                                (position, index) => {
-                                                    const result =
-                                                        displayTotals.positions[
-                                                            index
-                                                        ];
-                                                    const inventory =
-                                                        catalog.inventories.find(
-                                                            (item) =>
-                                                                item.id ===
-                                                                position.inventory_id,
-                                                        );
-
-                                                    return (
+                                                </dl>
+                                                {summary.positions.map(
+                                                    (position) => (
                                                         <section
                                                             key={
-                                                                position.client_key
+                                                                position.inventory_name
                                                             }
                                                             className="rounded-lg border p-4"
                                                         >
                                                             <p className="font-medium">
-                                                                {inventory?.name ??
-                                                                    'Sender'}
+                                                                {
+                                                                    position.inventory_name
+                                                                }{' '}
+                                                                ·{' '}
+                                                                {
+                                                                    position.spot_method
+                                                                }{' '}
+                                                                · Preisliste{' '}
+                                                                {
+                                                                    position.price_list_version
+                                                                }
                                                             </p>
                                                             <p className="text-muted-foreground mt-1">
                                                                 {
@@ -1932,24 +1976,45 @@ export default function CalculationWizard({
                                                                 {
                                                                     position.length_seconds
                                                                 }
-                                                                s
+                                                                s · Pos.-Rab.{' '}
+                                                                {
+                                                                    position.position_discount_percent
+                                                                }
+                                                                % · AE{' '}
+                                                                {
+                                                                    position.ae_percent
+                                                                }
+                                                                %
                                                             </p>
                                                             <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                                {(
-                                                                    result?.time_ranges ??
-                                                                    []
+                                                                {(position
+                                                                    .time_ranges
+                                                                    ?.length
+                                                                    ? position.time_ranges
+                                                                    : []
                                                                 ).map(
                                                                     (range) => (
                                                                         <li
                                                                             key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
                                                                         >
-                                                                            {formatHour(
+                                                                            {String(
                                                                                 range.start_hour,
+                                                                            ).padStart(
+                                                                                2,
+                                                                                '0',
                                                                             )}
-                                                                            –
-                                                                            {formatInclusiveEnd(
-                                                                                range.end_hour_exclusive,
+                                                                            :00–
+                                                                            {String(
+                                                                                range.end_hour_exclusive -
+                                                                                    1,
+                                                                            ).padStart(
+                                                                                2,
+                                                                                '0',
                                                                             )}
+                                                                            :59,{' '}
+                                                                            {
+                                                                                range.day_group
+                                                                            }
                                                                             ,{' '}
                                                                             {
                                                                                 range.spot_count
@@ -1962,64 +2027,215 @@ export default function CalculationWizard({
                                                                     ),
                                                                 )}
                                                             </ul>
-                                                            {(
-                                                                result?.position_discounts ??
-                                                                []
-                                                            ).map(
-                                                                (
-                                                                    discount,
-                                                                    discountIndex,
-                                                                ) => (
-                                                                    <p
-                                                                        key={`${discount.label}-${discountIndex}`}
-                                                                        className="text-muted-foreground mt-1"
-                                                                    >
-                                                                        {
-                                                                            discount.label
-                                                                        }{' '}
-                                                                        {formatPercent(
-                                                                            discount.percent,
-                                                                        )}{' '}
-                                                                        ·{' '}
-                                                                        {moneyDeduction(
-                                                                            discount.amount,
-                                                                        )}
-                                                                    </p>
-                                                                ),
-                                                            )}
-                                                            {result?.media_gross ? (
-                                                                <p className="mt-2">
-                                                                    {money(
-                                                                        result.media_gross,
-                                                                    )}{' '}
-                                                                    Brutto ·{' '}
-                                                                    {money(
-                                                                        result.nn_invest,
-                                                                    )}{' '}
-                                                                    N/N
-                                                                </p>
-                                                            ) : null}
+                                                            <p className="mt-2">
+                                                                {money(
+                                                                    position.media_gross,
+                                                                )}{' '}
+                                                                Brutto ·{' '}
+                                                                {money(
+                                                                    position.nn_invest,
+                                                                )}{' '}
+                                                                N/N
+                                                            </p>
                                                         </section>
-                                                    );
-                                                },
-                                            )}
-                                        </>
-                                    ) : (
-                                        <LoadingState />
-                                    )}
-                                </CardContent>
-                            </Card>
+                                                    ),
+                                                )}
+                                            </>
+                                        ) : displayTotals ? (
+                                            <>
+                                                <dl className="grid gap-2 sm:grid-cols-2">
+                                                    <SummaryDetail
+                                                        label="Media-Brutto"
+                                                        value={money(
+                                                            displayTotals.media_gross,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Werbeelemente"
+                                                        value={money(
+                                                            displayTotals.position_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Auftrag"
+                                                        value={money(
+                                                            displayTotals.order_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="AE gesamt"
+                                                        value={money(
+                                                            displayTotals.ae_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="N/N-Invest"
+                                                        value={money(
+                                                            displayTotals.nn_invest,
+                                                        )}
+                                                        emphasis
+                                                    />
+                                                    {displayTotals.target_budget_nn ? (
+                                                        <SummaryDetail
+                                                            label="Zielbudget"
+                                                            value={money(
+                                                                displayTotals.target_budget_nn,
+                                                            )}
+                                                        />
+                                                    ) : null}
+                                                </dl>
+                                                {displayTotals.target_budget_nn &&
+                                                displayTotals.budget_delta !==
+                                                    null ? (
+                                                    <p className="text-muted-foreground">
+                                                        {Number(
+                                                            displayTotals.budget_delta,
+                                                        ) >= 0
+                                                            ? `Rest ${money(displayTotals.budget_delta)}`
+                                                            : `Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`}
+                                                    </p>
+                                                ) : null}
+                                                {displayTotals.requires_special_approval ? (
+                                                    <StatusBanner tone="warning">
+                                                        Die persönliche
+                                                        Rabattgrenze ist
+                                                        überschritten.
+                                                    </StatusBanner>
+                                                ) : null}
+                                                {positions.map(
+                                                    (position, index) => {
+                                                        const result =
+                                                            displayTotals
+                                                                .positions[
+                                                                index
+                                                            ];
+                                                        const inventory =
+                                                            catalog.inventories.find(
+                                                                (item) =>
+                                                                    item.id ===
+                                                                    position.inventory_id,
+                                                            );
+
+                                                        return (
+                                                            <section
+                                                                key={
+                                                                    position.client_key
+                                                                }
+                                                                className="rounded-lg border p-4"
+                                                            >
+                                                                <p className="font-medium">
+                                                                    {inventory?.name ??
+                                                                        'Sender'}
+                                                                </p>
+                                                                <p className="text-muted-foreground mt-1">
+                                                                    {
+                                                                        position.total_spot_count
+                                                                    }{' '}
+                                                                    Spots à{' '}
+                                                                    {
+                                                                        position.length_seconds
+                                                                    }
+                                                                    s
+                                                                </p>
+                                                                <ul className="text-muted-foreground mt-2 list-inside list-disc">
+                                                                    {(
+                                                                        result?.time_ranges ??
+                                                                        []
+                                                                    ).map(
+                                                                        (
+                                                                            range,
+                                                                        ) => (
+                                                                            <li
+                                                                                key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                                            >
+                                                                                {formatHour(
+                                                                                    range.start_hour,
+                                                                                )}
+                                                                                –
+                                                                                {formatInclusiveEnd(
+                                                                                    range.end_hour_exclusive,
+                                                                                )}
+                                                                                ,{' '}
+                                                                                {
+                                                                                    range.spot_count
+                                                                                }{' '}
+                                                                                Spots
+                                                                                {range.range_gross
+                                                                                    ? ` · ${money(range.range_gross)}`
+                                                                                    : ''}
+                                                                            </li>
+                                                                        ),
+                                                                    )}
+                                                                </ul>
+                                                                {(
+                                                                    result?.position_discounts ??
+                                                                    []
+                                                                ).map(
+                                                                    (
+                                                                        discount,
+                                                                        discountIndex,
+                                                                    ) => (
+                                                                        <p
+                                                                            key={`${discount.label}-${discountIndex}`}
+                                                                            className="text-muted-foreground mt-1"
+                                                                        >
+                                                                            {
+                                                                                discount.label
+                                                                            }{' '}
+                                                                            {formatPercent(
+                                                                                discount.percent,
+                                                                            )}{' '}
+                                                                            ·{' '}
+                                                                            {moneyDeduction(
+                                                                                discount.amount,
+                                                                            )}
+                                                                        </p>
+                                                                    ),
+                                                                )}
+                                                                {result?.media_gross ? (
+                                                                    <p className="mt-2">
+                                                                        {money(
+                                                                            result.media_gross,
+                                                                        )}{' '}
+                                                                        Brutto ·{' '}
+                                                                        {money(
+                                                                            result.nn_invest,
+                                                                        )}{' '}
+                                                                        N/N
+                                                                    </p>
+                                                                ) : null}
+                                                            </section>
+                                                        );
+                                                    },
+                                                )}
+                                            </>
+                                        ) : (
+                                            <LoadingState />
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
                         ) : null}
                     </div>
 
                     <aside className="order-2 min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
-                        <CalculationSummaryPanel
-                            totals={summaryTotals}
-                            loading={canEdit && previewLoading}
-                            aeEnabled={aeEnabled}
-                            positions={positions}
-                            inventories={catalog.inventories}
-                        />
+                        {showBudgetPlanningSidebar ? (
+                            <BudgetPlanningSidebar
+                                targetBudget={targetBudget}
+                                wishInventoryCount={wishInventoryIds.length}
+                                spotLengthSeconds={budgetSpotLength}
+                                dayGroups={dayGroups}
+                                distributionRanges={budgetDistributionRanges}
+                            />
+                        ) : (
+                            <CalculationSummaryPanel
+                                totals={summaryTotals}
+                                loading={canEdit && previewLoading}
+                                aeEnabled={aeEnabled}
+                                positions={positions}
+                                inventories={catalog.inventories}
+                            />
+                        )}
                     </aside>
 
                     <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
@@ -2032,21 +2248,33 @@ export default function CalculationWizard({
                                 Zurück
                             </Button>
                         ) : null}
-                        {step < STEPS.length - 1 ? (
+                        {step < steps.length - 1 &&
+                        !(planningMode === 'budget' && step === 2) ? (
+                            <Button type="button" onClick={goNext}>
+                                {nextLabel}
+                            </Button>
+                        ) : null}
+                        {planningMode === 'budget' && step === 2 ? (
                             <Button
                                 type="button"
-                                onClick={() => setStep(step + 1)}
+                                data-test="budget-propose"
+                                onClick={() => void createProposal()}
+                                disabled={busy || proposalLoading}
                             >
-                                Weiter
+                                Budgetvorschlag berechnen
                             </Button>
                         ) : null}
                         {canEdit ? (
                             <Button
                                 type="button"
                                 onClick={save}
-                                disabled={busy}
+                                disabled={
+                                    busy ||
+                                    (planningMode === 'budget' &&
+                                        positions.length === 0)
+                                }
                                 variant={
-                                    step === STEPS.length - 1
+                                    step === steps.length - 1
                                         ? 'default'
                                         : 'secondary'
                                 }

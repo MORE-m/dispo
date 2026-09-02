@@ -65,7 +65,7 @@ export function BudgetProposalPanel({
     busy,
     canApply,
     onApply,
-    onDiscard,
+    onEditInputs,
     onRecalculate,
 }: {
     proposal: BudgetSpotProposal;
@@ -73,7 +73,7 @@ export function BudgetProposalPanel({
     busy: boolean;
     canApply: boolean;
     onApply: () => void;
-    onDiscard: () => void;
+    onEditInputs: () => void;
     onRecalculate: () => void;
 }) {
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
@@ -106,18 +106,33 @@ export function BudgetProposalPanel({
                         value={money(proposal.next_package_cost_nn)}
                     />
                 ) : null}
+                {proposal.next_package_shortfall &&
+                proposal.next_package_shortfall !== '0.00' ? (
+                    <Metric
+                        label="Zusätzlich benötigt"
+                        value={money(proposal.next_package_shortfall)}
+                    />
+                ) : null}
             </div>
 
             {proposal.insufficient_budget ? (
-                <p
-                    className="text-destructive text-sm"
+                <div
+                    className="text-destructive space-y-2 text-sm"
                     data-test="budget-insufficient"
                 >
-                    Für mindestens einen Spot auf jedem Wunschsender werden{' '}
-                    {money(proposal.minimum_budget_nn ?? '0')} N/N benötigt. Das
-                    Zielbudget liegt {money(proposal.budget_shortfall ?? '0')}{' '}
-                    darunter.
-                </p>
+                    <p>
+                        Mit diesem Budget kann noch kein vollständiges Spotpaket
+                        für alle ausgewählten Sender gebildet werden.
+                    </p>
+                    <p>
+                        Preis des ersten vollständigen Pakets:{' '}
+                        {money(proposal.minimum_budget_nn ?? '0')} N/N
+                    </p>
+                    <p>
+                        Noch benötigter Betrag:{' '}
+                        {money(proposal.budget_shortfall ?? '0')}
+                    </p>
+                </div>
             ) : null}
 
             <p className="text-muted-foreground text-sm">
@@ -196,31 +211,31 @@ export function BudgetProposalPanel({
             </div>
 
             <div className="flex flex-wrap gap-2">
-                {status === 'stale' ? (
-                    <Button
-                        type="button"
-                        data-test="budget-recalculate"
-                        onClick={onRecalculate}
-                        disabled={busy}
-                    >
-                        Vorschlag neu berechnen
-                    </Button>
-                ) : null}
                 <Button
                     type="button"
                     data-test="budget-apply"
                     onClick={onApply}
                     disabled={busy || !canApply || status === 'stale'}
                 >
-                    Vorschlag übernehmen
+                    Planung übernehmen
                 </Button>
                 <Button
                     type="button"
                     variant="outline"
-                    onClick={onDiscard}
+                    data-test="budget-edit-inputs"
+                    onClick={onEditInputs}
                     disabled={busy}
                 >
-                    Vorschlag verwerfen
+                    Eingaben ändern
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    data-test="budget-recalculate"
+                    onClick={onRecalculate}
+                    disabled={busy}
+                >
+                    Vorschlag neu berechnen
                 </Button>
             </div>
         </div>
