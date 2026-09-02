@@ -3,7 +3,6 @@ import {
     type DiscountDraft,
     type DiscountTypeOption,
 } from '@/components/discount-list-editor';
-import { LogoSlot } from '@/components/logo-slot';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -12,10 +11,13 @@ import {
     wizardCardHeaderClass,
     wizardCardTitleClass,
 } from '@/components/wizard-section';
-import type { BudgetPositionDiscountsByInventory } from '@/lib/budget-planning';
+import type {
+    BudgetElementDraft,
+    BudgetPositionDiscountsByClientId,
+} from '@/lib/budget-planning';
 
 export function BudgetConditionsStep({
-    wishInventoryIds,
+    budgetElements,
     inventories,
     catalogRules,
     budgetPositionDiscounts,
@@ -28,68 +30,63 @@ export function BudgetConditionsStep({
     onOrderDiscountsChange,
     onAeEnabledChange,
 }: {
-    wishInventoryIds: number[];
+    budgetElements: BudgetElementDraft[];
     inventories: Array<{
         id: number;
         name: string;
-        logo_path?: string | null;
         is_active: boolean;
     }>;
     catalogRules: Array<{
         inventory_id: number;
         is_discountable: boolean;
     }>;
-    budgetPositionDiscounts: BudgetPositionDiscountsByInventory;
+    budgetPositionDiscounts: BudgetPositionDiscountsByClientId;
     orderDiscounts: DiscountDraft[];
     aeEnabled: boolean;
     discountTypes: DiscountTypeOption[];
     canEdit: boolean;
     fieldErrors: Record<string, string[]>;
     onBudgetPositionDiscountsChange: (
-        discounts: BudgetPositionDiscountsByInventory,
+        discounts: BudgetPositionDiscountsByClientId,
     ) => void;
     onOrderDiscountsChange: (discounts: DiscountDraft[]) => void;
     onAeEnabledChange: (enabled: boolean) => void;
 }) {
     return (
         <div className="space-y-6" data-test="budget-conditions-step">
-            {wishInventoryIds.map((inventoryId, index) => {
+            {budgetElements.map((element, index) => {
                 const inventory = inventories.find(
-                    (item) => item.id === inventoryId,
+                    (item) => item.id === element.inventory_id,
                 );
                 const rule = catalogRules.find(
-                    (item) => item.inventory_id === inventoryId,
+                    (item) => item.inventory_id === element.inventory_id,
                 );
 
                 return (
-                    <Card key={inventoryId} className={wizardCardClass}>
+                    <Card key={element.client_id} className={wizardCardClass}>
                         <CardHeader className={wizardCardHeaderClass}>
-                            <CardTitle
-                                className={`${wizardCardTitleClass} flex items-center gap-2`}
-                            >
-                                <LogoSlot
-                                    name={inventory?.name ?? 'Sender'}
-                                    logoPath={inventory?.logo_path}
-                                />
-                                Rabatte für {inventory?.name ?? 'Sender'}
+                            <CardTitle className={wizardCardTitleClass}>
+                                Rabatte für {inventory?.name ?? 'Werbeelement'}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className={wizardCardContentClass}>
                             <DiscountListEditor
-                                title={`Rabatte für ${inventory?.name ?? 'Sender'}`}
+                                title={`Rabatte für ${inventory?.name ?? 'Werbeelement'}`}
                                 description="Optional. Diese Rabatte werden bei der Budgetberechnung berücksichtigt."
                                 discounts={
-                                    budgetPositionDiscounts[inventoryId] ?? []
+                                    budgetPositionDiscounts[
+                                        element.client_id
+                                    ] ?? []
                                 }
                                 types={discountTypes}
                                 canEdit={canEdit}
                                 disabled={rule?.is_discountable === false}
-                                fieldPrefix={`budget_position_discounts_by_inventory.${index}.discounts`}
+                                fieldPrefix={`budget_elements.${index}.position_discounts`}
                                 fieldErrors={fieldErrors}
                                 onChange={(discounts) =>
                                     onBudgetPositionDiscountsChange({
                                         ...budgetPositionDiscounts,
-                                        [inventoryId]: discounts,
+                                        [element.client_id]: discounts,
                                     })
                                 }
                             />

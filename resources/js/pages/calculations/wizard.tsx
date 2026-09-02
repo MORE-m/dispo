@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
 import { BudgetConditionsStep } from '@/components/budget-conditions-step';
-import { BudgetPlanningFrameStep } from '@/components/budget-planning-frame-step';
+import { BudgetElementsStep } from '@/components/budget-elements-step';
 import { BudgetPlanningSidebar } from '@/components/budget-planning-sidebar';
 import { BudgetProposalResultStep } from '@/components/budget-proposal-result-step';
 import {
@@ -58,10 +58,14 @@ import {
 import { useCalculationPreview } from '@/hooks/use-calculation-preview';
 import {
     buildBudgetProposalPayload,
-    payloadBudgetPositionDiscounts,
+    initBudgetElementsFromSources,
+    initBudgetPositionDiscountsByClientId,
+    payloadBudgetElementDiscounts,
+    payloadBudgetElements,
     validateBudgetBasics,
-    validateBudgetFrame,
-    type BudgetPositionDiscountsByInventory,
+    validateBudgetElements,
+    type BudgetElementDraft,
+    type BudgetPositionDiscountsByClientId,
 } from '@/lib/budget-planning';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
@@ -266,34 +270,22 @@ const BUDGET_STEPS = [
     'Budgetvorschlag',
 ] as const;
 
-function initBudgetPositionDiscounts(
-    latestBudgetProposal: LatestBudgetProposal | null,
-    calculation: SavedCalculation | null,
-): BudgetPositionDiscountsByInventory {
-    const map: BudgetPositionDiscountsByInventory = {};
-
-    for (const row of latestBudgetProposal?.payload
-        .budget_position_discounts_by_inventory ?? []) {
-        map[row.inventory_id] = draftDiscounts(row.discounts);
-    }
-
-    for (const position of calculation?.positions ?? []) {
-        if (!map[position.inventory_id]) {
-            map[position.inventory_id] = draftDiscounts(
-                position.position_discounts,
-                position.position_discount_percent,
-            );
-        }
-    }
-
-    return map;
-}
-
 type LatestBudgetProposal = {
     id: number;
     input_fingerprint: string | null;
     status: string;
     payload: BudgetSpotProposal & {
+        budget_elements?: Array<{
+            client_id?: string;
+            inventory_id: number;
+            spot_length_seconds: number;
+            distribution_ranges?: DistributionRangeDraft[];
+            position_discounts?: Array<{
+                type: string;
+                custom_label: string | null;
+                percent: string;
+            }>;
+        }>;
         wish_inventory_ids?: number[];
         spot_length_seconds?: number;
         distribution_ranges?: DistributionRangeDraft[];
@@ -311,6 +303,10 @@ type LatestBudgetProposal = {
             percent: string;
         }>;
     };
+};
+
+type AppliedBudgetProposal = LatestBudgetProposal & {
+    applied_at?: string | null;
 };
 
 function newClientKey(): string {
@@ -443,6 +439,7 @@ export default function CalculationWizard({
     savedSummary,
     savedDisplayTotals,
     latestBudgetProposal,
+    appliedBudgetProposal,
     canEdit,
 }: {
     catalog: Catalog;
@@ -452,16 +449,28 @@ export default function CalculationWizard({
     savedSummary: SavedSummary | null;
     savedDisplayTotals: Totals | null;
     latestBudgetProposal: LatestBudgetProposal | null;
+    appliedBudgetProposal: AppliedBudgetProposal | null;
     canEdit: boolean;
 }) {
     const flash = usePage().props.flash;
+    const initialBudgetApplied =
+        calculation?.budget_proposal_status === 'applied' ||
+        calculation?.budget_proposal_status === 'manual';
     const [step, setStep] = useState(() => {
-        if (
-            latestBudgetProposal &&
-            calculation?.planning_mode === 'budget' &&
-            (calculation.positions?.length ?? 0) === 0
-        ) {
-            return 3;
+        if (calculation?.planning_mode === 'budget') {
+            if (
+                initialBudgetApplied &&
+                (calculation.positions?.length ?? 0) > 0
+            ) {
+                return 1;
+            }
+
+            if (
+                latestBudgetProposal &&
+                (calculation.positions?.length ?? 0) === 0
+            ) {
+                return 3;
+            }
         }
 
         return 0;
@@ -503,35 +512,28 @@ export default function CalculationWizard({
         )?.default_length_seconds ??
         spotClassicMedium?.default_length_seconds ??
         30;
-    const [wishInventoryIds, setWishInventoryIds] = useState<number[]>(() => {
-        if (latestBudgetProposal?.payload.wish_inventory_ids?.length) {
-            return latestBudgetProposal.payload.wish_inventory_ids;
-        }
-
-        if (calculation?.positions?.length) {
-            return calculation.positions.map((p) => p.inventory_id);
-        }
-
-        return [];
-    });
-    const [budgetSpotLength, setBudgetSpotLength] = useState(
-        latestBudgetProposal?.payload.spot_length_seconds ??
-            calculation?.positions[0]?.length_seconds ??
-            defaultSpotLength,
+    const [budgetElements, setBudgetElements] = useState<BudgetElementDraft[]>(
+        () =>
+            initBudgetElementsFromSources(
+                latestBudgetProposal,
+                defaultSpotLength,
+            ),
     );
-    const [budgetDistributionRanges, setBudgetDistributionRanges] = useState<
-        DistributionRangeDraft[]
-    >(() => {
-        if (latestBudgetProposal?.payload.distribution_ranges?.length) {
-            return latestBudgetProposal.payload.distribution_ranges;
-        }
-
-        return [emptyDistributionRange()];
-    });
     const [budgetPositionDiscounts, setBudgetPositionDiscounts] =
-        useState<BudgetPositionDiscountsByInventory>(() =>
-            initBudgetPositionDiscounts(latestBudgetProposal, calculation),
+        useState<BudgetPositionDiscountsByClientId>(() =>
+            initBudgetPositionDiscountsByClientId(
+                latestBudgetProposal,
+                initBudgetElementsFromSources(
+                    latestBudgetProposal,
+                    defaultSpotLength,
+                ),
+                calculation,
+            ),
         );
+    const [budgetProposalManual, setBudgetProposalManual] = useState(
+        calculation?.budget_proposal_status === 'manual',
+    );
+    const [budgetAppliedLocally, setBudgetAppliedLocally] = useState(false);
     const [inputsRevision, setInputsRevision] = useState(0);
     const [proposalAtRevision, setProposalAtRevision] = useState<number | null>(
         latestBudgetProposal ? 0 : null,
@@ -574,13 +576,20 @@ export default function CalculationWizard({
         return first ? [first] : [];
     });
     const [proposal, setProposal] = useState<Proposal | null>(
-        latestBudgetProposal?.payload ?? null,
+        initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
     );
     const [busy, setBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveFieldErrors, setSaveFieldErrors] = useState<
         Record<string, string[]>
     >({});
+
+    const budgetEditingApplied =
+        planningMode === 'budget' &&
+        (budgetAppliedLocally ||
+            calculation?.budget_proposal_status === 'applied' ||
+            calculation?.budget_proposal_status === 'manual' ||
+            (positions.length > 0 && !proposal));
 
     const payload = useMemo(
         () => ({
@@ -596,26 +605,24 @@ export default function CalculationWizard({
             target_budget_nn: targetBudget === '' ? null : targetBudget,
             budget_strategy:
                 planningMode === 'budget' ? 'equal_spot_count' : null,
-            budget_wish_inventory_ids:
-                planningMode === 'budget' ? wishInventoryIds : undefined,
-            budget_spot_length_seconds:
-                planningMode === 'budget' ? budgetSpotLength : undefined,
-            budget_distribution_ranges:
+            budget_elements:
                 planningMode === 'budget'
-                    ? payloadDistributionRanges(budgetDistributionRanges)
-                    : undefined,
-            budget_position_discounts_by_inventory:
-                planningMode === 'budget'
-                    ? payloadBudgetPositionDiscounts(
-                          budgetPositionDiscounts,
-                          wishInventoryIds,
+                    ? payloadBudgetElements(budgetElements).map(
+                          (element, index) => ({
+                              ...element,
+                              position_discounts:
+                                  payloadBudgetElementDiscounts(
+                                      budgetElements,
+                                      budgetPositionDiscounts,
+                                  )[index]?.position_discounts ?? [],
+                          }),
                       )
                     : undefined,
-            budget_proposal_manual: false,
+            budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
             positions:
-                planningMode === 'budget'
+                planningMode === 'budget' && !budgetEditingApplied
                     ? []
                     : positions.map((position) => {
                           const ranges = payloadTimeRanges(
@@ -668,20 +675,25 @@ export default function CalculationWizard({
             aeEnabled,
             targetBudget,
             targetBudget,
-            wishInventoryIds,
-            budgetSpotLength,
-            budgetDistributionRanges,
+            budgetElements,
             budgetPositionDiscounts,
+            budgetProposalManual,
+            budgetEditingApplied,
             calculation,
             positions,
         ],
     );
 
-    const steps = planningMode === 'budget' ? BUDGET_STEPS : MANUAL_STEPS;
+    const steps =
+        planningMode === 'budget' && !budgetEditingApplied
+            ? BUDGET_STEPS
+            : MANUAL_STEPS;
     const budgetPreviewReady =
-        planningMode === 'budget' && positions.length > 0;
+        planningMode === 'budget' &&
+        budgetEditingApplied &&
+        positions.length > 0;
     const showBudgetPlanningSidebar =
-        planningMode === 'budget' && !budgetPreviewReady;
+        planningMode === 'budget' && !budgetEditingApplied;
 
     function markBudgetInputsChanged() {
         setInputsRevision((value) => value + 1);
@@ -723,6 +735,10 @@ export default function CalculationWizard({
     }
 
     function updatePosition(index: number, patch: Partial<PositionDraft>) {
+        if (budgetEditingApplied) {
+            setBudgetProposalManual(true);
+        }
+
         setPositions((current) =>
             current.map((item, itemIndex) => {
                 if (itemIndex !== index) {
@@ -771,6 +787,10 @@ export default function CalculationWizard({
     }
 
     function removePosition(index: number) {
+        if (budgetEditingApplied) {
+            setBudgetProposalManual(true);
+        }
+
         setPositions((current) =>
             current.filter((_, itemIndex) => itemIndex !== index),
         );
@@ -826,11 +846,7 @@ export default function CalculationWizard({
             return;
         }
 
-        const frameError = validateBudgetFrame(
-            wishInventoryIds,
-            budgetSpotLength,
-            budgetDistributionRanges,
-        );
+        const frameError = validateBudgetElements(budgetElements);
         if (frameError) {
             setProposalError(frameError);
             return;
@@ -852,9 +868,7 @@ export default function CalculationWizard({
                 orderDiscounts,
                 aeEnabled,
                 targetBudget,
-                wishInventoryIds,
-                budgetSpotLength,
-                budgetDistributionRanges,
+                budgetElements,
                 budgetPositionDiscounts,
                 calculationId: calculation?.id,
                 lockVersion: calculation?.lock_version,
@@ -924,6 +938,9 @@ export default function CalculationWizard({
                         }>;
                     }
                 ).position_discounts;
+                const element = budgetElements.find(
+                    (candidate) => candidate.inventory_id === item.inventory_id,
+                );
 
                 return {
                     id: existing?.id,
@@ -931,7 +948,10 @@ export default function CalculationWizard({
                     inventory_id: item.inventory_id,
                     advertising_medium_id: mediumId,
                     spot_method: 'average',
-                    length_seconds: item.length_seconds ?? budgetSpotLength,
+                    length_seconds:
+                        item.length_seconds ??
+                        element?.spot_length_seconds ??
+                        defaultSpotLength,
                     total_spot_count: item.total_spot_count,
                     needs_spot_redistribution: false,
                     position_discount_percent: '0',
@@ -948,14 +968,17 @@ export default function CalculationWizard({
                             custom_label: discount.custom_label ?? '',
                             percent: discount.percent,
                         })) ??
-                        budgetPositionDiscounts[item.inventory_id] ??
-                        [],
+                        (element
+                            ? (budgetPositionDiscounts[element.client_id] ?? [])
+                            : []),
                     plan_rows: [],
                 };
             }),
         );
         setProposal(null);
         setProposalAtRevision(null);
+        setBudgetAppliedLocally(true);
+        setStep(1);
     }
 
     const displayTotals = canEdit ? totals : null;
@@ -982,11 +1005,7 @@ export default function CalculationWizard({
             }
 
             if (step === 1) {
-                const frameError = validateBudgetFrame(
-                    wishInventoryIds,
-                    budgetSpotLength,
-                    budgetDistributionRanges,
-                );
+                const frameError = validateBudgetElements(budgetElements);
                 if (frameError) {
                     setProposalError(frameError);
                     return;
@@ -1023,6 +1042,16 @@ export default function CalculationWizard({
                 ) : null}
                 {flash.success ? (
                     <SuccessState message={flash.success} />
+                ) : null}
+                {planningMode === 'budget' && budgetEditingApplied ? (
+                    <StatusBanner data-test="budget-applied-hint">
+                        Mit Budget geplant · anschließend frei bearbeitbar
+                        {budgetProposalManual
+                            ? ' · Die übernommene Budgetplanung wurde manuell angepasst.'
+                            : appliedBudgetProposal || initialBudgetApplied
+                              ? ' · Aus Budgetvorschlag übernommen'
+                              : ''}
+                    </StatusBanner>
                 ) : null}
                 {error ? (
                     <ErrorState message={error} data-test="preview-error" />
@@ -1239,26 +1268,14 @@ export default function CalculationWizard({
                                     description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
                                 />
                             ) : planningMode === 'budget' ? (
-                                <BudgetPlanningFrameStep
+                                <BudgetElementsStep
+                                    elements={budgetElements}
                                     inventories={catalog.inventories}
-                                    wishInventoryIds={wishInventoryIds}
-                                    budgetSpotLength={budgetSpotLength}
-                                    budgetDistributionRanges={
-                                        budgetDistributionRanges
-                                    }
                                     dayGroups={dayGroups}
                                     canEdit={canEdit}
                                     fieldErrors={fieldErrors}
-                                    onWishInventoryChange={(ids) => {
-                                        setWishInventoryIds(ids);
-                                        markBudgetInputsChanged();
-                                    }}
-                                    onSpotLengthChange={(seconds) => {
-                                        setBudgetSpotLength(seconds);
-                                        markBudgetInputsChanged();
-                                    }}
-                                    onDistributionRangesChange={(ranges) => {
-                                        setBudgetDistributionRanges(ranges);
+                                    onChange={(elements) => {
+                                        setBudgetElements(elements);
                                         markBudgetInputsChanged();
                                     }}
                                 />
@@ -1595,7 +1612,7 @@ export default function CalculationWizard({
                             planningMode === 'budget' ? (
                                 <div className="space-y-6">
                                     <BudgetConditionsStep
-                                        wishInventoryIds={wishInventoryIds}
+                                        budgetElements={budgetElements}
                                         inventories={catalog.inventories}
                                         catalogRules={catalog.rules}
                                         budgetPositionDiscounts={
@@ -1880,7 +1897,8 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 3 ? (
-                            planningMode === 'budget' ? (
+                            planningMode === 'budget' &&
+                            !budgetEditingApplied ? (
                                 <BudgetProposalResultStep
                                     proposal={proposal}
                                     proposalStatus={proposalStatus}
@@ -2222,10 +2240,9 @@ export default function CalculationWizard({
                         {showBudgetPlanningSidebar ? (
                             <BudgetPlanningSidebar
                                 targetBudget={targetBudget}
-                                wishInventoryCount={wishInventoryIds.length}
-                                spotLengthSeconds={budgetSpotLength}
+                                budgetElements={budgetElements}
+                                inventories={catalog.inventories}
                                 dayGroups={dayGroups}
-                                distributionRanges={budgetDistributionRanges}
                             />
                         ) : (
                             <CalculationSummaryPanel

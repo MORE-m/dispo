@@ -15,12 +15,14 @@ export function BudgetDistributionRanges({
     canEdit,
     fieldErrors,
     onChange,
+    fieldPrefix = 'budget_distribution_ranges',
 }: {
     ranges: DistributionRangeDraft[];
     dayGroups: DayGroupOption[];
     canEdit: boolean;
     fieldErrors: Record<string, string[]>;
     onChange: (ranges: DistributionRangeDraft[]) => void;
+    fieldPrefix?: string;
 }) {
     function updateRange(
         index: number,
@@ -52,7 +54,7 @@ export function BudgetDistributionRanges({
                                 htmlFor={`budget-start-${rangeIndex}`}
                                 error={
                                     fieldErrors[
-                                        `budget_distribution_ranges.${rangeIndex}.start_hour`
+                                        `${fieldPrefix}.${rangeIndex}.start_hour`
                                     ]?.[0]
                                 }
                             >
@@ -81,7 +83,7 @@ export function BudgetDistributionRanges({
                                 htmlFor={`budget-end-${rangeIndex}`}
                                 error={
                                     fieldErrors[
-                                        `budget_distribution_ranges.${rangeIndex}.end_hour_exclusive`
+                                        `${fieldPrefix}.${rangeIndex}.end_hour_exclusive`
                                     ]?.[0]
                                 }
                             >
@@ -110,7 +112,7 @@ export function BudgetDistributionRanges({
                                 htmlFor={`budget-day-${rangeIndex}`}
                                 error={
                                     fieldErrors[
-                                        `budget_distribution_ranges.${rangeIndex}.day_group`
+                                        `${fieldPrefix}.${rangeIndex}.day_group`
                                     ]?.[0]
                                 }
                             >

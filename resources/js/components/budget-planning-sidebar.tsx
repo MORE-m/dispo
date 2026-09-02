@@ -1,22 +1,20 @@
 import { money } from '@/components/form-field';
 import {
-    formatHour,
-    type DayGroupOption,
-    type DistributionRangeDraft,
-} from '@/lib/pricing-time';
+    formatBudgetElementSummary,
+    type BudgetElementDraft,
+} from '@/lib/budget-planning';
+import type { DayGroupOption } from '@/lib/pricing-time';
 
 export function BudgetPlanningSidebar({
     targetBudget,
-    wishInventoryCount,
-    spotLengthSeconds,
+    budgetElements,
+    inventories,
     dayGroups,
-    distributionRanges,
 }: {
     targetBudget: string;
-    wishInventoryCount: number;
-    spotLengthSeconds: number;
+    budgetElements: BudgetElementDraft[];
+    inventories: Array<{ id: number; name: string }>;
     dayGroups: DayGroupOption[];
-    distributionRanges: DistributionRangeDraft[];
 }) {
     const dayGroupLabel = (value: string) =>
         dayGroups.find((group) => group.value === value)?.label ?? value;
@@ -35,30 +33,25 @@ export function BudgetPlanningSidebar({
                     </dd>
                 </div>
                 <div>
-                    <dt className="text-muted-foreground">Wunschsender</dt>
-                    <dd className="font-medium">{wishInventoryCount}</dd>
-                </div>
-                <div>
-                    <dt className="text-muted-foreground">Spotlänge</dt>
-                    <dd className="font-medium">{spotLengthSeconds} Sek.</dd>
-                </div>
-                <div>
                     <dt className="text-muted-foreground">
-                        Erlaubte Zeiträume
+                        Budget-Werbeelemente
                     </dt>
                     <dd className="space-y-1">
-                        {distributionRanges.map((range, index) => (
-                            <p key={`range-${index}`}>
-                                {dayGroupLabel(range.day_group)} ·{' '}
-                                {typeof range.start_hour === 'number'
-                                    ? formatHour(range.start_hour)
-                                    : '–'}
-                                –
-                                {typeof range.end_hour_exclusive === 'number'
-                                    ? formatHour(range.end_hour_exclusive)
-                                    : '–'}
-                            </p>
-                        ))}
+                        {budgetElements.map((element) => {
+                            const inventory = inventories.find(
+                                (item) => item.id === element.inventory_id,
+                            );
+
+                            return (
+                                <p key={element.client_id}>
+                                    {formatBudgetElementSummary(
+                                        element,
+                                        inventory?.name,
+                                        dayGroupLabel,
+                                    )}
+                                </p>
+                            );
+                        })}
                     </dd>
                 </div>
             </dl>

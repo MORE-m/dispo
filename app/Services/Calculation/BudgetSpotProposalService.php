@@ -9,7 +9,6 @@ use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
-use App\Models\CalculationPosition;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,6 +24,7 @@ final class BudgetSpotProposalService
         private readonly CatalogResolver $catalog,
         private readonly BudgetSpotAllocator $allocator,
         private readonly BudgetProposalFingerprint $fingerprint,
+        private readonly BudgetPlanningPayloadNormalizer $elementNormalizer,
     ) {}
 
     /**
@@ -40,88 +40,80 @@ final class BudgetSpotProposalService
             ]);
         }
 
-        $wishInventoryIds = $this->wishInventoryIds($payload);
-        if ($wishInventoryIds === []) {
-            throw ValidationException::withMessages([
-                'budget_wish_inventory_ids' => 'Mindestens ein Wunschsender ist erforderlich.',
-            ]);
-        }
-
-        $lengthSeconds = (int) ($payload['budget_spot_length_seconds'] ?? 0);
-        if ($lengthSeconds < 1) {
-            throw ValidationException::withMessages([
-                'budget_spot_length_seconds' => 'Spotlänge ist erforderlich.',
-            ]);
-        }
-
-        $distributionRanges = $this->validatedDistributionRanges($payload);
-        $buckets = $this->buildBuckets($distributionRanges);
-        if ($buckets === []) {
-            throw ValidationException::withMessages([
-                'budget_distribution_ranges' => 'Mindestens ein erlaubter Verteilungszeitraum ist erforderlich.',
-            ]);
-        }
+        $elements = $this->elementNormalizer->normalizeElements($payload);
 
         $mediumId = $this->spotClassicMediumId();
         $orderDiscounts = $this->orderDiscountInputs($payload);
         $orderDiscountPercent = $this->effectivePercentFromDiscounts($orderDiscounts);
         $aeEnabled = (bool) ($payload['ae_enabled'] ?? false);
-        $positionDiscountsByInventory = $this->positionDiscountsByInventory($payload, $existing);
 
-        $catalogs = [];
-        $bucketPrices = [];
+        /** @var list<array{
+         *     client_id: string,
+         *     inventory_id: int,
+         *     length_seconds: int,
+         *     distribution_ranges: list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>,
+         *     position_discounts: list<DiscountInput>,
+         *     catalog: array<string, mixed>,
+         *     buckets: list<BudgetBucket>,
+         *     bucket_prices: list<string>
+         * }> $elementConfigs */
+        $elementConfigs = [];
 
-        foreach ($wishInventoryIds as $inventoryId) {
-            $catalogs[$inventoryId] = $this->catalog->resolveInventoryForBudget($inventoryId, $mediumId);
-            $bucketPrices[$inventoryId] = $this->resolveBucketPrices(
-                $catalogs[$inventoryId],
-                $buckets,
-            );
+        foreach ($elements as $element) {
+            $catalog = $this->catalog->resolveInventoryForBudget($element['inventory_id'], $mediumId);
+            $buckets = $this->buildBuckets($element['distribution_ranges']);
+            if ($buckets === []) {
+                throw ValidationException::withMessages([
+                    'budget_elements' => 'Mindestens ein erlaubter Verteilungszeitraum ist erforderlich.',
+                ]);
+            }
+
+            $elementConfigs[] = [
+                'client_id' => $element['client_id'],
+                'inventory_id' => $element['inventory_id'],
+                'length_seconds' => $element['spot_length_seconds'],
+                'distribution_ranges' => $element['distribution_ranges'],
+                'position_discounts' => $this->discountInputsFromRows($element['position_discounts']),
+                'catalog' => $catalog,
+                'buckets' => $buckets,
+                'bucket_prices' => $this->resolveBucketPrices($catalog, $buckets),
+            ];
         }
 
-        $maxSpots = $this->findMaxSpotsPerSender(
-            $wishInventoryIds,
-            $catalogs,
-            $bucketPrices,
-            $buckets,
-            $lengthSeconds,
+        $wishInventoryIds = array_column($elementConfigs, 'inventory_id');
+        $catalogs = [];
+        foreach ($elementConfigs as $config) {
+            $catalogs[$config['inventory_id']] = $config['catalog'];
+        }
+
+        $maxSpots = $this->findMaxSpotsPerElement(
+            $elementConfigs,
             $orderDiscountPercent,
             $orderDiscounts,
             $aeEnabled,
-            $positionDiscountsByInventory,
             $target,
         );
 
         $nextPackage = $this->calculateAtSpots(
-            $wishInventoryIds,
-            $catalogs,
-            $bucketPrices,
-            $buckets,
-            $lengthSeconds,
+            $elementConfigs,
             $orderDiscountPercent,
             $orderDiscounts,
             $aeEnabled,
-            $positionDiscountsByInventory,
             $maxSpots + 1,
         );
 
         $result = $this->calculateAtSpots(
-            $wishInventoryIds,
-            $catalogs,
-            $bucketPrices,
-            $buckets,
-            $lengthSeconds,
+            $elementConfigs,
             $orderDiscountPercent,
             $orderDiscounts,
             $aeEnabled,
-            $positionDiscountsByInventory,
             $maxSpots,
         );
 
         $usedNn = $result['nn_invest'];
         $remainder = Decimal::roundMoney(Decimal::sub($target, $usedNn));
         $spotsPerSender = $maxSpots;
-        $totalSpots = $spotsPerSender * count($wishInventoryIds);
+        $totalSpots = $spotsPerSender * count($elementConfigs);
         $utilizationPercent = Decimal::roundPrice(Decimal::mul(Decimal::div($usedNn, $target), '100'));
 
         $nextPackageCost = $nextPackage['nn_invest'];
@@ -130,14 +122,20 @@ final class BudgetSpotProposalService
             ? Decimal::roundMoney(Decimal::sub($nextPackageCost, $target))
             : '0.00';
 
-        $fingerprintInput = $this->fingerprint->inputFromPayload(
-            $payload,
-            $wishInventoryIds,
-            $lengthSeconds,
-            $distributionRanges,
-            $catalogs,
+        $inputFingerprint = $this->fingerprint->compute(
+            $this->fingerprint->inputFromElements($payload, $elements, $catalogs),
         );
-        $inputFingerprint = $this->fingerprint->compute($fingerprintInput);
+
+        $budgetElementsPayload = array_map(
+            fn (array $element): array => [
+                'client_id' => $element['client_id'],
+                'inventory_id' => $element['inventory_id'],
+                'spot_length_seconds' => $element['spot_length_seconds'],
+                'distribution_ranges' => $element['distribution_ranges'],
+                'position_discounts' => $element['position_discounts'],
+            ],
+            $elements,
+        );
 
         $proposal = [
             'strategy' => BudgetStrategy::EqualSpotCount->value,
@@ -155,9 +153,10 @@ final class BudgetSpotProposalService
             'next_package_exceeds_budget' => $nextPackageExceeds,
             'next_package_shortfall' => $nextPackageShortfall,
             'input_fingerprint' => $inputFingerprint,
+            'budget_elements' => $budgetElementsPayload,
             'wish_inventory_ids' => $wishInventoryIds,
-            'spot_length_seconds' => $lengthSeconds,
-            'distribution_ranges' => $distributionRanges,
+            'spot_length_seconds' => $elementConfigs[0]['length_seconds'] ?? 0,
+            'distribution_ranges' => $elementConfigs[0]['distribution_ranges'] ?? [],
             'positions' => $result['positions'],
             'media_gross' => $result['media_gross'],
             'position_discount_total' => $result['position_discount_total'],
@@ -165,21 +164,15 @@ final class BudgetSpotProposalService
             'ae_total' => $result['ae_total'],
             'ae_enabled' => $aeEnabled,
             'order_discounts' => $payload['order_discounts'] ?? [],
-            'budget_position_discounts_by_inventory' => $payload['budget_position_discounts_by_inventory'] ?? [],
-            'explanation' => $this->buildExplanation($spotsPerSender, count($wishInventoryIds)),
+            'explanation' => $this->buildExplanation($spotsPerSender, count($elementConfigs)),
         ];
 
         if ($spotsPerSender < 1) {
             $firstPackage = $this->calculateAtSpots(
-                $wishInventoryIds,
-                $catalogs,
-                $bucketPrices,
-                $buckets,
-                $lengthSeconds,
+                $elementConfigs,
                 $orderDiscountPercent,
                 $orderDiscounts,
                 $aeEnabled,
-                $positionDiscountsByInventory,
                 1,
             );
             $proposal['minimum_budget_nn'] = $firstPackage['nn_invest'];
@@ -194,47 +187,6 @@ final class BudgetSpotProposalService
         }
 
         return $proposal;
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return list<int>
-     */
-    private function wishInventoryIds(array $payload): array
-    {
-        $raw = $payload['budget_wish_inventory_ids'] ?? [];
-        if (! is_array($raw)) {
-            return [];
-        }
-
-        $ids = [];
-        foreach ($raw as $id) {
-            $parsed = (int) $id;
-            if ($parsed > 0) {
-                $ids[] = $parsed;
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>
-     */
-    private function validatedDistributionRanges(array $payload): array
-    {
-        $raw = $payload['budget_distribution_ranges'] ?? [];
-        if (! is_array($raw) || $raw === []) {
-            return [];
-        }
-
-        return (new TimeRangeValidator)->validated(
-            $raw,
-            'budget_distribution_ranges',
-            requireAtLeastOne: true,
-            requireSpotCount: false,
-        );
     }
 
     /**
@@ -335,38 +287,33 @@ final class BudgetSpotProposalService
     }
 
     /**
-     * @param  list<int>  $wishInventoryIds
-     * @param  array<int, array<string, mixed>>  $catalogs
-     * @param  array<int, list<string>>  $bucketPrices
-     * @param  list<BudgetBucket>  $buckets
+     * @param  list<array{
+     *     client_id: string,
+     *     inventory_id: int,
+     *     length_seconds: int,
+     *     distribution_ranges: list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>,
+     *     position_discounts: list<DiscountInput>,
+     *     catalog: array<string, mixed>,
+     *     buckets: list<BudgetBucket>,
+     *     bucket_prices: list<string>
+     * }> $elementConfigs
      * @param  list<DiscountInput>  $orderDiscounts
-     * @param  array<int, list<DiscountInput>>  $positionDiscountsByInventory
      */
-    private function findMaxSpotsPerSender(
-        array $wishInventoryIds,
-        array $catalogs,
-        array $bucketPrices,
-        array $buckets,
-        int $lengthSeconds,
+    private function findMaxSpotsPerElement(
+        array $elementConfigs,
         string $orderDiscountPercent,
         array $orderDiscounts,
         bool $aeEnabled,
-        array $positionDiscountsByInventory,
         string $targetBudget,
     ): int {
         $low = 0;
         $high = 1;
 
         while ($this->fitsBudget(
-            $wishInventoryIds,
-            $catalogs,
-            $bucketPrices,
-            $buckets,
-            $lengthSeconds,
+            $elementConfigs,
             $orderDiscountPercent,
             $orderDiscounts,
             $aeEnabled,
-            $positionDiscountsByInventory,
             $high,
             $targetBudget,
         )) {
@@ -379,15 +326,10 @@ final class BudgetSpotProposalService
         while ($low < $high) {
             $mid = $low + intdiv($high - $low + 1, 2);
             if ($this->fitsBudget(
-                $wishInventoryIds,
-                $catalogs,
-                $bucketPrices,
-                $buckets,
-                $lengthSeconds,
+                $elementConfigs,
                 $orderDiscountPercent,
                 $orderDiscounts,
                 $aeEnabled,
-                $positionDiscountsByInventory,
                 $mid,
                 $targetBudget,
             )) {
@@ -401,53 +343,53 @@ final class BudgetSpotProposalService
     }
 
     /**
-     * @param  list<int>  $wishInventoryIds
-     * @param  array<int, array<string, mixed>>  $catalogs
-     * @param  array<int, list<string>>  $bucketPrices
-     * @param  list<BudgetBucket>  $buckets
+     * @param  list<array{
+     *     client_id: string,
+     *     inventory_id: int,
+     *     length_seconds: int,
+     *     distribution_ranges: list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>,
+     *     position_discounts: list<DiscountInput>,
+     *     catalog: array<string, mixed>,
+     *     buckets: list<BudgetBucket>,
+     *     bucket_prices: list<string>
+     * }> $elementConfigs
      * @param  list<DiscountInput>  $orderDiscounts
-     * @param  array<int, list<DiscountInput>>  $positionDiscountsByInventory
      */
     private function fitsBudget(
-        array $wishInventoryIds,
-        array $catalogs,
-        array $bucketPrices,
-        array $buckets,
-        int $lengthSeconds,
+        array $elementConfigs,
         string $orderDiscountPercent,
         array $orderDiscounts,
         bool $aeEnabled,
-        array $positionDiscountsByInventory,
-        int $spotsPerSender,
+        int $spotsPerElement,
         string $targetBudget,
     ): bool {
-        if ($spotsPerSender < 0) {
+        if ($spotsPerElement < 0) {
             return false;
         }
 
         $result = $this->calculateAtSpots(
-            $wishInventoryIds,
-            $catalogs,
-            $bucketPrices,
-            $buckets,
-            $lengthSeconds,
+            $elementConfigs,
             $orderDiscountPercent,
             $orderDiscounts,
             $aeEnabled,
-            $positionDiscountsByInventory,
-            $spotsPerSender,
+            $spotsPerElement,
         );
 
         return Decimal::cmp($result['nn_invest'], $targetBudget) <= 0;
     }
 
     /**
-     * @param  list<int>  $wishInventoryIds
-     * @param  array<int, array<string, mixed>>  $catalogs
-     * @param  array<int, list<string>>  $bucketPrices
-     * @param  list<BudgetBucket>  $buckets
+     * @param  list<array{
+     *     client_id: string,
+     *     inventory_id: int,
+     *     length_seconds: int,
+     *     distribution_ranges: list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>,
+     *     position_discounts: list<DiscountInput>,
+     *     catalog: array<string, mixed>,
+     *     buckets: list<BudgetBucket>,
+     *     bucket_prices: list<string>
+     * }> $elementConfigs
      * @param  list<DiscountInput>  $orderDiscounts
-     * @param  array<int, list<DiscountInput>>  $positionDiscountsByInventory
      * @return array{
      *     nn_invest: string,
      *     media_gross: string,
@@ -458,32 +400,27 @@ final class BudgetSpotProposalService
      * }
      */
     private function calculateAtSpots(
-        array $wishInventoryIds,
-        array $catalogs,
-        array $bucketPrices,
-        array $buckets,
-        int $lengthSeconds,
+        array $elementConfigs,
         string $orderDiscountPercent,
         array $orderDiscounts,
         bool $aeEnabled,
-        array $positionDiscountsByInventory,
-        int $spotsPerSender,
+        int $spotsPerElement,
     ): array {
         $inputs = [];
-        $distribution = $this->allocator->distribute($spotsPerSender, count($buckets));
 
-        foreach ($wishInventoryIds as $inventoryId) {
-            $catalog = $catalogs[$inventoryId];
-            $prices = $bucketPrices[$inventoryId];
-            $positionDiscounts = $positionDiscountsByInventory[$inventoryId] ?? [];
+        foreach ($elementConfigs as $config) {
+            $distribution = $this->allocator->distribute(
+                $spotsPerElement,
+                count($config['buckets']),
+            );
 
             $inputs[] = $this->buildPositionInput(
-                $catalog,
-                $buckets,
-                $prices,
+                $config['catalog'],
+                $config['buckets'],
+                $config['bucket_prices'],
                 $distribution,
-                $lengthSeconds,
-                $positionDiscounts,
+                $config['length_seconds'],
+                $config['position_discounts'],
                 $aeEnabled,
             );
         }
@@ -499,8 +436,8 @@ final class BudgetSpotProposalService
 
         $positions = [];
         foreach ($totals->positions as $index => $positionResult) {
-            $inventoryId = $wishInventoryIds[$index];
-            $catalog = $catalogs[$inventoryId];
+            $config = $elementConfigs[$index];
+            $catalog = $config['catalog'];
             $inventory = $catalog['inventory'];
 
             $bucketsPayload = [];
@@ -521,11 +458,12 @@ final class BudgetSpotProposalService
             }
 
             $positions[] = [
-                'position_key' => 'inventory:'.$inventoryId,
-                'inventory_id' => $inventoryId,
+                'position_key' => 'inventory:'.$config['inventory_id'],
+                'client_id' => $config['client_id'],
+                'inventory_id' => $config['inventory_id'],
                 'inventory_name' => $inventory->name,
                 'advertising_medium_id' => $catalog['medium']->id,
-                'length_seconds' => $lengthSeconds,
+                'length_seconds' => $config['length_seconds'],
                 'total_spot_count' => $positionResult->spotCount,
                 'media_gross' => $positionResult->mediaGross,
                 'position_discount_amount' => $positionResult->positionDiscountAmount,
@@ -614,83 +552,6 @@ final class BudgetSpotProposalService
             positionDiscounts: (bool) $catalog['is_discountable'] ? $positionDiscounts : [],
             needsSpotRedistribution: false,
         );
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<int, list<DiscountInput>>
-     */
-    private function positionDiscountsByInventory(array $payload, ?Calculation $existing): array
-    {
-        $map = [];
-
-        foreach ($payload['budget_position_discounts_by_inventory'] ?? [] as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $inventoryId = (int) ($row['inventory_id'] ?? 0);
-            if ($inventoryId < 1) {
-                continue;
-            }
-
-            $map[$inventoryId] = $this->discountInputsFromRows($row['discounts'] ?? []);
-        }
-
-        foreach ($payload['positions'] ?? [] as $position) {
-            $inventoryId = (int) ($position['inventory_id'] ?? 0);
-            if ($inventoryId < 1 || isset($map[$inventoryId])) {
-                continue;
-            }
-
-            $map[$inventoryId] = $this->positionDiscountInputs($position);
-        }
-
-        if ($existing !== null) {
-            foreach ($existing->positions as $position) {
-                if (! isset($map[$position->inventory_id])) {
-                    $map[$position->inventory_id] = $this->positionDiscountInputsFromModel($position);
-                }
-            }
-        }
-
-        return $map;
-    }
-
-    /**
-     * @param  array<string, mixed>  $position
-     * @return list<DiscountInput>
-     */
-    private function positionDiscountInputs(array $position): array
-    {
-        $raw = $position['position_discounts'] ?? [];
-        if (! is_array($raw) || $raw === []) {
-            $legacy = (string) ($position['position_discount_percent'] ?? '0');
-            if (Decimal::cmp($legacy, '0') <= 0) {
-                return [];
-            }
-
-            return [new DiscountInput(DiscountType::Quantity, $legacy)];
-        }
-
-        return $this->discountInputsFromRows($raw);
-    }
-
-    /**
-     * @return list<DiscountInput>
-     */
-    private function positionDiscountInputsFromModel(CalculationPosition $position): array
-    {
-        $position->loadMissing('discounts');
-        $rows = $position->discounts->map(
-            fn ($discount): array => [
-                'type' => $discount->type->value,
-                'custom_label' => $discount->custom_label,
-                'percent' => (string) $discount->percent,
-            ],
-        )->all();
-
-        return $this->discountInputsFromRows($rows);
     }
 
     /**

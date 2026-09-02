@@ -5,6 +5,7 @@ namespace App\Http\Requests\Calculation;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
+use App\Services\Calculation\BudgetPlanningPayloadNormalizer;
 use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\TimeRangeValidator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,10 +31,22 @@ class BudgetProposalPayloadRequest extends FormRequest
         return [
             'planning_mode' => ['required', Rule::enum(PlanningMode::class)],
             'target_budget_nn' => ['required', 'numeric', 'gt:0', 'max:999999999999.99'],
-            'budget_wish_inventory_ids' => ['required', 'array', 'min:1'],
+            'budget_elements' => ['sometimes', 'array', 'min:1'],
+            'budget_elements.*.client_id' => ['nullable', 'string', 'max:120'],
+            'budget_elements.*.inventory_id' => ['required_with:budget_elements', 'integer', 'min:1'],
+            'budget_elements.*.spot_length_seconds' => ['required_with:budget_elements', 'integer', 'min:1', 'max:3600'],
+            'budget_elements.*.distribution_ranges' => ['required_with:budget_elements', 'array', 'min:1'],
+            'budget_elements.*.distribution_ranges.*.start_hour' => ['required', 'integer', 'min:0', 'max:23'],
+            'budget_elements.*.distribution_ranges.*.end_hour_exclusive' => ['required', 'integer', 'min:1', 'max:24'],
+            'budget_elements.*.distribution_ranges.*.day_group' => ['required', Rule::enum(DayGroup::class)],
+            'budget_elements.*.position_discounts' => ['sometimes', 'array'],
+            'budget_elements.*.position_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
+            'budget_elements.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'budget_elements.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'budget_wish_inventory_ids' => ['sometimes', 'array', 'min:1'],
             'budget_wish_inventory_ids.*' => ['integer', 'min:1'],
-            'budget_spot_length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
-            'budget_distribution_ranges' => ['required', 'array', 'min:1'],
+            'budget_spot_length_seconds' => ['sometimes', 'integer', 'min:1', 'max:3600'],
+            'budget_distribution_ranges' => ['sometimes', 'array', 'min:1'],
             'budget_distribution_ranges.*.start_hour' => ['required', 'integer', 'min:0', 'max:23'],
             'budget_distribution_ranges.*.end_hour_exclusive' => ['required', 'integer', 'min:1', 'max:24'],
             'budget_distribution_ranges.*.day_group' => ['required', Rule::enum(DayGroup::class)],
@@ -65,17 +78,38 @@ class BudgetProposalPayloadRequest extends FormRequest
                 $validator->errors()->add('planning_mode', 'Budgetvorschläge sind nur im Planungsweg „Mit Budget planen“ möglich.');
             }
 
-            try {
-                (new TimeRangeValidator)->validated(
-                    $this->input('budget_distribution_ranges', []),
-                    'budget_distribution_ranges',
-                    requireAtLeastOne: true,
-                    requireSpotCount: false,
-                );
-            } catch (ValidationException $exception) {
-                foreach ($exception->errors() as $key => $messages) {
-                    foreach ($messages as $message) {
-                        $validator->errors()->add($key, $message);
+            $hasElements = is_array($this->input('budget_elements')) && $this->input('budget_elements') !== [];
+            $hasLegacy = is_array($this->input('budget_wish_inventory_ids')) && $this->input('budget_wish_inventory_ids') !== [];
+
+            if (! $hasElements && ! $hasLegacy) {
+                $validator->errors()->add('budget_elements', 'Mindestens ein Budget-Werbeelement ist erforderlich.');
+            }
+
+            if (! $hasElements && $hasLegacy) {
+                try {
+                    (new TimeRangeValidator)->validated(
+                        $this->input('budget_distribution_ranges', []),
+                        'budget_distribution_ranges',
+                        requireAtLeastOne: true,
+                        requireSpotCount: false,
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+
+            if ($hasElements) {
+                try {
+                    (new BudgetPlanningPayloadNormalizer)->normalizeElements($this->all());
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
                     }
                 }
             }
@@ -86,6 +120,25 @@ class BudgetProposalPayloadRequest extends FormRequest
                 foreach ($exception->errors() as $key => $messages) {
                     foreach ($messages as $message) {
                         $validator->errors()->add($key, $message);
+                    }
+                }
+            }
+
+            foreach ($this->input('budget_elements', []) as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                try {
+                    (new DiscountValidator)->validated(
+                        $row['position_discounts'] ?? [],
+                        "budget_elements.{$index}.position_discounts",
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
                     }
                 }
             }

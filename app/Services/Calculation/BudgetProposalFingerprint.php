@@ -21,16 +21,19 @@ final class BudgetProposalFingerprint
 
     /**
      * @param  array<string, mixed>  $payload
-     * @param  list<int>  $wishInventoryIds
-     * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>  $distributionRanges
+     * @param  list<array{
+     *     client_id: string,
+     *     inventory_id: int,
+     *     spot_length_seconds: int,
+     *     distribution_ranges: list<array{start_hour: int, end_hour_exclusive: int, day_group: string}>,
+     *     position_discounts: list<array{type: string, custom_label: string|null, percent: string}>
+     * }> $elements
      * @param  array<int, array<string, mixed>>  $catalogs
      * @return array<string, mixed>
      */
-    public function inputFromPayload(
+    public function inputFromElements(
         array $payload,
-        array $wishInventoryIds,
-        int $lengthSeconds,
-        array $distributionRanges,
+        array $elements,
         array $catalogs,
     ): array {
         $priceListVersions = [];
@@ -38,15 +41,23 @@ final class BudgetProposalFingerprint
             $priceListVersions[$inventoryId] = $catalog['priceList']->version;
         }
 
+        $elementFingerprint = [];
+        foreach ($elements as $element) {
+            $elementFingerprint[] = [
+                'client_id' => $element['client_id'],
+                'inventory_id' => $element['inventory_id'],
+                'spot_length_seconds' => $element['spot_length_seconds'],
+                'distribution_ranges' => $element['distribution_ranges'],
+                'position_discounts' => $this->normalizeDiscountRows($element['position_discounts']),
+            ];
+        }
+
         return [
             'algorithm_version' => BudgetSpotAllocator::ALGORITHM_VERSION,
             'target_budget_nn' => Decimal::roundMoney((string) $payload['target_budget_nn']),
-            'wish_inventory_ids' => $wishInventoryIds,
-            'spot_length_seconds' => $lengthSeconds,
-            'distribution_ranges' => $distributionRanges,
+            'budget_elements' => $elementFingerprint,
             'order_discounts' => $payload['order_discounts'] ?? [],
             'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
-            'position_discounts' => $this->positionDiscountFingerprint($payload),
             'price_list_versions' => $priceListVersions,
         ];
     }
@@ -56,32 +67,21 @@ final class BudgetProposalFingerprint
      */
     public function currentFingerprint(array $payload, ?Calculation $existing = null): string
     {
-        $wishIds = [];
-        foreach ($payload['budget_wish_inventory_ids'] ?? [] as $id) {
-            $parsed = (int) $id;
-            if ($parsed > 0) {
-                $wishIds[] = $parsed;
-            }
-        }
+        $normalizer = new BudgetPlanningPayloadNormalizer;
 
-        $ranges = [];
-        foreach ($payload['budget_distribution_ranges'] ?? [] as $range) {
-            if (! is_array($range)) {
-                continue;
-            }
-            $ranges[] = [
-                'start_hour' => (int) ($range['start_hour'] ?? 0),
-                'end_hour_exclusive' => (int) ($range['end_hour_exclusive'] ?? 0),
-                'day_group' => (string) ($range['day_group'] ?? ''),
-            ];
+        try {
+            $elements = $normalizer->normalizeElements($payload);
+        } catch (\Throwable) {
+            return $this->compute(['invalid' => true]);
         }
 
         $catalogs = [];
-        if ($wishIds !== []) {
+        if ($elements !== []) {
             $resolver = app(CatalogResolver::class);
             $mediumId = (int) (AdvertisingMedium::query()->where('code', 'spot_classic')->value('id') ?? 0);
-            foreach ($wishIds as $inventoryId) {
-                if ($mediumId > 0) {
+            foreach ($elements as $element) {
+                $inventoryId = $element['inventory_id'];
+                if ($mediumId > 0 && ! isset($catalogs[$inventoryId])) {
                     try {
                         $catalogs[$inventoryId] = $resolver->resolveInventoryForBudget($inventoryId, $mediumId);
                     } catch (\Throwable) {
@@ -91,13 +91,7 @@ final class BudgetProposalFingerprint
             }
         }
 
-        return $this->compute($this->inputFromPayload(
-            $payload,
-            $wishIds,
-            (int) ($payload['budget_spot_length_seconds'] ?? 0),
-            $ranges,
-            $catalogs,
-        ));
+        return $this->compute($this->inputFromElements($payload, $elements, $catalogs));
     }
 
     /**
@@ -135,50 +129,7 @@ final class BudgetProposalFingerprint
     }
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @return array<int, list<array{type: string, percent: string, custom_label: string|null}>>
-     */
-    private function positionDiscountFingerprint(array $payload): array
-    {
-        $map = [];
-
-        foreach ($payload['budget_position_discounts_by_inventory'] ?? [] as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $inventoryId = (int) ($row['inventory_id'] ?? 0);
-            if ($inventoryId < 1) {
-                continue;
-            }
-
-            $discounts = $row['discounts'] ?? [];
-            if (! is_array($discounts)) {
-                continue;
-            }
-
-            $map[$inventoryId] = $this->normalizeDiscountRows(array_values($discounts));
-        }
-
-        foreach ($payload['positions'] ?? [] as $position) {
-            $inventoryId = (int) ($position['inventory_id'] ?? 0);
-            if ($inventoryId < 1 || isset($map[$inventoryId])) {
-                continue;
-            }
-
-            $discounts = $position['position_discounts'] ?? [];
-            if (! is_array($discounts)) {
-                continue;
-            }
-
-            $map[$inventoryId] = $this->normalizeDiscountRows(array_values($discounts));
-        }
-
-        return $map;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $discounts
+     * @param  list<array{type: string, custom_label: string|null, percent: string}|array<string, mixed>>  $discounts
      * @return list<array{type: string, percent: string, custom_label: string|null}>
      */
     private function normalizeDiscountRows(array $discounts): array
