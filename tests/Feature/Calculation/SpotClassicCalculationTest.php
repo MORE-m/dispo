@@ -92,26 +92,8 @@ class SpotClassicCalculationTest extends TestCase
         $nnBefore = (string) $calculation->nn_invest;
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
-            ...$this->payload($catalog, [
-                [
-                    'inventory_id' => $catalog['hamburg']->id,
-                    'length_seconds' => 30,
-                    'total_spot_count' => 1,
-                    'hour' => 8,
-                ],
-                [
-                    'inventory_id' => $catalog['rock']->id,
-                    'length_seconds' => 30,
-                    'total_spot_count' => 1,
-                    'hour' => 8,
-                ],
-            ], [
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-            ]),
             'planning_mode' => 'budget',
             'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_spot_count',
             'budget_wish_inventory_ids' => [
                 $catalog['hamburg']->id,
                 $catalog['rock']->id,
@@ -124,19 +106,11 @@ class SpotClassicCalculationTest extends TestCase
                     'day_group' => 'mo_fr',
                 ],
             ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
             'calculation_id' => $calculation->id,
-            'positions' => $calculation->load('positions')->positions->map(fn ($position): array => [
-                'id' => $position->id,
-                'client_key' => $position->client_key,
-                'inventory_id' => $position->inventory_id,
-                'advertising_medium_id' => $position->advertising_medium_id,
-                'spot_method' => 'average',
-                'length_seconds' => $position->length_seconds,
-                'total_spot_count' => $position->total_spot_count,
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
-            ])->all(),
         ]);
 
         $propose->assertOk();

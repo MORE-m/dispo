@@ -88,6 +88,71 @@ class BudgetSpotProposalServiceTest extends TestCase
         }
     }
 
+    public function test_position_discounts_by_inventory_are_used(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $service = $this->service();
+
+        $without = $service->propose($this->basePayload($catalog['hamburg']->id, '2000.00'), null);
+        $with = $service->propose([
+            ...$this->basePayload($catalog['hamburg']->id, '2000.00'),
+            'budget_position_discounts_by_inventory' => [
+                [
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'discounts' => [
+                        ['type' => 'quantity', 'custom_label' => null, 'percent' => '10'],
+                    ],
+                ],
+            ],
+        ], null);
+
+        $this->assertGreaterThan(
+            '0.00',
+            $with['positions'][0]['position_discount_amount'] ?? '0',
+        );
+    }
+
+    public function test_order_discounts_change_spot_count(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $service = $this->service();
+
+        $without = $service->propose($this->basePayload($catalog['hamburg']->id, '2000.00'), null);
+        $with = $service->propose([
+            ...$this->basePayload($catalog['hamburg']->id, '2000.00'),
+            'order_discounts' => [
+                ['type' => 'quantity', 'custom_label' => null, 'percent' => '10'],
+            ],
+        ], null);
+
+        $this->assertGreaterThan(
+            '0.00',
+            $with['order_discount_total'] ?? '0',
+        );
+        $this->assertNotSame(
+            (int) $without['spots_per_sender'],
+            (int) $with['spots_per_sender'],
+        );
+    }
+
+    public function test_ae_enabled_reduces_spot_count(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $service = $this->service();
+
+        $withoutAe = $service->propose($this->basePayload($catalog['hamburg']->id, '2000.00'), null);
+        $withAe = $service->propose([
+            ...$this->basePayload($catalog['hamburg']->id, '2000.00'),
+            'ae_enabled' => true,
+        ], null);
+
+        $this->assertGreaterThan('0.00', $withAe['ae_total'] ?? '0');
+        $this->assertNotSame(
+            (int) $withoutAe['spots_per_sender'],
+            (int) $withAe['spots_per_sender'],
+        );
+    }
+
     public function test_missing_price_raises_validation_error(): void
     {
         $catalog = $this->createSpotClassicCatalog();

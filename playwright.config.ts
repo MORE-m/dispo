@@ -30,7 +30,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECalculationSeeder --force && php artisan serve --host=127.0.0.1 --port=8000`,
+        command: `npm run build && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECalculationSeeder --force && php artisan serve --host=127.0.0.1 --port=8000`,
         url: 'http://127.0.0.1:8000/health',
         reuseExistingServer: false,
         timeout: 120_000,

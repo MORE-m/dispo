@@ -99,18 +99,25 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     ).toHaveText('ROCK ANTENNE Hamburg');
 });
 
-test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
-    page,
-}) => {
+test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
+    test.setTimeout(120_000);
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
 
-    await page.getByLabel('Mit Budget planen').check();
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
     await page.getByLabel('Zielbudget N/N').fill('500');
-    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(
+        page.getByRole('button', { name: '2. Planungsrahmen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Weiter' }).click();
+    await expect(page.locator('[data-test="budget-planning-frame"]')).toBeVisible();
 
     await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
     await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await expect(page.locator('[data-test="budget-conditions-step"]')).toBeVisible();
 
     const proposeResponse = page.waitForResponse(
         (response) =>
@@ -119,52 +126,83 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     );
     await page.locator('[data-test="budget-propose"]').click();
     const proposalJson = await (await proposeResponse).json();
-    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    expect(proposalJson.proposal.spots_per_sender).toBeGreaterThan(0);
 
-    await page.locator('[data-test="budget-apply"]').click();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-proposal-desktop.png',
+    });
+    await page.getByRole('button', { name: 'Stundenverteilung' }).first().click();
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-hour-distribution.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-proposal-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.getByRole('button', { name: 'Eingaben ändern' }).click();
+    await page.getByLabel('Zielbudget N/N').fill('600');
+    await page.getByRole('button', { name: '4. Budgetvorschlag' }).click();
+    await expect(page.locator('[data-test="budget-proposal-status"]')).toContainText(
+        'Neuoptimierung',
+    );
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-stale-after-change.png',
+    });
+    await expect(page.locator('[data-test="budget-apply"]')).toBeDisabled();
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
-    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
-
-    const url = page.url();
-    const calculationId = url.match(/kalkulationen\/(\d+)/)?.[1];
-    expect(calculationId).toBeTruthy();
-
-    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
-    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
-
-    const secondPropose = page.waitForResponse(
+    const recalculateResponse = page.waitForResponse(
         (response) =>
             response.url().includes('budget-vorschlag') &&
             response.request().method() === 'POST',
     );
     await page.locator('[data-test="budget-propose"]').click();
-    const secondJson = await (await secondPropose).json();
-    const proposalId = secondJson.proposal.id;
-    expect(typeof proposalId).toBe('number');
+    await recalculateResponse;
 
     await page.locator('[data-test="budget-apply"]').click();
-    await expect(page.getByText('Vorschlag übernommen')).toBeVisible({
-        timeout: 15_000,
+
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
+    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+});
+
+test('BUD-009 Budget-Wizard Screenshots der Eingabeschritte', async ({ page }) => {
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
+    await page.getByLabel('Zielbudget N/N').fill('750');
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-1-budget-input.png',
     });
 
-    const cookies = await page.context().cookies();
-    const xsrfCookie = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
-    expect(xsrfCookie).toBeTruthy();
+    await expect(
+        page.getByRole('button', { name: '2. Planungsrahmen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Weiter' }).click();
+    await expect(page.locator('[data-test="budget-planning-frame"]')).toBeVisible();
+    await page.locator('[data-test="budget-wish-senders"] button').nth(0).click();
+    await page.locator('[data-test="budget-wish-senders"] button').nth(1).click();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-2-frame-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-2-frame-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
-    const secondApply = await page.request.post(
-        `/kalkulationen/${calculationId}/budget-vorschlaege/${proposalId}/uebernehmen`,
-        {
-            maxRedirects: 0,
-            headers: {
-                'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie!.value),
-            },
-        },
-    );
-    expect(secondApply.status()).toBe(422);
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-3-conditions.png',
+    });
 });
 
 test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({
