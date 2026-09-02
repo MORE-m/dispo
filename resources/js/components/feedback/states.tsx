@@ -76,12 +76,15 @@ export function LoadingState({
 export function StatusBanner({
     tone = 'info',
     children,
-}: {
+    className,
+    ...props
+}: React.ComponentProps<'div'> & {
     tone?: 'info' | 'warning' | 'error';
     children: React.ReactNode;
 }) {
     return (
         <div
+            {...props}
             className={cn(
                 'rounded-lg border px-4 py-3 text-sm',
                 tone === 'warning' &&
@@ -89,6 +92,7 @@ export function StatusBanner({
                 tone === 'error' &&
                     'border-destructive/40 bg-destructive/5 text-destructive',
                 tone === 'info' && 'bg-muted/40',
+                className,
             )}
             role="status"
         >

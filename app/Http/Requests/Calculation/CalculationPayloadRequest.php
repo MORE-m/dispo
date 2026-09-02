@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Calculation;
 
+use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
@@ -39,11 +40,35 @@ class CalculationPayloadRequest extends FormRequest
             'order_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'order_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'ae_enabled' => ['sometimes', 'boolean'],
-            'target_budget_nn' => ['nullable', 'numeric', 'min:0', 'max:999999999999.99'],
+            'target_budget_nn' => ['nullable', 'numeric', 'min:0.01', 'max:999999999999.99'],
             'budget_strategy' => ['nullable', Rule::enum(BudgetStrategy::class)],
+            'budget_wish_inventory_ids' => ['sometimes', 'array'],
+            'budget_wish_inventory_ids.*' => ['integer', 'min:1'],
+            'budget_elements' => ['sometimes', 'array'],
+            'budget_elements.*.client_id' => ['nullable', 'string', 'max:120'],
+            'budget_elements.*.inventory_id' => ['nullable', 'integer', 'min:1'],
+            'budget_elements.*.spot_length_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
+            'budget_elements.*.distribution_ranges' => ['sometimes', 'array'],
+            'budget_elements.*.distribution_ranges.*.start_hour' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'budget_elements.*.distribution_ranges.*.end_hour_exclusive' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'budget_elements.*.distribution_ranges.*.day_group' => ['nullable', Rule::enum(DayGroup::class)],
+            'budget_elements.*.position_discounts' => ['sometimes', 'array'],
+            'budget_spot_length_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
+            'budget_distribution_ranges' => ['sometimes', 'array'],
+            'budget_distribution_ranges.*.start_hour' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'budget_distribution_ranges.*.end_hour_exclusive' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'budget_distribution_ranges.*.day_group' => ['nullable', Rule::enum(DayGroup::class)],
+            'budget_position_discounts_by_inventory' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.inventory_id' => ['required', 'integer', 'min:1'],
+            'budget_position_discounts_by_inventory.*.discounts' => ['sometimes', 'array'],
+            'budget_position_discounts_by_inventory.*.discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
+            'budget_position_discounts_by_inventory.*.discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'budget_position_discounts_by_inventory.*.discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'budget_proposal_manual' => ['sometimes', 'boolean'],
+            'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
-            'positions' => ['array'],
+            'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
             'positions.*.inventory_id' => ['required', 'integer', 'exists:inventories,id'],
@@ -68,6 +93,25 @@ class CalculationPayloadRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return (array) trans('validation.attributes', [], 'de');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'budget_elements.*.inventory_id.min' => 'Bitte wähle einen Sender aus.',
+            'target_budget_nn.min' => 'Das Zielbudget muss größer als 0 sein.',
+        ];
+    }
+
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
@@ -89,7 +133,57 @@ class CalculationPayloadRequest extends FormRequest
                 }
             }
 
-            foreach ($this->input('positions', []) as $index => $position) {
+            $budgetRanges = $this->input('budget_distribution_ranges', []);
+            if (is_array($budgetRanges) && $budgetRanges !== []) {
+                try {
+                    $rangeValidator->validated(
+                        $budgetRanges,
+                        'budget_distribution_ranges',
+                        requireAtLeastOne: false,
+                        requireSpotCount: false,
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+
+            $isBudgetMode = $this->input('planning_mode') === PlanningMode::Budget->value;
+            $positions = $this->input('positions', []);
+
+            foreach ($this->input('budget_position_discounts_by_inventory', []) as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+
+                try {
+                    $discountValidator->validated(
+                        $row['discounts'] ?? [],
+                        "budget_position_discounts_by_inventory.{$index}.discounts",
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
+                }
+            }
+
+            if (! $isPreview && $isBudgetMode) {
+                $targetBudget = $this->input('target_budget_nn');
+                if ($targetBudget === null || $targetBudget === '' || (float) $targetBudget <= 0) {
+                    $validator->errors()->add(
+                        'target_budget_nn',
+                        'Das Zielbudget muss größer als 0 sein.',
+                    );
+                }
+            }
+
+            foreach ($positions as $index => $position) {
                 $ranges = $position['time_ranges'] ?? [];
                 $planRows = $position['plan_rows'] ?? [];
 
@@ -107,7 +201,7 @@ class CalculationPayloadRequest extends FormRequest
                             }
                         }
                     }
-                } elseif (! $isPreview && (! is_array($planRows) || $planRows === [])) {
+                } elseif (! $isPreview && ! $isBudgetMode && (! is_array($planRows) || $planRows === [])) {
                     $validator->errors()->add(
                         "positions.{$index}.time_ranges",
                         'Mindestens ein vollständiger Preiszeitraum mit mindestens einem Spot ist erforderlich.',
@@ -139,6 +233,10 @@ class CalculationPayloadRequest extends FormRequest
 
         if ($this->exists('ae_enabled')) {
             $payload['ae_enabled'] = $this->boolean('ae_enabled');
+        }
+
+        if ($this->exists('budget_proposal_manual')) {
+            $payload['budget_proposal_manual'] = $this->boolean('budget_proposal_manual');
         }
 
         return $payload;

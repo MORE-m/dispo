@@ -11,8 +11,12 @@ final class TimeRangeValidator
      * @param  array<int|string, mixed>  $ranges
      * @return list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, sort: int}>
      */
-    public function validated(array $ranges, string $prefix, bool $requireAtLeastOne): array
-    {
+    public function validated(
+        array $ranges,
+        string $prefix,
+        bool $requireAtLeastOne,
+        bool $requireSpotCount = true,
+    ): array {
         $complete = [];
         $errors = [];
 
@@ -53,8 +57,13 @@ final class TimeRangeValidator
                 $valid = false;
             }
 
-            if ($this->isEmptyValue($spots) || ! $this->isWholeNumber($spots) || (int) $spots < 1) {
-                $errors[$field.'.spot_count'] = ['Spotanzahl muss eine ganze Zahl von mindestens 1 sein.'];
+            if ($requireSpotCount) {
+                if ($this->isEmptyValue($spots) || ! $this->isWholeNumber($spots) || (int) $spots < 1) {
+                    $errors[$field.'.spot_count'] = ['Die Spotanzahl muss mindestens 1 betragen.'];
+                    $valid = false;
+                }
+            } elseif (! $this->isEmptyValue($spots) && (! $this->isWholeNumber($spots) || (int) $spots < 0)) {
+                $errors[$field.'.spot_count'] = ['Spotanzahl muss eine ganze Zahl von mindestens 0 sein.'];
                 $valid = false;
             }
 
@@ -71,13 +80,15 @@ final class TimeRangeValidator
                 'start_hour' => (int) $start,
                 'end_hour_exclusive' => (int) $end,
                 'day_group' => (string) $dayGroup,
-                'spot_count' => (int) $spots,
+                'spot_count' => $requireSpotCount ? (int) $spots : max(0, (int) ($spots ?? 0)),
                 'sort' => count($complete),
             ];
         }
 
         if ($requireAtLeastOne && $complete === [] && $errors === []) {
-            $errors[$prefix] = ['Mindestens ein vollständiger Preiszeitraum mit mindestens einem Spot ist erforderlich.'];
+            $errors[$prefix] = $requireSpotCount
+                ? ['Mindestens ein vollständiger Preiszeitraum mit mindestens einem Spot ist erforderlich.']
+                : ['Mindestens ein vollständiger Verteilungszeitraum ist erforderlich.'];
         }
 
         foreach ($complete as $leftIndex => $left) {

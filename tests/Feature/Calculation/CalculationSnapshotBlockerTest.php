@@ -172,27 +172,21 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), $payload);
         $calculation = Calculation::query()->firstOrFail()->load('positions.planRows');
-        $hoursBefore = $calculation->positions->map(fn ($p) => $p->planRows->pluck('hour')->all())->all();
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
-            ...$payload,
-            'planning_mode' => 'budget',
-            'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_budget',
-            'calculation_id' => $calculation->id,
-            'positions' => $this->positionsFromCalculation($calculation),
+            ...$this->budgetSpotProposalPayload($catalog, $calculation),
         ]);
         $proposalId = $propose->json('proposal.id');
+        $this->assertNotNull($proposalId);
 
         $this->actingAs($user)->post(route('calculations.budget-apply', [
             'calculation' => $calculation,
             'proposal' => $proposalId,
         ]));
 
-        $calculation->refresh()->load('positions.planRows');
-        $hoursAfter = $calculation->positions->map(fn ($p) => $p->planRows->pluck('hour')->all())->all();
-        $this->assertSame($hoursBefore, $hoursAfter);
+        $calculation->refresh()->load('positions.timeRanges');
         $this->assertGreaterThan(2, (int) $calculation->positions->sum('total_spot_count'));
+        $this->assertTrue($calculation->positions->every(fn ($position) => $position->timeRanges->isNotEmpty()));
     }
 
     public function test_gen_001_sequential_create_assigns_unique_numbers(): void
@@ -385,14 +379,10 @@ class CalculationSnapshotBlockerTest extends TestCase
         $calculation = Calculation::query()->firstOrFail();
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
-            ...$payload,
-            'planning_mode' => 'budget',
-            'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_budget',
-            'calculation_id' => $calculation->id,
-            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+            ...$this->budgetSpotProposalPayload($catalog, $calculation),
         ]);
         $proposalId = $propose->json('proposal.id');
+        $this->assertNotNull($proposalId);
 
         $this->actingAs($user)->post(route('calculations.budget-apply', [
             'calculation' => $calculation,
@@ -558,31 +548,14 @@ class CalculationSnapshotBlockerTest extends TestCase
         $position->update(['length_index' => 110]);
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
-            ...$payload,
-            'planning_mode' => 'budget',
-            'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_budget',
-            'calculation_id' => $calculation->id,
-            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
+            ...$this->budgetSpotProposalPayload($catalog, $calculation),
         ]);
 
         $usedNnSnapshot = $propose->json('proposal.used_nn');
         $proposalId = $propose->json('proposal.id');
+        $this->assertNotNull($proposalId);
 
         $position->update(['length_index' => 100]);
-        $proposeFresh = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
-            ...$payload,
-            'planning_mode' => 'budget',
-            'target_budget_nn' => '500',
-            'budget_strategy' => 'equal_budget',
-            'calculation_id' => $calculation->id,
-            'positions' => $this->positionsFromCalculation($calculation->fresh(['positions.planRows'])),
-        ]);
-        $usedNnFresh = $proposeFresh->json('proposal.used_nn');
-
-        $this->assertNotSame($usedNnSnapshot, $usedNnFresh);
-
-        $position->update(['length_index' => 110]);
 
         $this->actingAs($user)->post(route('calculations.budget-apply', [
             'calculation' => $calculation,
@@ -591,8 +564,8 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         $calculation->refresh();
         $position->refresh();
-        $this->assertSame(110, $position->length_index);
         $this->assertSame($usedNnSnapshot, (string) $calculation->nn_invest);
+        $this->assertGreaterThan(0, (int) $position->total_spot_count);
     }
 
     public function test_unimplemented_spot_method_change_is_not_treated_as_header_only(): void
@@ -676,6 +649,34 @@ class CalculationSnapshotBlockerTest extends TestCase
                     'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
                 ],
             ],
+        ];
+    }
+
+    /**
+     * @param  array{hamburg: mixed, rock: mixed, medium: mixed}  $catalog
+     * @return array<string, mixed>
+     */
+    private function budgetSpotProposalPayload(array $catalog, Calculation $calculation, string $budget = '500'): array
+    {
+        $inventoryIds = $calculation->positions->pluck('inventory_id')->unique()->values()->all();
+
+        return [
+            'planning_mode' => 'budget',
+            'target_budget_nn' => $budget,
+            'budget_wish_inventory_ids' => $inventoryIds !== [] ? $inventoryIds : [$catalog['hamburg']->id],
+            'budget_spot_length_seconds' => 30,
+            'budget_distribution_ranges' => [
+                [
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => 'mo_fr',
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+            'calculation_id' => $calculation->id,
         ];
     }
 

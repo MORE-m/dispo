@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function loginAsSales(page: Page) {
     await page.goto('/login');
+    await expect(page.locator('[data-test="login-button"]')).toBeEnabled();
     await page.locator('#email').fill('sales@example.com');
     await page.locator('#password').fill('password');
     await page.locator('[data-test="login-button"]').click();
@@ -19,6 +20,50 @@ function waitForNextPreview(page: Page) {
             response.request().method() === 'POST',
         { timeout: 15_000 },
     );
+}
+
+async function fillBudgetElement(
+    page: Page,
+    index: number,
+    config: {
+        name: string;
+        lengthSeconds?: number;
+        startHour: string;
+        endHour: string;
+    },
+) {
+    if (index > 0) {
+        await page.locator('[data-test="add-budget-element"]').click();
+    }
+
+    const card = page.locator(`[data-test="budget-element-${index}"]`);
+    await card.locator(`#budget-element-inventory-${index}`).selectOption({
+        label: config.name,
+    });
+
+    if (config.lengthSeconds !== undefined) {
+        await card
+            .locator(`#budget-element-length-${index}`)
+            .fill(String(config.lengthSeconds));
+    }
+
+    await card.locator('#budget-start-0').selectOption(config.startHour);
+    await card.locator('#budget-end-0').selectOption(config.endHour);
+}
+
+async function fillBudgetElements(
+    page: Page,
+    senders: Array<{ name: string }>,
+) {
+    await expect(page.locator('[data-test="budget-elements-step"]')).toBeVisible();
+
+    for (let index = 0; index < senders.length; index++) {
+        await fillBudgetElement(page, index, {
+            name: senders[index].name,
+            startHour: '8',
+            endHour: '12',
+        });
+    }
 }
 
 async function waitForCalculationPreview(page: Page) {
@@ -99,37 +144,25 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     ).toHaveText('ROCK ANTENNE Hamburg');
 });
 
-test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
-    page,
-}) => {
+test('BUD-008 Budgetvorschlag ohne manuelle Spotangabe', async ({ page }) => {
+    test.setTimeout(120_000);
     await loginAsSales(page);
     await page.goto('/kalkulationen/neu');
 
-    await page.getByLabel('Mit Budget planen').check();
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
     await page.getByLabel('Zielbudget N/N').fill('500');
-    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(
+        page.getByRole('button', { name: '2. Planungsrahmen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Weiter' }).click();
+    await fillBudgetElements(page, [
+        { name: 'Radio Hamburg' },
+        { name: 'ROCK ANTENNE Hamburg' },
+    ]);
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveCount(0);
 
-    await page.locator('[data-test="range-end-0-0"]').selectOption('9');
-    await page.locator('[data-test="range-spots-0-0"]').fill('1');
-    await waitForCalculationPreview(page);
-    await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page.locator('[data-test="position-inventory-1"]').selectOption({
-        label: 'ROCK ANTENNE Hamburg',
-    });
-    await page.locator('[data-test="range-end-1-0"]').selectOption('9');
-    await page.locator('[data-test="range-spots-1-0"]').fill('1');
-    await waitForCalculationPreview(page);
-
-    await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
-    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
-    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
-
-    const url = page.url();
-    const calculationId = url.match(/kalkulationen\/(\d+)/)?.[1];
-    expect(calculationId).toBeTruthy();
-
-    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await expect(page.locator('[data-test="budget-conditions-step"]')).toBeVisible();
 
     const proposeResponse = page.waitForResponse(
         (response) =>
@@ -138,30 +171,285 @@ test('BUD-008 Budgetvorschlag und serverseitige Übernahme', async ({
     );
     await page.locator('[data-test="budget-propose"]').click();
     const proposalJson = await (await proposeResponse).json();
-    const proposalId = proposalJson.proposal.id;
-    expect(typeof proposalId).toBe('number');
-    expect(proposalId).toBeGreaterThan(0);
-
-    await expect(page.locator('[data-test="budget-apply"]')).toBeVisible();
-    await page.locator('[data-test="budget-apply"]').click();
-    await expect(page.locator('[data-test="budget-apply"]')).toHaveCount(0, {
+    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible({
         timeout: 15_000,
     });
+    await expect(page.locator('[data-test="budget-proposal-step"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-apply-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="wizard-save"]')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('validation.');
+    expect(proposalJson.proposal.spots_per_sender).toBeGreaterThan(0);
 
-    const cookies = await page.context().cookies();
-    const xsrfCookie = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
-    expect(xsrfCookie).toBeTruthy();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-proposal-desktop.png',
+    });
+    await page.getByRole('button', { name: 'Stundenverteilung' }).first().click();
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-hour-distribution.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-proposal-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
 
-    const secondApply = await page.request.post(
-        `/kalkulationen/${calculationId}/budget-vorschlaege/${proposalId}/uebernehmen`,
-        {
-            maxRedirects: 0,
-            headers: {
-                'X-XSRF-TOKEN': decodeURIComponent(xsrfCookie!.value),
-            },
-        },
+    await page.getByRole('button', { name: 'Eingaben ändern' }).click();
+    await page.getByLabel('Zielbudget N/N').fill('600');
+    await page.getByRole('button', { name: '4. Budgetvorschlag' }).click();
+    await expect(page.locator('[data-test="budget-proposal-status"]')).toContainText(
+        'Neuoptimierung',
     );
-    expect(secondApply.status()).toBe(422);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-4-stale-after-change.png',
+    });
+    await expect(page.locator('[data-test="budget-apply"]')).toBeDisabled();
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    const recalculateResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
+    await page.locator('[data-test="budget-propose"]').click();
+    await recalculateResponse;
+
+    await page.locator('[data-test="budget-apply"]').click();
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="position-inventory-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    const firstSpotField = page.locator('[data-test="range-spots-0-0"]');
+    const originalSpots = await firstSpotField.inputValue();
+    await firstSpotField.fill(String(Number(originalSpots) + 1));
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-manual-edit-desktop.png',
+    });
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-summary-after-apply-desktop.png',
+    });
+
+    await page.locator('[data-test="wizard-save"]').click();
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
+    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('validation.');
+    await expect(page.locator('body')).not.toContainText(
+        'validation.min.numeric',
+    );
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue(
+        String(Number(originalSpots) + 1),
+    );
+    await page.reload();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveValue(
+        String(Number(originalSpots) + 1),
+    );
+    await expect(page.locator('body')).not.toContainText('validation.');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-mobile.png',
+    });
+    await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
+});
+
+test('BUD-010 Budget-Abschlussablauf mit individuellen Zeiträumen', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    const targetBudget = '5000';
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
+    await page.getByLabel('Zielbudget N/N').fill(targetBudget);
+    await page.getByRole('button', { name: 'Weiter' }).click();
+
+    await fillBudgetElement(page, 0, {
+        name: 'Radio Hamburg',
+        lengthSeconds: 30,
+        startHour: '6',
+        endHour: '12',
+    });
+    await fillBudgetElement(page, 1, {
+        name: 'ROCK ANTENNE Hamburg',
+        lengthSeconds: 30,
+        startHour: '14',
+        endHour: '18',
+    });
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await expect(page.locator('[data-test="ae-enabled"]')).not.toBeChecked();
+
+    const proposeResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('budget-vorschlag') &&
+            response.request().method() === 'POST',
+    );
+    await page.locator('[data-test="budget-propose"]').click();
+    const proposalJson = await (await proposeResponse).json();
+    const proposal = proposalJson.proposal;
+
+    await expect(page.locator('[data-test="budget-proposal-result"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="wizard-save"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="budget-apply-hint"]')).toBeVisible();
+    await expect(page.locator('[data-test="budget-next-package-exceeds"]')).toBeVisible();
+
+    expect(proposal.spots_per_sender).toBeGreaterThan(0);
+    expect(proposal.positions[0].total_spot_count).toBe(proposal.positions[1].total_spot_count);
+    expect(Number(proposal.nn_invest)).toBeLessThanOrEqual(Number(targetBudget));
+    expect(Number(proposal.remainder)).toBeGreaterThanOrEqual(0);
+    expect(proposal.next_package_exceeds_budget).toBe(true);
+
+    for (const range of proposal.positions[0].time_ranges ?? []) {
+        expect(range.start_hour).toBeGreaterThanOrEqual(6);
+        expect(range.start_hour).toBeLessThan(12);
+    }
+    for (const range of proposal.positions[1].time_ranges ?? []) {
+        expect(range.start_hour).toBeGreaterThanOrEqual(14);
+        expect(range.start_hour).toBeLessThan(18);
+    }
+
+    await page.locator('[data-test="budget-apply"]').click();
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="position-inventory-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-spots-0-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="position-total-spots-0"]')).toBeVisible();
+    await expect(page.locator('[data-test="range-gross-0-0"]')).toBeVisible();
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-apply-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    const firstSpotField = page.locator('[data-test="range-spots-0-0"]');
+    const originalSpots = Number(await firstSpotField.inputValue());
+    const totalSpotsLocator = page.locator('[data-test="position-total-spots-0"]');
+    const originalTotal = Number(
+        (await totalSpotsLocator.textContent())?.replace(/[^\d]/g, '') ?? '0',
+    );
+    const previewResponse = page.waitForResponse(
+        (response) =>
+            response.url().includes('vorschau') &&
+            response.request().method() === 'POST',
+        { timeout: 15_000 },
+    );
+    await firstSpotField.fill(String(originalSpots + 1));
+    await previewResponse;
+    await waitForCalculationPreview(page);
+
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toContainText(
+        'manuell angepasst',
+    );
+    await expect(totalSpotsLocator).toContainText(String(originalTotal + 1));
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-manual-edit-desktop.png',
+    });
+
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await waitForCalculationPreview(page);
+    await page.screenshot({
+        path: 'docs/screenshots/budget-summary-after-apply-desktop.png',
+    });
+
+    await page.locator('[data-test="wizard-save"]').click();
+    await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
+    await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('validation.');
+
+    const savedUrl = page.url();
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+    await expect(totalSpotsLocator).toContainText(String(originalTotal + 1));
+
+    await page.goto(savedUrl);
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await expect(firstSpotField).toHaveValue(String(originalSpots + 1));
+    await expect(page.locator('[data-test="budget-elements-step"]')).toHaveCount(0);
+    await expect(page.locator('[data-test="budget-applied-hint"]')).toBeVisible();
+    await expect(page.getByText('Noch kein Budgetvorschlag berechnet')).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText('validation.');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-after-reload-mobile.png',
+    });
+});
+
+test('BUD-009 Budget-Wizard Screenshots der Eingabeschritte', async ({ page }) => {
+    await loginAsSales(page);
+    await page.goto('/kalkulationen/neu');
+
+    await page.getByRole('radio', { name: /Mit Budget planen/i }).click({ force: true });
+    await page.getByLabel('Zielbudget N/N').fill('750');
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-1-budget-input.png',
+    });
+
+    await expect(
+        page.getByRole('button', { name: '2. Planungsrahmen' }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Weiter' }).click();
+    await fillBudgetElements(page, [
+        { name: 'Radio Hamburg' },
+        { name: 'ROCK ANTENNE Hamburg' },
+    ]);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-2-elements-desktop.png',
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-2-elements-mobile.png',
+    });
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.getByRole('button', { name: 'Weiter zu Konditionen' }).click();
+    await page.screenshot({
+        path: 'docs/screenshots/budget-step-3-conditions.png',
+    });
 });
 
 test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({

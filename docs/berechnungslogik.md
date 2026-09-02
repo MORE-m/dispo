@@ -279,34 +279,81 @@ Bei Mediabrutto null wird kein künstlicher Wert ausgegeben, sondern
 
 ## Budgetplanung
 
-Der Vorschlag ist nicht autoritativ. Autoritative Speicherung bleibt die
+Der Budgetvorschlag ist **preis- und verteilungsbasiert, nicht reichweitenoptimiert**
+(`BUD-009`). Er ist nicht autoritativ. Autoritative Speicherung bleibt die
 Kalkulation nach expliziter Übernahme (`BUD-008`).
 
-Zwei Planungswege:
+### Planungsweg „Mit Budget planen“
 
-- **Selbst planen:** optionales Zielbudget N/N nur als Vergleich mit dem
-  aktuellen N/N-Invest.
-- **Mit Budget planen:** Zielbudget N/N, Sender/Kombis, Preisstunden, Längen
-  und Konditionen zuerst; danach ein **neuer** Vorschlag. Kein bestehendes
-  Senderverhältnis (`BUD-005`).
+Vor der Übernahme: vier Schritte im Wizard (Grunddaten → Planungsrahmen →
+Konditionen → Budgetvorschlag). Nach der Übernahme wechselt die Oberfläche in die
+normale Bearbeitungsdarstellung (Grunddaten → Werbeelemente → Konditionen →
+Zusammenfassung), ohne `planning_mode` zu ändern.
 
-Eingaben für den Vorschlag:
+### Zustandsmodell (`budget_proposal_status`)
 
-- optionales numerisches Zielbudget N/N in EUR (`BUD-001`, `BUD-002`),
-- ausgewählte Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und
-  Auftragsrabatt (`BUD-003`),
-- Verteilungslogik (`BUD-006`): Budget je Sender gleich verteilen oder
-  Spotanzahl innerhalb der gewählten Preisstunden maximieren.
+| Status    | Bedeutung |
+| --------- | --------- |
+| `draft`   | Planungsrahmen vorhanden, noch kein Vorschlag berechnet |
+| `current` | Aktueller Vorschlag berechnet, nicht übernommen |
+| `stale`   | Vorschlag vorhanden, Eingaben danach geändert |
+| `applied` | Vorschlag in Kalkulationspositionen übernommen |
+| `manual`  | Übernommene Planung manuell angepasst |
 
-Regeln:
+Der Status ist serverseitig persistent. Nach Übernahme werden Positionen und
+Preiszeiträume gespeichert; beim erneuten Laden erscheint die Detailplanung,
+nicht der Budget-Entwurf.
 
-- Berechnung deterministisch und nachvollziehbar; Ergebnis immer editierbar (`BUD-004`).
-- Spotmengen ganzzahlig; Rest unter Zielbudget oder Überschreitung durch
-  Ganzzahligkeit transparent ausweisen (`BUD-007`).
-- Keine Reichweiten-, Leistungs- oder KI-Optimierung (`BUD-009`).
+### Budget-Werbeelemente (`budget_elements[]`)
 
-Die Positionspreise folgen unverändert der verbindlichen Rechenreihenfolge unten.
-Der Vorschlag ändert nur Mengen nach Übernahme, nicht die Formel selbst.
+Je Element:
+
+- `client_id` (stabile ID für Konditionen)
+- `inventory_id` (genau ein Sender)
+- `spot_length_seconds`
+- `distribution_ranges[]` (Beginn, exklusives Ende, Tagesgruppe)
+- `position_discounts[]`
+
+Legacy-Payloads mit `budget_wish_inventory_ids`, `budget_spot_length_seconds` und
+gemeinsamen `budget_distribution_ranges` werden beim Lesen normalisiert.
+
+Eingaben für den Proposal-Request:
+
+- `target_budget_nn`
+- `budget_elements[]`
+- `order_discounts[]`
+- `ae_enabled`
+
+Nicht Teil der Eingabe: `total_spot_count`, `spot_count`, bestehende `positions`.
+
+### Strategie `equal_spot_count`
+
+- Alle Budget-Werbeelemente erhalten **dieselbe** Gesamtspotanzahl `S`.
+- Jedes Element besitzt eigene erlaubte Stunden-Buckets; Spots werden nur dort verteilt.
+- Optimierung in vollständigen Spotpaketen: `+1 Spot je Budget-Werbeelement`.
+- Binäre Suche auf maximales `S` mit `N/N(S) ≤ Zielbudget`.
+- Keine Bevorzugung günstiger Sender oder Stunden.
+
+### Verteilung `even_distribution` (Algorithmusversion `1.0.0`)
+
+- Buckets: `Sender × Tagesgruppe × einzelne Uhrstunde`.
+- Stabil sortiert nach Tagesgruppe und Uhrstunde.
+- Gleichmäßige Verteilung der Spots je Sender über alle Buckets (Differenz ≤ 1).
+- Weniger Spots als Buckets: zeitliche Streuung über den gesamten Zeitraum.
+
+### Berechnung
+
+Vollständige Serverkette über `CalculationEngine`: Stundenpreise → Spotlänge →
+Zeitraumssummen → Positionsrabatte → Auftragssumme → Auftragsrabatte → AE 15 % → N/N.
+
+### Übernahme
+
+- Einstündige `calculation_position_time_ranges` je belegter Uhrstunde.
+- Keine proportionale Skalierung im Pfad `equal_spot_count`.
+- Status `applied` nach Übernahme; `manual` nach manuellen Änderungen.
+- Verknüpfung über `appliedBudgetProposal` beim Laden; unübernommene Vorschläge über `latestBudgetProposal`.
+
+Legacy-Strategien `equal_budget` und `maximize_spots` bleiben für Bestandsvorschläge lesbar.
 
 ## Verbindliche Rechenreihenfolge
 

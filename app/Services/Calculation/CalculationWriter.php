@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\CalculationKind;
 use App\Enums\CalculationStatus;
@@ -115,6 +116,12 @@ final class CalculationWriter
                 ]);
             }
 
+            if ($lockedProposal->status === BudgetProposalStatus::Stale) {
+                throw ValidationException::withMessages([
+                    'proposal' => 'Der Vorschlag ist veraltet. Bitte neu berechnen, bevor Sie übernehmen.',
+                ]);
+            }
+
             $before = $this->calculationSnapshot($this->reloadCalculation($lockedCalculation));
 
             $payload = $this->payloadFromCalculation($lockedCalculation);
@@ -123,14 +130,28 @@ final class CalculationWriter
             $payload['target_budget_nn'] = (string) $lockedProposal->target_budget_nn;
             $payload['budget_strategy'] = $lockedProposal->strategy->value;
             $payload['lock_version'] = $lockedCalculation->lock_version;
-            $payload['positions'] = $this->mergeProposalTotals($payload['positions'], $lockedProposal->payload['positions'] ?? []);
+
+            if ($lockedProposal->strategy === BudgetStrategy::EqualSpotCount) {
+                $payload['positions'] = $this->mergeProposalHourlyDistribution(
+                    $payload['positions'],
+                    $lockedProposal->payloadArray(),
+                );
+            } else {
+                $proposalPayload = $lockedProposal->payloadArray();
+                $payload['positions'] = $this->mergeProposalTotals(
+                    $payload['positions'],
+                    $proposalPayload['positions'] ?? [],
+                );
+            }
 
             $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false);
             $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
+            $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Applied;
             $lockedCalculation->save();
 
             $lockedProposal->applied_at = now();
             $lockedProposal->applied_by = $user->id;
+            $lockedProposal->status = BudgetProposalStatus::Applied;
             $lockedProposal->save();
 
             $fresh = $this->reloadCalculation($lockedCalculation);
@@ -386,6 +407,11 @@ final class CalculationWriter
         $calculation->budget_strategy = isset($payload['budget_strategy'])
             ? BudgetStrategy::from((string) $payload['budget_strategy'])
             : null;
+        if (array_key_exists('budget_proposal_status', $payload) && $payload['budget_proposal_status'] !== null) {
+            $calculation->budget_proposal_status = BudgetProposalStatus::from((string) $payload['budget_proposal_status']);
+        } elseif (($payload['budget_proposal_manual'] ?? false) === true) {
+            $calculation->budget_proposal_status = BudgetProposalStatus::Manual;
+        }
     }
 
     private function applyTotals(Calculation $calculation, CalculationTotals $totals): void
@@ -670,6 +696,100 @@ final class CalculationWriter
         }
 
         return $merged;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $positions
+     * @param  array<string, mixed>  $proposalPayload
+     * @return list<array<string, mixed>>
+     */
+    public function mergeProposalHourlyDistribution(array $positions, array $proposalPayload): array
+    {
+        $proposedPositions = $proposalPayload['positions'] ?? [];
+        /** @var array<int, array<string, mixed>> $proposedByInventory */
+        $proposedByInventory = [];
+        foreach ($proposedPositions as $proposedPosition) {
+            if (! is_array($proposedPosition)) {
+                continue;
+            }
+            $proposedByInventory[(int) ($proposedPosition['inventory_id'] ?? 0)] = $proposedPosition;
+        }
+        $merged = [];
+        $seenInventoryIds = [];
+
+        foreach ($positions as $position) {
+            $inventoryId = (int) ($position['inventory_id'] ?? 0);
+            $proposed = $proposedByInventory[$inventoryId] ?? null;
+
+            if ($proposed === null) {
+                $position['total_spot_count'] = 0;
+                $position['time_ranges'] = [];
+                $position['needs_spot_redistribution'] = false;
+                $merged[] = $position;
+
+                continue;
+            }
+
+            $seenInventoryIds[] = $inventoryId;
+            $merged[] = $this->positionFromHourlyProposal($position, $proposed);
+        }
+
+        foreach ($proposedPositions as $proposed) {
+            $inventoryId = (int) ($proposed['inventory_id'] ?? 0);
+            if ($inventoryId < 1 || in_array($inventoryId, $seenInventoryIds, true)) {
+                continue;
+            }
+
+            $merged[] = $this->positionFromHourlyProposal([
+                'client_key' => (string) Str::uuid(),
+            ], $proposed);
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  array<string, mixed>  $proposed
+     * @return array<string, mixed>
+     */
+    private function positionFromHourlyProposal(array $position, array $proposed): array
+    {
+        $timeRanges = [];
+        $planRows = [];
+
+        foreach ($proposed['time_ranges'] ?? [] as $range) {
+            if ((int) ($range['spot_count'] ?? 0) < 1) {
+                continue;
+            }
+
+            $timeRanges[] = [
+                'start_hour' => (int) $range['start_hour'],
+                'end_hour_exclusive' => (int) $range['end_hour_exclusive'],
+                'day_group' => (string) $range['day_group'],
+                'spot_count' => (int) $range['spot_count'],
+            ];
+
+            $planRows[] = [
+                'hour' => (int) $range['start_hour'],
+                'day_group' => (string) $range['day_group'],
+            ];
+        }
+
+        $position['inventory_id'] = (int) $proposed['inventory_id'];
+        $position['advertising_medium_id'] = (int) ($proposed['advertising_medium_id'] ?? $position['advertising_medium_id'] ?? 0);
+        $position['length_seconds'] = (int) $proposed['length_seconds'];
+        $position['total_spot_count'] = (int) $proposed['total_spot_count'];
+        $position['spot_method'] = 'average';
+        $position['needs_spot_redistribution'] = false;
+        $position['time_ranges'] = $timeRanges;
+        $position['plan_rows'] = $planRows;
+
+        if (isset($proposed['position_discounts']) && is_array($proposed['position_discounts'])) {
+            $position['position_discounts'] = $proposed['position_discounts'];
+        }
+
+        return $position;
     }
 
     private function hasPositionsWithMissingClientKey(Calculation $calculation): bool

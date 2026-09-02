@@ -7,7 +7,12 @@ const e2eDb = path.resolve(
     'database/e2e.sqlite',
 );
 
+const e2ePort = process.env.E2E_PORT ?? '8001';
+const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
+
 const e2eEnv = {
+    APP_ENV: 'testing',
+    E2E_SERVER: '1',
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: e2eDb,
     DB_URL: '',
@@ -20,7 +25,7 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
     use: {
-        baseURL: 'http://127.0.0.1:8000',
+        baseURL: e2eBaseUrl,
         trace: 'on-first-retry',
     },
     projects: [
@@ -30,8 +35,8 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECalculationSeeder --force && php artisan serve --host=127.0.0.1 --port=8000`,
-        url: 'http://127.0.0.1:8000/health',
+        command: `npm run build && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECalculationSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 120_000,
         env: e2eEnv,

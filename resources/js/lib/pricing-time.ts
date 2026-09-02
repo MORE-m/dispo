@@ -55,6 +55,44 @@ export function emptyTimeRange(): TimeRangeDraft {
     };
 }
 
+export type DistributionRangeDraft = Omit<TimeRangeDraft, 'spot_count'>;
+
+export function emptyDistributionRange(): DistributionRangeDraft {
+    return {
+        start_hour: 6,
+        end_hour_exclusive: 18,
+        day_group: 'mo_fr',
+    };
+}
+
+export function isCompleteDistributionRange(
+    range: DistributionRangeDraft,
+): range is DistributionRangeDraft & {
+    start_hour: number;
+    end_hour_exclusive: number;
+} {
+    return (
+        range.start_hour !== '' &&
+        range.end_hour_exclusive !== '' &&
+        range.day_group !== '' &&
+        range.end_hour_exclusive > range.start_hour
+    );
+}
+
+export function payloadDistributionRanges(
+    ranges: DistributionRangeDraft[],
+): Array<{
+    start_hour: number;
+    end_hour_exclusive: number;
+    day_group: string;
+}> {
+    return ranges.filter(isCompleteDistributionRange).map((range) => ({
+        start_hour: range.start_hour,
+        end_hour_exclusive: range.end_hour_exclusive,
+        day_group: range.day_group,
+    }));
+}
+
 export function totalSpotCount(ranges: TimeRangeDraft[]): number {
     return ranges.reduce((sum, range) => {
         if (!isCompleteTimeRange(range)) {

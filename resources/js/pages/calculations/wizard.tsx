@@ -2,6 +2,11 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
+import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
+import { BudgetConditionsStep } from '@/components/budget-conditions-step';
+import { BudgetElementsStep } from '@/components/budget-elements-step';
+import { BudgetPlanningSidebar } from '@/components/budget-planning-sidebar';
+import { BudgetProposalResultStep } from '@/components/budget-proposal-result-step';
 import {
     DiscountListEditor,
     payloadDiscounts,
@@ -10,7 +15,6 @@ import {
 } from '@/components/discount-list-editor';
 import {
     FormField,
-    formSelectClass,
     formTextareaClass,
     formatPercent,
     money,
@@ -19,6 +23,7 @@ import {
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
     emptyTimeRange,
+    type DistributionRangeDraft,
     formatHour,
     formatInclusiveEnd,
     payloadTimeRanges,
@@ -48,6 +53,23 @@ import {
     wizardCardTitleClass,
 } from '@/components/wizard-section';
 import { useCalculationPreview } from '@/hooks/use-calculation-preview';
+import {
+    buildBudgetProposalPayload,
+    initBudgetElementsFromSources,
+    initBudgetPositionDiscountsByClientId,
+    isBudgetSetupPhase,
+    payloadBudgetElementDiscounts,
+    payloadBudgetElements,
+    usesRegularPlanningEditor,
+    validateBudgetBasics,
+    validateBudgetElements,
+    type BudgetElementDraft,
+    type BudgetPositionDiscountsByClientId,
+} from '@/lib/budget-planning';
+import {
+    firstValidationMessage,
+    mapValidationErrors,
+} from '@/lib/validation-errors';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -149,21 +171,7 @@ type Totals = {
     }[];
 };
 
-type Proposal = {
-    id?: number;
-    lock_version?: number;
-    strategy: string;
-    target_budget_nn: string;
-    used_nn: string;
-    remainder: string;
-    explanation: string;
-    positions: {
-        position_key: string;
-        inventory_id: number;
-        length_seconds: number;
-        total_spot_count: number;
-    }[];
-};
+type Proposal = BudgetSpotProposal;
 
 type SavedSummary = {
     media_gross: string;
@@ -219,6 +227,7 @@ type SavedCalculation = {
     ae_enabled?: boolean;
     target_budget_nn: string | null;
     budget_strategy: string | null;
+    budget_proposal_status?: string | null;
     order_discounts?: Array<{
         type: string;
         custom_label: string | null;
@@ -250,12 +259,58 @@ type SavedCalculation = {
     }[];
 };
 
-const STEPS = [
+const MANUAL_STEPS = [
     'Grunddaten',
     'Werbeelemente',
     'Konditionen',
     'Zusammenfassung',
 ] as const;
+
+const BUDGET_STEPS = [
+    'Grunddaten',
+    'Planungsrahmen',
+    'Konditionen',
+    'Budgetvorschlag',
+] as const;
+
+type LatestBudgetProposal = {
+    id: number;
+    input_fingerprint: string | null;
+    status: string;
+    payload: BudgetSpotProposal & {
+        budget_elements?: Array<{
+            client_id?: string;
+            inventory_id: number;
+            spot_length_seconds: number;
+            distribution_ranges?: DistributionRangeDraft[];
+            position_discounts?: Array<{
+                type: string;
+                custom_label: string | null;
+                percent: string;
+            }>;
+        }>;
+        wish_inventory_ids?: number[];
+        spot_length_seconds?: number;
+        distribution_ranges?: DistributionRangeDraft[];
+        budget_position_discounts_by_inventory?: Array<{
+            inventory_id: number;
+            discounts?: Array<{
+                type: string;
+                custom_label: string | null;
+                percent: string;
+            }>;
+        }>;
+        order_discounts?: Array<{
+            type: string;
+            custom_label: string | null;
+            percent: string;
+        }>;
+    };
+};
+
+type AppliedBudgetProposal = LatestBudgetProposal & {
+    applied_at?: string | null;
+};
 
 function newClientKey(): string {
     return crypto.randomUUID();
@@ -304,12 +359,6 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
     }
 
     return null;
-}
-
-function positionKey(position: PositionDraft, index: number): string {
-    return position.id
-        ? `id:${position.id}`
-        : position.client_key || `new:${index}`;
 }
 
 function draftDiscounts(
@@ -386,6 +435,8 @@ export default function CalculationWizard({
     calculation,
     savedSummary,
     savedDisplayTotals,
+    latestBudgetProposal,
+    appliedBudgetProposal: _appliedBudgetProposal,
     canEdit,
 }: {
     catalog: Catalog;
@@ -394,10 +445,33 @@ export default function CalculationWizard({
     calculation: SavedCalculation | null;
     savedSummary: SavedSummary | null;
     savedDisplayTotals: Totals | null;
+    latestBudgetProposal: LatestBudgetProposal | null;
+    appliedBudgetProposal: AppliedBudgetProposal | null;
     canEdit: boolean;
 }) {
     const flash = usePage().props.flash;
-    const [step, setStep] = useState(0);
+    const initialBudgetApplied =
+        calculation?.budget_proposal_status === 'applied' ||
+        calculation?.budget_proposal_status === 'manual';
+    const [step, setStep] = useState(() => {
+        if (calculation?.planning_mode === 'budget') {
+            if (
+                initialBudgetApplied &&
+                (calculation.positions?.length ?? 0) > 0
+            ) {
+                return 1;
+            }
+
+            if (
+                latestBudgetProposal &&
+                (calculation.positions?.length ?? 0) === 0
+            ) {
+                return 3;
+            }
+        }
+
+        return 0;
+    });
     const [planningMode, setPlanningMode] = useState(
         calculation?.planning_mode ?? 'manual',
     );
@@ -424,9 +498,45 @@ export default function CalculationWizard({
     const [targetBudget, setTargetBudget] = useState(
         calculation?.target_budget_nn ?? '',
     );
-    const [budgetStrategy, setBudgetStrategy] = useState(
-        calculation?.budget_strategy ?? 'equal_budget',
+    const spotClassicMedium = catalog.media.find(
+        (item) => item.code === 'spot_classic' && item.is_active,
     );
+    const defaultSpotLength =
+        catalog.rules.find(
+            (rule) =>
+                rule.is_active &&
+                rule.advertising_medium_id === spotClassicMedium?.id,
+        )?.default_length_seconds ??
+        spotClassicMedium?.default_length_seconds ??
+        30;
+    const [budgetElements, setBudgetElements] = useState<BudgetElementDraft[]>(
+        () =>
+            initBudgetElementsFromSources(
+                latestBudgetProposal,
+                defaultSpotLength,
+            ),
+    );
+    const [budgetPositionDiscounts, setBudgetPositionDiscounts] =
+        useState<BudgetPositionDiscountsByClientId>(() =>
+            initBudgetPositionDiscountsByClientId(
+                latestBudgetProposal,
+                initBudgetElementsFromSources(
+                    latestBudgetProposal,
+                    defaultSpotLength,
+                ),
+                calculation,
+            ),
+        );
+    const [budgetProposalManual, setBudgetProposalManual] = useState(
+        calculation?.budget_proposal_status === 'manual',
+    );
+    const [budgetAppliedLocally, setBudgetAppliedLocally] = useState(false);
+    const [inputsRevision, setInputsRevision] = useState(0);
+    const [proposalAtRevision, setProposalAtRevision] = useState<number | null>(
+        latestBudgetProposal ? 0 : null,
+    );
+    const [proposalLoading, setProposalLoading] = useState(false);
+    const [proposalError, setProposalError] = useState<string | null>(null);
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
             return calculation.positions.map((position) => ({
@@ -455,15 +565,36 @@ export default function CalculationWizard({
             }));
         }
 
+        if (calculation?.planning_mode === 'budget') {
+            return [];
+        }
+
         const first = firstValidPosition(catalog);
         return first ? [first] : [];
     });
-    const [proposal, setProposal] = useState<Proposal | null>(null);
+    const [proposal, setProposal] = useState<Proposal | null>(
+        initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
+    );
     const [busy, setBusy] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveFieldErrors, setSaveFieldErrors] = useState<
         Record<string, string[]>
     >({});
+
+    const [budgetReenterSetup, setBudgetReenterSetup] = useState(false);
+
+    const planningViewState = {
+        planningMode,
+        budgetProposalStatus: calculation?.budget_proposal_status,
+        budgetAppliedLocally,
+        budgetProposalManual,
+        positionsCount: positions.length,
+        hasActiveProposal: proposal !== null,
+        budgetReenterSetup,
+    };
+    const usesRegularPlanningEditorView =
+        usesRegularPlanningEditor(planningViewState);
+    const isBudgetSetup = isBudgetSetupPhase(planningViewState);
 
     const payload = useMemo(
         () => ({
@@ -477,42 +608,65 @@ export default function CalculationWizard({
             order_discounts: payloadDiscounts(orderDiscounts),
             ae_enabled: aeEnabled,
             target_budget_nn: targetBudget === '' ? null : targetBudget,
-            budget_strategy: planningMode === 'budget' ? budgetStrategy : null,
+            budget_strategy:
+                planningMode === 'budget' ? 'equal_spot_count' : null,
+            ...(isBudgetSetup && planningMode === 'budget'
+                ? {
+                      budget_elements: payloadBudgetElements(
+                          budgetElements,
+                      ).map((element) => ({
+                          ...element,
+                          position_discounts:
+                              payloadBudgetElementDiscounts(
+                                  budgetElements,
+                                  budgetPositionDiscounts,
+                              ).find(
+                                  (row) => row.client_id === element.client_id,
+                              )?.position_discounts ?? [],
+                      })),
+                  }
+                : {}),
+            budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            positions: positions.map((position) => {
-                const ranges = payloadTimeRanges(position.time_ranges);
+            positions: isBudgetSetup
+                ? []
+                : positions.map((position) => {
+                      const ranges = payloadTimeRanges(position.time_ranges);
 
-                return {
-                    id: position.id,
-                    client_key: position.client_key,
-                    inventory_id: position.inventory_id,
-                    advertising_medium_id: position.advertising_medium_id,
-                    spot_method: position.spot_method,
-                    length_seconds: position.length_seconds,
-                    total_spot_count: totalSpotCount(position.time_ranges),
-                    needs_spot_redistribution:
-                        position.needs_spot_redistribution ?? false,
-                    position_discount_percent: '0',
-                    ae_percent: '0',
-                    time_ranges: ranges,
-                    position_discounts: payloadDiscounts(
-                        position.position_discounts,
-                    ),
-                    plan_rows: ranges.flatMap((range) =>
-                        Array.from(
-                            {
-                                length:
-                                    range.end_hour_exclusive - range.start_hour,
-                            },
-                            (_, offset) => ({
-                                hour: range.start_hour + offset,
-                                day_group: range.day_group,
-                            }),
-                        ),
-                    ),
-                };
-            }),
+                      return {
+                          id: position.id,
+                          client_key: position.client_key,
+                          inventory_id: position.inventory_id,
+                          advertising_medium_id: position.advertising_medium_id,
+                          spot_method: position.spot_method,
+                          length_seconds: position.length_seconds,
+                          total_spot_count: totalSpotCount(
+                              position.time_ranges,
+                          ),
+                          needs_spot_redistribution:
+                              position.needs_spot_redistribution ?? false,
+                          position_discount_percent: '0',
+                          ae_percent: '0',
+                          time_ranges: ranges,
+                          position_discounts: payloadDiscounts(
+                              position.position_discounts,
+                          ),
+                          plan_rows: ranges.flatMap((range) =>
+                              Array.from(
+                                  {
+                                      length:
+                                          range.end_hour_exclusive -
+                                          range.start_hour,
+                                  },
+                                  (_, offset) => ({
+                                      hour: range.start_hour + offset,
+                                      day_group: range.day_group,
+                                  }),
+                              ),
+                          ),
+                      };
+                  }),
         }),
         [
             planningMode,
@@ -524,11 +678,28 @@ export default function CalculationWizard({
             orderDiscounts,
             aeEnabled,
             targetBudget,
-            budgetStrategy,
+            targetBudget,
+            budgetElements,
+            budgetPositionDiscounts,
+            budgetProposalManual,
+            isBudgetSetup,
+            usesRegularPlanningEditorView,
             calculation,
             positions,
         ],
     );
+
+    const steps = isBudgetSetup ? BUDGET_STEPS : MANUAL_STEPS;
+    const budgetPreviewReady =
+        planningMode === 'budget' &&
+        usesRegularPlanningEditorView &&
+        positions.length > 0;
+    const showBudgetPlanningSidebar = isBudgetSetup;
+    const showSaveButton = canEdit && !(isBudgetSetup && step === 3);
+
+    function markBudgetInputsChanged() {
+        setInputsRevision((value) => value + 1);
+    }
 
     const {
         totals,
@@ -538,10 +709,10 @@ export default function CalculationWizard({
     } = useCalculationPreview<Totals>({
         url: '/kalkulationen/vorschau',
         payload,
-        enabled: canEdit,
-        blocked: busy,
+        enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
+        blocked: busy || proposalLoading,
     });
-    const error = previewError ?? saveError;
+    const error = previewError ?? saveError ?? proposalError;
     const fieldErrors = {
         ...previewFieldErrors,
         ...saveFieldErrors,
@@ -566,6 +737,10 @@ export default function CalculationWizard({
     }
 
     function updatePosition(index: number, patch: Partial<PositionDraft>) {
+        if (usesRegularPlanningEditorView && planningMode === 'budget') {
+            setBudgetProposalManual(true);
+        }
+
         setPositions((current) =>
             current.map((item, itemIndex) => {
                 if (itemIndex !== index) {
@@ -614,6 +789,10 @@ export default function CalculationWizard({
     }
 
     function removePosition(index: number) {
+        if (usesRegularPlanningEditorView && planningMode === 'budget') {
+            setBudgetProposalManual(true);
+        }
+
         setPositions((current) =>
             current.filter((_, itemIndex) => itemIndex !== index),
         );
@@ -632,14 +811,14 @@ export default function CalculationWizard({
             preserveScroll: true,
             onFinish: () => setBusy(false),
             onError: (errors: Record<string, string | string[]>) => {
-                const mapped: Record<string, string[]> = {};
-                for (const [key, value] of Object.entries(errors)) {
-                    mapped[key] = Array.isArray(value)
-                        ? value
-                        : [String(value)];
-                }
+                const mapped = mapValidationErrors(errors);
                 setSaveFieldErrors(mapped);
-                setSaveError('Speichern nicht möglich. Angaben prüfen.');
+                const detail = firstValidationMessage(mapped);
+                setSaveError(
+                    detail
+                        ? `Speichern nicht möglich: ${detail}`
+                        : 'Speichern nicht möglich. Angaben prüfen.',
+                );
                 setBusy(false);
             },
         };
@@ -651,28 +830,71 @@ export default function CalculationWizard({
         }
     }
 
+    const proposalStatus =
+        proposal &&
+        proposalAtRevision !== null &&
+        inputsRevision !== proposalAtRevision
+            ? 'stale'
+            : latestBudgetProposal?.status === 'stale'
+              ? 'stale'
+              : (proposal?.status ??
+                calculation?.budget_proposal_status ??
+                'current');
+
     async function createProposal() {
+        const basicsError = validateBudgetBasics(targetBudget);
+        if (basicsError) {
+            setProposalError(basicsError);
+            return;
+        }
+
+        const frameError = validateBudgetElements(budgetElements);
+        if (frameError) {
+            setProposalError(frameError);
+            return;
+        }
+
+        setProposalLoading(true);
         setBusy(true);
+        setProposalError(null);
         setSaveError(null);
         setSaveFieldErrors({});
         try {
+            const proposalPayload = buildBudgetProposalPayload({
+                planningMode,
+                customerName,
+                agencyName,
+                campaign,
+                productTitle,
+                briefing,
+                orderDiscounts,
+                aeEnabled,
+                targetBudget,
+                budgetElements,
+                budgetPositionDiscounts,
+                calculationId: calculation?.id,
+                lockVersion: calculation?.lock_version,
+            });
             const data = await jsonPost<{ proposal: Proposal }>(
                 '/kalkulationen/budget-vorschlag',
-                payload,
+                proposalPayload,
             );
             setProposal(data.proposal);
+            setProposalAtRevision(inputsRevision);
+            setStep(3);
         } catch (caught) {
             if (caught instanceof JsonPostError) {
                 setSaveFieldErrors(caught.fieldErrors);
-                setSaveError(caught.message);
+                setProposalError(caught.message);
             } else {
-                setSaveError(
+                setProposalError(
                     caught instanceof Error
                         ? caught.message
                         : 'Vorschlag nicht möglich.',
                 );
             }
         } finally {
+            setProposalLoading(false);
             setBusy(false);
         }
     }
@@ -700,62 +922,94 @@ export default function CalculationWizard({
             return;
         }
 
-        setPositions((current) =>
-            current.map((position, index) => {
-                const key = positionKey(position, index);
-                const match =
-                    proposal.positions.find(
-                        (item) => item.position_key === key,
-                    ) ??
-                    proposal.positions.find(
-                        (item) => item.inventory_id === position.inventory_id,
-                    );
+        setPositions(
+            proposal.positions.map((item) => {
+                const existing = positions.find(
+                    (position) => position.inventory_id === item.inventory_id,
+                );
+                const mediumId =
+                    spotClassicMedium?.id ??
+                    existing?.advertising_medium_id ??
+                    0;
+                const proposalDiscounts = (
+                    item as Proposal['positions'][number] & {
+                        position_discounts?: Array<{
+                            type: string;
+                            custom_label: string | null;
+                            percent: string;
+                        }>;
+                    }
+                ).position_discounts;
+                const element = budgetElements.find(
+                    (candidate) => candidate.inventory_id === item.inventory_id,
+                );
 
-                if (!match) {
-                    return {
-                        ...position,
-                        total_spot_count: 0,
-                        time_ranges: position.time_ranges.map(
-                            (range, index) => ({
-                                ...range,
-                                spot_count: index === 0 ? '' : range.spot_count,
-                            }),
-                        ),
-                    };
-                }
-
-                const current = totalSpotCount(position.time_ranges);
-                const target = match.total_spot_count;
-                let assigned = 0;
+                const time_ranges = (item.time_ranges ?? [])
+                    .filter((range) => Number(range.spot_count) > 0)
+                    .map((range) => ({
+                        start_hour: range.start_hour,
+                        end_hour_exclusive: range.end_hour_exclusive,
+                        day_group: range.day_group,
+                        spot_count: range.spot_count,
+                    }));
+                const summedSpotCount = time_ranges.reduce(
+                    (sum, range) => sum + Number(range.spot_count ?? 0),
+                    0,
+                );
 
                 return {
-                    ...position,
-                    length_seconds: match.length_seconds,
-                    total_spot_count: target,
-                    time_ranges: position.time_ranges.map(
-                        (range, index, all) => {
-                            const last = index === all.length - 1;
-                            const source =
-                                typeof range.spot_count === 'number'
-                                    ? range.spot_count
-                                    : 0;
-                            const share =
-                                current < 1
-                                    ? index === 0
-                                        ? target
-                                        : 0
-                                    : last
-                                      ? Math.max(0, target - assigned)
-                                      : Math.floor((source / current) * target);
-                            assigned += last ? 0 : share;
-
-                            return { ...range, spot_count: share };
-                        },
-                    ),
+                    id: existing?.id,
+                    client_key: existing?.client_key ?? newClientKey(),
+                    inventory_id: item.inventory_id,
+                    advertising_medium_id: mediumId,
+                    spot_method: 'average',
+                    length_seconds:
+                        item.length_seconds ??
+                        element?.spot_length_seconds ??
+                        defaultSpotLength,
+                    total_spot_count:
+                        summedSpotCount > 0
+                            ? summedSpotCount
+                            : item.total_spot_count,
+                    needs_spot_redistribution: false,
+                    position_discount_percent: '0',
+                    ae_percent: '0',
+                    time_ranges,
+                    position_discounts:
+                        proposalDiscounts?.map((discount) => ({
+                            type: discount.type,
+                            custom_label: discount.custom_label ?? '',
+                            percent: discount.percent,
+                        })) ??
+                        (element
+                            ? (budgetPositionDiscounts[element.client_id] ?? [])
+                            : []),
+                    plan_rows: [],
                 };
             }),
         );
         setProposal(null);
+        setProposalAtRevision(null);
+        setBudgetAppliedLocally(true);
+        setBudgetReenterSetup(false);
+        setStep(1);
+    }
+
+    function startBudgetReoptimize() {
+        const confirmed = window.confirm(
+            'Bei einer Neuoptimierung können deine manuellen Änderungen an Spotzahlen und Zeiträumen ersetzt werden.',
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        setBudgetReenterSetup(true);
+        setBudgetAppliedLocally(false);
+        setBudgetProposalManual(false);
+        setProposal(null);
+        setProposalAtRevision(null);
+        setProposalError(null);
+        setStep(0);
     }
 
     const displayTotals = canEdit ? totals : null;
@@ -766,7 +1020,36 @@ export default function CalculationWizard({
         catalog.media.some(
             (item) => item.code === 'spot_classic' && item.is_active,
         );
-    const catalogMissing = positions.length === 0 && !hasActiveCatalog;
+    const catalogMissing =
+        planningMode === 'manual' &&
+        positions.length === 0 &&
+        !hasActiveCatalog;
+
+    function goNext() {
+        if (isBudgetSetup) {
+            if (step === 0) {
+                const basicsError = validateBudgetBasics(targetBudget);
+                if (basicsError) {
+                    setProposalError(basicsError);
+                    return;
+                }
+            }
+
+            if (step === 1) {
+                const frameError = validateBudgetElements(budgetElements);
+                if (frameError) {
+                    setProposalError(frameError);
+                    return;
+                }
+            }
+        }
+
+        setProposalError(null);
+        setStep(step + 1);
+    }
+
+    const nextLabel =
+        isBudgetSetup && step === 1 ? 'Weiter zu Konditionen' : 'Weiter';
 
     return (
         <>
@@ -789,12 +1072,37 @@ export default function CalculationWizard({
                 {flash.success ? (
                     <SuccessState message={flash.success} />
                 ) : null}
+                {planningMode === 'budget' && usesRegularPlanningEditorView ? (
+                    <div
+                        className="flex flex-wrap items-center gap-3"
+                        data-test="budget-applied-hint"
+                    >
+                        <StatusBanner className="flex-1">
+                            Mit Budget geplant · anschließend frei bearbeitbar
+                            {budgetProposalManual ? ' · manuell angepasst' : ''}
+                            {targetBudget.trim() !== ''
+                                ? ` · Zielbudget: ${money(targetBudget)} N/N`
+                                : ''}
+                        </StatusBanner>
+                        {canEdit ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                data-test="budget-reoptimize"
+                                onClick={startBudgetReoptimize}
+                            >
+                                Budget neu optimieren
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
                 {error ? (
                     <ErrorState message={error} data-test="preview-error" />
                 ) : null}
 
                 <WizardStepper
-                    steps={STEPS}
+                    steps={steps}
                     currentStep={step}
                     onStepChange={setStep}
                 />
@@ -823,9 +1131,24 @@ export default function CalculationWizard({
                                                     planningMode === 'manual'
                                                 }
                                                 disabled={!canEdit}
-                                                onChange={() =>
-                                                    setPlanningMode('manual')
-                                                }
+                                                onChange={() => {
+                                                    setPlanningMode('manual');
+                                                    if (
+                                                        positions.length ===
+                                                            0 &&
+                                                        hasActiveCatalog
+                                                    ) {
+                                                        const first =
+                                                            firstValidPosition(
+                                                                catalog,
+                                                            );
+                                                        if (first) {
+                                                            setPositions([
+                                                                first,
+                                                            ]);
+                                                        }
+                                                    }
+                                                }}
                                             >
                                                 <SelectionCardOption
                                                     icon={SlidersHorizontal}
@@ -839,15 +1162,27 @@ export default function CalculationWizard({
                                                     planningMode === 'budget'
                                                 }
                                                 disabled={!canEdit}
-                                                onChange={() =>
-                                                    setPlanningMode('budget')
-                                                }
+                                                onChange={() => {
+                                                    setPlanningMode('budget');
+                                                    if (
+                                                        !calculation?.positions
+                                                            ?.length
+                                                    ) {
+                                                        setPositions([]);
+                                                        setProposal(null);
+                                                        setProposalAtRevision(
+                                                            null,
+                                                        );
+                                                    }
+                                                }}
                                             >
-                                                <SelectionCardOption
-                                                    icon={Wallet}
-                                                    title="Mit Budget planen"
-                                                    description="Zielbudget und Verteilungslogik vorgeben."
-                                                />
+                                                <div data-test="planning-mode-budget">
+                                                    <SelectionCardOption
+                                                        icon={Wallet}
+                                                        title="Mit Budget planen"
+                                                        description="Zielbudget und Verteilungslogik vorgeben."
+                                                    />
+                                                </div>
                                             </SelectionCard>
                                         </SelectionCardGrid>
                                     </CardContent>
@@ -948,57 +1283,45 @@ export default function CalculationWizard({
                                             hint={
                                                 planningMode === 'manual'
                                                     ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                                    : undefined
+                                                    : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
                                             }
                                         >
                                             <Input
                                                 id="budget"
                                                 inputMode="decimal"
                                                 value={targetBudget}
-                                                onChange={(event) =>
+                                                onChange={(event) => {
                                                     setTargetBudget(
                                                         event.target.value,
-                                                    )
-                                                }
+                                                    );
+                                                    markBudgetInputsChanged();
+                                                }}
                                                 disabled={!canEdit}
                                             />
                                         </FormField>
-                                        {planningMode === 'budget' ? (
-                                            <FormField
-                                                label="Verteilung"
-                                                htmlFor="strategy"
-                                            >
-                                                <select
-                                                    id="strategy"
-                                                    className={formSelectClass}
-                                                    value={budgetStrategy}
-                                                    onChange={(event) =>
-                                                        setBudgetStrategy(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                >
-                                                    <option value="equal_budget">
-                                                        Budget je Sender gleich
-                                                        verteilen
-                                                    </option>
-                                                    <option value="maximize_spots">
-                                                        Spotanzahl maximieren
-                                                    </option>
-                                                </select>
-                                            </FormField>
-                                        ) : null}
                                     </CardContent>
                                 </Card>
                             </div>
                         ) : null}
 
                         {step === 1 ? (
-                            catalogMissing ? (
+                            catalogMissing ||
+                            (isBudgetSetup && !hasActiveCatalog) ? (
                                 <EmptyState
                                     title="Kein Katalog"
                                     description="Sender, Werbemittel und Preise fehlen. Es werden keine Beispieldaten vorgetäuscht."
+                                />
+                            ) : isBudgetSetup ? (
+                                <BudgetElementsStep
+                                    elements={budgetElements}
+                                    inventories={catalog.inventories}
+                                    dayGroups={dayGroups}
+                                    canEdit={canEdit}
+                                    fieldErrors={fieldErrors}
+                                    onChange={(elements) => {
+                                        setBudgetElements(elements);
+                                        markBudgetInputsChanged();
+                                    }}
                                 />
                             ) : (
                                 <div className="space-y-6">
@@ -1330,226 +1653,167 @@ export default function CalculationWizard({
                         ) : null}
 
                         {step === 2 ? (
-                            <div className="space-y-6">
-                                {positions.map((position, index) => {
-                                    const inventory = catalog.inventories.find(
-                                        (item) =>
-                                            item.id === position.inventory_id,
-                                    );
-                                    const rule = ruleFor(
-                                        catalog,
-                                        position.inventory_id,
-                                        position.advertising_medium_id,
-                                    );
+                            isBudgetSetup ? (
+                                <div className="space-y-6">
+                                    <BudgetConditionsStep
+                                        budgetElements={budgetElements}
+                                        inventories={catalog.inventories}
+                                        catalogRules={catalog.rules}
+                                        budgetPositionDiscounts={
+                                            budgetPositionDiscounts
+                                        }
+                                        orderDiscounts={orderDiscounts}
+                                        aeEnabled={aeEnabled}
+                                        discountTypes={discountTypes}
+                                        canEdit={canEdit}
+                                        fieldErrors={fieldErrors}
+                                        onBudgetPositionDiscountsChange={(
+                                            discounts,
+                                        ) => {
+                                            setBudgetPositionDiscounts(
+                                                discounts,
+                                            );
+                                            markBudgetInputsChanged();
+                                        }}
+                                        onOrderDiscountsChange={(discounts) => {
+                                            setOrderDiscounts(discounts);
+                                            markBudgetInputsChanged();
+                                        }}
+                                        onAeEnabledChange={(enabled) => {
+                                            setAeEnabled(enabled);
+                                            markBudgetInputsChanged();
+                                        }}
+                                    />
+                                    {proposalStatus === 'stale' ? (
+                                        <StatusBanner data-test="budget-stale-hint">
+                                            Die Eingaben haben sich geändert.
+                                            Berechne den Vorschlag neu, bevor du
+                                            ihn übernimmst.
+                                        </StatusBanner>
+                                    ) : null}
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {positions.map((position, index) => {
+                                        const inventory =
+                                            catalog.inventories.find(
+                                                (item) =>
+                                                    item.id ===
+                                                    position.inventory_id,
+                                            );
+                                        const rule = ruleFor(
+                                            catalog,
+                                            position.inventory_id,
+                                            position.advertising_medium_id,
+                                        );
 
-                                    return (
-                                        <Card
-                                            key={`cond-${position.client_key}`}
-                                            className={wizardCardClass}
-                                        >
-                                            <CardHeader
-                                                className={
-                                                    wizardCardHeaderClass
-                                                }
+                                        return (
+                                            <Card
+                                                key={`cond-${position.client_key}`}
+                                                className={wizardCardClass}
                                             >
-                                                <CardTitle
-                                                    className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                <CardHeader
+                                                    className={
+                                                        wizardCardHeaderClass
+                                                    }
                                                 >
-                                                    <LogoSlot
-                                                        name={
-                                                            inventory?.name ??
-                                                            'Sender'
+                                                    <CardTitle
+                                                        className={`${wizardCardTitleClass} flex items-center gap-2`}
+                                                    >
+                                                        <LogoSlot
+                                                            name={
+                                                                inventory?.name ??
+                                                                'Sender'
+                                                            }
+                                                            logoPath={
+                                                                inventory?.logo_path
+                                                            }
+                                                        />
+                                                        Rabatte für{' '}
+                                                        {inventory?.name ??
+                                                            'dieses Werbeelement'}
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent
+                                                    className={`${wizardCardContentClass} space-y-4`}
+                                                >
+                                                    <p className="text-muted-foreground text-sm">
+                                                        Bruttoausgangswert{' '}
+                                                        <span className="text-foreground font-medium">
+                                                            {displayTotals &&
+                                                            !previewLoading &&
+                                                            displayTotals
+                                                                ?.positions[
+                                                                index
+                                                            ]?.media_gross
+                                                                ? money(
+                                                                      displayTotals
+                                                                          .positions[
+                                                                          index
+                                                                      ]
+                                                                          .media_gross,
+                                                                  )
+                                                                : previewLoading
+                                                                  ? '…'
+                                                                  : '–'}
+                                                        </span>
+                                                    </p>
+                                                    <DiscountListEditor
+                                                        title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
+                                                        description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
+                                                        discounts={
+                                                            position.position_discounts
                                                         }
-                                                        logoPath={
-                                                            inventory?.logo_path
+                                                        types={discountTypes}
+                                                        canEdit={canEdit}
+                                                        disabled={
+                                                            rule?.is_discountable ===
+                                                            false
+                                                        }
+                                                        fieldPrefix={`positions.${index}.position_discounts`}
+                                                        fieldErrors={
+                                                            fieldErrors
+                                                        }
+                                                        breakdown={
+                                                            displayTotals
+                                                                ?.positions[
+                                                                index
+                                                            ]
+                                                                ?.position_discounts
+                                                        }
+                                                        onChange={(
+                                                            position_discounts,
+                                                        ) =>
+                                                            updatePosition(
+                                                                index,
+                                                                {
+                                                                    position_discounts,
+                                                                },
+                                                            )
                                                         }
                                                     />
-                                                    Rabatte für{' '}
-                                                    {inventory?.name ??
-                                                        'dieses Werbeelement'}
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent
-                                                className={`${wizardCardContentClass} space-y-4`}
-                                            >
-                                                <p className="text-muted-foreground text-sm">
-                                                    Bruttoausgangswert{' '}
-                                                    <span className="text-foreground font-medium">
-                                                        {displayTotals &&
-                                                        !previewLoading &&
-                                                        displayTotals
-                                                            ?.positions[index]
-                                                            ?.media_gross
-                                                            ? money(
-                                                                  displayTotals
-                                                                      .positions[
-                                                                      index
-                                                                  ].media_gross,
-                                                              )
-                                                            : previewLoading
-                                                              ? '…'
-                                                              : '–'}
-                                                    </span>
-                                                </p>
-                                                <DiscountListEditor
-                                                    title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
-                                                    description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
-                                                    discounts={
-                                                        position.position_discounts
-                                                    }
-                                                    types={discountTypes}
-                                                    canEdit={canEdit}
-                                                    disabled={
-                                                        rule?.is_discountable ===
-                                                        false
-                                                    }
-                                                    fieldPrefix={`positions.${index}.position_discounts`}
-                                                    fieldErrors={fieldErrors}
-                                                    breakdown={
-                                                        displayTotals
-                                                            ?.positions[index]
-                                                            ?.position_discounts
-                                                    }
-                                                    onChange={(
-                                                        position_discounts,
-                                                    ) =>
-                                                        updatePosition(index, {
-                                                            position_discounts,
-                                                        })
-                                                    }
-                                                />
-                                                {displayTotals?.positions[index]
-                                                    ?.after_position_discount ? (
-                                                    <p className="text-sm">
-                                                        Verbleibende
-                                                        Positionssumme{' '}
-                                                        <span className="font-medium">
-                                                            {money(
-                                                                displayTotals
-                                                                    .positions[
-                                                                    index
-                                                                ]
-                                                                    .after_position_discount,
-                                                            )}
-                                                        </span>
-                                                    </p>
-                                                ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })}
-                                <Card className={wizardCardClass}>
-                                    <CardHeader
-                                        className={wizardCardHeaderClass}
-                                    >
-                                        <CardTitle
-                                            className={wizardCardTitleClass}
-                                        >
-                                            Auftragskonditionen
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent
-                                        className={wizardCardContentClass}
-                                    >
-                                        <div className="space-y-4">
-                                            <DiscountListEditor
-                                                title="Rabatte auf den Gesamtauftrag"
-                                                description="Diese Rabatte werden nach den Rabatten der einzelnen Werbeelemente auf die verbleibende Auftragssumme angewendet."
-                                                discounts={orderDiscounts}
-                                                types={discountTypes}
-                                                canEdit={canEdit}
-                                                fieldPrefix="order_discounts"
-                                                fieldErrors={fieldErrors}
-                                                breakdown={
-                                                    displayTotals?.order_discounts
-                                                }
-                                                onChange={setOrderDiscounts}
-                                            />
-                                            <label className="flex items-start gap-3 text-sm">
-                                                <Checkbox
-                                                    id="ae-enabled"
-                                                    data-test="ae-enabled"
-                                                    className="mt-0.5"
-                                                    checked={aeEnabled}
-                                                    disabled={!canEdit}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        setAeEnabled(
-                                                            checked === true,
-                                                        )
-                                                    }
-                                                />
-                                                <span>
-                                                    <span className="font-medium">
-                                                        15 % AE berücksichtigen
-                                                    </span>
-                                                    <span className="text-muted-foreground mt-1 block text-xs">
-                                                        AE wird nach allen
-                                                        Positions- und
-                                                        Auftragsrabatten nur auf
-                                                        den AE-fähigen Anteil
-                                                        angewendet.
-                                                        {displayTotals?.ae_eligible_base
-                                                            ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
-                                                            : ''}
-                                                    </span>
-                                                </span>
-                                            </label>
-                                            {displayTotals &&
-                                            !previewLoading ? (
-                                                <div
-                                                    className="border-border/60 space-y-2 border-t pt-4 text-sm"
-                                                    data-test="step-3-totals"
-                                                >
-                                                    <p>
-                                                        Ausgangssumme für
-                                                        Auftragsrabatte{' '}
-                                                        <span className="font-medium">
-                                                            {money(
-                                                                displayTotals.after_position_discount_total ??
-                                                                    displayTotals.media_gross,
-                                                            )}
-                                                        </span>
-                                                    </p>
-                                                    {aeEnabled ||
-                                                    Number(
-                                                        displayTotals.ae_total,
-                                                    ) > 0 ? (
-                                                        <p>
-                                                            AE-Abzug{' '}
-                                                            <span
-                                                                className="font-medium"
-                                                                data-test="ae-deduction"
-                                                            >
+                                                    {displayTotals?.positions[
+                                                        index
+                                                    ]
+                                                        ?.after_position_discount ? (
+                                                        <p className="text-sm">
+                                                            Verbleibende
+                                                            Positionssumme{' '}
+                                                            <span className="font-medium">
                                                                 {money(
-                                                                    displayTotals.ae_total,
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .after_position_discount,
                                                                 )}
                                                             </span>
                                                         </p>
                                                     ) : null}
-                                                    <p className="font-medium">
-                                                        Netto-Endsumme{' '}
-                                                        <span
-                                                            className="text-primary text-base"
-                                                            data-test="preview-net-total"
-                                                        >
-                                                            {money(
-                                                                displayTotals.nn_invest,
-                                                            )}
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                            ) : previewLoading ? (
-                                                <LoadingState
-                                                    label="Berechnet"
-                                                    data-test="preview-loading"
-                                                />
-                                            ) : null}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                                {planningMode === 'budget' && canEdit ? (
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                     <Card className={wizardCardClass}>
                                         <CardHeader
                                             className={wizardCardHeaderClass}
@@ -1557,301 +1821,214 @@ export default function CalculationWizard({
                                             <CardTitle
                                                 className={wizardCardTitleClass}
                                             >
-                                                Budgetvorschlag
+                                                Auftragskonditionen
                                             </CardTitle>
                                         </CardHeader>
                                         <CardContent
-                                            className={`${wizardCardContentClass} space-y-3`}
+                                            className={wizardCardContentClass}
                                         >
-                                            <p className="text-muted-foreground text-sm">
-                                                Konditionen und Verteilungslogik
-                                                müssen vor der
-                                                Vorschlagsberechnung feststehen.
-                                            </p>
-                                            <div className="flex flex-wrap gap-2">
-                                                <Button
-                                                    type="button"
-                                                    data-test="budget-propose"
-                                                    onClick={() =>
-                                                        void createProposal()
+                                            <div className="space-y-4">
+                                                <DiscountListEditor
+                                                    title="Rabatte auf den Gesamtauftrag"
+                                                    description="Diese Rabatte werden nach den Rabatten der einzelnen Werbeelemente auf die verbleibende Auftragssumme angewendet."
+                                                    discounts={orderDiscounts}
+                                                    types={discountTypes}
+                                                    canEdit={canEdit}
+                                                    fieldPrefix="order_discounts"
+                                                    fieldErrors={fieldErrors}
+                                                    breakdown={
+                                                        displayTotals?.order_discounts
                                                     }
-                                                    disabled={busy}
-                                                >
-                                                    Vorschlag erzeugen
-                                                </Button>
-                                                {proposal ? (
-                                                    <>
-                                                        <Button
-                                                            type="button"
-                                                            variant="secondary"
-                                                            data-test="budget-apply"
-                                                            onClick={
-                                                                takeProposal
-                                                            }
-                                                            disabled={busy}
-                                                        >
-                                                            Vorschlag übernehmen
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                setProposal(
-                                                                    null,
-                                                                )
-                                                            }
-                                                        >
-                                                            Vorschlag verwerfen
-                                                        </Button>
-                                                    </>
+                                                    onChange={setOrderDiscounts}
+                                                />
+                                                <label className="flex items-start gap-3 text-sm">
+                                                    <Checkbox
+                                                        id="ae-enabled"
+                                                        data-test="ae-enabled"
+                                                        className="mt-0.5"
+                                                        checked={aeEnabled}
+                                                        disabled={!canEdit}
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            setAeEnabled(
+                                                                checked ===
+                                                                    true,
+                                                            )
+                                                        }
+                                                    />
+                                                    <span>
+                                                        <span className="font-medium">
+                                                            15 % AE
+                                                            berücksichtigen
+                                                        </span>
+                                                        <span className="text-muted-foreground mt-1 block text-xs">
+                                                            AE wird nach allen
+                                                            Positions- und
+                                                            Auftragsrabatten nur
+                                                            auf den AE-fähigen
+                                                            Anteil angewendet.
+                                                            {displayTotals?.ae_eligible_base
+                                                                ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
+                                                                : ''}
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                                {displayTotals &&
+                                                !previewLoading ? (
+                                                    <div
+                                                        className="border-border/60 space-y-2 border-t pt-4 text-sm"
+                                                        data-test="step-3-totals"
+                                                    >
+                                                        <p>
+                                                            Ausgangssumme für
+                                                            Auftragsrabatte{' '}
+                                                            <span className="font-medium">
+                                                                {money(
+                                                                    displayTotals.after_position_discount_total ??
+                                                                        displayTotals.media_gross,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                        {aeEnabled ||
+                                                        Number(
+                                                            displayTotals.ae_total,
+                                                        ) > 0 ? (
+                                                            <p>
+                                                                AE-Abzug{' '}
+                                                                <span
+                                                                    className="font-medium"
+                                                                    data-test="ae-deduction"
+                                                                >
+                                                                    {money(
+                                                                        displayTotals.ae_total,
+                                                                    )}
+                                                                </span>
+                                                            </p>
+                                                        ) : null}
+                                                        <p className="font-medium">
+                                                            Netto-Endsumme{' '}
+                                                            <span
+                                                                className="text-primary text-base"
+                                                                data-test="preview-net-total"
+                                                            >
+                                                                {money(
+                                                                    displayTotals.nn_invest,
+                                                                )}
+                                                            </span>
+                                                        </p>
+                                                    </div>
+                                                ) : previewLoading ? (
+                                                    <LoadingState
+                                                        label="Berechnet"
+                                                        data-test="preview-loading"
+                                                    />
                                                 ) : null}
                                             </div>
-                                            {proposal ? (
-                                                <StatusBanner>
-                                                    {proposal.explanation}{' '}
-                                                    Verbrauch{' '}
-                                                    {money(proposal.used_nn)},
-                                                    Rest{' '}
-                                                    {money(proposal.remainder)}.
-                                                    Anzeigen oder Verwerfen
-                                                    ändert die Kalkulation
-                                                    nicht.
-                                                </StatusBanner>
-                                            ) : null}
                                         </CardContent>
                                     </Card>
-                                ) : null}
-                            </div>
+                                    {isBudgetSetup &&
+                                    proposalStatus === 'stale' ? (
+                                        <StatusBanner data-test="budget-stale-hint">
+                                            Die Konditionen haben sich geändert.
+                                            Optimiere den Vorschlag erneut, um
+                                            das Zielbudget bestmöglich
+                                            auszuschöpfen.
+                                        </StatusBanner>
+                                    ) : null}
+                                </div>
+                            )
                         ) : null}
 
                         {step === 3 ? (
-                            <Card className={wizardCardClass}>
-                                <CardHeader className={wizardCardHeaderClass}>
-                                    <CardTitle className={wizardCardTitleClass}>
-                                        Zusammenfassung
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent
-                                    className={`${wizardCardContentClass} space-y-4 text-sm`}
-                                >
-                                    {summary ? (
-                                        <>
-                                            <dl className="grid gap-2 sm:grid-cols-2">
-                                                <SummaryDetail
-                                                    label="Media-Brutto"
-                                                    value={money(
-                                                        summary.media_gross,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Werbeelemente"
-                                                    value={money(
-                                                        summary.position_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Auftrag"
-                                                    value={money(
-                                                        summary.order_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="AE gesamt"
-                                                    value={money(
-                                                        summary.ae_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="N/N-Invest"
-                                                    value={money(
-                                                        summary.nn_invest,
-                                                    )}
-                                                    emphasis
-                                                />
-                                                {summary.target_budget_nn ? (
+                            isBudgetSetup ? (
+                                <BudgetProposalResultStep
+                                    proposal={proposal}
+                                    proposalStatus={proposalStatus}
+                                    proposalLoading={proposalLoading}
+                                    busy={busy}
+                                    onApply={takeProposal}
+                                    onEditInputs={() => setStep(0)}
+                                    onRecalculate={() => void createProposal()}
+                                    showApplyHint={isBudgetSetup}
+                                />
+                            ) : (
+                                <Card className={wizardCardClass}>
+                                    <CardHeader
+                                        className={wizardCardHeaderClass}
+                                    >
+                                        <CardTitle
+                                            className={wizardCardTitleClass}
+                                        >
+                                            Zusammenfassung
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent
+                                        className={`${wizardCardContentClass} space-y-4 text-sm`}
+                                    >
+                                        {summary ? (
+                                            <>
+                                                <dl className="grid gap-2 sm:grid-cols-2">
                                                     <SummaryDetail
-                                                        label="Zielbudget"
+                                                        label="Media-Brutto"
                                                         value={money(
-                                                            summary.target_budget_nn,
+                                                            summary.media_gross,
                                                         )}
                                                     />
-                                                ) : null}
-                                            </dl>
-                                            {summary.positions.map(
-                                                (position) => (
-                                                    <section
-                                                        key={
-                                                            position.inventory_name
-                                                        }
-                                                        className="rounded-lg border p-4"
-                                                    >
-                                                        <p className="font-medium">
-                                                            {
-                                                                position.inventory_name
-                                                            }{' '}
-                                                            ·{' '}
-                                                            {
-                                                                position.spot_method
-                                                            }{' '}
-                                                            · Preisliste{' '}
-                                                            {
-                                                                position.price_list_version
-                                                            }
-                                                        </p>
-                                                        <p className="text-muted-foreground mt-1">
-                                                            {
-                                                                position.total_spot_count
-                                                            }{' '}
-                                                            Spots à{' '}
-                                                            {
-                                                                position.length_seconds
-                                                            }
-                                                            s · Pos.-Rab.{' '}
-                                                            {
-                                                                position.position_discount_percent
-                                                            }
-                                                            % · AE{' '}
-                                                            {
-                                                                position.ae_percent
-                                                            }
-                                                            %
-                                                        </p>
-                                                        <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                            {(position
-                                                                .time_ranges
-                                                                ?.length
-                                                                ? position.time_ranges
-                                                                : []
-                                                            ).map((range) => (
-                                                                <li
-                                                                    key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
-                                                                >
-                                                                    {String(
-                                                                        range.start_hour,
-                                                                    ).padStart(
-                                                                        2,
-                                                                        '0',
-                                                                    )}
-                                                                    :00–
-                                                                    {String(
-                                                                        range.end_hour_exclusive -
-                                                                            1,
-                                                                    ).padStart(
-                                                                        2,
-                                                                        '0',
-                                                                    )}
-                                                                    :59,{' '}
-                                                                    {
-                                                                        range.day_group
-                                                                    }
-                                                                    ,{' '}
-                                                                    {
-                                                                        range.spot_count
-                                                                    }{' '}
-                                                                    Spots
-                                                                    {range.range_gross
-                                                                        ? ` · ${money(range.range_gross)}`
-                                                                        : ''}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                        <p className="mt-2">
-                                                            {money(
-                                                                position.media_gross,
-                                                            )}{' '}
-                                                            Brutto ·{' '}
-                                                            {money(
-                                                                position.nn_invest,
-                                                            )}{' '}
-                                                            N/N
-                                                        </p>
-                                                    </section>
-                                                ),
-                                            )}
-                                        </>
-                                    ) : displayTotals ? (
-                                        <>
-                                            <dl className="grid gap-2 sm:grid-cols-2">
-                                                <SummaryDetail
-                                                    label="Media-Brutto"
-                                                    value={money(
-                                                        displayTotals.media_gross,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Werbeelemente"
-                                                    value={money(
-                                                        displayTotals.position_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="Rabatte Auftrag"
-                                                    value={money(
-                                                        displayTotals.order_discount_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="AE gesamt"
-                                                    value={money(
-                                                        displayTotals.ae_total,
-                                                    )}
-                                                />
-                                                <SummaryDetail
-                                                    label="N/N-Invest"
-                                                    value={money(
-                                                        displayTotals.nn_invest,
-                                                    )}
-                                                    emphasis
-                                                />
-                                                {displayTotals.target_budget_nn ? (
                                                     <SummaryDetail
-                                                        label="Zielbudget"
+                                                        label="Rabatte Werbeelemente"
                                                         value={money(
-                                                            displayTotals.target_budget_nn,
+                                                            summary.position_discount_total,
                                                         )}
                                                     />
-                                                ) : null}
-                                            </dl>
-                                            {displayTotals.target_budget_nn &&
-                                            displayTotals.budget_delta !==
-                                                null ? (
-                                                <p className="text-muted-foreground">
-                                                    {Number(
-                                                        displayTotals.budget_delta,
-                                                    ) >= 0
-                                                        ? `Rest ${money(displayTotals.budget_delta)}`
-                                                        : `Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`}
-                                                </p>
-                                            ) : null}
-                                            {displayTotals.requires_special_approval ? (
-                                                <StatusBanner tone="warning">
-                                                    Die persönliche Rabattgrenze
-                                                    ist überschritten.
-                                                </StatusBanner>
-                                            ) : null}
-                                            {positions.map(
-                                                (position, index) => {
-                                                    const result =
-                                                        displayTotals.positions[
-                                                            index
-                                                        ];
-                                                    const inventory =
-                                                        catalog.inventories.find(
-                                                            (item) =>
-                                                                item.id ===
-                                                                position.inventory_id,
-                                                        );
-
-                                                    return (
+                                                    <SummaryDetail
+                                                        label="Rabatte Auftrag"
+                                                        value={money(
+                                                            summary.order_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="AE gesamt"
+                                                        value={money(
+                                                            summary.ae_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="N/N-Invest"
+                                                        value={money(
+                                                            summary.nn_invest,
+                                                        )}
+                                                        emphasis
+                                                    />
+                                                    {summary.target_budget_nn ? (
+                                                        <SummaryDetail
+                                                            label="Zielbudget"
+                                                            value={money(
+                                                                summary.target_budget_nn,
+                                                            )}
+                                                        />
+                                                    ) : null}
+                                                </dl>
+                                                {summary.positions.map(
+                                                    (position) => (
                                                         <section
                                                             key={
-                                                                position.client_key
+                                                                position.inventory_name
                                                             }
                                                             className="rounded-lg border p-4"
                                                         >
                                                             <p className="font-medium">
-                                                                {inventory?.name ??
-                                                                    'Sender'}
+                                                                {
+                                                                    position.inventory_name
+                                                                }{' '}
+                                                                ·{' '}
+                                                                {
+                                                                    position.spot_method
+                                                                }{' '}
+                                                                · Preisliste{' '}
+                                                                {
+                                                                    position.price_list_version
+                                                                }
                                                             </p>
                                                             <p className="text-muted-foreground mt-1">
                                                                 {
@@ -1861,24 +2038,45 @@ export default function CalculationWizard({
                                                                 {
                                                                     position.length_seconds
                                                                 }
-                                                                s
+                                                                s · Pos.-Rab.{' '}
+                                                                {
+                                                                    position.position_discount_percent
+                                                                }
+                                                                % · AE{' '}
+                                                                {
+                                                                    position.ae_percent
+                                                                }
+                                                                %
                                                             </p>
                                                             <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                                {(
-                                                                    result?.time_ranges ??
-                                                                    []
+                                                                {(position
+                                                                    .time_ranges
+                                                                    ?.length
+                                                                    ? position.time_ranges
+                                                                    : []
                                                                 ).map(
                                                                     (range) => (
                                                                         <li
                                                                             key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
                                                                         >
-                                                                            {formatHour(
+                                                                            {String(
                                                                                 range.start_hour,
+                                                                            ).padStart(
+                                                                                2,
+                                                                                '0',
                                                                             )}
-                                                                            –
-                                                                            {formatInclusiveEnd(
-                                                                                range.end_hour_exclusive,
+                                                                            :00–
+                                                                            {String(
+                                                                                range.end_hour_exclusive -
+                                                                                    1,
+                                                                            ).padStart(
+                                                                                2,
+                                                                                '0',
                                                                             )}
+                                                                            :59,{' '}
+                                                                            {
+                                                                                range.day_group
+                                                                            }
                                                                             ,{' '}
                                                                             {
                                                                                 range.spot_count
@@ -1891,64 +2089,214 @@ export default function CalculationWizard({
                                                                     ),
                                                                 )}
                                                             </ul>
-                                                            {(
-                                                                result?.position_discounts ??
-                                                                []
-                                                            ).map(
-                                                                (
-                                                                    discount,
-                                                                    discountIndex,
-                                                                ) => (
-                                                                    <p
-                                                                        key={`${discount.label}-${discountIndex}`}
-                                                                        className="text-muted-foreground mt-1"
-                                                                    >
-                                                                        {
-                                                                            discount.label
-                                                                        }{' '}
-                                                                        {formatPercent(
-                                                                            discount.percent,
-                                                                        )}{' '}
-                                                                        ·{' '}
-                                                                        {moneyDeduction(
-                                                                            discount.amount,
-                                                                        )}
-                                                                    </p>
-                                                                ),
-                                                            )}
-                                                            {result?.media_gross ? (
-                                                                <p className="mt-2">
-                                                                    {money(
-                                                                        result.media_gross,
-                                                                    )}{' '}
-                                                                    Brutto ·{' '}
-                                                                    {money(
-                                                                        result.nn_invest,
-                                                                    )}{' '}
-                                                                    N/N
-                                                                </p>
-                                                            ) : null}
+                                                            <p className="mt-2">
+                                                                {money(
+                                                                    position.media_gross,
+                                                                )}{' '}
+                                                                Brutto ·{' '}
+                                                                {money(
+                                                                    position.nn_invest,
+                                                                )}{' '}
+                                                                N/N
+                                                            </p>
                                                         </section>
-                                                    );
-                                                },
-                                            )}
-                                        </>
-                                    ) : (
-                                        <LoadingState />
-                                    )}
-                                </CardContent>
-                            </Card>
+                                                    ),
+                                                )}
+                                            </>
+                                        ) : displayTotals ? (
+                                            <>
+                                                <dl className="grid gap-2 sm:grid-cols-2">
+                                                    <SummaryDetail
+                                                        label="Media-Brutto"
+                                                        value={money(
+                                                            displayTotals.media_gross,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Werbeelemente"
+                                                        value={money(
+                                                            displayTotals.position_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="Rabatte Auftrag"
+                                                        value={money(
+                                                            displayTotals.order_discount_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="AE gesamt"
+                                                        value={money(
+                                                            displayTotals.ae_total,
+                                                        )}
+                                                    />
+                                                    <SummaryDetail
+                                                        label="N/N-Invest"
+                                                        value={money(
+                                                            displayTotals.nn_invest,
+                                                        )}
+                                                        emphasis
+                                                    />
+                                                    {displayTotals.target_budget_nn ? (
+                                                        <SummaryDetail
+                                                            label="Zielbudget"
+                                                            value={money(
+                                                                displayTotals.target_budget_nn,
+                                                            )}
+                                                        />
+                                                    ) : null}
+                                                </dl>
+                                                {displayTotals.target_budget_nn &&
+                                                displayTotals.budget_delta !==
+                                                    null ? (
+                                                    <p className="text-muted-foreground">
+                                                        {Number(
+                                                            displayTotals.budget_delta,
+                                                        ) >= 0
+                                                            ? `Rest ${money(displayTotals.budget_delta)}`
+                                                            : `Überschreitung ${money(Math.abs(Number(displayTotals.budget_delta)))}`}
+                                                    </p>
+                                                ) : null}
+                                                {displayTotals.requires_special_approval ? (
+                                                    <StatusBanner tone="warning">
+                                                        Die persönliche
+                                                        Rabattgrenze ist
+                                                        überschritten.
+                                                    </StatusBanner>
+                                                ) : null}
+                                                {positions.map(
+                                                    (position, index) => {
+                                                        const result =
+                                                            displayTotals
+                                                                .positions[
+                                                                index
+                                                            ];
+                                                        const inventory =
+                                                            catalog.inventories.find(
+                                                                (item) =>
+                                                                    item.id ===
+                                                                    position.inventory_id,
+                                                            );
+
+                                                        return (
+                                                            <section
+                                                                key={
+                                                                    position.client_key
+                                                                }
+                                                                className="rounded-lg border p-4"
+                                                            >
+                                                                <p className="font-medium">
+                                                                    {inventory?.name ??
+                                                                        'Sender'}
+                                                                </p>
+                                                                <p className="text-muted-foreground mt-1">
+                                                                    {
+                                                                        position.total_spot_count
+                                                                    }{' '}
+                                                                    Spots à{' '}
+                                                                    {
+                                                                        position.length_seconds
+                                                                    }
+                                                                    s
+                                                                </p>
+                                                                <ul className="text-muted-foreground mt-2 list-inside list-disc">
+                                                                    {(
+                                                                        result?.time_ranges ??
+                                                                        []
+                                                                    ).map(
+                                                                        (
+                                                                            range,
+                                                                        ) => (
+                                                                            <li
+                                                                                key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                                            >
+                                                                                {formatHour(
+                                                                                    range.start_hour,
+                                                                                )}
+                                                                                –
+                                                                                {formatInclusiveEnd(
+                                                                                    range.end_hour_exclusive,
+                                                                                )}
+                                                                                ,{' '}
+                                                                                {
+                                                                                    range.spot_count
+                                                                                }{' '}
+                                                                                Spots
+                                                                                {range.range_gross
+                                                                                    ? ` · ${money(range.range_gross)}`
+                                                                                    : ''}
+                                                                            </li>
+                                                                        ),
+                                                                    )}
+                                                                </ul>
+                                                                {(
+                                                                    result?.position_discounts ??
+                                                                    []
+                                                                ).map(
+                                                                    (
+                                                                        discount,
+                                                                        discountIndex,
+                                                                    ) => (
+                                                                        <p
+                                                                            key={`${discount.label}-${discountIndex}`}
+                                                                            className="text-muted-foreground mt-1"
+                                                                        >
+                                                                            {
+                                                                                discount.label
+                                                                            }{' '}
+                                                                            {formatPercent(
+                                                                                discount.percent,
+                                                                            )}{' '}
+                                                                            ·{' '}
+                                                                            {moneyDeduction(
+                                                                                discount.amount,
+                                                                            )}
+                                                                        </p>
+                                                                    ),
+                                                                )}
+                                                                {result?.media_gross ? (
+                                                                    <p className="mt-2">
+                                                                        {money(
+                                                                            result.media_gross,
+                                                                        )}{' '}
+                                                                        Brutto ·{' '}
+                                                                        {money(
+                                                                            result.nn_invest,
+                                                                        )}{' '}
+                                                                        N/N
+                                                                    </p>
+                                                                ) : null}
+                                                            </section>
+                                                        );
+                                                    },
+                                                )}
+                                            </>
+                                        ) : (
+                                            <LoadingState />
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )
                         ) : null}
                     </div>
 
                     <aside className="order-2 min-w-0 lg:sticky lg:top-6 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
-                        <CalculationSummaryPanel
-                            totals={summaryTotals}
-                            loading={canEdit && previewLoading}
-                            aeEnabled={aeEnabled}
-                            positions={positions}
-                            inventories={catalog.inventories}
-                        />
+                        {showBudgetPlanningSidebar ? (
+                            <BudgetPlanningSidebar
+                                targetBudget={targetBudget}
+                                budgetElements={budgetElements}
+                                inventories={catalog.inventories}
+                                dayGroups={dayGroups}
+                            />
+                        ) : (
+                            <CalculationSummaryPanel
+                                totals={summaryTotals}
+                                loading={canEdit && previewLoading}
+                                aeEnabled={aeEnabled}
+                                positions={positions}
+                                inventories={catalog.inventories}
+                            />
+                        )}
                     </aside>
 
                     <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
@@ -1961,24 +2309,38 @@ export default function CalculationWizard({
                                 Zurück
                             </Button>
                         ) : null}
-                        {step < STEPS.length - 1 ? (
-                            <Button
-                                type="button"
-                                onClick={() => setStep(step + 1)}
-                            >
-                                Weiter
+                        {step < steps.length - 1 &&
+                        !(isBudgetSetup && step === 2) ? (
+                            <Button type="button" onClick={goNext}>
+                                {nextLabel}
                             </Button>
                         ) : null}
-                        {canEdit ? (
+                        {isBudgetSetup && step === 2 ? (
+                            <Button
+                                type="button"
+                                data-test="budget-propose"
+                                onClick={() => void createProposal()}
+                                disabled={busy || proposalLoading}
+                            >
+                                Budgetvorschlag berechnen
+                            </Button>
+                        ) : null}
+                        {canEdit && showSaveButton ? (
                             <Button
                                 type="button"
                                 onClick={save}
-                                disabled={busy}
+                                disabled={
+                                    busy ||
+                                    (planningMode === 'budget' &&
+                                        positions.length === 0 &&
+                                        !isBudgetSetup)
+                                }
                                 variant={
-                                    step === STEPS.length - 1
+                                    step === steps.length - 1
                                         ? 'default'
                                         : 'secondary'
                                 }
+                                data-test="wizard-save"
                             >
                                 Speichern
                             </Button>

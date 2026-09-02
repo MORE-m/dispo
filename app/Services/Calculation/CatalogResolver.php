@@ -546,4 +546,63 @@ final class CatalogResolver
 
         return DayGroupPrice::fromBaseMap($base, $dayGroup);
     }
+
+    /**
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule,
+     *     priceList: PriceList,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int
+     * }
+     */
+    public function resolveInventoryForBudget(int $inventoryId, int $mediumId): array
+    {
+        $inventory = Inventory::query()->find($inventoryId);
+        if ($inventory === null || ! $inventory->is_active) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => 'Der gewählte Sender ist nicht verfügbar.',
+            ]);
+        }
+
+        $medium = AdvertisingMedium::query()->find($mediumId);
+        if ($medium === null || (string) $medium->getAttributes()['kind'] !== CalculationKind::SpotClassic->value) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => 'Spot Classic ist nicht verfügbar.',
+            ]);
+        }
+
+        $rule = InventoryMediumRule::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('advertising_medium_id', $medium->id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($rule === null) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => 'Die Kombination '.$inventory->name.'/Spot ist nicht zulässig.',
+            ]);
+        }
+
+        $priceList = $this->activePriceList($inventory->id);
+        if ($priceList === null) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+            ]);
+        }
+
+        return [
+            'inventory' => $inventory,
+            'medium' => $medium,
+            'rule' => $rule,
+            'priceList' => $priceList,
+            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
+            'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
+            'inventory_medium_rule_id' => $rule->id,
+        ];
+    }
 }
