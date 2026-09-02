@@ -285,14 +285,27 @@ Kalkulation nach expliziter Übernahme (`BUD-008`).
 
 ### Planungsweg „Mit Budget planen“
 
-Eingaben:
+Vier Schritte im Wizard:
 
-- Zielbudget N/N (Pflicht, > 0),
-- Wunschsender (Mehrfachauswahl),
-- Spotlänge,
-- erlaubte Verteilungszeiträume (Beginn, exklusives Ende, Tagesgruppe).
+1. **Grunddaten** – Stammdaten und Zielbudget N/N (Pflicht, > 0)
+2. **Planungsrahmen** – Wunschsender, Spotlänge, erlaubte Verteilungszeiträume
+3. **Konditionen** – optionale Positionsrabatte je Wunschsender, Auftragsrabatte, AE
+4. **Budgetvorschlag** – KPIs, Senderübersicht, aufklappbare Stundenverteilung
 
-Der Vorschlag wird nur nach ausdrücklicher Aktion „Budgetvorschlag berechnen“ erzeugt.
+Der Vorschlag wird am Ende von Schritt 3 über **„Budgetvorschlag berechnen“** erzeugt.
+Vor dem Vorschlag gibt es keine Spotanzahl-Eingabe und keine normale Positionspreview.
+
+Eingaben für den Proposal-Request:
+
+- `target_budget_nn`
+- `budget_wish_inventory_ids[]`
+- `budget_spot_length_seconds`
+- `budget_distribution_ranges[]` (nur Beginn, Ende, Tagesgruppe)
+- `budget_position_discounts_by_inventory[]`
+- `order_discounts[]`
+- `ae_enabled`
+
+Nicht Teil der Eingabe: `total_spot_count`, `spot_count`, bestehende `positions`.
 
 ### Strategie `equal_spot_count`
 
