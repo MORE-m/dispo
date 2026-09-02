@@ -285,23 +285,42 @@ Kalkulation nach expliziter Übernahme (`BUD-008`).
 
 ### Planungsweg „Mit Budget planen“
 
-Vier Schritte im Wizard:
+Vor der Übernahme: vier Schritte im Wizard (Grunddaten → Planungsrahmen →
+Konditionen → Budgetvorschlag). Nach der Übernahme wechselt die Oberfläche in die
+normale Bearbeitungsdarstellung (Grunddaten → Werbeelemente → Konditionen →
+Zusammenfassung), ohne `planning_mode` zu ändern.
 
-1. **Grunddaten** – Stammdaten und Zielbudget N/N (Pflicht, > 0)
-2. **Planungsrahmen** – Wunschsender, Spotlänge, erlaubte Verteilungszeiträume
-3. **Konditionen** – optionale Positionsrabatte je Wunschsender, Auftragsrabatte, AE
-4. **Budgetvorschlag** – KPIs, Senderübersicht, aufklappbare Stundenverteilung
+### Zustandsmodell (`budget_proposal_status`)
 
-Der Vorschlag wird am Ende von Schritt 3 über **„Budgetvorschlag berechnen“** erzeugt.
-Vor dem Vorschlag gibt es keine Spotanzahl-Eingabe und keine normale Positionspreview.
+| Status    | Bedeutung |
+| --------- | --------- |
+| `draft`   | Planungsrahmen vorhanden, noch kein Vorschlag berechnet |
+| `current` | Aktueller Vorschlag berechnet, nicht übernommen |
+| `stale`   | Vorschlag vorhanden, Eingaben danach geändert |
+| `applied` | Vorschlag in Kalkulationspositionen übernommen |
+| `manual`  | Übernommene Planung manuell angepasst |
+
+Der Status ist serverseitig persistent. Nach Übernahme werden Positionen und
+Preiszeiträume gespeichert; beim erneuten Laden erscheint die Detailplanung,
+nicht der Budget-Entwurf.
+
+### Budget-Werbeelemente (`budget_elements[]`)
+
+Je Element:
+
+- `client_id` (stabile ID für Konditionen)
+- `inventory_id` (genau ein Sender)
+- `spot_length_seconds`
+- `distribution_ranges[]` (Beginn, exklusives Ende, Tagesgruppe)
+- `position_discounts[]`
+
+Legacy-Payloads mit `budget_wish_inventory_ids`, `budget_spot_length_seconds` und
+gemeinsamen `budget_distribution_ranges` werden beim Lesen normalisiert.
 
 Eingaben für den Proposal-Request:
 
 - `target_budget_nn`
-- `budget_wish_inventory_ids[]`
-- `budget_spot_length_seconds`
-- `budget_distribution_ranges[]` (nur Beginn, Ende, Tagesgruppe)
-- `budget_position_discounts_by_inventory[]`
+- `budget_elements[]`
 - `order_discounts[]`
 - `ae_enabled`
 
@@ -309,8 +328,9 @@ Nicht Teil der Eingabe: `total_spot_count`, `spot_count`, bestehende `positions`
 
 ### Strategie `equal_spot_count`
 
-- Alle Wunschsender erhalten **dieselbe** Gesamtspotanzahl `S`.
-- Optimierung in vollständigen Spotpaketen: `+1 Spot je Wunschsender`.
+- Alle Budget-Werbeelemente erhalten **dieselbe** Gesamtspotanzahl `S`.
+- Jedes Element besitzt eigene erlaubte Stunden-Buckets; Spots werden nur dort verteilt.
+- Optimierung in vollständigen Spotpaketen: `+1 Spot je Budget-Werbeelement`.
 - Binäre Suche auf maximales `S` mit `N/N(S) ≤ Zielbudget`.
 - Keine Bevorzugung günstiger Sender oder Stunden.
 
@@ -330,7 +350,8 @@ Zeitraumssummen → Positionsrabatte → Auftragssumme → Auftragsrabatte → A
 
 - Einstündige `calculation_position_time_ranges` je belegter Uhrstunde.
 - Keine proportionale Skalierung im Pfad `equal_spot_count`.
-- Status/Fingerprint für Aktualität (`current`, `stale`, `manual`).
+- Status `applied` nach Übernahme; `manual` nach manuellen Änderungen.
+- Verknüpfung über `appliedBudgetProposal` beim Laden; unübernommene Vorschläge über `latestBudgetProposal`.
 
 Legacy-Strategien `equal_budget` und `maximize_spots` bleiben für Bestandsvorschläge lesbar.
 
