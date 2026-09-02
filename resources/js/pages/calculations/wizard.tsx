@@ -15,7 +15,6 @@ import {
 } from '@/components/discount-list-editor';
 import {
     FormField,
-    formSelectClass,
     formTextareaClass,
     formatPercent,
     money,
@@ -23,9 +22,7 @@ import {
 } from '@/components/form-field';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
-    emptyDistributionRange,
     emptyTimeRange,
-    payloadDistributionRanges,
     type DistributionRangeDraft,
     formatHour,
     formatInclusiveEnd,
@@ -362,12 +359,6 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
     }
 
     return null;
-}
-
-function positionKey(position: PositionDraft, index: number): string {
-    return position.id
-        ? `id:${position.id}`
-        : position.client_key || `new:${index}`;
 }
 
 function draftDiscounts(

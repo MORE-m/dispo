@@ -62,7 +62,6 @@ export function BudgetElementsStep({
                 const inventory = inventories.find(
                     (item) => item.id === element.inventory_id,
                 );
-                const titleInventory = inventory?.name ?? 'Sender auswählen';
 
                 return (
                     <Card
