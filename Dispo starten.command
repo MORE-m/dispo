@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Doppelklick im Finder → Terminal öffnet sich und startet den Dispo-Dev-Server.
-# Legt bei jedem Start die Testbenutzer neu an (test@example.com / password).
+
+set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"

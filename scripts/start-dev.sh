@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lokaler Entwicklungsserver für Dispo (XAMPP/MySQL).
 # Nutzung: ./scripts/start-dev.sh
-# Bei „Server down“ oder leerer DB einfach erneut ausführen.
+# Erzwungener Neustart: DISPO_RESTART=1 ./scripts/start-dev.sh
 
 set -euo pipefail
 
@@ -11,6 +11,7 @@ cd "$ROOT"
 PORT="${DISPO_PORT:-8000}"
 HOST="${DISPO_HOST:-127.0.0.1}"
 MYSQL_BIN="${MYSQL_BIN:-/Applications/XAMPP/xamppfiles/bin/mysql}"
+readonly MAX_STOP_WAIT="${DISPO_STOP_WAIT:-10}"
 
 resolve_php_bin() {
     local candidate version_major version_minor
@@ -41,6 +42,90 @@ resolve_php_bin() {
     return 1
 }
 
+port_listener_pids() {
+    lsof -nP -iTCP:"${PORT}" -sTCP:LISTEN -t 2>/dev/null | sort -u
+}
+
+process_command() {
+    local pid="$1"
+    ps -p "$pid" -o command= 2>/dev/null | sed 's/^ *//'
+}
+
+process_cwd() {
+    local pid="$1"
+    lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | awk -F'/' '/^n/ { print substr($0, 2); exit }'
+}
+
+is_project_artisan_serve_pid() {
+    local pid="$1"
+    local cmd cwd
+
+    cmd="$(process_command "$pid")"
+    cwd="$(process_cwd "$pid")"
+
+    [[ "$cmd" == *"artisan serve"* ]] || return 1
+    [[ "$cwd" == "$ROOT" ]]
+}
+
+server_responds() {
+    curl -sf --max-time 2 "http://${HOST}:${PORT}/up" >/dev/null 2>&1
+}
+
+report_foreign_process() {
+    local pid="$1"
+    local cmd
+
+    cmd="$(process_command "$pid")"
+    cmd="${cmd:-unbekannt}"
+
+    echo "FEHLER: Port ${PORT} ist von einem fremden Prozess belegt (PID ${pid})."
+    echo "        Kommando: ${cmd}"
+    echo "        Bitte den Port manuell freigeben."
+    echo "        Ein erzwungener Neustart ist nur für den eigenen Dispo-Server möglich."
+    exit 1
+}
+
+stop_pid_gracefully() {
+    local pid="$1"
+    local waited=0
+
+    if ! kill -0 "$pid" 2>/dev/null; then
+        return 0
+    fi
+
+    kill -TERM "$pid" 2>/dev/null || return 1
+
+    while kill -0 "$pid" 2>/dev/null && [[ "$waited" -lt "$MAX_STOP_WAIT" ]]; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Prozess ${pid} reagiert nicht auf TERM – sende KILL …"
+        kill -KILL "$pid" 2>/dev/null || true
+        sleep 1
+    fi
+
+    ! kill -0 "$pid" 2>/dev/null
+}
+
+stop_project_listeners() {
+    local pid
+
+    while IFS= read -r pid; do
+        [[ -z "$pid" ]] && continue
+        if is_project_artisan_serve_pid "$pid"; then
+            echo "Beende Dispo-Server (PID ${pid}) …"
+            stop_pid_gracefully "$pid" || {
+                echo "FEHLER: Dispo-Server (PID ${pid}) konnte nicht beendet werden."
+                exit 1
+            }
+        else
+            report_foreign_process "$pid"
+        fi
+    done < <(port_listener_pids)
+}
+
 if ! PHP_BIN="$(resolve_php_bin)"; then
     echo "FEHLER: PHP >= 8.3 nicht gefunden (XAMPP liefert nur 8.2)."
     echo "        Homebrew: brew install php"
@@ -59,22 +144,34 @@ if [[ ! -f .env ]]; then
     exit 1
 fi
 
-server_responds() {
-    curl -sf --max-time 2 "http://${HOST}:${PORT}/up" >/dev/null 2>&1
-}
-
 SKIP_SERVE=0
-if lsof -ti ":${PORT}" >/dev/null 2>&1; then
-    if [[ "${DISPO_RESTART:-}" != "1" ]] && server_responds; then
-        echo "Dispo-Server läuft bereits auf http://${HOST}:${PORT}"
-        echo "Nur Setup (Migrationen, Testbenutzer) – Server bleibt unverändert."
-        echo
-        SKIP_SERVE=1
+EXISTING_PID=""
+
+if listener_pids="$(port_listener_pids)"; then
+    first_pid="$(printf '%s\n' "$listener_pids" | head -n 1)"
+
+    if is_project_artisan_serve_pid "$first_pid"; then
+        if [[ "${DISPO_RESTART:-}" == "1" ]]; then
+            echo "Neustart angefordert (DISPO_RESTART=1) …"
+            EXISTING_PID="$first_pid"
+            stop_project_listeners
+            EXISTING_PID=""
+        elif server_responds; then
+            EXISTING_PID="$first_pid"
+            SKIP_SERVE=1
+            echo "Dispo-Server läuft bereits auf http://${HOST}:${PORT} (PID ${EXISTING_PID})"
+            echo "Nur Setup (Migrationen, Testbenutzer) – Server bleibt unverändert."
+            echo
+        else
+            echo "FEHLER: Dispo-Prozess auf Port ${PORT} (PID ${first_pid}) antwortet nicht auf /up."
+            echo "        Für einen kontrollierten Neustart: DISPO_RESTART=1 ./scripts/start-dev.sh"
+            exit 1
+        fi
     else
-        echo "Beende Prozess auf Port ${PORT} …"
-        lsof -ti ":${PORT}" | xargs kill -9 2>/dev/null || true
-        sleep 1
+        report_foreign_process "$first_pid"
     fi
+elif [[ "${DISPO_RESTART:-}" == "1" ]]; then
+    echo "Hinweis: DISPO_RESTART=1 gesetzt, Port ${PORT} ist frei – starte neuen Server."
 fi
 
 DB_CONNECTION="$(grep -E '^DB_CONNECTION=' .env | cut -d= -f2- | tr -d '\r' || true)"
@@ -113,11 +210,32 @@ if [[ ! -d public/build ]] || [[ -z "$(ls -A public/build 2>/dev/null)" ]]; then
 fi
 
 if [[ "$SKIP_SERVE" == "1" ]]; then
+    current_pid="$(port_listener_pids | head -n 1 || true)"
+
+    if [[ -z "$current_pid" || "$current_pid" != "$EXISTING_PID" ]]; then
+        echo "FEHLER: Server-PID hat sich unerwartet geändert (war ${EXISTING_PID}, ist ${current_pid:-keine})."
+        exit 1
+    fi
+
+    if ! server_responds; then
+        echo "FEHLER: Server (PID ${EXISTING_PID}) antwortet nach Setup nicht mehr auf /up."
+        exit 1
+    fi
+
     echo
     echo "Fertig. Browser: http://${HOST}:${PORT}"
     echo "Login: test@example.com / password"
     echo "Server-Neustart erzwingen: DISPO_RESTART=1 ./scripts/start-dev.sh"
     exit 0
+fi
+
+if listener_pids="$(port_listener_pids)"; then
+    echo "FEHLER: Port ${PORT} ist noch belegt, obwohl kein Server gestartet werden sollte."
+    printf '%s\n' "$listener_pids" | while IFS= read -r pid; do
+        [[ -z "$pid" ]] && continue
+        echo "        PID ${pid}: $(process_command "$pid")"
+    done
+    exit 1
 fi
 
 echo

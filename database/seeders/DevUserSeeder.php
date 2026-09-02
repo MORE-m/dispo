@@ -13,6 +13,10 @@ class DevUserSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            return;
+        }
+
         foreach ([
             ['email' => 'test@example.com', 'name' => 'Test Benutzer', 'role' => Role::Sales],
             ['email' => 'sales@example.com', 'name' => 'E2E Vertrieb', 'role' => Role::Sales],
