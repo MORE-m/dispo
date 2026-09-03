@@ -3,8 +3,10 @@
 namespace App\Providers;
 
 use App\Models\Calculation;
+use App\Models\DispoOrder;
 use App\Models\User;
 use App\Policies\CalculationPolicy;
+use App\Policies\DispoOrderPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -63,5 +65,6 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::policy(Calculation::class, CalculationPolicy::class);
+        Gate::policy(DispoOrder::class, DispoOrderPolicy::class);
     }
 }

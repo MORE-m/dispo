@@ -160,6 +160,12 @@ synchronisiert. Die tatsächliche Spotlänge ist Teil des Positionssnapshots.
 Ein Dispoauftrag ohne Kundenkalkulation bzw. direkt aus einem Standardangebot
 ist unzulässig.
 
+**Implementiert (September 2026, Entwurf):** Tabellen `dispo_orders`,
+`dispo_order_positions`, `dispo_order_number_sequences`. Positionsdaten werden
+beim Anlegen als Snapshot in `dispo_order_positions` persistiert (JSON für
+Planzeilen, Zeiträume, Rabatte). Status-Enum kennt alle elf fachlichen Werte;
+erreichbar ist derzeit nur `Entwurf`.
+
 Zusätzlich:
 
 - sichtbare Nummer und laufende Nummer innerhalb der Kalkulation,

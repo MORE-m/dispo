@@ -1,24 +1,38 @@
 # Fortschritt V1
 
-Stand: 31. August 2026 (Preiszeiträume, gestaffelte Rabatte, AE-Checkbox)
+Stand: 2. September 2026 (Dispoauftrag-Entwurf aus Kalkulation)
 
 ## Aktuelle Phase
 
-Phase 0 und UX-GATE-A/B bleiben abgenommen. Branch `feat/spot-time-ranges-discounts`
-setzt den nächsten fachlichen Slice auf aktuellem `main` (PR #8 gemergt) um.
+Phase 8 (Dispoauftrag) – **Teilslice umgesetzt:** Entwurf aus Kalkulation mit
+Snapshot, Nummerierung, Liste/Detail, Berechtigungen und Tests. UX-GATE-D ist
+**nur für diesen Teilbereich** freigegeben; Freigabe- und Dispo-Workflow
+bleiben offen.
+
+Ausgangsbasis für den Slice: `main` @ `e6238c8`.
 
 ## Aktuelle Aufgabe
 
-Preiszeiträume, Spotverteilung, flexible Rabatte und AE-Checkbox sind auf
-`feat/spot-time-ranges-discounts` umgesetzt. Noch kein PR, kein Merge nach `main`.
-
-Lokale Prüfung: Pint, PHPStan, TypeScript, `npm run check`, Pest 122 passed /
-4 skipped, Playwright 7/7. Frische SQLite-Migration inkl. neuer Tabellen erfolgreich.
-MySQL-Suite lokal nicht ausgeführt (Port 3306 Connection refused).
+Branch `feat/dispo-order-draft-from-calculation`: Dispoauftrag im Status
+`Entwurf` aus gespeicherter Kalkulation anlegen (PR ausstehend).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-UX-GATE-A/B Visual Alignment (PR #8, Commit `7edd8fb` in `main`).
+Budgetplanung mit automatischer Spotverteilung (PR #10) und gehärteter
+Dev-Server-Start (PR #11) auf `main` (`e6238c8`).
+
+## Dispoauftrag-Entwurf (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Dispoauftrag aus Kalkulation (`DSP-001`, `DSP-003`, `DSP-004`) | umgesetzt |
+| Positionsauswahl inkl. „bereits übernommen“ | umgesetzt |
+| Snapshot-Isolation (Kalkulation/Stammdaten) | umgesetzt + getestet |
+| Nummernformat `DA-YYYY-NNNNNN-SS` (`TEC-001`, `TEC-002`) | umgesetzt |
+| Rollen: Anlegen Admin/Vertrieb/GF; Lesen + Disposition | umgesetzt |
+| Audit `dispo_order.created` | umgesetzt |
+| UX-GATE-D gesamt | **nicht** abgeschlossen – nur Entwurfsteil freigegeben |
+| Statusworkflow, Freigaben, Material, Kommentare | bewusst offen |
 
 ## Technische Abnahme UX-GATE-A/B
 
