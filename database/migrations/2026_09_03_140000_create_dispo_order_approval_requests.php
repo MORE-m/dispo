@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -27,7 +28,7 @@ return new class extends Migration
             $table->json('special_approval_reasons')->nullable();
             $table->foreignId('submitted_by_id')->constrained('users')->restrictOnDelete();
             $table->string('submitted_by_name');
-            $table->timestamp('submitted_at');
+            $table->timestamp('submitted_at')->useCurrent();
             $table->foreignId('decided_by_id')->nullable()->constrained('users')->restrictOnDelete();
             $table->string('decided_by_name')->nullable();
             $table->timestamp('decided_at')->nullable();
@@ -42,6 +43,14 @@ return new class extends Migration
             $table->index('status');
             $table->index('submitted_at');
         });
+
+        if (in_array(Schema::getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            // Verhindert ON UPDATE CURRENT_TIMESTAMP auf der ersten TIMESTAMP-Spalte.
+            DB::statement(
+                'ALTER TABLE dispo_order_approval_requests
+                 MODIFY submitted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP'
+            );
+        }
     }
 
     public function down(): void

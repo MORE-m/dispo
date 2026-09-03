@@ -3,6 +3,7 @@ import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { EmptyState, SuccessState } from '@/components/feedback/states';
 import { money } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
+import { formatDateTime } from '@/lib/date-time';
 
 type OrderRow = {
     id: number;
@@ -23,17 +24,6 @@ type OrderRow = {
     created_at: string | null;
     submitted_at: string | null;
 };
-
-function formatDate(iso: string | null): string {
-    if (!iso) {
-        return '–';
-    }
-
-    return new Intl.DateTimeFormat('de-DE', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(iso));
-}
 
 export default function DispoOrdersIndex({ orders }: { orders: OrderRow[] }) {
     const flash = usePage().props.flash;
@@ -157,10 +147,10 @@ export default function DispoOrdersIndex({ orders }: { orders: OrderRow[] }) {
                                             {row.creator_name ?? '–'}
                                         </td>
                                         <td className="px-4 py-2">
-                                            {formatDate(row.submitted_at)}
+                                            {formatDateTime(row.submitted_at)}
                                         </td>
                                         <td className="px-4 py-2">
-                                            {formatDate(row.created_at)}
+                                            {formatDateTime(row.created_at)}
                                         </td>
                                     </tr>
                                 ))}

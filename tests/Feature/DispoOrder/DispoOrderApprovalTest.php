@@ -12,6 +12,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
@@ -240,6 +241,35 @@ class DispoOrderApprovalTest extends TestCase
             'lock_version' => $order->lock_version,
             'reason' => 'selbst',
         ])->assertForbidden();
+    }
+
+    public function test_submitted_at_is_preserved_when_deciding(): void
+    {
+        ['order' => $order, 'creator' => $creator] = $this->draftOrder();
+        $other = User::factory()->role(Role::Sales)->create();
+
+        $this->travelTo(CarbonImmutable::parse('2026-09-03 19:17:00', 'UTC'));
+
+        $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+
+        $request = $order->fresh()->pendingApprovalRequest;
+        $this->assertNotNull($request);
+        $submittedAt = $request->submitted_at->toIso8601String();
+
+        $this->travelTo(CarbonImmutable::parse('2026-09-03 19:20:00', 'UTC'));
+
+        $this->actingAs($other)->postJson(route('dispo-orders.approve', $order->fresh()), [
+            'lock_version' => $order->fresh()->lock_version,
+        ])->assertOk();
+
+        $request->refresh();
+        $this->assertSame($submittedAt, $request->submitted_at->toIso8601String());
+        $this->assertTrue($request->decided_at->greaterThan($request->submitted_at));
+        $this->assertTrue(
+            $request->submitted_at->diffInMinutes($request->decided_at) < 10,
+        );
     }
 
     public function test_rejection_requires_reason(): void

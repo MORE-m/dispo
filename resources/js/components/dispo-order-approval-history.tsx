@@ -1,17 +1,7 @@
 import { SpecialApprovalReasonsList } from '@/components/special-approval-reasons-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDateTime } from '@/lib/date-time';
 import type { ApprovalHistoryEntry } from '@/types/dispo-order';
-
-function formatDate(iso: string | null): string {
-    if (!iso) {
-        return '–';
-    }
-
-    return new Intl.DateTimeFormat('de-DE', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    }).format(new Date(iso));
-}
 
 export function DispoOrderApprovalHistory({
     entries,
@@ -44,12 +34,16 @@ export function DispoOrderApprovalHistory({
                         </p>
                         <p className="text-muted-foreground mt-1 text-sm">
                             Eingereicht von {entry.submitted_by_name} am{' '}
-                            {formatDate(entry.submitted_at)}
+                            <span data-test="approval-submitted-at">
+                                {formatDateTime(entry.submitted_at)}
+                            </span>
                         </p>
                         {entry.decided_by_name ? (
                             <p className="text-muted-foreground mt-1 text-sm">
                                 Entschieden von {entry.decided_by_name} am{' '}
-                                {formatDate(entry.decided_at)}
+                                <span data-test="approval-decided-at">
+                                    {formatDateTime(entry.decided_at)}
+                                </span>
                             </p>
                         ) : null}
                         <SpecialApprovalReasonsList

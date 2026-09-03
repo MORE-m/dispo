@@ -40,5 +40,11 @@ describe('DispoOrderApprovalHistory', () => {
         expect(screen.getByTestId('approval-rejection-reason')).toHaveTextContent(
             'Rabatt nicht tragbar',
         );
+        expect(screen.getByTestId('approval-submitted-at')).toHaveTextContent(
+            '03.09.2026, 10:00',
+        );
+        expect(screen.getByTestId('approval-decided-at')).toHaveTextContent(
+            '03.09.2026, 11:00',
+        );
     });
 });

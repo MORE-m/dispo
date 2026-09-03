@@ -10,6 +10,7 @@ import PageHeader from '@/components/heading-page';
 import { SpecialApprovalReasonsList } from '@/components/special-approval-reasons-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import { formatDateTime } from '@/lib/date-time';
 import type {
     ApprovalHistoryEntry,
     DispoOrderRevisionLink,
@@ -92,17 +93,6 @@ type OrderDetail = {
     current_approval: ApprovalHistoryEntry | null;
     positions: OrderPosition[];
 };
-
-function formatDate(iso: string | null): string {
-    if (!iso) {
-        return '–';
-    }
-
-    return new Intl.DateTimeFormat('de-DE', {
-        dateStyle: 'long',
-        timeStyle: 'short',
-    }).format(new Date(iso));
-}
 
 export default function DispoOrderShow({
     order,
@@ -215,7 +205,7 @@ export default function DispoOrderShow({
                             </p>
                             <p className="text-muted-foreground">
                                 Eingereicht von {current.submitted_by_name} am{' '}
-                                {formatDate(current.submitted_at)}
+                                {formatDateTime(current.submitted_at)}
                             </p>
                             <p className="text-muted-foreground">
                                 Vier-Augen-Prinzip: Der Ersteller darf nicht
@@ -284,7 +274,7 @@ export default function DispoOrderShow({
                         <Detail label="Ersteller" value={order.creator_name} />
                         <Detail
                             label="Erstellt am"
-                            value={formatDate(order.created_at)}
+                            value={formatDateTime(order.created_at)}
                         />
                         <Detail
                             label="Freigabeart"
