@@ -4,7 +4,7 @@ namespace App\Services\DispoOrder;
 
 use App\Models\Calculation;
 use App\Models\DispoOrder;
-use App\Models\DispoOrderNumberSequence;
+use App\Support\DocumentNumber;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -27,10 +27,11 @@ final class DispoOrderNumberSequencer
      */
     private function allocate(Calculation $calculation): array
     {
-        Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
+        /** @var Calculation $locked */
+        $locked = Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
 
         $family = DispoOrder::query()
-            ->where('calculation_id', $calculation->id)
+            ->where('calculation_id', $locked->id)
             ->orderBy('id')
             ->lockForUpdate()
             ->first();
@@ -39,43 +40,19 @@ final class DispoOrderNumberSequencer
             $year = (int) $family->number_year;
             $orgSeq = (int) $family->number_org_seq;
             $calcSeq = (int) (DispoOrder::query()
-                ->where('calculation_id', $calculation->id)
+                ->where('calculation_id', $locked->id)
                 ->max('number_calc_seq') ?? 0) + 1;
+            $pad = DocumentNumber::sequencePadFromDispoNumber($family->number);
 
-            return [$year, $orgSeq, $calcSeq, $this->format($year, $orgSeq, $calcSeq)];
+            return [$year, $orgSeq, $calcSeq, DocumentNumber::dispoOrder($year, $orgSeq, $calcSeq, $pad)];
         }
 
-        $year = (int) now('Europe/Berlin')->format('Y');
-
-        DB::table('dispo_order_number_sequences')->insertOrIgnore([
-            'year' => $year,
-            'last_seq' => 0,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        /** @var DispoOrderNumberSequence|null $sequence */
-        $sequence = DispoOrderNumberSequence::query()
-            ->where('year', $year)
-            ->lockForUpdate()
-            ->first();
-
-        if ($sequence === null) {
-            throw new \RuntimeException("Dispo-Jahressequenz {$year} konnte nicht gesperrt werden.");
-        }
-
-        $orgSeq = $sequence->last_seq + 1;
-        $sequence->last_seq = $orgSeq;
-        $sequence->save();
-
+        // Neue Familie: Stamm direkt aus der Kalkulationsnummer (kein Verbrauch der Legacy-Jahressequenz).
+        $year = (int) $locked->number_year;
+        $orgSeq = (int) $locked->number_seq;
         $calcSeq = 1;
 
-        return [$year, $orgSeq, $calcSeq, $this->format($year, $orgSeq, $calcSeq)];
-    }
-
-    private function format(int $year, int $orgSeq, int $calcSeq): string
-    {
-        return sprintf('DA-%d-%06d-%02d', $year, $orgSeq, $calcSeq);
+        return [$year, $orgSeq, $calcSeq, DocumentNumber::dispoOrder($year, $orgSeq, $calcSeq)];
     }
 
     public function isRetryable(QueryException $exception): bool

@@ -226,7 +226,7 @@ class DispoOrderRevisionTest extends TestCase
         $this->assertSame($order->number_org_seq, $revision->number_org_seq);
         $this->assertSame(2, $revision->number_calc_seq);
         $this->assertSame(
-            sprintf('DA-%d-%06d-02', $order->number_year, $order->number_org_seq),
+            preg_replace('/-\d{2}$/', '-02', $order->number),
             $revision->number,
         );
         $this->assertSame('Korrektur AG', $revision->customer_name);

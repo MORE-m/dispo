@@ -1,27 +1,35 @@
 # Fortschritt V1
 
-Stand: 3. September 2026 (Vier-Augen-Freigabe + Nachbesserung + Nummernfamilie)
+Stand: 3. September 2026 (Dispo-Nummer aus Kalkulationsnummer)
 
 ## Aktuelle Phase
 
 Phase 8 (Dispoauftrag) – **Teilslice umgesetzt:** Entwurf aus Kalkulation,
-Vier-Augen-Freigabe sowie Nachbesserung abgelehnter Aufträge über einen neuen,
-verknüpften Entwurf. Nummernformat `DA-JJJJ-NNNNNN-SS`: Stammnummer einmal pro
-Kalkulationsfamilie, Suffix nur bei weiteren Teilaufträgen/Korrekturen.
+Vier-Augen-Freigabe, Nachbesserung sowie Nummernableitung
+`K-JJJJ-NNNNN` → `DA-JJJJ-NNNNN-SS` (Legacy-Familien behalten Stamm).
 Nach erfolgreicher Genehmigung steht der Status **„Liegt bei Disposition“**.
 UX-GATE-D bleibt **nicht** vollständig abgeschlossen (operative Disposition,
 Material, Kommentare, weitere Status weiterhin offen).
 
-Ausgangsbasis für den Freigabe-Slice: `main` @ `6aa2563`.
-
 ## Aktuelle Aufgabe
 
-Branch `feat/dispo-order-approval` / PR #13: Vier-Augen-Freigabe und Nacharbeit
-(Listen-Cache, Nachbesserung).
+Branch `feat/dispo-number-from-calculation`: direkte K→DA-Stammableitung.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Dispoauftrag-Entwurf aus Kalkulation (PR #12) auf `main` (`6aa2563`).
+Vier-Augen-Freigabe und Nacharbeit (PR #13) auf `main` (`b9c1313`).
+
+## Nummernableitung K→DA (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Neue Familie: Stamm aus `calculation.number_year` / `number_seq` | umgesetzt |
+| Padding wie Kalkulation (`NNNNN`, nicht `NNNNNN`) | umgesetzt |
+| Folgeaufträge / Nachbesserung: nur Suffix | umgesetzt |
+| Legacy-Familien behalten Stamm inkl. Padding | umgesetzt |
+| Keine Umnummerierung historischer Nummern | umgesetzt |
+| `dispo_order_number_sequences` nur noch Legacy | umgesetzt |
+| MySQL-Concurrency | umgesetzt |
 
 ## Vier-Augen-Freigabe (September 2026)
 

@@ -249,10 +249,19 @@ class CreateDispoOrderFromCalculationTest extends TestCase
         $this->assertSame(1, $orders->pluck('number_org_seq')->unique()->count());
         $this->assertSame([1, 2, 3], $orders->pluck('number_calc_seq')->all());
 
-        $stem = sprintf('DA-%d-%06d', $orders[0]->number_year, $orders[0]->number_org_seq);
-        $this->assertSame("{$stem}-01", $orders[0]->number);
-        $this->assertSame("{$stem}-02", $orders[1]->number);
-        $this->assertSame("{$stem}-03", $orders[2]->number);
+        $this->assertSame($calculation->number_seq, $orders[0]->number_org_seq);
+        $this->assertSame(
+            'DA-'.substr($calculation->number, 2).'-01',
+            $orders[0]->number,
+        );
+        $this->assertSame(
+            'DA-'.substr($calculation->number, 2).'-02',
+            $orders[1]->number,
+        );
+        $this->assertSame(
+            'DA-'.substr($calculation->number, 2).'-03',
+            $orders[2]->number,
+        );
     }
 
     public function test_adopted_positions_are_reported(): void
@@ -286,8 +295,11 @@ class CreateDispoOrderFromCalculationTest extends TestCase
         ]);
 
         $order = DispoOrder::query()->firstOrFail();
-        $this->assertMatchesRegularExpression('/^DA-\d{4}-\d{6}-\d{2}$/', $order->number);
-        $this->assertSame(sprintf('DA-%d-%06d-%02d', $year, 1, 1), $order->number);
+        $this->assertMatchesRegularExpression('/^DA-\d{4}-\d{5}-\d{2}$/', $order->number);
+        $this->assertSame('DA-'.substr($calculation->number, 2).'-01', $order->number);
+        $this->assertSame($calculation->number_year, $order->number_year);
+        $this->assertSame($calculation->number_seq, $order->number_org_seq);
+        $this->assertSame($year, $order->number_year);
     }
 
     public function test_audit_event_is_written(): void

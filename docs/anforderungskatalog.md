@@ -687,7 +687,7 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 
 **DSP-003** Ein erstellter Dispoauftrag ist ein unabhängiger Snapshot. Spätere Änderungen an der Kalkulation synchronisieren ihn nicht.
 
-**DSP-004** Die Auftragsnummer wird automatisch gebildet, z. B. DA-2026-000123-01. Die Stammnummer (`JJJJ-NNNNNN`) wird einmal pro Kalkulation beziehungsweise Dispoauftragsfamilie vergeben; die Endung kennzeichnet die laufende Nummer innerhalb dieser Familie.
+**DSP-004** Die Auftragsnummer wird automatisch gebildet. Bei einer neuen Dispoauftragsfamilie entsprechen Jahr und Stammsequenz der zugehörigen Kalkulationsnummer, z. B. `K-2026-00005` → `DA-2026-00005-01`. Weitere Teilaufträge und Korrekturen erhöhen ausschließlich den zweistelligen Suffix. Bereits vergebene Dispoauftragsnummern bleiben unverändert; bestehende Familien behalten ihren bisherigen Stamm.
 
 ## 16.2 Aufbau
 
@@ -1009,7 +1009,7 @@ E-Mail und In-App-Benachrichtigungen werden ausgelöst bei: Freigabe angefordert
 
 **TEC-001** Kalkulation, Standardangebot und Dispoauftrag besitzen interne unveränderbare IDs sowie lesbare fortlaufende Nummern. Nummern werden transaktionssicher und ohne Dubletten vergeben.
 
-**TEC-002** Eine Dispoauftragsnummer besteht mindestens aus Präfix, Jahr, organisationsweiter Sequenz und laufender Nummer innerhalb der Kalkulation, z. B. DA-2026-000123-01. Die Stammnummer wird einmal pro Familie vergeben; weitere Teilaufträge und Korrekturen erhöhen ausschließlich den Suffix.
+**TEC-002** Eine Dispoauftragsnummer besteht mindestens aus Präfix, Jahr, Stammsequenz und laufender Nummer innerhalb der Kalkulation. Bei neuen Familien entsprechen Jahr und Stammsequenz der Kalkulationsnummer, z. B. `K-2026-00005` → `DA-2026-00005-01`. Weitere Teilaufträge und Korrekturen erhöhen ausschließlich den Suffix. Legacy-Familien behalten ihren bisherigen Stamm.
 
 # 24. Nichtfunktionale Anforderungen
 

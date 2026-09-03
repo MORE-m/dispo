@@ -171,12 +171,14 @@ Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und
 Selbstreferenz `revises_dispo_order_id` verknüpft einen Korrektur-Entwurf mit
 genau einem abgelehnten Vorgänger (höchstens ein direkter Nachfolger).
 
-**Nummernformat** `DA-JJJJ-NNNNNN-SS`: Die Stammnummer (`JJJJ-NNNNNN`) wird einmal
-pro Kalkulation beziehungsweise Dispoauftragsfamilie vergeben. Weitere Teilaufträge
-und Korrekturen erhöhen ausschließlich den zweistelligen Suffix (`SS`). Die
-Jahressequenz wird nur bei erstmaliger Familienbildung erhöht. Bereits gespeicherte
-Nummern werden nicht umnummeriert; künftige Aufträge einer Kalkulation übernehmen
-die Stammnummer ihres frühesten Dispoauftrags.
+**Nummernformat** neue Familien `DA-JJJJ-NNNNN-SS`: Jahr und Stammsequenz entsprechen
+der zugehörigen Kalkulationsnummer (`K-JJJJ-NNNNN` → `DA-JJJJ-NNNNN-01`). Weitere
+Teilaufträge und Korrekturen erhöhen ausschließlich den zweistelligen Suffix.
+Bereits vergebene Dispoauftragsnummern bleiben unverändert; bestehende
+Legacy-Familien behalten ihren bisherigen Stamm (historisch oft sechsstellige
+Sequenz) und zählen nur den Suffix weiter. Die Tabelle
+`dispo_order_number_sequences` bleibt für Legacy-Kompatibilität bestehen, wird
+für neue Familien aber nicht mehr verbraucht.
 
 Erreichbare Status in diesem Slice:
 
