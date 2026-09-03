@@ -9,8 +9,20 @@ const mockJsonPost = vi.fn();
 vi.mock('@inertiajs/react', () => ({
     router: {
         visit: (...args: unknown[]) => mockVisit(...args),
+        flushByCacheTags: vi.fn(),
+        flush: vi.fn(),
     },
 }));
+
+vi.mock('@/lib/dispo-order-inertia-cache', async (importOriginal) => {
+    const actual =
+        await importOriginal<typeof import('@/lib/dispo-order-inertia-cache')>();
+
+    return {
+        ...actual,
+        flushDispoOrderInertiaCache: vi.fn(),
+    };
+});
 
 vi.mock('@/lib/json-post', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/lib/json-post')>();
@@ -118,7 +130,9 @@ describe('DispoOrderApprovalActions', () => {
                 { lock_version: 3 },
             );
         });
-        expect(mockVisit).toHaveBeenCalledWith('/dispoauftraege/1');
+        expect(mockVisit).toHaveBeenCalledWith('/dispoauftraege/1', {
+            invalidateCacheTags: 'dispo-orders',
+        });
     });
 
     it('shows conflict message on reject', async () => {

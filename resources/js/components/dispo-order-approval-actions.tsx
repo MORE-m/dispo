@@ -12,6 +12,10 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import {
+    DISPO_ORDERS_CACHE_TAG,
+    flushDispoOrderInertiaCache,
+} from '@/lib/dispo-order-inertia-cache';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { firstValidationMessage } from '@/lib/validation-errors';
 
@@ -68,7 +72,10 @@ export function DispoOrderApprovalActions({
                 ...body,
             });
             onSuccessClose();
-            router.visit(result.redirect);
+            flushDispoOrderInertiaCache(orderId);
+            router.visit(result.redirect, {
+                invalidateCacheTags: DISPO_ORDERS_CACHE_TAG,
+            });
         } catch (caught) {
             if (caught instanceof JsonPostError) {
                 setError(
@@ -254,9 +261,10 @@ export function DispoOrderApprovalActions({
                     <DialogHeader>
                         <DialogTitle>Dispoauftrag ablehnen</DialogTitle>
                         <DialogDescription>
-                            Eine Ablehnung ist endgültig. Der Auftrag bleibt als
-                            unveränderbarer Snapshot im Status „Freigabe
-                            abgelehnt“.
+                            Eine Ablehnung betrifft diesen Snapshot endgültig.
+                            Der Auftrag bleibt unveränderbar im Status „Freigabe
+                            abgelehnt“. Eine Korrektur erfolgt über eine neue
+                            Nachbesserung der Kalkulation.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2">

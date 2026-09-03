@@ -46,6 +46,88 @@ async function submitForApproval(page: Page) {
     );
 }
 
+async function openDispoOrdersViaSidebar(page: Page) {
+    await page
+        .locator('[data-sidebar="menu"]')
+        .getByRole('link', { name: 'Dispoaufträge' })
+        .click();
+    await expect(page).toHaveURL(/\/dispoauftraege\/?$/);
+}
+
+async function expectRowStatus(page: Page, orderId: string, label: string) {
+    await expect(
+        page.locator(`[data-test="dispo-order-row-${orderId}"]`),
+    ).toContainText(label, { timeout: 15_000 });
+}
+
+test('Liste zeigt nach Einreichen aktuellen Status ohne Reload', async ({ page }) => {
+    test.setTimeout(180_000);
+    await login(page, 'sales@example.com');
+    await page.goto('/dispoauftraege');
+    await expect(page.locator('[data-test="dispo-orders-table"], [data-test="dispo-orders-empty"]')).toBeVisible();
+
+    await createDraftDispoOrder(page);
+    const orderId = page.url().match(/dispoauftraege\/(\d+)/)?.[1];
+    expect(orderId).toBeTruthy();
+
+    await submitForApproval(page);
+    await openDispoOrdersViaSidebar(page);
+    await expectRowStatus(page, orderId!, 'Wartet auf Vertriebsfreigabe');
+});
+
+test('Liste zeigt nach Genehmigen aktuellen Status ohne Reload', async ({ page }) => {
+    test.setTimeout(180_000);
+    await login(page, 'sales@example.com');
+    await createDraftDispoOrder(page);
+    await submitForApproval(page);
+    const detailUrl = page.url();
+    const orderId = detailUrl.match(/dispoauftraege\/(\d+)/)?.[1];
+    expect(orderId).toBeTruthy();
+
+    await page.context().clearCookies();
+    await login(page, 'sales-b@example.com');
+    await page.goto('/dispoauftraege');
+    await expect(page.locator(`[data-test="dispo-order-row-${orderId}"]`)).toBeVisible();
+    await page.goto(detailUrl);
+    await page.locator('[data-test="dispo-order-approve-open"]').click();
+    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
+        'Liegt bei Disposition',
+        { timeout: 15_000 },
+    );
+
+    await openDispoOrdersViaSidebar(page);
+    await expectRowStatus(page, orderId!, 'Liegt bei Disposition');
+});
+
+test('Liste zeigt nach Ablehnen aktuellen Status ohne Reload', async ({ page }) => {
+    test.setTimeout(180_000);
+    await login(page, 'sales@example.com');
+    await createDraftDispoOrder(page);
+    await submitForApproval(page);
+    const detailUrl = page.url();
+    const orderId = detailUrl.match(/dispoauftraege\/(\d+)/)?.[1];
+    expect(orderId).toBeTruthy();
+
+    await page.context().clearCookies();
+    await login(page, 'sales-b@example.com');
+    await page.goto('/dispoauftraege');
+    await expect(page.locator(`[data-test="dispo-order-row-${orderId}"]`)).toBeVisible();
+    await page.goto(detailUrl);
+    await page.locator('[data-test="dispo-order-reject-open"]').click();
+    await page.locator('[data-test="dispo-order-reject-reason"]').fill(
+        'Konditionen nicht freigabefähig',
+    );
+    await page.locator('[data-test="dispo-order-reject-confirm"]').click();
+    await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
+        'Freigabe abgelehnt',
+        { timeout: 15_000 },
+    );
+
+    await openDispoOrdersViaSidebar(page);
+    await expectRowStatus(page, orderId!, 'Freigabe abgelehnt');
+});
+
 test('Reguläre Freigabe mit Vier-Augen-Prinzip', async ({ page }) => {
     test.setTimeout(180_000);
     await login(page, 'sales@example.com');
