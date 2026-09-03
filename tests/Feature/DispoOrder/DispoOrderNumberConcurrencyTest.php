@@ -42,6 +42,7 @@ class DispoOrderNumberConcurrencyTest extends TestCase
         $this->runParallelWorkers(
             (string) $calculation->id,
             (string) $positions[0]->id,
+            (string) $calculation->id,
             (string) $positions[1]->id,
         );
 
