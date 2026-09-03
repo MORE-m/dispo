@@ -23,7 +23,10 @@ return new class extends Migration
     {
         Schema::table('dispo_orders', function (Blueprint $table) {
             $table->dropIndex(['number_year', 'number_org_seq']);
-            $table->unique(['number_year', 'number_org_seq']);
         });
+
+        // Unique auf (number_year, number_org_seq) wird bewusst nicht wieder
+        // hergestellt: Familien teilen die Stammnummer; ein Restore würde bei
+        // vorhandenem Suffix > 1 und bei DatabaseMigrations-Teardown scheitern.
     }
 };
