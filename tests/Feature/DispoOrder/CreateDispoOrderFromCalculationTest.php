@@ -236,10 +236,23 @@ class CreateDispoOrderFromCalculationTest extends TestCase
         $this->actingAs($user)->post(route('dispo-orders.store', $calculation), [
             'position_ids' => [$positionId],
         ]);
+        $this->actingAs($user)->post(route('dispo-orders.store', $calculation), [
+            'position_ids' => [$positionId],
+        ]);
 
-        $this->assertSame(2, DispoOrder::query()->where('calculation_id', $calculation->id)->count());
-        $this->assertSame(1, DispoOrder::query()->where('number_calc_seq', 1)->count());
-        $this->assertSame(1, DispoOrder::query()->where('number_calc_seq', 2)->count());
+        $orders = DispoOrder::query()
+            ->where('calculation_id', $calculation->id)
+            ->orderBy('number_calc_seq')
+            ->get();
+
+        $this->assertCount(3, $orders);
+        $this->assertSame(1, $orders->pluck('number_org_seq')->unique()->count());
+        $this->assertSame([1, 2, 3], $orders->pluck('number_calc_seq')->all());
+
+        $stem = sprintf('DA-%d-%06d', $orders[0]->number_year, $orders[0]->number_org_seq);
+        $this->assertSame("{$stem}-01", $orders[0]->number);
+        $this->assertSame("{$stem}-02", $orders[1]->number);
+        $this->assertSame("{$stem}-03", $orders[2]->number);
     }
 
     public function test_adopted_positions_are_reported(): void

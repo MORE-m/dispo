@@ -222,7 +222,13 @@ class DispoOrderRevisionTest extends TestCase
         $this->assertSame(DispoOrderStatus::Draft, $revision->status);
         $this->assertSame(DispoOrderStatus::ApprovalRejected, $order->fresh()->status);
         $this->assertNotSame($oldNumber, $revision->number);
+        $this->assertSame($order->number_year, $revision->number_year);
+        $this->assertSame($order->number_org_seq, $revision->number_org_seq);
         $this->assertSame(2, $revision->number_calc_seq);
+        $this->assertSame(
+            sprintf('DA-%d-%06d-02', $order->number_year, $order->number_org_seq),
+            $revision->number,
+        );
         $this->assertSame('Korrektur AG', $revision->customer_name);
         $this->assertNotSame($oldNn, (string) $revision->nn_invest);
         $this->assertSame($order->id, $revision->revises_dispo_order_id);

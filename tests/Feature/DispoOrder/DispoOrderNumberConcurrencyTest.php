@@ -50,6 +50,10 @@ class DispoOrderNumberConcurrencyTest extends TestCase
         $this->assertCount(2, $orders);
         $this->assertSame(2, $orders->pluck('number')->unique()->count());
         $this->assertSame([1, 2], $orders->pluck('number_calc_seq')->sort()->values()->all());
+        $this->assertSame(1, $orders->pluck('number_org_seq')->unique()->count());
+        $this->assertTrue(
+            $orders->every(fn (DispoOrder $order): bool => $order->number_org_seq === $orders->first()->number_org_seq),
+        );
 
         foreach ($orders as $order) {
             $this->assertMatchesRegularExpression('/^DA-\d{4}-\d{6}-\d{2}$/', $order->number);
@@ -57,7 +61,50 @@ class DispoOrderNumberConcurrencyTest extends TestCase
             $this->assertSame(DispoOrderPosition::class, $order->positions()->first()::class);
         }
 
-        $this->assertSame(2, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+        $this->assertSame(1, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+    }
+
+    public function test_parallel_follow_up_orders_reuse_stem_and_increment_suffix_only(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('Paralleler Dispo-Writer-Test erfordert MySQL (GitHub-Job mysql).');
+        }
+
+        $year = (int) now('Europe/Berlin')->format('Y');
+        DispoOrderNumberSequence::query()->where('year', $year)->delete();
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+            ['inventory_id' => $catalog['rock']->id, 'total_spot_count' => 3, 'hour' => 10],
+        ], $user);
+        $calculation->load('positions');
+        $positions = $calculation->positions->values();
+
+        $this->actingAs($user)->post(route('dispo-orders.store', $calculation), [
+            'position_ids' => [$positions[0]->id],
+        ])->assertRedirect();
+
+        $first = DispoOrder::query()->where('calculation_id', $calculation->id)->firstOrFail();
+        $stem = $first->number_org_seq;
+
+        $this->runParallelWorkers(
+            (string) $calculation->id,
+            (string) $positions[0]->id,
+            (string) $calculation->id,
+            (string) $positions[1]->id,
+        );
+
+        $orders = DispoOrder::query()
+            ->where('calculation_id', $calculation->id)
+            ->orderBy('number_calc_seq')
+            ->get();
+
+        $this->assertCount(3, $orders);
+        $this->assertSame([$stem, $stem, $stem], $orders->pluck('number_org_seq')->all());
+        $this->assertSame([1, 2, 3], $orders->pluck('number_calc_seq')->all());
+        $this->assertSame(1, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
     }
 
     public function test_parallel_workers_from_different_calculations_receive_unique_org_sequences(): void

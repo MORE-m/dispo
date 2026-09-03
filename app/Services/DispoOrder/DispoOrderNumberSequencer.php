@@ -29,6 +29,22 @@ final class DispoOrderNumberSequencer
     {
         Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
 
+        $family = DispoOrder::query()
+            ->where('calculation_id', $calculation->id)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first();
+
+        if ($family !== null) {
+            $year = (int) $family->number_year;
+            $orgSeq = (int) $family->number_org_seq;
+            $calcSeq = (int) (DispoOrder::query()
+                ->where('calculation_id', $calculation->id)
+                ->max('number_calc_seq') ?? 0) + 1;
+
+            return [$year, $orgSeq, $calcSeq, $this->format($year, $orgSeq, $calcSeq)];
+        }
+
         $year = (int) now('Europe/Berlin')->format('Y');
 
         DB::table('dispo_order_number_sequences')->insertOrIgnore([
@@ -52,14 +68,14 @@ final class DispoOrderNumberSequencer
         $sequence->last_seq = $orgSeq;
         $sequence->save();
 
-        $calcSeq = (int) (DispoOrder::query()
-            ->where('calculation_id', $calculation->id)
-            ->lockForUpdate()
-            ->max('number_calc_seq') ?? 0) + 1;
+        $calcSeq = 1;
 
-        $number = sprintf('DA-%d-%06d-%02d', $year, $orgSeq, $calcSeq);
+        return [$year, $orgSeq, $calcSeq, $this->format($year, $orgSeq, $calcSeq)];
+    }
 
-        return [$year, $orgSeq, $calcSeq, $number];
+    private function format(int $year, int $orgSeq, int $calcSeq): string
+    {
+        return sprintf('DA-%d-%06d-%02d', $year, $orgSeq, $calcSeq);
     }
 
     public function isRetryable(QueryException $exception): bool

@@ -1,14 +1,16 @@
 # Fortschritt V1
 
-Stand: 3. September 2026 (Vier-Augen-Freigabe + Nachbesserung)
+Stand: 3. September 2026 (Vier-Augen-Freigabe + Nachbesserung + Nummernfamilie)
 
 ## Aktuelle Phase
 
 Phase 8 (Dispoauftrag) – **Teilslice umgesetzt:** Entwurf aus Kalkulation,
 Vier-Augen-Freigabe sowie Nachbesserung abgelehnter Aufträge über einen neuen,
-verknüpften Entwurf. Nach erfolgreicher Genehmigung steht der Status
-**„Liegt bei Disposition“**. UX-GATE-D bleibt **nicht** vollständig abgeschlossen
-(operative Disposition, Material, Kommentare, weitere Status weiterhin offen).
+verknüpften Entwurf. Nummernformat `DA-JJJJ-NNNNNN-SS`: Stammnummer einmal pro
+Kalkulationsfamilie, Suffix nur bei weiteren Teilaufträgen/Korrekturen.
+Nach erfolgreicher Genehmigung steht der Status **„Liegt bei Disposition“**.
+UX-GATE-D bleibt **nicht** vollständig abgeschlossen (operative Disposition,
+Material, Kommentare, weitere Status weiterhin offen).
 
 Ausgangsbasis für den Freigabe-Slice: `main` @ `6aa2563`.
 

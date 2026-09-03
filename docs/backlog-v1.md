@@ -331,7 +331,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Status:** **umgesetzt** (September 2026)
 - **Anforderungen:** `DSP-001` bis `DSP-007`, `TEC-001`, `TEC-002` (Entwurfsteil)
 - **Abhängigkeiten:** BL-P7-02, BL-P3-02
-- **Ergebnis:** unabhängiger Dispo-Snapshot beim Anlegen, Nummernvergabe `DA-YYYY-NNNNNN-SS`, Positionsauswahl inkl. Kennzeichnung bereits übernommener Positionen
+- **Ergebnis:** unabhängiger Dispo-Snapshot beim Anlegen, Nummernvergabe `DA-YYYY-NNNNNN-SS` (Stammnummer einmal pro Kalkulationsfamilie; Suffix je Teilauftrag/Korrektur), Positionsauswahl inkl. Kennzeichnung bereits übernommener Positionen
 - **Akzeptanz:** `AT-15`, `AT-29` (Entwurf); keine Sync zurück zur Kalkulation; kein Dispo aus Standardangebot
 - **Tests:** Pest (Anlage, Berechtigungen, Snapshot-Isolation, Nummern), Vitest (Dialog), Playwright (Happy Path)
 
