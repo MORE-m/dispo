@@ -7,6 +7,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderNumberSequence;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderNumberSequencer;
+use App\Support\DocumentNumber;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesSavedCalculation;
@@ -19,21 +20,50 @@ class DispoOrderNumberSequencerTest extends TestCase
     use CreatesSpotClassicCatalog;
     use RefreshDatabase;
 
-    public function test_next_assigns_org_and_calculation_sequence(): void
+    public function test_first_order_derives_stem_from_calculation_number(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $calculation = $this->createSavedCalculation($catalog, [
             ['inventory_id' => $catalog['hamburg']->id],
         ]);
         $sequencer = app(DispoOrderNumberSequencer::class);
-        $year = (int) now('Europe/Berlin')->format('Y');
 
         [$numberYear, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
 
-        $this->assertSame($year, $numberYear);
-        $this->assertSame(1, $orgSeq);
+        $this->assertSame($calculation->number_year, $numberYear);
+        $this->assertSame($calculation->number_seq, $orgSeq);
         $this->assertSame(1, $calcSeq);
-        $this->assertSame(sprintf('DA-%d-%06d-%02d', $year, 1, 1), $number);
+        $this->assertSame(
+            DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 1),
+            $number,
+        );
+        $this->assertSame(
+            'DA-'.substr($calculation->number, 2).'-01',
+            $number,
+        );
+        $this->assertNull(
+            DispoOrderNumberSequence::query()->where('year', $calculation->number_year)->value('last_seq'),
+        );
+    }
+
+    public function test_k_2026_00005_produces_da_2026_00005_01(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $calculation->forceFill([
+            'number' => 'K-2026-00005',
+            'number_year' => 2026,
+            'number_seq' => 5,
+        ])->save();
+
+        [$year, $orgSeq, $calcSeq, $number] = app(DispoOrderNumberSequencer::class)->next($calculation);
+
+        $this->assertSame(2026, $year);
+        $this->assertSame(5, $orgSeq);
+        $this->assertSame(1, $calcSeq);
+        $this->assertSame('DA-2026-00005-01', $number);
     }
 
     public function test_second_order_reuses_stem_and_only_increments_suffix(): void
@@ -47,26 +77,23 @@ class DispoOrderNumberSequencerTest extends TestCase
 
         DispoOrder::query()->create([
             'calculation_id' => $calculation->id,
-            'number' => 'DA-2026-000123-01',
-            'number_year' => 2026,
-            'number_org_seq' => 123,
+            'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 1),
+            'number_year' => $calculation->number_year,
+            'number_org_seq' => $calculation->number_seq,
             'number_calc_seq' => 1,
             'status' => 'draft',
             'created_by_id' => $user->id,
             'source_calculation_number' => $calculation->number,
         ]);
 
-        $yearBefore = DispoOrderNumberSequence::query()->where('year', 2026)->value('last_seq');
-
         [$year, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
 
-        $this->assertSame(2026, $year);
-        $this->assertSame(123, $orgSeq);
+        $this->assertSame($calculation->number_year, $year);
+        $this->assertSame($calculation->number_seq, $orgSeq);
         $this->assertSame(2, $calcSeq);
-        $this->assertSame('DA-2026-000123-02', $number);
         $this->assertSame(
-            $yearBefore,
-            DispoOrderNumberSequence::query()->where('year', 2026)->value('last_seq'),
+            DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 2),
+            $number,
         );
     }
 
@@ -82,9 +109,9 @@ class DispoOrderNumberSequencerTest extends TestCase
         foreach ([1, 2] as $seq) {
             DispoOrder::query()->create([
                 'calculation_id' => $calculation->id,
-                'number' => sprintf('DA-2026-000123-%02d', $seq),
-                'number_year' => 2026,
-                'number_org_seq' => 123,
+                'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, $seq),
+                'number_year' => $calculation->number_year,
+                'number_org_seq' => $calculation->number_seq,
                 'number_calc_seq' => $seq,
                 'status' => 'draft',
                 'created_by_id' => $user->id,
@@ -94,12 +121,15 @@ class DispoOrderNumberSequencerTest extends TestCase
 
         [, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
 
-        $this->assertSame(123, $orgSeq);
+        $this->assertSame($calculation->number_seq, $orgSeq);
         $this->assertSame(3, $calcSeq);
-        $this->assertSame('DA-2026-000123-03', $number);
+        $this->assertSame(
+            DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 3),
+            $number,
+        );
     }
 
-    public function test_other_calculation_receives_new_stem_starting_at_01(): void
+    public function test_other_calculation_uses_its_own_calculation_number(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $first = $this->createSavedCalculation($catalog, [
@@ -109,21 +139,29 @@ class DispoOrderNumberSequencerTest extends TestCase
             ['inventory_id' => $catalog['rock']->id],
         ]);
         $sequencer = app(DispoOrderNumberSequencer::class);
-        $year = (int) now('Europe/Berlin')->format('Y');
 
         [, $firstOrgSeq, $firstCalcSeq, $firstNumber] = $sequencer->next($first);
         [, $secondOrgSeq, $secondCalcSeq, $secondNumber] = $sequencer->next($second);
 
-        $this->assertSame(1, $firstOrgSeq);
+        $this->assertSame($first->number_seq, $firstOrgSeq);
         $this->assertSame(1, $firstCalcSeq);
-        $this->assertSame(2, $secondOrgSeq);
+        $this->assertSame($second->number_seq, $secondOrgSeq);
         $this->assertSame(1, $secondCalcSeq);
-        $this->assertSame(sprintf('DA-%d-%06d-01', $year, 1), $firstNumber);
-        $this->assertSame(sprintf('DA-%d-%06d-01', $year, 2), $secondNumber);
-        $this->assertSame(2, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+        $this->assertSame(
+            DocumentNumber::dispoOrder($first->number_year, $first->number_seq, 1),
+            $firstNumber,
+        );
+        $this->assertSame(
+            DocumentNumber::dispoOrder($second->number_year, $second->number_seq, 1),
+            $secondNumber,
+        );
+        $this->assertNotSame($firstNumber, $secondNumber);
+        $this->assertNull(
+            DispoOrderNumberSequence::query()->where('year', $first->number_year)->value('last_seq'),
+        );
     }
 
-    public function test_year_change_keeps_existing_family_stem(): void
+    public function test_year_change_keeps_existing_family_stem_from_calculation(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-12-31 12:00:00', 'Europe/Berlin'));
 
@@ -136,9 +174,9 @@ class DispoOrderNumberSequencerTest extends TestCase
 
         DispoOrder::query()->create([
             'calculation_id' => $calculation->id,
-            'number' => 'DA-2026-000123-01',
-            'number_year' => 2026,
-            'number_org_seq' => 123,
+            'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 1),
+            'number_year' => $calculation->number_year,
+            'number_org_seq' => $calculation->number_seq,
             'number_calc_seq' => 1,
             'status' => 'draft',
             'created_by_id' => $user->id,
@@ -149,33 +187,105 @@ class DispoOrderNumberSequencerTest extends TestCase
 
         [$year, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
 
-        $this->assertSame(2026, $year);
-        $this->assertSame(123, $orgSeq);
+        $this->assertSame($calculation->number_year, $year);
+        $this->assertSame($calculation->number_seq, $orgSeq);
         $this->assertSame(2, $calcSeq);
-        $this->assertSame('DA-2026-000123-02', $number);
+        $this->assertSame(
+            DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 2),
+            $number,
+        );
 
         Carbon::setTestNow();
     }
 
-    public function test_new_family_in_new_year_starts_yearly_sequence(): void
+    public function test_legacy_family_keeps_six_digit_stem_and_only_increments_suffix(): void
     {
-        Carbon::setTestNow(Carbon::parse('2027-01-02 09:00:00', 'Europe/Berlin'));
-
         $catalog = $this->createSpotClassicCatalog();
         $calculation = $this->createSavedCalculation($catalog, [
             ['inventory_id' => $catalog['hamburg']->id],
         ]);
+        $user = User::factory()->role(Role::Sales)->create();
         $sequencer = app(DispoOrderNumberSequencer::class);
+
+        DispoOrder::query()->create([
+            'calculation_id' => $calculation->id,
+            'number' => 'DA-2026-000008-01',
+            'number_year' => 2026,
+            'number_org_seq' => 8,
+            'number_calc_seq' => 1,
+            'status' => 'draft',
+            'created_by_id' => $user->id,
+            'source_calculation_number' => $calculation->number,
+        ]);
+
+        $yearBefore = DispoOrderNumberSequence::query()->where('year', 2026)->value('last_seq');
 
         [$year, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
 
-        $this->assertSame(2027, $year);
-        $this->assertSame(1, $orgSeq);
-        $this->assertSame(1, $calcSeq);
-        $this->assertSame('DA-2027-000001-01', $number);
-        $this->assertSame(1, DispoOrderNumberSequence::query()->where('year', 2027)->value('last_seq'));
+        $this->assertSame(2026, $year);
+        $this->assertSame(8, $orgSeq);
+        $this->assertSame(2, $calcSeq);
+        $this->assertSame('DA-2026-000008-02', $number);
+        $this->assertSame(
+            $yearBefore,
+            DispoOrderNumberSequence::query()->where('year', 2026)->value('last_seq'),
+        );
+    }
 
-        Carbon::setTestNow();
+    public function test_legacy_family_third_order_ends_with_03(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $user = User::factory()->role(Role::Sales)->create();
+        $sequencer = app(DispoOrderNumberSequencer::class);
+
+        foreach ([1, 2] as $seq) {
+            DispoOrder::query()->create([
+                'calculation_id' => $calculation->id,
+                'number' => sprintf('DA-2026-000008-%02d', $seq),
+                'number_year' => 2026,
+                'number_org_seq' => 8,
+                'number_calc_seq' => $seq,
+                'status' => 'draft',
+                'created_by_id' => $user->id,
+                'source_calculation_number' => $calculation->number,
+            ]);
+        }
+
+        [, $orgSeq, $calcSeq, $number] = $sequencer->next($calculation);
+
+        $this->assertSame(8, $orgSeq);
+        $this->assertSame(3, $calcSeq);
+        $this->assertSame('DA-2026-000008-03', $number);
+    }
+
+    public function test_historical_legacy_numbers_are_not_changed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $existing = DispoOrder::query()->create([
+            'calculation_id' => $calculation->id,
+            'number' => 'DA-2026-000008-01',
+            'number_year' => 2026,
+            'number_org_seq' => 8,
+            'number_calc_seq' => 1,
+            'status' => 'draft',
+            'created_by_id' => $user->id,
+            'source_calculation_number' => $calculation->number,
+        ]);
+
+        app(DispoOrderNumberSequencer::class)->next($calculation);
+
+        $existing->refresh();
+        $this->assertSame('DA-2026-000008-01', $existing->number);
+        $this->assertSame(8, $existing->number_org_seq);
+        $this->assertSame(1, $existing->number_calc_seq);
     }
 
     public function test_future_order_uses_earliest_family_stem_when_history_is_inconsistent(): void

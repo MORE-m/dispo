@@ -52,16 +52,17 @@ class DispoOrderNumberConcurrencyTest extends TestCase
         $this->assertSame([1, 2], $orders->pluck('number_calc_seq')->sort()->values()->all());
         $this->assertSame(1, $orders->pluck('number_org_seq')->unique()->count());
         $this->assertTrue(
-            $orders->every(fn (DispoOrder $order): bool => $order->number_org_seq === $orders->first()->number_org_seq),
+            $orders->every(fn (DispoOrder $order): bool => $order->number_org_seq === $calculation->number_seq),
         );
 
         foreach ($orders as $order) {
-            $this->assertMatchesRegularExpression('/^DA-\d{4}-\d{6}-\d{2}$/', $order->number);
+            $this->assertMatchesRegularExpression('/^DA-\d{4}-\d{5}-\d{2}$/', $order->number);
+            $this->assertStringStartsWith('DA-'.substr($calculation->number, 2).'-', $order->number);
             $this->assertSame(1, $order->positions()->count());
             $this->assertSame(DispoOrderPosition::class, $order->positions()->first()::class);
         }
 
-        $this->assertSame(1, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+        $this->assertNull(DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
     }
 
     public function test_parallel_follow_up_orders_reuse_stem_and_increment_suffix_only(): void
@@ -104,7 +105,55 @@ class DispoOrderNumberConcurrencyTest extends TestCase
         $this->assertCount(3, $orders);
         $this->assertSame([$stem, $stem, $stem], $orders->pluck('number_org_seq')->all());
         $this->assertSame([1, 2, 3], $orders->pluck('number_calc_seq')->all());
-        $this->assertSame(1, DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+        $this->assertNull(DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
+    }
+
+    public function test_parallel_legacy_follow_up_orders_keep_six_digit_stem(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('Paralleler Dispo-Writer-Test erfordert MySQL (GitHub-Job mysql).');
+        }
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+            ['inventory_id' => $catalog['rock']->id, 'total_spot_count' => 3, 'hour' => 10],
+        ], $user);
+        $calculation->load('positions');
+        $positions = $calculation->positions->values();
+
+        DispoOrder::query()->create([
+            'calculation_id' => $calculation->id,
+            'number' => 'DA-2026-000008-01',
+            'number_year' => 2026,
+            'number_org_seq' => 8,
+            'number_calc_seq' => 1,
+            'status' => 'draft',
+            'created_by_id' => $user->id,
+            'source_calculation_number' => $calculation->number,
+        ]);
+
+        $this->runParallelWorkers(
+            (string) $calculation->id,
+            (string) $positions[0]->id,
+            (string) $calculation->id,
+            (string) $positions[1]->id,
+        );
+
+        $orders = DispoOrder::query()
+            ->where('calculation_id', $calculation->id)
+            ->orderBy('number_calc_seq')
+            ->get();
+
+        $this->assertCount(3, $orders);
+        $this->assertSame([8, 8, 8], $orders->pluck('number_org_seq')->all());
+        $this->assertSame([1, 2, 3], $orders->pluck('number_calc_seq')->all());
+        $this->assertSame('DA-2026-000008-01', $orders[0]->number);
+        $this->assertSame(['DA-2026-000008-02', 'DA-2026-000008-03'], [
+            $orders[1]->number,
+            $orders[2]->number,
+        ]);
     }
 
     public function test_parallel_workers_from_different_calculations_receive_unique_org_sequences(): void
@@ -136,14 +185,20 @@ class DispoOrderNumberConcurrencyTest extends TestCase
             (string) $secondCalculation->positions->first()->id,
         );
 
-        $numbers = DispoOrder::query()->orderBy('number_org_seq')->pluck('number')->all();
-        $this->assertCount(2, $numbers);
-        $this->assertSame(2, count(array_unique($numbers)));
+        $orders = DispoOrder::query()->orderBy('number_org_seq')->get();
+        $this->assertCount(2, $orders);
+        $this->assertSame(2, $orders->pluck('number')->unique()->count());
 
-        preg_match('/^DA-(\d{4})-(\d{6})-01$/', $numbers[0], $firstParts);
-        preg_match('/^DA-(\d{4})-(\d{6})-01$/', $numbers[1], $secondParts);
-        $this->assertSame($firstParts[1], $secondParts[1]);
-        $this->assertSame(1, abs((int) $firstParts[2] - (int) $secondParts[2]));
+        $byCalc = $orders->keyBy('calculation_id');
+        $this->assertSame(
+            'DA-'.substr($firstCalculation->number, 2).'-01',
+            $byCalc[$firstCalculation->id]->number,
+        );
+        $this->assertSame(
+            'DA-'.substr($secondCalculation->number, 2).'-01',
+            $byCalc[$secondCalculation->id]->number,
+        );
+        $this->assertNull(DispoOrderNumberSequence::query()->where('year', $year)->value('last_seq'));
     }
 
     /**

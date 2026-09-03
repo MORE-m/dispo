@@ -3,6 +3,7 @@
 namespace App\Services\Calculation;
 
 use App\Models\CalculationNumberSequence;
+use App\Support\DocumentNumber;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
@@ -43,9 +44,7 @@ final class CalculationNumberSequencer
         $sequence->last_seq = $seq;
         $sequence->save();
 
-        $number = sprintf('K-%d-%05d', $year, $seq);
-
-        return [$year, $seq, $number];
+        return [$year, $seq, DocumentNumber::calculation($year, $seq)];
     }
 
     public function isRetryable(QueryException $exception): bool

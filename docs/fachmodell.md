@@ -133,8 +133,10 @@ Interne IDs und sichtbare Nummern werden getrennt behandelt:
 - Anzeigenamen dürfen versioniert geändert werden,
 - historische Vorgänge zeigen weiterhin ihre gespeicherten damaligen Namen.
 
-Beispiel Dispoauftragsnummer: `DA-2026-000123-01` (`TEC-001`, `TEC-002`).
-Die Stammnummer wird einmal pro Kalkulation beziehungsweise Dispoauftragsfamilie
-vergeben. Weitere Teilaufträge und Korrekturen erhöhen ausschließlich den
-zweistelligen Suffix (`DA-2026-000123-02`, `DA-2026-000123-03`).
+Beispiel Dispoauftragsnummer: `DA-2026-00005-01` zu Kalkulation `K-2026-00005`
+(`TEC-001`, `TEC-002`). Bei einer neuen Dispoauftragsfamilie entsprechen Jahr und
+Stammsequenz der zugehörigen Kalkulationsnummer. Weitere Teilaufträge und
+Korrekturen erhöhen ausschließlich den zweistelligen Suffix
+(`DA-2026-00005-02`, `DA-2026-00005-03`). Bereits vergebene Nummern bleiben
+unverändert; bestehende Legacy-Familien behalten ihren bisherigen Stamm.
 
