@@ -4,9 +4,14 @@ export class JsonPostError extends Error {
     constructor(
         message: string,
         public fieldErrors: Record<string, string[]> = {},
+        public status = 0,
     ) {
         super(message);
         this.name = 'JsonPostError';
+    }
+
+    get isConflict(): boolean {
+        return this.status === 409;
     }
 }
 
@@ -40,12 +45,24 @@ export async function jsonPost<T>(
         signal,
     });
 
-    const data = (await response.json()) as T & ValidationPayload;
+    const text = await response.text();
+    let data = {} as T & ValidationPayload;
+
+    if (text !== '') {
+        try {
+            data = JSON.parse(text) as T & ValidationPayload;
+        } catch {
+            data = {
+                message: 'Die Anfrage ist fehlgeschlagen.',
+            } as T & ValidationPayload;
+        }
+    }
 
     if (!response.ok) {
         throw new JsonPostError(
             data.message ?? 'Die Anfrage ist fehlgeschlagen.',
             mapValidationErrors(data.errors ?? {}),
+            response.status,
         );
     }
 

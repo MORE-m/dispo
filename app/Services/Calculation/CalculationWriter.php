@@ -85,7 +85,7 @@ final class CalculationWriter
             if ($this->isHeaderOnlyChange($payload, $locked) && ! $this->hasPositionsWithMissingClientKey($locked)) {
                 $this->applyHeaderFields($locked, $payload);
                 $totals = $this->totalsFromExisting($locked, $payload, $user);
-                $this->applyTotals($locked, $totals);
+                $this->applyTotals($locked, $totals, $user);
                 $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();
             } else {
@@ -182,7 +182,7 @@ final class CalculationWriter
         }
 
         $this->applyHeaderFields($calculation, $payload);
-        $this->applyTotals($calculation, $totals);
+        $this->applyTotals($calculation, $totals, $user);
         $calculation->save();
 
         $seenIds = [];
@@ -414,7 +414,7 @@ final class CalculationWriter
         }
     }
 
-    private function applyTotals(Calculation $calculation, CalculationTotals $totals): void
+    private function applyTotals(Calculation $calculation, CalculationTotals $totals, User $user): void
     {
         $calculation->media_gross = $totals->mediaGross;
         $calculation->position_discount_total = $totals->positionDiscountTotal;
@@ -422,6 +422,8 @@ final class CalculationWriter
         $calculation->ae_total = $totals->aeTotal;
         $calculation->nn_invest = $totals->nnInvest;
         $calculation->requires_special_approval = $totals->requiresSpecialApproval;
+        $calculation->special_approval_reasons = $totals->specialApprovalReasons;
+        $calculation->personal_discount_limit_percent = $user->discount_limit_percent;
     }
 
     /**

@@ -2,12 +2,14 @@
 
 namespace App\Services\DispoOrder;
 
+use App\Enums\DispoOrderApprovalKind;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
+use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
 use Illuminate\Support\Collection;
 
@@ -16,16 +18,21 @@ use Illuminate\Support\Collection;
  */
 final class DispoOrderSnapshotMapper
 {
+    public function __construct(
+        private readonly SpecialApprovalAssessor $assessor = new SpecialApprovalAssessor,
+    ) {}
+
     /**
      * @param  Collection<int, CalculationPosition>  $selectedPositions
      * @return array<string, mixed>
      */
     public function headerFromCalculation(Calculation $calculation, Collection $selectedPositions): array
     {
-        $calculation->loadMissing(['advisor', 'orderDiscounts', 'positions']);
+        $calculation->loadMissing(['advisor', 'orderDiscounts', 'positions.inventory']);
         $allSelected = $selectedPositions->count() === $calculation->positions->count();
         $orderTotals = StoredPositionTotals::sum($selectedPositions);
         $sourceTotals = StoredPositionTotals::fromCalculation($calculation);
+        $assessment = $this->assessor->assessFromCalculation($calculation, $selectedPositions);
 
         return [
             'source_calculation_number' => $calculation->number,
@@ -46,9 +53,11 @@ final class DispoOrderSnapshotMapper
             'order_discount_total' => $orderTotals['order_discount_total'],
             'ae_total' => $orderTotals['ae_total'],
             'nn_invest' => $orderTotals['nn_invest'],
-            'requires_special_approval' => $allSelected
-                ? (bool) $calculation->requires_special_approval
-                : false,
+            'requires_special_approval' => $assessment->requiresSpecialApproval,
+            'approval_kind' => $assessment->requiresSpecialApproval
+                ? DispoOrderApprovalKind::Special->value
+                : DispoOrderApprovalKind::Regular->value,
+            'special_approval_reasons' => $assessment->reasons,
             'order_discounts_snapshot' => $calculation->orderDiscounts->map(
                 fn (CalculationOrderDiscount $discount): array => [
                     'type' => $discount->type->value,
@@ -141,6 +150,9 @@ final class DispoOrderSnapshotMapper
             'created_by_id' => $order->created_by_id,
             'position_ids' => $result->positionIds,
             'nn_invest' => (string) $order->nn_invest,
+            'approval_kind' => $order->approval_kind->value,
+            'requires_special_approval' => (bool) $order->requires_special_approval,
+            'special_approval_reasons' => $order->special_approval_reasons ?? [],
             'positions' => $order->positions->map(fn ($position): array => [
                 'calculation_position_id' => $position->calculation_position_id,
                 'inventory_name' => $position->inventory_name,

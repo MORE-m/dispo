@@ -28,5 +28,8 @@ return [
         'positions.*.time_ranges.*.end_hour_exclusive' => 'Ende im Preiszeitraum',
         'positions.*.position_discounts.*.percent' => 'Positionsrabatt',
         'order_discounts.*.percent' => 'Auftragsrabatt',
+        'reason' => 'Begründung',
+        'note' => 'Notiz',
+        'lock_version' => 'Version',
     ],
 ];

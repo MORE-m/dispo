@@ -134,4 +134,7 @@ Interne IDs und sichtbare Nummern werden getrennt behandelt:
 - historische Vorgänge zeigen weiterhin ihre gespeicherten damaligen Namen.
 
 Beispiel Dispoauftragsnummer: `DA-2026-000123-01` (`TEC-001`, `TEC-002`).
+Die Stammnummer wird einmal pro Kalkulation beziehungsweise Dispoauftragsfamilie
+vergeben. Weitere Teilaufträge und Korrekturen erhöhen ausschließlich den
+zweistelligen Suffix (`DA-2026-000123-02`, `DA-2026-000123-03`).
 

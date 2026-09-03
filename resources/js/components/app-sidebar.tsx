@@ -20,6 +20,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { DISPO_ORDERS_CACHE_TAG } from '@/lib/dispo-order-inertia-cache';
 import type { NavItem } from '@/types';
 
 const icons = {
@@ -39,6 +40,8 @@ export function AppSidebar() {
         title: item.title,
         href: item.href,
         icon: icons[item.key as keyof typeof icons] ?? LayoutDashboard,
+        cacheTags:
+            item.key === 'dispo-orders' ? DISPO_ORDERS_CACHE_TAG : undefined,
     }));
 
     return (

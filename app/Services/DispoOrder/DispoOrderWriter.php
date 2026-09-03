@@ -3,6 +3,7 @@
 namespace App\Services\DispoOrder;
 
 use App\Enums\DispoOrderStatus;
+use App\Exceptions\DispoOrderConflictException;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrder;
@@ -10,6 +11,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -27,8 +29,16 @@ final class DispoOrderWriter
     /**
      * @param  list<int>  $positionIds
      */
-    public function createFromCalculation(Calculation $calculation, array $positionIds, User $user): DispoOrderWriterResult
-    {
+    public function createFromCalculation(
+        Calculation $calculation,
+        array $positionIds,
+        User $user,
+        ?DispoOrder $revises = null,
+    ): DispoOrderWriterResult {
+        if ($revises !== null) {
+            return $this->createRevision($revises, $calculation, $positionIds, $user);
+        }
+
         $attempt = 0;
 
         while (true) {
@@ -49,8 +59,91 @@ final class DispoOrderWriter
     /**
      * @param  list<int>  $positionIds
      */
-    private function createWithinTransaction(Calculation $calculation, array $positionIds, User $user): DispoOrderWriterResult
-    {
+    public function createRevision(
+        DispoOrder $predecessor,
+        Calculation $calculation,
+        array $positionIds,
+        User $user,
+    ): DispoOrderWriterResult {
+        $attempt = 0;
+
+        while (true) {
+            try {
+                return DB::transaction(function () use ($predecessor, $calculation, $positionIds, $user): DispoOrderWriterResult {
+                    $locked = DispoOrder::query()
+                        ->whereKey($predecessor->id)
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    $this->assertRevisionPreconditions($locked, $calculation, $user);
+
+                    $result = $this->createWithinTransaction($calculation, $positionIds, $user, $locked);
+
+                    $this->auditRevisionCreated($result, $locked, $user);
+
+                    return $result;
+                }, self::MAX_DEADLOCK_RETRIES);
+            } catch (UniqueConstraintViolationException) {
+                throw new DispoOrderConflictException(
+                    'Für diesen abgelehnten Dispoauftrag wurde bereits eine Nachbesserung angelegt.',
+                );
+            } catch (QueryException $exception) {
+                if ($this->isUniqueRevisesViolation($exception)) {
+                    throw new DispoOrderConflictException(
+                        'Für diesen abgelehnten Dispoauftrag wurde bereits eine Nachbesserung angelegt.',
+                    );
+                }
+
+                $attempt++;
+
+                if (! $this->numbers->isRetryable($exception) || $attempt >= self::MAX_DEADLOCK_RETRIES) {
+                    throw $exception;
+                }
+            }
+        }
+    }
+
+    private function assertRevisionPreconditions(
+        DispoOrder $predecessor,
+        Calculation $calculation,
+        User $user,
+    ): void {
+        if (! DispoOrderRevisionRules::predecessorStatusAllowed($predecessor)) {
+            throw ValidationException::withMessages([
+                'revises_dispo_order_id' => 'Nur abgelehnte Dispoaufträge können nachgebessert werden.',
+            ]);
+        }
+
+        if (! DispoOrderRevisionRules::sameCalculation($predecessor, $calculation)) {
+            throw ValidationException::withMessages([
+                'revises_dispo_order_id' => 'Vorgänger und Kalkulation müssen übereinstimmen.',
+            ]);
+        }
+
+        if ($predecessor->hasRevision()) {
+            throw new DispoOrderConflictException(
+                'Für diesen abgelehnten Dispoauftrag wurde bereits eine Nachbesserung angelegt.',
+            );
+        }
+
+        if ((int) $user->id !== (int) $predecessor->created_by_id
+            || ! $user->can('update', $calculation)
+        ) {
+            throw ValidationException::withMessages([
+                'revises_dispo_order_id' => 'Keine Berechtigung zur Nachbesserung dieses Dispoauftrags.',
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<int>  $positionIds
+     */
+    private function createWithinTransaction(
+        Calculation $calculation,
+        array $positionIds,
+        User $user,
+        ?DispoOrder $revises = null,
+    ): DispoOrderWriterResult {
         $calculation->loadMissing([
             'advisor',
             'orderDiscounts',
@@ -98,6 +191,9 @@ final class DispoOrderWriter
         $order->status = DispoOrderStatus::Draft;
         $order->created_by_id = $user->id;
         $order->lock_version = 1;
+        if ($revises !== null) {
+            $order->revises_dispo_order_id = $revises->id;
+        }
         $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
         $order->save();
 
@@ -114,21 +210,80 @@ final class DispoOrderWriter
         $fresh = $this->reloadOrder($order);
         $result = new DispoOrderWriterResult($fresh, $uniqueIds);
 
-        $this->audit->record(
-            $fresh,
-            'dispo_order.created',
-            $user,
-            null,
-            $this->mapper->orderSnapshot($result),
-        );
+        if ($revises === null) {
+            $this->audit->record(
+                $fresh,
+                'dispo_order.created',
+                $user,
+                null,
+                $this->mapper->orderSnapshot($result),
+            );
+        }
 
         return $result;
+    }
+
+    private function auditRevisionCreated(
+        DispoOrderWriterResult $result,
+        DispoOrder $predecessor,
+        User $user,
+    ): void {
+        $snapshot = $this->mapper->orderSnapshot($result);
+        $meta = [
+            'predecessor_dispo_order_id' => $predecessor->id,
+            'predecessor_number' => $predecessor->number,
+            'successor_dispo_order_id' => $result->order->id,
+            'successor_number' => $result->order->number,
+            'calculation_id' => $result->order->calculation_id,
+            'position_ids' => $result->positionIds,
+            'approval_kind' => $result->order->approval_kind->value,
+            'requires_special_approval' => (bool) $result->order->requires_special_approval,
+        ];
+
+        $this->audit->record(
+            $result->order,
+            'dispo_order.revision_created',
+            $user,
+            [
+                'revises_dispo_order_id' => $predecessor->id,
+            ],
+            array_merge($snapshot, $meta),
+        );
+
+        $this->audit->record(
+            $predecessor,
+            'dispo_order.revision_created',
+            $user,
+            [
+                'status' => $predecessor->status->value,
+                'has_revision' => false,
+            ],
+            [
+                'revision_dispo_order_id' => $result->order->id,
+                'revision_number' => $result->order->number,
+                'calculation_id' => $result->order->calculation_id,
+                'position_ids' => $result->positionIds,
+                'has_revision' => true,
+            ],
+        );
+    }
+
+    private function isUniqueRevisesViolation(QueryException $exception): bool
+    {
+        $message = $exception->getMessage();
+
+        return str_contains($message, 'revises_dispo_order_id')
+            && (
+                str_contains($message, 'UNIQUE')
+                || str_contains($message, 'unique')
+                || (string) $exception->getCode() === '23000'
+            );
     }
 
     private function reloadOrder(DispoOrder $order): DispoOrder
     {
         $order->refresh();
-        $order->load(['positions', 'creator', 'advisor', 'calculation']);
+        $order->load(['positions', 'creator', 'advisor', 'calculation', 'revises', 'revision']);
 
         return $order;
     }

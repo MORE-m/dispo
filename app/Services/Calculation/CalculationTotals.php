@@ -7,6 +7,7 @@ final readonly class CalculationTotals
     /**
      * @param  list<PositionResult>  $positions
      * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $orderDiscounts
+     * @param  list<array<string, mixed>>  $specialApprovalReasons
      */
     public function __construct(
         public string $mediaGross,
@@ -23,6 +24,7 @@ final readonly class CalculationTotals
         public string $afterPositionDiscountTotal = '0.00',
         public string $afterOrderDiscountTotal = '0.00',
         public string $aeEligibleBase = '0.00',
+        public array $specialApprovalReasons = [],
     ) {}
 
     /**
@@ -39,6 +41,7 @@ final readonly class CalculationTotals
             'target_budget_nn' => $this->targetBudgetNn,
             'budget_delta' => $this->budgetDelta,
             'requires_special_approval' => $this->requiresSpecialApproval,
+            'special_approval_reasons' => $this->specialApprovalReasons,
             'ae_enabled' => $this->aeEnabled,
             'order_discounts' => $this->orderDiscounts,
             'after_position_discount_total' => $this->afterPositionDiscountTotal,

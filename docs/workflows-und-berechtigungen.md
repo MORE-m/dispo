@@ -45,37 +45,60 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
 ## Vier-Augen-Prinzip
 
-Der Ersteller darf weder die allgemeine Vertriebsfreigabe noch eine erforderliche
-kaufmännische Sonderfreigabe selbst erteilen (`AUTH-004`). Besitzt eine andere
-Person beide Freigaberechte, darf sie beide Freigaben in einem Bedienvorgang
-erteilen; es entstehen dennoch zwei getrennte Freigabeereignisse (`AUTH-005`).
+Der Ersteller eines Dispoauftrags darf den eigenen Auftrag niemals genehmigen
+oder ablehnen (`AUTH-004`) – auch nicht als Admin oder Geschäftsführung.
+
+### Implementierter Slice (September 2026)
+
+Jeder Dispoauftrag benötigt vor Disposition eine Freigabe. Es gibt keinen
+Übergang `Entwurf → Liegt bei Disposition`.
+
+| Art | Genehmigen / Ablehnen |
+|---|---|
+| Regulär | anderer Vertrieb, Admin, Geschäftsführung |
+| Sonderfreigabe | ausschließlich Admin, Geschäftsführung |
+
+Disposition und Produktmanagement entscheiden nicht. Der abgelehnte Dispoauftrag
+bleibt als unveränderbarer, terminaler Snapshot erhalten. Der Ersteller kann die
+zugrunde liegende Kalkulation nachbessern und daraus einen neuen, verknüpften
+Dispoauftrag im Status Entwurf erzeugen.
+
+Freigabeart und Gründe werden beim Anlegen des Dispoauftrags aus der kanonischen
+Sonderfreigabelogik als Snapshot gespeichert; spätere Änderungen an
+Benutzergrenzen ändern sie nicht. Teilübernahmen bewerten nur den ausgewählten
+Umfang; nicht zuordenbare Gründe führen sicherheitshalber zur Sonderfreigabe.
+
+`AUTH-005` (zwei getrennte Freigabeereignisse in einem Bedienvorgang) ist in
+diesem Slice **nicht** umgesetzt: Es gibt eine Entscheidung, deren
+Rollenanforderung von `regular` vs. `special` abhängt.
 
 ## Auslöser einer Sonderfreigabe
 
 Mindestens folgende Fälle lösen eine kaufmännische Sonderfreigabe aus:
 
-- effektiver Positionsrabatt überschreitet persönliche Rabattgrenze,
-- Basis-TKP liegt unter Mindest-TKP,
-- Online-Audio-Festpreis,
-- überschreibender regulärer Produktionspreis,
+- Positionsrabatt überschreitet persönliche Rabattgrenze,
+- Auftragsrabatt überschreitet persönliche Rabattgrenze,
+- effektiver (kombinierter) Rabatt überschreitet persönliche Rabattgrenze,
+- Basis-TKP liegt unter Mindest-TKP (noch nicht implementiert),
+- Online-Audio-Festpreis (noch nicht implementiert),
+- überschreibender regulärer Produktionspreis (noch nicht implementiert),
 - weitere administrativ definierte Freigaberegel.
 
-## Freigabereihenfolge
+## Freigabereihenfolge (Slice)
 
 ```mermaid
 flowchart TD
-    A[Entwurf vollständig] --> B{Sonderfreigabe nötig?}
-    B -- Ja --> C[Kaufmännische Sonderfreigabe]
-    B -- Nein --> D[Vier-Augen-Freigabe]
-    C --> D
-    D --> E[Liegt bei Disposition]
-    C -. abgelehnt .-> F[Freigabe abgelehnt]
-    D -. abgelehnt .-> F
-    F --> A
+    A[Entwurf] --> B[Wartet auf Vertriebsfreigabe]
+    B --> C[Liegt bei Disposition]
+    B --> D[Freigabe abgelehnt]
+    D --> E[Kalkulation nachbessern]
+    E --> F[Neuer Entwurf verknüpft]
+    F --> B
 ```
 
-Während einer laufenden Freigabe ist der Auftrag schreibgeschützt. Der Ersteller
-muss ihn vor einer Änderung zurückziehen (`APR-003`).
+Während einer laufenden Freigabe ist der Auftrag schreibgeschützt. Rückzug einer
+offenen Freigabe sowie Überschreiben desselben abgelehnten Snapshots sind in
+diesem Slice nicht umgesetzt. Nachbesserung erzeugt immer einen neuen Auftrag.
 
 ## Freigabeinvalidierung
 

@@ -34,6 +34,7 @@ export function NavMain({ items }: { items: NavItem[] }) {
                                 <Link
                                     href={item.href}
                                     prefetch
+                                    cacheTags={item.cacheTags}
                                     aria-current={active ? 'page' : undefined}
                                 >
                                     {item.icon && <item.icon />}

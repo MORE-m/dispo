@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\DispoOrderStatus;
+use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
+use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
+use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderApprovalRequest;
 use App\Models\DispoOrderPosition;
 use App\Models\User;
+use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
+use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +27,8 @@ class DispoOrderController extends Controller
     public function __construct(
         private readonly DispoOrderWriter $writer,
         private readonly DispoOrderPositionAdoptionService $adoptions,
+        private readonly DispoOrderApprovalService $approvals,
+        private readonly DispoOrderRevisionContext $revisionContext,
     ) {}
 
     public function index(Request $request): Response
@@ -27,7 +36,7 @@ class DispoOrderController extends Controller
         $this->authorize('viewAny', DispoOrder::class);
 
         $orders = DispoOrder::query()
-            ->with(['creator', 'calculation'])
+            ->with(['creator', 'calculation', 'latestApprovalRequest'])
             ->withCount('positions')
             ->latest()
             ->limit(100)
@@ -44,8 +53,12 @@ class DispoOrderController extends Controller
                 'nn_invest' => (string) $order->nn_invest,
                 'status' => $order->status->value,
                 'status_label' => $order->status->label(),
+                'approval_kind' => $order->approval_kind->value,
+                'approval_kind_label' => $order->approval_kind->label(),
+                'requires_special_approval' => $order->requiresSpecialApproval(),
                 'creator_name' => $order->creator?->name,
                 'created_at' => $order->created_at?->toIso8601String(),
+                'submitted_at' => $order->latestApprovalRequest?->submitted_at?->toIso8601String(),
             ]);
 
         return Inertia::render('dispo-orders/index', [
@@ -58,16 +71,104 @@ class DispoOrderController extends Controller
     {
         $this->authorize('view', $dispoOrder);
 
-        $dispoOrder->load(['positions', 'creator', 'calculation']);
+        $dispoOrder->load([
+            'positions',
+            'creator',
+            'calculation',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+            'revises',
+            'revision',
+        ]);
+
+        /** @var User|null $user */
+        $user = $request->user();
 
         $canViewCalculation = $dispoOrder->calculation !== null
-            && ($request->user()?->can('view', $dispoOrder->calculation) ?? false);
+            && ($user?->can('view', $dispoOrder->calculation) ?? false);
+
+        $isCreator = $user !== null && (int) $user->id === (int) $dispoOrder->created_by_id;
+        $canSubmit = ($user?->can('submit', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Draft;
+        $awaiting = $dispoOrder->status === DispoOrderStatus::AwaitingSalesApproval
+            && $dispoOrder->pendingApprovalRequest !== null;
+        $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
+        $canReject = ($user?->can('reject', $dispoOrder) ?? false) && $awaiting;
+        $canRevise = $user?->can('revise', $dispoOrder) ?? false;
 
         return Inertia::render('dispo-orders/show', [
             'order' => $this->serializeOrder($dispoOrder),
             'canViewCalculation' => $canViewCalculation,
             'canCreate' => false,
+            'canSubmit' => $canSubmit,
+            'canApprove' => $canApprove,
+            'canReject' => $canReject,
+            'canRevise' => $canRevise,
+            'isCreator' => $isCreator,
         ]);
+    }
+
+    public function startRevision(Request $request, DispoOrder $dispoOrder): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->authorize('revise', $dispoOrder);
+
+        $dispoOrder->loadMissing('calculation');
+
+        abort_if($dispoOrder->calculation === null, 404);
+
+        $this->revisionContext->start($user, $dispoOrder);
+
+        return redirect()
+            ->route('calculations.edit', $dispoOrder->calculation)
+            ->with('success', 'Nachbesserung gestartet. Passe die Kalkulation an und erstelle danach den korrigierten Dispoauftrag.');
+    }
+
+    public function submit(SubmitDispoOrderRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->approvals->submit(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Dispoauftrag zur Freigabe eingereicht.');
+    }
+
+    public function approve(ApproveDispoOrderRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->approvals->approve(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->note(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Dispoauftrag genehmigt. Status: Liegt bei Disposition.');
+    }
+
+    public function reject(RejectDispoOrderRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->approvals->reject(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->reason(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Dispoauftrag abgelehnt.');
     }
 
     public function positions(Request $request, Calculation $calculation): JsonResponse
@@ -76,15 +177,60 @@ class DispoOrderController extends Controller
 
         $calculation->load(['positions.inventory', 'positions.advertisingMedium', 'positions.timeRanges']);
 
-        return response()->json([
+        $payload = [
             'positions' => $this->adoptions->selectablePositions($calculation),
-        ]);
+        ];
+
+        $revision = $this->revisionContext->currentForCalculation($request, $calculation->id);
+
+        if ($revision !== null) {
+            $predecessor = DispoOrder::query()
+                ->with('positions')
+                ->find($revision['predecessor_id']);
+
+            $existingIds = $calculation->positions->pluck('id')->all();
+            $preferred = [];
+
+            if ($predecessor !== null) {
+                foreach ($predecessor->positions as $position) {
+                    $calcPositionId = $position->calculation_position_id;
+                    if ($calcPositionId !== null && in_array((int) $calcPositionId, $existingIds, true)) {
+                        $preferred[] = (int) $calcPositionId;
+                    }
+                }
+            }
+
+            $payload['preferred_position_ids'] = array_values(array_unique($preferred));
+            $payload['revision'] = [
+                'predecessor_id' => $revision['predecessor_id'],
+                'predecessor_number' => $revision['predecessor_number'],
+                'rejection_reason' => $revision['rejection_reason'],
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     public function store(CreateDispoOrderFromCalculationRequest $request, Calculation $calculation): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
+
+        $predecessor = $request->predecessor();
+
+        if ($predecessor !== null) {
+            $result = $this->writer->createRevision(
+                $predecessor,
+                $calculation,
+                $request->positionIds(),
+                $user,
+            );
+            $this->revisionContext->clear();
+
+            return redirect()
+                ->route('dispo-orders.show', $result->order)
+                ->with('success', 'Korrigierter Dispoauftrag als Entwurf angelegt. Bitte erneut zur Freigabe einreichen.');
+        }
 
         $result = $this->writer->createFromCalculation(
             $calculation,
@@ -97,6 +243,20 @@ class DispoOrderController extends Controller
             ->with('success', 'Dispoauftrag angelegt.');
     }
 
+    private function respondSuccess(Request $request, DispoOrder $order, string $message): JsonResponse|RedirectResponse
+    {
+        $url = route('dispo-orders.show', $order);
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => $message,
+                'redirect' => $url,
+            ]);
+        }
+
+        return redirect()->to($url)->with('success', $message);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -107,6 +267,7 @@ class DispoOrderController extends Controller
             'number' => $order->number,
             'status' => $order->status->value,
             'status_label' => $order->status->label(),
+            'lock_version' => $order->lock_version,
             'source_calculation_number' => $order->source_calculation_number,
             'calculation_id' => $order->calculation_id,
             'customer_name' => $order->customer_name,
@@ -123,11 +284,26 @@ class DispoOrderController extends Controller
             'order_discount_total' => (string) $order->order_discount_total,
             'ae_total' => (string) $order->ae_total,
             'nn_invest' => (string) $order->nn_invest,
-            'requires_special_approval' => (bool) $order->requires_special_approval,
+            'requires_special_approval' => $order->requiresSpecialApproval(),
+            'approval_kind' => $order->approval_kind->value,
+            'approval_kind_label' => $order->approval_kind->label(),
+            'special_approval_reasons' => $order->special_approval_reasons ?? [],
             'order_discounts' => $order->order_discounts_snapshot ?? [],
             'source_calculation_totals' => $order->source_calculation_totals_snapshot ?? null,
             'creator_name' => $order->creator?->name,
             'created_at' => $order->created_at?->toIso8601String(),
+            'rejection_reason' => $order->latestApprovalRequest?->rejection_reason,
+            'revises_dispo_order_id' => $order->revises_dispo_order_id,
+            'revises' => $this->serializeRevisionLink($order->revises),
+            'revision' => $this->serializeRevisionLink($order->revision),
+            'approval_history' => $order->approvalRequests->map(
+                fn (DispoOrderApprovalRequest $request): array => $this->serializeApprovalRequest($request),
+            )->all(),
+            'current_approval' => $order->pendingApprovalRequest instanceof DispoOrderApprovalRequest
+                ? $this->serializeApprovalRequest($order->pendingApprovalRequest)
+                : ($order->approvalRequests->last() instanceof DispoOrderApprovalRequest
+                    ? $this->serializeApprovalRequest($order->approvalRequests->last())
+                    : null),
             'positions' => $order->positions->map(fn (DispoOrderPosition $position): array => [
                 'id' => $position->id,
                 'inventory_name' => $position->inventory_name,
@@ -145,6 +321,45 @@ class DispoOrderController extends Controller
                 'time_ranges' => $position->time_ranges_snapshot ?? [],
                 'position_discounts' => $position->position_discounts_snapshot ?? [],
             ])->all(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, number: string, status: string, status_label: string}|null
+     */
+    private function serializeRevisionLink(?DispoOrder $order): ?array
+    {
+        if ($order === null) {
+            return null;
+        }
+
+        return [
+            'id' => $order->id,
+            'number' => $order->number,
+            'status' => $order->status->value,
+            'status_label' => $order->status->label(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeApprovalRequest(DispoOrderApprovalRequest $request): array
+    {
+        return [
+            'id' => $request->id,
+            'cycle_number' => $request->cycle_number,
+            'status' => $request->status->value,
+            'status_label' => $request->status->label(),
+            'kind' => $request->kind->value,
+            'kind_label' => $request->kind->label(),
+            'special_approval_reasons' => $request->special_approval_reasons ?? [],
+            'submitted_by_name' => $request->submitted_by_name,
+            'submitted_at' => $request->submitted_at->toIso8601String(),
+            'decided_by_name' => $request->decided_by_name,
+            'decided_at' => $request->decided_at?->toIso8601String(),
+            'rejection_reason' => $request->rejection_reason,
+            'decision_note' => $request->decision_note,
         ];
     }
 }

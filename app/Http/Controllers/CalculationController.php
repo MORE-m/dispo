@@ -24,6 +24,7 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DispoOrder\DispoOrderRevisionContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,6 +37,7 @@ class CalculationController extends Controller
         private readonly CalculationWriter $writer,
         private readonly BudgetSpotProposalService $spotProposals,
         private readonly AuditLogger $audit,
+        private readonly DispoOrderRevisionContext $dispoOrderRevisionContext,
     ) {}
 
     public function index(Request $request): Response
@@ -440,6 +442,33 @@ class CalculationController extends Controller
             'canEdit' => $canEdit,
             'canCreateDispoOrder' => $calculation !== null
                 && ($request->user()?->can('create', [DispoOrder::class, $calculation]) ?? false),
+            'dispoOrderRevision' => $calculation === null
+                ? null
+                : $this->dispoOrderRevisionProp($request, $calculation),
+        ];
+    }
+
+    /**
+     * @return array{
+     *     predecessor_id: int,
+     *     predecessor_number: string,
+     *     rejection_reason: ?string,
+     *     return_url: string
+     * }|null
+     */
+    private function dispoOrderRevisionProp(Request $request, Calculation $calculation): ?array
+    {
+        $context = $this->dispoOrderRevisionContext->currentForCalculation($request, $calculation->id);
+
+        if ($context === null) {
+            return null;
+        }
+
+        return [
+            'predecessor_id' => $context['predecessor_id'],
+            'predecessor_number' => $context['predecessor_number'],
+            'rejection_reason' => $context['rejection_reason'],
+            'return_url' => $context['return_url'],
         ];
     }
 }

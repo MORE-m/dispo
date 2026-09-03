@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Inertia prefetch cache tags for mutable list pages. */
+    cacheTags?: string | string[];
 };

@@ -38,6 +38,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $ae_total
  * @property string $nn_invest
  * @property bool $requires_special_approval
+ * @property array<int, array<string, mixed>>|null $special_approval_reasons
+ * @property string|null $personal_discount_limit_percent
  * @property int $lock_version
  */
 class Calculation extends Model
@@ -71,6 +73,8 @@ class Calculation extends Model
         'ae_total',
         'nn_invest',
         'requires_special_approval',
+        'special_approval_reasons',
+        'personal_discount_limit_percent',
         'lock_version',
     ];
 
@@ -93,6 +97,8 @@ class Calculation extends Model
             'ae_total' => 'decimal:2',
             'nn_invest' => 'decimal:2',
             'requires_special_approval' => 'boolean',
+            'special_approval_reasons' => 'array',
+            'personal_discount_limit_percent' => 'decimal:4',
             'lock_version' => 'integer',
         ];
     }

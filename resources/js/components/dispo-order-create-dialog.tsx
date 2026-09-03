@@ -1,7 +1,11 @@
 import { router } from '@inertiajs/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorState, LoadingState } from '@/components/feedback/states';
 import { money } from '@/components/form-field';
+import {
+    DISPO_ORDERS_CACHE_TAG,
+    flushDispoOrderInertiaCache,
+} from '@/lib/dispo-order-inertia-cache';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
     firstValidationMessage,
@@ -18,6 +22,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import type { DispoOrderRevisionContext } from '@/types/dispo-order';
 
 type SelectablePosition = {
     id: number;
@@ -38,6 +43,12 @@ type SelectablePosition = {
 
 type PositionsResponse = {
     positions: SelectablePosition[];
+    preferred_position_ids?: number[];
+    revision?: {
+        predecessor_id: number;
+        predecessor_number: string;
+        rejection_reason: string | null;
+    };
 };
 
 function formatTimeRanges(ranges: SelectablePosition['time_ranges']): string {
@@ -53,20 +64,53 @@ function formatTimeRanges(ranges: SelectablePosition['time_ranges']): string {
         .join('; ');
 }
 
+function defaultSelectedIds(
+    positions: SelectablePosition[],
+    preferredIds: number[] | undefined,
+    isRevision: boolean,
+): number[] {
+    const available = new Set(positions.map((position) => position.id));
+
+    if (isRevision && preferredIds && preferredIds.length > 0) {
+        const preferred = preferredIds.filter((id) => available.has(id));
+        if (preferred.length > 0) {
+            return preferred;
+        }
+    }
+
+    if (isRevision) {
+        return positions.map((position) => position.id);
+    }
+
+    return positions
+        .filter((position) => !position.already_adopted)
+        .map((position) => position.id);
+}
+
 export function DispoOrderCreateDialog({
     calculationId,
     open,
     onOpenChange,
+    revision = null,
 }: {
     calculationId: number;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    revision?: DispoOrderRevisionContext | null;
 }) {
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [positions, setPositions] = useState<SelectablePosition[]>([]);
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [activeRevision, setActiveRevision] = useState<{
+        predecessor_id: number;
+        predecessor_number: string;
+        rejection_reason: string | null;
+    } | null>(revision);
+    const inFlight = useRef(false);
+
+    const isRevision = activeRevision !== null;
 
     useEffect(() => {
         if (!open) {
@@ -76,6 +120,7 @@ export function DispoOrderCreateDialog({
         let cancelled = false;
         setLoading(true);
         setError(null);
+        setActiveRevision(revision);
 
         fetch(`/kalkulationen/${calculationId}/dispoauftraege/positionen`, {
             credentials: 'same-origin',
@@ -96,11 +141,15 @@ export function DispoOrderCreateDialog({
                     return;
                 }
 
+                const nextRevision = data.revision ?? revision;
+                setActiveRevision(nextRevision);
                 setPositions(data.positions);
                 setSelectedIds(
-                    data.positions
-                        .filter((position) => !position.already_adopted)
-                        .map((position) => position.id),
+                    defaultSelectedIds(
+                        data.positions,
+                        data.preferred_position_ids,
+                        nextRevision !== null,
+                    ),
                 );
             })
             .catch((loadError: Error) => {
@@ -117,7 +166,7 @@ export function DispoOrderCreateDialog({
         return () => {
             cancelled = true;
         };
-    }, [calculationId, open]);
+    }, [calculationId, open, revision]);
 
     const allSelected = useMemo(
         () => positions.length > 0 && selectedIds.length === positions.length,
@@ -137,32 +186,44 @@ export function DispoOrderCreateDialog({
     }
 
     function handleSubmit() {
-        if (submitting || selectedIds.length === 0) {
+        if (inFlight.current || submitting || selectedIds.length === 0) {
             return;
         }
 
+        inFlight.current = true;
         setSubmitting(true);
         setError(null);
 
-        router.post(
-            `/kalkulationen/${calculationId}/dispoauftraege`,
-            { position_ids: selectedIds },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    onOpenChange(false);
-                },
-                onError: (errors) => {
-                    setError(
-                        firstValidationMessage(mapValidationErrors(errors)) ??
-                            'Dispoauftrag konnte nicht angelegt werden.',
-                    );
-                },
-                onFinish: () => {
-                    setSubmitting(false);
-                },
+        const payload =
+            activeRevision !== null
+                ? {
+                      position_ids: selectedIds,
+                      revises_dispo_order_id: activeRevision.predecessor_id,
+                  }
+                : {
+                      position_ids: selectedIds,
+                  };
+
+        flushDispoOrderInertiaCache();
+        router.post(`/kalkulationen/${calculationId}/dispoauftraege`, payload, {
+            preserveScroll: true,
+            invalidateCacheTags: DISPO_ORDERS_CACHE_TAG,
+            onSuccess: () => {
+                onOpenChange(false);
             },
-        );
+            onError: (errors) => {
+                setError(
+                    firstValidationMessage(mapValidationErrors(errors)) ??
+                        (isRevision
+                            ? 'Korrigierter Dispoauftrag konnte nicht angelegt werden.'
+                            : 'Dispoauftrag konnte nicht angelegt werden.'),
+                );
+            },
+            onFinish: () => {
+                inFlight.current = false;
+                setSubmitting(false);
+            },
+        });
     }
 
     return (
@@ -172,10 +233,15 @@ export function DispoOrderCreateDialog({
                 data-test="dispo-order-create-dialog"
             >
                 <DialogHeader>
-                    <DialogTitle>Dispoauftrag anlegen</DialogTitle>
+                    <DialogTitle>
+                        {isRevision
+                            ? 'Korrigierten Dispoauftrag erstellen'
+                            : 'Dispoauftrag anlegen'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Wählen Sie die Kalkulationspositionen, die in den
-                        Dispoauftrag übernommen werden sollen.
+                        {isRevision
+                            ? `Wählen Sie die Positionen für die Korrektur von ${activeRevision.predecessor_number}. Bereits übernommene Positionen dürfen für diese Nachbesserung erneut gewählt werden.`
+                            : 'Wählen Sie die Kalkulationspositionen, die in den Dispoauftrag übernommen werden sollen.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -269,16 +335,17 @@ export function DispoOrderCreateDialog({
                                                                 className="text-xs font-medium text-orange-700"
                                                                 data-test={`dispo-order-position-adopted-${position.id}`}
                                                             >
-                                                                Bereits
-                                                                übernommen
+                                                                {isRevision
+                                                                    ? 'Bereits in einem früheren Dispoauftrag enthalten'
+                                                                    : 'Bereits übernommen'}
                                                                 {position.adoptions
                                                                     .map(
                                                                         (
                                                                             adoption,
                                                                         ) =>
-                                                                            adoption.dispo_order_number,
+                                                                            ` ${adoption.dispo_order_number}`,
                                                                     )
-                                                                    .join(', ')}
+                                                                    .join(',')}
                                                             </p>
                                                         ) : null}
                                                     </div>
@@ -313,8 +380,12 @@ export function DispoOrderCreateDialog({
                         data-test="dispo-order-submit"
                     >
                         {submitting
-                            ? 'Wird angelegt …'
-                            : 'Dispoauftrag anlegen'}
+                            ? isRevision
+                                ? 'Wird erstellt …'
+                                : 'Wird angelegt …'
+                            : isRevision
+                              ? 'Korrigierten Dispoauftrag erstellen'
+                              : 'Dispoauftrag anlegen'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
