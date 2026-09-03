@@ -150,6 +150,7 @@ UX-GATE-D-Bestandteile **freigegeben**:
 - Navigation zum Dispoauftragsmodul
 - Einreichen zur Freigabe, Genehmigen/Ablehnen, Vier-Augen-Prinzip
 - Statusübergänge bis `Liegt bei Disposition` / `Freigabe abgelehnt`
+- Nachbesserung abgelehnter Aufträge über neuen verknüpften Entwurf
 - zugehörige Policies, Persistenz, Auditierung und Tests
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
@@ -157,14 +158,16 @@ UX-GATE-D-Bestandteile **freigegeben**:
 - operative Bearbeitung durch die Disposition
 - Material, Uploads, Kommentare, Rückfragen
 - vollständiger Statusworkflow ab `In Bearbeitung`
-- Rückkehr abgelehnter Aufträge in den Entwurf / Wiedereinreichung
+- Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
 - Administration der Initialkataloge
 - Auswertungen und abschließende Fachoberflächen
 
 Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
-technisch und fachlich umgesetzt. Weitere Statuswerte bleiben definiert, aber
-noch nicht erreichbar.
+technisch und fachlich umgesetzt. Der abgelehnte Dispoauftrag bleibt als
+unveränderbarer, terminaler Snapshot erhalten; der Ersteller kann die Kalkulation
+nachbessern und einen neuen verknüpften Entwurf erzeugen. Weitere Statuswerte
+bleiben definiert, aber noch nicht erreichbar.
 
 ## Erlaubt / nicht erlaubt
 

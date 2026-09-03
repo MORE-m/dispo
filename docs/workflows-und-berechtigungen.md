@@ -58,9 +58,10 @@ Jeder Dispoauftrag benötigt vor Disposition eine Freigabe. Es gibt keinen
 | Regulär | anderer Vertrieb, Admin, Geschäftsführung |
 | Sonderfreigabe | ausschließlich Admin, Geschäftsführung |
 
-Disposition und Produktmanagement entscheiden nicht. Abgelehnte Aufträge bleiben
-als unveränderbarer Snapshot im Status `Freigabe abgelehnt` (keine Rückkehr in
-den Entwurf in diesem Slice).
+Disposition und Produktmanagement entscheiden nicht. Der abgelehnte Dispoauftrag
+bleibt als unveränderbarer, terminaler Snapshot erhalten. Der Ersteller kann die
+zugrunde liegende Kalkulation nachbessern und daraus einen neuen, verknüpften
+Dispoauftrag im Status Entwurf erzeugen.
 
 Freigabeart und Gründe werden beim Anlegen des Dispoauftrags aus der kanonischen
 Sonderfreigabelogik als Snapshot gespeichert; spätere Änderungen an
@@ -90,10 +91,14 @@ flowchart TD
     A[Entwurf] --> B[Wartet auf Vertriebsfreigabe]
     B --> C[Liegt bei Disposition]
     B --> D[Freigabe abgelehnt]
+    D --> E[Kalkulation nachbessern]
+    E --> F[Neuer Entwurf verknüpft]
+    F --> B
 ```
 
-Während einer laufenden Freigabe ist der Auftrag schreibgeschützt. Rückzug und
-Wiedereinreichung sind in diesem Slice nicht umgesetzt.
+Während einer laufenden Freigabe ist der Auftrag schreibgeschützt. Rückzug einer
+offenen Freigabe sowie Überschreiben desselben abgelehnten Snapshots sind in
+diesem Slice nicht umgesetzt. Nachbesserung erzeugt immer einen neuen Auftrag.
 
 ## Freigabeinvalidierung
 

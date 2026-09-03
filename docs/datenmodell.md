@@ -167,14 +167,17 @@ in `dispo_order_positions` persistiert. Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
 Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und
-`personal_discount_limit_percent` (Grenze zum Speicherzeitpunkt).
+`personal_discount_limit_percent` (Grenze zum Speicherzeitpunkt). Eine optionale
+Selbstreferenz `revises_dispo_order_id` verknüpft einen Korrektur-Entwurf mit
+genau einem abgelehnten Vorgänger (höchstens ein direkter Nachfolger).
 
 Erreichbare Status in diesem Slice:
 
 - `Entwurf`
 - `Wartet auf Vertriebsfreigabe`
 - `Liegt bei Disposition`
-- `Freigabe abgelehnt` (terminal; keine Rückkehr in den Entwurf in diesem Slice)
+- `Freigabe abgelehnt` (unveränderbarer, terminaler Snapshot; Nachbesserung nur
+  über neuen verknüpften Entwurf)
 
 Zusätzlich vorgesehen, aber noch nicht operativ:
 

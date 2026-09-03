@@ -304,10 +304,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung im Dispo-Freigabe-Slice; Invalidierung/Wiedereinreichung offen
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; Invalidierung offen
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
-- **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag terminal in diesem Slice
+- **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
 - **Offen:** Freigabeinvalidierung nach Änderungen, Rückzug, AUTH-005 als zwei getrennte Ereignisse
 - **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` offen
 - **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright
@@ -338,11 +338,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-01b – Vier-Augen-Freigabe (Vertical Slice)
 
 - **Phase:** 8
-- **Status:** **umgesetzt** (September 2026, Branch `feat/dispo-order-approval`)
+- **Status:** **umgesetzt** (September 2026, Branch `feat/dispo-order-approval`, PR #13)
 - **Anforderungen:** `AUTH-004`, `APR-001` (Teil), Statusübergänge Entwurf/Freigabe
 - **Abhängigkeiten:** BL-P8-01
-- **Ergebnis:** Einreichen → Genehmigen/Ablehnen; Status `Liegt bei Disposition` bzw. `Freigabe abgelehnt`; persistente Freigabehistorie
-- **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe nur Admin/GF
+- **Ergebnis:** Einreichen → Genehmigen/Ablehnen; Status `Liegt bei Disposition` bzw. `Freigabe abgelehnt`; persistente Freigabehistorie; Nachbesserung über neuen verknüpften Entwurf; Listenstatus ohne Browser-Reload
+- **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe nur Admin/GF; Ersteller bessert abgelehnte Aufträge nach
 - **Tests:** Pest, Vitest, Playwright, MySQL-Concurrency
 
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
