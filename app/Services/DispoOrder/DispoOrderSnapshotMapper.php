@@ -8,6 +8,8 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
+use App\Services\Calculation\StoredPositionTotals;
+use Illuminate\Support\Collection;
 
 /**
  * Snapshot-Mapping aus gespeicherten Kalkulationswerten – keine Neuberechnung.
@@ -15,11 +17,15 @@ use App\Models\SpotClassicPlanRow;
 final class DispoOrderSnapshotMapper
 {
     /**
+     * @param  Collection<int, CalculationPosition>  $selectedPositions
      * @return array<string, mixed>
      */
-    public function headerFromCalculation(Calculation $calculation): array
+    public function headerFromCalculation(Calculation $calculation, Collection $selectedPositions): array
     {
-        $calculation->loadMissing(['advisor', 'orderDiscounts']);
+        $calculation->loadMissing(['advisor', 'orderDiscounts', 'positions']);
+        $allSelected = $selectedPositions->count() === $calculation->positions->count();
+        $orderTotals = StoredPositionTotals::sum($selectedPositions);
+        $sourceTotals = StoredPositionTotals::fromCalculation($calculation);
 
         return [
             'source_calculation_number' => $calculation->number,
@@ -32,13 +38,17 @@ final class DispoOrderSnapshotMapper
             'advisor_name' => $calculation->advisor?->name,
             'order_discount_percent' => (string) $calculation->order_discount_percent,
             'ae_enabled' => (bool) $calculation->ae_enabled,
-            'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
-            'media_gross' => (string) $calculation->media_gross,
-            'position_discount_total' => (string) $calculation->position_discount_total,
-            'order_discount_total' => (string) $calculation->order_discount_total,
-            'ae_total' => (string) $calculation->ae_total,
-            'nn_invest' => (string) $calculation->nn_invest,
-            'requires_special_approval' => (bool) $calculation->requires_special_approval,
+            'target_budget_nn' => $allSelected && $calculation->target_budget_nn !== null
+                ? (string) $calculation->target_budget_nn
+                : null,
+            'media_gross' => $orderTotals['media_gross'],
+            'position_discount_total' => $orderTotals['position_discount_total'],
+            'order_discount_total' => $orderTotals['order_discount_total'],
+            'ae_total' => $orderTotals['ae_total'],
+            'nn_invest' => $orderTotals['nn_invest'],
+            'requires_special_approval' => $allSelected
+                ? (bool) $calculation->requires_special_approval
+                : false,
             'order_discounts_snapshot' => $calculation->orderDiscounts->map(
                 fn (CalculationOrderDiscount $discount): array => [
                     'type' => $discount->type->value,
@@ -46,6 +56,7 @@ final class DispoOrderSnapshotMapper
                     'percent' => (string) $discount->percent,
                 ]
             )->all(),
+            'source_calculation_totals_snapshot' => $sourceTotals,
         ];
     }
 
@@ -129,6 +140,7 @@ final class DispoOrderSnapshotMapper
             'status' => $order->status->value,
             'created_by_id' => $order->created_by_id,
             'position_ids' => $result->positionIds,
+            'nn_invest' => (string) $order->nn_invest,
             'positions' => $order->positions->map(fn ($position): array => [
                 'calculation_position_id' => $position->calculation_position_id,
                 'inventory_name' => $position->inventory_name,

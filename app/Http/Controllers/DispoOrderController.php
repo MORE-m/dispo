@@ -41,6 +41,7 @@ class DispoOrderController extends Controller
                 'source_calculation_number' => $order->source_calculation_number,
                 'calculation_id' => $order->calculation_id,
                 'positions_count' => $order->positions_count,
+                'nn_invest' => (string) $order->nn_invest,
                 'status' => $order->status->value,
                 'status_label' => $order->status->label(),
                 'creator_name' => $order->creator?->name,
@@ -124,6 +125,7 @@ class DispoOrderController extends Controller
             'nn_invest' => (string) $order->nn_invest,
             'requires_special_approval' => (bool) $order->requires_special_approval,
             'order_discounts' => $order->order_discounts_snapshot ?? [],
+            'source_calculation_totals' => $order->source_calculation_totals_snapshot ?? null,
             'creator_name' => $order->creator?->name,
             'created_at' => $order->created_at?->toIso8601String(),
             'positions' => $order->positions->map(fn (DispoOrderPosition $position): array => [

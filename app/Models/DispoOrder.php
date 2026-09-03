@@ -48,6 +48,7 @@ class DispoOrder extends Model
         'nn_invest',
         'requires_special_approval',
         'order_discounts_snapshot',
+        'source_calculation_totals_snapshot',
         'lock_version',
     ];
 
@@ -68,6 +69,7 @@ class DispoOrder extends Model
             'nn_invest' => 'decimal:2',
             'requires_special_approval' => 'boolean',
             'order_discounts_snapshot' => 'array',
+            'source_calculation_totals_snapshot' => 'array',
             'lock_version' => 'integer',
         ];
     }

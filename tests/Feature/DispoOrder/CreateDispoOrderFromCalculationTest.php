@@ -167,7 +167,11 @@ class CreateDispoOrderFromCalculationTest extends TestCase
         $this->assertSame($calculation->number, $order->source_calculation_number);
         $this->assertSame('Testkunde GmbH', $order->customer_name);
         $this->assertSame('Frühjahr 2026', $order->campaign);
-        $this->assertSame((string) $calculation->nn_invest, (string) $order->nn_invest);
+        $this->assertSame((string) $position->nn_invest, (string) $order->nn_invest);
+        $this->assertSame(
+            (string) $calculation->nn_invest,
+            $order->source_calculation_totals_snapshot['nn_invest'],
+        );
 
         $snapshot = $order->positions->first();
         $this->assertSame($position->inventory->name, $snapshot->inventory_name);

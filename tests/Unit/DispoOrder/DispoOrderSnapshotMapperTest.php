@@ -22,9 +22,10 @@ class DispoOrderSnapshotMapperTest extends TestCase
         $calculation = $this->createSavedCalculation($catalog, [
             ['inventory_id' => $catalog['hamburg']->id],
         ]);
-        $calculation->load('advisor');
+        $calculation->load('advisor', 'positions');
+        $selected = $calculation->positions;
 
-        $header = app(DispoOrderSnapshotMapper::class)->headerFromCalculation($calculation);
+        $header = app(DispoOrderSnapshotMapper::class)->headerFromCalculation($calculation, $selected);
 
         $this->assertSame($calculation->number, $header['source_calculation_number']);
         $this->assertSame('Testkunde GmbH', $header['customer_name']);

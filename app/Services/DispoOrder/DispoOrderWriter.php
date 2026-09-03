@@ -98,7 +98,7 @@ final class DispoOrderWriter
         $order->status = DispoOrderStatus::Draft;
         $order->created_by_id = $user->id;
         $order->lock_version = 1;
-        $order->fill($this->mapper->headerFromCalculation($calculation));
+        $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
         $order->save();
 
         $sort = 0;

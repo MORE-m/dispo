@@ -62,6 +62,13 @@ type OrderDetail = {
         custom_label?: string | null;
         percent?: string;
     }[];
+    source_calculation_totals: {
+        media_gross: string;
+        position_discount_total: string;
+        order_discount_total: string;
+        ae_total: string;
+        nn_invest: string;
+    } | null;
     creator_name: string | null;
     created_at: string | null;
     positions: OrderPosition[];
@@ -181,6 +188,21 @@ export default function DispoOrderShow({
                         {order.requires_special_approval ? (
                             <p className="text-primary pt-2 text-xs font-medium">
                                 Sonderfreigabe erforderlich
+                            </p>
+                        ) : null}
+                        {order.source_calculation_totals &&
+                        order.source_calculation_totals.nn_invest !==
+                            order.nn_invest ? (
+                            <p
+                                className="text-muted-foreground border-border/60 mt-3 border-t pt-3 text-xs"
+                                data-test="dispo-order-source-calculation-totals"
+                            >
+                                Summe der Quellkalkulation{' '}
+                                {order.source_calculation_number}:{' '}
+                                {money(
+                                    order.source_calculation_totals.nn_invest,
+                                )}{' '}
+                                N/N (nicht Auftragssumme)
                             </p>
                         ) : null}
                     </CardContent>

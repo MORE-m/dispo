@@ -38,18 +38,24 @@ final class DispoOrderNumberSequencer
             'updated_at' => now(),
         ]);
 
+        /** @var DispoOrderNumberSequence|null $sequence */
         $sequence = DispoOrderNumberSequence::query()
             ->where('year', $year)
             ->lockForUpdate()
-            ->firstOrFail();
+            ->first();
+
+        if ($sequence === null) {
+            throw new \RuntimeException("Dispo-Jahressequenz {$year} konnte nicht gesperrt werden.");
+        }
 
         $orgSeq = $sequence->last_seq + 1;
         $sequence->last_seq = $orgSeq;
         $sequence->save();
 
-        $calcSeq = (int) DispoOrder::query()
+        $calcSeq = (int) (DispoOrder::query()
             ->where('calculation_id', $calculation->id)
-            ->max('number_calc_seq') + 1;
+            ->lockForUpdate()
+            ->max('number_calc_seq') ?? 0) + 1;
 
         $number = sprintf('DA-%d-%06d-%02d', $year, $orgSeq, $calcSeq);
 
