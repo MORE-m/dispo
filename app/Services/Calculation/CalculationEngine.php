@@ -10,6 +10,10 @@ use App\Enums\SpotCalculationMethod;
  */
 final class CalculationEngine
 {
+    public function __construct(
+        private readonly SpecialApprovalAssessor $assessor = new SpecialApprovalAssessor,
+    ) {}
+
     /**
      * @param  list<PositionInput>  $positions
      * @param  list<DiscountInput>  $orderDiscounts
@@ -37,9 +41,13 @@ final class CalculationEngine
         $afterPositionTotal = '0.00';
         $afterOrderTotal = '0.00';
         $aeEligibleBase = '0';
-        $requiresSpecialApproval = false;
+        $specialApprovalReasons = [];
 
-        foreach ($results as $result) {
+        $orderStackedPercent = $this->assessor->stackedPercent(
+            array_map(fn (DiscountInput $discount): string => $discount->percent, $resolvedOrderDiscounts),
+        );
+
+        foreach ($results as $index => $result) {
             $mediaGross = Decimal::roundMoney(Decimal::add($mediaGross, $result->mediaGross));
             $positionDiscountTotal = Decimal::roundMoney(Decimal::add($positionDiscountTotal, $result->positionDiscountAmount));
             $orderDiscountTotal = Decimal::roundMoney(Decimal::add($orderDiscountTotal, $result->orderDiscountAmount));
@@ -48,9 +56,22 @@ final class CalculationEngine
             $afterPositionTotal = Decimal::roundMoney(Decimal::add($afterPositionTotal, $result->afterPositionDiscount));
             $afterOrderTotal = Decimal::roundMoney(Decimal::add($afterOrderTotal, $result->afterOrderDiscount));
 
-            if ($this->exceedsDiscountLimit($result->effectiveDiscountPercent, $personalDiscountLimitPercent)) {
-                $requiresSpecialApproval = true;
-            }
+            $position = $positions[$index];
+            $positionStackedPercent = $this->stackedPositionPercent($position);
+            $appliedOrderPercent = $position->isDiscountable ? $orderStackedPercent : '0';
+
+            $specialApprovalReasons = array_merge(
+                $specialApprovalReasons,
+                $this->assessor->reasonsForRates(
+                    $positionStackedPercent,
+                    $appliedOrderPercent,
+                    $result->effectiveDiscountPercent,
+                    $personalDiscountLimitPercent,
+                    null,
+                    $position->positionKey,
+                    $position->inventoryName,
+                ),
+            );
         }
 
         foreach ($positions as $index => $position) {
@@ -60,6 +81,7 @@ final class CalculationEngine
         }
 
         $orderDiscountBreakdown = $this->applyDiscountSequence($afterPositionTotal, $resolvedOrderDiscounts);
+        $assessment = SpecialApprovalAssessment::fromReasons($specialApprovalReasons);
 
         $budgetDelta = null;
         $roundedTarget = $targetBudgetNn === null || $targetBudgetNn === ''
@@ -78,13 +100,14 @@ final class CalculationEngine
             nnInvest: $nnInvest,
             targetBudgetNn: $roundedTarget,
             budgetDelta: $budgetDelta,
-            requiresSpecialApproval: $requiresSpecialApproval,
+            requiresSpecialApproval: $assessment->requiresSpecialApproval,
             positions: $results,
             aeEnabled: $aeEnabled,
             orderDiscounts: $orderDiscountBreakdown,
             afterPositionDiscountTotal: $afterPositionTotal,
             afterOrderDiscountTotal: $afterOrderTotal,
             aeEligibleBase: Decimal::roundMoney($aeEligibleBase),
+            specialApprovalReasons: $assessment->reasons,
         );
     }
 
@@ -513,12 +536,16 @@ final class CalculationEngine
         return $rows;
     }
 
-    private function exceedsDiscountLimit(string $effectiveDiscountPercent, ?string $personalLimitPercent): bool
+    private function stackedPositionPercent(PositionInput $position): string
     {
-        if ($personalLimitPercent === null || $personalLimitPercent === '') {
-            return false;
+        if (! $position->isDiscountable) {
+            return '0';
         }
 
-        return Decimal::cmp($effectiveDiscountPercent, $personalLimitPercent, 4) === 1;
+        $discounts = $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent);
+
+        return $this->assessor->stackedPercent(
+            array_map(fn (DiscountInput $discount): string => $discount->percent, $discounts),
+        );
     }
 }

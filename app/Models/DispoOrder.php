@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Enums\DispoOrderApprovalKind;
 use App\Enums\DispoOrderStatus;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $id
@@ -18,7 +20,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property DispoOrderStatus $status
  * @property int $created_by_id
  * @property string $source_calculation_number
+ * @property DispoOrderApprovalKind $approval_kind
+ * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property-read Collection<int, DispoOrderPosition> $positions
+ * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  */
 class DispoOrder extends Model
 {
@@ -47,6 +52,8 @@ class DispoOrder extends Model
         'ae_total',
         'nn_invest',
         'requires_special_approval',
+        'approval_kind',
+        'special_approval_reasons',
         'order_discounts_snapshot',
         'source_calculation_totals_snapshot',
         'lock_version',
@@ -68,6 +75,8 @@ class DispoOrder extends Model
             'ae_total' => 'decimal:2',
             'nn_invest' => 'decimal:2',
             'requires_special_approval' => 'boolean',
+            'approval_kind' => DispoOrderApprovalKind::class,
+            'special_approval_reasons' => 'array',
             'order_discounts_snapshot' => 'array',
             'source_calculation_totals_snapshot' => 'array',
             'lock_version' => 'integer',
@@ -104,5 +113,37 @@ class DispoOrder extends Model
     public function positions(): HasMany
     {
         return $this->hasMany(DispoOrderPosition::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<DispoOrderApprovalRequest, $this>
+     */
+    public function approvalRequests(): HasMany
+    {
+        return $this->hasMany(DispoOrderApprovalRequest::class)->orderBy('cycle_number')->orderBy('id');
+    }
+
+    /**
+     * @return HasOne<DispoOrderApprovalRequest, $this>
+     */
+    public function latestApprovalRequest(): HasOne
+    {
+        return $this->hasOne(DispoOrderApprovalRequest::class)->latestOfMany('cycle_number');
+    }
+
+    /**
+     * @return HasOne<DispoOrderApprovalRequest, $this>
+     */
+    public function pendingApprovalRequest(): HasOne
+    {
+        return $this->hasOne(DispoOrderApprovalRequest::class)
+            ->where('status', 'pending')
+            ->where('open_guard', 1);
+    }
+
+    public function requiresSpecialApproval(): bool
+    {
+        return $this->approval_kind === DispoOrderApprovalKind::Special
+            || (bool) $this->requires_special_approval;
     }
 }

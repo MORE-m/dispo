@@ -28,6 +28,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('standardangebote', UnavailableModuleController::class)->defaults('module', 'standard-offers')->name('standard-offers.index');
     Route::get('dispoauftraege', [DispoOrderController::class, 'index'])->name('dispo-orders.index');
     Route::get('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'show'])->name('dispo-orders.show');
+    Route::post('dispoauftraege/{dispoOrder}/einreichen', [DispoOrderController::class, 'submit'])
+        ->name('dispo-orders.submit');
+    Route::post('dispoauftraege/{dispoOrder}/genehmigen', [DispoOrderController::class, 'approve'])
+        ->name('dispo-orders.approve');
+    Route::post('dispoauftraege/{dispoOrder}/ablehnen', [DispoOrderController::class, 'reject'])
+        ->name('dispo-orders.reject');
     Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])
         ->name('dispo-orders.positions');
     Route::post('kalkulationen/{calculation}/dispoauftraege', [DispoOrderController::class, 'store'])
