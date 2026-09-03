@@ -1,11 +1,18 @@
 import type { ReactNode } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
+import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { SuccessState } from '@/components/feedback/states';
 import { formatPercent, money } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
-import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import { SpecialApprovalReasonsList } from '@/components/special-approval-reasons-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import type {
+    ApprovalHistoryEntry,
+    SpecialApprovalReason,
+} from '@/types/dispo-order';
 
 type OrderPosition = {
     id: number;
@@ -40,6 +47,7 @@ type OrderDetail = {
     number: string;
     status: string;
     status_label: string;
+    lock_version: number;
     source_calculation_number: string;
     calculation_id: number;
     customer_name: string | null;
@@ -57,6 +65,9 @@ type OrderDetail = {
     ae_total: string;
     nn_invest: string;
     requires_special_approval: boolean;
+    approval_kind: string;
+    approval_kind_label: string;
+    special_approval_reasons: SpecialApprovalReason[];
     order_discounts: {
         type?: string;
         custom_label?: string | null;
@@ -71,6 +82,8 @@ type OrderDetail = {
     } | null;
     creator_name: string | null;
     created_at: string | null;
+    approval_history: ApprovalHistoryEntry[];
+    current_approval: ApprovalHistoryEntry | null;
     positions: OrderPosition[];
 };
 
@@ -88,11 +101,20 @@ function formatDate(iso: string | null): string {
 export default function DispoOrderShow({
     order,
     canViewCalculation,
+    canSubmit = false,
+    canApprove = false,
+    canReject = false,
+    isCreator = false,
 }: {
     order: OrderDetail;
     canViewCalculation: boolean;
+    canSubmit?: boolean;
+    canApprove?: boolean;
+    canReject?: boolean;
+    isCreator?: boolean;
 }) {
     const flash = usePage().props.flash;
+    const current = order.current_approval;
 
     return (
         <>
@@ -110,6 +132,68 @@ export default function DispoOrderShow({
                 />
                 {flash.success ? (
                     <SuccessState message={flash.success} />
+                ) : null}
+
+                <DispoOrderApprovalActions
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    canSubmit={canSubmit}
+                    canApprove={canApprove}
+                    canReject={canReject}
+                    isCreator={isCreator}
+                    status={order.status}
+                />
+
+                {order.status === 'awaiting_sales_approval' && current ? (
+                    <Card
+                        className="border-border/70 rounded-xl shadow-xs"
+                        data-test="dispo-order-approval-panel"
+                    >
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Freigabeanforderung
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 px-5 py-4 text-sm">
+                            <p>
+                                <span className="font-medium">
+                                    {current.kind_label}
+                                </span>
+                                {' · '}
+                                Status {current.status_label}
+                            </p>
+                            <p className="text-muted-foreground">
+                                Eingereicht von {current.submitted_by_name} am{' '}
+                                {formatDate(current.submitted_at)}
+                            </p>
+                            <p className="text-muted-foreground">
+                                Vier-Augen-Prinzip: Der Ersteller darf nicht
+                                selbst entscheiden.
+                            </p>
+                            <SpecialApprovalReasonsList
+                                reasons={current.special_approval_reasons}
+                            />
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {order.status === 'approval_rejected' &&
+                current?.rejection_reason ? (
+                    <Card
+                        className="border-border/70 rounded-xl shadow-xs"
+                        data-test="dispo-order-rejection-panel"
+                    >
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Ablehnung
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-5 py-4 text-sm">
+                            <p data-test="dispo-order-rejection-reason">
+                                {current.rejection_reason}
+                            </p>
+                        </CardContent>
+                    </Card>
                 ) : null}
 
                 <Card className="border-border/70 rounded-xl shadow-xs">
@@ -151,6 +235,10 @@ export default function DispoOrderShow({
                             label="Erstellt am"
                             value={formatDate(order.created_at)}
                         />
+                        <Detail
+                            label="Freigabeart"
+                            value={order.approval_kind_label}
+                        />
                     </CardContent>
                 </Card>
 
@@ -186,9 +274,17 @@ export default function DispoOrderShow({
                             data-test="dispo-order-net-total"
                         />
                         {order.requires_special_approval ? (
-                            <p className="text-primary pt-2 text-xs font-medium">
-                                Sonderfreigabe erforderlich
-                            </p>
+                            <div
+                                className="pt-2"
+                                data-test="dispo-order-special-approval-hint"
+                            >
+                                <p className="text-primary text-xs font-medium">
+                                    Sonderfreigabe erforderlich
+                                </p>
+                                <SpecialApprovalReasonsList
+                                    reasons={order.special_approval_reasons}
+                                />
+                            </div>
                         ) : null}
                         {order.source_calculation_totals &&
                         order.source_calculation_totals.nn_invest !==
@@ -207,6 +303,8 @@ export default function DispoOrderShow({
                         ) : null}
                     </CardContent>
                 </Card>
+
+                <DispoOrderApprovalHistory entries={order.approval_history} />
 
                 <Card className="border-border/70 rounded-xl shadow-xs">
                     <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
