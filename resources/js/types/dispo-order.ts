@@ -24,3 +24,17 @@ export type ApprovalHistoryEntry = {
     rejection_reason: string | null;
     decision_note: string | null;
 };
+
+export type DispoOrderRevisionLink = {
+    id: number;
+    number: string;
+    status: string;
+    status_label: string;
+};
+
+export type DispoOrderRevisionContext = {
+    predecessor_id: number;
+    predecessor_number: string;
+    rejection_reason: string | null;
+    return_url: string;
+};

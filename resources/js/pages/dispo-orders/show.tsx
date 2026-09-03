@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
+import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { SuccessState } from '@/components/feedback/states';
 import { formatPercent, money } from '@/components/form-field';
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import type {
     ApprovalHistoryEntry,
+    DispoOrderRevisionLink,
     SpecialApprovalReason,
 } from '@/types/dispo-order';
 
@@ -82,6 +84,10 @@ type OrderDetail = {
     } | null;
     creator_name: string | null;
     created_at: string | null;
+    rejection_reason: string | null;
+    revises_dispo_order_id: number | null;
+    revises: DispoOrderRevisionLink | null;
+    revision: DispoOrderRevisionLink | null;
     approval_history: ApprovalHistoryEntry[];
     current_approval: ApprovalHistoryEntry | null;
     positions: OrderPosition[];
@@ -104,6 +110,7 @@ export default function DispoOrderShow({
     canSubmit = false,
     canApprove = false,
     canReject = false,
+    canRevise = false,
     isCreator = false,
 }: {
     order: OrderDetail;
@@ -111,6 +118,7 @@ export default function DispoOrderShow({
     canSubmit?: boolean;
     canApprove?: boolean;
     canReject?: boolean;
+    canRevise?: boolean;
     isCreator?: boolean;
 }) {
     const flash = usePage().props.flash;
@@ -143,6 +151,49 @@ export default function DispoOrderShow({
                     isCreator={isCreator}
                     status={order.status}
                 />
+
+                {canRevise ? (
+                    <DispoOrderReviseAction orderId={order.id} />
+                ) : null}
+
+                {order.revision || order.revises ? (
+                    <Card
+                        className="border-border/70 rounded-xl shadow-xs"
+                        data-test="dispo-order-revision-links"
+                    >
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Versionen
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 px-5 py-4 text-sm">
+                            {order.revises ? (
+                                <p data-test="dispo-order-revises-link">
+                                    Nachbesserung von{' '}
+                                    <Link
+                                        href={`/dispoauftraege/${order.revises.id}`}
+                                        className="font-medium underline-offset-4 hover:underline"
+                                    >
+                                        {order.revises.number}
+                                    </Link>{' '}
+                                    ({order.revises.status_label})
+                                </p>
+                            ) : null}
+                            {order.revision ? (
+                                <p data-test="dispo-order-revision-link">
+                                    Korrigierte Version:{' '}
+                                    <Link
+                                        href={`/dispoauftraege/${order.revision.id}`}
+                                        className="font-medium underline-offset-4 hover:underline"
+                                    >
+                                        {order.revision.number}
+                                    </Link>{' '}
+                                    ({order.revision.status_label})
+                                </p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 {order.status === 'awaiting_sales_approval' && current ? (
                     <Card

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\DispoOrderStatus;
 use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
@@ -23,6 +24,43 @@ class DispoOrderPolicy
     {
         return $user->canManageDispoOrders()
             && $user->can('view', $calculation);
+    }
+
+    /**
+     * Nachbesserung: nur Ersteller, abgelehnter Auftrag, ohne Nachfolger.
+     * Admin/GF erhalten dies nicht automatisch für fremde Aufträge.
+     */
+    public function revise(User $user, DispoOrder $dispoOrder): bool
+    {
+        if ($dispoOrder->status !== DispoOrderStatus::ApprovalRejected) {
+            return false;
+        }
+
+        if ((int) $user->id !== (int) $dispoOrder->created_by_id) {
+            return false;
+        }
+
+        $calculation = $dispoOrder->relationLoaded('calculation')
+            ? $dispoOrder->calculation
+            : $dispoOrder->calculation()->first();
+
+        if ($calculation === null) {
+            return false;
+        }
+
+        if (! $user->can('update', $calculation)) {
+            return false;
+        }
+
+        return ! $dispoOrder->hasRevision();
+    }
+
+    /**
+     * Anlage eines Korrektur-Drafts mit revises_dispo_order_id.
+     */
+    public function createRevision(User $user, DispoOrder $predecessor): bool
+    {
+        return $this->revise($user, $predecessor);
     }
 
     public function submit(User $user, DispoOrder $dispoOrder): bool

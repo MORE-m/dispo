@@ -3,6 +3,8 @@ import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
+import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
+import type { DispoOrderRevisionContext } from '@/types/dispo-order';
 import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
 import { BudgetConditionsStep } from '@/components/budget-conditions-step';
 import { BudgetElementsStep } from '@/components/budget-elements-step';
@@ -440,6 +442,7 @@ export default function CalculationWizard({
     appliedBudgetProposal: _appliedBudgetProposal,
     canEdit,
     canCreateDispoOrder = false,
+    dispoOrderRevision = null,
 }: {
     catalog: Catalog;
     dayGroups: DayGroupOption[];
@@ -451,6 +454,7 @@ export default function CalculationWizard({
     appliedBudgetProposal: AppliedBudgetProposal | null;
     canEdit: boolean;
     canCreateDispoOrder?: boolean;
+    dispoOrderRevision?: DispoOrderRevisionContext | null;
 }) {
     const flash = usePage().props.flash;
     const initialBudgetApplied =
@@ -1074,6 +1078,9 @@ export default function CalculationWizard({
                 ) : null}
                 {flash.success ? (
                     <SuccessState message={flash.success} />
+                ) : null}
+                {dispoOrderRevision ? (
+                    <DispoOrderRevisionBanner revision={dispoOrderRevision} />
                 ) : null}
                 {planningMode === 'budget' && usesRegularPlanningEditorView ? (
                     <div
@@ -1969,6 +1976,7 @@ export default function CalculationWizard({
                                         canCreateDispoOrder ? (
                                             <DispoOrderCreateAction
                                                 calculationId={calculation.id}
+                                                revision={dispoOrderRevision}
                                             />
                                         ) : null}
                                     </CardHeader>

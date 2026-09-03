@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property int $id
  * @property int $calculation_id
+ * @property int|null $revises_dispo_order_id
  * @property string $number
  * @property int $number_year
  * @property int $number_org_seq
@@ -24,11 +25,14 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
+ * @property-read DispoOrder|null $revises
+ * @property-read DispoOrder|null $revision
  */
 class DispoOrder extends Model
 {
     protected $fillable = [
         'calculation_id',
+        'revises_dispo_order_id',
         'number',
         'number_year',
         'number_org_seq',
@@ -66,6 +70,7 @@ class DispoOrder extends Model
     {
         return [
             'status' => DispoOrderStatus::class,
+            'revises_dispo_order_id' => 'integer',
             'order_discount_percent' => 'decimal:4',
             'ae_enabled' => 'boolean',
             'target_budget_nn' => 'decimal:2',
@@ -141,9 +146,43 @@ class DispoOrder extends Model
             ->where('open_guard', 1);
     }
 
+    /**
+     * Abgelehnter Vorgänger, den dieser Auftrag nachbessert.
+     *
+     * @return BelongsTo<DispoOrder, $this>
+     */
+    public function revises(): BelongsTo
+    {
+        return $this->belongsTo(DispoOrder::class, 'revises_dispo_order_id');
+    }
+
+    /**
+     * Direkter Nachfolger (korrigierter Draft) dieses Auftrags.
+     *
+     * @return HasOne<DispoOrder, $this>
+     */
+    public function revision(): HasOne
+    {
+        return $this->hasOne(DispoOrder::class, 'revises_dispo_order_id');
+    }
+
     public function requiresSpecialApproval(): bool
     {
         return $this->approval_kind === DispoOrderApprovalKind::Special
             || (bool) $this->requires_special_approval;
+    }
+
+    public function isApprovalRejected(): bool
+    {
+        return $this->status === DispoOrderStatus::ApprovalRejected;
+    }
+
+    public function hasRevision(): bool
+    {
+        if ($this->relationLoaded('revision')) {
+            return $this->revision !== null;
+        }
+
+        return $this->revision()->exists();
     }
 }

@@ -34,6 +34,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.approve');
     Route::post('dispoauftraege/{dispoOrder}/ablehnen', [DispoOrderController::class, 'reject'])
         ->name('dispo-orders.reject');
+    Route::post('dispoauftraege/{dispoOrder}/nachbessern', [DispoOrderController::class, 'startRevision'])
+        ->name('dispo-orders.revise');
     Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])
         ->name('dispo-orders.positions');
     Route::post('kalkulationen/{calculation}/dispoauftraege', [DispoOrderController::class, 'store'])

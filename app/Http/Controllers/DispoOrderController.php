@@ -14,6 +14,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
+use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -27,6 +28,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderWriter $writer,
         private readonly DispoOrderPositionAdoptionService $adoptions,
         private readonly DispoOrderApprovalService $approvals,
+        private readonly DispoOrderRevisionContext $revisionContext,
     ) {}
 
     public function index(Request $request): Response
@@ -75,6 +77,9 @@ class DispoOrderController extends Controller
             'calculation',
             'approvalRequests',
             'pendingApprovalRequest',
+            'latestApprovalRequest',
+            'revises',
+            'revision',
         ]);
 
         /** @var User|null $user */
@@ -90,6 +95,7 @@ class DispoOrderController extends Controller
             && $dispoOrder->pendingApprovalRequest !== null;
         $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
         $canReject = ($user?->can('reject', $dispoOrder) ?? false) && $awaiting;
+        $canRevise = $user?->can('revise', $dispoOrder) ?? false;
 
         return Inertia::render('dispo-orders/show', [
             'order' => $this->serializeOrder($dispoOrder),
@@ -98,8 +104,27 @@ class DispoOrderController extends Controller
             'canSubmit' => $canSubmit,
             'canApprove' => $canApprove,
             'canReject' => $canReject,
+            'canRevise' => $canRevise,
             'isCreator' => $isCreator,
         ]);
+    }
+
+    public function startRevision(Request $request, DispoOrder $dispoOrder): RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->authorize('revise', $dispoOrder);
+
+        $dispoOrder->loadMissing('calculation');
+
+        abort_if($dispoOrder->calculation === null, 404);
+
+        $this->revisionContext->start($user, $dispoOrder);
+
+        return redirect()
+            ->route('calculations.edit', $dispoOrder->calculation)
+            ->with('success', 'Nachbesserung gestartet. Passe die Kalkulation an und erstelle danach den korrigierten Dispoauftrag.');
     }
 
     public function submit(SubmitDispoOrderRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse
@@ -152,15 +177,60 @@ class DispoOrderController extends Controller
 
         $calculation->load(['positions.inventory', 'positions.advertisingMedium', 'positions.timeRanges']);
 
-        return response()->json([
+        $payload = [
             'positions' => $this->adoptions->selectablePositions($calculation),
-        ]);
+        ];
+
+        $revision = $this->revisionContext->currentForCalculation($request, $calculation->id);
+
+        if ($revision !== null) {
+            $predecessor = DispoOrder::query()
+                ->with('positions')
+                ->find($revision['predecessor_id']);
+
+            $existingIds = $calculation->positions->pluck('id')->all();
+            $preferred = [];
+
+            if ($predecessor !== null) {
+                foreach ($predecessor->positions as $position) {
+                    $calcPositionId = $position->calculation_position_id;
+                    if ($calcPositionId !== null && in_array((int) $calcPositionId, $existingIds, true)) {
+                        $preferred[] = (int) $calcPositionId;
+                    }
+                }
+            }
+
+            $payload['preferred_position_ids'] = array_values(array_unique($preferred));
+            $payload['revision'] = [
+                'predecessor_id' => $revision['predecessor_id'],
+                'predecessor_number' => $revision['predecessor_number'],
+                'rejection_reason' => $revision['rejection_reason'],
+            ];
+        }
+
+        return response()->json($payload);
     }
 
     public function store(CreateDispoOrderFromCalculationRequest $request, Calculation $calculation): RedirectResponse
     {
         /** @var User $user */
         $user = $request->user();
+
+        $predecessor = $request->predecessor();
+
+        if ($predecessor !== null) {
+            $result = $this->writer->createRevision(
+                $predecessor,
+                $calculation,
+                $request->positionIds(),
+                $user,
+            );
+            $this->revisionContext->clear();
+
+            return redirect()
+                ->route('dispo-orders.show', $result->order)
+                ->with('success', 'Korrigierter Dispoauftrag als Entwurf angelegt. Bitte erneut zur Freigabe einreichen.');
+        }
 
         $result = $this->writer->createFromCalculation(
             $calculation,
@@ -222,6 +292,10 @@ class DispoOrderController extends Controller
             'source_calculation_totals' => $order->source_calculation_totals_snapshot ?? null,
             'creator_name' => $order->creator?->name,
             'created_at' => $order->created_at?->toIso8601String(),
+            'rejection_reason' => $order->latestApprovalRequest?->rejection_reason,
+            'revises_dispo_order_id' => $order->revises_dispo_order_id,
+            'revises' => $this->serializeRevisionLink($order->revises),
+            'revision' => $this->serializeRevisionLink($order->revision),
             'approval_history' => $order->approvalRequests->map(
                 fn (DispoOrderApprovalRequest $request): array => $this->serializeApprovalRequest($request),
             )->all(),
@@ -247,6 +321,23 @@ class DispoOrderController extends Controller
                 'time_ranges' => $position->time_ranges_snapshot ?? [],
                 'position_discounts' => $position->position_discounts_snapshot ?? [],
             ])->all(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, number: string, status: string, status_label: string}|null
+     */
+    private function serializeRevisionLink(?DispoOrder $order): ?array
+    {
+        if ($order === null) {
+            return null;
+        }
+
+        return [
+            'id' => $order->id,
+            'number' => $order->number,
+            'status' => $order->status->value,
+            'status_label' => $order->status->label(),
         ];
     }
 
