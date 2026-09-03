@@ -160,20 +160,26 @@ synchronisiert. Die tatsächliche Spotlänge ist Teil des Positionssnapshots.
 Ein Dispoauftrag ohne Kundenkalkulation bzw. direkt aus einem Standardangebot
 ist unzulässig.
 
-**Implementiert (September 2026, Entwurf):** Tabellen `dispo_orders`,
-`dispo_order_positions`, `dispo_order_number_sequences`. Positionsdaten werden
-beim Anlegen als Snapshot in `dispo_order_positions` persistiert (JSON für
-Planzeilen, Zeiträume, Rabatte). Status-Enum kennt alle elf fachlichen Werte;
-erreichbar ist derzeit nur `Entwurf`.
+**Implementiert (September 2026):** Tabellen `dispo_orders`,
+`dispo_order_positions`, `dispo_order_number_sequences`,
+`dispo_order_approval_requests`. Positionsdaten werden beim Anlegen als Snapshot
+in `dispo_order_positions` persistiert. Freigabeanforderungen sind append-only
+nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
+Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
+Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und
+`personal_discount_limit_percent` (Grenze zum Speicherzeitpunkt).
 
-Zusätzlich:
+Erreichbare Status in diesem Slice:
 
-- sichtbare Nummer und laufende Nummer innerhalb der Kalkulation,
-- Gesamtstatus und Priorität,
-- Kopfdaten-Snapshot,
-- Rechnungsempfänger-/Meridian-Snapshot,
-- Freigaben und Ausnahmebestätigungen,
-- zentrale Dateien, Kommentare und Historien.
+- `Entwurf`
+- `Wartet auf Vertriebsfreigabe`
+- `Liegt bei Disposition`
+- `Freigabe abgelehnt` (terminal; keine Rückkehr in den Entwurf in diesem Slice)
+
+Zusätzlich vorgesehen, aber noch nicht operativ:
+
+- Priorität, Rechnungsempfänger-/Meridian-Snapshot,
+- Ausnahmebestätigungen, zentrale Dateien, Kommentare und weitere Status.
 
 ## Dynamische Daten
 

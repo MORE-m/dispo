@@ -80,10 +80,10 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** blockiert
-- **Anforderungen:** `DSP-*`, `APR-*`, `STD-*` (Fachoberflächen), Admin-Kataloge
+- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe); Rest blockiert
+- **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
-- **Blocker:** Product-Owner-Freigabe ausstehend (BLK-006)
+- **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006)
 
 ### BL-P1-A – App-Shell und gemeinsame Grundlage (UX-GATE-A)
 
@@ -304,12 +304,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** offen
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung im Dispo-Freigabe-Slice; Invalidierung/Wiedereinreichung offen
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
-- **Ergebnis:** Auslöser, Vier-Augen-Trennung, Invalidierung
-- **Akzeptanz:** `AT-09`, `AT-12`, `AT-13`
-- **Tests:** Pest Ersteller ≠ Freigeber; Invalidierung mit Auditgrund
+- **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag terminal in diesem Slice
+- **Offen:** Freigabeinvalidierung nach Änderungen, Rückzug, AUTH-005 als zwei getrennte Ereignisse
+- **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` offen
+- **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright
 
 ### BL-P7-03 – Budget-Assistent
 
@@ -327,18 +328,27 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-01 – Snapshot, Nummerierung, Positionsübernahme
 
 - **Phase:** 8
-- **Status:** **Entwurf umgesetzt** (September 2026); Freigabe-/Dispo-Workflow offen
+- **Status:** **umgesetzt** (September 2026)
 - **Anforderungen:** `DSP-001` bis `DSP-007`, `TEC-001`, `TEC-002` (Entwurfsteil)
 - **Abhängigkeiten:** BL-P7-02, BL-P3-02
 - **Ergebnis:** unabhängiger Dispo-Snapshot beim Anlegen, Nummernvergabe `DA-YYYY-NNNNNN-SS`, Positionsauswahl inkl. Kennzeichnung bereits übernommener Positionen
 - **Akzeptanz:** `AT-15`, `AT-29` (Entwurf); keine Sync zurück zur Kalkulation; kein Dispo aus Standardangebot
 - **Tests:** Pest (Anlage, Berechtigungen, Snapshot-Isolation, Nummern), Vitest (Dialog), Playwright (Happy Path)
-- **Offen:** BL-P8-02 Statusmodell ab Freigabe, Kundenbestätigung, operative Disposition
+
+### BL-P8-01b – Vier-Augen-Freigabe (Vertical Slice)
+
+- **Phase:** 8
+- **Status:** **umgesetzt** (September 2026, Branch `feat/dispo-order-approval`)
+- **Anforderungen:** `AUTH-004`, `APR-001` (Teil), Statusübergänge Entwurf/Freigabe
+- **Abhängigkeiten:** BL-P8-01
+- **Ergebnis:** Einreichen → Genehmigen/Ablehnen; Status `Liegt bei Disposition` bzw. `Freigabe abgelehnt`; persistente Freigabehistorie
+- **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe nur Admin/GF
+- **Tests:** Pest, Vitest, Playwright, MySQL-Concurrency
 
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** offen
+- **Status:** offen (Freigabe-Kanten teilweise über BL-P8-01b erledigt)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
