@@ -34,19 +34,13 @@ final class DispoOrderDynamicFieldWriter
     ) {}
 
     /**
-     * @param  list<int>  $selectedCalculationPositionIds
+     * Compose Snapshot und setzt configuration_snapshot_id vor dem ersten Save.
      */
-    public function attachOnCreate(
-        DispoOrder $order,
-        Calculation $calculation,
-        array $selectedCalculationPositionIds,
-        ?DispoOrder $predecessor = null,
-    ): void {
+    public function assignComposedSnapshot(DispoOrder $order, Calculation $calculation): void
+    {
         $calculation->loadMissing([
             'configurationSnapshot.fieldDefinitions',
             'configurationSnapshot.rules',
-            'fieldValues.snapshotFieldDefinition',
-            'positions.fieldValues.snapshotFieldDefinition',
         ]);
 
         $calcSnapshot = $calculation->configurationSnapshot;
@@ -59,7 +53,31 @@ final class DispoOrderDynamicFieldWriter
         $snapshot = $this->composer->composeFromCalculationSnapshot($calcSnapshot);
         $order->forceFill([
             'configuration_snapshot_id' => $snapshot->id,
-        ])->save();
+        ]);
+    }
+
+    /**
+     * @param  list<int>  $selectedCalculationPositionIds
+     */
+    public function persistCopiedValues(
+        DispoOrder $order,
+        Calculation $calculation,
+        array $selectedCalculationPositionIds,
+        ?DispoOrder $predecessor = null,
+    ): void {
+        $snapshot = $this->requireSnapshot($order);
+        $calculation->loadMissing([
+            'configurationSnapshot.fieldDefinitions',
+            'fieldValues.snapshotFieldDefinition',
+            'positions.fieldValues.snapshotFieldDefinition',
+        ]);
+
+        $calcSnapshot = $calculation->configurationSnapshot;
+        if ($calcSnapshot === null) {
+            throw ValidationException::withMessages([
+                'calculation' => 'Die Kalkulation besitzt keinen Konfigurationssnapshot.',
+            ]);
+        }
 
         $headerFromCalc = $this->calculationFields->headerValuesForPayload($calculation);
         $this->persistHeaderPeriod(
@@ -102,6 +120,24 @@ final class DispoOrderDynamicFieldWriter
 
         $headerValues = $this->headerValuesForValidation($order, $snapshot);
         $this->rules->validate($snapshot, $headerValues, $positionContexts);
+    }
+
+    /**
+     * @deprecated Use assignComposedSnapshot + persistCopiedValues
+     *
+     * @param  list<int>  $selectedCalculationPositionIds
+     */
+    public function attachOnCreate(
+        DispoOrder $order,
+        Calculation $calculation,
+        array $selectedCalculationPositionIds,
+        ?DispoOrder $predecessor = null,
+    ): void {
+        if ($order->configuration_snapshot_id === null) {
+            $this->assignComposedSnapshot($order, $calculation);
+            $order->save();
+        }
+        $this->persistCopiedValues($order, $calculation, $selectedCalculationPositionIds, $predecessor);
     }
 
     /**

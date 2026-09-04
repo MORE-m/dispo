@@ -184,6 +184,16 @@ final class DispoOrderWriter
 
         [$year, $orgSeq, $calcSeq, $number] = $this->numbers->next($calculation);
 
+        $calculation->loadMissing([
+            'configurationSnapshot.fieldDefinitions',
+            'configurationSnapshot.rules',
+        ]);
+        if ($calculation->configurationSnapshot === null) {
+            throw ValidationException::withMessages([
+                'calculation' => 'Die Kalkulation besitzt keinen Konfigurationssnapshot.',
+            ]);
+        }
+
         $order = new DispoOrder;
         $order->calculation_id = $calculation->id;
         $order->number = $number;
@@ -197,6 +207,7 @@ final class DispoOrderWriter
             $order->revises_dispo_order_id = $revises->id;
         }
         $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
+        $this->dynamicFields->assignComposedSnapshot($order, $calculation);
         $order->save();
 
         $sort = 0;
@@ -209,7 +220,7 @@ final class DispoOrderWriter
             $sort++;
         }
 
-        $this->dynamicFields->attachOnCreate(
+        $this->dynamicFields->persistCopiedValues(
             $order,
             $calculation,
             $uniqueIds,

@@ -89,18 +89,14 @@ return new class extends Migration
         Schema::disableForeignKeyConstraints();
         if (Schema::getConnection()->getDriverName() === 'sqlite') {
             DB::statement('CREATE INDEX IF NOT EXISTS dispo_orders_configuration_snapshot_id_index ON dispo_orders (configuration_snapshot_id)');
-        } else {
-            if (! $this->foreignKeyExists('dispo_orders', 'dispo_orders_cfg_snap_fk')) {
-                Schema::table('dispo_orders', function (Blueprint $table) {
-                    $table->foreign('configuration_snapshot_id', 'dispo_orders_cfg_snap_fk')
-                        ->references('id')
-                        ->on('configuration_snapshots')
-                        ->restrictOnDelete();
-                    $table->index('configuration_snapshot_id', 'dispo_orders_cfg_snap_idx');
-                });
-            }
-
-            DB::statement('ALTER TABLE dispo_orders MODIFY configuration_snapshot_id BIGINT UNSIGNED NOT NULL');
+        } elseif (! $this->foreignKeyExists('dispo_orders', 'dispo_orders_cfg_snap_fk')) {
+            Schema::table('dispo_orders', function (Blueprint $table) {
+                $table->foreign('configuration_snapshot_id', 'dispo_orders_cfg_snap_fk')
+                    ->references('id')
+                    ->on('configuration_snapshots')
+                    ->restrictOnDelete();
+                $table->index('configuration_snapshot_id', 'dispo_orders_cfg_snap_idx');
+            });
         }
         Schema::enableForeignKeyConstraints();
 
