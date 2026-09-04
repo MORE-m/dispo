@@ -38,9 +38,14 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
   Kalkulationssnapshot und materialisiert die zwei Dispo-Texte aus dem aktiven
   Dispo-Feldset. `field_set_*` zeigt auf `system_dispo_order_core`;
   `source_configuration_snapshot_id` hält die Calc-Herkunft (kein Laufzeit-Lesen).
+  Quellsnapshot muss Calculation-Source (`seed_active` / `legacy_backfill`) sein.
 - Werte in `dispo_order_field_values` / `dispo_order_position_field_values`.
-- Draft: Texte editierbar; Calc-origin read-only; Legacy ohne historische Dyn-Werte
-  als „nicht erfasst“; Draft-Sync für fehlende Calc-origin-Werte.
+- Capture-Semantik: neue Create/Revision legen für jedes Calc-origin-Feld immer
+  eine Value-Zeile an (auch bei optional leerem Zeitraum). Legacy-Backfill legt
+  keine Calc-origin-Zeilen an („Nicht erfasst“). Draft-Sync füllt nur fehlende
+  Capture-Zeilen positionsbezogen; vorhandene Werte und Dispo-Texte bleiben.
+- Missing-/Submit-Prüfung je Position; bewusst leere Capture-Zeilen sind vollständig.
+- Draft: Texte editierbar; Calc-origin read-only; Hilfetexte aus dem DA-Snapshot.
 - Revision (PO-DF2-1): Texte aus Vorgänger per Schlüssel, Calc-Werte frisch.
 
 ## Konfigurationsebenen

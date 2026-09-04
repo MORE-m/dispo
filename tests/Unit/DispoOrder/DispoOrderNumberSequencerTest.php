@@ -3,19 +3,20 @@
 namespace Tests\Unit\DispoOrder;
 
 use App\Enums\Role;
-use App\Models\DispoOrder;
 use App\Models\DispoOrderNumberSequence;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderNumberSequencer;
 use App\Support\DocumentNumber;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\CreatesMinimalDispoConfigurationSnapshot;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
 
 class DispoOrderNumberSequencerTest extends TestCase
 {
+    use CreatesMinimalDispoConfigurationSnapshot;
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
     use RefreshDatabase;
@@ -75,7 +76,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $sequencer = app(DispoOrderNumberSequencer::class);
 
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 1),
             'number_year' => $calculation->number_year,
@@ -107,7 +108,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $sequencer = app(DispoOrderNumberSequencer::class);
 
         foreach ([1, 2] as $seq) {
-            DispoOrder::query()->create([
+            $this->createDispoOrderWithMinimalSnapshot($calculation, [
                 'calculation_id' => $calculation->id,
                 'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, $seq),
                 'number_year' => $calculation->number_year,
@@ -172,7 +173,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $sequencer = app(DispoOrderNumberSequencer::class);
 
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => DocumentNumber::dispoOrder($calculation->number_year, $calculation->number_seq, 1),
             'number_year' => $calculation->number_year,
@@ -207,7 +208,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $sequencer = app(DispoOrderNumberSequencer::class);
 
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => 'DA-2026-000008-01',
             'number_year' => 2026,
@@ -242,7 +243,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $sequencer = app(DispoOrderNumberSequencer::class);
 
         foreach ([1, 2] as $seq) {
-            DispoOrder::query()->create([
+            $this->createDispoOrderWithMinimalSnapshot($calculation, [
                 'calculation_id' => $calculation->id,
                 'number' => sprintf('DA-2026-000008-%02d', $seq),
                 'number_year' => 2026,
@@ -269,7 +270,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         ]);
         $user = User::factory()->role(Role::Sales)->create();
 
-        $existing = DispoOrder::query()->create([
+        $existing = $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => 'DA-2026-000008-01',
             'number_year' => 2026,
@@ -297,7 +298,7 @@ class DispoOrderNumberSequencerTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $sequencer = app(DispoOrderNumberSequencer::class);
 
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => 'DA-2026-000002-01',
             'number_year' => 2026,
@@ -307,7 +308,7 @@ class DispoOrderNumberSequencerTest extends TestCase
             'created_by_id' => $user->id,
             'source_calculation_number' => $calculation->number,
         ]);
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => 'DA-2026-000003-02',
             'number_year' => 2026,

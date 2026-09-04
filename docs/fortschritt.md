@@ -14,7 +14,9 @@ Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/dynamic-fields-dispo-df2` (DF-2).
+Feature-Branch `feat/dynamic-fields-dispo-df2` (DF-2) – offener PR
+[#16](https://github.com/MORE-m/dispo/pull/16); Review-Korrekturen
+(NOT-NULL-Snapshot, Capture-Semantik, Legacy-Sync-Tests, UI-Anzeige, Composer).
 
 ## Zuletzt abgeschlossene Aufgabe
 

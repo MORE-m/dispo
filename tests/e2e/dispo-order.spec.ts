@@ -45,6 +45,28 @@ test('Vertrieb legt Dispoauftrag aus Kalkulation an', async ({ page }) => {
     await expect(page.locator('[data-test="dispo-order-net-total"]')).toContainText(
         /€/,
     );
+    await expect(page.locator('[data-test="dispo-order-campaign-period"]')).not.toContainText(
+        'Nicht erfasst',
+    );
+    await expect(page.locator('[data-test="dispo-order-sync-calc-dynamic-fields"]')).toHaveCount(0);
+    await expect(page.locator('#dispo-order-billing-special-features-help')).toBeVisible();
+
+    await page.locator('[data-test="dispo-order-billing-special-features"]').fill(
+        'Rechnung E2E',
+    );
+    await page.locator('[data-test="dispo-order-disposition-notes"]').fill('Dispo E2E');
+    await page.getByRole('button', { name: 'Speichern' }).click();
+    await expect(page.getByText('Dispoauftrag gespeichert.')).toBeVisible({
+        timeout: 15_000,
+    });
+
+    await page.reload();
+    await expect(page.locator('[data-test="dispo-order-billing-special-features"]')).toHaveValue(
+        'Rechnung E2E',
+    );
+    await expect(page.locator('[data-test="dispo-order-disposition-notes"]')).toHaveValue(
+        'Dispo E2E',
+    );
 
     const orderNumber = await page.locator('h1').first().textContent();
 

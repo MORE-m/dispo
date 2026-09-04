@@ -86,23 +86,71 @@ return new class extends Migration
         }
         $this->backfillExistingDispoOrders();
 
-        Schema::disableForeignKeyConstraints();
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
-            DB::statement('CREATE INDEX IF NOT EXISTS dispo_orders_configuration_snapshot_id_index ON dispo_orders (configuration_snapshot_id)');
-        } elseif (! $this->foreignKeyExists('dispo_orders', 'dispo_orders_cfg_snap_fk')) {
-            Schema::table('dispo_orders', function (Blueprint $table) {
-                $table->foreign('configuration_snapshot_id', 'dispo_orders_cfg_snap_fk')
-                    ->references('id')
-                    ->on('configuration_snapshots')
-                    ->restrictOnDelete();
-                $table->index('configuration_snapshot_id', 'dispo_orders_cfg_snap_idx');
-            });
-        }
-        Schema::enableForeignKeyConstraints();
-
         if (DB::table('dispo_orders')->whereNull('configuration_snapshot_id')->exists()) {
             throw new RuntimeException('DF-2 Backfill: dispo_orders.configuration_snapshot_id bleibt NULL.');
         }
+
+        $this->enforceConfigurationSnapshotNotNull();
+    }
+
+    private function enforceConfigurationSnapshotNotNull(): void
+    {
+        Schema::disableForeignKeyConstraints();
+
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            if (! $this->sqliteColumnIsNotNull('dispo_orders', 'configuration_snapshot_id')) {
+                Schema::table('dispo_orders', function (Blueprint $table) {
+                    $table->unsignedBigInteger('configuration_snapshot_id')->nullable(false)->change();
+                });
+            }
+
+            DB::statement('CREATE INDEX IF NOT EXISTS dispo_orders_configuration_snapshot_id_index ON dispo_orders (configuration_snapshot_id)');
+
+            if (! $this->sqliteForeignKeyExists('dispo_orders', 'configuration_snapshot_id')) {
+                Schema::table('dispo_orders', function (Blueprint $table) {
+                    $table->foreign('configuration_snapshot_id', 'dispo_orders_cfg_snap_fk')
+                        ->references('id')
+                        ->on('configuration_snapshots')
+                        ->restrictOnDelete();
+                });
+            }
+        } else {
+            if (! $this->foreignKeyExists('dispo_orders', 'dispo_orders_cfg_snap_fk')) {
+                Schema::table('dispo_orders', function (Blueprint $table) {
+                    $table->foreign('configuration_snapshot_id', 'dispo_orders_cfg_snap_fk')
+                        ->references('id')
+                        ->on('configuration_snapshots')
+                        ->restrictOnDelete();
+                    $table->index('configuration_snapshot_id', 'dispo_orders_cfg_snap_idx');
+                });
+            }
+
+            DB::statement('ALTER TABLE dispo_orders MODIFY configuration_snapshot_id BIGINT UNSIGNED NOT NULL');
+        }
+
+        Schema::enableForeignKeyConstraints();
+    }
+
+    private function sqliteColumnIsNotNull(string $table, string $column): bool
+    {
+        foreach (DB::select("PRAGMA table_info({$table})") as $row) {
+            if (($row->name ?? null) === $column) {
+                return (int) ($row->notnull ?? 0) === 1;
+            }
+        }
+
+        return false;
+    }
+
+    private function sqliteForeignKeyExists(string $table, string $column): bool
+    {
+        foreach (DB::select("PRAGMA foreign_key_list({$table})") as $row) {
+            if (($row->from ?? null) === $column) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function foreignKeyExists(string $table, string $name): bool
@@ -145,8 +193,13 @@ return new class extends Migration
                 $table->dropIndex('cfg_snap_source_cfg_snap_idx');
                 $table->dropColumn('source_configuration_snapshot_id');
             });
+        } elseif (Schema::hasColumn('dispo_orders', 'configuration_snapshot_id')) {
+            // SQLite: Spalte bleibt für Idempotenz; wieder nullable für Legacy-Inserts vor Up.
+            Schema::table('dispo_orders', function (Blueprint $table) {
+                $table->unsignedBigInteger('configuration_snapshot_id')->nullable()->change();
+            });
         }
-        // SQLite: Spalten/FKs bleiben stehen; Up ist idempotent über hasColumn/hasTable.
+        // SQLite: Spalten bleiben stehen; Up ist idempotent über hasColumn/hasTable.
         $set = DB::table('field_sets')->where('key', 'system_dispo_order_core')->first();
         if ($set !== null) {
             $versionIds = DB::table('field_set_versions')

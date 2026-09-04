@@ -308,7 +308,14 @@ class DispoOrderController extends Controller
     }
 
     /**
-     * @param  array{header: array<string, mixed>, positions: array<int, array<string, mixed>>, missing_calc_origin_keys: list<string>, historically_uncaptured: bool}|null  $dynamicValues
+     * @param  array{
+     *     header: array<string, mixed>,
+     *     positions: array<int, array<string, mixed>>,
+     *     header_captured: array<string, bool>,
+     *     positions_captured: array<int, array<string, bool>>,
+     *     missing_calc_origin_keys: list<string>,
+     *     historically_uncaptured: bool
+     * }|null  $dynamicValues
      * @return array<string, mixed>
      */
     private function serializeOrder(DispoOrder $order, ?array $dynamicValues = null): array
@@ -351,6 +358,7 @@ class DispoOrderController extends Controller
             'revises' => $this->serializeRevisionLink($order->revises),
             'revision' => $this->serializeRevisionLink($order->revision),
             'dynamic_field_values' => $dynamicValues['header'],
+            'dynamic_field_captured' => $dynamicValues['header_captured'],
             'missing_calc_origin_keys' => $dynamicValues['missing_calc_origin_keys'],
             'historically_uncaptured' => $dynamicValues['historically_uncaptured'],
             'approval_history' => $order->approvalRequests->map(
@@ -378,6 +386,7 @@ class DispoOrderController extends Controller
                 'time_ranges' => $position->time_ranges_snapshot ?? [],
                 'position_discounts' => $position->position_discounts_snapshot ?? [],
                 'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
+                'dynamic_field_captured' => $dynamicValues['positions_captured'][(int) $position->id] ?? [],
             ])->all(),
         ];
     }

@@ -50,7 +50,10 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
-        $snapshot = $this->composer->composeFromCalculationSnapshot($calcSnapshot);
+        $snapshot = $this->composer->composeFromCalculationSnapshot(
+            $calcSnapshot,
+            expectedCalculationSnapshotId: (int) $calculation->configuration_snapshot_id,
+        );
         $order->forceFill([
             'configuration_snapshot_id' => $snapshot->id,
         ]);
@@ -233,7 +236,8 @@ final class DispoOrderDynamicFieldWriter
 
             $snapshot = $this->requireSnapshot($locked);
             $calculation = $locked->calculation()->with([
-                'configurationSnapshot',
+                'configurationSnapshot.fieldDefinitions',
+                'configurationSnapshot.rules',
                 'fieldValues.snapshotFieldDefinition',
                 'positions.fieldValues.snapshotFieldDefinition',
             ])->first();
@@ -281,6 +285,9 @@ final class DispoOrderDynamicFieldWriter
                 return $this->reloadOrder($locked);
             }
 
+            $locked->unsetRelation('positions');
+            $locked->unsetRelation('fieldValues');
+            $locked->load(['positions.fieldValues.snapshotFieldDefinition', 'fieldValues.snapshotFieldDefinition']);
             $this->assertReadyForRules($locked, $snapshot);
 
             $locked->lock_version = $locked->lock_version + 1;
@@ -312,8 +319,8 @@ final class DispoOrderDynamicFieldWriter
         $snapshot = $this->requireSnapshot($order);
         $order->loadMissing(['positions.fieldValues.snapshotFieldDefinition', 'fieldValues.snapshotFieldDefinition']);
 
-        $missing = $this->missingCalcOriginKeys($order, $snapshot);
-        if ($missing !== []) {
+        $gaps = $this->calcOriginCaptureGaps($order, $snapshot);
+        if ($gaps !== []) {
             throw ValidationException::withMessages([
                 'dynamic_field_values' => 'Dynamische Zeitraumfelder fehlen. Bitte „Dynamische Zeitraumfelder aus Kalkulation übernehmen“ ausführen oder einen neuen Dispoauftrag anlegen.',
             ]);
@@ -362,7 +369,14 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @return array{header: array<string, mixed>, positions: array<int, array<string, mixed>>, missing_calc_origin_keys: list<string>, historically_uncaptured: bool}
+     * @return array{
+     *     header: array<string, mixed>,
+     *     positions: array<int, array<string, mixed>>,
+     *     header_captured: array<string, bool>,
+     *     positions_captured: array<int, array<string, bool>>,
+     *     missing_calc_origin_keys: list<string>,
+     *     historically_uncaptured: bool
+     * }
      */
     public function valuesProp(DispoOrder $order): array
     {
@@ -371,6 +385,8 @@ final class DispoOrderDynamicFieldWriter
             return [
                 'header' => [],
                 'positions' => [],
+                'header_captured' => [],
+                'positions_captured' => [],
                 'missing_calc_origin_keys' => [],
                 'historically_uncaptured' => true,
             ];
@@ -383,17 +399,23 @@ final class DispoOrderDynamicFieldWriter
         ]);
 
         $header = [];
+        $headerCaptured = [];
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            $headerCaptured[$def->key] = $this->hasHeaderValue($order, $snapshot, $def->key);
             $header[$def->key] = $this->readHeaderValue($order, $def);
         }
 
         $positions = [];
+        $positionsCaptured = [];
         foreach ($order->positions as $position) {
             $values = [];
+            $captured = [];
             foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                $captured[$def->key] = $this->hasPositionValue($position, $snapshot, $def->key);
                 $values[$def->key] = $this->readPositionValue($position, $def);
             }
             $positions[(int) $position->id] = $values;
+            $positionsCaptured[(int) $position->id] = $captured;
         }
 
         $missing = $this->missingCalcOriginKeys($order, $snapshot);
@@ -401,6 +423,8 @@ final class DispoOrderDynamicFieldWriter
         return [
             'header' => $header,
             'positions' => $positions,
+            'header_captured' => $headerCaptured,
+            'positions_captured' => $positionsCaptured,
             'missing_calc_origin_keys' => $missing,
             'historically_uncaptured' => $missing !== [] && $order->status !== DispoOrderStatus::Draft
                 ? true
@@ -557,10 +581,6 @@ final class DispoOrderDynamicFieldWriter
             $end = $end === '' ? null : $end;
         }
 
-        if ($start === null && $end === null) {
-            return;
-        }
-
         $row = DispoOrderFieldValue::query()->firstOrNew([
             'dispo_order_id' => $order->id,
             'snapshot_field_definition_id' => $def->id,
@@ -613,25 +633,28 @@ final class DispoOrderDynamicFieldWriter
             return;
         }
 
-        if ($raw === null || $raw === '') {
-            return;
-        }
-        if (! is_array($raw)) {
-            throw ValidationException::withMessages([
-                "dynamic_field_values.{$key}" => 'Zeitraum muss Start und Ende enthalten.',
-            ]);
-        }
-        $start = $raw['start'] ?? $raw['period_start'] ?? null;
-        $end = $raw['end'] ?? $raw['period_end'] ?? null;
-        $start = $start === '' ? null : $start;
-        $end = $end === '' ? null : $end;
-        if ($start === null && $end === null) {
-            return;
-        }
-        if ($start === null || $end === null) {
-            throw ValidationException::withMessages([
-                "dynamic_field_values.{$key}" => 'Zeitraum muss vollständig mit Beginn und Ende angegeben werden.',
-            ]);
+        $start = null;
+        $end = null;
+        if ($raw !== null && $raw !== '') {
+            if (! is_array($raw)) {
+                throw ValidationException::withMessages([
+                    "dynamic_field_values.{$key}" => 'Zeitraum muss Start und Ende enthalten.',
+                ]);
+            }
+            $start = $raw['start'] ?? $raw['period_start'] ?? null;
+            $end = $raw['end'] ?? $raw['period_end'] ?? null;
+            $start = $start === '' ? null : $start;
+            $end = $end === '' ? null : $end;
+            if (($start === null) !== ($end === null)) {
+                throw ValidationException::withMessages([
+                    "dynamic_field_values.{$key}" => 'Zeitraum muss vollständig mit Beginn und Ende angegeben werden.',
+                ]);
+            }
+            if ($start !== null && $end !== null && (string) $start > (string) $end) {
+                throw ValidationException::withMessages([
+                    "dynamic_field_values.{$key}" => 'Zeitraum-Beginn darf nicht nach dem Ende liegen.',
+                ]);
+            }
         }
 
         $row = DispoOrderPositionFieldValue::query()->firstOrNew([
@@ -639,8 +662,8 @@ final class DispoOrderDynamicFieldWriter
             'snapshot_field_definition_id' => $def->id,
         ]);
         $row->value_boolean = null;
-        $row->value_period_start = Carbon::parse((string) $start)->toDateString();
-        $row->value_period_end = Carbon::parse((string) $end)->toDateString();
+        $row->value_period_start = $start !== null ? Carbon::parse((string) $start)->toDateString() : null;
+        $row->value_period_end = $end !== null ? Carbon::parse((string) $end)->toDateString() : null;
         $row->save();
     }
 
@@ -781,21 +804,63 @@ final class DispoOrderDynamicFieldWriter
      */
     private function missingCalcOriginKeys(DispoOrder $order, ConfigurationSnapshot $snapshot): array
     {
-        $missing = [];
+        $gaps = $this->calcOriginCaptureGaps($order, $snapshot);
+        $keys = [];
+        foreach ($gaps as $gap) {
+            $keys[] = $gap['key'];
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * @return list<array{key: string, position_id: int|null, reason: string}>
+     */
+    private function calcOriginCaptureGaps(DispoOrder $order, ConfigurationSnapshot $snapshot): array
+    {
+        $gaps = [];
         $order->loadMissing(['fieldValues', 'positions.fieldValues']);
 
         if (! $this->hasHeaderValue($order, $snapshot, 'campaign_period')) {
-            // campaign_period is optional; absence of row is OK if never set.
-            // Only period_open is required for submit readiness of positions.
+            $gaps[] = [
+                'key' => 'campaign_period',
+                'position_id' => null,
+                'reason' => 'missing_row',
+            ];
         }
 
         foreach ($order->positions as $position) {
+            $positionId = (int) $position->id;
             if (! $this->hasPositionValue($position, $snapshot, 'period_open')) {
-                $missing[] = 'period_open';
+                $gaps[] = [
+                    'key' => 'period_open',
+                    'position_id' => $positionId,
+                    'reason' => 'missing_row',
+                ];
+            } else {
+                $periodOpenDef = $snapshot->fieldDefinitions->firstWhere('key', 'period_open');
+                $periodOpen = $periodOpenDef === null
+                    ? null
+                    : $this->readPositionValue($position, $periodOpenDef);
+                if (! is_bool($periodOpen)) {
+                    $gaps[] = [
+                        'key' => 'period_open',
+                        'position_id' => $positionId,
+                        'reason' => 'missing_boolean',
+                    ];
+                }
+            }
+
+            if (! $this->hasPositionValue($position, $snapshot, 'position_flight_period')) {
+                $gaps[] = [
+                    'key' => 'position_flight_period',
+                    'position_id' => $positionId,
+                    'reason' => 'missing_row',
+                ];
             }
         }
 
-        return array_values(array_unique($missing));
+        return $gaps;
     }
 
     private function hasAnyCalcOriginValue(DispoOrder $order, ConfigurationSnapshot $snapshot): bool

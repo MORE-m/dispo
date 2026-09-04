@@ -73,6 +73,10 @@ type OrderPosition = {
         period_open?: boolean | null;
         position_flight_period?: PeriodValue;
     };
+    dynamic_field_captured?: {
+        period_open?: boolean;
+        position_flight_period?: boolean;
+    };
 };
 
 type OrderDetail = {
@@ -126,6 +130,11 @@ type OrderDetail = {
         disposition_notes?: string | null;
         campaign_period?: PeriodValue;
     };
+    dynamic_field_captured?: {
+        billing_special_features?: boolean;
+        disposition_notes?: boolean;
+        campaign_period?: boolean;
+    };
     missing_calc_origin_keys?: string[];
     historically_uncaptured?: boolean;
     positions: OrderPosition[];
@@ -157,6 +166,7 @@ export default function DispoOrderShow({
     const flash = usePage().props.flash;
     const current = order.current_approval;
     const headerValues = order.dynamic_field_values ?? {};
+    const headerCaptured = order.dynamic_field_captured ?? {};
 
     const [billingSpecialFeatures, setBillingSpecialFeatures] = useState(
         headerValues.billing_special_features ?? '',
@@ -178,42 +188,36 @@ export default function DispoOrderShow({
         'campaign_period',
         'Kampagnenzeitraum',
     );
+    const campaignPeriodHelp = fieldHelp(fieldSchema, 'campaign_period');
     const billingLabel = fieldLabel(
         fieldSchema,
         'billing_special_features',
         'Besonderheiten zur Rechnungsstellung',
     );
+    const billingHelp = fieldHelp(fieldSchema, 'billing_special_features');
     const dispositionLabel = fieldLabel(
         fieldSchema,
         'disposition_notes',
         'Wichtige Informationen an die Disposition',
     );
+    const dispositionHelp = fieldHelp(fieldSchema, 'disposition_notes');
     const periodOpenLabel = fieldLabel(
         fieldSchema,
         'period_open',
         'Zeitraum offen',
     );
+    const periodOpenHelp = fieldHelp(fieldSchema, 'period_open');
     const flightPeriodLabel = fieldLabel(
         fieldSchema,
         'position_flight_period',
         'Flugzeitraum',
     );
+    const flightPeriodHelp = fieldHelp(fieldSchema, 'position_flight_period');
 
-    const campaignPeriodDisplay = (() => {
-        const formatted = formatPeriod(headerValues.campaign_period);
-        if (formatted !== null) {
-            return formatted;
-        }
-
-        const missing =
-            order.missing_calc_origin_keys?.includes('campaign_period') ??
-            false;
-        if (order.historically_uncaptured || missing) {
-            return 'Nicht erfasst';
-        }
-
-        return '–';
-    })();
+    const campaignPeriodDisplay = displayCalcOriginPeriod(
+        headerValues.campaign_period,
+        headerCaptured.campaign_period === true,
+    );
 
     function saveNotes() {
         if (savingNotes) {
@@ -431,6 +435,7 @@ export default function DispoOrderShow({
                             <Detail
                                 label={campaignPeriodLabel}
                                 value={campaignPeriodDisplay}
+                                helpText={campaignPeriodHelp}
                             />
                         </div>
                     </CardContent>
@@ -468,12 +473,25 @@ export default function DispoOrderShow({
                                     <Label htmlFor="dispo-order-billing-special-features">
                                         {billingLabel}
                                     </Label>
+                                    {billingHelp ? (
+                                        <p
+                                            id="dispo-order-billing-special-features-help"
+                                            className="text-muted-foreground text-xs"
+                                        >
+                                            {billingHelp}
+                                        </p>
+                                    ) : null}
                                     <textarea
                                         id="dispo-order-billing-special-features"
                                         className={formTextareaClass}
                                         value={billingSpecialFeatures}
                                         data-test="dispo-order-billing-special-features"
                                         disabled={savingNotes}
+                                        aria-describedby={
+                                            billingHelp
+                                                ? 'dispo-order-billing-special-features-help'
+                                                : undefined
+                                        }
                                         onChange={(event) =>
                                             setBillingSpecialFeatures(
                                                 event.target.value,
@@ -496,12 +514,25 @@ export default function DispoOrderShow({
                                     <Label htmlFor="dispo-order-disposition-notes">
                                         {dispositionLabel}
                                     </Label>
+                                    {dispositionHelp ? (
+                                        <p
+                                            id="dispo-order-disposition-notes-help"
+                                            className="text-muted-foreground text-xs"
+                                        >
+                                            {dispositionHelp}
+                                        </p>
+                                    ) : null}
                                     <textarea
                                         id="dispo-order-disposition-notes"
                                         className={formTextareaClass}
                                         value={dispositionNotes}
                                         data-test="dispo-order-disposition-notes"
                                         disabled={savingNotes}
+                                        aria-describedby={
+                                            dispositionHelp
+                                                ? 'dispo-order-disposition-notes-help'
+                                                : undefined
+                                        }
                                         onChange={(event) =>
                                             setDispositionNotes(
                                                 event.target.value,
@@ -542,17 +573,19 @@ export default function DispoOrderShow({
                                 <div data-test="dispo-order-billing-special-features">
                                     <Detail
                                         label={billingLabel}
-                                        value={displayTextOrUncaptured(
+                                        value={displayOptionalText(
                                             headerValues.billing_special_features,
                                         )}
+                                        helpText={billingHelp}
                                     />
                                 </div>
                                 <div data-test="dispo-order-disposition-notes">
                                     <Detail
                                         label={dispositionLabel}
-                                        value={displayTextOrUncaptured(
+                                        value={displayOptionalText(
                                             headerValues.disposition_notes,
                                         )}
+                                        helpText={dispositionHelp}
                                     />
                                 </div>
                             </>
@@ -634,9 +667,17 @@ export default function DispoOrderShow({
                         {order.positions.map((position, index) => {
                             const positionValues =
                                 position.dynamic_field_values ?? {};
+                            const positionCaptured =
+                                position.dynamic_field_captured ?? {};
                             const periodOpen = positionValues.period_open;
-                            const flightFormatted = formatPeriod(
+                            const periodOpenCaptured =
+                                positionCaptured.period_open === true;
+                            const flightCaptured =
+                                positionCaptured.position_flight_period ===
+                                true;
+                            const flightDisplay = displayCalcOriginPeriod(
                                 positionValues.position_flight_period,
+                                flightCaptured,
                             );
 
                             return (
@@ -660,16 +701,25 @@ export default function DispoOrderShow({
                                     <div className="text-muted-foreground mt-2 space-y-1 text-xs">
                                         <p>
                                             {periodOpenLabel}:{' '}
-                                            {periodOpen == null
+                                            {!periodOpenCaptured
                                                 ? 'Nicht erfasst'
                                                 : periodOpen
                                                   ? 'Ja'
                                                   : 'Nein'}
                                         </p>
+                                        {periodOpenHelp ? (
+                                            <p className="text-muted-foreground/80">
+                                                {periodOpenHelp}
+                                            </p>
+                                        ) : null}
                                         <p>
-                                            {flightPeriodLabel}:{' '}
-                                            {flightFormatted ?? 'Nicht erfasst'}
+                                            {flightPeriodLabel}: {flightDisplay}
                                         </p>
+                                        {flightPeriodHelp ? (
+                                            <p className="text-muted-foreground/80">
+                                                {flightPeriodHelp}
+                                            </p>
+                                        ) : null}
                                     </div>
                                     {position.time_ranges.length > 0 ? (
                                         <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
@@ -731,6 +781,15 @@ function fieldLabel(
     return schema.fields.find((field) => field.key === key)?.label ?? fallback;
 }
 
+function fieldHelp(schema: FieldSchema, key: string): string | null {
+    const help = schema.fields.find((field) => field.key === key)?.help_text;
+    if (help == null || help.trim() === '') {
+        return null;
+    }
+
+    return help;
+}
+
 function formatPeriod(period: PeriodValue | undefined): string | null {
     if (period == null || period.start == null || period.end == null) {
         return null;
@@ -745,20 +804,42 @@ function formatPeriod(period: PeriodValue | undefined): string | null {
     return `${start} – ${end}`;
 }
 
-function displayTextOrUncaptured(value: string | null | undefined): string {
-    if (value == null || value.trim() === '') {
+function displayCalcOriginPeriod(
+    period: PeriodValue | undefined,
+    captured: boolean,
+): string {
+    if (!captured) {
         return 'Nicht erfasst';
+    }
+
+    return formatPeriod(period) ?? '–';
+}
+
+function displayOptionalText(value: string | null | undefined): string {
+    if (value == null || value.trim() === '') {
+        return '–';
     }
 
     return value;
 }
 
-function Detail({ label, value }: { label: string; value: ReactNode }) {
+function Detail({
+    label,
+    value,
+    helpText,
+}: {
+    label: string;
+    value: ReactNode;
+    helpText?: string | null;
+}) {
     return (
         <div>
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                 {label}
             </p>
+            {helpText ? (
+                <p className="text-muted-foreground mt-1 text-xs">{helpText}</p>
+            ) : null}
             <p className="mt-1 text-sm">{value ?? '–'}</p>
         </div>
     );
