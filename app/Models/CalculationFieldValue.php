@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -12,8 +13,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $value_string
  * @property string|null $value_text
  * @property bool|null $value_boolean
- * @property string|null $value_period_start
- * @property string|null $value_period_end
+ * @property Carbon|null $value_period_start
+ * @property Carbon|null $value_period_end
  */
 class CalculationFieldValue extends Model
 {

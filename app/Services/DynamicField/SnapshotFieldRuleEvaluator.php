@@ -33,7 +33,10 @@ final class SnapshotFieldRuleEvaluator
         $snapshot->loadMissing(['rules', 'fieldDefinitions']);
         $defsByKey = $snapshot->fieldDefinitions->keyBy('key');
 
-        $this->assertRulesCompatibleWithDefinitions($defsByKey, $snapshot->rules);
+        $this->assertRulesCompatibleWithDefinitions(
+            $defsByKey->all(),
+            $snapshot->rules,
+        );
 
         $errors = [];
 
@@ -86,10 +89,10 @@ final class SnapshotFieldRuleEvaluator
     }
 
     /**
-     * @param  Collection<string, object>  $defsByKey  objects with key, scope
-     * @param  iterable<int, object>  $rules  objects with condition_json/action_json or condition/action arrays
+     * @param  array<array-key, object>  $defsByKey
+     * @param  iterable<int, object>  $rules
      */
-    public function assertRulesCompatibleWithDefinitions(Collection $defsByKey, iterable $rules): void
+    public function assertRulesCompatibleWithDefinitions(array $defsByKey, iterable $rules): void
     {
         foreach ($rules as $rule) {
             $condition = is_array($rule->condition_json ?? null)
@@ -111,7 +114,7 @@ final class SnapshotFieldRuleEvaluator
             }
 
             $conditionKey = (string) ($condition['field_key'] ?? '');
-            if ($conditionKey === '' || ! $defsByKey->has($conditionKey)) {
+            if ($conditionKey === '' || ! array_key_exists($conditionKey, $defsByKey)) {
                 throw new RuntimeException(
                     "Regelbedingung referenziert unbekanntes Feld „{$conditionKey}“.",
                 );
@@ -125,7 +128,7 @@ final class SnapshotFieldRuleEvaluator
             }
 
             $actionKey = (string) ($action['field_key'] ?? '');
-            if ($actionKey === '' || ! $defsByKey->has($actionKey)) {
+            if ($actionKey === '' || ! array_key_exists($actionKey, $defsByKey)) {
                 throw new RuntimeException(
                     "Regelaktion referenziert unbekanntes Feld „{$actionKey}“.",
                 );
@@ -203,7 +206,6 @@ final class SnapshotFieldRuleEvaluator
             FieldType::Boolean => $this->asBool($value) === null,
             FieldType::Period => $this->periodIsEmpty(is_array($value) ? $value : []),
             FieldType::ShortText, FieldType::LongText => trim((string) $value) === '',
-            default => $value === null || $value === '',
         };
     }
 

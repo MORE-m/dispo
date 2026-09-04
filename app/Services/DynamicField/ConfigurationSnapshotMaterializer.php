@@ -71,7 +71,7 @@ final class ConfigurationSnapshotMaterializer
             $defsByKey->put($definition->key, $definition);
         }
 
-        $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $version->rules);
+        $this->rules->assertRulesCompatibleWithDefinitions($defsByKey->all(), $version->rules);
 
         return DB::transaction(function () use ($set, $version, $source): ConfigurationSnapshot {
             $snapshot = new ConfigurationSnapshot;

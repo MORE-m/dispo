@@ -474,7 +474,7 @@ class CalculationController extends Controller
     }
 
     /**
-     * @return array{fields: list<array<string, mixed>>, rules: list<array<string, mixed>>}
+     * @return array{fields: array<int, array<string, mixed>>, rules: array<int, array<string, mixed>>}
      */
     private function fieldSchemaProp(?Calculation $calculation): array
     {
@@ -484,12 +484,12 @@ class CalculationController extends Controller
 
             return [
                 'fields' => $snapshot->fieldDefinitions->map(fn ($def): array => [
-                    'key' => $def->key,
-                    'field_type' => $def->field_type->value,
-                    'label' => $def->label,
+                    'key' => (string) $def->key,
+                    'field_type' => (string) $def->field_type->value,
+                    'label' => (string) $def->label,
                     'help_text' => $def->help_text,
-                    'scope' => $def->scope->value,
-                    'sort' => $def->sort,
+                    'scope' => (string) $def->scope->value,
+                    'sort' => (int) $def->sort,
                 ])->values()->all(),
                 'rules' => $snapshot->rules->map(fn ($rule): array => [
                     'condition' => $rule->condition_json,
@@ -515,12 +515,12 @@ class CalculationController extends Controller
                 $definition = $revision->definition;
 
                 return [
-                    'key' => $definition->key,
-                    'field_type' => $definition->field_type->value,
-                    'label' => $revision->label,
+                    'key' => (string) $definition->key,
+                    'field_type' => (string) $definition->field_type->value,
+                    'label' => (string) $revision->label,
                     'help_text' => $revision->help_text,
-                    'scope' => $definition->scope->value,
-                    'sort' => $membership->sort,
+                    'scope' => (string) $definition->scope->value,
+                    'sort' => (int) $membership->sort,
                 ];
             })->values()->all(),
             'rules' => $version->rules->map(fn ($rule): array => [

@@ -18,9 +18,6 @@ use Illuminate\Validation\ValidationException;
  */
 final class CalculationDynamicFieldWriter
 {
-    /** @var list<string> */
-    private const SUPPORTED_TYPES = ['boolean', 'period', 'short_text', 'long_text'];
-
     public function __construct(
         private readonly SnapshotFieldRuleEvaluator $rules,
     ) {}
@@ -187,16 +184,6 @@ final class CalculationDynamicFieldWriter
         $errors = [];
 
         foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
-            $typeValue = $def->field_type instanceof FieldType
-                ? $def->field_type->value
-                : (string) $def->field_type;
-
-            if (! in_array($typeValue, self::SUPPORTED_TYPES, true)) {
-                throw new \RuntimeException(
-                    "Snapshot enthält nicht unterstützten Feldtyp „{$typeValue}“ ({$def->key}).",
-                );
-            }
-
             $raw = $input[$def->key] ?? null;
 
             if ($def->field_type === FieldType::Period) {
@@ -212,9 +199,6 @@ final class CalculationDynamicFieldWriter
                 FieldType::Boolean => $this->normalizeBoolean($raw, $def->key === 'period_open'),
                 FieldType::Period => $this->normalizePeriod($raw),
                 FieldType::ShortText, FieldType::LongText => $raw === null || $raw === '' ? null : (string) $raw,
-                default => throw new \RuntimeException(
-                    "Snapshot enthält nicht unterstützten Feldtyp „{$typeValue}“ ({$def->key}).",
-                ),
             };
         }
 
@@ -363,7 +347,6 @@ final class CalculationDynamicFieldWriter
             FieldType::Period => $this->fillPeriod($row, is_array($value) ? $value : null),
             FieldType::ShortText => $row->value_string = $value === null ? null : (string) $value,
             FieldType::LongText => $row->value_text = $value === null ? null : (string) $value,
-            default => null,
         };
     }
 
@@ -380,8 +363,8 @@ final class CalculationDynamicFieldWriter
 
         $start = $period['start'] ?? null;
         $end = $period['end'] ?? null;
-        $row->value_period_start = $start ? Carbon::parse((string) $start)->toDateString() : null;
-        $row->value_period_end = $end ? Carbon::parse((string) $end)->toDateString() : null;
+        $row->value_period_start = $start ? Carbon::parse((string) $start) : null;
+        $row->value_period_end = $end ? Carbon::parse((string) $end) : null;
     }
 
     private function emptyValue(SnapshotFieldDefinition $def): mixed
@@ -389,7 +372,7 @@ final class CalculationDynamicFieldWriter
         return match ($def->field_type) {
             FieldType::Boolean => $def->key === 'period_open' ? true : null,
             FieldType::Period => null,
-            default => null,
+            FieldType::ShortText, FieldType::LongText => null,
         };
     }
 
@@ -407,7 +390,6 @@ final class CalculationDynamicFieldWriter
                 ],
             FieldType::ShortText => $value->value_string,
             FieldType::LongText => $value->value_text,
-            default => null,
         };
     }
 }
