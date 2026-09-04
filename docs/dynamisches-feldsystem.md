@@ -10,6 +10,25 @@ Validierungen werden konfiguriert.
 Verbindliche Anforderungen: `DYN-001` bis `DYN-008`, `VER-001` bis `VER-007`,
 `ADM-001` bis `ADM-003`.
 
+## Umsetzungsstand DF-1 (Kalkulation)
+
+Produktiv nutzbare Grundlage ohne Admin-UI:
+
+- Systemfelder: `campaign_period` (Kopf), `period_open` und
+  `position_flight_period` (Position).
+- Feldset `system_calculation_core` Version 1; Revision über
+  `current_revision_id`, Aktivierung über `active_version_id`.
+- Neue Kalkulationen materialisieren einen unveränderlichen
+  `configuration_snapshot`; Legacy-Kalkulationen erhalten denselben Snapshot
+  einmalig per Migration inkl. `period_open = true` je Position.
+- Werte liegen in `calculation_field_values` /
+  `calculation_position_field_values` (keine festen Perioden-Spalten).
+- Serverseitig ausgewertet: `field_equals` + `require_field` auf Snapshot-Regeln
+  (`period_open = false` → `position_flight_period` Pflicht).
+- Bewusst nicht in DF-1: Admin-Feldeditor, Dispo-Werte,
+  `billing_special_features` / `disposition_notes` (DF-2), Custom Fields,
+  Optionskatalog, volle Regelmatrix.
+
 ## Konfigurationsebenen
 
 ```mermaid
@@ -117,7 +136,7 @@ und getestet sein.
 |---|---|
 | Reporting = ja | Reporting-E-Mail sichtbar und Pflicht |
 | Targeting gewählt | Targeting-Spezifikation Pflicht |
-| Zeitraum offen = nein | Kampagnenzeitraum Pflicht |
+| Zeitraum offen = nein | Positions-Flugzeitraum Pflicht (`position_flight_period`; DF-1) |
 | keine Kundenbestätigung als Upload | Ausnahmegrund Pflicht, sofern Ausnahme genutzt wird |
 
 ## Validierungen

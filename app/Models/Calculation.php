@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property string|null $personal_discount_limit_percent
  * @property int $lock_version
+ * @property int|null $configuration_snapshot_id
  */
 class Calculation extends Model
 {
@@ -76,6 +77,7 @@ class Calculation extends Model
         'special_approval_reasons',
         'personal_discount_limit_percent',
         'lock_version',
+        'configuration_snapshot_id',
     ];
 
     /**
@@ -141,5 +143,21 @@ class Calculation extends Model
     public function dispoOrders(): HasMany
     {
         return $this->hasMany(DispoOrder::class);
+    }
+
+    /**
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function configurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(ConfigurationSnapshot::class);
+    }
+
+    /**
+     * @return HasMany<CalculationFieldValue, $this>
+     */
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(CalculationFieldValue::class);
     }
 }

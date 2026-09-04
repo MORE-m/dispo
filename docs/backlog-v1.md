@@ -195,22 +195,31 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** offen
+- **Status:** teilweise (DF-1)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Abhängigkeiten:** BL-P2-02
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
+- **DF-1 erledigt:** geschützte Systemfelder + Feldset `system_calculation_core`;
+  Snapshot-Regel `field_equals`/`require_field` für `period_open` →
+  `position_flight_period`; Writer-/Wizard-Anbindung (`DYN-001`, `DYN-004`,
+  `DYN-006`). **Offen:** Admin-UI, Optionen, Custom Fields, volle Regelmatrix,
+  ADM-001/002.
 
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** offen
+- **Status:** teilweise (DF-1)
 - **Anforderungen:** `VER-001` bis `VER-007`
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
 - **Akzeptanz:** Adminänderung ändert alte Vorgänge nicht; muss vor produktiver Kalkulation stehen
 - **Tests:** AT-14-Vorstufe; Mutation historischer Snapshots schlägt fehl
+- **DF-1 erledigt:** unveränderlicher Config-Snapshot an Kalkulationen inkl.
+  Legacy-Backfill (`VER-002`, `VER-007`); dynamische Kopf-/Positionswerte.
+  **Offen:** Dispo-Snapshot (DF-2 / `VER-004`), Positionskonfig-Snapshot voll
+  laut Doku, AT-14.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

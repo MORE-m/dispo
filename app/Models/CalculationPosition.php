@@ -136,4 +136,12 @@ class CalculationPosition extends Model
     {
         return $this->hasMany(CalculationPositionDiscount::class)->orderBy('sort')->orderBy('id');
     }
+
+    /**
+     * @return HasMany<CalculationPositionFieldValue, $this>
+     */
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(CalculationPositionFieldValue::class);
+    }
 }

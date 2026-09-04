@@ -68,6 +68,10 @@ class CalculationPayloadRequest extends FormRequest
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
+            'dynamic_field_values' => ['sometimes', 'array'],
+            'dynamic_field_values.campaign_period' => ['nullable', 'array'],
+            'dynamic_field_values.campaign_period.start' => ['nullable', 'date'],
+            'dynamic_field_values.campaign_period.end' => ['nullable', 'date', 'after_or_equal:dynamic_field_values.campaign_period.start'],
             'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
@@ -90,6 +94,15 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.position_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'positions.*.dynamic_field_values' => ['sometimes', 'array'],
+            'positions.*.dynamic_field_values.period_open' => ['sometimes', 'boolean'],
+            'positions.*.dynamic_field_values.position_flight_period' => ['nullable', 'array'],
+            'positions.*.dynamic_field_values.position_flight_period.start' => ['nullable', 'date'],
+            'positions.*.dynamic_field_values.position_flight_period.end' => [
+                'nullable',
+                'date',
+                'after_or_equal:positions.*.dynamic_field_values.position_flight_period.start',
+            ],
         ];
     }
 

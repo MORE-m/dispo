@@ -40,6 +40,9 @@ Keine stillschweigenden ADR-Änderungen.
 | 31.08.2026 | Gestaffelte Rabatte | Mehrere Positions- und Auftragsrabatte nacheinander, nicht addiert; kumulierte Wirkung für Rabattgrenzen | COM-001, COM-002 |
 | 31.08.2026 | AE-Checkbox | AE als 15-%-Checkbox, standardmäßig aus; bestehende explizite AE-Werte bleiben wirksam | COM-005–COM-007 |
 | 31.08.2026 | Bestandsverteilung | Eine Preisstunde wird 1:1 zu Stunde–Stunde+1; mehrere Stunden ohne erfundene Spotverteilung | Migration, SPT-004 |
+| 04.09.2026 | DF-1 Zeitraum offen (PO-A / A1) | `period_open` nach Persistenz immer gesetzt; Default und Legacy-Backfill `true`; UI-Toggle; bei `false` Snapshot-Regel verlangt `position_flight_period`; kein fachliches `null`; Speicherung nur als dynamischer Wert | DYN-*, VER-002, PO DF-1 |
+| 04.09.2026 | DF-1 Dispo-Hinweise (PO-B / B2) | `billing_special_features` und `disposition_notes` gehören in den Dispoauftrag-Entwurf (DF-2); in DF-1 weder Seed noch Wizard noch Kalkulations-Kopffelder | DSP-*, PO DF-1 |
+| 04.09.2026 | DF-1 Revisions-/Aktivzeiger | Aktuelle Definition über `field_definitions.current_revision_id`; aktives Feldset über `field_sets.active_version_id`; Set-Felder pinnen `field_definition_revision_id` | DYN-001, VER-001 |
 
 ## Offene Blocker
 
