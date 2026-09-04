@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property int $id
  * @property int $field_set_version_id
+ * @property int $field_definition_id
  * @property int $field_definition_revision_id
  * @property int $sort
  * @property bool|null $required_override
@@ -19,6 +20,7 @@ class FieldSetVersionField extends Model
 
     protected $fillable = [
         'field_set_version_id',
+        'field_definition_id',
         'field_definition_revision_id',
         'sort',
         'required_override',
@@ -34,6 +36,14 @@ class FieldSetVersionField extends Model
             'required_override' => 'boolean',
             'visible_override' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsTo<FieldDefinition, $this>
+     */
+    public function definition(): BelongsTo
+    {
+        return $this->belongsTo(FieldDefinition::class, 'field_definition_id');
     }
 
     /**

@@ -14,8 +14,9 @@ Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 
 ## Aktuelle Aufgabe
 
-Branch `feat/dynamic-fields-calculation-df1`: DF-1 abschließen und PR öffnen
-(ohne Merge).
+PR [#15](https://github.com/MORE-m/dispo/pull/15) (`feat/dynamic-fields-calculation-df1`)
+ist geöffnet; Korrekturen nach Review und CI-Prüfung auf dem Feature-Branch.
+Noch **nicht** gemergt.
 
 ## Zuletzt abgeschlossene Aufgabe
 

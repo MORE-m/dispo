@@ -18,6 +18,9 @@ use Illuminate\Validation\ValidationException;
  */
 final class CalculationDynamicFieldWriter
 {
+    /** @var list<string> */
+    private const SUPPORTED_TYPES = ['boolean', 'period', 'short_text', 'long_text'];
+
     public function __construct(
         private readonly SnapshotFieldRuleEvaluator $rules,
     ) {}
@@ -38,7 +41,19 @@ final class CalculationDynamicFieldWriter
         $headerInput = is_array($payload['dynamic_field_values'] ?? null)
             ? $payload['dynamic_field_values']
             : [];
-        $headerValues = $this->normalizeScopeValues($snapshot, FieldScope::Header, $headerInput);
+
+        $this->rejectUnknownKeys(
+            $snapshot,
+            FieldScope::Header,
+            $headerInput,
+            'dynamic_field_values',
+        );
+        $headerValues = $this->normalizeScopeValues(
+            $snapshot,
+            FieldScope::Header,
+            $headerInput,
+            'dynamic_field_values',
+        );
 
         $positionContexts = [];
         foreach (array_values($payload['positions'] ?? []) as $index => $positionPayload) {
@@ -48,7 +63,9 @@ final class CalculationDynamicFieldWriter
             if (! array_key_exists('period_open', $input)) {
                 $input['period_open'] = true;
             }
-            $positionValues = $this->normalizeScopeValues($snapshot, FieldScope::Position, $input);
+            $prefix = "positions.{$index}.dynamic_field_values";
+            $this->rejectUnknownKeys($snapshot, FieldScope::Position, $input, $prefix);
+            $positionValues = $this->normalizeScopeValues($snapshot, FieldScope::Position, $input, $prefix);
             $positionContexts[] = [
                 'index' => $index,
                 'values' => $positionValues,
@@ -125,26 +142,124 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $input
+     */
+    private function rejectUnknownKeys(
+        ConfigurationSnapshot $snapshot,
+        FieldScope $scope,
+        array $input,
+        string $errorPrefix,
+    ): void {
+        $allowed = $snapshot->fieldDefinitions
+            ->where('scope', $scope)
+            ->pluck('key')
+            ->all();
+        $allowedLookup = array_fill_keys($allowed, true);
+        $errors = [];
+
+        foreach (array_keys($input) as $key) {
+            $key = (string) $key;
+            if (! isset($allowedLookup[$key])) {
+                $foreign = $snapshot->fieldDefinitions->firstWhere('key', $key);
+                if ($foreign !== null) {
+                    $errors["{$errorPrefix}.{$key}"] = 'Dieses Feld gehört nicht in diesen Bereich.';
+                } else {
+                    $errors["{$errorPrefix}.{$key}"] = 'Unbekanntes dynamisches Feld.';
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     private function normalizeScopeValues(
         ConfigurationSnapshot $snapshot,
         FieldScope $scope,
         array $input,
+        string $errorPrefix,
     ): array {
         $normalized = [];
+        $errors = [];
 
         foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
+            $typeValue = $def->field_type instanceof FieldType
+                ? $def->field_type->value
+                : (string) $def->field_type;
+
+            if (! in_array($typeValue, self::SUPPORTED_TYPES, true)) {
+                throw new \RuntimeException(
+                    "Snapshot enthält nicht unterstützten Feldtyp „{$typeValue}“ ({$def->key}).",
+                );
+            }
+
             $raw = $input[$def->key] ?? null;
+
+            if ($def->field_type === FieldType::Period) {
+                $periodError = $this->periodRawError($raw);
+                if ($periodError !== null) {
+                    $errors["{$errorPrefix}.{$def->key}"] = $periodError;
+
+                    continue;
+                }
+            }
+
             $normalized[$def->key] = match ($def->field_type) {
                 FieldType::Boolean => $this->normalizeBoolean($raw, $def->key === 'period_open'),
                 FieldType::Period => $this->normalizePeriod($raw),
                 FieldType::ShortText, FieldType::LongText => $raw === null || $raw === '' ? null : (string) $raw,
-                default => $raw,
+                default => throw new \RuntimeException(
+                    "Snapshot enthält nicht unterstützten Feldtyp „{$typeValue}“ ({$def->key}).",
+                ),
             };
         }
 
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         return $normalized;
+    }
+
+    private function periodRawError(mixed $raw): ?string
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+
+        if (! is_array($raw)) {
+            return 'Zeitraum muss Start und Ende enthalten.';
+        }
+
+        $start = $raw['start'] ?? $raw['period_start'] ?? null;
+        $end = $raw['end'] ?? $raw['period_end'] ?? null;
+        $start = $start === '' ? null : $start;
+        $end = $end === '' ? null : $end;
+
+        if ($start === null && $end === null) {
+            return null;
+        }
+
+        if ($start === null || $end === null) {
+            return 'Zeitraum muss vollständig mit Beginn und Ende angegeben werden.';
+        }
+
+        try {
+            $startDate = Carbon::parse((string) $start)->startOfDay();
+            $endDate = Carbon::parse((string) $end)->startOfDay();
+        } catch (\Throwable) {
+            return 'Zeitraum enthält ungültige Datumsangaben.';
+        }
+
+        if ($startDate->greaterThan($endDate)) {
+            return 'Der Zeitraumbeginn darf nicht nach dem Ende liegen.';
+        }
+
+        return null;
     }
 
     private function normalizeBoolean(mixed $raw, bool $defaultTrue): bool
@@ -169,7 +284,7 @@ final class CalculationDynamicFieldWriter
     }
 
     /**
-     * @return array{start: string|null, end: string|null}|null
+     * @return array{start: string, end: string}|null
      */
     private function normalizePeriod(mixed $raw): ?array
     {
@@ -183,7 +298,6 @@ final class CalculationDynamicFieldWriter
 
         $start = $raw['start'] ?? $raw['period_start'] ?? null;
         $end = $raw['end'] ?? $raw['period_end'] ?? null;
-
         $start = $start === '' ? null : $start;
         $end = $end === '' ? null : $end;
 
@@ -192,8 +306,8 @@ final class CalculationDynamicFieldWriter
         }
 
         return [
-            'start' => $start === null ? null : (string) $start,
-            'end' => $end === null ? null : (string) $end,
+            'start' => (string) $start,
+            'end' => (string) $end,
         ];
     }
 

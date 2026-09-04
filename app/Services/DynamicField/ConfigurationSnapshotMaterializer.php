@@ -19,6 +19,10 @@ final class ConfigurationSnapshotMaterializer
 {
     public const SYSTEM_CALCULATION_CORE_KEY = 'system_calculation_core';
 
+    public function __construct(
+        private readonly SnapshotFieldRuleEvaluator $rules,
+    ) {}
+
     public function materializeFromActiveSet(
         string $fieldSetKey = self::SYSTEM_CALCULATION_CORE_KEY,
         ConfigurationSnapshotSource $source = ConfigurationSnapshotSource::SeedActive,
@@ -40,6 +44,34 @@ final class ConfigurationSnapshotMaterializer
         if ($version->status !== FieldSetVersionStatus::Active) {
             throw new RuntimeException("Aktive Feldset-Version von {$fieldSetKey} ist nicht aktiv.");
         }
+
+        $seenDefinitionIds = [];
+        $defsByKey = collect();
+
+        foreach ($version->fields as $membership) {
+            $revision = $membership->revision;
+            $definition = $revision?->definition;
+            if ($revision === null || $definition === null) {
+                throw new RuntimeException('Feldset-Membership ohne gültige Revision.');
+            }
+
+            if ((int) $membership->field_definition_id !== (int) $definition->id
+                || (int) $revision->field_definition_id !== (int) $membership->field_definition_id) {
+                throw new RuntimeException(
+                    "Feldset-Membership Revision passt nicht zur Definition ({$definition->key}).",
+                );
+            }
+
+            if (isset($seenDefinitionIds[$definition->id])) {
+                throw new RuntimeException(
+                    "Feldset-Version enthält Definition „{$definition->key}“ mehrfach.",
+                );
+            }
+            $seenDefinitionIds[$definition->id] = true;
+            $defsByKey->put($definition->key, $definition);
+        }
+
+        $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $version->rules);
 
         return DB::transaction(function () use ($set, $version, $source): ConfigurationSnapshot {
             $snapshot = new ConfigurationSnapshot;

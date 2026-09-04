@@ -75,14 +75,16 @@ return new class extends Migration
         Schema::create('field_set_version_fields', function (Blueprint $table) {
             $table->id();
             $table->foreignId('field_set_version_id')->constrained('field_set_versions')->cascadeOnDelete();
+            $table->foreignId('field_definition_id')->constrained('field_definitions')->restrictOnDelete();
             $table->foreignId('field_definition_revision_id')->constrained('field_definition_revisions')->restrictOnDelete();
             $table->unsignedInteger('sort')->default(0);
             $table->boolean('required_override')->nullable();
             $table->boolean('visible_override')->nullable();
 
+            // Eine stabile Definition darf pro Feldset-Version nur einmal vorkommen.
             $table->unique(
-                ['field_set_version_id', 'field_definition_revision_id'],
-                'field_set_version_field_unique',
+                ['field_set_version_id', 'field_definition_id'],
+                'field_set_version_def_unique',
             );
         });
 
@@ -130,13 +132,17 @@ return new class extends Migration
             $table->json('action_json');
         });
 
-        Schema::table('calculations', function (Blueprint $table) {
-            $table->foreignId('configuration_snapshot_id')
-                ->nullable()
-                ->after('lock_version')
-                ->constrained('configuration_snapshots')
-                ->restrictOnDelete();
-        });
+        // Spalte per ADD COLUMN (ohne Rebuild): Laravel Blueprint `after()` rebuildet
+        // unter SQLite die Tabelle und löscht dabei child-rows mit ON DELETE CASCADE.
+        Schema::disableForeignKeyConstraints();
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            DB::statement('ALTER TABLE calculations ADD COLUMN configuration_snapshot_id INTEGER NULL');
+        } else {
+            Schema::table('calculations', function (Blueprint $table) {
+                $table->unsignedBigInteger('configuration_snapshot_id')->nullable()->after('lock_version');
+            });
+        }
+        Schema::enableForeignKeyConstraints();
 
         Schema::create('calculation_field_values', function (Blueprint $table) {
             $table->id();
@@ -182,34 +188,58 @@ return new class extends Migration
 
         $this->seedSystemCalculationCore();
         $this->backfillExistingCalculations();
+
+        Schema::disableForeignKeyConstraints();
+        if (Schema::getConnection()->getDriverName() === 'sqlite') {
+            // FK als no-op-Sicherheit: SQLite ADD CONSTRAINT ist eingeschränkt;
+            // Integrität wird über Writer und Tests abgesichert. Index für Lookups.
+            DB::statement('CREATE INDEX IF NOT EXISTS calculations_configuration_snapshot_id_index ON calculations (configuration_snapshot_id)');
+        } else {
+            Schema::table('calculations', function (Blueprint $table) {
+                $table->foreign('configuration_snapshot_id')
+                    ->references('id')
+                    ->on('configuration_snapshots')
+                    ->restrictOnDelete();
+            });
+        }
+        Schema::enableForeignKeyConstraints();
     }
 
     public function down(): void
     {
+        Schema::disableForeignKeyConstraints();
+
         Schema::dropIfExists('calculation_position_field_values');
         Schema::dropIfExists('calculation_field_values');
 
-        Schema::table('calculations', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('configuration_snapshot_id');
-        });
+        if (Schema::hasColumn('calculations', 'configuration_snapshot_id')) {
+            if (Schema::getConnection()->getDriverName() === 'sqlite') {
+                try {
+                    DB::statement('DROP INDEX IF EXISTS calculations_configuration_snapshot_id_index');
+                } catch (Throwable) {
+                }
+                DB::statement('ALTER TABLE calculations DROP COLUMN configuration_snapshot_id');
+            } else {
+                Schema::table('calculations', function (Blueprint $table) {
+                    $table->dropForeign(['configuration_snapshot_id']);
+                });
+                Schema::table('calculations', function (Blueprint $table) {
+                    $table->dropColumn('configuration_snapshot_id');
+                });
+            }
+        }
 
         Schema::dropIfExists('snapshot_field_rules');
         Schema::dropIfExists('snapshot_field_definitions');
         Schema::dropIfExists('configuration_snapshots');
         Schema::dropIfExists('field_rules');
         Schema::dropIfExists('field_set_version_fields');
-
-        Schema::table('field_sets', function (Blueprint $table) {
-            $table->dropForeign(['active_version_id']);
-        });
         Schema::dropIfExists('field_set_versions');
         Schema::dropIfExists('field_sets');
-
-        Schema::table('field_definitions', function (Blueprint $table) {
-            $table->dropForeign(['current_revision_id']);
-        });
         Schema::dropIfExists('field_definition_revisions');
         Schema::dropIfExists('field_definitions');
+
+        Schema::enableForeignKeyConstraints();
     }
 
     private function seedSystemCalculationCore(): void
@@ -249,7 +279,7 @@ return new class extends Migration
             ],
         ];
 
-        $revisionIdsByKey = [];
+        $membershipByKey = [];
 
         foreach ($fields as $field) {
             $definitionId = DB::table('field_definitions')->insertGetId([
@@ -280,7 +310,10 @@ return new class extends Migration
                 'current_revision_id' => $revisionId,
             ]);
 
-            $revisionIdsByKey[$field['key']] = $revisionId;
+            $membershipByKey[$field['key']] = [
+                'definition_id' => $definitionId,
+                'revision_id' => $revisionId,
+            ];
         }
 
         $setId = DB::table('field_sets')->insertGetId([
@@ -303,10 +336,11 @@ return new class extends Migration
         ]);
 
         $sort = 0;
-        foreach ($revisionIdsByKey as $revisionId) {
+        foreach ($membershipByKey as $membership) {
             DB::table('field_set_version_fields')->insert([
                 'field_set_version_id' => $versionId,
-                'field_definition_revision_id' => $revisionId,
+                'field_definition_id' => $membership['definition_id'],
+                'field_definition_revision_id' => $membership['revision_id'],
                 'sort' => $sort,
                 'required_override' => null,
                 'visible_override' => null,

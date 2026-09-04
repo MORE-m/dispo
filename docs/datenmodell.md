@@ -195,21 +195,36 @@ Zusätzlich vorgesehen, aber noch nicht operativ:
 
 ## Dynamische Daten
 
-Konfigurationsobjekte:
+### DF-1 – Kalkulation (umgesetzt)
 
-- `FieldDefinition`,
-- `FieldOption`,
-- `FieldSet` und `FieldSetVersion`,
-- `FieldSetAssignment`,
-- `FieldRule`,
-- `SystemFieldSetting`.
+Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 
-Vorgangsdaten:
+| Tabelle | Rolle |
+|---|---|
+| `field_definitions` | stabile Feldidentität (`key`, Typ, Scope, `current_revision_id`) |
+| `field_definition_revisions` | unveränderliche Revisionszeilen (Label, Hilfe, Reportflag) |
+| `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id` |
+| `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |
+| `field_rules` | Regeln der Feldset-Version (`field_equals` / `require_field` in DF-1) |
+| `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill) |
+| `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis |
+| `snapshot_field_rules` | kopierte Regeln des Snapshots |
+| `calculation_field_values` | typisierte Kopfwerte einer Kalkulation |
+| `calculation_position_field_values` | typisierte Positionswerte |
+| `calculations.configuration_snapshot_id` | FK auf den Config-Snapshot der Kalkulation |
 
-- `ConfigurationSnapshot`,
-- `SnapshotFieldDefinition`,
-- `DynamicFieldValue`,
-- typisierte Auswahl-/Referenzbeziehungen.
+Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, Textfelder), nicht als generisches JSON-Blob.
+
+### Spätere Ausbaustufen (nicht DF-1)
+
+Konzeptuell vorgesehen, aber **nicht** Teil von DF-1:
+
+- `FieldOption` / Auswahloptionen,
+- `SystemFieldSetting`,
+- `FieldSetAssignment` an Kategorien/Werbemittel,
+- generisches `DynamicFieldValue` als Sammelbegriff (ersetzt in DF-1 durch die beiden Calc-Value-Tabellen),
+- Dispo-Wertetabellen und Dispo-Snapshot-Dynamik (DF-2+),
+- Custom-Feld-Administration (GATE-D / ADM-*).
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.

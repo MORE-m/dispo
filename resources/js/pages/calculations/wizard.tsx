@@ -73,6 +73,7 @@ import {
     firstValidationMessage,
     mapValidationErrors,
 } from '@/lib/validation-errors';
+import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -607,8 +608,7 @@ export default function CalculationWizard({
                     position.position_discounts,
                     position.position_discount_percent,
                 ),
-                period_open:
-                    position.dynamic_field_values?.period_open ?? true,
+                period_open: position.dynamic_field_values?.period_open ?? true,
                 flight_period_start:
                     position.dynamic_field_values?.position_flight_period
                         ?.start ?? '',
@@ -1673,34 +1673,57 @@ export default function CalculationWizard({
                                                                     undefined
                                                                 }
                                                             >
-                                                                <label className="flex items-center gap-2 text-sm">
-                                                                    <Checkbox
-                                                                        id={`period-open-${index}`}
-                                                                        checked={
-                                                                            position.period_open
-                                                                        }
-                                                                        disabled={
-                                                                            !canEdit
-                                                                        }
-                                                                        data-test={`period-open-${index}`}
-                                                                        onCheckedChange={(
-                                                                            checked,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    period_open:
-                                                                                        checked ===
-                                                                                        true,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    Zeitraum
-                                                                    offen
-                                                                </label>
+                                                                <Checkbox
+                                                                    id={`period-open-${index}`}
+                                                                    checked={
+                                                                        position.period_open
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    data-test={`period-open-${index}`}
+                                                                    aria-label={
+                                                                        fieldSchema.fields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
+                                                                        )
+                                                                            ?.label ??
+                                                                        'Zeitraum offen'
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                period_open:
+                                                                                    checked ===
+                                                                                    true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
                                                             </FormField>
-                                                            {!position.period_open ? (
+                                                            {requiredPositionFieldKeysFromSnapshotRules(
+                                                                fieldSchema.rules,
+                                                                {
+                                                                    period_open:
+                                                                        position.period_open,
+                                                                    position_flight_period:
+                                                                        position.flight_period_start ||
+                                                                        position.flight_period_end
+                                                                            ? {
+                                                                                  start: position.flight_period_start,
+                                                                                  end: position.flight_period_end,
+                                                                              }
+                                                                            : null,
+                                                                },
+                                                            ).includes(
+                                                                'position_flight_period',
+                                                            ) ? (
                                                                 <FormField
                                                                     label={
                                                                         fieldSchema.fields.find(
