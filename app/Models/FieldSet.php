@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $key
  * @property string $name
  * @property int|null $active_version_id
+ * @property int $lock_version
  */
 class FieldSet extends Model
 {
@@ -18,7 +19,18 @@ class FieldSet extends Model
         'key',
         'name',
         'active_version_id',
+        'lock_version',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'lock_version' => 'integer',
+        ];
+    }
 
     /**
      * @return BelongsTo<FieldSetVersion, $this>

@@ -20,9 +20,10 @@ type ValidationPayload = {
     errors?: Record<string, string[]>;
 };
 
-export async function jsonPost<T>(
+export async function jsonRequest<T>(
+    method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
-    body: unknown,
+    body?: unknown,
     signal?: AbortSignal,
 ): Promise<T> {
     const token = decodeURIComponent(
@@ -33,7 +34,7 @@ export async function jsonPost<T>(
     );
 
     const response = await fetch(url, {
-        method: 'POST',
+        method,
         credentials: 'same-origin',
         headers: {
             Accept: 'application/json',
@@ -41,7 +42,7 @@ export async function jsonPost<T>(
             'X-XSRF-TOKEN': token,
             'X-Requested-With': 'XMLHttpRequest',
         },
-        body: JSON.stringify(body),
+        body: body === undefined ? undefined : JSON.stringify(body),
         signal,
     });
 
@@ -67,4 +68,20 @@ export async function jsonPost<T>(
     }
 
     return data;
+}
+
+export async function jsonPost<T>(
+    url: string,
+    body: unknown,
+    signal?: AbortSignal,
+): Promise<T> {
+    return jsonRequest<T>('POST', url, body, signal);
+}
+
+export async function jsonPut<T>(
+    url: string,
+    body: unknown,
+    signal?: AbortSignal,
+): Promise<T> {
+    return jsonRequest<T>('PUT', url, body, signal);
 }

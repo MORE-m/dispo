@@ -203,7 +203,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 |---|---|
 | `field_definitions` | stabile Feldidentität (`key`, Typ, Scope, `current_revision_id`) |
 | `field_definition_revisions` | unveränderliche Revisionszeilen (Label, Hilfe, Reportflag) |
-| `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id` |
+| `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version` am Feldset |
 | `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |
 | `field_rules` | Regeln der Feldset-Version (`field_equals` / `require_field` in DF-1) |
 | `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill) |
@@ -233,14 +233,16 @@ nicht erfasst“; vorhandene Zeile mit `NULL` bedeutet „erfasst, bewusst leer�
 Draft-Sync erzeugt ausschließlich fehlende Capture-Zeilen und überschreibt keine
 vorhandenen Werte.
 
-### Spätere Ausbaustufen (nicht DF-1/DF-2)
+### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 nur Admin-Versionierung der Seeds)
 
-Konzeptuell vorgesehen, aber **nicht** Teil von DF-1/DF-2:
+Konzeptuell vorgesehen; **DF-3.1** liefert Admin für Systemfeld-Revisionen und
+Kern-Feldset-Versionen, aber noch nicht:
 
+- Custom-Feld-Administration und neue Typen,
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
 - `FieldSetAssignment` an Kategorien/Werbemittel,
-- Custom-Feld-Administration (GATE-D / ADM-*).
+- Regel-Editor / volle Regelmatrix.
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.

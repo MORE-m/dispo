@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $group_key
  * @property int $sort_default
  * @property bool $reportable
+ * @property CarbonInterface|null $created_at
  */
 class FieldDefinitionRevision extends Model
 {

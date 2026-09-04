@@ -1,32 +1,42 @@
 # Fortschritt V1
 
-Stand: 4. September 2026 (DF-2 abgeschlossen; kleine Nachpflege)
+Stand: 4. September 2026 (DF-3.1 in Arbeit – kein Abschluss von DF-3)
 
 ## Aktuelle Phase
 
 Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 und DF-2 auf
-`main`:** eigenständiger Dispo-Config-Snapshot, Übernahme der drei
-Kalkulations-Dyn-Felder, Draft-Erfassung von `billing_special_features` /
-`disposition_notes`.
+`main`**. **DF-3.1** (Admin-Versionierung geschützter Systemfelder und
+Kern-Feldsets) auf Feature-Branch; Gesamtziel DF-3 bleibt offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
-`main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen.
+`main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
+Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin.
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `chore/df2-post-merge-cleanup` – kleine Nachpflege nach DF-2
-(PHPDoc non-null, Fortschrittsdokument, Multi-Positions-Sync-Test,
-Revision-ohne-Definition-Test). DF-3 / Admin-UI nicht begonnen.
+Feature-Branch `feat/df3-1-system-field-admin` – DF-3.1 Admin für Systemfeld-
+Revisionen und Kern-Feldset Draft/Activate/Vorschau. **DF-3 ist damit nicht
+abgeschlossen** (Custom Fields, Assignments, Optionen, Regelmatrix folgen).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-2 Dispo-Config-Snapshot und Dispo-Hinweise – PR
-[#16](https://github.com/MORE-m/dispo/pull/16) gemergt in `main`
-(`ac0d533`, Post-Merge-CI Run `33851426061` Attempt 3 grün: `ci` + `mysql`,
-inkl. npm audit und Playwright).
+DF-2 Nachpflege – PR
+[#17](https://github.com/MORE-m/dispo/pull/17) gemergt in `main`
+(`ced673d`, Post-Merge-CI Run `33859778546` grün: `ci` + `mysql`).
 
-Davor: DF-1 dynamische Systemfelder Kalkulation – PR
-[#15](https://github.com/MORE-m/dispo/pull/15) gemergt (`ed194b4`).
+Davor: DF-2 Dispo-Config-Snapshot – PR
+[#16](https://github.com/MORE-m/dispo/pull/16) (`ac0d533`).
+
+## DF-3.1 – Admin Systemfelder / Kern-Feldsets (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe „Administration dynamischer Felder“ | freigegeben |
+| Revision geschützter Systemfelder (Label/Hilfe/Gruppe/Sort/reportable) | umgesetzt |
+| Draft/Activate/Copy-as-template für zwei Kern-Feldsets | umgesetzt |
+| Statische Vorschau mit Beispielwerten; Regeln nur lesbar | umgesetzt |
+| Audit + `lock_version` + AT-14 (Historie unverändert) | umgesetzt |
+| Custom Fields / Optionen / Assignments / Regel-Editor | **nicht** in DF-3.1 |
 
 ## DF-2 – Dispo-Config-Snapshot und Hinweise (September 2026)
 
@@ -47,6 +57,8 @@ Davor: DF-1 dynamische Systemfelder Kalkulation – PR
 - **PO-B2:** Hinweise nur im Dispo-Entwurf.
 - **PO-DF2-1:** Nachfolge-Draft kopiert beide Texte per Schlüssel aus dem
   abgelehnten Vorgänger; neuer Snapshot; Vorgänger unverändert.
+- **PO-DF3.1:** UX-GATE-D Dyn-Feld-Admin; Vorschau statisch mit Beispielwerten;
+  Regeln in DF-3.1 nur lesbar.
 
 ## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
 
@@ -62,45 +74,12 @@ Davor: DF-1 dynamische Systemfelder Kalkulation – PR
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Nummernableitung K→DA (September 2026)
+## Bewusst offen nach DF-3.1
 
-| Kriterium | Status |
-|---|---|
-| Neue Familie: Stamm aus `calculation.number_year` / `number_seq` | umgesetzt |
-| Padding wie Kalkulation (`NNNNN`, nicht `NNNNNN`) | umgesetzt |
-| Folgeaufträge / Nachbesserung: nur Suffix | umgesetzt |
-| Legacy-Familien behalten Stamm inkl. Padding | umgesetzt |
-| Keine Umnummerierung historischer Nummern | umgesetzt |
-| `dispo_order_number_sequences` nur noch Legacy | umgesetzt |
-| MySQL-Concurrency | umgesetzt |
-
-## Vier-Augen-Freigabe (September 2026)
-
-| Kriterium | Status |
-|---|---|
-| Jeder Auftrag benötigt Freigabe (kein `Entwurf → Disposition`) | umgesetzt |
-| Statusübergänge: Entwurf → Wartet → Disposition / Abgelehnt | umgesetzt |
-| Regulär: anderer Vertrieb / Admin / GF | umgesetzt |
-| Sonderfreigabe: nur Admin / GF | umgesetzt |
-| Ersteller-Ausschluss auch bei Admin/GF | umgesetzt |
-| Persistente Freigabeanforderung + Historie | umgesetzt |
-| Teilübernahme umgeht Sonderfreigabe nicht | umgesetzt |
-| Concurrency / `lock_version` / 409 | umgesetzt |
-| Audit `submitted_for_approval` / `approved` / `rejected` | umgesetzt |
-| Listenstatus nach Mutation ohne Browser-Reload | umgesetzt |
-| Nachbesserung abgelehnter Aufträge als neuer Entwurf | umgesetzt |
-| UX-GATE-D gesamt | **nicht** abgeschlossen |
-
-## Nachbesserung abgelehnter Aufträge
-
-Der abgelehnte Dispoauftrag bleibt als unveränderbarer, terminaler Snapshot erhalten.
-Der Ersteller kann die zugrunde liegende Kalkulation nachbessern und daraus einen
-neuen, verknüpften Dispoauftrag im Status Entwurf erzeugen (`revises_dispo_order_id`).
-
-## Bewusst offen nach DF-2
-
-- Admin-UI für Felddefinitionen/Feldsets (GATE-D / ADM-*/DF-3)
-- volle Regelmatrix, Optionen, Custom Fields, Payfaktor als FieldDefinition
+- Custom Fields anlegen/ändern/deaktivieren und Formularnutzung (DF-3.2+)
+- Feldset-Assignments / Vererbung (braucht BL-P2-02)
+- Optionen, Auswahltypen, volle Regelmatrix
+- übrige UX-GATE-D-Adminmodule (Inventare, Kataloge, Preislisten, …)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 
 ## Echte Blocker
@@ -108,6 +87,6 @@ neuen, verknüpften Dispoauftrag im Status Entwurf erzeugen (`revises_dispo_orde
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin teilfreigegeben) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
