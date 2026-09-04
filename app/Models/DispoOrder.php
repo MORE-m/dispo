@@ -23,11 +23,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $source_calculation_number
  * @property DispoOrderApprovalKind $approval_kind
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
- * @property int|null $configuration_snapshot_id
+ * @property int $configuration_snapshot_id
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  * @property-read Collection<int, DispoOrderFieldValue> $fieldValues
- * @property-read ConfigurationSnapshot|null $configurationSnapshot
+ * @property-read ConfigurationSnapshot $configurationSnapshot
  * @property-read DispoOrder|null $revises
  * @property-read DispoOrder|null $revision
  */

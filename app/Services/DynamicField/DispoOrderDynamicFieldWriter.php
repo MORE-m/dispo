@@ -136,10 +136,6 @@ final class DispoOrderDynamicFieldWriter
         array $selectedCalculationPositionIds,
         ?DispoOrder $predecessor = null,
     ): void {
-        if ($order->configuration_snapshot_id === null) {
-            $this->assignComposedSnapshot($order, $calculation);
-            $order->save();
-        }
         $this->persistCopiedValues($order, $calculation, $selectedCalculationPositionIds, $predecessor);
     }
 
@@ -344,10 +340,6 @@ final class DispoOrderDynamicFieldWriter
     public function fieldSchemaProp(DispoOrder $order): array
     {
         $snapshot = $order->configurationSnapshot;
-        if ($snapshot === null) {
-            return ['fields' => [], 'rules' => []];
-        }
-
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
         return [
@@ -381,16 +373,6 @@ final class DispoOrderDynamicFieldWriter
     public function valuesProp(DispoOrder $order): array
     {
         $snapshot = $order->configurationSnapshot;
-        if ($snapshot === null) {
-            return [
-                'header' => [],
-                'positions' => [],
-                'header_captured' => [],
-                'positions_captured' => [],
-                'missing_calc_origin_keys' => [],
-                'historically_uncaptured' => true,
-            ];
-        }
 
         $order->loadMissing([
             'fieldValues.snapshotFieldDefinition',
@@ -453,9 +435,6 @@ final class DispoOrderDynamicFieldWriter
     ): void {
         $predecessor->loadMissing(['fieldValues.snapshotFieldDefinition', 'configurationSnapshot.fieldDefinitions']);
         $predSnapshot = $predecessor->configurationSnapshot;
-        if ($predSnapshot === null) {
-            throw new RuntimeException('Vorgänger besitzt keinen Konfigurationssnapshot.');
-        }
 
         foreach (DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS as $key) {
             $newDef = $snapshot->fieldDefinitions->firstWhere('key', $key);
@@ -670,14 +649,8 @@ final class DispoOrderDynamicFieldWriter
     private function requireSnapshot(DispoOrder $order): ConfigurationSnapshot
     {
         $order->loadMissing('configurationSnapshot.fieldDefinitions', 'configurationSnapshot.rules');
-        $snapshot = $order->configurationSnapshot;
-        if ($snapshot === null) {
-            throw ValidationException::withMessages([
-                'configuration_snapshot_id' => 'Konfigurationssnapshot fehlt.',
-            ]);
-        }
 
-        return $snapshot;
+        return $order->configurationSnapshot;
     }
 
     private function assertReadyForRules(DispoOrder $order, ConfigurationSnapshot $snapshot): void

@@ -1,11 +1,11 @@
 # Fortschritt V1
 
-Stand: 4. September 2026 (DF-2 Dispo-Config-Snapshot und Dispo-Hinweise)
+Stand: 4. September 2026 (DF-2 abgeschlossen; kleine Nachpflege)
 
 ## Aktuelle Phase
 
-Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 auf `main`**,
-**DF-2 in Arbeit:** eigenständiger Dispo-Config-Snapshot, Übernahme der drei
+Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 und DF-2 auf
+`main`:** eigenständiger Dispo-Config-Snapshot, Übernahme der drei
 Kalkulations-Dyn-Felder, Draft-Erfassung von `billing_special_features` /
 `disposition_notes`.
 
@@ -14,15 +14,19 @@ Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/dynamic-fields-dispo-df2` (DF-2) – offener PR
-[#16](https://github.com/MORE-m/dispo/pull/16); Review-Korrekturen
-(NOT-NULL-Snapshot, Capture-Semantik, Legacy-Sync-Tests, UI-Anzeige, Composer).
+Feature-Branch `chore/df2-post-merge-cleanup` – kleine Nachpflege nach DF-2
+(PHPDoc non-null, Fortschrittsdokument, Multi-Positions-Sync-Test,
+Revision-ohne-Definition-Test). DF-3 / Admin-UI nicht begonnen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-1 dynamische Systemfelder Kalkulation – PR
-[#15](https://github.com/MORE-m/dispo/pull/15) gemergt in `main`
-(`ed194b4`, Post-Merge-CI grün).
+DF-2 Dispo-Config-Snapshot und Dispo-Hinweise – PR
+[#16](https://github.com/MORE-m/dispo/pull/16) gemergt in `main`
+(`ac0d533`, Post-Merge-CI Run `33851426061` Attempt 3 grün: `ci` + `mysql`,
+inkl. npm audit und Playwright).
+
+Davor: DF-1 dynamische Systemfelder Kalkulation – PR
+[#15](https://github.com/MORE-m/dispo/pull/15) gemergt (`ed194b4`).
 
 ## DF-2 – Dispo-Config-Snapshot und Hinweise (September 2026)
 

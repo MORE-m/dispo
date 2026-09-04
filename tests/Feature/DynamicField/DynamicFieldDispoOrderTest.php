@@ -10,7 +10,11 @@ use App\Models\Calculation;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderFieldValue;
+use App\Models\DispoOrderPosition;
+use App\Models\DispoOrderPositionFieldValue;
+use App\Models\FieldDefinition;
 use App\Models\FieldSet;
+use App\Models\FieldSetVersionField;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
@@ -679,6 +683,273 @@ class DynamicFieldDispoOrderTest extends TestCase
                 'snapshotFieldDefinition',
                 fn ($q) => $q->whereIn('key', ['billing_special_features', 'disposition_notes']),
             )->count(),
+        );
+    }
+
+    public function test_sync_maps_missing_capture_rows_by_calculation_position_id_across_multiple_positions(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+            ['inventory_id' => $catalog['rock']->id, 'total_spot_count' => 5, 'hour' => 10],
+        ]);
+        $user = User::factory()->role(Role::Sales)->create();
+        $calcPositions = $calculation->positions()->orderBy('id')->get();
+        $this->assertCount(2, $calcPositions);
+
+        $calcSnapshotId = (int) $calculation->configuration_snapshot_id;
+        $periodOpenDefId = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcSnapshotId)
+            ->where('key', 'period_open')
+            ->value('id');
+        $flightDefId = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcSnapshotId)
+            ->where('key', 'position_flight_period')
+            ->value('id');
+
+        $calcA = $calcPositions[0];
+        $calcB = $calcPositions[1];
+
+        DB::table('calculation_position_field_values')
+            ->where('calculation_position_id', $calcA->id)
+            ->where('snapshot_field_definition_id', $periodOpenDefId)
+            ->update(['value_boolean' => false]);
+        DB::table('calculation_position_field_values')
+            ->where('calculation_position_id', $calcA->id)
+            ->where('snapshot_field_definition_id', $flightDefId)
+            ->update([
+                'value_period_start' => '2026-01-01',
+                'value_period_end' => '2026-01-31',
+            ]);
+
+        DB::table('calculation_position_field_values')
+            ->where('calculation_position_id', $calcB->id)
+            ->where('snapshot_field_definition_id', $periodOpenDefId)
+            ->update(['value_boolean' => true]);
+        DB::table('calculation_position_field_values')
+            ->where('calculation_position_id', $calcB->id)
+            ->where('snapshot_field_definition_id', $flightDefId)
+            ->update([
+                'value_period_start' => null,
+                'value_period_end' => null,
+            ]);
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calcPositions->pluck('id')->all(),
+                $user,
+            )
+            ->order;
+
+        $this->actingAs($user)->patch(route('dispo-orders.update', $order), [
+            'lock_version' => $order->lock_version,
+            'dynamic_field_values' => [
+                'billing_special_features' => 'Bleibt Multi',
+                'disposition_notes' => 'Auch Multi',
+            ],
+        ])->assertRedirect();
+        $order->refresh();
+
+        $dispoA = DispoOrderPosition::query()
+            ->where('dispo_order_id', $order->id)
+            ->where('calculation_position_id', $calcA->id)
+            ->firstOrFail();
+        $dispoB = DispoOrderPosition::query()
+            ->where('dispo_order_id', $order->id)
+            ->where('calculation_position_id', $calcB->id)
+            ->firstOrFail();
+
+        $sortA = (int) $dispoA->sort;
+        $sortB = (int) $dispoB->sort;
+        $dispoA->forceFill(['sort' => $sortB])->save();
+        $dispoB->forceFill(['sort' => $sortA])->save();
+
+        $snapshotId = (int) $order->configuration_snapshot_id;
+        $dispoPeriodOpenDefId = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $snapshotId)
+            ->where('key', 'period_open')
+            ->value('id');
+        $dispoFlightDefId = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $snapshotId)
+            ->where('key', 'position_flight_period')
+            ->value('id');
+        $campaignDefId = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $snapshotId)
+            ->where('key', 'campaign_period')
+            ->value('id');
+
+        $keptPeriodOpen = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoA->id)
+            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefId)
+            ->firstOrFail();
+        $keptPeriodOpen->value_boolean = true;
+        $keptPeriodOpen->save();
+
+        DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoA->id)
+            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->delete();
+        DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoB->id)
+            ->whereIn('snapshot_field_definition_id', [$dispoPeriodOpenDefId, $dispoFlightDefId])
+            ->delete();
+        DispoOrderFieldValue::query()
+            ->where('dispo_order_id', $order->id)
+            ->where('snapshot_field_definition_id', $campaignDefId)
+            ->delete();
+
+        $lockBefore = (int) $order->lock_version;
+        $auditBefore = AuditEvent::query()
+            ->where('action', 'dispo_order.calculation_dynamic_fields_synced')
+            ->where('auditable_id', $order->id)
+            ->count();
+
+        $this->actingAs($user)->post(route('dispo-orders.sync-calculation-dynamic-fields', $order), [
+            'lock_version' => $lockBefore,
+        ])->assertRedirect(route('dispo-orders.show', $order));
+
+        $order->refresh();
+        $this->assertSame($lockBefore + 1, (int) $order->lock_version);
+        $this->assertSame(
+            $auditBefore + 1,
+            AuditEvent::query()
+                ->where('action', 'dispo_order.calculation_dynamic_fields_synced')
+                ->where('auditable_id', $order->id)
+                ->count(),
+        );
+
+        $keptPeriodOpen->refresh();
+        $this->assertTrue((bool) $keptPeriodOpen->value_boolean);
+
+        $flightA = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoA->id)
+            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->firstOrFail();
+        $this->assertSame('2026-01-01', $flightA->value_period_start?->toDateString());
+        $this->assertSame('2026-01-31', $flightA->value_period_end?->toDateString());
+
+        $periodOpenB = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoB->id)
+            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefId)
+            ->firstOrFail();
+        $this->assertTrue((bool) $periodOpenB->value_boolean);
+
+        $flightB = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $dispoB->id)
+            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->firstOrFail();
+        $this->assertNull($flightB->value_period_start);
+        $this->assertNull($flightB->value_period_end);
+
+        $this->assertTrue(
+            DispoOrderFieldValue::query()
+                ->where('dispo_order_id', $order->id)
+                ->where('snapshot_field_definition_id', $campaignDefId)
+                ->exists(),
+        );
+
+        $texts = $order->fieldValues()->with('snapshotFieldDefinition')->get()
+            ->mapWithKeys(fn ($row) => [$row->snapshotFieldDefinition->key => $row->value_text])
+            ->all();
+        $this->assertSame('Bleibt Multi', $texts['billing_special_features']);
+        $this->assertSame('Auch Multi', $texts['disposition_notes']);
+
+        $values = app(DispoOrderDynamicFieldWriter::class)->valuesProp($order);
+        $this->assertSame([], $values['missing_calc_origin_keys']);
+
+        $this->actingAs($user)->post(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertRedirect();
+
+        $order->refresh();
+        $this->assertSame(DispoOrderStatus::AwaitingSalesApproval, $order->status);
+    }
+
+    public function test_revision_fails_when_protected_dispo_definition_missing_from_fieldset(): void
+    {
+        $calculation = $this->savedCalculation();
+        $creator = User::factory()->role(Role::Sales)->create();
+        $approver = User::factory()->role(Role::Sales)->create();
+        $writer = app(DispoOrderWriter::class);
+        $approvals = app(DispoOrderApprovalService::class);
+
+        $predecessor = $writer->createFromCalculation(
+            $calculation,
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+
+        $this->actingAs($creator)->patch(route('dispo-orders.update', $predecessor), [
+            'lock_version' => $predecessor->lock_version,
+            'dynamic_field_values' => [
+                'billing_special_features' => 'Vorgänger-Hinweis',
+                'disposition_notes' => null,
+            ],
+        ])->assertRedirect();
+        $predecessor->refresh();
+
+        $approvals->submit($predecessor, $creator, $predecessor->lock_version);
+        $predecessor->refresh();
+        $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');
+        $predecessor->refresh();
+
+        $set = FieldSet::query()
+            ->where('key', DispoConfigurationSnapshotComposer::SYSTEM_DISPO_ORDER_CORE_KEY)
+            ->firstOrFail();
+        $definitionId = (int) FieldDefinition::query()
+            ->where('key', 'billing_special_features')
+            ->value('id');
+        FieldSetVersionField::query()
+            ->where('field_set_version_id', $set->active_version_id)
+            ->where('field_definition_id', $definitionId)
+            ->delete();
+
+        $snapshotsBefore = ConfigurationSnapshot::query()
+            ->where('source', ConfigurationSnapshotSource::DispoOrderCreate)
+            ->count();
+        $ordersBefore = DispoOrder::query()->count();
+        $revisionAuditsBefore = AuditEvent::query()
+            ->where('action', 'dispo_order.revision_created')
+            ->count();
+
+        try {
+            $writer->createRevision(
+                $predecessor,
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calculation->positions()->pluck('id')->all(),
+                $creator,
+            );
+            $this->fail('Expected RuntimeException for missing protected dispo definition');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString(
+                'system_dispo_order_core fehlt Definition „billing_special_features“',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame($ordersBefore, DispoOrder::query()->count());
+        $this->assertSame(
+            $snapshotsBefore,
+            ConfigurationSnapshot::query()
+                ->where('source', ConfigurationSnapshotSource::DispoOrderCreate)
+                ->count(),
+        );
+        $this->assertSame(
+            $revisionAuditsBefore,
+            AuditEvent::query()
+                ->where('action', 'dispo_order.revision_created')
+                ->count(),
+        );
+
+        $predecessor->refresh();
+        $this->assertSame(DispoOrderStatus::ApprovalRejected, $predecessor->status);
+        $this->assertFalse($predecessor->hasRevision());
+        $this->assertSame(
+            'Vorgänger-Hinweis',
+            $predecessor->fieldValues()
+                ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', 'billing_special_features'))
+                ->value('value_text'),
         );
     }
 
