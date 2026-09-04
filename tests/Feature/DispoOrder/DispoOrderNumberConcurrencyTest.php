@@ -11,12 +11,14 @@ use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\CreatesMinimalDispoConfigurationSnapshot;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
 
 class DispoOrderNumberConcurrencyTest extends TestCase
 {
+    use CreatesMinimalDispoConfigurationSnapshot;
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
     use DatabaseMigrations;
@@ -123,7 +125,7 @@ class DispoOrderNumberConcurrencyTest extends TestCase
         $calculation->load('positions');
         $positions = $calculation->positions->values();
 
-        DispoOrder::query()->create([
+        $this->createDispoOrderWithMinimalSnapshot($calculation, [
             'calculation_id' => $calculation->id,
             'number' => 'DA-2026-000008-01',
             'number_year' => 2026,

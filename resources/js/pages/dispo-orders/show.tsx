@@ -1,21 +1,47 @@
 import type { ReactNode } from 'react';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { SuccessState } from '@/components/feedback/states';
-import { formatPercent, money } from '@/components/form-field';
+import {
+    formatPercent,
+    formTextareaClass,
+    money,
+} from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
 import { SpecialApprovalReasonsList } from '@/components/special-approval-reasons-list';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { formatDateOnly, formatDateTime } from '@/lib/date-time';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
-import { formatDateTime } from '@/lib/date-time';
 import type {
     ApprovalHistoryEntry,
     DispoOrderRevisionLink,
     SpecialApprovalReason,
 } from '@/types/dispo-order';
+
+type PeriodValue = { start: string | null; end: string | null } | null;
+
+type FieldSchema = {
+    fields: Array<{
+        key: string;
+        label: string;
+        help_text: string | null;
+        field_type: string;
+        scope: string;
+        sort: number;
+        group_key?: string | null;
+    }>;
+    rules: Array<{
+        sort?: number;
+        condition: { op?: string; field_key?: string; value?: unknown };
+        action: { op?: string; field_key?: string };
+    }>;
+};
 
 type OrderPosition = {
     id: number;
@@ -43,6 +69,14 @@ type OrderPosition = {
         custom_label?: string | null;
         percent?: string;
     }[];
+    dynamic_field_values?: {
+        period_open?: boolean | null;
+        position_flight_period?: PeriodValue;
+    };
+    dynamic_field_captured?: {
+        period_open?: boolean;
+        position_flight_period?: boolean;
+    };
 };
 
 type OrderDetail = {
@@ -91,21 +125,39 @@ type OrderDetail = {
     revision: DispoOrderRevisionLink | null;
     approval_history: ApprovalHistoryEntry[];
     current_approval: ApprovalHistoryEntry | null;
+    dynamic_field_values?: {
+        billing_special_features?: string | null;
+        disposition_notes?: string | null;
+        campaign_period?: PeriodValue;
+    };
+    dynamic_field_captured?: {
+        billing_special_features?: boolean;
+        disposition_notes?: boolean;
+        campaign_period?: boolean;
+    };
+    missing_calc_origin_keys?: string[];
+    historically_uncaptured?: boolean;
     positions: OrderPosition[];
 };
 
 export default function DispoOrderShow({
     order,
+    fieldSchema = { fields: [], rules: [] },
     canViewCalculation,
     canSubmit = false,
+    canUpdate = false,
+    canSyncCalculationDynamicFields = false,
     canApprove = false,
     canReject = false,
     canRevise = false,
     isCreator = false,
 }: {
     order: OrderDetail;
+    fieldSchema?: FieldSchema;
     canViewCalculation: boolean;
     canSubmit?: boolean;
+    canUpdate?: boolean;
+    canSyncCalculationDynamicFields?: boolean;
     canApprove?: boolean;
     canReject?: boolean;
     canRevise?: boolean;
@@ -113,6 +165,105 @@ export default function DispoOrderShow({
 }) {
     const flash = usePage().props.flash;
     const current = order.current_approval;
+    const headerValues = order.dynamic_field_values ?? {};
+    const headerCaptured = order.dynamic_field_captured ?? {};
+
+    const [billingSpecialFeatures, setBillingSpecialFeatures] = useState(
+        headerValues.billing_special_features ?? '',
+    );
+    const [dispositionNotes, setDispositionNotes] = useState(
+        headerValues.disposition_notes ?? '',
+    );
+    const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+    const [savingNotes, setSavingNotes] = useState(false);
+    const [syncingCalcFields, setSyncingCalcFields] = useState(false);
+
+    const pageDescription =
+        order.status === 'draft' && canUpdate
+            ? 'Entwurf – Rechnungs- und Dispohinweise bearbeitbar'
+            : 'Dispoauftrag (Snapshot, schreibgeschützt)';
+
+    const campaignPeriodLabel = fieldLabel(
+        fieldSchema,
+        'campaign_period',
+        'Kampagnenzeitraum',
+    );
+    const campaignPeriodHelp = fieldHelp(fieldSchema, 'campaign_period');
+    const billingLabel = fieldLabel(
+        fieldSchema,
+        'billing_special_features',
+        'Besonderheiten zur Rechnungsstellung',
+    );
+    const billingHelp = fieldHelp(fieldSchema, 'billing_special_features');
+    const dispositionLabel = fieldLabel(
+        fieldSchema,
+        'disposition_notes',
+        'Wichtige Informationen an die Disposition',
+    );
+    const dispositionHelp = fieldHelp(fieldSchema, 'disposition_notes');
+    const periodOpenLabel = fieldLabel(
+        fieldSchema,
+        'period_open',
+        'Zeitraum offen',
+    );
+    const periodOpenHelp = fieldHelp(fieldSchema, 'period_open');
+    const flightPeriodLabel = fieldLabel(
+        fieldSchema,
+        'position_flight_period',
+        'Flugzeitraum',
+    );
+    const flightPeriodHelp = fieldHelp(fieldSchema, 'position_flight_period');
+
+    const campaignPeriodDisplay = displayCalcOriginPeriod(
+        headerValues.campaign_period,
+        headerCaptured.campaign_period === true,
+    );
+
+    function saveNotes() {
+        if (savingNotes) {
+            return;
+        }
+
+        setSavingNotes(true);
+        setFieldErrors({});
+        router.patch(
+            `/dispoauftraege/${order.id}`,
+            {
+                lock_version: order.lock_version,
+                dynamic_field_values: {
+                    billing_special_features: billingSpecialFeatures,
+                    disposition_notes: dispositionNotes,
+                },
+            },
+            {
+                preserveScroll: true,
+                onError: (errors) => {
+                    setFieldErrors(errors);
+                },
+                onFinish: () => {
+                    setSavingNotes(false);
+                },
+            },
+        );
+    }
+
+    function syncCalculationDynamicFields() {
+        if (syncingCalcFields) {
+            return;
+        }
+
+        setSyncingCalcFields(true);
+        router.post(
+            `/dispoauftraege/${order.id}/sync-calculation-dynamic-fields`,
+            { lock_version: order.lock_version },
+            {
+                preserveScroll: true,
+                onFinish: () => {
+                    setSyncingCalcFields(false);
+                },
+            },
+        );
+    }
 
     return (
         <>
@@ -120,7 +271,7 @@ export default function DispoOrderShow({
             <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title={order.number}
-                    description="Dispoauftrag (Snapshot, schreibgeschützt)"
+                    description={pageDescription}
                     actions={
                         <DispoOrderStatusBadge
                             status={order.status}
@@ -280,6 +431,165 @@ export default function DispoOrderShow({
                             label="Freigabeart"
                             value={order.approval_kind_label}
                         />
+                        <div data-test="dispo-order-campaign-period">
+                            <Detail
+                                label={campaignPeriodLabel}
+                                value={campaignPeriodDisplay}
+                                helpText={campaignPeriodHelp}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {canSyncCalculationDynamicFields ? (
+                    <div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            data-test="dispo-order-sync-calc-dynamic-fields"
+                            disabled={syncingCalcFields}
+                            onClick={syncCalculationDynamicFields}
+                        >
+                            {syncingCalcFields
+                                ? 'Wird übernommen…'
+                                : 'Dynamische Zeitraumfelder aus Kalkulation übernehmen'}
+                        </Button>
+                    </div>
+                ) : null}
+
+                <Card
+                    className="border-border/70 rounded-xl shadow-xs"
+                    data-test="dispo-order-notes-card"
+                >
+                    <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                        <CardTitle className="text-sm font-semibold">
+                            Rechnungs- und Dispohinweise
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4 px-5 py-4">
+                        {canUpdate ? (
+                            <>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="dispo-order-billing-special-features">
+                                        {billingLabel}
+                                    </Label>
+                                    {billingHelp ? (
+                                        <p
+                                            id="dispo-order-billing-special-features-help"
+                                            className="text-muted-foreground text-xs"
+                                        >
+                                            {billingHelp}
+                                        </p>
+                                    ) : null}
+                                    <textarea
+                                        id="dispo-order-billing-special-features"
+                                        className={formTextareaClass}
+                                        value={billingSpecialFeatures}
+                                        data-test="dispo-order-billing-special-features"
+                                        disabled={savingNotes}
+                                        aria-describedby={
+                                            billingHelp
+                                                ? 'dispo-order-billing-special-features-help'
+                                                : undefined
+                                        }
+                                        onChange={(event) =>
+                                            setBillingSpecialFeatures(
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    {fieldErrors[
+                                        'dynamic_field_values.billing_special_features'
+                                    ] ? (
+                                        <p className="text-destructive text-xs">
+                                            {
+                                                fieldErrors[
+                                                    'dynamic_field_values.billing_special_features'
+                                                ]
+                                            }
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="dispo-order-disposition-notes">
+                                        {dispositionLabel}
+                                    </Label>
+                                    {dispositionHelp ? (
+                                        <p
+                                            id="dispo-order-disposition-notes-help"
+                                            className="text-muted-foreground text-xs"
+                                        >
+                                            {dispositionHelp}
+                                        </p>
+                                    ) : null}
+                                    <textarea
+                                        id="dispo-order-disposition-notes"
+                                        className={formTextareaClass}
+                                        value={dispositionNotes}
+                                        data-test="dispo-order-disposition-notes"
+                                        disabled={savingNotes}
+                                        aria-describedby={
+                                            dispositionHelp
+                                                ? 'dispo-order-disposition-notes-help'
+                                                : undefined
+                                        }
+                                        onChange={(event) =>
+                                            setDispositionNotes(
+                                                event.target.value,
+                                            )
+                                        }
+                                    />
+                                    {fieldErrors[
+                                        'dynamic_field_values.disposition_notes'
+                                    ] ? (
+                                        <p className="text-destructive text-xs">
+                                            {
+                                                fieldErrors[
+                                                    'dynamic_field_values.disposition_notes'
+                                                ]
+                                            }
+                                        </p>
+                                    ) : null}
+                                </div>
+                                {fieldErrors.dynamic_field_values ||
+                                fieldErrors.lock_version ? (
+                                    <p className="text-destructive text-xs">
+                                        {fieldErrors.dynamic_field_values ??
+                                            fieldErrors.lock_version}
+                                    </p>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    disabled={savingNotes}
+                                    onClick={saveNotes}
+                                >
+                                    {savingNotes
+                                        ? 'Wird gespeichert…'
+                                        : 'Speichern'}
+                                </Button>
+                            </>
+                        ) : (
+                            <>
+                                <div data-test="dispo-order-billing-special-features">
+                                    <Detail
+                                        label={billingLabel}
+                                        value={displayOptionalText(
+                                            headerValues.billing_special_features,
+                                        )}
+                                        helpText={billingHelp}
+                                    />
+                                </div>
+                                <div data-test="dispo-order-disposition-notes">
+                                    <Detail
+                                        label={dispositionLabel}
+                                        value={displayOptionalText(
+                                            headerValues.disposition_notes,
+                                        )}
+                                        helpText={dispositionHelp}
+                                    />
+                                </div>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -354,62 +664,108 @@ export default function DispoOrderShow({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4 px-5 py-4">
-                        {order.positions.map((position, index) => (
-                            <section
-                                key={position.id}
-                                className="rounded-lg border p-4"
-                                data-test={`dispo-order-position-${index}`}
-                            >
-                                <p className="font-medium">
-                                    {position.inventory_name} ·{' '}
-                                    {position.advertising_medium_name}
-                                </p>
-                                <p className="text-muted-foreground mt-1 text-xs">
-                                    {position.spot_method_label} ·{' '}
-                                    {position.total_spot_count} Spots ·{' '}
-                                    {position.length_seconds}s
-                                    {position.price_list_version
-                                        ? ` · Preisliste ${position.price_list_version}`
-                                        : ''}
-                                </p>
-                                {position.time_ranges.length > 0 ? (
-                                    <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
-                                        {position.time_ranges.map((range) => (
-                                            <li
-                                                key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
-                                            >
-                                                {formatHour(range.start_hour)}–
-                                                {formatInclusiveEnd(
-                                                    range.end_hour_exclusive,
-                                                )}{' '}
-                                                · {range.spot_count} Spots
-                                                {range.range_gross
-                                                    ? ` · ${money(range.range_gross)}`
-                                                    : ''}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : null}
-                                {position.position_discounts.length > 0 ? (
-                                    <ul className="text-muted-foreground mt-2 text-xs">
-                                        {position.position_discounts.map(
-                                            (discount, discountIndex) => (
-                                                <li key={discountIndex}>
-                                                    {discount.custom_label ??
-                                                        discount.type}
-                                                    {discount.percent
-                                                        ? ` ${formatPercent(discount.percent)}`
-                                                        : ''}
-                                                </li>
-                                            ),
-                                        )}
-                                    </ul>
-                                ) : null}
-                                <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
-                                    {money(position.nn_invest)} N/N
-                                </p>
-                            </section>
-                        ))}
+                        {order.positions.map((position, index) => {
+                            const positionValues =
+                                position.dynamic_field_values ?? {};
+                            const positionCaptured =
+                                position.dynamic_field_captured ?? {};
+                            const periodOpen = positionValues.period_open;
+                            const periodOpenCaptured =
+                                positionCaptured.period_open === true;
+                            const flightCaptured =
+                                positionCaptured.position_flight_period ===
+                                true;
+                            const flightDisplay = displayCalcOriginPeriod(
+                                positionValues.position_flight_period,
+                                flightCaptured,
+                            );
+
+                            return (
+                                <section
+                                    key={position.id}
+                                    className="rounded-lg border p-4"
+                                    data-test={`dispo-order-position-${index}`}
+                                >
+                                    <p className="font-medium">
+                                        {position.inventory_name} ·{' '}
+                                        {position.advertising_medium_name}
+                                    </p>
+                                    <p className="text-muted-foreground mt-1 text-xs">
+                                        {position.spot_method_label} ·{' '}
+                                        {position.total_spot_count} Spots ·{' '}
+                                        {position.length_seconds}s
+                                        {position.price_list_version
+                                            ? ` · Preisliste ${position.price_list_version}`
+                                            : ''}
+                                    </p>
+                                    <div className="text-muted-foreground mt-2 space-y-1 text-xs">
+                                        <p>
+                                            {periodOpenLabel}:{' '}
+                                            {!periodOpenCaptured
+                                                ? 'Nicht erfasst'
+                                                : periodOpen
+                                                  ? 'Ja'
+                                                  : 'Nein'}
+                                        </p>
+                                        {periodOpenHelp ? (
+                                            <p className="text-muted-foreground/80">
+                                                {periodOpenHelp}
+                                            </p>
+                                        ) : null}
+                                        <p>
+                                            {flightPeriodLabel}: {flightDisplay}
+                                        </p>
+                                        {flightPeriodHelp ? (
+                                            <p className="text-muted-foreground/80">
+                                                {flightPeriodHelp}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    {position.time_ranges.length > 0 ? (
+                                        <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
+                                            {position.time_ranges.map(
+                                                (range) => (
+                                                    <li
+                                                        key={`${range.start_hour}-${range.end_hour_exclusive}-${range.day_group}`}
+                                                    >
+                                                        {formatHour(
+                                                            range.start_hour,
+                                                        )}
+                                                        –
+                                                        {formatInclusiveEnd(
+                                                            range.end_hour_exclusive,
+                                                        )}{' '}
+                                                        · {range.spot_count}{' '}
+                                                        Spots
+                                                        {range.range_gross
+                                                            ? ` · ${money(range.range_gross)}`
+                                                            : ''}
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    ) : null}
+                                    {position.position_discounts.length > 0 ? (
+                                        <ul className="text-muted-foreground mt-2 text-xs">
+                                            {position.position_discounts.map(
+                                                (discount, discountIndex) => (
+                                                    <li key={discountIndex}>
+                                                        {discount.custom_label ??
+                                                            discount.type}
+                                                        {discount.percent
+                                                            ? ` ${formatPercent(discount.percent)}`
+                                                            : ''}
+                                                    </li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    ) : null}
+                                    <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
+                                        {money(position.nn_invest)} N/N
+                                    </p>
+                                </section>
+                            );
+                        })}
                     </CardContent>
                 </Card>
             </div>
@@ -417,12 +773,73 @@ export default function DispoOrderShow({
     );
 }
 
-function Detail({ label, value }: { label: string; value: ReactNode }) {
+function fieldLabel(
+    schema: FieldSchema,
+    key: string,
+    fallback: string,
+): string {
+    return schema.fields.find((field) => field.key === key)?.label ?? fallback;
+}
+
+function fieldHelp(schema: FieldSchema, key: string): string | null {
+    const help = schema.fields.find((field) => field.key === key)?.help_text;
+    if (help == null || help.trim() === '') {
+        return null;
+    }
+
+    return help;
+}
+
+function formatPeriod(period: PeriodValue | undefined): string | null {
+    if (period == null || period.start == null || period.end == null) {
+        return null;
+    }
+
+    const start = formatDateOnly(period.start);
+    const end = formatDateOnly(period.end);
+    if (start === '–' || end === '–') {
+        return null;
+    }
+
+    return `${start} – ${end}`;
+}
+
+function displayCalcOriginPeriod(
+    period: PeriodValue | undefined,
+    captured: boolean,
+): string {
+    if (!captured) {
+        return 'Nicht erfasst';
+    }
+
+    return formatPeriod(period) ?? '–';
+}
+
+function displayOptionalText(value: string | null | undefined): string {
+    if (value == null || value.trim() === '') {
+        return '–';
+    }
+
+    return value;
+}
+
+function Detail({
+    label,
+    value,
+    helpText,
+}: {
+    label: string;
+    value: ReactNode;
+    helpText?: string | null;
+}) {
     return (
         <div>
             <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                 {label}
             </p>
+            {helpText ? (
+                <p className="text-muted-foreground mt-1 text-xs">{helpText}</p>
+            ) : null}
             <p className="mt-1 text-sm">{value ?? '–'}</p>
         </div>
     );

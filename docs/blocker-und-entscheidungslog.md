@@ -43,6 +43,8 @@ Keine stillschweigenden ADR-Änderungen.
 | 04.09.2026 | DF-1 Zeitraum offen (PO-A / A1) | `period_open` nach Persistenz immer gesetzt; Default und Legacy-Backfill `true`; UI-Toggle; bei `false` Snapshot-Regel verlangt `position_flight_period`; kein fachliches `null`; Speicherung nur als dynamischer Wert | DYN-*, VER-002, PO DF-1 |
 | 04.09.2026 | DF-1 Dispo-Hinweise (PO-B / B2) | `billing_special_features` und `disposition_notes` gehören in den Dispoauftrag-Entwurf (DF-2); in DF-1 weder Seed noch Wizard noch Kalkulations-Kopffelder | DSP-*, PO DF-1 |
 | 04.09.2026 | DF-1 Revisions-/Aktivzeiger | Aktuelle Definition über `field_definitions.current_revision_id`; aktives Feldset über `field_sets.active_version_id`; Set-Felder pinnen `field_definition_revision_id` | DYN-001, VER-001 |
+| 04.09.2026 | DF-2 Nachbesserung Texte (PO-DF2-1) | Bei Nachfolge-Draft nach Ablehnung: `billing_special_features` und `disposition_notes` per Feldschlüssel aus dem unmittelbaren Vorgänger in neue Snapshot-Value-Zeilen kopieren; Vorgänger unverändert; fehlender/inkompatibler Schlüssel → Transaktionsabbruch | DSP-002, APR-002, VER-004 |
+| 04.09.2026 | DF-2 Capture-Zeilen | Calc-origin-Felder erhalten bei Create/Revision immer Value-Zeilen (auch bei bewusst leerem optionalem Zeitraum). Legacy-Backfill ohne Dyn-Werte; fehlende Zeile = historisch nicht erfasst; Draft-Sync füllt nur fehlende Capture-Zeilen. `dispo_orders.configuration_snapshot_id` nach Backfill NOT NULL | VER-004, DF-2 Review |
 
 ## Offene Blocker
 

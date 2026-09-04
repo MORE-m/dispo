@@ -218,8 +218,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** AT-14-Vorstufe; Mutation historischer Snapshots schlägt fehl
 - **DF-1 erledigt:** unveränderlicher Config-Snapshot an Kalkulationen inkl.
   Legacy-Backfill (`VER-002`, `VER-007`); dynamische Kopf-/Positionswerte.
-  **Offen:** Dispo-Snapshot (DF-2 / `VER-004`), Positionskonfig-Snapshot voll
-  laut Doku, AT-14.
+  **DF-2:** Dispo-Compose-Snapshot (`VER-004`) inkl. `source_configuration_snapshot_id`,
+  Dispo-Wertetabellen, Draft-Texte, Legacy ohne erfundene Dyn-Werte.
+  **Offen:** Positionskonfig-Snapshot voll laut Doku, AT-14 vollständig.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 
