@@ -153,6 +153,12 @@ UX-GATE-D-Bestandteile **freigegeben**:
 - Nachbesserung abgelehnter Aufträge über neuen verknüpften Entwurf
 - zugehörige Policies, Persistenz, Auditierung und Tests
 
+**Product-Owner-Teilfreigabe (September 2026, DF-3.1):** Zusätzlich freigegeben:
+
+- Administration dynamischer Felder (Systemfeld-Revisionen, Kern-Feldset-
+  Versionierung, statische Vorschau mit Beispielwerten)
+- Navigation Administration → Hub mit freigeschaltetem Dyn-Feld-Modul
+
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition
@@ -160,7 +166,7 @@ UX-GATE-D-Bestandteile **freigegeben**:
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der Initialkataloge
+- Administration der übrigen Initialkataloge (Inventare, Werbemittel, Preislisten, …)
 - Auswertungen und abschließende Fachoberflächen
 
 Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
@@ -175,7 +181,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe; operative Disposition und Rest von GATE-D weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (DF-3.1); operative Disposition und übrige Admin-Kataloge weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

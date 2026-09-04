@@ -48,6 +48,21 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
 - Draft: Texte editierbar; Calc-origin read-only; Hilfetexte aus dem DA-Snapshot.
 - Revision (PO-DF2-1): Texte aus Vorgänger per Schlüssel, Calc-Werte frisch.
 
+## Umsetzungsstand DF-3.1 (Admin Systemfelder / Kern-Feldsets)
+
+Erster technischer Teilslice von DF-3 – **kein Abschluss von DF-3**.
+
+- UX-GATE-D Teilfreigabe „Administration dynamischer Felder“.
+- Admin kann geschützte Systemdefinitionen revisionieren (Label, Hilfe, Gruppe,
+  Sort-Default, reportable); Key/Typ/Scope bleiben unveränderlich.
+- Feldsets `system_calculation_core` und `system_dispo_order_core`: Draft aus
+  aktiver/archivierter Version, Membership (Revision-Pin, Sort, Overrides),
+  Copy-as-template, Activate mit `lock_version`, Audit (`ADM-001`).
+- Statische Vorschau mit Beispielwerten (`ADM-002`); Regeln nur lesbar.
+- Historische Snapshots unverändert (`VER-007`, AT-14).
+- Bewusst nicht in DF-3.1: Custom Fields, Optionen, Assignments, Regel-Editor,
+  neue Feldtypen, Provenance-Mehrquellen.
+
 ## Konfigurationsebenen
 
 ```mermaid

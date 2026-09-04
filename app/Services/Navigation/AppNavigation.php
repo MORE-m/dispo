@@ -58,7 +58,7 @@ final class AppNavigation
                 'key' => 'administration',
                 'title' => 'Administration',
                 'href' => '/administration',
-                'available' => false,
+                'available' => true,
                 'visible' => $user->canAccessAdministration(),
             ],
         ];

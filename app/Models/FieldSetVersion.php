@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FieldSetVersionStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $field_set_id
  * @property int $version
  * @property FieldSetVersionStatus $status
+ * @property CarbonInterface|null $created_at
  */
 class FieldSetVersion extends Model
 {

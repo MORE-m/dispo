@@ -42,12 +42,30 @@ class NavigationTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->component('dispo-orders/index'));
     }
 
-    public function test_locked_modules_are_empty_states_not_fake_pages(): void
+    public function test_administration_hub_is_available_for_admin_with_dynamic_fields(): void
+    {
+        $user = User::factory()->role(Role::Admin)->create();
+
+        $adminNav = collect(app(AppNavigation::class)->itemsFor($user))
+            ->firstWhere('key', 'administration');
+        $this->assertNotNull($adminNav);
+        $this->assertTrue($adminNav['available']);
+
+        $this->actingAs($user)
+            ->get(route('administration.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('administration/index')
+                ->where('modules.0.key', 'dynamic-fields')
+                ->where('modules.0.available', true));
+    }
+
+    public function test_locked_modules_remain_unavailable_empty_states(): void
     {
         $user = User::factory()->role(Role::Admin)->create();
 
         $this->actingAs($user)
-            ->get(route('administration.index'))
+            ->get(route('reports.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('modules/unavailable')

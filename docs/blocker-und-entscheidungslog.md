@@ -45,13 +45,14 @@ Keine stillschweigenden ADR-Änderungen.
 | 04.09.2026 | DF-1 Revisions-/Aktivzeiger | Aktuelle Definition über `field_definitions.current_revision_id`; aktives Feldset über `field_sets.active_version_id`; Set-Felder pinnen `field_definition_revision_id` | DYN-001, VER-001 |
 | 04.09.2026 | DF-2 Nachbesserung Texte (PO-DF2-1) | Bei Nachfolge-Draft nach Ablehnung: `billing_special_features` und `disposition_notes` per Feldschlüssel aus dem unmittelbaren Vorgänger in neue Snapshot-Value-Zeilen kopieren; Vorgänger unverändert; fehlender/inkompatibler Schlüssel → Transaktionsabbruch | DSP-002, APR-002, VER-004 |
 | 04.09.2026 | DF-2 Capture-Zeilen | Calc-origin-Felder erhalten bei Create/Revision immer Value-Zeilen (auch bei bewusst leerem optionalem Zeitraum). Legacy-Backfill ohne Dyn-Werte; fehlende Zeile = historisch nicht erfasst; Draft-Sync füllt nur fehlende Capture-Zeilen. `dispo_orders.configuration_snapshot_id` nach Backfill NOT NULL | VER-004, DF-2 Review |
+| 04.09.2026 | DF-3.1 Admin-Teilfreigabe | UX-GATE-D „Administration dynamischer Felder“; Vorschau statisch mit Beispielwerten; Regeln in DF-3.1 nur lesbar; DF-3.1 ist erster Teilslice, kein Abschluss von DF-3 | DYN-001/003, VER-005/006, ADM-001/002, PO DF-3 |
 
 ## Offene Blocker
 
 | ID | Betrifft | Beschreibung | Wirkung |
 |---|---|---|---|
 | BLK-005 | UX-GATE-C | Trailer/SWF, Influencer, Social Media und weitere Werbeelement-Oberflächen nicht freigegeben | Keine Fachseiten für diese Elemente |
-| BLK-006 | UX-GATE-D | Dispo, Freigaben, Standardangebots-Fach-UI, Administration der Initialkataloge nicht freigegeben | Nur Sperrzustände in der Navigation |
+| BLK-006 | UX-GATE-D | Operative Disposition, Standardangebote, übrige Admin-Initialkataloge und Auswertungen nicht freigegeben. Teilfreigaben: Dispo/Vier-Augen; Dynamische-Felder-Admin (DF-3.1). | Nur Sperrzustände für nicht freigegebene Module |
 | BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung; UI zeigt Leerzustände |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
 

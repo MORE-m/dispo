@@ -195,22 +195,26 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin-Teil)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Abhängigkeiten:** BL-P2-02
+- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
 - **DF-1 erledigt:** geschützte Systemfelder + Feldset `system_calculation_core`;
   Snapshot-Regel `field_equals`/`require_field` für `period_open` →
   `position_flight_period`; Writer-/Wizard-Anbindung (`DYN-001`, `DYN-004`,
-  `DYN-006`). **Offen:** Admin-UI, Optionen, Custom Fields, volle Regelmatrix,
-  ADM-001/002.
+  `DYN-006`).
+- **DF-3.1 erledigt:** Admin-UI für Systemfeld-Revisionen und Kern-Feldset
+  Draft/Activate/statische Vorschau; Regeln nur lesbar; Audit (`ADM-001`,
+  `ADM-002` Teil). **DF-3 nicht abgeschlossen.**
+- **Offen:** Custom Fields, Optionen, Assignments/Vererbung, volle Regelmatrix,
+  Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1)
+- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin)
 - **Anforderungen:** `VER-001` bis `VER-007`
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
@@ -220,7 +224,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Legacy-Backfill (`VER-002`, `VER-007`); dynamische Kopf-/Positionswerte.
   **DF-2:** Dispo-Compose-Snapshot (`VER-004`) inkl. `source_configuration_snapshot_id`,
   Dispo-Wertetabellen, Draft-Texte, Legacy ohne erfundene Dyn-Werte.
-  **Offen:** Positionskonfig-Snapshot voll laut Doku, AT-14 vollständig.
+  **DF-3.1:** Admin-Activate ändert historische Snapshots nicht (AT-14).
+  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 
