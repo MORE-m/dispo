@@ -6,6 +6,7 @@ use App\Enums\CalculationKind;
 use App\Enums\SpotCalculationMethod;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -93,5 +94,13 @@ class DispoOrderPosition extends Model
     public function calculationPosition(): BelongsTo
     {
         return $this->belongsTo(CalculationPosition::class);
+    }
+
+    /**
+     * @return HasMany<DispoOrderPositionFieldValue, $this>
+     */
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(DispoOrderPositionFieldValue::class);
     }
 }

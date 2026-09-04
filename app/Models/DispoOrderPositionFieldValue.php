@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * @property int $id
+ * @property int $dispo_order_position_id
+ * @property int $snapshot_field_definition_id
+ * @property bool|null $value_boolean
+ * @property string|null $value_period_start
+ * @property string|null $value_period_end
+ */
+class DispoOrderPositionFieldValue extends Model
+{
+    protected $fillable = [
+        'dispo_order_position_id',
+        'snapshot_field_definition_id',
+        'value_boolean',
+        'value_period_start',
+        'value_period_end',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'value_boolean' => 'boolean',
+            'value_period_start' => 'date',
+            'value_period_end' => 'date',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<DispoOrderPosition, $this>
+     */
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(DispoOrderPosition::class, 'dispo_order_position_id');
+    }
+
+    /**
+     * @return BelongsTo<SnapshotFieldDefinition, $this>
+     */
+    public function snapshotFieldDefinition(): BelongsTo
+    {
+        return $this->belongsTo(SnapshotFieldDefinition::class);
+    }
+}

@@ -27,6 +27,15 @@ class DispoOrderPolicy
     }
 
     /**
+     * Draft-Update der Dispo-only-Texte (DF-2).
+     */
+    public function update(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->canManageDispoOrders()
+            && $dispoOrder->status === DispoOrderStatus::Draft;
+    }
+
+    /**
      * Nachbesserung: nur Ersteller, abgelehnter Auftrag, ohne Nachfolger.
      * Admin/GF erhalten dies nicht automatisch für fremde Aufträge.
      */

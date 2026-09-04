@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $field_set_id
  * @property int $field_set_version_id
  * @property ConfigurationSnapshotSource $source
+ * @property int|null $source_configuration_snapshot_id
  */
 class ConfigurationSnapshot extends Model
 {
@@ -21,6 +22,7 @@ class ConfigurationSnapshot extends Model
         'field_set_id',
         'field_set_version_id',
         'source',
+        'source_configuration_snapshot_id',
         'created_at',
     ];
 
@@ -33,6 +35,14 @@ class ConfigurationSnapshot extends Model
             'source' => ConfigurationSnapshotSource::class,
             'created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function sourceConfigurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_configuration_snapshot_id');
     }
 
     /**

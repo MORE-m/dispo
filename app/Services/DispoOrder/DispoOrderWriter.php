@@ -10,6 +10,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderPosition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -24,6 +25,7 @@ final class DispoOrderWriter
         private readonly DispoOrderNumberSequencer $numbers,
         private readonly DispoOrderSnapshotMapper $mapper,
         private readonly AuditLogger $audit,
+        private readonly DispoOrderDynamicFieldWriter $dynamicFields,
     ) {}
 
     /**
@@ -207,6 +209,13 @@ final class DispoOrderWriter
             $sort++;
         }
 
+        $this->dynamicFields->attachOnCreate(
+            $order,
+            $calculation,
+            $uniqueIds,
+            $revises,
+        );
+
         $fresh = $this->reloadOrder($order);
         $result = new DispoOrderWriterResult($fresh, $uniqueIds);
 
@@ -216,7 +225,10 @@ final class DispoOrderWriter
                 'dispo_order.created',
                 $user,
                 null,
-                $this->mapper->orderSnapshot($result),
+                array_merge(
+                    $this->mapper->orderSnapshot($result),
+                    $this->dynamicFields->dynamicSnapshotForAudit($fresh),
+                ),
             );
         }
 
@@ -228,7 +240,10 @@ final class DispoOrderWriter
         DispoOrder $predecessor,
         User $user,
     ): void {
-        $snapshot = $this->mapper->orderSnapshot($result);
+        $snapshot = array_merge(
+            $this->mapper->orderSnapshot($result),
+            $this->dynamicFields->dynamicSnapshotForAudit($result->order),
+        );
         $meta = [
             'predecessor_dispo_order_id' => $predecessor->id,
             'predecessor_number' => $predecessor->number,
@@ -283,7 +298,16 @@ final class DispoOrderWriter
     private function reloadOrder(DispoOrder $order): DispoOrder
     {
         $order->refresh();
-        $order->load(['positions', 'creator', 'advisor', 'calculation', 'revises', 'revision']);
+        $order->load([
+            'positions.fieldValues',
+            'fieldValues',
+            'configurationSnapshot.fieldDefinitions',
+            'creator',
+            'advisor',
+            'calculation',
+            'revises',
+            'revision',
+        ]);
 
         return $order;
     }

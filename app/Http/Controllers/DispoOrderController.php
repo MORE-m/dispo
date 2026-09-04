@@ -7,6 +7,8 @@ use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
 use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
+use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
+use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
@@ -16,6 +18,7 @@ use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
+use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +32,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderPositionAdoptionService $adoptions,
         private readonly DispoOrderApprovalService $approvals,
         private readonly DispoOrderRevisionContext $revisionContext,
+        private readonly DispoOrderDynamicFieldWriter $dynamicFields,
     ) {}
 
     public function index(Request $request): Response
@@ -72,7 +76,10 @@ class DispoOrderController extends Controller
         $this->authorize('view', $dispoOrder);
 
         $dispoOrder->load([
-            'positions',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'fieldValues.snapshotFieldDefinition',
+            'configurationSnapshot.fieldDefinitions',
+            'configurationSnapshot.rules',
             'creator',
             'calculation',
             'approvalRequests',
@@ -91,22 +98,65 @@ class DispoOrderController extends Controller
         $isCreator = $user !== null && (int) $user->id === (int) $dispoOrder->created_by_id;
         $canSubmit = ($user?->can('submit', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Draft;
+        $canUpdate = ($user?->can('update', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Draft;
         $awaiting = $dispoOrder->status === DispoOrderStatus::AwaitingSalesApproval
             && $dispoOrder->pendingApprovalRequest !== null;
         $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
         $canReject = ($user?->can('reject', $dispoOrder) ?? false) && $awaiting;
         $canRevise = $user?->can('revise', $dispoOrder) ?? false;
+        $dynamicValues = $this->dynamicFields->valuesProp($dispoOrder);
+        $canSyncCalculationDynamicFields = $canUpdate
+            && $dynamicValues['missing_calc_origin_keys'] !== [];
 
         return Inertia::render('dispo-orders/show', [
-            'order' => $this->serializeOrder($dispoOrder),
+            'order' => $this->serializeOrder($dispoOrder, $dynamicValues),
+            'fieldSchema' => $this->dynamicFields->fieldSchemaProp($dispoOrder),
             'canViewCalculation' => $canViewCalculation,
             'canCreate' => false,
             'canSubmit' => $canSubmit,
+            'canUpdate' => $canUpdate,
+            'canSyncCalculationDynamicFields' => $canSyncCalculationDynamicFields,
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canRevise' => $canRevise,
             'isCreator' => $isCreator,
         ]);
+    }
+
+    public function update(UpdateDispoOrderDraftRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->dynamicFields->updateDraftTexts(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->dynamicFieldValues(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Dispoauftrag gespeichert.');
+    }
+
+    public function syncCalculationDynamicFields(
+        SyncDispoOrderCalculationDynamicFieldsRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->dynamicFields->syncMissingCalculationFields(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            'Dynamische Zeitraumfelder aus der Kalkulation übernommen.',
+        );
     }
 
     public function startRevision(Request $request, DispoOrder $dispoOrder): RedirectResponse
@@ -258,16 +308,20 @@ class DispoOrderController extends Controller
     }
 
     /**
+     * @param  array{header: array<string, mixed>, positions: array<int, array<string, mixed>>, missing_calc_origin_keys: list<string>, historically_uncaptured: bool}|null  $dynamicValues
      * @return array<string, mixed>
      */
-    private function serializeOrder(DispoOrder $order): array
+    private function serializeOrder(DispoOrder $order, ?array $dynamicValues = null): array
     {
+        $dynamicValues ??= $this->dynamicFields->valuesProp($order);
+
         return [
             'id' => $order->id,
             'number' => $order->number,
             'status' => $order->status->value,
             'status_label' => $order->status->label(),
             'lock_version' => $order->lock_version,
+            'configuration_snapshot_id' => $order->configuration_snapshot_id,
             'source_calculation_number' => $order->source_calculation_number,
             'calculation_id' => $order->calculation_id,
             'customer_name' => $order->customer_name,
@@ -296,6 +350,9 @@ class DispoOrderController extends Controller
             'revises_dispo_order_id' => $order->revises_dispo_order_id,
             'revises' => $this->serializeRevisionLink($order->revises),
             'revision' => $this->serializeRevisionLink($order->revision),
+            'dynamic_field_values' => $dynamicValues['header'],
+            'missing_calc_origin_keys' => $dynamicValues['missing_calc_origin_keys'],
+            'historically_uncaptured' => $dynamicValues['historically_uncaptured'],
             'approval_history' => $order->approvalRequests->map(
                 fn (DispoOrderApprovalRequest $request): array => $this->serializeApprovalRequest($request),
             )->all(),
@@ -320,6 +377,7 @@ class DispoOrderController extends Controller
                 'nn_invest' => (string) $position->nn_invest,
                 'time_ranges' => $position->time_ranges_snapshot ?? [],
                 'position_discounts' => $position->position_discounts_snapshot ?? [],
+                'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
             ])->all(),
         ];
     }

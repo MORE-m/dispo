@@ -1,26 +1,46 @@
 # Fortschritt V1
 
-Stand: 4. September 2026 (DF-1 dynamische Systemfelder in der Kalkulation)
+Stand: 4. September 2026 (DF-2 Dispo-Config-Snapshot und Dispo-Hinweise)
 
 ## Aktuelle Phase
 
-Phase 3 (Versionen, dynamische Felder und Snapshots) – **Teilslice DF-1
-umgesetzt:** geschützte Systemfelddefinitionen, Konfigurationssnapshots für
-Kalkulationen, dynamische Kopf-/Positionswerte, Erfassung im Kalkulationswizard
-sowie snapshot-basierte serverseitige Regelvalidierung.
+Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 auf `main`**,
+**DF-2 in Arbeit:** eigenständiger Dispo-Config-Snapshot, Übernahme der drei
+Kalkulations-Dyn-Felder, Draft-Erfassung von `billing_special_features` /
+`disposition_notes`.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen.
 
 ## Aktuelle Aufgabe
 
-PR [#15](https://github.com/MORE-m/dispo/pull/15) (`feat/dynamic-fields-calculation-df1`)
-ist geöffnet; Korrekturen nach Review und CI-Prüfung auf dem Feature-Branch.
-Noch **nicht** gemergt.
+Feature-Branch `feat/dynamic-fields-dispo-df2` (DF-2).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Dispo-Nummer aus Kalkulationsnummer (PR #14) auf `main` (`180572d`).
+DF-1 dynamische Systemfelder Kalkulation – PR
+[#15](https://github.com/MORE-m/dispo/pull/15) gemergt in `main`
+(`ed194b4`, Post-Merge-CI grün).
+
+## DF-2 – Dispo-Config-Snapshot und Hinweise (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Compose-Snapshot aus Calc-Snapshot + `system_dispo_order_core` | umgesetzt |
+| `source_configuration_snapshot_id` (Herkunft, kein Laufzeit-Fallback) | umgesetzt |
+| Felder `billing_special_features`, `disposition_notes` (Draft editierbar) | umgesetzt |
+| Calc-origin `campaign_period` / `period_open` / `position_flight_period` read-only | umgesetzt |
+| Revision: Texte aus Vorgänger (PO-DF2-1), Calc-Werte frisch | umgesetzt |
+| Legacy-Backfill ohne erfundene Dyn-Werte | umgesetzt |
+| Draft-Sync fehlender Calc-Dyn-Werte | umgesetzt |
+| Admin-UI / Custom Fields | **nicht** in DF-2 |
+
+### Verbindliche PO-Entscheidungen
+
+- **PO-A1:** unverändert (Kalkulation).
+- **PO-B2:** Hinweise nur im Dispo-Entwurf.
+- **PO-DF2-1:** Nachfolge-Draft kopiert beide Texte per Schlüssel aus dem
+  abgelehnten Vorgänger; neuer Snapshot; Vorgänger unverändert.
 
 ## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
 
@@ -34,16 +54,7 @@ Dispo-Nummer aus Kalkulationsnummer (PR #14) auf `main` (`180572d`).
 | Dynamische Kopf-/Positionswerte (eigene Value-Tabellen) | umgesetzt |
 | Wizard: Kampagnenzeitraum, Toggle „Zeitraum offen“, Flight-Period | umgesetzt |
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
-| Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 |
-| `billing_special_features` / `disposition_notes` | **nicht** in DF-1 (DF-2) |
-
-### Verbindliche PO-Entscheidungen in DF-1
-
-- **PO-A (A1):** `period_open` nach Persistenz immer gesetzt; Default/Backfill
-  `true`; UI-Toggle; bei `false` wird `position_flight_period` verpflichtend;
-  kein `null`; keine feste Spalte an der Position.
-- **PO-B (B2):** Rechnungsbesonderheiten und Dispositionshinweise gehören in den
-  Dispoauftrag-Entwurf (DF-2), nicht in die Kalkulation.
+| Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
 ## Nummernableitung K→DA (September 2026)
 
@@ -80,10 +91,9 @@ Der abgelehnte Dispoauftrag bleibt als unveränderbarer, terminaler Snapshot erh
 Der Ersteller kann die zugrunde liegende Kalkulation nachbessern und daraus einen
 neuen, verknüpften Dispoauftrag im Status Entwurf erzeugen (`revises_dispo_order_id`).
 
-## Bewusst offen nach DF-1
+## Bewusst offen nach DF-2
 
-- Admin-UI für Felddefinitionen/Feldsets (GATE-D / ADM-*)
-- Dispo-Snapshot inkl. `billing_special_features` / `disposition_notes` (DF-2)
+- Admin-UI für Felddefinitionen/Feldsets (GATE-D / ADM-*/DF-3)
 - volle Regelmatrix, Optionen, Custom Fields, Payfaktor als FieldDefinition
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 

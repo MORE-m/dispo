@@ -23,8 +23,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $source_calculation_number
  * @property DispoOrderApprovalKind $approval_kind
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
+ * @property int|null $configuration_snapshot_id
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
+ * @property-read Collection<int, DispoOrderFieldValue> $fieldValues
+ * @property-read ConfigurationSnapshot|null $configurationSnapshot
  * @property-read DispoOrder|null $revises
  * @property-read DispoOrder|null $revision
  */
@@ -61,6 +64,7 @@ class DispoOrder extends Model
         'order_discounts_snapshot',
         'source_calculation_totals_snapshot',
         'lock_version',
+        'configuration_snapshot_id',
     ];
 
     /**
@@ -94,6 +98,22 @@ class DispoOrder extends Model
     public function calculation(): BelongsTo
     {
         return $this->belongsTo(Calculation::class);
+    }
+
+    /**
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function configurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(ConfigurationSnapshot::class);
+    }
+
+    /**
+     * @return HasMany<DispoOrderFieldValue, $this>
+     */
+    public function fieldValues(): HasMany
+    {
+        return $this->hasMany(DispoOrderFieldValue::class);
     }
 
     /**

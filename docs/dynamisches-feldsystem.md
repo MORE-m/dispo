@@ -29,6 +29,20 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
   `billing_special_features` / `disposition_notes` (DF-2), Custom Fields,
   Optionskatalog, volle Regelmatrix.
 
+## Umsetzungsstand DF-2 (Dispoauftrag)
+
+- Feldset `system_dispo_order_core` mit `billing_special_features` und
+  `disposition_notes` (`long_text`, Header, `applies_to=dispo_order`).
+- Compose-Snapshot je Dispoauftrag: kopiert Calc-origin-Definitionen/Regeln
+  (`campaign_period`, `period_open`, `position_flight_period`) aus dem
+  Kalkulationssnapshot und materialisiert die zwei Dispo-Texte aus dem aktiven
+  Dispo-Feldset. `field_set_*` zeigt auf `system_dispo_order_core`;
+  `source_configuration_snapshot_id` hält die Calc-Herkunft (kein Laufzeit-Lesen).
+- Werte in `dispo_order_field_values` / `dispo_order_position_field_values`.
+- Draft: Texte editierbar; Calc-origin read-only; Legacy ohne historische Dyn-Werte
+  als „nicht erfasst“; Draft-Sync für fehlende Calc-origin-Werte.
+- Revision (PO-DF2-1): Texte aus Vorgänger per Schlüssel, Calc-Werte frisch.
+
 ## Konfigurationsebenen
 
 ```mermaid

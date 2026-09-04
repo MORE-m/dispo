@@ -215,15 +215,26 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 
 Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, Textfelder), nicht als generisches JSON-Blob.
 
-### Spätere Ausbaustufen (nicht DF-1)
+### DF-2 – Dispoauftrag (umgesetzt)
 
-Konzeptuell vorgesehen, aber **nicht** Teil von DF-1:
+| Tabelle / Spalte | Rolle |
+|---|---|
+| `configuration_snapshots.source_configuration_snapshot_id` | Herkunftszeiger Calc→Dispo-Compose (kein Laufzeit-Fallback) |
+| `dispo_orders.configuration_snapshot_id` | FK auf den Dispo-Config-Snapshot |
+| `dispo_order_field_values` | Header-Werte (`value_text` MEDIUMTEXT, Perioden) |
+| `dispo_order_position_field_values` | Positionswerte (`value_boolean`, Perioden) |
+
+Dispo-Snapshots nutzen Source `dispo_order_create` bzw. `dispo_order_legacy_backfill`.
+Legacy-Backfill erzeugt Definitionen ohne Dyn-Value-Zeilen (keine erfundenen
+historischen Zeitraumwerte).
+
+### Spätere Ausbaustufen (nicht DF-1/DF-2)
+
+Konzeptuell vorgesehen, aber **nicht** Teil von DF-1/DF-2:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
 - `FieldSetAssignment` an Kategorien/Werbemittel,
-- generisches `DynamicFieldValue` als Sammelbegriff (ersetzt in DF-1 durch die beiden Calc-Value-Tabellen),
-- Dispo-Wertetabellen und Dispo-Snapshot-Dynamik (DF-2+),
 - Custom-Feld-Administration (GATE-D / ADM-*).
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt

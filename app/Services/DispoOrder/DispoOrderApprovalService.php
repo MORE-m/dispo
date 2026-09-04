@@ -10,6 +10,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,7 @@ final class DispoOrderApprovalService
 {
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly DispoOrderDynamicFieldWriter $dynamicFields,
     ) {}
 
     public function submit(DispoOrder $order, User $user, int $expectedLockVersion): DispoOrder
@@ -36,6 +38,8 @@ final class DispoOrderApprovalService
                         'order' => 'Der Dispoauftrag enthält keine Positionen und kann nicht eingereicht werden.',
                     ]);
                 }
+
+                $this->dynamicFields->assertReadyForSubmit($locked);
 
                 if ($locked->pendingApprovalRequest()->exists()) {
                     throw new DispoOrderConflictException(
