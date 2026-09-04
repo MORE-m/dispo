@@ -73,10 +73,11 @@ import {
     firstValidationMessage,
     mapValidationErrors,
 } from '@/lib/validation-errors';
+import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { WizardStepper } from '@/components/wizard-stepper';
 import { cn } from '@/lib/utils';
@@ -101,7 +102,27 @@ type PositionDraft = {
     plan_rows: PlanRow[];
     time_ranges: TimeRangeDraft[];
     position_discounts: DiscountDraft[];
+    period_open: boolean;
+    flight_period_start: string;
+    flight_period_end: string;
 };
+
+type FieldSchema = {
+    fields: Array<{
+        key: string;
+        field_type: string;
+        label: string;
+        help_text: string | null;
+        scope: string;
+        sort: number;
+    }>;
+    rules: Array<{
+        condition: { op?: string; field_key?: string; value?: unknown };
+        action: { op?: string; field_key?: string };
+    }>;
+};
+
+type PeriodValue = { start: string | null; end: string | null } | null;
 
 type Catalog = {
     inventories: {
@@ -231,6 +252,9 @@ type SavedCalculation = {
     target_budget_nn: string | null;
     budget_strategy: string | null;
     budget_proposal_status?: string | null;
+    dynamic_field_values?: {
+        campaign_period?: PeriodValue;
+    };
     order_discounts?: Array<{
         type: string;
         custom_label: string | null;
@@ -259,6 +283,10 @@ type SavedCalculation = {
             custom_label: string | null;
             percent: string;
         }>;
+        dynamic_field_values?: {
+            period_open?: boolean;
+            position_flight_period?: PeriodValue;
+        };
     }[];
 };
 
@@ -357,6 +385,9 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                 plan_rows: [],
                 time_ranges: [emptyTimeRange()],
                 position_discounts: [],
+                period_open: true,
+                flight_period_start: '',
+                flight_period_end: '',
             };
         }
     }
@@ -435,6 +466,7 @@ export default function CalculationWizard({
     catalog,
     dayGroups,
     discountTypes,
+    fieldSchema,
     calculation,
     savedSummary,
     savedDisplayTotals,
@@ -447,6 +479,7 @@ export default function CalculationWizard({
     catalog: Catalog;
     dayGroups: DayGroupOption[];
     discountTypes: DiscountTypeOption[];
+    fieldSchema: FieldSchema;
     calculation: SavedCalculation | null;
     savedSummary: SavedSummary | null;
     savedDisplayTotals: Totals | null;
@@ -493,6 +526,12 @@ export default function CalculationWizard({
         calculation?.product_title ?? '',
     );
     const [briefing, setBriefing] = useState(calculation?.briefing ?? '');
+    const [campaignPeriodStart, setCampaignPeriodStart] = useState(
+        calculation?.dynamic_field_values?.campaign_period?.start ?? '',
+    );
+    const [campaignPeriodEnd, setCampaignPeriodEnd] = useState(
+        calculation?.dynamic_field_values?.campaign_period?.end ?? '',
+    );
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -569,6 +608,13 @@ export default function CalculationWizard({
                     position.position_discounts,
                     position.position_discount_percent,
                 ),
+                period_open: position.dynamic_field_values?.period_open ?? true,
+                flight_period_start:
+                    position.dynamic_field_values?.position_flight_period
+                        ?.start ?? '',
+                flight_period_end:
+                    position.dynamic_field_values?.position_flight_period
+                        ?.end ?? '',
             }));
         }
 
@@ -611,6 +657,15 @@ export default function CalculationWizard({
             campaign: campaign || null,
             product_title: productTitle || null,
             briefing: briefing || null,
+            dynamic_field_values: {
+                campaign_period:
+                    campaignPeriodStart || campaignPeriodEnd
+                        ? {
+                              start: campaignPeriodStart || null,
+                              end: campaignPeriodEnd || null,
+                          }
+                        : null,
+            },
             order_discount_percent: '0',
             order_discounts: payloadDiscounts(orderDiscounts),
             ae_enabled: aeEnabled,
@@ -659,6 +714,21 @@ export default function CalculationWizard({
                           position_discounts: payloadDiscounts(
                               position.position_discounts,
                           ),
+                          dynamic_field_values: {
+                              period_open: position.period_open,
+                              position_flight_period:
+                                  position.flight_period_start ||
+                                  position.flight_period_end
+                                      ? {
+                                            start:
+                                                position.flight_period_start ||
+                                                null,
+                                            end:
+                                                position.flight_period_end ||
+                                                null,
+                                        }
+                                      : null,
+                          },
                           plan_rows: ranges.flatMap((range) =>
                               Array.from(
                                   {
@@ -682,6 +752,8 @@ export default function CalculationWizard({
             campaign,
             productTitle,
             briefing,
+            campaignPeriodStart,
+            campaignPeriodEnd,
             orderDiscounts,
             aeEnabled,
             targetBudget,
@@ -992,6 +1064,9 @@ export default function CalculationWizard({
                             ? (budgetPositionDiscounts[element.client_id] ?? [])
                             : []),
                     plan_rows: [],
+                    period_open: existing?.period_open ?? true,
+                    flight_period_start: existing?.flight_period_start ?? '',
+                    flight_period_end: existing?.flight_period_end ?? '',
                 };
             }),
         );
@@ -1288,6 +1363,50 @@ export default function CalculationWizard({
                                             />
                                         </FormField>
                                         <FormField
+                                            label={
+                                                fieldSchema.fields.find(
+                                                    (field) =>
+                                                        field.key ===
+                                                        'campaign_period',
+                                                )?.label ?? 'Kampagnenzeitraum'
+                                            }
+                                            htmlFor="campaign-period-start"
+                                            hint={
+                                                fieldSchema.fields.find(
+                                                    (field) =>
+                                                        field.key ===
+                                                        'campaign_period',
+                                                )?.help_text ?? undefined
+                                            }
+                                        >
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Input
+                                                    id="campaign-period-start"
+                                                    type="date"
+                                                    value={campaignPeriodStart}
+                                                    onChange={(event) =>
+                                                        setCampaignPeriodStart(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    disabled={!canEdit}
+                                                    data-test="campaign-period-start"
+                                                />
+                                                <Input
+                                                    id="campaign-period-end"
+                                                    type="date"
+                                                    value={campaignPeriodEnd}
+                                                    onChange={(event) =>
+                                                        setCampaignPeriodEnd(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    disabled={!canEdit}
+                                                    data-test="campaign-period-end"
+                                                />
+                                            </div>
+                                        </FormField>
+                                        <FormField
                                             label="Zielbudget N/N"
                                             htmlFor="budget"
                                             hint={
@@ -1530,6 +1649,158 @@ export default function CalculationWizard({
                                                                     }
                                                                 />
                                                             </FormField>
+                                                            <FormField
+                                                                label={
+                                                                    fieldSchema.fields.find(
+                                                                        (
+                                                                            field,
+                                                                        ) =>
+                                                                            field.key ===
+                                                                            'period_open',
+                                                                    )?.label ??
+                                                                    'Zeitraum offen'
+                                                                }
+                                                                htmlFor={`period-open-${index}`}
+                                                                hint={
+                                                                    fieldSchema.fields.find(
+                                                                        (
+                                                                            field,
+                                                                        ) =>
+                                                                            field.key ===
+                                                                            'period_open',
+                                                                    )
+                                                                        ?.help_text ??
+                                                                    undefined
+                                                                }
+                                                            >
+                                                                <Checkbox
+                                                                    id={`period-open-${index}`}
+                                                                    checked={
+                                                                        position.period_open
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    data-test={`period-open-${index}`}
+                                                                    aria-label={
+                                                                        fieldSchema.fields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
+                                                                        )
+                                                                            ?.label ??
+                                                                        'Zeitraum offen'
+                                                                    }
+                                                                    onCheckedChange={(
+                                                                        checked,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                period_open:
+                                                                                    checked ===
+                                                                                    true,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </FormField>
+                                                            {requiredPositionFieldKeysFromSnapshotRules(
+                                                                fieldSchema.rules,
+                                                                {
+                                                                    period_open:
+                                                                        position.period_open,
+                                                                    position_flight_period:
+                                                                        position.flight_period_start ||
+                                                                        position.flight_period_end
+                                                                            ? {
+                                                                                  start: position.flight_period_start,
+                                                                                  end: position.flight_period_end,
+                                                                              }
+                                                                            : null,
+                                                                },
+                                                            ).includes(
+                                                                'position_flight_period',
+                                                            ) ? (
+                                                                <FormField
+                                                                    label={
+                                                                        fieldSchema.fields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'position_flight_period',
+                                                                        )
+                                                                            ?.label ??
+                                                                        'Flugzeitraum'
+                                                                    }
+                                                                    htmlFor={`flight-start-${index}`}
+                                                                    hint={
+                                                                        fieldSchema.fields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'position_flight_period',
+                                                                        )
+                                                                            ?.help_text ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <Input
+                                                                            id={`flight-start-${index}`}
+                                                                            type="date"
+                                                                            value={
+                                                                                position.flight_period_start
+                                                                            }
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            data-test={`flight-period-start-${index}`}
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        flight_period_start:
+                                                                                            event
+                                                                                                .target
+                                                                                                .value,
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                        <Input
+                                                                            id={`flight-end-${index}`}
+                                                                            type="date"
+                                                                            value={
+                                                                                position.flight_period_end
+                                                                            }
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            data-test={`flight-period-end-${index}`}
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        flight_period_end:
+                                                                                            event
+                                                                                                .target
+                                                                                                .value,
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </div>
+                                                                </FormField>
+                                                            ) : null}
                                                             {canEdit &&
                                                             positions.length >
                                                                 1 ? (

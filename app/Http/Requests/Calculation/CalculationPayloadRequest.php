@@ -68,6 +68,10 @@ class CalculationPayloadRequest extends FormRequest
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
+            'dynamic_field_values' => ['sometimes', 'array'],
+            'dynamic_field_values.campaign_period' => ['nullable', 'array'],
+            'dynamic_field_values.campaign_period.start' => ['nullable', 'date'],
+            'dynamic_field_values.campaign_period.end' => ['nullable', 'date'],
             'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
@@ -90,6 +94,11 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.position_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'positions.*.dynamic_field_values' => ['sometimes', 'array'],
+            'positions.*.dynamic_field_values.period_open' => ['sometimes', 'boolean'],
+            'positions.*.dynamic_field_values.position_flight_period' => ['nullable', 'array'],
+            'positions.*.dynamic_field_values.position_flight_period.start' => ['nullable', 'date'],
+            'positions.*.dynamic_field_values.position_flight_period.end' => ['nullable', 'date'],
         ];
     }
 
@@ -109,6 +118,10 @@ class CalculationPayloadRequest extends FormRequest
         return [
             'budget_elements.*.inventory_id.min' => 'Bitte wähle einen Sender aus.',
             'target_budget_nn.min' => 'Das Zielbudget muss größer als 0 sein.',
+            'dynamic_field_values.campaign_period.start.date' => 'Kampagnenbeginn ist kein gültiges Datum.',
+            'dynamic_field_values.campaign_period.end.date' => 'Kampagnenende ist kein gültiges Datum.',
+            'positions.*.dynamic_field_values.position_flight_period.start.date' => 'Flugzeitraum-Beginn ist kein gültiges Datum.',
+            'positions.*.dynamic_field_values.position_flight_period.end.date' => 'Flugzeitraum-Ende ist kein gültiges Datum.',
         ];
     }
 
@@ -118,6 +131,9 @@ class CalculationPayloadRequest extends FormRequest
             if ($validator->errors()->isNotEmpty()) {
                 return;
             }
+
+            $this->validateDynamicPeriods($validator);
+            $this->validateDynamicFieldKeys($validator);
 
             $isPreview = $this->routeIs('calculations.preview');
             $rangeValidator = new TimeRangeValidator;
@@ -222,6 +238,103 @@ class CalculationPayloadRequest extends FormRequest
                 }
             }
         });
+    }
+
+    private function validateDynamicFieldKeys(Validator $validator): void
+    {
+        $headerAllowed = ['campaign_period'];
+        $positionAllowed = ['period_open', 'position_flight_period'];
+
+        $header = $this->input('dynamic_field_values', []);
+        if (is_array($header)) {
+            foreach (array_keys($header) as $key) {
+                if (! in_array((string) $key, $headerAllowed, true)) {
+                    $validator->errors()->add(
+                        'dynamic_field_values.'.$key,
+                        in_array((string) $key, $positionAllowed, true)
+                            ? 'Dieses Feld gehört nicht in diesen Bereich.'
+                            : 'Unbekanntes dynamisches Feld.',
+                    );
+                }
+            }
+        }
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+            $values = $position['dynamic_field_values'] ?? null;
+            if (! is_array($values)) {
+                continue;
+            }
+            foreach (array_keys($values) as $key) {
+                if (! in_array((string) $key, $positionAllowed, true)) {
+                    $validator->errors()->add(
+                        "positions.{$index}.dynamic_field_values.{$key}",
+                        in_array((string) $key, $headerAllowed, true)
+                            ? 'Dieses Feld gehört nicht in diesen Bereich.'
+                            : 'Unbekanntes dynamisches Feld.',
+                    );
+                }
+            }
+        }
+    }
+
+    private function validateDynamicPeriods(Validator $validator): void
+    {
+        $campaign = $this->input('dynamic_field_values.campaign_period');
+        $campaignError = $this->periodCompletenessError($campaign);
+        if ($campaignError !== null) {
+            $validator->errors()->add('dynamic_field_values.campaign_period', $campaignError);
+        }
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+            $flight = $position['dynamic_field_values']['position_flight_period'] ?? null;
+            $flightError = $this->periodCompletenessError($flight);
+            if ($flightError !== null) {
+                $validator->errors()->add(
+                    "positions.{$index}.dynamic_field_values.position_flight_period",
+                    $flightError,
+                );
+            }
+        }
+    }
+
+    private function periodCompletenessError(mixed $period): ?string
+    {
+        if ($period === null || $period === '') {
+            return null;
+        }
+
+        if (! is_array($period)) {
+            return 'Zeitraum muss Start und Ende enthalten.';
+        }
+
+        $start = $period['start'] ?? null;
+        $end = $period['end'] ?? null;
+        $start = $start === '' ? null : $start;
+        $end = $end === '' ? null : $end;
+
+        if ($start === null && $end === null) {
+            return null;
+        }
+
+        if ($start === null || $end === null) {
+            return 'Zeitraum muss vollständig mit Beginn und Ende angegeben werden.';
+        }
+
+        if (strtotime((string) $start) === false || strtotime((string) $end) === false) {
+            return 'Zeitraum enthält ungültige Datumsangaben.';
+        }
+
+        if (strtotime((string) $start) > strtotime((string) $end)) {
+            return 'Der Zeitraumbeginn darf nicht nach dem Ende liegen.';
+        }
+
+        return null;
     }
 
     /**

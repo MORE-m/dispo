@@ -17,6 +17,8 @@ use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\DynamicField\CalculationDynamicFieldWriter;
+use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -30,6 +32,8 @@ final class CalculationWriter
         private readonly CalculationEngine $engine,
         private readonly AuditLogger $audit,
         private readonly CalculationNumberSequencer $numbers,
+        private readonly ConfigurationSnapshotMaterializer $snapshots,
+        private readonly CalculationDynamicFieldWriter $dynamicFields,
     ) {}
 
     /**
@@ -55,6 +59,7 @@ final class CalculationWriter
             $calculation->status = CalculationStatus::Draft;
             $calculation->advisor_id = $user->id;
             $calculation->lock_version = 1;
+            $calculation->configuration_snapshot_id = $this->snapshots->materializeFromActiveSet()->id;
 
             $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
 
@@ -88,6 +93,21 @@ final class CalculationWriter
                 $this->applyTotals($locked, $totals, $user);
                 $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();
+                $dynamicPayload = $this->payloadFromCalculation($locked);
+                $dynamicPayload['dynamic_field_values'] = $payload['dynamic_field_values']
+                    ?? $dynamicPayload['dynamic_field_values'];
+                if (isset($payload['positions']) && is_array($payload['positions'])) {
+                    foreach ($payload['positions'] as $index => $positionPayload) {
+                        if (! isset($dynamicPayload['positions'][$index])) {
+                            continue;
+                        }
+                        if (isset($positionPayload['dynamic_field_values'])) {
+                            $dynamicPayload['positions'][$index]['dynamic_field_values'] =
+                                $positionPayload['dynamic_field_values'];
+                        }
+                    }
+                }
+                $this->dynamicFields->syncFromPayload($locked, $dynamicPayload);
             } else {
                 $this->fillAndPersist($locked, $payload, $user, isCreate: false);
                 $locked->lock_version = $locked->lock_version + 1;
@@ -248,9 +268,13 @@ final class CalculationWriter
                     $orphan->planRows()->delete();
                     $orphan->timeRanges()->delete();
                     $orphan->discounts()->delete();
+                    $orphan->fieldValues()->delete();
                     $orphan->delete();
                 });
         }
+
+        $calculation->load('positions');
+        $this->dynamicFields->syncFromPayload($calculation, $payload);
     }
 
     private function syncPlanRows(CalculationPosition $position, PositionResult $result): void
@@ -504,6 +528,7 @@ final class CalculationWriter
                 'plan_rows' => $rows,
                 'time_ranges' => $ranges,
                 'position_discounts' => $discounts,
+                'dynamic_field_values' => $position['dynamic_field_values'] ?? null,
             ];
         }
 
@@ -517,8 +542,17 @@ final class CalculationWriter
      */
     public function payloadFromCalculation(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $calculation->loadMissing([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'orderDiscounts',
+            'configurationSnapshot.fieldDefinitions',
+            'fieldValues.snapshotFieldDefinition',
+        ]);
 
+        $snapshot = $calculation->configurationSnapshot;
         $positions = [];
 
         foreach ($calculation->positions as $position) {
@@ -553,6 +587,9 @@ final class CalculationWriter
                     'custom_label' => $discount->custom_label,
                     'percent' => (string) $discount->percent,
                 ])->all(),
+                'dynamic_field_values' => $snapshot === null
+                    ? ['period_open' => true]
+                    : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
             ];
         }
 
@@ -572,6 +609,7 @@ final class CalculationWriter
             'ae_enabled' => (bool) $calculation->ae_enabled,
             'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
             'budget_strategy' => $calculation->budget_strategy?->value,
+            'dynamic_field_values' => $this->dynamicFields->headerValuesForPayload($calculation),
             'positions' => $positions,
         ];
     }
@@ -581,7 +619,18 @@ final class CalculationWriter
      */
     public function calculationSnapshot(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.priceList', 'orderDiscounts']);
+        $calculation->loadMissing([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.priceList',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'orderDiscounts',
+            'configurationSnapshot.fieldDefinitions',
+            'fieldValues.snapshotFieldDefinition',
+        ]);
+
+        $snapshot = $calculation->configurationSnapshot;
 
         return [
             'number' => $calculation->number,
@@ -591,6 +640,8 @@ final class CalculationWriter
             'campaign' => $calculation->campaign,
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,
+            'configuration_snapshot_id' => $calculation->configuration_snapshot_id,
+            'dynamic_field_values' => $this->dynamicFields->headerValuesForPayload($calculation),
             'order_discount_percent' => (string) $calculation->order_discount_percent,
             'ae_enabled' => (bool) $calculation->ae_enabled,
             'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
@@ -604,7 +655,7 @@ final class CalculationWriter
                     'percent' => (string) $discount->percent,
                 ]
             )->all(),
-            'positions' => $calculation->positions->map(function (CalculationPosition $position): array {
+            'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($snapshot): array {
                 return [
                     'id' => $position->id,
                     'client_key' => $position->client_key,
@@ -648,6 +699,9 @@ final class CalculationWriter
                             'percent' => (string) $discount->percent,
                         ]
                     )->all(),
+                    'dynamic_field_values' => $snapshot === null
+                        ? ['period_open' => true]
+                        : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
                 ];
             })->values()->all(),
         ];
@@ -656,7 +710,18 @@ final class CalculationWriter
     private function reloadCalculation(Calculation $calculation): Calculation
     {
         $calculation->refresh();
-        $calculation->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'positions.priceList', 'orderDiscounts']);
+        $calculation->load([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.inventory',
+            'positions.priceList',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'orderDiscounts',
+            'configurationSnapshot.fieldDefinitions',
+            'configurationSnapshot.rules',
+            'fieldValues.snapshotFieldDefinition',
+        ]);
 
         return $calculation;
     }

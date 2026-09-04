@@ -17,6 +17,7 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\DispoOrder;
+use App\Models\FieldSet;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\SpotClassicPlanRow;
@@ -25,6 +26,8 @@ use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
+use App\Services\DynamicField\CalculationDynamicFieldWriter;
+use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,6 +41,7 @@ class CalculationController extends Controller
         private readonly BudgetSpotProposalService $spotProposals,
         private readonly AuditLogger $audit,
         private readonly DispoOrderRevisionContext $dispoOrderRevisionContext,
+        private readonly CalculationDynamicFieldWriter $dynamicFields,
     ) {}
 
     public function index(Request $request): Response
@@ -80,7 +84,19 @@ class CalculationController extends Controller
     {
         $this->authorize('view', $calculation);
 
-        $calculation->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'positions.advertisingMedium', 'positions.priceList', 'orderDiscounts']);
+        $calculation->load([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.inventory',
+            'positions.advertisingMedium',
+            'positions.priceList',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'orderDiscounts',
+            'configurationSnapshot.fieldDefinitions',
+            'configurationSnapshot.rules',
+            'fieldValues.snapshotFieldDefinition',
+        ]);
 
         return Inertia::render('calculations/wizard', $this->wizardProps($request, $calculation));
     }
@@ -387,6 +403,7 @@ class CalculationController extends Controller
             ],
             'dayGroups' => DayGroup::options(),
             'discountTypes' => DiscountType::options(),
+            'fieldSchema' => $this->fieldSchemaProp($calculation),
             'calculation' => $calculation === null ? null : [
                 'id' => $calculation->id,
                 'lock_version' => $calculation->lock_version,
@@ -401,39 +418,47 @@ class CalculationController extends Controller
                 'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
                 'budget_strategy' => $calculation->budget_strategy?->value,
                 'budget_proposal_status' => $calculation->budget_proposal_status?->value,
+                'dynamic_field_values' => $this->dynamicFields->headerValuesForPayload($calculation),
                 'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
                     'type' => $discount->type->value,
                     'custom_label' => $discount->custom_label,
                     'percent' => (string) $discount->percent,
                 ])->all(),
-                'positions' => $calculation->positions->map(fn (CalculationPosition $position): array => [
-                    'id' => $position->id,
-                    'client_key' => $position->client_key,
-                    'inventory_id' => $position->inventory_id,
-                    'advertising_medium_id' => $position->advertising_medium_id,
-                    'spot_method' => $position->spot_method->value,
-                    'length_seconds' => $position->length_seconds,
-                    'total_spot_count' => $position->total_spot_count,
-                    'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
-                    'position_discount_percent' => (string) $position->position_discount_percent,
-                    'ae_percent' => (string) $position->ae_percent,
-                    'plan_rows' => $position->planRows->map(fn (SpotClassicPlanRow $row): array => [
-                        'hour' => $row->hour,
-                        'day_group' => $row->day_group->value,
-                        'second_price' => (string) $row->second_price,
-                    ])->all(),
-                    'time_ranges' => $position->timeRanges->map(fn (CalculationPositionTimeRange $range): array => [
-                        'start_hour' => $range->start_hour,
-                        'end_hour_exclusive' => $range->end_hour_exclusive,
-                        'day_group' => $range->day_group->value,
-                        'spot_count' => $range->spot_count,
-                    ])->all(),
-                    'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
-                        'type' => $discount->type->value,
-                        'custom_label' => $discount->custom_label,
-                        'percent' => (string) $discount->percent,
-                    ])->all(),
-                ])->all(),
+                'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($calculation): array {
+                    $snapshot = $calculation->configurationSnapshot;
+
+                    return [
+                        'id' => $position->id,
+                        'client_key' => $position->client_key,
+                        'inventory_id' => $position->inventory_id,
+                        'advertising_medium_id' => $position->advertising_medium_id,
+                        'spot_method' => $position->spot_method->value,
+                        'length_seconds' => $position->length_seconds,
+                        'total_spot_count' => $position->total_spot_count,
+                        'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
+                        'position_discount_percent' => (string) $position->position_discount_percent,
+                        'ae_percent' => (string) $position->ae_percent,
+                        'plan_rows' => $position->planRows->map(fn (SpotClassicPlanRow $row): array => [
+                            'hour' => $row->hour,
+                            'day_group' => $row->day_group->value,
+                            'second_price' => (string) $row->second_price,
+                        ])->all(),
+                        'time_ranges' => $position->timeRanges->map(fn (CalculationPositionTimeRange $range): array => [
+                            'start_hour' => $range->start_hour,
+                            'end_hour_exclusive' => $range->end_hour_exclusive,
+                            'day_group' => $range->day_group->value,
+                            'spot_count' => $range->spot_count,
+                        ])->all(),
+                        'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
+                            'type' => $discount->type->value,
+                            'custom_label' => $discount->custom_label,
+                            'percent' => (string) $discount->percent,
+                        ])->all(),
+                        'dynamic_field_values' => $snapshot === null
+                            ? ['period_open' => true]
+                            : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
+                    ];
+                })->all(),
             ],
             'savedSummary' => $savedSummary,
             'savedDisplayTotals' => $savedDisplayTotals,
@@ -445,6 +470,63 @@ class CalculationController extends Controller
             'dispoOrderRevision' => $calculation === null
                 ? null
                 : $this->dispoOrderRevisionProp($request, $calculation),
+        ];
+    }
+
+    /**
+     * @return array{fields: array<int, array<string, mixed>>, rules: array<int, array<string, mixed>>}
+     */
+    private function fieldSchemaProp(?Calculation $calculation): array
+    {
+        if ($calculation?->configurationSnapshot !== null) {
+            $snapshot = $calculation->configurationSnapshot;
+            $snapshot->loadMissing(['fieldDefinitions', 'rules']);
+
+            return [
+                'fields' => $snapshot->fieldDefinitions->map(fn ($def): array => [
+                    'key' => (string) $def->key,
+                    'field_type' => (string) $def->field_type->value,
+                    'label' => (string) $def->label,
+                    'help_text' => $def->help_text,
+                    'scope' => (string) $def->scope->value,
+                    'sort' => (int) $def->sort,
+                ])->values()->all(),
+                'rules' => $snapshot->rules->map(fn ($rule): array => [
+                    'condition' => $rule->condition_json,
+                    'action' => $rule->action_json,
+                ])->values()->all(),
+            ];
+        }
+
+        $set = FieldSet::query()
+            ->where('key', ConfigurationSnapshotMaterializer::SYSTEM_CALCULATION_CORE_KEY)
+            ->with(['activeVersion.fields.revision.definition', 'activeVersion.rules'])
+            ->first();
+
+        if ($set?->activeVersion === null) {
+            return ['fields' => [], 'rules' => []];
+        }
+
+        $version = $set->activeVersion;
+
+        return [
+            'fields' => $version->fields->map(function ($membership): array {
+                $revision = $membership->revision;
+                $definition = $revision->definition;
+
+                return [
+                    'key' => (string) $definition->key,
+                    'field_type' => (string) $definition->field_type->value,
+                    'label' => (string) $revision->label,
+                    'help_text' => $revision->help_text,
+                    'scope' => (string) $definition->scope->value,
+                    'sort' => (int) $membership->sort,
+                ];
+            })->values()->all(),
+            'rules' => $version->rules->map(fn ($rule): array => [
+                'condition' => $rule->condition_json,
+                'action' => $rule->action_json,
+            ])->values()->all(),
         ];
     }
 

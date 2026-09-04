@@ -1,23 +1,49 @@
 # Fortschritt V1
 
-Stand: 3. September 2026 (Dispo-Nummer aus Kalkulationsnummer)
+Stand: 4. September 2026 (DF-1 dynamische Systemfelder in der Kalkulation)
 
 ## Aktuelle Phase
 
-Phase 8 (Dispoauftrag) – **Teilslice umgesetzt:** Entwurf aus Kalkulation,
-Vier-Augen-Freigabe, Nachbesserung sowie Nummernableitung
-`K-JJJJ-NNNNN` → `DA-JJJJ-NNNNN-SS` (Legacy-Familien behalten Stamm).
-Nach erfolgreicher Genehmigung steht der Status **„Liegt bei Disposition“**.
-UX-GATE-D bleibt **nicht** vollständig abgeschlossen (operative Disposition,
-Material, Kommentare, weitere Status weiterhin offen).
+Phase 3 (Versionen, dynamische Felder und Snapshots) – **Teilslice DF-1
+umgesetzt:** geschützte Systemfelddefinitionen, Konfigurationssnapshots für
+Kalkulationen, dynamische Kopf-/Positionswerte, Erfassung im Kalkulationswizard
+sowie snapshot-basierte serverseitige Regelvalidierung.
+
+Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
+`main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen.
 
 ## Aktuelle Aufgabe
 
-Branch `feat/dispo-number-from-calculation`: direkte K→DA-Stammableitung.
+PR [#15](https://github.com/MORE-m/dispo/pull/15) (`feat/dynamic-fields-calculation-df1`)
+ist geöffnet; Korrekturen nach Review und CI-Prüfung auf dem Feature-Branch.
+Noch **nicht** gemergt.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-Vier-Augen-Freigabe und Nacharbeit (PR #13) auf `main` (`b9c1313`).
+Dispo-Nummer aus Kalkulationsnummer (PR #14) auf `main` (`180572d`).
+
+## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Systemfelder `campaign_period`, `period_open`, `position_flight_period` | umgesetzt |
+| Feldset `system_calculation_core` v1 + aktive Version | umgesetzt |
+| Revision über `current_revision_id` / Pin in Set-Version | umgesetzt |
+| Unveränderlicher Config-Snapshot bei neuer Kalkulation | umgesetzt |
+| Legacy-Backfill: Snapshot + `period_open = true` | umgesetzt |
+| Dynamische Kopf-/Positionswerte (eigene Value-Tabellen) | umgesetzt |
+| Wizard: Kampagnenzeitraum, Toggle „Zeitraum offen“, Flight-Period | umgesetzt |
+| Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
+| Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 |
+| `billing_special_features` / `disposition_notes` | **nicht** in DF-1 (DF-2) |
+
+### Verbindliche PO-Entscheidungen in DF-1
+
+- **PO-A (A1):** `period_open` nach Persistenz immer gesetzt; Default/Backfill
+  `true`; UI-Toggle; bei `false` wird `position_flight_period` verpflichtend;
+  kein `null`; keine feste Spalte an der Position.
+- **PO-B (B2):** Rechnungsbesonderheiten und Dispositionshinweise gehören in den
+  Dispoauftrag-Entwurf (DF-2), nicht in die Kalkulation.
 
 ## Nummernableitung K→DA (September 2026)
 
@@ -54,12 +80,12 @@ Der abgelehnte Dispoauftrag bleibt als unveränderbarer, terminaler Snapshot erh
 Der Ersteller kann die zugrunde liegende Kalkulation nachbessern und daraus einen
 neuen, verknüpften Dispoauftrag im Status Entwurf erzeugen (`revises_dispo_order_id`).
 
-## Bewusst offen in diesem Slice
+## Bewusst offen nach DF-1
 
-- Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
-- operative Disposition, Material, Kommentare, Benachrichtigungen
-- Status ab `In Bearbeitung`
-- AUTH-005 als zwei getrennte Freigabeereignisse (hier: eine Entscheidung, Rolle hängt von Freigabeart ab)
+- Admin-UI für Felddefinitionen/Feldsets (GATE-D / ADM-*)
+- Dispo-Snapshot inkl. `billing_special_features` / `disposition_notes` (DF-2)
+- volle Regelmatrix, Optionen, Custom Fields, Payfaktor als FieldDefinition
+- operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 
 ## Echte Blocker
 
