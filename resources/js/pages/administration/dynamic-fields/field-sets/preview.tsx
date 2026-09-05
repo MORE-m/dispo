@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import PageHeader from '@/components/heading-page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 
@@ -65,6 +66,72 @@ function formatExample(value: unknown): string {
     return '–';
 }
 
+function FieldTable({ fields }: { fields: PreviewField[] }) {
+    if (fields.length === 0) {
+        return <p className="text-muted-foreground text-sm">Keine Felder.</p>;
+    }
+
+    return (
+        <div className="overflow-x-auto rounded-xl border">
+            <table className="w-full text-left text-sm">
+                <thead className="bg-muted/50">
+                    <tr>
+                        <th className="px-4 py-2 font-medium">Feld</th>
+                        <th className="px-4 py-2 font-medium">Scope</th>
+                        <th className="px-4 py-2 font-medium">Pflicht</th>
+                        <th className="px-4 py-2 font-medium">Sichtbar</th>
+                        <th className="px-4 py-2 font-medium">Beispielwert</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {fields.map((field) => (
+                        <tr key={field.membership_id} className="border-t">
+                            <td className="px-4 py-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-medium">
+                                        {field.label}
+                                    </span>
+                                    {field.is_system ? (
+                                        <Badge variant="outline">System</Badge>
+                                    ) : (
+                                        <Badge variant="secondary">Eigen</Badge>
+                                    )}
+                                    {field.field_type === 'short_text' ||
+                                    field.field_type === 'long_text' ? (
+                                        <Badge variant="outline">
+                                            {field.field_type}
+                                        </Badge>
+                                    ) : null}
+                                </div>
+                                <div className="text-muted-foreground">
+                                    {field.key}
+                                    {field.help_text
+                                        ? ` · ${field.help_text}`
+                                        : ''}
+                                </div>
+                            </td>
+                            <td className="px-4 py-2">{field.scope}</td>
+                            <td className="px-4 py-2">
+                                {field.effective_required
+                                    ? field.required_by_rule
+                                        ? 'ja (Regel)'
+                                        : 'ja'
+                                    : 'nein'}
+                            </td>
+                            <td className="px-4 py-2">
+                                {field.visible ? 'ja' : 'nein'}
+                            </td>
+                            <td className="px-4 py-2 font-mono text-xs">
+                                {formatExample(field.example_value)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 export default function FieldSetPreview({
     fieldSet,
     preview,
@@ -73,6 +140,15 @@ export default function FieldSetPreview({
     const flash = usePage().props.flash;
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+
+    const isCalcSet = fieldSet.key === 'system_calculation_core';
+    const isDispoSet = fieldSet.key === 'system_dispo_order_core';
+    const headerFields = preview.fields.filter(
+        (field) => field.scope === 'header',
+    );
+    const positionFields = preview.fields.filter(
+        (field) => field.scope === 'position',
+    );
 
     async function activate() {
         if (
@@ -122,6 +198,7 @@ export default function FieldSetPreview({
                                     type="button"
                                     onClick={() => void activate()}
                                     disabled={busy}
+                                    data-test="fieldset-version-activate"
                                 >
                                     Version aktivieren
                                 </Button>
@@ -143,71 +220,27 @@ export default function FieldSetPreview({
 
                 <section className="space-y-3">
                     <h2 className="text-base font-semibold">
-                        Felder (endgültige Reihenfolge)
+                        {isCalcSet
+                            ? 'Kalkulation – Header'
+                            : isDispoSet
+                              ? 'Dispoauftrag – Header'
+                              : 'Header'}
                     </h2>
-                    <div className="overflow-x-auto rounded-xl border">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-muted/50">
-                                <tr>
-                                    <th className="px-4 py-2 font-medium">
-                                        Feld
-                                    </th>
-                                    <th className="px-4 py-2 font-medium">
-                                        Scope
-                                    </th>
-                                    <th className="px-4 py-2 font-medium">
-                                        Pflicht
-                                    </th>
-                                    <th className="px-4 py-2 font-medium">
-                                        Sichtbar
-                                    </th>
-                                    <th className="px-4 py-2 font-medium">
-                                        Beispielwert
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {preview.fields.map((field) => (
-                                    <tr
-                                        key={field.membership_id}
-                                        className="border-t"
-                                    >
-                                        <td className="px-4 py-2">
-                                            <div className="font-medium">
-                                                {field.label}
-                                            </div>
-                                            <div className="text-muted-foreground">
-                                                {field.key}
-                                                {field.is_system
-                                                    ? ' · Systemfeld'
-                                                    : ''}
-                                                {field.help_text
-                                                    ? ` · ${field.help_text}`
-                                                    : ''}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {field.scope}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {field.effective_required
-                                                ? field.required_by_rule
-                                                    ? 'ja (Regel)'
-                                                    : 'ja'
-                                                : 'nein'}
-                                        </td>
-                                        <td className="px-4 py-2">
-                                            {field.visible ? 'ja' : 'nein'}
-                                        </td>
-                                        <td className="px-4 py-2 font-mono text-xs">
-                                            {formatExample(field.example_value)}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <FieldTable fields={headerFields} />
                 </section>
+
+                {positionFields.length > 0 ? (
+                    <section className="space-y-3">
+                        <h2 className="text-base font-semibold">
+                            {isCalcSet
+                                ? 'Kalkulation – Position'
+                                : isDispoSet
+                                  ? 'Dispoauftrag – Position'
+                                  : 'Position'}
+                        </h2>
+                        <FieldTable fields={positionFields} />
+                    </section>
+                ) : null}
 
                 <section className="space-y-3">
                     <h2 className="text-base font-semibold">

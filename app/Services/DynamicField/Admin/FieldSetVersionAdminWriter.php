@@ -2,6 +2,8 @@
 
 namespace App\Services\DynamicField\Admin;
 
+use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
 use App\Enums\FieldSetVersionStatus;
 use App\Exceptions\FieldSetConflictException;
 use App\Models\FieldDefinition;
@@ -155,7 +157,7 @@ final class FieldSetVersionAdminWriter
 
             if (count($memberships) !== $existingById->count()) {
                 throw ValidationException::withMessages([
-                    'fields' => 'In DF-3.1 dürfen Memberships nicht hinzugefügt oder entfernt werden.',
+                    'fields' => 'Memberships bitte über die dedizierten Hinzufügen-/Entfernen-Aktionen ändern.',
                 ]);
             }
 
@@ -348,6 +350,245 @@ final class FieldSetVersionAdminWriter
         }
 
         return $this->updateDraftMemberships($fieldSet, $draft, $memberships, $actor, $expectedLockVersion);
+    }
+
+    /**
+     * @param  array{
+     *     field_definition_id: int,
+     *     field_definition_revision_id: int,
+     *     sort: int,
+     *     required_override?: bool|null,
+     *     visible_override?: bool|null,
+     *     lock_version: int
+     * }  $payload
+     */
+    public function addCustomMembership(
+        FieldSet $fieldSet,
+        FieldSetVersion $draft,
+        array $payload,
+        User $actor,
+    ): FieldSetVersionField {
+        $this->assertAdminFieldSet($fieldSet);
+        $this->assertDraftOfSet($fieldSet, $draft);
+
+        return DB::transaction(function () use ($fieldSet, $draft, $payload, $actor): FieldSetVersionField {
+            /** @var FieldSet $locked */
+            $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
+            $this->assertLock($locked, (int) $payload['lock_version']);
+
+            /** @var FieldSetVersion $lockedDraft */
+            $lockedDraft = FieldSetVersion::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
+            if ($lockedDraft->status !== FieldSetVersionStatus::Draft) {
+                throw ValidationException::withMessages([
+                    'version' => 'Nur Entwurfsversionen dürfen bearbeitet werden.',
+                ]);
+            }
+
+            /** @var FieldDefinition $definition */
+            $definition = FieldDefinition::query()
+                ->whereKey((int) $payload['field_definition_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($definition->is_system) {
+                throw ValidationException::withMessages([
+                    'field_definition_id' => 'Systemfelder können nicht nachträglich hinzugefügt werden.',
+                ]);
+            }
+
+            if (! $definition->is_active) {
+                throw ValidationException::withMessages([
+                    'field_definition_id' => 'Nur aktive Custom-Definitionen können hinzugefügt werden.',
+                ]);
+            }
+
+            if ($definition->scope !== FieldScope::Header) {
+                throw ValidationException::withMessages([
+                    'field_definition_id' => 'In DF-3.2a sind nur Header-Felder als Membership zulässig.',
+                ]);
+            }
+
+            $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked->key);
+
+            if (FieldSetVersionField::query()
+                ->where('field_set_version_id', $lockedDraft->id)
+                ->where('field_definition_id', $definition->id)
+                ->exists()) {
+                throw ValidationException::withMessages([
+                    'field_definition_id' => 'Diese Definition ist bereits Mitglied dieser Version.',
+                ]);
+            }
+
+            /** @var FieldDefinitionRevision $revision */
+            $revision = FieldDefinitionRevision::query()
+                ->whereKey((int) $payload['field_definition_revision_id'])
+                ->firstOrFail();
+            if ((int) $revision->field_definition_id !== (int) $definition->id) {
+                throw ValidationException::withMessages([
+                    'field_definition_revision_id' => 'Die Revision gehört nicht zu dieser Felddefinition.',
+                ]);
+            }
+
+            $membership = new FieldSetVersionField;
+            $membership->field_set_version_id = $lockedDraft->id;
+            $membership->field_definition_id = $definition->id;
+            $membership->field_definition_revision_id = $revision->id;
+            $membership->sort = (int) $payload['sort'];
+            $membership->required_override = array_key_exists('required_override', $payload)
+                ? $payload['required_override']
+                : null;
+            $membership->visible_override = array_key_exists('visible_override', $payload)
+                ? $payload['visible_override']
+                : null;
+            $membership->save();
+
+            $lockedDraft->load(['fields.revision.definition', 'rules']);
+            $defsByKey = [];
+            foreach ($lockedDraft->fields as $row) {
+                $def = $row->revision?->definition;
+                if ($def === null) {
+                    throw new RuntimeException('Membership ohne gültige Definition.');
+                }
+                $defsByKey[$def->key] = $def;
+            }
+            $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
+
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $this->audit->record(
+                $locked,
+                'field_set.membership_added',
+                $actor,
+                [
+                    'lock_version' => (int) $payload['lock_version'],
+                    'draft_version_id' => $lockedDraft->id,
+                ],
+                [
+                    'lock_version' => $locked->lock_version,
+                    'draft_version_id' => $lockedDraft->id,
+                    'membership_id' => $membership->id,
+                    'field_definition_id' => $definition->id,
+                    'field_definition_key' => $definition->key,
+                    'field_definition_revision_id' => $revision->id,
+                    'sort' => $membership->sort,
+                    'required_override' => $membership->required_override,
+                    'visible_override' => $membership->visible_override,
+                    'field_set_key' => $locked->key,
+                ],
+            );
+
+            return $membership;
+        });
+    }
+
+    public function removeCustomMembership(
+        FieldSet $fieldSet,
+        FieldSetVersion $draft,
+        FieldSetVersionField $membership,
+        User $actor,
+        int $expectedLockVersion,
+    ): void {
+        $this->assertAdminFieldSet($fieldSet);
+        $this->assertDraftOfSet($fieldSet, $draft);
+
+        if ((int) $membership->field_set_version_id !== (int) $draft->id) {
+            throw ValidationException::withMessages([
+                'membership' => 'Die Membership gehört nicht zu dieser Version.',
+            ]);
+        }
+
+        DB::transaction(function () use ($fieldSet, $draft, $membership, $actor, $expectedLockVersion): void {
+            /** @var FieldSet $locked */
+            $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
+            $this->assertLock($locked, $expectedLockVersion);
+
+            /** @var FieldSetVersion $lockedDraft */
+            $lockedDraft = FieldSetVersion::query()->whereKey($draft->id)->lockForUpdate()->firstOrFail();
+            if ($lockedDraft->status !== FieldSetVersionStatus::Draft) {
+                throw ValidationException::withMessages([
+                    'version' => 'Nur Entwurfsversionen dürfen bearbeitet werden.',
+                ]);
+            }
+
+            /** @var FieldSetVersionField $lockedMembership */
+            $lockedMembership = FieldSetVersionField::query()->whereKey($membership->id)->lockForUpdate()->firstOrFail();
+            if ((int) $lockedMembership->field_set_version_id !== (int) $lockedDraft->id) {
+                throw ValidationException::withMessages([
+                    'membership' => 'Die Membership gehört nicht zu dieser Version.',
+                ]);
+            }
+
+            /** @var FieldDefinition $definition */
+            $definition = FieldDefinition::query()->whereKey($lockedMembership->field_definition_id)->firstOrFail();
+            if ($definition->is_system) {
+                throw ValidationException::withMessages([
+                    'membership' => 'System-Memberships können nicht entfernt werden.',
+                ]);
+            }
+
+            $before = [
+                'membership_id' => $lockedMembership->id,
+                'field_definition_id' => $definition->id,
+                'field_definition_key' => $definition->key,
+                'field_definition_revision_id' => $lockedMembership->field_definition_revision_id,
+                'sort' => $lockedMembership->sort,
+            ];
+
+            $lockedMembership->delete();
+
+            $lockedDraft->load(['fields.revision.definition', 'rules']);
+            $defsByKey = [];
+            foreach ($lockedDraft->fields as $row) {
+                $def = $row->revision?->definition;
+                if ($def === null) {
+                    throw new RuntimeException('Membership ohne gültige Definition.');
+                }
+                $defsByKey[$def->key] = $def;
+            }
+            $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
+
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $this->audit->record(
+                $locked,
+                'field_set.membership_removed',
+                $actor,
+                [
+                    'lock_version' => $expectedLockVersion,
+                    'draft_version_id' => $lockedDraft->id,
+                    'membership' => $before,
+                ],
+                [
+                    'lock_version' => $locked->lock_version,
+                    'draft_version_id' => $lockedDraft->id,
+                    'field_set_key' => $locked->key,
+                ],
+            );
+        });
+    }
+
+    private function assertAppliesToMatchesFieldSet(FieldAppliesTo $appliesTo, string $fieldSetKey): void
+    {
+        $isCalc = $fieldSetKey === AdminFieldSetCatalog::CALCULATION_CORE;
+        $isDispo = $fieldSetKey === AdminFieldSetCatalog::DISPO_ORDER_CORE;
+
+        $allowed = match ($appliesTo) {
+            FieldAppliesTo::Calculation => $isCalc,
+            FieldAppliesTo::DispoOrder => $isDispo,
+            FieldAppliesTo::Both => $isCalc || $isDispo,
+        };
+
+        if (! $allowed) {
+            throw ValidationException::withMessages([
+                'field_definition_id' => match ($appliesTo) {
+                    FieldAppliesTo::Calculation => 'Felder mit applies_to=calculation dürfen nur dem Kalkulations-Feldset zugeordnet werden.',
+                    FieldAppliesTo::DispoOrder => 'Felder mit applies_to=dispo_order dürfen nur dem Dispo-Feldset zugeordnet werden.',
+                    FieldAppliesTo::Both => 'Dieses Feld kann diesem Feldset nicht zugeordnet werden.',
+                },
+            ]);
+        }
     }
 
     private function assertDraftOfSet(FieldSet $fieldSet, FieldSetVersion $version): void

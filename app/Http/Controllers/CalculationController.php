@@ -17,9 +17,11 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\DispoOrder;
+use App\Models\FieldDefinition;
 use App\Models\FieldSet;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
+use App\Models\SnapshotFieldDefinition;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -482,6 +484,10 @@ class CalculationController extends Controller
             $snapshot = $calculation->configurationSnapshot;
             $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
+            $systemByDefinitionId = FieldDefinition::query()
+                ->whereIn('id', $snapshot->fieldDefinitions->pluck('field_definition_id')->unique()->all())
+                ->pluck('is_system', 'id');
+
             return [
                 'fields' => $snapshot->fieldDefinitions->map(fn ($def): array => [
                     'key' => (string) $def->key,
@@ -489,7 +495,13 @@ class CalculationController extends Controller
                     'label' => (string) $def->label,
                     'help_text' => $def->help_text,
                     'scope' => (string) $def->scope->value,
+                    'applies_to' => (string) $def->applies_to->value,
                     'sort' => (int) $def->sort,
+                    'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+                    'required' => (bool) $def->required,
+                    'visible' => (bool) $def->visible,
+                    'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
+                    'validation_json' => $def->validation_json,
                 ])->values()->all(),
                 'rules' => $snapshot->rules->map(fn ($rule): array => [
                     'condition' => $rule->condition_json,
@@ -520,7 +532,16 @@ class CalculationController extends Controller
                     'label' => (string) $revision->label,
                     'help_text' => $revision->help_text,
                     'scope' => (string) $definition->scope->value,
+                    'applies_to' => (string) $definition->applies_to->value,
                     'sort' => (int) $membership->sort,
+                    'is_system' => (bool) $definition->is_system,
+                    'required' => SnapshotFieldDefinition::effectiveRequired($membership->required_override),
+                    'visible' => SnapshotFieldDefinition::effectiveVisible($membership->visible_override),
+                    'max_length' => $this->maxLengthFromValidation(
+                        $revision->validation_json,
+                        (string) $definition->field_type->value,
+                    ),
+                    'validation_json' => $revision->validation_json,
                 ];
             })->values()->all(),
             'rules' => $version->rules->map(fn ($rule): array => [
@@ -528,6 +549,19 @@ class CalculationController extends Controller
                 'action' => $rule->action_json,
             ])->values()->all(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $validation
+     */
+    private function maxLengthFromValidation(?array $validation, string $fieldType): int
+    {
+        $fromJson = is_array($validation) ? ($validation['max_length'] ?? null) : null;
+        if (is_numeric($fromJson)) {
+            return (int) $fromJson;
+        }
+
+        return $fieldType === 'short_text' ? 255 : 20000;
     }
 
     /**

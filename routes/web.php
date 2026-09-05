@@ -49,32 +49,50 @@ Route::middleware(['auth'])->group(function () {
     Route::get('auswertungen', UnavailableModuleController::class)->defaults('module', 'reports')->name('reports.index');
     Route::get('stammdaten', UnavailableModuleController::class)->defaults('module', 'master-data')->name('master-data.index');
 
-    Route::get('administration', AdministrationHubController::class)
-        ->name('administration.index');
-    Route::get('administration/dynamische-felder', [FieldSetAdminController::class, 'home'])
-        ->name('administration.dynamic-fields.index');
-    Route::get('administration/dynamische-felder/definitionen', [FieldDefinitionAdminController::class, 'index'])
-        ->name('administration.dynamic-fields.definitions.index');
-    Route::get('administration/dynamische-felder/definitionen/{definition}', [FieldDefinitionAdminController::class, 'show'])
-        ->name('administration.dynamic-fields.definitions.show');
-    Route::post('administration/dynamische-felder/definitionen/{definition}/revisionen', [FieldDefinitionAdminController::class, 'storeRevision'])
-        ->name('administration.dynamic-fields.definitions.revisions.store');
-    Route::get('administration/dynamische-felder/feldsets', [FieldSetAdminController::class, 'index'])
-        ->name('administration.dynamic-fields.field-sets.index');
-    Route::get('administration/dynamische-felder/feldsets/{fieldSet}', [FieldSetAdminController::class, 'show'])
-        ->name('administration.dynamic-fields.field-sets.show');
-    Route::post('administration/dynamische-felder/feldsets/{fieldSet}/entwuerfe', [FieldSetAdminController::class, 'createDraft'])
-        ->name('administration.dynamic-fields.field-sets.drafts.store');
-    Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}', [FieldSetAdminController::class, 'editVersion'])
-        ->name('administration.dynamic-fields.field-sets.versions.edit');
-    Route::put('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}', [FieldSetAdminController::class, 'updateDraft'])
-        ->name('administration.dynamic-fields.field-sets.versions.update');
-    Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktuelle-revisionen', [FieldSetAdminController::class, 'pinCurrentRevisions'])
-        ->name('administration.dynamic-fields.field-sets.versions.pin-current');
-    Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/vorschau', [FieldSetAdminController::class, 'preview'])
-        ->name('administration.dynamic-fields.field-sets.versions.preview');
-    Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktivieren', [FieldSetAdminController::class, 'activate'])
-        ->name('administration.dynamic-fields.field-sets.versions.activate');
+    Route::middleware(['can:access-administration'])->group(function () {
+        Route::get('administration', AdministrationHubController::class)
+            ->name('administration.index');
+        Route::get('administration/dynamische-felder', [FieldSetAdminController::class, 'home'])
+            ->name('administration.dynamic-fields.index');
+        Route::get('administration/dynamische-felder/definitionen', [FieldDefinitionAdminController::class, 'index'])
+            ->name('administration.dynamic-fields.definitions.index');
+        Route::get('administration/dynamische-felder/definitionen/neu', [FieldDefinitionAdminController::class, 'create'])
+            ->name('administration.dynamic-fields.definitions.create');
+        Route::post('administration/dynamische-felder/definitionen', [FieldDefinitionAdminController::class, 'store'])
+            ->name('administration.dynamic-fields.definitions.store');
+        Route::get('administration/dynamische-felder/definitionen/{definition}', [FieldDefinitionAdminController::class, 'show'])
+            ->name('administration.dynamic-fields.definitions.show');
+        Route::put('administration/dynamische-felder/definitionen/{definition}', [FieldDefinitionAdminController::class, 'update'])
+            ->name('administration.dynamic-fields.definitions.update');
+        Route::post('administration/dynamische-felder/definitionen/{definition}/revisionen', [FieldDefinitionAdminController::class, 'storeRevision'])
+            ->name('administration.dynamic-fields.definitions.revisions.store');
+        Route::post('administration/dynamische-felder/definitionen/{definition}/deaktivieren', [FieldDefinitionAdminController::class, 'deactivate'])
+            ->name('administration.dynamic-fields.definitions.deactivate');
+        Route::post('administration/dynamische-felder/definitionen/{definition}/reaktivieren', [FieldDefinitionAdminController::class, 'reactivate'])
+            ->name('administration.dynamic-fields.definitions.reactivate');
+        Route::delete('administration/dynamische-felder/definitionen/{definition}', [FieldDefinitionAdminController::class, 'destroy'])
+            ->name('administration.dynamic-fields.definitions.destroy');
+        Route::get('administration/dynamische-felder/feldsets', [FieldSetAdminController::class, 'index'])
+            ->name('administration.dynamic-fields.field-sets.index');
+        Route::get('administration/dynamische-felder/feldsets/{fieldSet}', [FieldSetAdminController::class, 'show'])
+            ->name('administration.dynamic-fields.field-sets.show');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/entwuerfe', [FieldSetAdminController::class, 'createDraft'])
+            ->name('administration.dynamic-fields.field-sets.drafts.store');
+        Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}', [FieldSetAdminController::class, 'editVersion'])
+            ->name('administration.dynamic-fields.field-sets.versions.edit');
+        Route::put('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}', [FieldSetAdminController::class, 'updateDraft'])
+            ->name('administration.dynamic-fields.field-sets.versions.update');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/felder', [FieldSetAdminController::class, 'addMembership'])
+            ->name('administration.dynamic-fields.field-sets.versions.memberships.store');
+        Route::delete('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/felder/{membership}', [FieldSetAdminController::class, 'removeMembership'])
+            ->name('administration.dynamic-fields.field-sets.versions.memberships.destroy');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktuelle-revisionen', [FieldSetAdminController::class, 'pinCurrentRevisions'])
+            ->name('administration.dynamic-fields.field-sets.versions.pin-current');
+        Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/vorschau', [FieldSetAdminController::class, 'preview'])
+            ->name('administration.dynamic-fields.field-sets.versions.preview');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktivieren', [FieldSetAdminController::class, 'activate'])
+            ->name('administration.dynamic-fields.field-sets.versions.activate');
+    });
 
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
 });

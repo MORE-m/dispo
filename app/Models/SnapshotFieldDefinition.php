@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $sort
  * @property string|null $group_key
  * @property bool $reportable
+ * @property bool $required
+ * @property bool $visible
  * @property array<string, mixed>|null $validation_json
  */
 class SnapshotFieldDefinition extends Model
@@ -41,6 +43,8 @@ class SnapshotFieldDefinition extends Model
         'sort',
         'group_key',
         'reportable',
+        'required',
+        'visible',
         'validation_json',
     ];
 
@@ -54,8 +58,26 @@ class SnapshotFieldDefinition extends Model
             'scope' => FieldScope::class,
             'applies_to' => FieldAppliesTo::class,
             'reportable' => 'boolean',
+            'required' => 'boolean',
+            'visible' => 'boolean',
             'validation_json' => 'array',
         ];
+    }
+
+    /**
+     * Membership: null → optional; true → Pflicht.
+     */
+    public static function effectiveRequired(?bool $requiredOverride): bool
+    {
+        return $requiredOverride === true;
+    }
+
+    /**
+     * Membership: null → sichtbar; false → unsichtbar.
+     */
+    public static function effectiveVisible(?bool $visibleOverride): bool
+    {
+        return $visibleOverride !== false;
     }
 
     /**

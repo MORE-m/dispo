@@ -10,13 +10,14 @@ use App\Enums\FieldType;
 use App\Models\ConfigurationSnapshot;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
+use App\Models\FieldSetVersionField;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\SnapshotFieldRule;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * VER-004 / DF-2: Compose eines Dispo-Config-Snapshots aus Calc-Snapshot + system_dispo_order_core.
+ * VER-004 / DF-2 / DF-3.2a: Compose eines Dispo-Config-Snapshots aus Calc-Snapshot + system_dispo_order_core.
  */
 final class DispoConfigurationSnapshotComposer
 {
@@ -93,55 +94,84 @@ final class DispoConfigurationSnapshotComposer
                 throw new RuntimeException('Aktive Version von system_dispo_order_core ist nicht aktiv.');
             }
 
-            $calcDefs = $calculationSnapshot->fieldDefinitions
-                ->whereIn('key', self::CALC_ORIGIN_KEYS)
-                ->keyBy('key');
+            $calcDefsByKey = $calculationSnapshot->fieldDefinitions->keyBy('key');
 
             foreach (self::CALC_ORIGIN_KEYS as $key) {
-                if (! $calcDefs->has($key)) {
+                if (! $calcDefsByKey->has($key)) {
                     throw new RuntimeException("Calc-Snapshot fehlt Definition „{$key}“.");
                 }
-                $this->assertCalcOriginShape($calcDefs->get($key), $key);
+                $this->assertCalcOriginShape($calcDefsByKey->get($key), $key);
             }
 
+            /** @var array<string, true> $seenKeys */
             $seenKeys = [];
-            foreach ($calcDefs as $def) {
-                $seenKeys[$def->key] = true;
+            /** @var list<array{source: 'calc'|'native', calc: SnapshotFieldDefinition|null, membership: FieldSetVersionField|null}> $toMaterialize */
+            $toMaterialize = [];
+
+            foreach (self::CALC_ORIGIN_KEYS as $key) {
+                $seenKeys[$key] = true;
+                /** @var SnapshotFieldDefinition $calcOriginDef */
+                $calcOriginDef = $calcDefsByKey->get($key);
+                $toMaterialize[] = [
+                    'source' => 'calc',
+                    'calc' => $calcOriginDef,
+                    'membership' => null,
+                ];
             }
 
-            $dispoMemberships = [];
             foreach ($version->fields as $membership) {
                 $revision = $membership->revision;
                 $definition = $revision?->definition;
                 if ($revision === null || $definition === null) {
                     throw new RuntimeException('Dispo-Feldset-Membership ohne gültige Revision.');
                 }
-                if (! in_array($definition->key, self::DISPO_TEXT_KEYS, true)) {
+
+                if ($definition->applies_to === FieldAppliesTo::Calculation) {
                     throw new RuntimeException(
-                        "Unerwartetes Feld „{$definition->key}“ in system_dispo_order_core.",
+                        "Feld „{$definition->key}“ mit applies_to=calculation darf nicht im Dispo-Feldset stehen.",
                     );
                 }
-                if ($definition->field_type !== FieldType::LongText) {
-                    throw new RuntimeException(
-                        "Dispo-Feld „{$definition->key}“ muss long_text sein.",
-                    );
-                }
+
                 if ($definition->scope !== FieldScope::Header) {
                     throw new RuntimeException(
                         "Dispo-Feld „{$definition->key}“ muss Header-Scope haben.",
                     );
                 }
-                if ($definition->applies_to !== FieldAppliesTo::DispoOrder
-                    && $definition->applies_to !== FieldAppliesTo::Both) {
+
+                if (! in_array($definition->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                     throw new RuntimeException(
-                        "Dispo-Feld „{$definition->key}“ muss applies_to=dispo_order haben.",
+                        "Dispo-Feld „{$definition->key}“ muss short_text oder long_text sein.",
                     );
                 }
+
+                if (in_array($definition->key, self::DISPO_TEXT_KEYS, true)
+                    && $definition->field_type !== FieldType::LongText) {
+                    throw new RuntimeException(
+                        "Dispo-Feld „{$definition->key}“ muss long_text sein.",
+                    );
+                }
+
                 if (isset($seenKeys[$definition->key])) {
                     throw new RuntimeException("Doppelter Snapshot-Schlüssel „{$definition->key}“.");
                 }
-                $seenKeys[$definition->key] = true;
-                $dispoMemberships[] = $membership;
+
+                /** @var SnapshotFieldDefinition|null $calcDef */
+                $calcDef = $calcDefsByKey->get($definition->key);
+                if ($calcDef !== null) {
+                    $seenKeys[$definition->key] = true;
+                    $toMaterialize[] = [
+                        'source' => 'calc',
+                        'calc' => $calcDef,
+                        'membership' => null,
+                    ];
+                } else {
+                    $seenKeys[$definition->key] = true;
+                    $toMaterialize[] = [
+                        'source' => 'native',
+                        'calc' => null,
+                        'membership' => $membership,
+                    ];
+                }
             }
 
             foreach (self::DISPO_TEXT_KEYS as $key) {
@@ -165,11 +195,20 @@ final class DispoConfigurationSnapshotComposer
             })->values();
 
             $defsForRuleCheck = [];
-            foreach ($calcDefs as $def) {
-                $defsForRuleCheck[$def->key] = $def;
-            }
-            foreach ($dispoMemberships as $membership) {
-                $defsForRuleCheck[$membership->revision->definition->key] = $membership->revision->definition;
+            foreach ($toMaterialize as $item) {
+                if ($item['source'] === 'calc') {
+                    $calc = $item['calc'];
+                    if ($calc === null) {
+                        throw new RuntimeException('Calc-Snapshot-Definition fehlt beim Materialisieren.');
+                    }
+                    $defsForRuleCheck[$calc->key] = $calc;
+                } else {
+                    $nativeMembership = $item['membership'];
+                    if ($nativeMembership === null) {
+                        throw new RuntimeException('Native Membership fehlt beim Materialisieren.');
+                    }
+                    $defsForRuleCheck[$nativeMembership->revision->definition->key] = $nativeMembership->revision->definition;
+                }
             }
             $this->rules->assertRulesCompatibleWithDefinitions($defsForRuleCheck, $relevantRules);
 
@@ -181,37 +220,37 @@ final class DispoConfigurationSnapshotComposer
             $snapshot->created_at = now();
             $snapshot->save();
 
-            foreach (self::CALC_ORIGIN_KEYS as $key) {
-                /** @var SnapshotFieldDefinition $sourceDef */
-                $sourceDef = $calcDefs->get($key);
-                $snapDef = new SnapshotFieldDefinition;
-                $snapDef->configuration_snapshot_id = $snapshot->id;
-                $snapDef->field_definition_id = $sourceDef->field_definition_id;
-                $snapDef->field_definition_revision_id = $sourceDef->field_definition_revision_id;
-                $snapDef->key = $sourceDef->key;
-                $snapDef->field_type = $sourceDef->field_type;
-                $snapDef->label = $sourceDef->label;
-                $snapDef->help_text = $sourceDef->help_text;
-                $snapDef->scope = $sourceDef->scope;
-                $snapDef->applies_to = $sourceDef->applies_to;
-                $snapDef->sort = $sourceDef->sort;
-                $snapDef->group_key = $sourceDef->group_key;
-                $snapDef->reportable = $sourceDef->reportable;
-                $snapDef->validation_json = $sourceDef->validation_json;
-                $snapDef->save();
-            }
+            foreach ($toMaterialize as $item) {
+                if ($item['source'] === 'calc') {
+                    $sourceDef = $item['calc'];
+                    if ($sourceDef === null) {
+                        throw new RuntimeException('Calc-Snapshot-Definition fehlt beim Materialisieren.');
+                    }
+                    $snapDef = new SnapshotFieldDefinition;
+                    $snapDef->configuration_snapshot_id = $snapshot->id;
+                    $snapDef->field_definition_id = $sourceDef->field_definition_id;
+                    $snapDef->field_definition_revision_id = $sourceDef->field_definition_revision_id;
+                    $snapDef->key = $sourceDef->key;
+                    $snapDef->field_type = $sourceDef->field_type;
+                    $snapDef->label = $sourceDef->label;
+                    $snapDef->help_text = $sourceDef->help_text;
+                    $snapDef->scope = $sourceDef->scope;
+                    $snapDef->applies_to = $sourceDef->applies_to;
+                    $snapDef->sort = $sourceDef->sort;
+                    $snapDef->group_key = $sourceDef->group_key;
+                    $snapDef->reportable = $sourceDef->reportable;
+                    $snapDef->required = (bool) $sourceDef->required;
+                    $snapDef->visible = (bool) $sourceDef->visible;
+                    $snapDef->validation_json = $sourceDef->validation_json;
+                    $snapDef->save();
 
-            foreach ($relevantRules as $rule) {
-                $snapRule = new SnapshotFieldRule;
-                $snapRule->configuration_snapshot_id = $snapshot->id;
-                $snapRule->source_field_rule_id = $rule->source_field_rule_id ?? $rule->id;
-                $snapRule->sort = $rule->sort;
-                $snapRule->condition_json = $rule->condition_json;
-                $snapRule->action_json = $rule->action_json;
-                $snapRule->save();
-            }
+                    continue;
+                }
 
-            foreach ($dispoMemberships as $membership) {
+                $membership = $item['membership'];
+                if ($membership === null) {
+                    throw new RuntimeException('Native Membership fehlt beim Materialisieren.');
+                }
                 $revision = $membership->revision;
                 $definition = $revision->definition;
                 $snapDef = new SnapshotFieldDefinition;
@@ -227,8 +266,20 @@ final class DispoConfigurationSnapshotComposer
                 $snapDef->sort = $membership->sort;
                 $snapDef->group_key = $revision->group_key;
                 $snapDef->reportable = $revision->reportable;
+                $snapDef->required = SnapshotFieldDefinition::effectiveRequired($membership->required_override);
+                $snapDef->visible = SnapshotFieldDefinition::effectiveVisible($membership->visible_override);
                 $snapDef->validation_json = $revision->validation_json;
                 $snapDef->save();
+            }
+
+            foreach ($relevantRules as $rule) {
+                $snapRule = new SnapshotFieldRule;
+                $snapRule->configuration_snapshot_id = $snapshot->id;
+                $snapRule->source_field_rule_id = $rule->source_field_rule_id ?? $rule->id;
+                $snapRule->sort = $rule->sort;
+                $snapRule->condition_json = $rule->condition_json;
+                $snapRule->action_json = $rule->action_json;
+                $snapRule->save();
             }
 
             return $snapshot->load(['fieldDefinitions', 'rules']);

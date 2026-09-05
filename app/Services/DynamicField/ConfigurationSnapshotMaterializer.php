@@ -98,6 +98,8 @@ final class ConfigurationSnapshotMaterializer
                 $snapDef->sort = $membership->sort;
                 $snapDef->group_key = $revision->group_key;
                 $snapDef->reportable = $revision->reportable;
+                $snapDef->required = SnapshotFieldDefinition::effectiveRequired($membership->required_override);
+                $snapDef->visible = SnapshotFieldDefinition::effectiveVisible($membership->visible_override);
                 $snapDef->validation_json = $revision->validation_json;
                 $snapDef->save();
             }

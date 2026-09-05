@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
+import {
+    SchemaTextFields,
+    type SchemaTextField,
+} from '@/components/dynamic-fields/schema-text-fields';
 import { SuccessState } from '@/components/feedback/states';
 import {
     formatPercent,
@@ -26,21 +30,30 @@ import type {
 
 type PeriodValue = { start: string | null; end: string | null } | null;
 
+type SchemaField = {
+    key: string;
+    label: string;
+    help_text: string | null;
+    field_type: string;
+    scope: string;
+    sort: number;
+    group_key?: string | null;
+    is_system?: boolean;
+    editable?: boolean;
+    calc_origin?: boolean;
+    max_length?: number | null;
+    required?: boolean;
+};
+
 type FieldSchema = {
-    fields: Array<{
-        key: string;
-        label: string;
-        help_text: string | null;
-        field_type: string;
-        scope: string;
-        sort: number;
-        group_key?: string | null;
-    }>;
+    fields: SchemaField[];
     rules: Array<{
         sort?: number;
         condition: { op?: string; field_key?: string; value?: unknown };
         action: { op?: string; field_key?: string };
     }>;
+    editable_custom_header_fields?: SchemaField[];
+    calc_origin_custom_header_fields?: SchemaField[];
 };
 
 type OrderPosition = {
@@ -125,12 +138,12 @@ type OrderDetail = {
     revision: DispoOrderRevisionLink | null;
     approval_history: ApprovalHistoryEntry[];
     current_approval: ApprovalHistoryEntry | null;
-    dynamic_field_values?: {
+    dynamic_field_values?: Record<string, unknown> & {
         billing_special_features?: string | null;
         disposition_notes?: string | null;
         campaign_period?: PeriodValue;
     };
-    dynamic_field_captured?: {
+    dynamic_field_captured?: Record<string, boolean> & {
         billing_special_features?: boolean;
         disposition_notes?: boolean;
         campaign_period?: boolean;
@@ -169,11 +182,71 @@ export default function DispoOrderShow({
     const headerCaptured = order.dynamic_field_captured ?? {};
 
     const [billingSpecialFeatures, setBillingSpecialFeatures] = useState(
-        headerValues.billing_special_features ?? '',
+        typeof headerValues.billing_special_features === 'string'
+            ? headerValues.billing_special_features
+            : '',
     );
     const [dispositionNotes, setDispositionNotes] = useState(
-        headerValues.disposition_notes ?? '',
+        typeof headerValues.disposition_notes === 'string'
+            ? headerValues.disposition_notes
+            : '',
     );
+    const editableCustomFields = useMemo((): SchemaTextField[] => {
+        const source =
+            fieldSchema.editable_custom_header_fields ??
+            fieldSchema.fields.filter(
+                (field) =>
+                    field.is_system !== true &&
+                    field.editable === true &&
+                    field.scope === 'header' &&
+                    (field.field_type === 'short_text' ||
+                        field.field_type === 'long_text'),
+            );
+
+        return source.map((field) => ({
+            key: field.key,
+            label: field.label,
+            help_text: field.help_text,
+            field_type: field.field_type,
+            sort: field.sort,
+            max_length: field.max_length ?? undefined,
+            required: field.required === true,
+        }));
+    }, [fieldSchema]);
+    const calcOriginCustomFields = useMemo((): SchemaTextField[] => {
+        const source =
+            fieldSchema.calc_origin_custom_header_fields ??
+            fieldSchema.fields.filter(
+                (field) =>
+                    field.is_system !== true &&
+                    field.calc_origin === true &&
+                    field.scope === 'header' &&
+                    (field.field_type === 'short_text' ||
+                        field.field_type === 'long_text'),
+            );
+
+        return source.map((field) => ({
+            key: field.key,
+            label: field.label,
+            help_text: field.help_text,
+            field_type: field.field_type,
+            sort: field.sort,
+            max_length: field.max_length ?? undefined,
+        }));
+    }, [fieldSchema]);
+    const [customHeaderValues, setCustomHeaderValues] = useState<
+        Record<string, string>
+    >(() => {
+        const initial: Record<string, string> = {};
+        for (const field of editableCustomFields) {
+            const raw = headerValues[field.key];
+            initial[field.key] =
+                typeof raw === 'string' || typeof raw === 'number'
+                    ? String(raw)
+                    : '';
+        }
+        return initial;
+    });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
     const [syncingCalcFields, setSyncingCalcFields] = useState(false);
@@ -219,7 +292,7 @@ export default function DispoOrderShow({
         headerCaptured.campaign_period === true,
     );
 
-    function saveNotes() {
+    function saveSystemNotes() {
         if (savingNotes) {
             return;
         }
@@ -234,6 +307,36 @@ export default function DispoOrderShow({
                     billing_special_features: billingSpecialFeatures,
                     disposition_notes: dispositionNotes,
                 },
+            },
+            {
+                preserveScroll: true,
+                onError: (errors) => {
+                    setFieldErrors(errors);
+                },
+                onFinish: () => {
+                    setSavingNotes(false);
+                },
+            },
+        );
+    }
+
+    function saveCustomHeaders() {
+        if (savingNotes) {
+            return;
+        }
+
+        setSavingNotes(true);
+        setFieldErrors({});
+        router.patch(
+            `/dispoauftraege/${order.id}`,
+            {
+                lock_version: order.lock_version,
+                dynamic_field_values: Object.fromEntries(
+                    editableCustomFields.map((field) => [
+                        field.key,
+                        customHeaderValues[field.key] ?? '',
+                    ]),
+                ),
             },
             {
                 preserveScroll: true,
@@ -438,6 +541,43 @@ export default function DispoOrderShow({
                                 helpText={campaignPeriodHelp}
                             />
                         </div>
+                        {calcOriginCustomFields.length > 0 ? (
+                            <div
+                                className="space-y-3 border-t pt-3"
+                                data-test="dispo-order-calc-origin-custom-fields"
+                            >
+                                <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                                    Aus Kalkulation
+                                </p>
+                                <SchemaTextFields
+                                    fields={calcOriginCustomFields}
+                                    values={Object.fromEntries(
+                                        calcOriginCustomFields.map((field) => {
+                                            const raw = headerValues[field.key];
+                                            const captured =
+                                                headerCaptured[field.key] ===
+                                                true;
+                                            if (!captured) {
+                                                return [
+                                                    field.key,
+                                                    'Nicht erfasst',
+                                                ];
+                                            }
+                                            return [
+                                                field.key,
+                                                typeof raw === 'string' ||
+                                                typeof raw === 'number'
+                                                    ? String(raw)
+                                                    : '',
+                                            ];
+                                        }),
+                                    )}
+                                    readOnly
+                                    idPrefix="dispo-calc-origin"
+                                    onChange={() => undefined}
+                                />
+                            </div>
+                        ) : null}
                     </CardContent>
                 </Card>
 
@@ -561,7 +701,8 @@ export default function DispoOrderShow({
                                 <Button
                                     type="button"
                                     disabled={savingNotes}
-                                    onClick={saveNotes}
+                                    data-test="dispo-order-save-system-notes"
+                                    onClick={saveSystemNotes}
                                 >
                                     {savingNotes
                                         ? 'Wird gespeichert…'
@@ -592,6 +733,70 @@ export default function DispoOrderShow({
                         )}
                     </CardContent>
                 </Card>
+
+                {editableCustomFields.length > 0 ||
+                Object.keys(customHeaderValues).length > 0 ? (
+                    <Card
+                        className="border-border/70 rounded-xl shadow-xs"
+                        data-test="dispo-order-custom-header-card"
+                    >
+                        <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
+                            <CardTitle className="text-sm font-semibold">
+                                Weitere Angaben
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 px-5 py-4">
+                            {canUpdate ? (
+                                <>
+                                    <SchemaTextFields
+                                        fields={editableCustomFields}
+                                        values={customHeaderValues}
+                                        errors={fieldErrors}
+                                        disabled={savingNotes}
+                                        idPrefix="dispo-custom"
+                                        onChange={(key, value) =>
+                                            setCustomHeaderValues(
+                                                (current) => ({
+                                                    ...current,
+                                                    [key]: value,
+                                                }),
+                                            )
+                                        }
+                                    />
+                                    <Button
+                                        type="button"
+                                        disabled={savingNotes}
+                                        data-test="dispo-order-save-custom-headers"
+                                        onClick={saveCustomHeaders}
+                                    >
+                                        {savingNotes
+                                            ? 'Wird gespeichert…'
+                                            : 'Speichern'}
+                                    </Button>
+                                </>
+                            ) : (
+                                <SchemaTextFields
+                                    fields={editableCustomFields}
+                                    values={Object.fromEntries(
+                                        editableCustomFields.map((field) => {
+                                            const raw = headerValues[field.key];
+                                            return [
+                                                field.key,
+                                                typeof raw === 'string' ||
+                                                typeof raw === 'number'
+                                                    ? String(raw)
+                                                    : '',
+                                            ];
+                                        }),
+                                    )}
+                                    readOnly
+                                    idPrefix="dispo-custom-ro"
+                                    onChange={() => undefined}
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
 
                 <Card className="border-border/70 rounded-xl shadow-xs">
                     <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">

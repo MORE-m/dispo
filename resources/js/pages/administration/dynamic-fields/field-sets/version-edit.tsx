@@ -2,9 +2,18 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import PageHeader from '@/components/heading-page';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { JsonPostError, jsonPost, jsonPut } from '@/lib/json-post';
+import { JsonPostError, jsonDelete, jsonPost, jsonPut } from '@/lib/json-post';
 
 type AvailableRevision = {
     id: number;
@@ -18,9 +27,20 @@ type Membership = {
     field_definition_revision_id: number;
     key: string | null;
     label: string | null;
+    is_system: boolean;
     sort: number;
     required_override: boolean | null;
     visible_override: boolean | null;
+    available_revisions: AvailableRevision[];
+};
+
+type AvailableCustomDefinition = {
+    id: number;
+    key: string;
+    label: string | null;
+    applies_to: string;
+    field_type: string;
+    current_revision_id: number | null;
     available_revisions: AvailableRevision[];
 };
 
@@ -46,13 +66,30 @@ type Props = {
         fields: Membership[];
         rules: RuleRow[];
     };
+    availableCustomDefinitions?: AvailableCustomDefinition[];
 };
 
-export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
+export default function FieldSetVersionEdit({
+    fieldSet,
+    version,
+    availableCustomDefinitions = [],
+}: Props) {
     const flash = usePage().props.flash;
     const [fields, setFields] = useState(version.fields);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
+    const [selectedDefinitionId, setSelectedDefinitionId] = useState<
+        number | ''
+    >('');
+    const [selectedRevisionId, setSelectedRevisionId] = useState<number | ''>(
+        '',
+    );
+    const [addSort, setAddSort] = useState(100);
+
+    const selectedDefinition = availableCustomDefinitions.find(
+        (definition) => definition.id === selectedDefinitionId,
+    );
 
     function syncFormFields(next: Membership[]) {
         setFields(next);
@@ -66,6 +103,15 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
             required_override: field.required_override,
             visible_override: field.visible_override,
         }));
+    }
+
+    function handleCaught(caught: unknown, fallback: string) {
+        if (caught instanceof JsonPostError) {
+            setError(caught.message || fallback);
+        } else {
+            setError(fallback);
+        }
+        setBusy(false);
     }
 
     async function save() {
@@ -86,17 +132,10 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
             );
             router.visit(result.redirect, { preserveScroll: true });
         } catch (caught) {
-            if (caught instanceof JsonPostError) {
-                setError(
-                    caught.isConflict
-                        ? caught.message
-                        : caught.message ||
-                              'Der Entwurf konnte nicht gespeichert werden.',
-                );
-            } else {
-                setError('Der Entwurf konnte nicht gespeichert werden.');
-            }
-            setBusy(false);
+            handleCaught(
+                caught,
+                'Der Entwurf konnte nicht gespeichert werden.',
+            );
         }
     }
 
@@ -115,17 +154,64 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
             );
             router.visit(result.redirect, { preserveScroll: true });
         } catch (caught) {
-            if (caught instanceof JsonPostError) {
-                setError(
-                    caught.isConflict
-                        ? caught.message
-                        : caught.message ||
-                              'Die Revisionen konnten nicht übernommen werden.',
-                );
-            } else {
-                setError('Die Revisionen konnten nicht übernommen werden.');
-            }
-            setBusy(false);
+            handleCaught(
+                caught,
+                'Die Revisionen konnten nicht übernommen werden.',
+            );
+        }
+    }
+
+    async function addMembership() {
+        if (busy || selectedDefinitionId === '' || selectedRevisionId === '') {
+            return;
+        }
+
+        setBusy(true);
+        setError(null);
+
+        try {
+            const result = await jsonPost<{ redirect: string }>(
+                `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}/felder`,
+                {
+                    lock_version: fieldSet.lock_version,
+                    field_definition_id: selectedDefinitionId,
+                    field_definition_revision_id: selectedRevisionId,
+                    sort: addSort,
+                    required_override: null,
+                    visible_override: null,
+                },
+            );
+            setAddOpen(false);
+            router.visit(result.redirect, { preserveScroll: true });
+        } catch (caught) {
+            handleCaught(caught, 'Das Feld konnte nicht hinzugefügt werden.');
+        }
+    }
+
+    async function removeMembership(membership: Membership) {
+        if (busy || membership.is_system) {
+            return;
+        }
+
+        if (
+            !window.confirm(
+                `Feld „${membership.key}“ aus dem Entwurf entfernen?`,
+            )
+        ) {
+            return;
+        }
+
+        setBusy(true);
+        setError(null);
+
+        try {
+            const result = await jsonDelete<{ redirect: string }>(
+                `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}/felder/${membership.id}`,
+                { lock_version: fieldSet.lock_version },
+            );
+            router.visit(result.redirect, { preserveScroll: true });
+        } catch (caught) {
+            handleCaught(caught, 'Das Feld konnte nicht entfernt werden.');
         }
     }
 
@@ -135,7 +221,7 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title={`${fieldSet.name} · Version ${version.version}`}
-                    description={`Status: ${version.status}. Regeln sind in DF-3.1 nur lesbar.`}
+                    description={`Status: ${version.status}. Regeln sind nur lesbar. Position-Felder können in DF-3.2a nicht hinzugefügt werden.`}
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" asChild>
@@ -166,6 +252,7 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                             type="button"
                             onClick={() => void save()}
                             disabled={busy}
+                            data-test="fieldset-draft-save"
                         >
                             Entwurf speichern
                         </Button>
@@ -176,6 +263,20 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                             disabled={busy}
                         >
                             Aktuelle Definition-Revisionen übernehmen
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedDefinitionId('');
+                                setSelectedRevisionId('');
+                                setAddSort(100);
+                                setAddOpen(true);
+                            }}
+                            disabled={busy}
+                            data-test="fieldset-add-custom-field"
+                        >
+                            Eigenes Feld hinzufügen
                         </Button>
                     </div>
                 ) : (
@@ -205,14 +306,30 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                                     <th className="px-4 py-2 font-medium">
                                         Sichtbar
                                     </th>
+                                    {version.editable ? (
+                                        <th className="px-4 py-2 font-medium">
+                                            Aktion
+                                        </th>
+                                    ) : null}
                                 </tr>
                             </thead>
                             <tbody>
                                 {fields.map((field, index) => (
                                     <tr key={field.id} className="border-t">
                                         <td className="px-4 py-2">
-                                            <div className="font-medium">
-                                                {field.key}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="font-medium">
+                                                    {field.key}
+                                                </span>
+                                                {field.is_system ? (
+                                                    <Badge variant="outline">
+                                                        System
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">
+                                                        Eigen
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <div className="text-muted-foreground">
                                                 {field.label}
@@ -241,21 +358,13 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                                                     }}
                                                 >
                                                     {field.available_revisions.map(
-                                                        (revision) => (
+                                                        (rev) => (
                                                             <option
-                                                                key={
-                                                                    revision.id
-                                                                }
-                                                                value={
-                                                                    revision.id
-                                                                }
+                                                                key={rev.id}
+                                                                value={rev.id}
                                                             >
-                                                                r
-                                                                {
-                                                                    revision.revision
-                                                                }
-                                                                :{' '}
-                                                                {revision.label}
+                                                                r{rev.revision}:{' '}
+                                                                {rev.label}
                                                             </option>
                                                         ),
                                                     )}
@@ -292,6 +401,7 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                                             {version.editable ? (
                                                 <select
                                                     className="border-input bg-background rounded-md border px-2 py-1"
+                                                    data-test={`membership-required-${field.key}`}
                                                     value={
                                                         field.required_override ===
                                                         null
@@ -384,6 +494,30 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                                                 'Unsichtbar'
                                             )}
                                         </td>
+                                        {version.editable ? (
+                                            <td className="px-4 py-2">
+                                                {!field.is_system ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={busy}
+                                                        data-test={`membership-remove-${field.key}`}
+                                                        onClick={() =>
+                                                            void removeMembership(
+                                                                field,
+                                                            )
+                                                        }
+                                                    >
+                                                        Entfernen
+                                                    </Button>
+                                                ) : (
+                                                    <span className="text-muted-foreground text-xs">
+                                                        –
+                                                    </span>
+                                                )}
+                                            </td>
+                                        ) : null}
                                     </tr>
                                 ))}
                             </tbody>
@@ -414,6 +548,118 @@ export default function FieldSetVersionEdit({ fieldSet, version }: Props) {
                     )}
                 </section>
             </div>
+
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Eigenes Feld hinzufügen</DialogTitle>
+                        <DialogDescription>
+                            Nur aktive Custom-Header-Felder mit passendem
+                            applies_to. Positionsfelder sind in DF-3.2a nicht
+                            erlaubt.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {availableCustomDefinitions.length === 0 ? (
+                        <p className="text-muted-foreground text-sm">
+                            Keine passenden eigenen Felder verfügbar.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            <label className="block space-y-1 text-sm">
+                                <span className="font-medium">Feld</span>
+                                <select
+                                    className="border-input bg-background w-full rounded-md border px-3 py-2"
+                                    data-test="fieldset-add-definition-select"
+                                    value={selectedDefinitionId}
+                                    onChange={(e) => {
+                                        const id =
+                                            e.target.value === ''
+                                                ? ''
+                                                : Number(e.target.value);
+                                        setSelectedDefinitionId(id);
+                                        const def =
+                                            availableCustomDefinitions.find(
+                                                (row) => row.id === id,
+                                            );
+                                        setSelectedRevisionId(
+                                            def?.current_revision_id ?? '',
+                                        );
+                                    }}
+                                >
+                                    <option value="">Bitte wählen</option>
+                                    {availableCustomDefinitions.map((def) => (
+                                        <option key={def.id} value={def.id}>
+                                            {def.key}
+                                            {def.label ? ` – ${def.label}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            {selectedDefinition ? (
+                                <label className="block space-y-1 text-sm">
+                                    <span className="font-medium">
+                                        Revision
+                                    </span>
+                                    <select
+                                        className="border-input bg-background w-full rounded-md border px-3 py-2"
+                                        value={selectedRevisionId}
+                                        onChange={(e) =>
+                                            setSelectedRevisionId(
+                                                e.target.value === ''
+                                                    ? ''
+                                                    : Number(e.target.value),
+                                            )
+                                        }
+                                    >
+                                        {selectedDefinition.available_revisions.map(
+                                            (rev) => (
+                                                <option
+                                                    key={rev.id}
+                                                    value={rev.id}
+                                                >
+                                                    r{rev.revision}: {rev.label}
+                                                </option>
+                                            ),
+                                        )}
+                                    </select>
+                                </label>
+                            ) : null}
+                            <label className="block space-y-1 text-sm">
+                                <span className="font-medium">Sortierung</span>
+                                <Input
+                                    type="number"
+                                    min={0}
+                                    value={addSort}
+                                    onChange={(e) =>
+                                        setAddSort(Number(e.target.value))
+                                    }
+                                />
+                            </label>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setAddOpen(false)}
+                        >
+                            Abbrechen
+                        </Button>
+                        <Button
+                            type="button"
+                            disabled={
+                                busy ||
+                                selectedDefinitionId === '' ||
+                                selectedRevisionId === ''
+                            }
+                            data-test="fieldset-add-membership-submit"
+                            onClick={() => void addMembership()}
+                        >
+                            Hinzufügen
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

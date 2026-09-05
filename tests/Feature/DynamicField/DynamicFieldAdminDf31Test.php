@@ -74,6 +74,7 @@ class DynamicFieldAdminDf31Test extends TestCase
 
         $this->actingAs($admin)
             ->post(route('administration.dynamic-fields.definitions.revisions.store', $definition), [
+                'lock_version' => $definition->lock_version,
                 'label' => 'Rechnungsbesonderheiten (neu)',
                 'help_text' => 'Aktualisierter Hilfetext',
                 'group_key' => 'dispo',
@@ -152,6 +153,7 @@ class DynamicFieldAdminDf31Test extends TestCase
 
         $this->actingAs($sales)
             ->post(route('administration.dynamic-fields.definitions.revisions.store', $definition), [
+                'lock_version' => $definition->lock_version,
                 'label' => 'Unerlaubt',
                 'sort_default' => 1,
                 'reportable' => true,

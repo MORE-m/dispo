@@ -85,3 +85,11 @@ export async function jsonPut<T>(
 ): Promise<T> {
     return jsonRequest<T>('PUT', url, body, signal);
 }
+
+export async function jsonDelete<T>(
+    url: string,
+    body?: unknown,
+    signal?: AbortSignal,
+): Promise<T> {
+    return jsonRequest<T>('DELETE', url, body, signal);
+}

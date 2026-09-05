@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $dispo_order_id
  * @property int $snapshot_field_definition_id
+ * @property string|null $value_string
  * @property string|null $value_text
  * @property string|null $value_period_start
  * @property string|null $value_period_end
@@ -18,6 +19,7 @@ class DispoOrderFieldValue extends Model
     protected $fillable = [
         'dispo_order_id',
         'snapshot_field_definition_id',
+        'value_string',
         'value_text',
         'value_period_start',
         'value_period_end',

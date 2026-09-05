@@ -195,9 +195,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin-Teil)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a Custom-Header)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1)
+- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1/3.2a)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -207,14 +207,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `DYN-006`).
 - **DF-3.1 erledigt:** Admin-UI für Systemfeld-Revisionen und Kern-Feldset
   Draft/Activate/statische Vorschau; Regeln nur lesbar; Audit (`ADM-001`,
-  `ADM-002` Teil). **DF-3 nicht abgeschlossen.**
-- **Offen:** Custom Fields, Optionen, Assignments/Vererbung, volle Regelmatrix,
-  Regel-Editor.
+  `ADM-002` Teil).
+- **DF-3.2a erledigt (Feature-Branch):** Custom Header-Textfelder
+  (`short_text`/`long_text`, `max_length` bis 20000 / MEDIUMTEXT), Admin
+  Anlegen/Revision/Deaktivieren, Membership in Kern-Feldsets, Runtime in
+  Kalkulations-Wizard und Dispo-Show. **DF-3 nicht abgeschlossen.**
+- **Offen:** DF-3.2b Position-Custom-Felder, Optionen, Assignments/Vererbung,
+  volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin)
+- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a Custom-Header)
 - **Anforderungen:** `VER-001` bis `VER-007`
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
@@ -225,7 +229,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **DF-2:** Dispo-Compose-Snapshot (`VER-004`) inkl. `source_configuration_snapshot_id`,
   Dispo-Wertetabellen, Draft-Texte, Legacy ohne erfundene Dyn-Werte.
   **DF-3.1:** Admin-Activate ändert historische Snapshots nicht (AT-14).
-  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance.
+  **DF-3.2a:** Custom-Header in neuen Snapshots nach Activate; Historie unverändert.
+  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance;
+  DF-3.2b Position-Custom.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

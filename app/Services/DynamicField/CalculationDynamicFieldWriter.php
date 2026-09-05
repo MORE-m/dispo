@@ -198,7 +198,7 @@ final class CalculationDynamicFieldWriter
             $normalized[$def->key] = match ($def->field_type) {
                 FieldType::Boolean => $this->normalizeBoolean($raw, $def->key === 'period_open'),
                 FieldType::Period => $this->normalizePeriod($raw),
-                FieldType::ShortText, FieldType::LongText => $raw === null || $raw === '' ? null : (string) $raw,
+                FieldType::ShortText, FieldType::LongText => $this->normalizeText($raw, $def, $errorPrefix, $errors),
             };
         }
 
@@ -207,6 +207,49 @@ final class CalculationDynamicFieldWriter
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, string>  $errors
+     */
+    private function normalizeText(
+        mixed $raw,
+        SnapshotFieldDefinition $def,
+        string $errorPrefix,
+        array &$errors,
+    ): ?string {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (! is_string($raw) && ! is_numeric($raw)) {
+            $errors["{$errorPrefix}.{$def->key}"] = $def->label.' muss Text sein.';
+
+            return null;
+        }
+
+        $value = trim((string) $raw);
+        if ($value === '') {
+            return null;
+        }
+
+        $maxLength = $this->maxLengthForDefinition($def);
+        if (mb_strlen($value) > $maxLength) {
+            $errors["{$errorPrefix}.{$def->key}"] = $def->label." darf höchstens {$maxLength} Zeichen haben.";
+
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function maxLengthForDefinition(SnapshotFieldDefinition $def): int
+    {
+        $fromJson = is_array($def->validation_json) ? ($def->validation_json['max_length'] ?? null) : null;
+        if (is_numeric($fromJson)) {
+            return (int) $fromJson;
+        }
+
+        return $def->field_type === FieldType::ShortText ? 255 : 20000;
     }
 
     private function periodRawError(mixed $raw): ?string
