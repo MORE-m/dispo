@@ -14,6 +14,9 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * Der Test mutiert aktive Feldsets; deshalb zz-* und serielle Config. Feature-
  * Tests decken Required/Submit-Guards unabhängig ab.
+ *
+ * Helfer warten auf Response/Enabled-State (kein reines isVisible-Rennen),
+ * damit CI-Retries mit vorhandenem Entwurf und langsame Inertia-Visits stabil sind.
  */
 
 async function login(page: Page, email: string) {
@@ -30,30 +33,40 @@ async function login(page: Page, email: string) {
 
 async function openOrCreateDraft(page: Page, fieldSetPathSegment: string) {
     await page.goto(`/administration/dynamische-felder/feldsets`);
-    await page.getByRole('link', { name: fieldSetPathSegment }).click();
+    await page
+        .getByRole('link', { name: fieldSetPathSegment, exact: true })
+        .click();
 
     const draftOpen = page.getByRole('link', { name: 'Entwurf öffnen' });
-    if (await draftOpen.isVisible().catch(() => false)) {
+    const createDraft = page.getByRole('button', {
+        name: 'Entwurf aus aktiver Version',
+    });
+    // Race vermeiden: nach Retry kann ein Entwurf schon existieren.
+    await expect(draftOpen.or(createDraft)).toBeVisible({ timeout: 15_000 });
+    if (await draftOpen.isVisible()) {
         await draftOpen.click();
     } else {
-        await page
-            .getByRole('button', { name: 'Entwurf aus aktiver Version' })
-            .click();
+        await createDraft.click();
     }
     await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeEnabled({
         timeout: 15_000,
     });
 }
 
 async function activateCurrentDraft(page: Page) {
-    await page.getByRole('link', { name: 'Vorschau' }).click();
-    await expect(
-        page.locator('[data-test="fieldset-version-activate"]'),
-    ).toBeVisible({ timeout: 15_000 });
-    await Promise.all([
-        page.waitForEvent('dialog').then((dialog) => dialog.accept()),
-        page.locator('[data-test="fieldset-version-activate"]').click(),
-    ]);
+    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeEnabled({
+        timeout: 15_000,
+    });
+    await page.locator('a[href*="/vorschau"]').first().click();
+    await expect(page).toHaveURL(/\/vorschau$/, { timeout: 15_000 });
+    const activate = page.locator('[data-test="fieldset-version-activate"]');
+    await expect(activate).toBeVisible({ timeout: 15_000 });
+
+    page.once('dialog', (dialog) => dialog.accept());
+    await activate.click();
     await expect(page).toHaveURL(/feldsets\/\d+$/, { timeout: 30_000 });
 }
 
@@ -62,6 +75,9 @@ async function addCustomFieldToDraft(
     fieldKey: string,
     makeRequired: boolean,
 ) {
+    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeEnabled({
+        timeout: 15_000,
+    });
     await page.locator('[data-test="fieldset-add-custom-field"]').click();
     const definitionSelect = page.locator(
         '[data-test="fieldset-add-definition-select"]',
@@ -74,8 +90,19 @@ async function addCustomFieldToDraft(
         .getAttribute('value');
     expect(optionValue).toBeTruthy();
     await definitionSelect.selectOption(optionValue!);
-    await page.locator('[data-test="fieldset-add-membership-submit"]').click();
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/felder') &&
+                response.request().method() === 'POST' &&
+                response.ok(),
+        ),
+        page.locator('[data-test="fieldset-add-membership-submit"]').click(),
+    ]);
     await expect(page.getByText(fieldKey).first()).toBeVisible({
+        timeout: 15_000,
+    });
+    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeEnabled({
         timeout: 15_000,
     });
 
@@ -83,10 +110,21 @@ async function addCustomFieldToDraft(
         await page
             .locator(`[data-test="membership-required-${fieldKey}"]`)
             .selectOption('1');
-        await page.locator('[data-test="fieldset-draft-save"]').click();
+        await Promise.all([
+            page.waitForResponse(
+                (response) =>
+                    response.url().includes('/versionen/') &&
+                    response.request().method() === 'PUT' &&
+                    response.ok(),
+            ),
+            page.locator('[data-test="fieldset-draft-save"]').click(),
+        ]);
         await expect(
             page.locator(`[data-test="membership-required-${fieldKey}"]`),
-        ).toBeVisible({ timeout: 15_000 });
+        ).toHaveValue('1', { timeout: 15_000 });
+        await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeEnabled({
+            timeout: 15_000,
+        });
     }
 }
 
