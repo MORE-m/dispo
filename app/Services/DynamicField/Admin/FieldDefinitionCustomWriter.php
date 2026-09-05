@@ -375,7 +375,8 @@ final class FieldDefinitionCustomWriter
 
     public function isUsed(FieldDefinition $definition): bool
     {
-        return $this->hasActiveOrArchivedMembership($definition)
+        return $this->hasActiveOrDraftMembership($definition)
+            || $this->hasActiveOrArchivedMembership($definition)
             || $this->hasSnapshotReference($definition)
             || $this->hasAnyValue($definition);
     }

@@ -4,10 +4,16 @@ import { expect, test, type Page } from '@playwright/test';
  * DF-3.2a Browser-Smoke auf der separaten E2E-SQLite (database/e2e.sqlite).
  * Setzt die lokale DB `dispo` nicht zurück.
  *
- * Dateiname zz-*: läuft bewusst zuletzt in der Suite, weil der Test das aktive
- * Calc-/Dispo-Feldset um Custom-Felder erweitert. Die E2E-DB wird pro Suite-Lauf
- * neu aufgebaut (playwright.config webServer), daher keine Querkontamination
- * zwischen Suite-Läufen.
+ * Isolation (bewusst kombiniert, nicht nur zz-):
+ * 1. playwright.config: fullyParallel=false, workers=1 → Suite seriell.
+ * 2. webServer löscht/neu-migriert database/e2e.sqlite pro Suite-Lauf.
+ * 3. Dateiname zz-* → läuft nach den übrigen Specs (stabile lexikografische
+ *    Discovery-Reihenfolge unter workers=1).
+ * 4. Allein ausführbar: `npx playwright test tests/e2e/zz-df32a-custom-header.spec.ts`
+ *    startet eigenen frischen webServer (reuseExistingServer: false).
+ *
+ * Der Test mutiert aktive Feldsets; deshalb zz-* und serielle Config. Feature-
+ * Tests decken Required/Submit-Guards unabhängig ab.
  */
 
 async function login(page: Page, email: string) {

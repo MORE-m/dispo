@@ -321,6 +321,27 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
+        $errors = [];
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if (! $def->required || ! $def->visible) {
+                continue;
+            }
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+            if ($this->isCalcOriginKey($snapshot, $def->key)) {
+                continue;
+            }
+
+            $raw = $this->readHeaderValue($order, $def);
+            if ($raw === null || $raw === '') {
+                $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         $headerValues = $this->headerValuesForValidation($order, $snapshot);
         $positionContexts = [];
         foreach ($order->positions->values() as $index => $position) {

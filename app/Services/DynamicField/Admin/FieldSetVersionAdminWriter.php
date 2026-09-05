@@ -282,6 +282,14 @@ final class FieldSetVersionAdminWriter
                         'fields' => "Feldschlüssel „{$definition->key}“ ist mehrfach vorhanden.",
                     ]);
                 }
+                if (! $definition->is_system) {
+                    $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked->key);
+                    if ($definition->scope !== FieldScope::Header) {
+                        throw ValidationException::withMessages([
+                            'fields' => 'In DF-3.2a dürfen nur Header-Felder in Feldsets aktiviert werden.',
+                        ]);
+                    }
+                }
                 $defsByKey[$definition->key] = $definition;
             }
             $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);

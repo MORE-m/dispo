@@ -556,6 +556,48 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
             ->assertSessionHasErrors("dynamic_field_values.{$both->key}");
     }
 
+    public function test_dispo_submit_requires_visible_native_custom_header(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createAndActivateOnSets(
+            $admin,
+            'Dispo Pflicht',
+            FieldAppliesTo::DispoOrder,
+            calc: false,
+            dispo: true,
+            requiredOverride: true,
+            visibleOverride: true,
+        );
+
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
+            ->order;
+
+        $this->actingAs($user)
+            ->post(route('dispo-orders.submit', $order), [
+                'lock_version' => $order->lock_version,
+            ])
+            ->assertSessionHasErrors("dynamic_field_values.{$definition->key}");
+
+        $this->actingAs($user)
+            ->patch(route('dispo-orders.update', $order), [
+                'lock_version' => $order->lock_version,
+                'dynamic_field_values' => [
+                    $definition->key => 'Erfüllt',
+                ],
+            ])
+            ->assertRedirect();
+
+        $order->refresh();
+        $this->actingAs($user)
+            ->post(route('dispo-orders.submit', $order), [
+                'lock_version' => $order->lock_version,
+            ])
+            ->assertRedirect();
+    }
+
     private function savedCalculation(): Calculation
     {
         $catalog = $this->createSpotClassicCatalog();

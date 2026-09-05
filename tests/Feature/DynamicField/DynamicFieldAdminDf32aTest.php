@@ -328,6 +328,48 @@ class DynamicFieldAdminDf32aTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_draft_membership_locks_structural_update_and_activate_rechecks_applies_to(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createCustomDefinition($admin, [
+            'label' => 'Drift Guard',
+            'applies_to' => FieldAppliesTo::Both->value,
+        ]);
+
+        $calcSet = FieldSet::query()->where('key', AdminFieldSetCatalog::CALCULATION_CORE)->firstOrFail();
+        $calcDraft = $this->createDraft($admin, $calcSet);
+        $calcSet->refresh();
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.versions.memberships.store', [$calcSet, $calcDraft]), [
+                'lock_version' => $calcSet->lock_version,
+                'field_definition_id' => $definition->id,
+                'field_definition_revision_id' => $definition->current_revision_id,
+                'sort' => 55,
+            ])
+            ->assertRedirect();
+
+        $definition->refresh();
+        $this->actingAs($admin)
+            ->put(route('administration.dynamic-fields.definitions.update', $definition), [
+                'lock_version' => $definition->lock_version,
+                'label' => 'Drift Guard',
+                'field_type' => FieldType::ShortText->value,
+                'applies_to' => FieldAppliesTo::DispoOrder->value,
+                'max_length' => 100,
+            ])
+            ->assertSessionHasErrors('definition');
+
+        // Defense-in-depth: even if applies_to were wrong, activate must reject.
+        $definition->forceFill(['applies_to' => FieldAppliesTo::DispoOrder])->save();
+        $calcSet->refresh();
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.versions.activate', [$calcSet, $calcDraft]), [
+                'lock_version' => $calcSet->lock_version,
+            ])
+            ->assertSessionHasErrors('field_definition_id');
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */
