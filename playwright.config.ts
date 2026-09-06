@@ -20,6 +20,8 @@ const e2eEnv = {
 
 export default defineConfig({
     testDir: 'tests/e2e',
+    // DF-3.2a mutiert aktive Feldsets: Suite muss seriell und in stabiler
+    // Discovery-Reihenfolge laufen (zz-* Specs zuletzt). Nicht parallelisieren.
     fullyParallel: false,
     workers: 1,
     forbidOnly: !!process.env.CI,

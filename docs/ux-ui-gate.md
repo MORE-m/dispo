@@ -153,10 +153,12 @@ UX-GATE-D-Bestandteile **freigegeben**:
 - Nachbesserung abgelehnter Aufträge über neuen verknüpften Entwurf
 - zugehörige Policies, Persistenz, Auditierung und Tests
 
-**Product-Owner-Teilfreigabe (September 2026, DF-3.1):** Zusätzlich freigegeben:
+**Product-Owner-Teilfreigabe (September 2026, DF-3.1 / DF-3.2a):** Zusätzlich
+freigegeben:
 
 - Administration dynamischer Felder (Systemfeld-Revisionen, Kern-Feldset-
   Versionierung, statische Vorschau mit Beispielwerten)
+- Custom Header-Textfelder (DF-3.2a) inkl. Runtime in Kalkulation/Dispo
 - Navigation Administration → Hub mit freigeschaltetem Dyn-Feld-Modul
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
@@ -181,7 +183,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (DF-3.1); operative Disposition und übrige Admin-Kataloge weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (DF-3.1/DF-3.2a Header-Custom); operative Disposition und übrige Admin-Kataloge weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

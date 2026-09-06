@@ -209,7 +209,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 | `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill) |
 | `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis |
 | `snapshot_field_rules` | kopierte Regeln des Snapshots |
-| `calculation_field_values` | typisierte Kopfwerte einer Kalkulation |
+| `calculation_field_values` | typisierte Kopfwerte einer Kalkulation (`value_text` MEDIUMTEXT ab DF-3.2a) |
 | `calculation_position_field_values` | typisierte Positionswerte |
 | `calculations.configuration_snapshot_id` | FK auf den Config-Snapshot der Kalkulation |
 
@@ -221,7 +221,7 @@ Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, 
 |---|---|
 | `configuration_snapshots.source_configuration_snapshot_id` | Herkunftszeiger Calc→Dispo-Compose (kein Laufzeit-Fallback) |
 | `dispo_orders.configuration_snapshot_id` | FK auf den Dispo-Config-Snapshot, nach Backfill **NOT NULL** |
-| `dispo_order_field_values` | Header-Werte (`value_text` MEDIUMTEXT, Perioden) |
+| `dispo_order_field_values` | Header-Werte (`value_text` MEDIUMTEXT, Perioden; DF-3.2a max. 20000 Zeichen) |
 | `dispo_order_position_field_values` | Positionswerte (`value_boolean`, Perioden) |
 
 Dispo-Snapshots nutzen Source `dispo_order_create` bzw. `dispo_order_legacy_backfill`.
@@ -233,12 +233,18 @@ nicht erfasst“; vorhandene Zeile mit `NULL` bedeutet „erfasst, bewusst leer�
 Draft-Sync erzeugt ausschließlich fehlende Capture-Zeilen und überschreibt keine
 vorhandenen Werte.
 
-### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 nur Admin-Versionierung der Seeds)
+### DF-3.2a – Custom Header-Textfelder (Feature-Branch)
 
-Konzeptuell vorgesehen; **DF-3.1** liefert Admin für Systemfeld-Revisionen und
-Kern-Feldset-Versionen, aber noch nicht:
+- `field_definitions.is_active` und Admin-Lifecycle für Custom-Felder.
+- Custom nur Header `short_text`/`long_text`; `max_length` in
+  `field_definition_revisions.validation_json` (bis 20000).
+- Membership Custom in Drafts der beiden Kern-Feldsets; Position-Custom = DF-3.2b.
 
-- Custom-Feld-Administration und neue Typen,
+### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a nur Header-Text)
+
+Konzeptuell vorgesehen; **DF-3.2a** liefert Custom-Header-Texte, aber noch nicht:
+
+- Position-Custom-Felder (DF-3.2b),
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
 - `FieldSetAssignment` an Kategorien/Werbemittel,

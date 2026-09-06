@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
 use App\Enums\FieldSetVersionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\DynamicField\ActivateFieldSetVersionRequest;
+use App\Http\Requests\Administration\DynamicField\AddFieldSetMembershipRequest;
 use App\Http\Requests\Administration\DynamicField\CreateFieldSetDraftRequest;
 use App\Http\Requests\Administration\DynamicField\PinCurrentRevisionsRequest;
+use App\Http\Requests\Administration\DynamicField\RemoveFieldSetMembershipRequest;
 use App\Http\Requests\Administration\DynamicField\UpdateFieldSetDraftRequest;
 use App\Models\FieldDefinition;
+use App\Models\FieldDefinitionRevision;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
+use App\Models\FieldSetVersionField;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldSetVersionAdminWriter;
 use App\Services\DynamicField\Admin\FieldSetVersionPreviewService;
@@ -37,7 +43,7 @@ class FieldSetAdminController extends Controller
             'links' => [
                 [
                     'title' => 'Felddefinitionen',
-                    'description' => 'Geschützte Systemfelder revisionieren.',
+                    'description' => 'Systemfelder revisionieren und eigene Header-Textfelder verwalten.',
                     'href' => '/administration/dynamische-felder/definitionen',
                 ],
                 [
@@ -148,7 +154,7 @@ class FieldSetAdminController extends Controller
             ->get()
             ->each(function (FieldDefinition $definition) use (&$revisionsByDefinition): void {
                 $revisionsByDefinition[$definition->id] = $definition->revisions
-                    ->map(fn ($revision): array => [
+                    ->map(fn (FieldDefinitionRevision $revision): array => [
                         'id' => $revision->id,
                         'revision' => $revision->revision,
                         'label' => $revision->label,
@@ -156,6 +162,62 @@ class FieldSetAdminController extends Controller
                     ->values()
                     ->all();
             });
+
+        $memberDefinitionIds = $version->fields->pluck('field_definition_id')->unique()->all();
+        $allowedApplies = match ($fieldSet->key) {
+            AdminFieldSetCatalog::CALCULATION_CORE => [
+                FieldAppliesTo::Calculation->value,
+                FieldAppliesTo::Both->value,
+            ],
+            AdminFieldSetCatalog::DISPO_ORDER_CORE => [
+                FieldAppliesTo::DispoOrder->value,
+                FieldAppliesTo::Both->value,
+            ],
+            default => [],
+        };
+
+        /** @var list<array{
+         *     id: int,
+         *     key: string,
+         *     label: string|null,
+         *     applies_to: string,
+         *     field_type: string,
+         *     current_revision_id: int|null,
+         *     available_revisions: list<array{id: int, revision: int, label: string}>
+         * }> $availableCustomDefinitions
+         */
+        $availableCustomDefinitions = FieldDefinition::query()
+            ->where('is_system', false)
+            ->where('is_active', true)
+            ->where('scope', FieldScope::Header)
+            ->whereIn('applies_to', $allowedApplies)
+            ->whereNotIn('id', $memberDefinitionIds)
+            ->with(['currentRevision', 'revisions' => fn ($q) => $q->orderByDesc('revision')])
+            ->orderBy('key')
+            ->get()
+            ->map(function (FieldDefinition $definition): array {
+                /** @var list<array{id: int, revision: int, label: string}> $availableRevisions */
+                $availableRevisions = $definition->revisions
+                    ->map(fn (FieldDefinitionRevision $revision): array => [
+                        'id' => $revision->id,
+                        'revision' => $revision->revision,
+                        'label' => $revision->label,
+                    ])
+                    ->values()
+                    ->all();
+
+                return [
+                    'id' => $definition->id,
+                    'key' => $definition->key,
+                    'label' => $definition->currentRevision?->label,
+                    'applies_to' => $definition->applies_to->value,
+                    'field_type' => $definition->field_type->value,
+                    'current_revision_id' => $definition->current_revision_id,
+                    'available_revisions' => $availableRevisions,
+                ];
+            })
+            ->values()
+            ->all();
 
         return Inertia::render('administration/dynamic-fields/field-sets/version-edit', [
             'fieldSet' => [
@@ -169,17 +231,17 @@ class FieldSetAdminController extends Controller
                 'version' => $version->version,
                 'status' => $version->status->value,
                 'editable' => $version->status === FieldSetVersionStatus::Draft,
-                'fields' => $version->fields->map(function ($membership) use ($revisionsByDefinition): array {
-                    $key = $membership->definition !== null
-                        ? $membership->definition->key
-                        : ($membership->revision?->definition?->key);
+                'fields' => $version->fields->map(function (FieldSetVersionField $membership) use ($revisionsByDefinition): array {
+                    $definition = $membership->definition ?? $membership->revision->definition;
+                    $key = $definition->key;
 
                     return [
                         'id' => $membership->id,
                         'field_definition_id' => $membership->field_definition_id,
                         'field_definition_revision_id' => $membership->field_definition_revision_id,
                         'key' => $key,
-                        'label' => $membership->revision?->label,
+                        'label' => $membership->revision->label,
+                        'is_system' => (bool) $definition->is_system,
                         'sort' => $membership->sort,
                         'required_override' => $membership->required_override,
                         'visible_override' => $membership->visible_override,
@@ -193,6 +255,7 @@ class FieldSetAdminController extends Controller
                     'action' => $rule->action_json,
                 ]),
             ],
+            'availableCustomDefinitions' => $availableCustomDefinitions,
         ]);
     }
 
@@ -213,6 +276,66 @@ class FieldSetAdminController extends Controller
 
         $redirect = route('administration.dynamic-fields.field-sets.versions.edit', [$fieldSet, $version]);
         $message = 'Entwurf wurde gespeichert.';
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect' => $redirect,
+                'message' => $message,
+            ]);
+        }
+
+        return redirect()
+            ->to($redirect)
+            ->with('success', $message);
+    }
+
+    public function addMembership(
+        AddFieldSetMembershipRequest $request,
+        FieldSet $fieldSet,
+        FieldSetVersion $version,
+    ): RedirectResponse|JsonResponse {
+        $this->authorize('access-administration');
+
+        $this->writer->addCustomMembership(
+            $fieldSet,
+            $version,
+            $request->payload(),
+            $request->user(),
+        );
+
+        $redirect = route('administration.dynamic-fields.field-sets.versions.edit', [$fieldSet, $version]);
+        $message = 'Feld wurde dem Entwurf hinzugefügt.';
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'redirect' => $redirect,
+                'message' => $message,
+            ]);
+        }
+
+        return redirect()
+            ->to($redirect)
+            ->with('success', $message);
+    }
+
+    public function removeMembership(
+        RemoveFieldSetMembershipRequest $request,
+        FieldSet $fieldSet,
+        FieldSetVersion $version,
+        FieldSetVersionField $membership,
+    ): RedirectResponse|JsonResponse {
+        $this->authorize('access-administration');
+
+        $this->writer->removeCustomMembership(
+            $fieldSet,
+            $version,
+            $membership,
+            $request->user(),
+            $request->lockVersion(),
+        );
+
+        $redirect = route('administration.dynamic-fields.field-sets.versions.edit', [$fieldSet, $version]);
+        $message = 'Feld wurde aus dem Entwurf entfernt.';
 
         if ($request->wantsJson()) {
             return response()->json([

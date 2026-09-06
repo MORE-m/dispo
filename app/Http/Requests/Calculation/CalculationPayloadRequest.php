@@ -6,10 +6,17 @@ use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
+use App\Enums\FieldScope;
+use App\Enums\FieldType;
 use App\Enums\PlanningMode;
 use App\Enums\SpotCalculationMethod;
+use App\Models\Calculation;
+use App\Models\ConfigurationSnapshot;
+use App\Models\FieldSet;
+use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\TimeRangeValidator;
+use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -72,6 +79,7 @@ class CalculationPayloadRequest extends FormRequest
             'dynamic_field_values.campaign_period' => ['nullable', 'array'],
             'dynamic_field_values.campaign_period.start' => ['nullable', 'date'],
             'dynamic_field_values.campaign_period.end' => ['nullable', 'date'],
+            'dynamic_field_values.*' => ['nullable'],
             'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
@@ -134,6 +142,9 @@ class CalculationPayloadRequest extends FormRequest
 
             $this->validateDynamicPeriods($validator);
             $this->validateDynamicFieldKeys($validator);
+            if (! $this->routeIs('calculations.preview')) {
+                $this->validateRequiredDynamicFields($validator);
+            }
 
             $isPreview = $this->routeIs('calculations.preview');
             $rangeValidator = new TimeRangeValidator;
@@ -242,20 +253,26 @@ class CalculationPayloadRequest extends FormRequest
 
     private function validateDynamicFieldKeys(Validator $validator): void
     {
-        $headerAllowed = ['campaign_period'];
-        $positionAllowed = ['period_open', 'position_flight_period'];
+        $schema = $this->resolveDynamicFieldSchema();
+        $headerAllowed = $schema['header'];
+        $positionAllowed = $schema['position'];
 
         $header = $this->input('dynamic_field_values', []);
         if (is_array($header)) {
-            foreach (array_keys($header) as $key) {
-                if (! in_array((string) $key, $headerAllowed, true)) {
+            foreach ($header as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($headerAllowed[$key])) {
                     $validator->errors()->add(
                         'dynamic_field_values.'.$key,
-                        in_array((string) $key, $positionAllowed, true)
+                        isset($positionAllowed[$key])
                             ? 'Dieses Feld gehört nicht in diesen Bereich.'
                             : 'Unbekanntes dynamisches Feld.',
                     );
+
+                    continue;
                 }
+
+                $this->validateHeaderTextValue($validator, $key, $raw, $headerAllowed[$key]);
             }
         }
 
@@ -268,16 +285,221 @@ class CalculationPayloadRequest extends FormRequest
                 continue;
             }
             foreach (array_keys($values) as $key) {
-                if (! in_array((string) $key, $positionAllowed, true)) {
+                $key = (string) $key;
+                if (! isset($positionAllowed[$key])) {
                     $validator->errors()->add(
                         "positions.{$index}.dynamic_field_values.{$key}",
-                        in_array((string) $key, $headerAllowed, true)
+                        isset($headerAllowed[$key])
                             ? 'Dieses Feld gehört nicht in diesen Bereich.'
                             : 'Unbekanntes dynamisches Feld.',
                     );
                 }
             }
         }
+    }
+
+    /**
+     * @param  array{field_type: string, max_length: int, label: string, required?: bool, visible?: bool}  $meta
+     */
+    private function validateHeaderTextValue(Validator $validator, string $key, mixed $raw, array $meta): void
+    {
+        if (! in_array($meta['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true)) {
+            return;
+        }
+
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        if (! is_string($raw) && ! is_numeric($raw)) {
+            $validator->errors()->add(
+                "dynamic_field_values.{$key}",
+                $meta['label'].' muss Text sein.',
+            );
+
+            return;
+        }
+
+        $value = (string) $raw;
+        if (mb_strlen($value) > $meta['max_length']) {
+            $validator->errors()->add(
+                "dynamic_field_values.{$key}",
+                $meta['label'].' darf höchstens '.$meta['max_length'].' Zeichen haben.',
+            );
+        }
+    }
+
+    private function validateRequiredDynamicFields(Validator $validator): void
+    {
+        $schema = $this->resolveDynamicFieldSchema();
+        $header = $this->input('dynamic_field_values', []);
+        if (! is_array($header)) {
+            $header = [];
+        }
+
+        foreach ($schema['header'] as $key => $meta) {
+            if (! in_array($meta['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true)) {
+                continue;
+            }
+            if ($meta['required'] !== true || $meta['visible'] !== true) {
+                continue;
+            }
+
+            $raw = $header[$key] ?? null;
+            if ($raw === null || $raw === '') {
+                $validator->errors()->add(
+                    "dynamic_field_values.{$key}",
+                    $meta['label'].' ist erforderlich.',
+                );
+            }
+        }
+    }
+
+    /**
+     * @return array{
+     *     header: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>,
+     *     position: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
+     * }
+     */
+    private function resolveDynamicFieldSchema(): array
+    {
+        $snapshot = $this->resolveConfigurationSnapshot();
+        if ($snapshot !== null) {
+            return $this->schemaFromSnapshot($snapshot);
+        }
+
+        return $this->schemaFromActiveCalculationSet();
+    }
+
+    private function resolveConfigurationSnapshot(): ?ConfigurationSnapshot
+    {
+        /** @var Calculation|null $routeCalculation */
+        $routeCalculation = $this->route('calculation');
+        if ($routeCalculation instanceof Calculation) {
+            $routeCalculation->loadMissing('configurationSnapshot.fieldDefinitions');
+
+            return $routeCalculation->configurationSnapshot;
+        }
+
+        $calculationId = (int) $this->input('calculation_id', 0);
+        if ($calculationId > 0) {
+            $calculation = Calculation::query()
+                ->with('configurationSnapshot.fieldDefinitions')
+                ->find($calculationId);
+
+            return $calculation?->configurationSnapshot;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{
+     *     header: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>,
+     *     position: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
+     * }
+     */
+    private function schemaFromSnapshot(ConfigurationSnapshot $snapshot): array
+    {
+        $snapshot->loadMissing('fieldDefinitions');
+        $header = [];
+        $position = [];
+        foreach ($snapshot->fieldDefinitions as $def) {
+            $meta = [
+                'field_type' => $def->field_type->value,
+                'max_length' => $this->maxLengthForDefinition($def),
+                'label' => $def->label,
+                'required' => (bool) $def->required,
+                'visible' => (bool) $def->visible,
+            ];
+            if ($def->scope === FieldScope::Header) {
+                $header[$def->key] = $meta;
+            } elseif ($def->scope === FieldScope::Position) {
+                $position[$def->key] = $meta;
+            }
+        }
+
+        return ['header' => $header, 'position' => $position];
+    }
+
+    /**
+     * @return array{
+     *     header: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>,
+     *     position: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
+     * }
+     */
+    private function schemaFromActiveCalculationSet(): array
+    {
+        $set = FieldSet::query()
+            ->where('key', ConfigurationSnapshotMaterializer::SYSTEM_CALCULATION_CORE_KEY)
+            ->with(['activeVersion.fields.revision.definition'])
+            ->first();
+
+        $header = [];
+        $position = [];
+        foreach ($set?->activeVersion->fields ?? [] as $membership) {
+            $revision = $membership->revision;
+            $definition = $revision?->definition;
+            if ($revision === null || $definition === null) {
+                continue;
+            }
+            $validation = is_array($revision->validation_json) ? $revision->validation_json : [];
+            $max = isset($validation['max_length']) ? (int) $validation['max_length'] : (
+                $definition->field_type === FieldType::ShortText ? 255 : 20000
+            );
+            $meta = [
+                'field_type' => $definition->field_type->value,
+                'max_length' => $max,
+                'label' => $revision->label,
+                'required' => SnapshotFieldDefinition::effectiveRequired($membership->required_override),
+                'visible' => SnapshotFieldDefinition::effectiveVisible($membership->visible_override),
+            ];
+            if ($definition->scope === FieldScope::Header) {
+                $header[$definition->key] = $meta;
+            } elseif ($definition->scope === FieldScope::Position) {
+                $position[$definition->key] = $meta;
+            }
+        }
+
+        if ($header === [] && $position === []) {
+            $header = [
+                'campaign_period' => [
+                    'field_type' => FieldType::Period->value,
+                    'max_length' => 0,
+                    'label' => 'Kampagnenzeitraum',
+                    'required' => false,
+                    'visible' => true,
+                ],
+            ];
+            $position = [
+                'period_open' => [
+                    'field_type' => FieldType::Boolean->value,
+                    'max_length' => 0,
+                    'label' => 'Zeitraum offen',
+                    'required' => false,
+                    'visible' => true,
+                ],
+                'position_flight_period' => [
+                    'field_type' => FieldType::Period->value,
+                    'max_length' => 0,
+                    'label' => 'Flugzeitraum',
+                    'required' => false,
+                    'visible' => true,
+                ],
+            ];
+        }
+
+        return ['header' => $header, 'position' => $position];
+    }
+
+    private function maxLengthForDefinition(SnapshotFieldDefinition $def): int
+    {
+        $fromJson = is_array($def->validation_json) ? ($def->validation_json['max_length'] ?? null) : null;
+        if (is_numeric($fromJson)) {
+            return (int) $fromJson;
+        }
+
+        return $def->field_type === FieldType::ShortText ? 255 : 20000;
     }
 
     private function validateDynamicPeriods(Validator $validator): void

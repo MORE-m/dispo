@@ -12,6 +12,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderFieldValue;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
+use App\Models\FieldDefinition;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -83,12 +84,14 @@ final class DispoOrderDynamicFieldWriter
         }
 
         $headerFromCalc = $this->calculationFields->headerValuesForPayload($calculation);
+        $calcSnapshot = $calculation->configurationSnapshot;
         $this->persistHeaderPeriod(
             $order,
             $snapshot,
             'campaign_period',
             $headerFromCalc['campaign_period'] ?? null,
         );
+        $this->captureCalcOriginHeaderTexts($order, $snapshot, $calcSnapshot, $headerFromCalc);
 
         $order->loadMissing('positions');
         $positionsByCalcId = $order->positions->keyBy('calculation_position_id');
@@ -140,7 +143,7 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @param  array{billing_special_features?: mixed, disposition_notes?: mixed}  $input
+     * @param  array<string, mixed>  $input
      */
     public function updateDraftTexts(
         DispoOrder $order,
@@ -169,16 +172,12 @@ final class DispoOrderDynamicFieldWriter
             $normalized = $this->normalizeTextInput($snapshot, $input);
             $changed = false;
 
-            foreach (DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS as $key) {
-                if (! array_key_exists($key, $normalized)) {
-                    continue;
-                }
-                $newValue = $normalized[$key];
+            foreach ($normalized as $key => $newValue) {
                 $oldValue = $before[$key] ?? null;
                 if ($oldValue === $newValue) {
                     continue;
                 }
-                $this->upsertTextValue($locked, $snapshot, $key, $newValue);
+                $this->upsertHeaderTextValue($locked, $snapshot, $key, $newValue);
                 $changed = true;
             }
 
@@ -322,6 +321,27 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
+        $errors = [];
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if (! $def->required || ! $def->visible) {
+                continue;
+            }
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+            if ($this->isCalcOriginKey($snapshot, $def->key)) {
+                continue;
+            }
+
+            $raw = $this->readHeaderValue($order, $def);
+            if ($raw === null || $raw === '') {
+                $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
+            }
+        }
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
         $headerValues = $this->headerValuesForValidation($order, $snapshot);
         $positionContexts = [];
         foreach ($order->positions->values() as $index => $position) {
@@ -342,21 +362,54 @@ final class DispoOrderDynamicFieldWriter
         $snapshot = $order->configurationSnapshot;
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
+        $systemByDefinitionId = FieldDefinition::query()
+            ->whereIn('id', $snapshot->fieldDefinitions->pluck('field_definition_id')->unique()->all())
+            ->pluck('is_system', 'id');
+
+        $fields = array_values($snapshot->fieldDefinitions->map(fn (SnapshotFieldDefinition $def): array => [
+            'key' => $def->key,
+            'label' => $def->label,
+            'help_text' => $def->help_text,
+            'field_type' => $def->field_type->value,
+            'scope' => $def->scope->value,
+            'sort' => $def->sort,
+            'group_key' => $def->group_key,
+            'applies_to' => $def->applies_to->value,
+            'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+            'required' => (bool) $def->required,
+            'visible' => (bool) $def->visible,
+            'editable' => $this->isNativeEditableHeaderText($snapshot, $def),
+            'calc_origin' => $this->isCalcOriginKey($snapshot, $def->key),
+            'max_length' => $this->maxLengthForDefinition($def),
+            'validation_json' => $def->validation_json,
+        ])->all());
+
+        $editableCustom = array_values(array_filter(
+            $fields,
+            fn (array $field): bool => ! $field['is_system']
+                && $field['editable'] === true
+                && $field['visible'] === true
+                && $field['scope'] === FieldScope::Header->value
+                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+        ));
+        $calcOriginCustom = array_values(array_filter(
+            $fields,
+            fn (array $field): bool => ! $field['is_system']
+                && $field['calc_origin'] === true
+                && $field['visible'] === true
+                && $field['scope'] === FieldScope::Header->value
+                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+        ));
+
         return [
-            'fields' => array_values($snapshot->fieldDefinitions->map(fn (SnapshotFieldDefinition $def): array => [
-                'key' => $def->key,
-                'label' => $def->label,
-                'help_text' => $def->help_text,
-                'field_type' => $def->field_type->value,
-                'scope' => $def->scope->value,
-                'sort' => $def->sort,
-                'group_key' => $def->group_key,
-            ])->all()),
+            'fields' => $fields,
             'rules' => array_values($snapshot->rules->map(fn ($rule): array => [
                 'sort' => $rule->sort,
                 'condition' => $rule->condition_json,
                 'action' => $rule->action_json,
             ])->all()),
+            'editable_custom_header_fields' => $editableCustom,
+            'calc_origin_custom_header_fields' => $calcOriginCustom,
         ];
     }
 
@@ -436,29 +489,58 @@ final class DispoOrderDynamicFieldWriter
         $predecessor->loadMissing(['fieldValues.snapshotFieldDefinition', 'configurationSnapshot.fieldDefinitions']);
         $predSnapshot = $predecessor->configurationSnapshot;
 
-        foreach (DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS as $key) {
-            $newDef = $snapshot->fieldDefinitions->firstWhere('key', $key);
-            if ($newDef === null || $newDef->field_type !== FieldType::LongText) {
-                throw new RuntimeException(
-                    "Neuer Snapshot fehlt kompatibles Textfeld „{$key}“.",
-                );
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $newDef) {
+            if (! $this->isNativeEditableHeaderText($snapshot, $newDef)) {
+                continue;
             }
 
-            $predDef = $predSnapshot->fieldDefinitions->firstWhere('key', $key);
-            if ($predDef === null || $predDef->field_type !== FieldType::LongText) {
-                throw new RuntimeException(
-                    "Vorgänger-Snapshot fehlt kompatibles Textfeld „{$key}“.",
-                );
+            $predDef = $predSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
+            if ($predDef === null
+                || ! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
             }
 
             $predValue = $predecessor->fieldValues
                 ->firstWhere('snapshot_field_definition_id', $predDef->id);
-            $text = $predValue?->value_text;
+            $text = $predDef->field_type === FieldType::ShortText
+                ? $predValue?->value_string
+                : $predValue?->value_text;
             if ($text === null || trim($text) === '') {
                 continue;
             }
 
-            $this->upsertTextValue($order, $snapshot, $key, $text);
+            $this->upsertHeaderTextValue($order, $snapshot, $newDef->key, $text);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $headerFromCalc
+     */
+    private function captureCalcOriginHeaderTexts(
+        DispoOrder $order,
+        ConfigurationSnapshot $snapshot,
+        ConfigurationSnapshot $calcSnapshot,
+        array $headerFromCalc,
+    ): void {
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if ($def->key === 'campaign_period') {
+                continue;
+            }
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+            if (! $this->isCalcOriginKey($snapshot, $def->key, $calcSnapshot)) {
+                continue;
+            }
+
+            $raw = $headerFromCalc[$def->key] ?? null;
+            $value = null;
+            if (is_string($raw)) {
+                $trimmed = trim($raw);
+                $value = $trimmed === '' ? null : $trimmed;
+            }
+
+            $this->upsertHeaderTextValue($order, $snapshot, $def->key, $value);
         }
     }
 
@@ -468,12 +550,18 @@ final class DispoOrderDynamicFieldWriter
      */
     private function normalizeTextInput(ConfigurationSnapshot $snapshot, array $input): array
     {
-        $allowed = array_fill_keys(DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS, true);
+        $editableKeys = [];
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if ($this->isNativeEditableHeaderText($snapshot, $def)) {
+                $editableKeys[$def->key] = $def;
+            }
+        }
+
         $errors = [];
 
         foreach (array_keys($input) as $key) {
             $key = (string) $key;
-            if (! isset($allowed[$key])) {
+            if (! isset($editableKeys[$key])) {
                 if ($snapshot->fieldDefinitions->firstWhere('key', $key) !== null) {
                     $errors["dynamic_field_values.{$key}"] = 'Dieses Feld ist im Dispoauftrag nicht bearbeitbar.';
                 } else {
@@ -483,14 +571,8 @@ final class DispoOrderDynamicFieldWriter
         }
 
         $normalized = [];
-        foreach (DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS as $key) {
+        foreach ($editableKeys as $key => $def) {
             if (! array_key_exists($key, $input)) {
-                continue;
-            }
-            $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
-            if ($def === null) {
-                $errors["dynamic_field_values.{$key}"] = 'Snapshot-Definition fehlt.';
-
                 continue;
             }
             $raw = $input[$key];
@@ -503,9 +585,10 @@ final class DispoOrderDynamicFieldWriter
             if ($value === '') {
                 $value = null;
             }
-            if ($value !== null && mb_strlen($value) > 20000) {
+            $maxLength = $this->maxLengthForDefinition($def);
+            if ($value !== null && mb_strlen($value) > $maxLength) {
                 $errors["dynamic_field_values.{$key}"] =
-                    $def->label.' darf höchstens 20000 Zeichen haben.';
+                    $def->label." darf höchstens {$maxLength} Zeichen haben.";
 
                 continue;
             }
@@ -519,7 +602,7 @@ final class DispoOrderDynamicFieldWriter
         return $normalized;
     }
 
-    private function upsertTextValue(
+    private function upsertHeaderTextValue(
         DispoOrder $order,
         ConfigurationSnapshot $snapshot,
         string $key,
@@ -534,10 +617,60 @@ final class DispoOrderDynamicFieldWriter
             'dispo_order_id' => $order->id,
             'snapshot_field_definition_id' => $def->id,
         ]);
-        $row->value_text = $value;
+        $row->value_string = $def->field_type === FieldType::ShortText ? $value : null;
+        $row->value_text = $def->field_type === FieldType::LongText ? $value : null;
         $row->value_period_start = null;
         $row->value_period_end = null;
         $row->save();
+    }
+
+    private function isNativeEditableHeaderText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
+    {
+        if ($def->scope !== FieldScope::Header) {
+            return false;
+        }
+        if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            return false;
+        }
+
+        return ! $this->isCalcOriginKey($snapshot, $def->key);
+    }
+
+    private function isCalcOriginKey(
+        ConfigurationSnapshot $dispoSnapshot,
+        string $key,
+        ?ConfigurationSnapshot $calcSnapshot = null,
+    ): bool {
+        if (in_array($key, DispoConfigurationSnapshotComposer::CALC_ORIGIN_KEYS, true)) {
+            return true;
+        }
+
+        if ($calcSnapshot === null) {
+            $sourceId = $dispoSnapshot->source_configuration_snapshot_id;
+            if ($sourceId === null) {
+                return false;
+            }
+            $calcSnapshot = ConfigurationSnapshot::query()
+                ->with('fieldDefinitions')
+                ->find($sourceId);
+            if ($calcSnapshot === null) {
+                return false;
+            }
+        } else {
+            $calcSnapshot->loadMissing('fieldDefinitions');
+        }
+
+        return $calcSnapshot->fieldDefinitions->contains('key', $key);
+    }
+
+    private function maxLengthForDefinition(SnapshotFieldDefinition $def): int
+    {
+        $fromJson = is_array($def->validation_json) ? ($def->validation_json['max_length'] ?? null) : null;
+        if (is_numeric($fromJson)) {
+            return (int) $fromJson;
+        }
+
+        return $def->field_type === FieldType::ShortText ? 255 : 20000;
     }
 
     private function persistHeaderPeriod(
@@ -712,7 +845,15 @@ final class DispoOrderDynamicFieldWriter
             ];
         }
 
-        return $row->value_text;
+        if ($def->field_type === FieldType::ShortText) {
+            return $row->value_string;
+        }
+
+        if ($def->field_type === FieldType::LongText) {
+            return $row->value_text;
+        }
+
+        return null;
     }
 
     private function readPositionValue(DispoOrderPosition $position, SnapshotFieldDefinition $def): mixed
@@ -858,9 +999,15 @@ final class DispoOrderDynamicFieldWriter
     {
         $order->loadMissing('fieldValues.snapshotFieldDefinition');
         $out = [];
-        foreach (DispoConfigurationSnapshotComposer::DISPO_TEXT_KEYS as $key) {
-            $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
-            $out[$key] = $def === null ? null : $this->readHeaderValue($order, $def);
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+            if (! $this->isNativeEditableHeaderText($snapshot, $def)
+                && ! $this->isCalcOriginKey($snapshot, $def->key)) {
+                continue;
+            }
+            $out[$def->key] = $this->readHeaderValue($order, $def);
         }
 
         return $out;

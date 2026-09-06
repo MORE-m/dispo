@@ -63,6 +63,27 @@ Erster technischer Teilslice von DF-3 – **kein Abschluss von DF-3**.
 - Bewusst nicht in DF-3.1: Custom Fields, Optionen, Assignments, Regel-Editor,
   neue Feldtypen, Provenance-Mehrquellen.
 
+## Umsetzungsstand DF-3.2a (Custom Header-Textfelder)
+
+Zweiter Teilslice von DF-3 auf Feature-Branch
+`feat/df3-2a-custom-header-text-fields` – **DF-3 bleibt unvollständig**.
+
+- Custom-Definitionen: nur `short_text` / `long_text`, Scope fest `header`,
+  `applies_to` calculation|dispo_order|both; Key aus Label (vor Save
+  editierbar), danach unveränderlich.
+- `max_length` in `validation_json`: short_text max. 255, long_text max. 20000;
+  Speicher Calc/Dispo Header-Text als MEDIUMTEXT bzw. erweiterte String-Spalte.
+- Admin: Index System vs. Eigene Felder; Anlegen; Show mit struktureller
+  Änderung solange unbenutzt, sonst Revision; Deaktivieren/Reaktivieren/Löschen
+  mit `lock_version` und deutscher 409-Meldung.
+- Kern-Feldset-Draft: aktive Custom-Header mit passendem `applies_to`
+  hinzufügen/entfernen; Positions-Memberships abgelehnt (DF-3.2b).
+- Runtime: Kalkulations-Wizard Abschnitt „Weitere Angaben“; Dispo-Show
+  editierbare native Custom-Header sowie Calc-origin Custom read-only
+  „Aus Kalkulation“.
+- Bewusst später: DF-3.2b Position-Custom-Felder, Optionen, Assignments,
+  Regel-Editor.
+
 ## Konfigurationsebenen
 
 ```mermaid

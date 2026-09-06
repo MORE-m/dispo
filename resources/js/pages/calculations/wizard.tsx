@@ -23,6 +23,10 @@ import {
     money,
     moneyDeduction,
 } from '@/components/form-field';
+import {
+    SchemaTextFields,
+    customHeaderTextFieldsFromSchema,
+} from '@/components/dynamic-fields/schema-text-fields';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
     emptyTimeRange,
@@ -115,6 +119,10 @@ type FieldSchema = {
         help_text: string | null;
         scope: string;
         sort: number;
+        is_system?: boolean;
+        required?: boolean;
+        max_length?: number | null;
+        validation_json?: { max_length?: number } | null;
     }>;
     rules: Array<{
         condition: { op?: string; field_key?: string; value?: unknown };
@@ -252,7 +260,7 @@ type SavedCalculation = {
     target_budget_nn: string | null;
     budget_strategy: string | null;
     budget_proposal_status?: string | null;
-    dynamic_field_values?: {
+    dynamic_field_values?: Record<string, unknown> & {
         campaign_period?: PeriodValue;
     };
     order_discounts?: Array<{
@@ -532,6 +540,26 @@ export default function CalculationWizard({
     const [campaignPeriodEnd, setCampaignPeriodEnd] = useState(
         calculation?.dynamic_field_values?.campaign_period?.end ?? '',
     );
+    const customHeaderFields = useMemo(
+        () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
+        [fieldSchema.fields],
+    );
+    const [customHeaderValues, setCustomHeaderValues] = useState<
+        Record<string, string>
+    >(() => {
+        const initial: Record<string, string> = {};
+        const stored = calculation?.dynamic_field_values ?? {};
+        for (const field of customHeaderTextFieldsFromSchema(
+            fieldSchema.fields,
+        )) {
+            const raw = stored[field.key];
+            initial[field.key] =
+                typeof raw === 'string' || typeof raw === 'number'
+                    ? String(raw)
+                    : '';
+        }
+        return initial;
+    });
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -665,6 +693,12 @@ export default function CalculationWizard({
                               end: campaignPeriodEnd || null,
                           }
                         : null,
+                ...Object.fromEntries(
+                    customHeaderFields.map((field) => [
+                        field.key,
+                        customHeaderValues[field.key] ?? '',
+                    ]),
+                ),
             },
             order_discount_percent: '0',
             order_discounts: payloadDiscounts(orderDiscounts),
@@ -754,6 +788,8 @@ export default function CalculationWizard({
             briefing,
             campaignPeriodStart,
             campaignPeriodEnd,
+            customHeaderFields,
+            customHeaderValues,
             orderDiscounts,
             aeEnabled,
             targetBudget,
@@ -792,7 +828,11 @@ export default function CalculationWizard({
         blocked: busy || proposalLoading,
     });
     const error = previewError ?? saveError ?? proposalError;
+    const pageValidationErrors = mapValidationErrors(
+        (usePage().props.errors ?? {}) as Record<string, string | string[]>,
+    );
     const fieldErrors = {
+        ...pageValidationErrors,
         ...previewFieldErrors,
         ...saveFieldErrors,
     };
@@ -886,7 +926,7 @@ export default function CalculationWizard({
             : '/kalkulationen';
 
         const options = {
-            preserveState: false,
+            preserveState: true,
             preserveScroll: true,
             onFinish: () => setBusy(false),
             onError: (errors: Record<string, string | string[]>) => {
@@ -1406,6 +1446,31 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         </FormField>
+                                        {customHeaderFields.length > 0 ? (
+                                            <div
+                                                className="space-y-3 sm:col-span-2"
+                                                data-test="calculation-custom-header-fields"
+                                            >
+                                                <h3 className="text-sm font-semibold">
+                                                    Weitere Angaben
+                                                </h3>
+                                                <SchemaTextFields
+                                                    fields={customHeaderFields}
+                                                    values={customHeaderValues}
+                                                    errors={fieldErrors}
+                                                    disabled={!canEdit}
+                                                    idPrefix="calc-custom"
+                                                    onChange={(key, value) =>
+                                                        setCustomHeaderValues(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: value,
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        ) : null}
                                         <FormField
                                             label="Zielbudget N/N"
                                             htmlFor="budget"

@@ -39,6 +39,14 @@ class FieldSetVersionField extends Model
     }
 
     /**
+     * @return BelongsTo<FieldSetVersion, $this>
+     */
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(FieldSetVersion::class, 'field_set_version_id');
+    }
+
+    /**
      * @return BelongsTo<FieldDefinition, $this>
      */
     public function definition(): BelongsTo

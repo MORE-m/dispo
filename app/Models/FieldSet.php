@@ -19,7 +19,6 @@ class FieldSet extends Model
         'key',
         'name',
         'active_version_id',
-        'lock_version',
     ];
 
     /**

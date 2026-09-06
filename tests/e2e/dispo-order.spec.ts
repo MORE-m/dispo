@@ -55,7 +55,7 @@ test('Vertrieb legt Dispoauftrag aus Kalkulation an', async ({ page }) => {
         'Rechnung E2E',
     );
     await page.locator('[data-test="dispo-order-disposition-notes"]').fill('Dispo E2E');
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.locator('[data-test="dispo-order-save-system-notes"]').click();
     await expect(page.getByText('Dispoauftrag gespeichert.')).toBeVisible({
         timeout: 15_000,
     });

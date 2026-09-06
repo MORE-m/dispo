@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_key_protected
  * @property FieldScope $scope
  * @property FieldAppliesTo $applies_to
+ * @property bool $is_active
+ * @property int $lock_version
  * @property int|null $current_revision_id
  */
 class FieldDefinition extends Model
@@ -28,6 +30,7 @@ class FieldDefinition extends Model
         'is_key_protected',
         'scope',
         'applies_to',
+        'is_active',
         'current_revision_id',
     ];
 
@@ -42,6 +45,8 @@ class FieldDefinition extends Model
             'is_key_protected' => 'boolean',
             'scope' => FieldScope::class,
             'applies_to' => FieldAppliesTo::class,
+            'is_active' => 'boolean',
+            'lock_version' => 'integer',
         ];
     }
 
