@@ -83,6 +83,8 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
+        $this->assertSelectedCalcPositionsReadyForDispo($calculation, $selectedCalculationPositionIds);
+
         $headerFromCalc = $this->calculationFields->headerValuesForPayload($calculation);
         $calcSnapshot = $calculation->configurationSnapshot;
         $this->persistHeaderPeriod(
@@ -109,13 +111,10 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
-            $this->persistPositionValues($dispoPosition, $snapshot, $values);
+            $this->persistPositionValues($dispoPosition, $snapshot, $values, $calcSnapshot);
             $positionContexts[] = [
                 'index' => $index,
-                'values' => [
-                    'period_open' => $values['period_open'] ?? null,
-                    'position_flight_period' => $values['position_flight_period'] ?? null,
-                ],
+                'values' => $values,
             ];
             $index++;
         }
@@ -209,6 +208,136 @@ final class DispoOrderDynamicFieldWriter
         });
     }
 
+    /**
+     * Atomare Teilspeicherung nativer Positions-Custom-Textfelder (PO-32b-2).
+     *
+     * @param  array<int|string, array<string, mixed>>  $byPositionId
+     */
+    public function updateDraftPositionCustoms(
+        DispoOrder $order,
+        User $user,
+        int $expectedLockVersion,
+        array $byPositionId,
+    ): DispoOrder {
+        return DB::transaction(function () use ($order, $user, $expectedLockVersion, $byPositionId): DispoOrder {
+            $locked = DispoOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->lock_version !== $expectedLockVersion) {
+                throw new DispoOrderConflictException(
+                    'Der Dispoauftrag wurde zwischenzeitlich geändert. Bitte die Seite neu laden.',
+                );
+            }
+
+            if ($locked->status !== DispoOrderStatus::Draft) {
+                throw ValidationException::withMessages([
+                    'status' => 'Nur Entwürfe können bearbeitet werden.',
+                ]);
+            }
+
+            $snapshot = $this->requireSnapshot($locked);
+            $locked->loadMissing(['positions.fieldValues.snapshotFieldDefinition']);
+            $positionsById = $locked->positions->keyBy('id');
+            $before = $this->positionCustomValuesForAudit($locked, $snapshot);
+
+            $errors = [];
+            $changed = false;
+
+            foreach ($byPositionId as $positionId => $values) {
+                $positionId = (int) $positionId;
+                $position = $positionsById->get($positionId);
+                if ($position === null) {
+                    $errors["position_dynamic_field_values.{$positionId}"] = 'Unbekannte Position.';
+
+                    continue;
+                }
+
+                $editableKeys = [];
+                foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                    if ($this->isNativeEditablePositionText($snapshot, $def)) {
+                        $editableKeys[$def->key] = $def;
+                    }
+                }
+
+                foreach (array_keys($values) as $key) {
+                    $key = (string) $key;
+                    if (! isset($editableKeys[$key])) {
+                        if ($this->isCalcOriginKey($snapshot, $key)) {
+                            $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                                'Dieses Feld ist im Dispoauftrag nicht bearbeitbar.';
+                        } elseif ($snapshot->fieldDefinitions->firstWhere('key', $key) !== null) {
+                            $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                                'Dieses Feld ist im Dispoauftrag nicht bearbeitbar.';
+                        } else {
+                            $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                                'Unbekanntes dynamisches Feld.';
+                        }
+                    }
+                }
+
+                foreach ($editableKeys as $key => $def) {
+                    if (! array_key_exists($key, $values)) {
+                        continue;
+                    }
+                    $raw = $values[$key];
+                    if ($raw !== null && ! is_string($raw) && ! is_numeric($raw)) {
+                        $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                            $def->label.' muss Text sein.';
+
+                        continue;
+                    }
+                    $value = $raw === null ? null : trim((string) $raw);
+                    if ($value === '') {
+                        $value = null;
+                    }
+                    $maxLength = $this->maxLengthForDefinition($def);
+                    if ($value !== null && mb_strlen($value) > $maxLength) {
+                        $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                            $def->label." darf höchstens {$maxLength} Zeichen haben.";
+
+                        continue;
+                    }
+
+                    $old = $this->readPositionValue($position, $def);
+                    if ($old === $value) {
+                        continue;
+                    }
+                    $this->upsertPositionTextValue($position, $snapshot, $key, $value);
+                    $changed = true;
+                }
+            }
+
+            if ($errors !== []) {
+                throw ValidationException::withMessages($errors);
+            }
+
+            if (! $changed) {
+                return $this->reloadOrder($locked);
+            }
+
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $fresh = $this->reloadOrder($locked);
+            $after = $this->positionCustomValuesForAudit($fresh, $snapshot);
+
+            $this->audit->record(
+                $fresh,
+                'dispo_order.updated',
+                $user,
+                [
+                    'lock_version' => $expectedLockVersion,
+                    'position_dynamic_field_values' => $before,
+                ],
+                [
+                    'lock_version' => $fresh->lock_version,
+                    'position_dynamic_field_values' => $after,
+                ],
+            );
+
+            return $fresh;
+        });
+    }
+
     public function syncMissingCalculationFields(
         DispoOrder $order,
         User $user,
@@ -267,11 +396,19 @@ final class DispoOrderDynamicFieldWriter
                     continue;
                 }
                 $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
-                foreach (['period_open', 'position_flight_period'] as $key) {
-                    if ($this->hasPositionValue($dispoPosition, $snapshot, $key)) {
+                foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                    if (! $this->isCalcOriginKey($snapshot, $def->key, $calcSnapshot)) {
                         continue;
                     }
-                    $this->persistSinglePositionValue($dispoPosition, $snapshot, $key, $values[$key] ?? null);
+                    if ($this->hasPositionValue($dispoPosition, $snapshot, $def->key)) {
+                        continue;
+                    }
+                    $this->persistPositionFieldValue(
+                        $dispoPosition,
+                        $snapshot,
+                        $def->key,
+                        $values[$def->key] ?? null,
+                    );
                     $changed = true;
                 }
             }
@@ -338,6 +475,25 @@ final class DispoOrderDynamicFieldWriter
                 $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
             }
         }
+        foreach ($order->positions as $position) {
+            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                if (! $def->required || ! $def->visible) {
+                    continue;
+                }
+                if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                    continue;
+                }
+                if ($this->isCalcOriginKey($snapshot, $def->key)) {
+                    continue;
+                }
+
+                $raw = $this->readPositionValue($position, $def);
+                if ($raw === null || $raw === '') {
+                    $errors["position_dynamic_field_values.{$position->id}.{$def->key}"] =
+                        $def->label.' ist erforderlich.';
+                }
+            }
+        }
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
@@ -378,7 +534,9 @@ final class DispoOrderDynamicFieldWriter
             'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
             'required' => (bool) $def->required,
             'visible' => (bool) $def->visible,
-            'editable' => $this->isNativeEditableHeaderText($snapshot, $def),
+            'editable' => $def->scope === FieldScope::Header
+                ? $this->isNativeEditableHeaderText($snapshot, $def)
+                : $this->isNativeEditablePositionText($snapshot, $def),
             'calc_origin' => $this->isCalcOriginKey($snapshot, $def->key),
             'max_length' => $this->maxLengthForDefinition($def),
             'validation_json' => $def->validation_json,
@@ -400,6 +558,22 @@ final class DispoOrderDynamicFieldWriter
                 && $field['scope'] === FieldScope::Header->value
                 && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
         ));
+        $editableCustomPosition = array_values(array_filter(
+            $fields,
+            fn (array $field): bool => ! $field['is_system']
+                && $field['editable'] === true
+                && $field['visible'] === true
+                && $field['scope'] === FieldScope::Position->value
+                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+        ));
+        $calcOriginCustomPosition = array_values(array_filter(
+            $fields,
+            fn (array $field): bool => ! $field['is_system']
+                && $field['calc_origin'] === true
+                && $field['visible'] === true
+                && $field['scope'] === FieldScope::Position->value
+                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+        ));
 
         return [
             'fields' => $fields,
@@ -410,6 +584,8 @@ final class DispoOrderDynamicFieldWriter
             ])->all()),
             'editable_custom_header_fields' => $editableCustom,
             'calc_origin_custom_header_fields' => $calcOriginCustom,
+            'editable_custom_position_fields' => $editableCustomPosition,
+            'calc_origin_custom_position_fields' => $calcOriginCustomPosition,
         ];
     }
 
@@ -636,6 +812,63 @@ final class DispoOrderDynamicFieldWriter
         return ! $this->isCalcOriginKey($snapshot, $def->key);
     }
 
+    private function isNativeEditablePositionText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
+    {
+        if ($def->scope !== FieldScope::Position) {
+            return false;
+        }
+        if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            return false;
+        }
+
+        return ! $this->isCalcOriginKey($snapshot, $def->key);
+    }
+
+    /**
+     * @param  list<int>  $selectedCalculationPositionIds
+     */
+    private function assertSelectedCalcPositionsReadyForDispo(
+        Calculation $calculation,
+        array $selectedCalculationPositionIds,
+    ): void {
+        $calcSnapshot = $calculation->configurationSnapshot;
+        if ($calcSnapshot === null) {
+            return;
+        }
+        $calcSnapshot->loadMissing('fieldDefinitions');
+        $calcPositions = $calculation->positions->keyBy('id');
+
+        $requiredDefs = $calcSnapshot->fieldDefinitions
+            ->where('scope', FieldScope::Position)
+            ->filter(fn (SnapshotFieldDefinition $def): bool => $def->required
+                && $def->visible
+                && in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true));
+
+        if ($requiredDefs->isEmpty()) {
+            return;
+        }
+
+        $errors = [];
+        foreach ($selectedCalculationPositionIds as $index => $calcPositionId) {
+            $calcPosition = $calcPositions->get($calcPositionId);
+            if ($calcPosition === null) {
+                continue;
+            }
+            $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
+            foreach ($requiredDefs as $def) {
+                $raw = $values[$def->key] ?? null;
+                if ($raw === null || $raw === '') {
+                    $errors["positions.{$index}.dynamic_field_values.{$def->key}"] =
+                        $def->label.' ist erforderlich.';
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
     private function isCalcOriginKey(
         ConfigurationSnapshot $dispoSnapshot,
         string $key,
@@ -710,13 +943,17 @@ final class DispoOrderDynamicFieldWriter
         DispoOrderPosition $position,
         ConfigurationSnapshot $snapshot,
         array $values,
+        ?ConfigurationSnapshot $calcSnapshot = null,
     ): void {
-        foreach (['period_open', 'position_flight_period'] as $key) {
-            $this->persistSinglePositionValue($position, $snapshot, $key, $values[$key] ?? null);
+        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+            if (! $this->isCalcOriginKey($snapshot, $def->key, $calcSnapshot)) {
+                continue;
+            }
+            $this->persistPositionFieldValue($position, $snapshot, $def->key, $values[$def->key] ?? null);
         }
     }
 
-    private function persistSinglePositionValue(
+    private function persistPositionFieldValue(
         DispoOrderPosition $position,
         ConfigurationSnapshot $snapshot,
         string $key,
@@ -727,20 +964,38 @@ final class DispoOrderDynamicFieldWriter
             throw new RuntimeException("Snapshot-Definition {$key} fehlt.");
         }
 
-        if ($key === 'period_open') {
-            if (! is_bool($raw)) {
+        if ($def->field_type === FieldType::Boolean || $key === 'period_open') {
+            if ($key === 'period_open' && ! is_bool($raw)) {
                 throw ValidationException::withMessages([
                     'dynamic_field_values.period_open' => 'Zeitraum offen muss gesetzt sein.',
+                ]);
+            }
+            if ($raw !== null && ! is_bool($raw)) {
+                throw ValidationException::withMessages([
+                    "dynamic_field_values.{$key}" => 'Boolean-Wert ungültig.',
                 ]);
             }
             $row = DispoOrderPositionFieldValue::query()->firstOrNew([
                 'dispo_order_position_id' => $position->id,
                 'snapshot_field_definition_id' => $def->id,
             ]);
-            $row->value_boolean = $raw;
+            $row->value_boolean = is_bool($raw) ? $raw : null;
+            $row->value_string = null;
+            $row->value_text = null;
             $row->value_period_start = null;
             $row->value_period_end = null;
             $row->save();
+
+            return;
+        }
+
+        if (in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            $value = null;
+            if (is_string($raw) || is_numeric($raw)) {
+                $trimmed = trim((string) $raw);
+                $value = $trimmed === '' ? null : $trimmed;
+            }
+            $this->upsertPositionTextValue($position, $snapshot, $key, $value);
 
             return;
         }
@@ -774,8 +1029,33 @@ final class DispoOrderDynamicFieldWriter
             'snapshot_field_definition_id' => $def->id,
         ]);
         $row->value_boolean = null;
+        $row->value_string = null;
+        $row->value_text = null;
         $row->value_period_start = $start !== null ? Carbon::parse((string) $start)->toDateString() : null;
         $row->value_period_end = $end !== null ? Carbon::parse((string) $end)->toDateString() : null;
+        $row->save();
+    }
+
+    private function upsertPositionTextValue(
+        DispoOrderPosition $position,
+        ConfigurationSnapshot $snapshot,
+        string $key,
+        ?string $value,
+    ): void {
+        $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+        if ($def === null) {
+            throw new RuntimeException("Snapshot-Definition {$key} fehlt.");
+        }
+
+        $row = DispoOrderPositionFieldValue::query()->firstOrNew([
+            'dispo_order_position_id' => $position->id,
+            'snapshot_field_definition_id' => $def->id,
+        ]);
+        $row->value_string = $def->field_type === FieldType::ShortText ? $value : null;
+        $row->value_text = $def->field_type === FieldType::LongText ? $value : null;
+        $row->value_boolean = null;
+        $row->value_period_start = null;
+        $row->value_period_end = null;
         $row->save();
     }
 
@@ -862,21 +1142,18 @@ final class DispoOrderDynamicFieldWriter
         if ($row === null) {
             return null;
         }
-        if ($def->field_type === FieldType::Boolean) {
-            return $row->value_boolean;
-        }
-        if ($def->field_type === FieldType::Period) {
-            if ($row->value_period_start === null && $row->value_period_end === null) {
-                return null;
-            }
 
-            return [
-                'start' => $this->dateToString($row->value_period_start),
-                'end' => $this->dateToString($row->value_period_end),
-            ];
-        }
-
-        return null;
+        return match ($def->field_type) {
+            FieldType::Boolean => $row->value_boolean,
+            FieldType::Period => ($row->value_period_start === null && $row->value_period_end === null)
+                ? null
+                : [
+                    'start' => $this->dateToString($row->value_period_start),
+                    'end' => $this->dateToString($row->value_period_end),
+                ],
+            FieldType::ShortText => $row->value_string,
+            FieldType::LongText => $row->value_text,
+        };
     }
 
     private function dateToString(mixed $value): ?string
@@ -1035,6 +1312,32 @@ final class DispoOrderDynamicFieldWriter
         }
 
         return ['header' => $header, 'positions' => $positions];
+    }
+
+    /**
+     * @return array<int, array<string, string|null>>
+     */
+    private function positionCustomValuesForAudit(DispoOrder $order, ConfigurationSnapshot $snapshot): array
+    {
+        $order->loadMissing('positions.fieldValues.snapshotFieldDefinition');
+        $out = [];
+        foreach ($order->positions as $position) {
+            $values = [];
+            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                    continue;
+                }
+                if (! $this->isNativeEditablePositionText($snapshot, $def)
+                    && ! $this->isCalcOriginKey($snapshot, $def->key)) {
+                    continue;
+                }
+                $raw = $this->readPositionValue($position, $def);
+                $values[$def->key] = is_string($raw) || $raw === null ? $raw : (string) $raw;
+            }
+            $out[(int) $position->id] = $values;
+        }
+
+        return $out;
     }
 
     private function reloadOrder(DispoOrder $order): DispoOrder

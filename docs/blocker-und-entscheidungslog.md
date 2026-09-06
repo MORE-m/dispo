@@ -47,13 +47,14 @@ Keine stillschweigenden ADR-Änderungen.
 | 04.09.2026 | DF-2 Capture-Zeilen | Calc-origin-Felder erhalten bei Create/Revision immer Value-Zeilen (auch bei bewusst leerem optionalem Zeitraum). Legacy-Backfill ohne Dyn-Werte; fehlende Zeile = historisch nicht erfasst; Draft-Sync füllt nur fehlende Capture-Zeilen. `dispo_orders.configuration_snapshot_id` nach Backfill NOT NULL | VER-004, DF-2 Review |
 | 04.09.2026 | DF-3.1 Admin-Teilfreigabe | UX-GATE-D „Administration dynamischer Felder“; Vorschau statisch mit Beispielwerten; Regeln in DF-3.1 nur lesbar; DF-3.1 ist erster Teilslice, kein Abschluss von DF-3 | DYN-001/003, VER-005/006, ADM-001/002, PO DF-3 |
 | 04.09.2026 | DF-3.2a Custom Header-Text | Custom nur Header short/long_text; max_length bis 20000 (MEDIUMTEXT); Key vor Save editierbar; Membership Position abgelehnt (DF-3.2b später); DF-3 bleibt unvollständig | DYN-001, ADM-001, DF-3.2a |
+| 06.09.2026 | DF-3.2b Position-Custom (PO-32b-1…4) | **PO-32b-1:** Pflicht-Vollständigkeit nur bei Dispo-Create/Revision aus Calc, nicht bei Calc-Store/Update, Budget-Apply, Re-Optimize. **PO-32b-2:** atomarer Partial-Save nativer Positions-Customs. **PO-32b-3:** Calc-Origin über Source-Snapshot (`source_configuration_snapshot_id` + Key), kein neues Provenance-Flag; Capture bleibt nach Wegfall der Calc-Position erkennbar/read-only. **PO-32b-4:** both wie DF-3.2a. E2E isoliert (`playwright.df32b.config.ts`). DF-3 bleibt unvollständig | DYN-001, VER-004, DF-3.2b |
 
 ## Offene Blocker
 
 | ID | Betrifft | Beschreibung | Wirkung |
 |---|---|---|---|
 | BLK-005 | UX-GATE-C | Trailer/SWF, Influencer, Social Media und weitere Werbeelement-Oberflächen nicht freigegeben | Keine Fachseiten für diese Elemente |
-| BLK-006 | UX-GATE-D | Operative Disposition, Standardangebote, übrige Admin-Initialkataloge und Auswertungen nicht freigegeben. Teilfreigaben: Dispo/Vier-Augen; Dynamische-Felder-Admin (DF-3.1/DF-3.2a). | Nur Sperrzustände für nicht freigegebene Module |
+| BLK-006 | UX-GATE-D | Operative Disposition, Standardangebote, übrige Admin-Initialkataloge und Auswertungen nicht freigegeben. Teilfreigaben: Dispo/Vier-Augen; Dynamische-Felder-Admin (DF-3.1/DF-3.2a/b). | Nur Sperrzustände für nicht freigegebene Module |
 | BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung; UI zeigt Leerzustände |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
 

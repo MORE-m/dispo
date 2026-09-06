@@ -32,6 +32,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dispoauftraege', [DispoOrderController::class, 'index'])->name('dispo-orders.index');
     Route::get('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'show'])->name('dispo-orders.show');
     Route::patch('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'update'])->name('dispo-orders.update');
+    Route::patch('dispoauftraege/{dispoOrder}/positions-angaben', [DispoOrderController::class, 'updatePositionCustoms'])
+        ->name('dispo-orders.update-position-customs');
     Route::post('dispoauftraege/{dispoOrder}/sync-calculation-dynamic-fields', [DispoOrderController::class, 'syncCalculationDynamicFields'])
         ->name('dispo-orders.sync-calculation-dynamic-fields');
     Route::post('dispoauftraege/{dispoOrder}/einreichen', [DispoOrderController::class, 'submit'])

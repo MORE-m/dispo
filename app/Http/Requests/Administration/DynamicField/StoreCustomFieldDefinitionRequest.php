@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Administration\DynamicField;
 
 use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
             'label' => ['required', 'string', 'max:255'],
             'key' => ['nullable', 'string', 'max:64'],
             'field_type' => ['required', Rule::enum(FieldType::class)->only([FieldType::ShortText, FieldType::LongText])],
+            'scope' => ['required', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['required', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],
             'group_key' => ['nullable', 'string', 'max:64'],
@@ -37,6 +39,7 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
      *     label: string,
      *     key: string|null,
      *     field_type: string,
+     *     scope: string,
      *     applies_to: string,
      *     help_text: string|null,
      *     group_key: string|null,
@@ -57,6 +60,7 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
             'label' => (string) $data['label'],
             'key' => $key,
             'field_type' => (string) $data['field_type'],
+            'scope' => (string) $data['scope'],
             'applies_to' => (string) $data['applies_to'],
             'help_text' => $data['help_text'] ?? null,
             'group_key' => $data['group_key'] ?? null,

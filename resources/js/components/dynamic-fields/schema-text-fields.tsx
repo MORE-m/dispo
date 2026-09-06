@@ -16,6 +16,8 @@ type Props = {
     values: Record<string, string>;
     onChange: (key: string, value: string) => void;
     errors?: Record<string, string | string[]>;
+    /** Prefixed error keys, e.g. positions.0.dynamic_field_values */
+    errorKeyPrefixes?: string[];
     disabled?: boolean;
     idPrefix?: string;
     readOnly?: boolean;
@@ -43,6 +45,7 @@ export function SchemaTextFields({
     values,
     onChange,
     errors = {},
+    errorKeyPrefixes = ['dynamic_field_values'],
     disabled = false,
     idPrefix = 'schema-text',
     readOnly = false,
@@ -61,7 +64,9 @@ export function SchemaTextFields({
                 const id = `${idPrefix}-${field.key}`;
                 const error = firstError(
                     errors,
-                    `dynamic_field_values.${field.key}`,
+                    ...errorKeyPrefixes.map(
+                        (prefix) => `${prefix}.${field.key}`,
+                    ),
                     field.key,
                 );
                 const value = values[field.key] ?? '';
@@ -122,27 +127,30 @@ export function SchemaTextFields({
     );
 }
 
-export function customHeaderTextFieldsFromSchema(
-    fields: Array<{
-        key: string;
-        label: string;
-        help_text?: string | null;
-        field_type: string;
-        scope?: string;
-        sort?: number;
-        is_system?: boolean;
-        max_length?: number | null;
-        required?: boolean;
-        visible?: boolean;
-        validation_json?: { max_length?: number } | null;
-    }>,
+type SchemaSourceField = {
+    key: string;
+    label: string;
+    help_text?: string | null;
+    field_type: string;
+    scope?: string;
+    sort?: number;
+    is_system?: boolean;
+    max_length?: number | null;
+    required?: boolean;
+    visible?: boolean;
+    validation_json?: { max_length?: number } | null;
+};
+
+function customTextFieldsFromSchema(
+    fields: SchemaSourceField[],
+    scope: 'header' | 'position',
 ): SchemaTextField[] {
     return fields
         .filter(
             (field) =>
                 field.is_system !== true &&
                 field.visible !== false &&
-                (field.scope === undefined || field.scope === 'header') &&
+                (field.scope === undefined || field.scope === scope) &&
                 (field.field_type === 'short_text' ||
                     field.field_type === 'long_text'),
         )
@@ -158,4 +166,16 @@ export function customHeaderTextFieldsFromSchema(
                 field.validation_json?.max_length ??
                 (field.field_type === 'short_text' ? 255 : 20000),
         }));
+}
+
+export function customHeaderTextFieldsFromSchema(
+    fields: SchemaSourceField[],
+): SchemaTextField[] {
+    return customTextFieldsFromSchema(fields, 'header');
+}
+
+export function customPositionTextFieldsFromSchema(
+    fields: SchemaSourceField[],
+): SchemaTextField[] {
+    return customTextFieldsFromSchema(fields, 'position');
 }

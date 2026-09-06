@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 /**
- * VER-004 / DF-2 / DF-3.2a: Compose eines Dispo-Config-Snapshots aus Calc-Snapshot + system_dispo_order_core.
+ * VER-004 / DF-2 / DF-3.2b: Compose eines Dispo-Config-Snapshots aus Calc-Snapshot + system_dispo_order_core.
  */
 final class DispoConfigurationSnapshotComposer
 {
@@ -132,9 +132,9 @@ final class DispoConfigurationSnapshotComposer
                     );
                 }
 
-                if ($definition->scope !== FieldScope::Header) {
+                if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
                     throw new RuntimeException(
-                        "Dispo-Feld „{$definition->key}“ muss Header-Scope haben.",
+                        "Dispo-Feld „{$definition->key}“ muss Header- oder Position-Scope haben.",
                     );
                 }
 

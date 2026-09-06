@@ -38,6 +38,7 @@ type AvailableCustomDefinition = {
     id: number;
     key: string;
     label: string | null;
+    scope: string;
     applies_to: string;
     field_type: string;
     current_revision_id: number | null;
@@ -221,7 +222,7 @@ export default function FieldSetVersionEdit({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title={`${fieldSet.name} · Version ${version.version}`}
-                    description={`Status: ${version.status}. Regeln sind nur lesbar. Position-Felder können in DF-3.2a nicht hinzugefügt werden.`}
+                    description={`Status: ${version.status}. Regeln sind nur lesbar. Custom-Felder mit Scope header oder position können hinzugefügt werden.`}
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" asChild>
@@ -554,9 +555,8 @@ export default function FieldSetVersionEdit({
                     <DialogHeader>
                         <DialogTitle>Eigenes Feld hinzufügen</DialogTitle>
                         <DialogDescription>
-                            Nur aktive Custom-Header-Felder mit passendem
-                            applies_to. Positionsfelder sind in DF-3.2a nicht
-                            erlaubt.
+                            Nur aktive Custom-Felder (header oder position) mit
+                            passendem applies_to.
                         </DialogDescription>
                     </DialogHeader>
                     {availableCustomDefinitions.length === 0 ? (
@@ -589,7 +589,7 @@ export default function FieldSetVersionEdit({
                                     <option value="">Bitte wählen</option>
                                     {availableCustomDefinitions.map((def) => (
                                         <option key={def.id} value={def.id}>
-                                            {def.key}
+                                            [{def.scope}] {def.key}
                                             {def.label ? ` – ${def.label}` : ''}
                                         </option>
                                     ))}

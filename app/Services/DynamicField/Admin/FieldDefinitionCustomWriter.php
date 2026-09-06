@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * DF-3.2a: Custom Header-Textfelder anlegen, ändern, deaktivieren, löschen.
+ * DF-3.2b: Custom Header-/Position-Textfelder anlegen, ändern, deaktivieren, löschen.
  */
 final class FieldDefinitionCustomWriter
 {
@@ -36,6 +36,7 @@ final class FieldDefinitionCustomWriter
      *     label: string,
      *     key?: string|null,
      *     field_type: FieldType|string,
+     *     scope: FieldScope|string,
      *     applies_to: FieldAppliesTo|string,
      *     help_text?: string|null,
      *     group_key?: string|null,
@@ -47,8 +48,9 @@ final class FieldDefinitionCustomWriter
     public function create(array $payload, User $actor): FieldDefinition
     {
         $fieldType = $this->normalizeFieldType($payload['field_type']);
+        $scope = $this->normalizeScope($payload['scope']);
         $appliesTo = $this->normalizeAppliesTo($payload['applies_to']);
-        $this->assertCustomHeaderTextType($fieldType);
+        $this->assertCustomTextType($fieldType);
         $maxLength = $this->resolveMaxLength($fieldType, $payload['max_length'] ?? null);
         $keyCandidate = $payload['key'] ?? null;
         $explicitKey = is_string($keyCandidate) && trim($keyCandidate) !== ''
@@ -61,13 +63,13 @@ final class FieldDefinitionCustomWriter
             $key = $this->slugger->uniqueSlugFromLabel($payload['label']);
         }
 
-        return DB::transaction(function () use ($payload, $actor, $fieldType, $appliesTo, $maxLength, $key): FieldDefinition {
+        return DB::transaction(function () use ($payload, $actor, $fieldType, $scope, $appliesTo, $maxLength, $key): FieldDefinition {
             $definition = new FieldDefinition;
             $definition->key = $key;
             $definition->field_type = $fieldType;
             $definition->is_system = false;
             $definition->is_key_protected = false;
-            $definition->scope = FieldScope::Header;
+            $definition->scope = $scope;
             $definition->applies_to = $appliesTo;
             $definition->is_active = true;
             $definition->lock_version = 1;
@@ -115,6 +117,7 @@ final class FieldDefinitionCustomWriter
      * @param  array{
      *     label?: string,
      *     field_type?: FieldType|string,
+     *     scope?: FieldScope|string,
      *     applies_to?: FieldAppliesTo|string,
      *     help_text?: string|null,
      *     group_key?: string|null,
@@ -151,6 +154,7 @@ final class FieldDefinitionCustomWriter
             $before = [
                 'key' => $locked->key,
                 'field_type' => $locked->field_type->value,
+                'scope' => $locked->scope->value,
                 'applies_to' => $locked->applies_to->value,
                 'lock_version' => $locked->lock_version,
                 'label' => $previous->label,
@@ -163,13 +167,15 @@ final class FieldDefinitionCustomWriter
 
             if (isset($payload['field_type'])) {
                 $fieldType = $this->normalizeFieldType($payload['field_type']);
-                $this->assertCustomHeaderTextType($fieldType);
+                $this->assertCustomTextType($fieldType);
                 $locked->field_type = $fieldType;
+            }
+            if (isset($payload['scope'])) {
+                $locked->scope = $this->normalizeScope($payload['scope']);
             }
             if (isset($payload['applies_to'])) {
                 $locked->applies_to = $this->normalizeAppliesTo($payload['applies_to']);
             }
-            $locked->scope = FieldScope::Header;
 
             $fieldType = $locked->field_type;
             $maxLength = array_key_exists('max_length', $payload)
@@ -208,6 +214,7 @@ final class FieldDefinitionCustomWriter
                 [
                     'key' => $locked->key,
                     'field_type' => $locked->field_type->value,
+                    'scope' => $locked->scope->value,
                     'applies_to' => $locked->applies_to->value,
                     'lock_version' => $locked->lock_version,
                     'label' => $previous->label,
@@ -397,11 +404,11 @@ final class FieldDefinitionCustomWriter
         }
     }
 
-    private function assertCustomHeaderTextType(FieldType $fieldType): void
+    private function assertCustomTextType(FieldType $fieldType): void
     {
         if (! in_array($fieldType, [FieldType::ShortText, FieldType::LongText], true)) {
             throw ValidationException::withMessages([
-                'field_type' => 'In DF-3.2a sind nur short_text und long_text zulässig.',
+                'field_type' => 'In DF-3.2b sind nur short_text und long_text zulässig.',
             ]);
         }
     }
@@ -409,6 +416,18 @@ final class FieldDefinitionCustomWriter
     private function normalizeFieldType(FieldType|string $value): FieldType
     {
         return $value instanceof FieldType ? $value : FieldType::from((string) $value);
+    }
+
+    private function normalizeScope(FieldScope|string $value): FieldScope
+    {
+        $scope = $value instanceof FieldScope ? $value : FieldScope::from((string) $value);
+        if (! in_array($scope, [FieldScope::Header, FieldScope::Position], true)) {
+            throw ValidationException::withMessages([
+                'scope' => 'Scope muss header oder position sein.',
+            ]);
+        }
+
+        return $scope;
     }
 
     private function normalizeAppliesTo(FieldAppliesTo|string $value): FieldAppliesTo

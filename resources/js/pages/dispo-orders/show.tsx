@@ -54,6 +54,8 @@ type FieldSchema = {
     }>;
     editable_custom_header_fields?: SchemaField[];
     calc_origin_custom_header_fields?: SchemaField[];
+    editable_custom_position_fields?: SchemaField[];
+    calc_origin_custom_position_fields?: SchemaField[];
 };
 
 type OrderPosition = {
@@ -82,11 +84,11 @@ type OrderPosition = {
         custom_label?: string | null;
         percent?: string;
     }[];
-    dynamic_field_values?: {
+    dynamic_field_values?: Record<string, unknown> & {
         period_open?: boolean | null;
         position_flight_period?: PeriodValue;
     };
-    dynamic_field_captured?: {
+    dynamic_field_captured?: Record<string, boolean> & {
         period_open?: boolean;
         position_flight_period?: boolean;
     };
@@ -234,6 +236,49 @@ export default function DispoOrderShow({
             max_length: field.max_length ?? undefined,
         }));
     }, [fieldSchema]);
+    const editablePositionCustomFields = useMemo((): SchemaTextField[] => {
+        const source =
+            fieldSchema.editable_custom_position_fields ??
+            fieldSchema.fields.filter(
+                (field) =>
+                    field.is_system !== true &&
+                    field.editable === true &&
+                    field.scope === 'position' &&
+                    (field.field_type === 'short_text' ||
+                        field.field_type === 'long_text'),
+            );
+
+        return source.map((field) => ({
+            key: field.key,
+            label: field.label,
+            help_text: field.help_text,
+            field_type: field.field_type,
+            sort: field.sort,
+            max_length: field.max_length ?? undefined,
+            required: field.required === true,
+        }));
+    }, [fieldSchema]);
+    const calcOriginPositionCustomFields = useMemo((): SchemaTextField[] => {
+        const source =
+            fieldSchema.calc_origin_custom_position_fields ??
+            fieldSchema.fields.filter(
+                (field) =>
+                    field.is_system !== true &&
+                    field.calc_origin === true &&
+                    field.scope === 'position' &&
+                    (field.field_type === 'short_text' ||
+                        field.field_type === 'long_text'),
+            );
+
+        return source.map((field) => ({
+            key: field.key,
+            label: field.label,
+            help_text: field.help_text,
+            field_type: field.field_type,
+            sort: field.sort,
+            max_length: field.max_length ?? undefined,
+        }));
+    }, [fieldSchema]);
     const [customHeaderValues, setCustomHeaderValues] = useState<
         Record<string, string>
     >(() => {
@@ -247,8 +292,27 @@ export default function DispoOrderShow({
         }
         return initial;
     });
+    const [positionCustomValues, setPositionCustomValues] = useState<
+        Record<number, Record<string, string>>
+    >(() => {
+        const initial: Record<number, Record<string, string>> = {};
+        for (const position of order.positions) {
+            const stored = position.dynamic_field_values ?? {};
+            const row: Record<string, string> = {};
+            for (const field of editablePositionCustomFields) {
+                const raw = stored[field.key];
+                row[field.key] =
+                    typeof raw === 'string' || typeof raw === 'number'
+                        ? String(raw)
+                        : '';
+            }
+            initial[position.id] = row;
+        }
+        return initial;
+    });
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
+    const [savingPositionCustoms, setSavingPositionCustoms] = useState(false);
     const [syncingCalcFields, setSyncingCalcFields] = useState(false);
 
     const pageDescription =
@@ -321,7 +385,7 @@ export default function DispoOrderShow({
     }
 
     function saveCustomHeaders() {
-        if (savingNotes) {
+        if (savingNotes || savingPositionCustoms) {
             return;
         }
 
@@ -345,6 +409,40 @@ export default function DispoOrderShow({
                 },
                 onFinish: () => {
                     setSavingNotes(false);
+                },
+            },
+        );
+    }
+
+    function savePositionCustoms() {
+        if (savingNotes || savingPositionCustoms) {
+            return;
+        }
+
+        setSavingPositionCustoms(true);
+        setFieldErrors({});
+        const payload: Record<string, Record<string, string>> = {};
+        for (const position of order.positions) {
+            payload[String(position.id)] = Object.fromEntries(
+                editablePositionCustomFields.map((field) => [
+                    field.key,
+                    positionCustomValues[position.id]?.[field.key] ?? '',
+                ]),
+            );
+        }
+        router.patch(
+            `/dispoauftraege/${order.id}/positions-angaben`,
+            {
+                lock_version: order.lock_version,
+                position_dynamic_field_values: payload,
+            },
+            {
+                preserveScroll: true,
+                onError: (errors) => {
+                    setFieldErrors(errors);
+                },
+                onFinish: () => {
+                    setSavingPositionCustoms(false);
                 },
             },
         );
@@ -926,6 +1024,114 @@ export default function DispoOrderShow({
                                             </p>
                                         ) : null}
                                     </div>
+                                    {calcOriginPositionCustomFields.length >
+                                    0 ? (
+                                        <div
+                                            className="mt-4 space-y-3"
+                                            data-test={`dispo-order-calc-origin-position-fields-${position.id}`}
+                                        >
+                                            <p className="text-sm font-medium">
+                                                Aus Kalkulation
+                                            </p>
+                                            <SchemaTextFields
+                                                fields={
+                                                    calcOriginPositionCustomFields
+                                                }
+                                                values={Object.fromEntries(
+                                                    calcOriginPositionCustomFields.map(
+                                                        (field) => {
+                                                            const raw =
+                                                                positionValues[
+                                                                    field.key
+                                                                ];
+                                                            const captured =
+                                                                positionCaptured[
+                                                                    field.key
+                                                                ] === true;
+                                                            if (!captured) {
+                                                                return [
+                                                                    field.key,
+                                                                    '',
+                                                                ];
+                                                            }
+                                                            return [
+                                                                field.key,
+                                                                typeof raw ===
+                                                                    'string' ||
+                                                                typeof raw ===
+                                                                    'number'
+                                                                    ? String(
+                                                                          raw,
+                                                                      )
+                                                                    : '',
+                                                            ];
+                                                        },
+                                                    ),
+                                                )}
+                                                readOnly
+                                                idPrefix={`dispo-pos-calc-${position.id}`}
+                                                onChange={() => undefined}
+                                            />
+                                        </div>
+                                    ) : null}
+                                    {editablePositionCustomFields.length > 0 ? (
+                                        <div
+                                            className="mt-4 space-y-3"
+                                            data-test={`dispo-order-native-position-fields-${position.id}`}
+                                        >
+                                            <p className="text-sm font-medium">
+                                                Weitere Angaben
+                                            </p>
+                                            {canUpdate ? (
+                                                <SchemaTextFields
+                                                    fields={
+                                                        editablePositionCustomFields
+                                                    }
+                                                    values={
+                                                        positionCustomValues[
+                                                            position.id
+                                                        ] ?? {}
+                                                    }
+                                                    errors={fieldErrors}
+                                                    errorKeyPrefixes={[
+                                                        `position_dynamic_field_values.${position.id}`,
+                                                    ]}
+                                                    disabled={
+                                                        savingPositionCustoms
+                                                    }
+                                                    idPrefix={`dispo-pos-custom-${position.id}`}
+                                                    onChange={(key, value) =>
+                                                        setPositionCustomValues(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [position.id]: {
+                                                                    ...current[
+                                                                        position
+                                                                            .id
+                                                                    ],
+                                                                    [key]: value,
+                                                                },
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                            ) : (
+                                                <SchemaTextFields
+                                                    fields={
+                                                        editablePositionCustomFields
+                                                    }
+                                                    values={
+                                                        positionCustomValues[
+                                                            position.id
+                                                        ] ?? {}
+                                                    }
+                                                    readOnly
+                                                    idPrefix={`dispo-pos-custom-${position.id}`}
+                                                    onChange={() => undefined}
+                                                />
+                                            )}
+                                        </div>
+                                    ) : null}
                                     {position.time_ranges.length > 0 ? (
                                         <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
                                             {position.time_ranges.map(
@@ -971,6 +1177,19 @@ export default function DispoOrderShow({
                                 </section>
                             );
                         })}
+                        {canUpdate &&
+                        editablePositionCustomFields.length > 0 ? (
+                            <Button
+                                type="button"
+                                disabled={savingPositionCustoms}
+                                data-test="dispo-order-save-position-customs"
+                                onClick={savePositionCustoms}
+                            >
+                                {savingPositionCustoms
+                                    ? 'Wird gespeichert…'
+                                    : 'Positionsangaben speichern'}
+                            </Button>
+                        ) : null}
                     </CardContent>
                 </Card>
             </div>

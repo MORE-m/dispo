@@ -2,12 +2,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
+/**
+ * DF-3.2b isolierte E2E-Suite: eigene SQLite-DB und eigener Port.
+ * Keine Abhängigkeit von der Hauptsuite oder alphabetischer Spec-Reihenfolge.
+ */
 const e2eDb = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    'database/e2e.sqlite',
+    'database/e2e-df32b.sqlite',
 );
 
-const e2ePort = process.env.E2E_PORT ?? '8001';
+const e2ePort = process.env.E2E_DF32B_PORT ?? '8002';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
 const e2eEnv = {
@@ -20,9 +24,7 @@ const e2eEnv = {
 
 export default defineConfig({
     testDir: 'tests/e2e',
-    testIgnore: '**/df32b-*.spec.ts',
-    // Hauptsuite: seriell (u. a. DF-3.2a mutiert Feldsets). DF-3.2b läuft
-    // separat über playwright.df32b.config.ts mit eigener DB/Port.
+    testMatch: '**/df32b-*.spec.ts',
     fullyParallel: false,
     workers: 1,
     forbidOnly: !!process.env.CI,
@@ -33,7 +35,7 @@ export default defineConfig({
     },
     projects: [
         {
-            name: 'chromium',
+            name: 'chromium-df32b',
             use: { ...devices['Desktop Chrome'] },
         },
     ],

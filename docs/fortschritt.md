@@ -1,12 +1,13 @@
 # Fortschritt V1
 
-Stand: 4. September 2026 (DF-3.2a auf Feature-Branch – kein Abschluss von DF-3)
+Stand: 6. September 2026 (DF-3.2b auf Feature-Branch – kein Abschluss von DF-3)
 
 ## Aktuelle Phase
 
 Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 und DF-2 auf
-`main`**. **DF-3.1** (Admin Systemfelder / Kern-Feldsets) und **DF-3.2a**
-(Custom Header-Textfelder) auf Feature-Branch; Gesamtziel DF-3 bleibt offen.
+`main`**. **DF-3.1** (Admin Systemfelder / Kern-Feldsets), **DF-3.2a**
+(Custom Header-Textfelder) und **DF-3.2b** (Custom Position-Textfelder) auf
+Feature-Branch; Gesamtziel DF-3 bleibt offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -14,10 +15,9 @@ Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin.
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/df3-2a-custom-header-text-fields` – DF-3.2a Custom
-Header-Textfelder (Admin + Runtime Kalkulation/Dispo). **DF-3 ist damit nicht
-abgeschlossen** (Position-Custom-Felder DF-3.2b, Assignments, Optionen,
-Regelmatrix folgen).
+Feature-Branch `feat/df3-2b-custom-position-text-fields` – DF-3.2b Custom
+Position-Textfelder (Admin + Runtime Kalkulation/Dispo). **DF-3 ist damit nicht
+abgeschlossen** (Assignments, Optionen, Regelmatrix folgen).
 
 ## Zuletzt abgeschlossene Aufgabe
 
@@ -28,6 +28,19 @@ DF-2 Nachpflege – PR
 Davor: DF-2 Dispo-Config-Snapshot – PR
 [#16](https://github.com/MORE-m/dispo/pull/16) (`ac0d533`).
 
+## DF-3.2b – Custom Position-Textfelder (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Custom-Definitionen `short_text` / `long_text`, Scope fest `position` | umgesetzt |
+| `applies_to` calculation / dispo_order / both (wie DF-3.2a) | umgesetzt |
+| Pflicht-Vollständigkeit nur bei Dispo-Create/Revision aus Calc (PO-32b-1) | umgesetzt |
+| Identity Calc: `id`/`client_key`; Dispo-Position: `calculation_position_id` | umgesetzt |
+| Provenance Calc-Origin über Source-Snapshot (kein neues Flag) | umgesetzt |
+| Atomarer Partial-Save nativer Positions-Customs (PO-32b-2) | umgesetzt |
+| E2E isoliert: `playwright.df32b.config.ts` (eigene DB/Port) | umgesetzt |
+| Assignments / Optionen / Regel-Editor | **nicht** in DF-3.2b |
+
 ## DF-3.2a – Custom Header-Textfelder (September 2026)
 
 | Kriterium | Status |
@@ -36,9 +49,9 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | `applies_to` calculation / dispo_order / both; Key aus Label (editierbar vor Save) | umgesetzt |
 | `max_length` bis 255 bzw. 20000 (`MEDIUMTEXT` / Dispo-String) | umgesetzt |
 | Admin: Index System vs. Eigene, Anlegen, Show (strukturell/Revision/Lifecycle) | umgesetzt |
-| Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt |
+| Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt (Position in DF-3.2b) |
 | Runtime: Wizard „Weitere Angaben“, Dispo editierbar + Calc-origin read-only | umgesetzt |
-| DF-3.2b Position-Custom-Felder | **später** |
+| DF-3.2b Position-Custom-Felder | **umgesetzt** (Feature-Branch) |
 | Assignments / Optionen / Regel-Editor | **nicht** in DF-3.2a |
 
 ## DF-3.1 – Admin Systemfelder / Kern-Feldsets (September 2026)
@@ -50,7 +63,7 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | Draft/Activate/Copy-as-template für zwei Kern-Feldsets | umgesetzt |
 | Statische Vorschau mit Beispielwerten; Regeln nur lesbar | umgesetzt |
 | Audit + `lock_version` + AT-14 (Historie unverändert) | umgesetzt |
-| Custom Fields / Optionen / Assignments / Regel-Editor | **nicht** in DF-3.1 (teilweise DF-3.2a) |
+| Custom Fields / Optionen / Assignments / Regel-Editor | **nicht** in DF-3.1 (teilweise DF-3.2a/b) |
 
 ## DF-2 – Dispo-Config-Snapshot und Hinweise (September 2026)
 
@@ -73,6 +86,8 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
   abgelehnten Vorgänger; neuer Snapshot; Vorgänger unverändert.
 - **PO-DF3.1:** UX-GATE-D Dyn-Feld-Admin; Vorschau statisch mit Beispielwerten;
   Regeln in DF-3.1 nur lesbar.
+- **PO-32b-1…4:** siehe Entscheidungslog (Pflicht erst Dispo-Create; Partial-Save;
+  Snapshot-Provenance; both wie 3.2a).
 
 ## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
 
@@ -88,9 +103,8 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.2a
+## Bewusst offen nach DF-3.2b
 
-- Position-Custom-Felder (DF-3.2b)
 - Feldset-Assignments / Vererbung (braucht BL-P2-02)
 - Optionen, Auswahltypen, volle Regelmatrix
 - übrige UX-GATE-D-Adminmodule (Inventare, Kataloge, Preislisten, …)

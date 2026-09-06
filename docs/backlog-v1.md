@@ -195,9 +195,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a Custom-Header)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1/3.2a)
+- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -211,14 +211,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.2a erledigt (Feature-Branch):** Custom Header-Textfelder
   (`short_text`/`long_text`, `max_length` bis 20000 / MEDIUMTEXT), Admin
   Anlegen/Revision/Deaktivieren, Membership in Kern-Feldsets, Runtime in
-  Kalkulations-Wizard und Dispo-Show. **DF-3 nicht abgeschlossen.**
-- **Offen:** DF-3.2b Position-Custom-Felder, Optionen, Assignments/Vererbung,
-  volle Regelmatrix, Regel-Editor.
+  Kalkulations-Wizard und Dispo-Show.
+- **DF-3.2b erledigt (Feature-Branch):** Custom Position-Textfelder
+  (`scope=position`, short/long), Identity `id`/`client_key` bzw.
+  `calculation_position_id`, Pflicht erst bei Dispo-Create (PO-32b-1),
+  Partial-Save, Snapshot-Provenance, isolierte E2E-Config.
+  **DF-3 nicht abgeschlossen.**
+- **Offen:** Optionen, Assignments/Vererbung, volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a Custom-Header)
+- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a/b Custom-Text)
 - **Anforderungen:** `VER-001` bis `VER-007`
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
@@ -230,8 +234,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Dispo-Wertetabellen, Draft-Texte, Legacy ohne erfundene Dyn-Werte.
   **DF-3.1:** Admin-Activate ändert historische Snapshots nicht (AT-14).
   **DF-3.2a:** Custom-Header in neuen Snapshots nach Activate; Historie unverändert.
-  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance;
-  DF-3.2b Position-Custom.
+  **DF-3.2b:** Position-Custom in Snapshots; Calc-Origin über Source-Snapshot;
+  Historie unverändert. **DF-3 nicht abgeschlossen.**
+  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

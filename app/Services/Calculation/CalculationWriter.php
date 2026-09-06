@@ -274,7 +274,37 @@ final class CalculationWriter
         }
 
         $calculation->load('positions');
+        $payload = $this->stampPositionIdentityOnPayload($calculation, $payload);
         $this->dynamicFields->syncFromPayload($calculation, $payload);
+    }
+
+    /**
+     * Stellt sicher, dass Dyn-Feld-Sync Positionen per id/client_key zuordnen kann
+     * (auch direkt nach Create, wenn der Payload noch keine Keys hatte).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function stampPositionIdentityOnPayload(Calculation $calculation, array $payload): array
+    {
+        $positions = $calculation->positions->values();
+        if (! isset($payload['positions']) || ! is_array($payload['positions'])) {
+            return $payload;
+        }
+
+        foreach (array_values($payload['positions']) as $index => $positionPayload) {
+            if (! is_array($positionPayload)) {
+                continue;
+            }
+            $stored = $positions->get($index);
+            if ($stored === null) {
+                continue;
+            }
+            $payload['positions'][$index]['id'] = $stored->id;
+            $payload['positions'][$index]['client_key'] = $stored->client_key;
+        }
+
+        return $payload;
     }
 
     private function syncPlanRows(CalculationPosition $position, PositionResult $result): void

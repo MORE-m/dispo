@@ -210,7 +210,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 | `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis |
 | `snapshot_field_rules` | kopierte Regeln des Snapshots |
 | `calculation_field_values` | typisierte Kopfwerte einer Kalkulation (`value_text` MEDIUMTEXT ab DF-3.2a) |
-| `calculation_position_field_values` | typisierte Positionswerte |
+| `calculation_position_field_values` | typisierte Positionswerte (`value_text` MEDIUMTEXT ab DF-3.2b) |
 | `calculations.configuration_snapshot_id` | FK auf den Config-Snapshot der Kalkulation |
 
 Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, Textfelder), nicht als generisches JSON-Blob.
@@ -222,7 +222,7 @@ Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, 
 | `configuration_snapshots.source_configuration_snapshot_id` | Herkunftszeiger Calc→Dispo-Compose (kein Laufzeit-Fallback) |
 | `dispo_orders.configuration_snapshot_id` | FK auf den Dispo-Config-Snapshot, nach Backfill **NOT NULL** |
 | `dispo_order_field_values` | Header-Werte (`value_text` MEDIUMTEXT, Perioden; DF-3.2a max. 20000 Zeichen) |
-| `dispo_order_position_field_values` | Positionswerte (`value_boolean`, Perioden) |
+| `dispo_order_position_field_values` | Positionswerte (`value_boolean`, Perioden; ab DF-3.2b `value_string`/`value_text`) |
 
 Dispo-Snapshots nutzen Source `dispo_order_create` bzw. `dispo_order_legacy_backfill`.
 Legacy-Backfill erzeugt Definitionen **ohne** Dyn-Value-Zeilen (keine erfundenen
@@ -240,11 +240,17 @@ vorhandenen Werte.
   `field_definition_revisions.validation_json` (bis 20000).
 - Membership Custom in Drafts der beiden Kern-Feldsets; Position-Custom = DF-3.2b.
 
-### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a nur Header-Text)
+### DF-3.2b – Custom Position-Textfelder (Feature-Branch)
 
-Konzeptuell vorgesehen; **DF-3.2a** liefert Custom-Header-Texte, aber noch nicht:
+- Custom Position `short_text`/`long_text`; gleiche `max_length`-Grenzen wie Header.
+- `calculation_position_field_values.value_text` → MEDIUMTEXT;
+  `dispo_order_position_field_values`: `value_string` (255) + `value_text` (MEDIUMTEXT).
+- Calc-Origin-Provenance weiter über Source-Snapshot (kein neues Value-Flag).
 
-- Position-Custom-Felder (DF-3.2b),
+### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a/b Text-Custom)
+
+Konzeptuell vorgesehen; **DF-3.2a/b** liefern Custom Header-/Position-Texte, aber noch nicht:
+
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
 - `FieldSetAssignment` an Kategorien/Werbemittel,
