@@ -98,9 +98,13 @@ final class CalculationWriter
                 $dynamicPayload['dynamic_field_values'] = $payload['dynamic_field_values']
                     ?? $dynamicPayload['dynamic_field_values'];
                 if (isset($payload['positions']) && is_array($payload['positions'])) {
+                    /** @var array<int, array<string, mixed>> $basePositions */
+                    $basePositions = $dynamicPayload['positions'];
+                    /** @var array<int|string, mixed> $incomingPositions */
+                    $incomingPositions = $payload['positions'];
                     $dynamicPayload['positions'] = $this->mergePositionDynamicValuesByIdentity(
-                        $dynamicPayload['positions'],
-                        $payload['positions'],
+                        $basePositions,
+                        $incomingPositions,
                     );
                 }
                 $this->dynamicFields->syncFromPayload($locked, $dynamicPayload);
@@ -284,9 +288,9 @@ final class CalculationWriter
     /**
      * Übernimmt Positions-Dyn-Werte per id/client_key (nie per Array-Index).
      *
-     * @param  list<array<string, mixed>>  $basePositions
-     * @param  list<array<string, mixed>>  $incomingPositions
-     * @return list<array<string, mixed>>
+     * @param  array<int, array<string, mixed>>  $basePositions
+     * @param  array<int|string, mixed>  $incomingPositions
+     * @return array<int, array<string, mixed>>
      */
     private function mergePositionDynamicValuesByIdentity(array $basePositions, array $incomingPositions): array
     {
@@ -306,9 +310,6 @@ final class CalculationWriter
         }
 
         foreach ($basePositions as $index => $base) {
-            if (! is_array($base)) {
-                continue;
-            }
             $values = null;
             if (isset($base['id']) && array_key_exists((int) $base['id'], $byId)) {
                 $values = $byId[(int) $base['id']];
