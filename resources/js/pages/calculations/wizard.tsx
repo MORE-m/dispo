@@ -293,7 +293,7 @@ type SavedCalculation = {
             custom_label: string | null;
             percent: string;
         }>;
-        dynamic_field_values?: {
+        dynamic_field_values?: Record<string, unknown> & {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
         };
