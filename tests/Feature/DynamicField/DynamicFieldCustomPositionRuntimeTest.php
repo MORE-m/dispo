@@ -16,6 +16,7 @@ use App\Models\FieldSetVersion;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldDefinitionCustomWriter;
@@ -121,6 +122,179 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $this->assertSame($storedKeyA, $reordered[1]->client_key);
         $this->assertSame('Wert B', $valueFor($reordered[0]));
         $this->assertSame('Wert A', $valueFor($reordered[1]));
+    }
+
+    public function test_full_payload_reorder_keeps_dynamic_values_by_identity(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createAndActivateOnSets(
+            $admin,
+            'Pos Hinweis Full',
+            FieldAppliesTo::Calculation,
+            calc: true,
+            dispo: false,
+            scope: FieldScope::Position,
+            requiredOverride: false,
+        );
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+
+        $calculation = $writer->create([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [
+                $this->positionPayload($catalog, $catalog['hamburg']->id, (string) Str::uuid(), [
+                    $definition->key => 'Wert A',
+                ]),
+                $this->positionPayload($catalog, $catalog['rock']->id, (string) Str::uuid(), [
+                    $definition->key => 'Wert B',
+                ]),
+            ],
+        ], $user);
+
+        $payload = $writer->payloadFromCalculation($calculation);
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'] = array_reverse($payload['positions']);
+
+        $fresh = $writer->update($calculation, $payload, $user);
+        $reordered = $fresh->positions()->orderBy('sort')->get();
+        $snapDef = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $fresh->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+
+        $valueFor = fn ($position): ?string => CalculationPositionFieldValue::query()
+            ->where('calculation_position_id', $position->id)
+            ->where('snapshot_field_definition_id', $snapDef->id)
+            ->value('value_string');
+
+        $this->assertSame($payload['positions'][0]['client_key'], $reordered[0]->client_key);
+        $this->assertSame($payload['positions'][1]['client_key'], $reordered[1]->client_key);
+        $this->assertSame('Wert B', $valueFor($reordered[0]));
+        $this->assertSame('Wert A', $valueFor($reordered[1]));
+    }
+
+    public function test_foreign_and_duplicate_position_identities_are_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+
+        $other = $writer->create([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Andere',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [
+                $this->positionPayload($catalog, $catalog['hamburg']->id, (string) Str::uuid(), []),
+            ],
+        ], $user);
+        $foreignId = (int) $other->positions()->firstOrFail()->id;
+        $foreignKey = (string) $other->positions()->firstOrFail()->client_key;
+
+        $calculation = $writer->create([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [
+                $this->positionPayload($catalog, $catalog['hamburg']->id, (string) Str::uuid(), []),
+                $this->positionPayload($catalog, $catalog['rock']->id, (string) Str::uuid(), []),
+            ],
+        ], $user);
+
+        $own = $calculation->positions()->orderBy('sort')->get();
+        $base = [
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'lock_version' => $calculation->lock_version,
+        ];
+
+        try {
+            $writer->update($calculation, [
+                ...$base,
+                'positions' => [
+                    $this->positionPayload($catalog, $catalog['hamburg']->id, (string) $own[0]->client_key, [], $foreignId),
+                ],
+            ], $user);
+            $this->fail('Expected ValidationException for foreign position id.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.id', $exception->errors());
+        }
+
+        try {
+            $writer->update($calculation->fresh(), [
+                ...$base,
+                'lock_version' => $calculation->fresh()->lock_version,
+                'positions' => [
+                    $this->positionPayload($catalog, $catalog['hamburg']->id, $foreignKey, []),
+                ],
+            ], $user);
+            $this->fail('Expected ValidationException for foreign client_key.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.client_key', $exception->errors());
+        }
+
+        try {
+            $writer->update($calculation->fresh(), [
+                ...$base,
+                'lock_version' => $calculation->fresh()->lock_version,
+                'positions' => [
+                    $this->positionPayload($catalog, $catalog['hamburg']->id, (string) $own[0]->client_key, [], (int) $own[0]->id),
+                    $this->positionPayload($catalog, $catalog['rock']->id, (string) $own[1]->client_key, [], (int) $own[0]->id),
+                ],
+            ], $user);
+            $this->fail('Expected ValidationException for duplicate position id.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.1.id', $exception->errors());
+        }
+    }
+
+    public function test_invisible_native_position_key_rejected_on_partial_save(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createAndActivateOnSets(
+            $admin,
+            'Unsichtbar Pos',
+            FieldAppliesTo::DispoOrder,
+            calc: false,
+            dispo: true,
+            scope: FieldScope::Position,
+            requiredOverride: false,
+            visibleOverride: false,
+        );
+
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
+            ->order;
+
+        $positionId = (int) $order->positions()->firstOrFail()->id;
+        $this->actingAs($user)
+            ->patch(route('dispo-orders.update-position-customs', $order), [
+                'lock_version' => $order->lock_version,
+                'position_dynamic_field_values' => [
+                    $positionId => [
+                        $definition->key => 'Hack',
+                    ],
+                ],
+            ])
+            ->assertSessionHasErrors('position_dynamic_field_values.'.$positionId.'.'.$definition->key);
     }
 
     public function test_budget_apply_with_empty_required_position_custom_succeeds(): void
@@ -458,6 +632,86 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $order->refresh();
         app(DispoOrderDynamicFieldWriter::class)->assertReadyForSubmit($order);
         $this->assertTrue(true);
+    }
+
+    public function test_revision_copies_native_position_customs_by_calc_position(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createAndActivateOnSets(
+            $admin,
+            'Rev Pos Native',
+            FieldAppliesTo::DispoOrder,
+            calc: false,
+            dispo: true,
+            scope: FieldScope::Position,
+        );
+
+        $calculation = $this->savedCalculation();
+        $creator = User::factory()->role(Role::Sales)->create();
+        $approver = User::factory()->role(Role::Sales)->create();
+        $writer = app(DispoOrderWriter::class);
+        $approvals = app(DispoOrderApprovalService::class);
+
+        $first = $writer->createFromCalculation(
+            $calculation,
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+
+        $positionId = (int) $first->positions()->firstOrFail()->id;
+        $this->actingAs($creator)
+            ->patch(route('dispo-orders.update', $first), [
+                'lock_version' => $first->lock_version,
+                'dynamic_field_values' => [
+                    'billing_special_features' => 'Rechnung',
+                    'disposition_notes' => 'Dispo',
+                ],
+            ])
+            ->assertRedirect();
+        $first->refresh();
+        $this->actingAs($creator)
+            ->patch(route('dispo-orders.update-position-customs', $first), [
+                'lock_version' => $first->lock_version,
+                'position_dynamic_field_values' => [
+                    $positionId => [
+                        $definition->key => 'Alt Pos Native',
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $first->refresh();
+        $approvals->submit($first, $creator, $first->lock_version);
+        $first->refresh();
+        $approvals->reject($first, $approver, $first->lock_version, 'Bitte nachbessern');
+        $first->refresh();
+
+        $second = $writer->createRevision(
+            $first,
+            $calculation->fresh(['positions', 'configurationSnapshot']),
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
+        )->order;
+
+        $snapDef = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $second->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $secondPositionId = (int) $second->positions()->firstOrFail()->id;
+        $this->assertSame(
+            'Alt Pos Native',
+            DispoOrderPositionFieldValue::query()
+                ->where('dispo_order_position_id', $secondPositionId)
+                ->where('snapshot_field_definition_id', $snapDef->id)
+                ->value('value_string'),
+        );
+        $this->assertSame(
+            1,
+            DispoOrderPositionFieldValue::query()
+                ->where('dispo_order_position_id', $secondPositionId)
+                ->where('snapshot_field_definition_id', $snapDef->id)
+                ->count(),
+        );
     }
 
     public function test_long_text_utf8mb4_20000_on_mysql_position(): void

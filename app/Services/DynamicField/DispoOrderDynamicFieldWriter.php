@@ -662,7 +662,11 @@ final class DispoOrderDynamicFieldWriter
         ConfigurationSnapshot $snapshot,
         DispoOrder $predecessor,
     ): void {
-        $predecessor->loadMissing(['fieldValues.snapshotFieldDefinition', 'configurationSnapshot.fieldDefinitions']);
+        $predecessor->loadMissing([
+            'fieldValues.snapshotFieldDefinition',
+            'positions.fieldValues.snapshotFieldDefinition',
+            'configurationSnapshot.fieldDefinitions',
+        ]);
         $predSnapshot = $predecessor->configurationSnapshot;
 
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $newDef) {
@@ -686,6 +690,43 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $this->upsertHeaderTextValue($order, $snapshot, $newDef->key, $text);
+        }
+
+        $order->loadMissing('positions');
+        $predByCalcId = $predecessor->positions->keyBy('calculation_position_id');
+
+        foreach ($order->positions as $dispoPosition) {
+            $calcPositionId = $dispoPosition->calculation_position_id;
+            if ($calcPositionId === null) {
+                continue;
+            }
+            $predPosition = $predByCalcId->get($calcPositionId);
+            if ($predPosition === null) {
+                continue;
+            }
+
+            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $newDef) {
+                if (! $this->isNativeEditablePositionText($snapshot, $newDef)) {
+                    continue;
+                }
+
+                $predDef = $predSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
+                if ($predDef === null
+                    || ! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                    continue;
+                }
+
+                $predValue = $predPosition->fieldValues
+                    ->firstWhere('snapshot_field_definition_id', $predDef->id);
+                $text = $predDef->field_type === FieldType::ShortText
+                    ? $predValue?->value_string
+                    : $predValue?->value_text;
+                if ($text === null || trim($text) === '') {
+                    continue;
+                }
+
+                $this->upsertPositionTextValue($dispoPosition, $snapshot, $newDef->key, $text);
+            }
         }
     }
 
@@ -815,6 +856,9 @@ final class DispoOrderDynamicFieldWriter
     private function isNativeEditablePositionText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
     {
         if ($def->scope !== FieldScope::Position) {
+            return false;
+        }
+        if (! $def->visible) {
             return false;
         }
         if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
