@@ -32,12 +32,21 @@ Festlegungen:
 
 ## Oberkategorien
 
-- Spots
-- SWF / Sonderwerbeformen
-- Online Audio
-- Social Media / Online
-- Events / Promotion
-- Gegengeschäft
+ADV-001a legt die sechs kanonischen Oberkategorien per Migration an (stabile
+technische Keys; nicht beiläufig umbenennen):
+
+| Key | Anzeigename |
+|---|---|
+| `spots` | Spots |
+| `special_advertising_formats` | SWF / Sonderwerbeformen |
+| `online_audio` | Online Audio |
+| `social_online` | Social Media / Online |
+| `events_promotion` | Events / Promotion |
+| `barter` | Gegengeschäft |
+
+Bekannte Bestands-Codes (explizite Map, fail-closed): `spot_classic` und
+`spot_classic_alt` → `spots`. Unbekannte Codes dürfen nicht pauschal zugeordnet
+werden.
 
 Produktion/Sonstiges ist keine Oberkategorie für normale Werbemittel, sondern eine
 Zusatzzeile innerhalb einer Position.

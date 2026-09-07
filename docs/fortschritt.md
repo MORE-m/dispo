@@ -1,32 +1,50 @@
 # Fortschritt V1
 
-Stand: 6. September 2026 (DF-3.2b auf Feature-Branch – kein Abschluss von DF-3)
+Stand: 7. September 2026 (ADV-001a auf Feature-Branch – kein Abschluss von ADV-001/DF-3)
 
 ## Aktuelle Phase
 
-Phase 3 (Versionen, dynamische Felder und Snapshots) – **DF-1 und DF-2 auf
-`main`**. **DF-3.1** (Admin Systemfelder / Kern-Feldsets), **DF-3.2a**
-(Custom Header-Textfelder) und **DF-3.2b** (Custom Position-Textfelder) auf
-Feature-Branch; Gesamtziel DF-3 bleibt offen.
+Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a und DF-3.2b auf `main`**
+(PR #15–#20). Gesamtziel DF-3 bleibt offen (freie Feldsets, Assignments,
+Optionen, Regel-Editor).
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
-Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin.
+Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin. Katalog-Admin
+(Inventare, Werbemittel, Oberkategorien, …) bleibt gesperrt.
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/df3-2b-custom-position-text-fields` – DF-3.2b Custom
-Position-Textfelder (Admin + Runtime Kalkulation/Dispo). **DF-3 ist damit nicht
-abgeschlossen** (Assignments, Optionen, Regelmatrix folgen).
+Feature-Branch `feat/adv-001a-advertising-categories` – ADV-001a
+Oberkategorie-Datenbasis (Schema, Seeds, Relation, Tests). **Kein** Abschluss von
+`ADV-001`, `ADV-002`, `DYN-002` oder DF-3.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-2 Nachpflege – PR
-[#17](https://github.com/MORE-m/dispo/pull/17) gemergt in `main`
-(`ced673d`, Post-Merge-CI Run `33859778546` grün: `ci` + `mysql`).
+DF-3.2b Custom Position-Textfelder – PR
+[#20](https://github.com/MORE-m/dispo/pull/20) gemergt in `main`
+(`91df455`, Post-Merge-CI Run `34083810421` grün: `ci` + `mysql`).
 
-Davor: DF-2 Dispo-Config-Snapshot – PR
-[#16](https://github.com/MORE-m/dispo/pull/16) (`ac0d533`).
+Davor: DF-3.2a Custom Header – PR [#19](https://github.com/MORE-m/dispo/pull/19).
+
+## ADV-001a – Oberkategorie-Datenbasis (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Tabelle `advertising_categories` (key, name, is_active, sort) | umgesetzt |
+| Sechs kanonische Keys laut Initialdaten | umgesetzt |
+| `advertising_media.category_id` NOT NULL, `restrictOnDelete` | umgesetzt |
+| Explizite Bestands-Map, fail-closed ohne Default | umgesetzt |
+| Models/Relations/Factories/Tests | umgesetzt |
+| Katalog-Admin-UI | **nicht** (UX-GATE-D) |
+| Kategorie-Defaults, Assignments, Snapshot-Provenance | **nicht** (spätere Slices) |
+
+## Bestätigte Folgeplanung (noch nicht implementiert)
+
+- Snapshotmodell: VER-002-Basis-Freeze + VER-003-Positions-Effektiv-Snapshot
+- Header-Vererbung V1 nur global; Kat/Medium-Assignments nur Positionsfelder
+- Overrides dreistufig `null`/`true`/`false`, spezifischere Ebene gewinnt
+- Slice-Reihenfolge: `ADV-001a` → `DF-3.3-fs` → `DF-3.3a` → `DF-3.3b`
 
 ## DF-3.2b – Custom Position-Textfelder (September 2026)
 
@@ -51,7 +69,7 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | Admin: Index System vs. Eigene, Anlegen, Show (strukturell/Revision/Lifecycle) | umgesetzt |
 | Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt (Position in DF-3.2b) |
 | Runtime: Wizard „Weitere Angaben“, Dispo editierbar + Calc-origin read-only | umgesetzt |
-| DF-3.2b Position-Custom-Felder | **umgesetzt** (Feature-Branch) |
+| DF-3.2b Position-Custom-Felder | **umgesetzt** (auf `main`) |
 | Assignments / Optionen / Regel-Editor | **nicht** in DF-3.2a |
 
 ## DF-3.1 – Admin Systemfelder / Kern-Feldsets (September 2026)
@@ -103,10 +121,12 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.2b
+## Bewusst offen nach ADV-001a
 
-- Feldset-Assignments / Vererbung (braucht BL-P2-02)
-- Optionen, Auswahltypen, volle Regelmatrix
+- ADV-001 Rest: Kategorie-Defaults, historische Positions-Provenance, Admin
+- ADV-002 / SystemFieldSetting
+- DF-3.3-fs freie Feldsets; DF-3.3a/b Assignments/Merge/Runtime
+- Optionen, Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Kataloge, Preislisten, …)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 
@@ -115,6 +135,6 @@ Davor: DF-2 Dispo-Config-Snapshot – PR
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin teilfreigegeben) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin teilfreigegeben; Katalog-Admin gesperrt) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |

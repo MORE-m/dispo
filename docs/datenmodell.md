@@ -49,9 +49,20 @@ nicht der Preisberechnung (`ORG-002`).
 
 ### Oberkategorie und Werbemittel
 
-`AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört genau einer
-Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert Neuanlage, entfernt
-aber keine historische Referenz.
+**ADV-001a (umgesetzt):** Tabelle `advertising_categories` mit stabilem technischen
+`key`, fachlichem `name`, `is_active`, `sort`. `AdvertisingMedium` besitzt
+verbindliches `category_id` (`restrictOnDelete`). Kanonische Keys:
+`spots`, `special_advertising_formats`, `online_audio`, `social_online`,
+`events_promotion`, `barter`. Kategorie-IDs sind nicht als fachliche Konstanten
+im Anwendungscode zu verwenden; Auflösung über den Key.
+
+**ADV-001 insgesamt noch offen:** Kategorie-Defaults (Kalkulationsarten,
+Standard-/Pflichtfelder, Dispo-Feldsets, Rabatt/AE/Preisdefaults), historische
+Positions-Provenance der Oberkategorie, Assignments und Admin-CRUD.
+
+Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
+genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert
+Neuanlage, entfernt aber keine historische Referenz.
 
 ### Kombinationstabelle
 

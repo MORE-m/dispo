@@ -6,8 +6,10 @@ use App\Enums\CalculationKind;
 use Database\Factories\AdvertisingMediumFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property int $category_id
  * @property CalculationKind $kind
  * @property int $default_length_seconds
  * @property bool $is_discountable
@@ -19,6 +21,7 @@ class AdvertisingMedium extends Model
     use HasFactory;
 
     protected $fillable = [
+        'category_id',
         'name',
         'code',
         'kind',
@@ -39,5 +42,13 @@ class AdvertisingMedium extends Model
             'is_ae_eligible' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * @return BelongsTo<AdvertisingCategory, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(AdvertisingCategory::class, 'category_id');
     }
 }
