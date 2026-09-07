@@ -173,12 +173,16 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** offen
+- **Status:** teilweise (`ADV-001a` Datenbasis; Rest offen)
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
-- **Abhängigkeiten:** BL-P2-01
+- **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern
 - **Akzeptanz:** nur aktive erlaubte Kombinationen auswählbar; `MAT-004` nicht umsetzen
 - **Tests:** Pest Filter, Planungsverbot, eindeutiger fachlicher Schlüssel
+- **ADV-001a erledigt:** `advertising_categories` + `advertising_media.category_id`
+  NOT NULL; sechs kanonische Keys; explizite Bestands-Map; keine Katalog-Admin-UI
+  (UX-GATE-D). **ADV-001 nicht vollständig** (Defaults, Snapshot-Provenance,
+  Assignments, Admin fehlen).
 
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 
@@ -195,9 +199,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text auf `main`)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Abhängigkeiten:** BL-P2-02 (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b)
+- **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b)
+- **Geplante Folge:** `ADV-001a` → `DF-3.3-fs` (freie Feldsets) → `DF-3.3a`
+  (Assignments/Freeze/Merge) → `DF-3.3b` (Admin/Runtime)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
