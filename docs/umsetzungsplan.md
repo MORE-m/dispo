@@ -79,8 +79,9 @@ Umfang:
 Relevante Anforderungen: `DYN-*`, `VER-*`, `ADM-001`, `ADM-002`.
 
 Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
-Feldset-Container. Offen: Assignments/Vererbung (DF-3.3a/b), Optionen,
-Regel-Editor, Positions-Effektiv-Snapshots.
+Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview (ohne Runtime-Wirkung).
+Offen: VER-002/003 + Runtime (`DF-3.3a2`), Assignment-UI (`DF-3.3b`), Optionen,
+Regel-Editor.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

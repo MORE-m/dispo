@@ -84,11 +84,45 @@ Zweiter Teilslice von DF-3 auf Feature-Branch
 - Bewusst später in DF-3.2a: Position-Custom (DF-3.2b), Optionen, Assignments,
   Regel-Editor.
 
+## Umsetzungsstand DF-3.3a1 (Field-Set-Assignments)
+
+Teilslice nach DF-3.3-fs – **kein** Abschluss von DF-3, **kein** Start von
+`DF-3.3a2`/`DF-3.3b`. Assignments haben **noch keine Runtime-Wirkung** auf
+Kalkulation oder Dispoauftrag.
+
+- Tabelle `field_set_assignments` mit Ziel-XOR und `target_identity`-Unique.
+- Nur freie, assignierbare Feldsets mit aktiver Version; Cores nie assignierbar.
+- Prozessgültigkeit ist Teilmenge der Feldset-`applies_to`.
+- Lebenszyklus: inaktiv anlegen → Preview → Activate/Deactivate; strukturelle
+  Änderungen nur inaktiv; `lock_version` + Audit + 409.
+- Deterministischer Resolver: Primary-Core → global → Oberkategorie → Werbemittel;
+  innerhalb Ebene `sort` ASC, Assignment-ID ASC.
+- Effektive Feldsortierung: `(membership_sort, winning_merge_order, field_definition_id)`.
+- Overrides dreistufig `null`/`true`/`false`; spezifischere Ebene gewinnt;
+  widersprüchliche Overrides derselben Ebene blockieren.
+- Minimale JSON-API unter `access-administration` (Kontext-Preview, Aktivierungs-
+  Preview, CRUD); **keine** Assignment-Admin-UI.
+- Bewusst nicht: VER-002 Quellengraph, VER-003 Positions-Effektiv, Writer-/Composer-
+  Umbau, produktive Feldwirkung.
+
+### Verbindliche Grenzen für DF-3.3a2 (noch nicht implementiert)
+
+1. **Revision** bestehender Kalkulation/Dispo: historisch eingefrorene Konfiguration
+   bleibt; keine stillschweigende Neuauflösung aktueller Assignments.
+2. **Explizites Kopieren** als neuer Vorgang: neuer Freeze anhand dann aktueller
+   Assignments; Quellvorgang unverändert.
+3. **Kalkulation → Dispo:** Calc-Herkunft/Werte bleiben historisch; zusätzlich müssen
+   für `dispo_order` geltende globale/Kategorie-/Werbemittel-Assignments separat
+   aufgelöst werden. Dispo darf nicht ausschließlich die Calc-Positionskonfiguration
+   kopieren; Calc-Origin-Capture und Dispo-eigene Effektiv-Konfiguration müssen
+   konfliktfrei zusammengesetzt und eingefroren werden.
+4. **VER-002/VER-003:** erst in `DF-3.3a2`; kein vorsorgliches leeres Snapshot-Schema
+   in DF-3.3a1.
+
 ## Umsetzungsstand DF-3.3-fs (freie Feldsets)
 
-Teilslice nach ADV-001a – **kein** Abschluss von DF-3, **kein** Start von
-DF-3.3a/b. Freie Feldsets haben **noch keine Runtime-Wirkung** auf Kalkulation
-oder Dispoauftrag.
+Teilslice nach ADV-001a – **kein** Abschluss von DF-3. Freie Feldsets haben
+**noch keine Runtime-Wirkung** auf Kalkulation oder Dispoauftrag.
 
 - `field_sets`: `is_system`, `applies_to` (calculation|dispo_order|both),
   `is_assignable`; Core-Backfill fail-closed nur für
@@ -101,7 +135,7 @@ oder Dispoauftrag.
   Versionsaktivierung reaktiviert nicht automatisch; Reaktivieren ist eigene Aktion.
 - Kern-Feldsets: dauerhaft `is_assignable=false`, Metadaten geschützt.
 - Admin unter Dyn-Feld-Teilfreigabe; E2E isoliert `playwright.df33fs.config.ts`.
-- Bewusst nicht: Assignments, Merge, Snapshot-Quellengraph, Runtime-Auswertung.
+- Bewusst später in fs: Assignments (→ DF-3.3a1), Snapshot-Quellengraph, Runtime.
 
 ## Umsetzungsstand DF-3.2b (Custom Position-Textfelder)
 
@@ -135,14 +169,17 @@ flowchart TD
     G --> H[Dispo-Snapshot]
 ```
 
-Prioritäten und Konfliktauflösung müssen deterministisch sein. Empfohlen ist:
+Prioritäten und Konfliktauflösung (DF-3.3a1 Resolver, verbindlich getestet):
 
-1. Kategorie liefert Defaults.
-2. Feldsets ergänzen wiederverwendbare Felder.
-3. Werbemittel ergänzt oder überschreibt ausdrücklich erlaubte Eigenschaften.
-4. Systemfelder behalten unabhängig von Sichtbarkeit ihre technische Identität.
+1. Primary-Core-Feldset des Prozesses.
+2. Globale Assignments.
+3. Oberkategorie-Assignments.
+4. Werbemittel-Assignments.
 
-Die genaue Merge-Reihenfolge wird vor Implementierung als Testfall festgeschrieben.
+Innerhalb einer Ebene: `sort` ASC, Assignment-ID ASC. Header-Scope: nur Core +
+global. Kategorie-/Werbemittel-Assignments mit Headerdefinitionen sind ungültig.
+Overrides: `null` erbt, spezifischere non-null gewinnt; Konflikte blockieren
+Aktivierung. DYN-005 und System-Invarianten bleiben geschützt.
 
 ## Felddefinition
 

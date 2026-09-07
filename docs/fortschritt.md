@@ -1,12 +1,13 @@
 # Fortschritt V1
 
-Stand: 7. September 2026 (DF-3.3-fs auf Feature-Branch – kein Abschluss von DF-3 / ADV-001)
+Stand: 7. September 2026 (DF-3.3a1 auf Feature-Branch – kein Abschluss von DF-3)
 
 ## Aktuelle Phase
 
-Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b und ADV-001a auf `main`**
-(PR #15–#21). **DF-3.3-fs** (freie Feldsets) auf Feature-Branch.
-Gesamtziel DF-3 bleibt offen (Assignments, Optionen, Regel-Editor).
+Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a und
+DF-3.3-fs auf `main`** (PR #15–#22). **DF-3.3a1** (Assignments/Resolver/Preview)
+auf Feature-Branch. Gesamtziel DF-3 bleibt offen (`DF-3.3a2`, `DF-3.3b`, Optionen,
+Regel-Editor).
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -15,17 +16,30 @@ Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin. Katalog-Admin
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/df3-3-fs-reusable-field-sets` – DF-3.3-fs frei anlegbare,
-versionierte Feldsets. **Kein** Start von `DF-3.3a` / `DF-3.3b`. Freie Feldsets
-haben **noch keine Runtime-Wirkung** auf Kalkulation/Dispo.
+Feature-Branch `feat/df3-3a1-field-set-assignments` – DF-3.3a1 Assignments,
+deterministischer Resolver und Kontext-Preview. **Kein** Start von `DF-3.3a2` /
+`DF-3.3b`. Assignments haben **noch keine Runtime-Wirkung** auf Kalkulation/Dispo.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001a Oberkategorie-Datenbasis – PR
-[#21](https://github.com/MORE-m/dispo/pull/21) gemergt in `main`
-(`0b2dd66`, Post-Merge-CI Run `34096668979` grün: `ci` + `mysql`).
+DF-3.3-fs freie Feldsets – PR [#22](https://github.com/MORE-m/dispo/pull/22)
+gemergt in `main` (`8078a8d`, Post-Merge-CI Run `34120191678` grün: `ci` + `mysql`).
 
-Davor: DF-3.2b Custom Position – PR [#20](https://github.com/MORE-m/dispo/pull/20).
+Davor: ADV-001a – PR [#21](https://github.com/MORE-m/dispo/pull/21).
+
+## DF-3.3a1 – Field-Set-Assignments (September 2026)
+
+| Kriterium | Status |
+|---|---|
+| Tabelle `field_set_assignments` + Model/Factory/XOR/`target_identity`-Unique | umgesetzt |
+| CRUD inaktiv anlegen / Metadaten / Deaktivieren / Activate mit Fingerprint | umgesetzt |
+| Deterministischer Resolver (Core→global→Kat→Medium) | umgesetzt |
+| Kontext-Preview JSON-API unter `access-administration` | umgesetzt |
+| Audit + `lock_version` + 409 | umgesetzt |
+| SQLite + MySQL Migration-/Unique-/Restrict-Tests | umgesetzt |
+| Produktive Runtime-Wirkung freier Sets | **nicht** (DF-3.3a2) |
+| VER-002 Quellengraph / VER-003 Positions-Effektiv | **nicht** (DF-3.3a2) |
+| Assignment-Admin-UI | **nicht** (DF-3.3b) |
 
 ## DF-3.3-fs – Freie Feldsets (September 2026)
 
@@ -40,14 +54,15 @@ Davor: DF-3.2b Custom Position – PR [#20](https://github.com/MORE-m/dispo/pull
 | Kern-Feldsets geschützt, dauerhaft nicht assignierbar | umgesetzt |
 | Admin-Liste/Create/Detail/Editor/Vorschau; Runtime-Hinweis | umgesetzt |
 | E2E isoliert: `playwright.df33fs.config.ts` | umgesetzt |
-| Assignments / Merge / Runtime freier Sets | **nicht** (DF-3.3a/b) |
+| Assignments / Merge / Preview | **teilweise** (DF-3.3a1); Runtime weiterhin DF-3.3a2 |
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- Snapshotmodell: VER-002-Basis-Freeze + VER-003-Positions-Effektiv-Snapshot
+- `DF-3.3a2`: VER-002-Basis-Freeze + VER-003-Positions-Effektiv + schmale Runtime
+- `DF-3.3b`: Assignment-Admin-UI, Herkunft/Konflikte UX
 - Header-Vererbung V1 nur global; Kat/Medium-Assignments nur Positionsfelder
 - Overrides dreistufig `null`/`true`/`false`, spezifischere Ebene gewinnt
-- Slice-Reihenfolge: ADV-001a (erledigt) → **DF-3.3-fs** → `DF-3.3a` → `DF-3.3b`
+- Slice-Reihenfolge: ADV-001a → DF-3.3-fs → **DF-3.3a1** → DF-3.3a2 → DF-3.3b
 
 ## ADV-001a – Oberkategorie-Datenbasis (September 2026)
 
@@ -59,7 +74,7 @@ Davor: DF-3.2b Custom Position – PR [#20](https://github.com/MORE-m/dispo/pull
 | Explizite Bestands-Map, fail-closed ohne Default | umgesetzt |
 | Models/Relations/Factories/Tests | umgesetzt |
 | Katalog-Admin-UI | **nicht** (UX-GATE-D) |
-| Kategorie-Defaults, Assignments, Snapshot-Provenance | **nicht** (spätere Slices) |
+| Kategorie-Defaults, Snapshot-Provenance | **nicht** (spätere Slices) |
 
 ## DF-3.2b – Custom Position-Textfelder (September 2026)
 
@@ -136,9 +151,10 @@ Davor: DF-3.2b Custom Position – PR [#20](https://github.com/MORE-m/dispo/pull
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.3-fs
+## Bewusst offen nach DF-3.3a1
 
-- DF-3.3a / DF-3.3b: Assignments, Freeze/Merge, Provenance, Runtime
+- DF-3.3a2: VER-002/003 Freeze, schmale Runtime-Wirkung freier Assignments
+- DF-3.3b: Assignment-Admin-UI, Herkunft/Konflikte
 - ADV-001 Rest: Kategorie-Defaults, historische Positions-Provenance, Admin
 - ADV-002 / SystemFieldSetting
 - Optionen, Regelmatrix, Regel-Editor
