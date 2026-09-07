@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\FieldSetAssignment;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +12,8 @@ use Illuminate\Support\Facades\Schema;
  * (g | c:{id} | m:{id}) statt nullable Unique/COALESCE – SQLite und MySQL
  * erlauben sonst mehrere NULL-Duplikate. DB-Constraint fängt Race Conditions.
  *
- * Ziel-XOR: MySQL CHECK; SQLite BEFORE INSERT/UPDATE Trigger.
+ * Ziel-XOR inkl. target_identity sowie erlaubte Enum-Werte:
+ * MySQL CHECK; SQLite BEFORE INSERT/UPDATE Trigger.
  */
 return new class extends Migration
 {
@@ -33,7 +33,7 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('advertising_media')
                 ->restrictOnDelete();
-            /** @see FieldSetAssignment::buildTargetIdentity() */
+            // Normalisierte Zielidentität: g | c:{id} | m:{id}
             $table->string('target_identity', 64);
             $table->string('applies_to_process', 32);
             $table->boolean('is_active')->default(false);
@@ -50,7 +50,7 @@ return new class extends Migration
             $table->index(['advertising_medium_id', 'is_active'], 'field_set_assignment_medium_idx');
         });
 
-        $this->installTargetXorGuards();
+        $this->installTargetGuards();
     }
 
     public function down(): void
@@ -67,7 +67,7 @@ return new class extends Migration
         Schema::dropIfExists('field_set_assignments');
     }
 
-    private function installTargetXorGuards(): void
+    private function installTargetGuards(): void
     {
         $driver = Schema::getConnection()->getDriverName();
 
@@ -76,20 +76,27 @@ return new class extends Migration
 ALTER TABLE field_set_assignments
 ADD CONSTRAINT field_set_assignment_target_xor
 CHECK (
-    (
-        target_layer = 'global'
-        AND advertising_category_id IS NULL
-        AND advertising_medium_id IS NULL
-    )
-    OR (
-        target_layer = 'advertising_category'
-        AND advertising_category_id IS NOT NULL
-        AND advertising_medium_id IS NULL
-    )
-    OR (
-        target_layer = 'advertising_medium'
-        AND advertising_medium_id IS NOT NULL
-        AND advertising_category_id IS NULL
+    target_layer IN ('global', 'advertising_category', 'advertising_medium')
+    AND applies_to_process IN ('calculation', 'dispo_order', 'both')
+    AND (
+        (
+            target_layer = 'global'
+            AND advertising_category_id IS NULL
+            AND advertising_medium_id IS NULL
+            AND target_identity = 'g'
+        )
+        OR (
+            target_layer = 'advertising_category'
+            AND advertising_category_id IS NOT NULL
+            AND advertising_medium_id IS NULL
+            AND target_identity = CONCAT('c:', advertising_category_id)
+        )
+        OR (
+            target_layer = 'advertising_medium'
+            AND advertising_medium_id IS NOT NULL
+            AND advertising_category_id IS NULL
+            AND target_identity = CONCAT('m:', advertising_medium_id)
+        )
     )
 )
 SQL);
@@ -100,23 +107,27 @@ SQL);
         if ($driver === 'sqlite') {
             $predicate = <<<'SQL'
 (
-    (
-        NEW.target_layer = 'global'
-        AND NEW.advertising_category_id IS NULL
-        AND NEW.advertising_medium_id IS NULL
-        AND NEW.target_identity = 'g'
-    )
-    OR (
-        NEW.target_layer = 'advertising_category'
-        AND NEW.advertising_category_id IS NOT NULL
-        AND NEW.advertising_medium_id IS NULL
-        AND NEW.target_identity = ('c:' || CAST(NEW.advertising_category_id AS TEXT))
-    )
-    OR (
-        NEW.target_layer = 'advertising_medium'
-        AND NEW.advertising_medium_id IS NOT NULL
-        AND NEW.advertising_category_id IS NULL
-        AND NEW.target_identity = ('m:' || CAST(NEW.advertising_medium_id AS TEXT))
+    NEW.target_layer IN ('global', 'advertising_category', 'advertising_medium')
+    AND NEW.applies_to_process IN ('calculation', 'dispo_order', 'both')
+    AND (
+        (
+            NEW.target_layer = 'global'
+            AND NEW.advertising_category_id IS NULL
+            AND NEW.advertising_medium_id IS NULL
+            AND NEW.target_identity = 'g'
+        )
+        OR (
+            NEW.target_layer = 'advertising_category'
+            AND NEW.advertising_category_id IS NOT NULL
+            AND NEW.advertising_medium_id IS NULL
+            AND NEW.target_identity = ('c:' || CAST(NEW.advertising_category_id AS TEXT))
+        )
+        OR (
+            NEW.target_layer = 'advertising_medium'
+            AND NEW.advertising_medium_id IS NOT NULL
+            AND NEW.advertising_category_id IS NULL
+            AND NEW.target_identity = ('m:' || CAST(NEW.advertising_medium_id AS TEXT))
+        )
     )
 )
 SQL;

@@ -9,7 +9,7 @@ use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
  */
 final class FieldSetAssignmentConflictException extends ConflictHttpException
 {
-    public function __construct(string $message = 'Das Assignment wurde parallel geändert. Bitte neu laden und erneut prüfen.')
+    public function __construct(string $message = 'Preview-Fingerprint veraltet')
     {
         parent::__construct($message);
     }

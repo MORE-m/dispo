@@ -23,6 +23,9 @@ class UpdateFieldSetAssignmentRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'id' => ['prohibited'],
+            'target_identity' => ['prohibited'],
+            'is_active' => ['prohibited'],
             'lock_version' => ['required', 'integer', 'min:1'],
             'field_set_id' => ['sometimes', 'integer', 'exists:field_sets,id'],
             'target_layer' => ['sometimes', Rule::enum(FieldSetAssignmentTargetLayer::class)],

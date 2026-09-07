@@ -32,7 +32,8 @@ final class FieldSetAssignmentPreviewService
      *     scope: FieldScope|string,
      *     advertising_category_id?: int|null,
      *     advertising_medium_id?: int|null,
-     *     candidate_assignment_id?: int|null
+     *     candidate_assignment_id?: int|null,
+     *     strict?: bool
      * }  $input
      * @return array<string, mixed>
      */
@@ -43,13 +44,20 @@ final class FieldSetAssignmentPreviewService
         $categoryId = $this->nullablePositiveInt($input['advertising_category_id'] ?? null);
         $mediumId = $this->nullablePositiveInt($input['advertising_medium_id'] ?? null);
         $candidateId = $this->nullablePositiveInt($input['candidate_assignment_id'] ?? null);
+        $strict = (bool) ($input['strict'] ?? ($candidateId !== null));
 
         if ($mediumId !== null) {
             $medium = AdvertisingMedium::query()->whereKey($mediumId)->first();
             if ($medium === null) {
                 throw new RuntimeException("Werbemittel {$mediumId} fehlt (Integrität).");
             }
-            $categoryId = (int) $medium->category_id;
+            $mediumCategoryId = (int) $medium->category_id;
+            if ($categoryId !== null && $categoryId !== $mediumCategoryId) {
+                throw ValidationException::withMessages([
+                    'advertising_category_id' => 'Die angegebene Kategorie passt nicht zum Werbemittel.',
+                ]);
+            }
+            $categoryId = $mediumCategoryId;
         }
 
         if ($scope === FieldScope::Header && ($categoryId !== null || $mediumId !== null)) {
@@ -65,13 +73,15 @@ final class FieldSetAssignmentPreviewService
             'advertising_category_id' => $categoryId,
             'advertising_medium_id' => $mediumId,
             'medium_category_id' => $mediumId !== null ? $categoryId : null,
+            'assignments' => [],
+            'skipped_assignments' => [],
         ];
 
         $core = $this->loadPrimaryCoreSource($process);
         $sourcesPayload[] = $core['source'];
         $fingerprintParts['primary_core'] = $core['fingerprint'];
 
-        $assignments = $this->loadAssignmentsForContext(
+        $loaded = $this->loadAssignmentsForContext(
             $process,
             $scope,
             $categoryId,
@@ -80,23 +90,74 @@ final class FieldSetAssignmentPreviewService
         );
 
         $includedAssignments = [];
-        foreach ($assignments as $assignment) {
-            $built = $this->buildAssignmentSource($assignment);
-            $sourcesPayload[] = $built['source'];
-            $fingerprintParts['assignments'][] = $built['fingerprint'];
-            $includedAssignments[] = [
-                'id' => $assignment->id,
+        $skippedSources = [];
+        $sourceConflicts = [];
+        $sourceWarnings = [];
+
+        foreach ($loaded as $assignment) {
+            $isCandidate = $candidateId !== null && (int) $assignment->id === $candidateId;
+            $validity = $this->assessAssignmentSourceValidity($assignment, $process);
+
+            if ($validity['valid']) {
+                $built = $this->buildAssignmentSource($assignment);
+                $sourcesPayload[] = $built['source'];
+                $fingerprintParts['assignments'][] = $built['fingerprint'];
+                $includedAssignments[] = [
+                    'id' => $assignment->id,
+                    'field_set_id' => $assignment->field_set_id,
+                    'field_set_key' => $assignment->fieldSet?->key,
+                    'target_layer' => $assignment->target_layer->value,
+                    'advertising_category_id' => $assignment->advertising_category_id,
+                    'advertising_medium_id' => $assignment->advertising_medium_id,
+                    'applies_to_process' => $assignment->applies_to_process->value,
+                    'sort' => $assignment->sort,
+                    'is_active' => $assignment->is_active,
+                    'lock_version' => $assignment->lock_version,
+                    'is_candidate' => $isCandidate,
+                ];
+
+                continue;
+            }
+
+            $skip = [
+                'assignment_id' => $assignment->id,
                 'field_set_id' => $assignment->field_set_id,
                 'field_set_key' => $assignment->fieldSet?->key,
-                'target_layer' => $assignment->target_layer->value,
-                'advertising_category_id' => $assignment->advertising_category_id,
-                'advertising_medium_id' => $assignment->advertising_medium_id,
-                'applies_to_process' => $assignment->applies_to_process->value,
-                'sort' => $assignment->sort,
-                'is_active' => $assignment->is_active,
-                'lock_version' => $assignment->lock_version,
-                'is_candidate' => $candidateId !== null && (int) $assignment->id === $candidateId,
+                'reason_code' => $validity['code'],
+                'reason' => $validity['message'],
+                'is_candidate' => $isCandidate,
             ];
+            $skippedSources[] = $skip;
+            $fingerprintParts['skipped_assignments'][] = [
+                'assignment_id' => $assignment->id,
+                'lock_version' => $assignment->lock_version,
+                'is_active' => $assignment->is_active,
+                'field_set_id' => $assignment->field_set_id,
+                'is_assignable' => $assignment->fieldSet?->is_assignable,
+                'active_version_id' => $assignment->fieldSet?->active_version_id,
+                'active_version_status' => $assignment->fieldSet?->activeVersion?->status?->value,
+                'reason_code' => $validity['code'],
+            ];
+
+            if ($strict) {
+                $sourceConflicts[] = [
+                    'code' => $validity['code'],
+                    'message' => $validity['message'],
+                    'details' => [
+                        'assignment_id' => $assignment->id,
+                        'field_set_id' => $assignment->field_set_id,
+                    ],
+                ];
+            } else {
+                $sourceWarnings[] = [
+                    'code' => 'skipped_assignment_source',
+                    'message' => "Assignment {$assignment->id} übersprungen: {$validity['message']}",
+                    'details' => [
+                        'assignment_id' => $assignment->id,
+                        'reason_code' => $validity['code'],
+                    ],
+                ];
+            }
         }
 
         $resolved = $this->resolver->resolve([
@@ -128,7 +189,14 @@ final class FieldSetAssignmentPreviewService
             $resolved['has_blocking_conflicts'] = true;
         }
 
-        $fingerprint = $this->fingerprint($fingerprintParts, $resolved);
+        $conflicts = array_merge($sourceConflicts, $resolved['conflicts']);
+        $warnings = array_merge($sourceWarnings, $resolved['warnings']);
+
+        $fingerprint = $this->fingerprint($fingerprintParts, [
+            'fields' => $resolved['fields'],
+            'rules' => $resolved['rules'],
+            'conflicts' => $conflicts,
+        ]);
 
         return [
             'process' => $process->value,
@@ -142,13 +210,14 @@ final class FieldSetAssignmentPreviewService
                 'field_set_version_number' => $core['source']['field_set_version_number'],
             ],
             'included_assignments' => $includedAssignments,
+            'skipped_sources' => $skippedSources,
             'sources' => $resolved['sources'],
             'merge_order' => array_column($resolved['sources'], 'merge_order'),
             'fields' => $resolved['fields'],
             'rules' => $resolved['rules'],
-            'warnings' => $resolved['warnings'],
-            'conflicts' => $resolved['conflicts'],
-            'has_blocking_conflicts' => $resolved['has_blocking_conflicts'],
+            'warnings' => $warnings,
+            'conflicts' => $conflicts,
+            'has_blocking_conflicts' => $conflicts !== [],
             'fingerprint' => $fingerprint,
         ];
     }
@@ -193,6 +262,76 @@ final class FieldSetAssignmentPreviewService
         ];
 
         return hash('sha256', json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * @return array{valid: bool, code: string, message: string}
+     */
+    public function assessAssignmentSourceValidity(FieldSetAssignment $assignment, FieldAppliesTo $process): array
+    {
+        $fieldSet = $assignment->fieldSet;
+        if ($fieldSet === null) {
+            throw new RuntimeException("Assignment {$assignment->id}: Feldset-FK beschädigt.");
+        }
+
+        if ($fieldSet->is_system || AdminFieldSetCatalog::isCoreKey($fieldSet->key)) {
+            return [
+                'valid' => false,
+                'code' => 'system_fieldset',
+                'message' => 'Core-/System-Feldsets dürfen nicht als Assignment-Quelle dienen.',
+            ];
+        }
+
+        if (! $fieldSet->is_assignable) {
+            return [
+                'valid' => false,
+                'code' => 'fieldset_not_assignable',
+                'message' => 'Feldset ist nicht assignierbar.',
+            ];
+        }
+
+        if (! $assignment->appliesToProcess($process)) {
+            return [
+                'valid' => false,
+                'code' => 'process_incompatible',
+                'message' => 'Assignment-Prozessgültigkeit passt nicht zum Preview-Prozess.',
+            ];
+        }
+
+        if (! $this->processIsSubsetOfFieldSet($assignment->applies_to_process, $fieldSet->applies_to)) {
+            return [
+                'valid' => false,
+                'code' => 'fieldset_process_incompatible',
+                'message' => 'Feldset-Gültigkeit ist nicht mehr kompatibel zum Assignment.',
+            ];
+        }
+
+        if ($fieldSet->active_version_id === null) {
+            return [
+                'valid' => false,
+                'code' => 'missing_active_version',
+                'message' => 'Feldset besitzt keine aktive Version.',
+            ];
+        }
+
+        $version = $fieldSet->activeVersion;
+        if ($version === null) {
+            throw new RuntimeException("Assignment {$assignment->id}: active_version_id beschädigt.");
+        }
+
+        if ($version->status !== FieldSetVersionStatus::Active) {
+            return [
+                'valid' => false,
+                'code' => 'active_version_not_active',
+                'message' => 'Aktive Feldset-Version hat nicht den Status active.',
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'code' => 'ok',
+            'message' => 'ok',
+        ];
     }
 
     /**
@@ -284,25 +423,39 @@ final class FieldSetAssignmentPreviewService
         $rows = $query->orderBy('sort')->orderBy('id')->get()->all();
 
         $result = [];
+        $candidateIncluded = false;
         foreach ($rows as $assignment) {
             $isCandidate = $candidateId !== null && (int) $assignment->id === $candidateId;
             if (! $assignment->is_active && ! $isCandidate) {
                 continue;
             }
+            if ($isCandidate) {
+                $this->assertCandidateFitsContext($assignment, $process, $scope, $categoryId, $mediumId);
+                $candidateIncluded = true;
+            }
             $result[] = $assignment;
         }
 
-        if ($candidateId !== null && ! collect($result)->contains(fn (FieldSetAssignment $a): bool => (int) $a->id === $candidateId)) {
+        if ($candidateId !== null && ! $candidateIncluded) {
             /** @var FieldSetAssignment $candidate */
             $candidate = FieldSetAssignment::query()
                 ->with(['fieldSet.activeVersion.fields.revision.definition', 'fieldSet.activeVersion.fields.definition', 'fieldSet.activeVersion.rules'])
                 ->whereKey($candidateId)
                 ->firstOrFail();
-            if (! $candidate->appliesToProcess($process)) {
+
+            // Fremde / kontextfremde Kandidaten nicht still anhängen.
+            $this->assertCandidateFitsContext($candidate, $process, $scope, $categoryId, $mediumId);
+
+            // Wenn die Query den Kandidaten nicht gefunden hat, obwohl er passt
+            // (z. B. inaktiv und Layer passte nicht in die OR-Filter), ablehnen –
+            // assertCandidateFitsContext sollte das bereits abfangen. Zusätzliche
+            // Sicherheit: nur anhängen, wenn Layer/Ziel exakt zum Kontext passen.
+            if (! $this->assignmentMatchesContextFilters($candidate, $scope, $categoryId, $mediumId)) {
                 throw ValidationException::withMessages([
-                    'candidate_assignment_id' => 'Kandidat passt nicht zum Preview-Prozess.',
+                    'candidate_assignment_id' => 'Kandidat passt nicht zum angefragten Preview-Kontext.',
                 ]);
             }
+
             $result[] = $candidate;
         }
 
@@ -327,6 +480,87 @@ final class FieldSetAssignmentPreviewService
         return $result;
     }
 
+    private function assertCandidateFitsContext(
+        FieldSetAssignment $candidate,
+        FieldAppliesTo $process,
+        FieldScope $scope,
+        ?int $categoryId,
+        ?int $mediumId,
+    ): void {
+        if (! $candidate->appliesToProcess($process)) {
+            throw ValidationException::withMessages([
+                'candidate_assignment_id' => 'Kandidat passt nicht zum Preview-Prozess.',
+            ]);
+        }
+
+        match ($candidate->target_layer) {
+            FieldSetAssignmentTargetLayer::Global => null,
+            FieldSetAssignmentTargetLayer::AdvertisingCategory => $this->assertCategoryCandidateContext(
+                $candidate,
+                $scope,
+                $categoryId,
+            ),
+            FieldSetAssignmentTargetLayer::AdvertisingMedium => $this->assertMediumCandidateContext(
+                $candidate,
+                $scope,
+                $mediumId,
+            ),
+        };
+    }
+
+    private function assertCategoryCandidateContext(
+        FieldSetAssignment $candidate,
+        FieldScope $scope,
+        ?int $categoryId,
+    ): void {
+        if ($scope !== FieldScope::Position) {
+            throw ValidationException::withMessages([
+                'candidate_assignment_id' => 'Kategorie-Kandidaten sind nur in Positions-Previews zulässig.',
+            ]);
+        }
+        if ($categoryId === null || (int) $candidate->advertising_category_id !== $categoryId) {
+            throw ValidationException::withMessages([
+                'candidate_assignment_id' => 'Kategorie-Kandidat passt nicht zur angefragten Kategorie.',
+            ]);
+        }
+    }
+
+    private function assertMediumCandidateContext(
+        FieldSetAssignment $candidate,
+        FieldScope $scope,
+        ?int $mediumId,
+    ): void {
+        if ($scope !== FieldScope::Position) {
+            throw ValidationException::withMessages([
+                'candidate_assignment_id' => 'Werbemittel-Kandidaten sind nur in Positions-Previews zulässig.',
+            ]);
+        }
+        if ($mediumId === null || (int) $candidate->advertising_medium_id !== $mediumId) {
+            throw ValidationException::withMessages([
+                'candidate_assignment_id' => 'Werbemittel-Kandidat passt nicht zum angefragten Werbemittel.',
+            ]);
+        }
+    }
+
+    private function assignmentMatchesContextFilters(
+        FieldSetAssignment $assignment,
+        FieldScope $scope,
+        ?int $categoryId,
+        ?int $mediumId,
+    ): bool {
+        if ($scope === FieldScope::Header) {
+            return $assignment->target_layer === FieldSetAssignmentTargetLayer::Global;
+        }
+
+        return match ($assignment->target_layer) {
+            FieldSetAssignmentTargetLayer::Global => true,
+            FieldSetAssignmentTargetLayer::AdvertisingCategory => $categoryId !== null
+                && (int) $assignment->advertising_category_id === $categoryId,
+            FieldSetAssignmentTargetLayer::AdvertisingMedium => $mediumId !== null
+                && (int) $assignment->advertising_medium_id === $mediumId,
+        };
+    }
+
     /**
      * @return array{source: array<string, mixed>, fingerprint: array<string, mixed>}
      */
@@ -337,59 +571,12 @@ final class FieldSetAssignmentPreviewService
             throw new RuntimeException("Assignment {$assignment->id}: Feldset-FK beschädigt.");
         }
 
-        if ($fieldSet->is_system || AdminFieldSetCatalog::isCoreKey($fieldSet->key)) {
-            throw ValidationException::withMessages([
-                'field_set_id' => 'Core-Feldsets dürfen nicht als Assignment-Quelle dienen.',
-            ]);
-        }
-
-        if ($fieldSet->active_version_id === null) {
-            // Wird als Konflikt im Merge/Preview ausgewiesen, Quelle ohne Memberships.
-            $empty = [
-                'layer' => FieldSetAssignmentMergeResolver::layerFromTarget($assignment->target_layer),
-                'assignment_id' => $assignment->id,
-                'assignment_sort' => $assignment->sort,
-                'field_set_id' => $fieldSet->id,
-                'field_set_key' => $fieldSet->key,
-                'field_set_version_id' => 0,
-                'field_set_version_number' => 0,
-                'is_system_core' => false,
-                'memberships' => [],
-                'rules' => [],
-            ];
-
-            return [
-                'source' => $empty,
-                'fingerprint' => [
-                    'assignment_id' => $assignment->id,
-                    'lock_version' => $assignment->lock_version,
-                    'is_active' => $assignment->is_active,
-                    'sort' => $assignment->sort,
-                    'applies_to_process' => $assignment->applies_to_process->value,
-                    'target_layer' => $assignment->target_layer->value,
-                    'target_identity' => $assignment->target_identity,
-                    'field_set_id' => $fieldSet->id,
-                    'active_version_id' => null,
-                    'missing_active_version' => true,
-                ],
-            ];
-        }
-
-        /** @var FieldSetVersion|null $version */
-        $version = $fieldSet->activeVersion;
-        if ($version === null) {
-            $version = FieldSetVersion::query()
+        /** @var FieldSetVersion $version */
+        $version = $fieldSet->activeVersion
+            ?? FieldSetVersion::query()
                 ->with(['fields.revision.definition', 'fields.definition', 'rules'])
                 ->whereKey($fieldSet->active_version_id)
-                ->first();
-        }
-        if ($version === null) {
-            throw new RuntimeException("Assignment {$assignment->id}: active_version_id beschädigt.");
-        }
-
-        if ($version->status !== FieldSetVersionStatus::Active) {
-            // Conflict via empty + explicit later; still include for fingerprint
-        }
+                ->firstOrFail();
 
         $source = $this->versionToSource(
             layer: FieldSetAssignmentMergeResolver::layerFromTarget($assignment->target_layer),
@@ -411,6 +598,7 @@ final class FieldSetAssignmentPreviewService
                 'target_layer' => $assignment->target_layer->value,
                 'target_identity' => $assignment->target_identity,
                 'field_set_id' => $fieldSet->id,
+                'is_assignable' => $fieldSet->is_assignable,
                 'active_version_id' => $fieldSet->active_version_id,
                 'version_id' => $version->id,
                 'version_status' => $version->status->value,
@@ -517,6 +705,15 @@ final class FieldSetAssignmentPreviewService
         }
 
         return $rows;
+    }
+
+    private function processIsSubsetOfFieldSet(FieldAppliesTo $assignment, FieldAppliesTo $fieldSet): bool
+    {
+        return match ($fieldSet) {
+            FieldAppliesTo::Calculation => $assignment === FieldAppliesTo::Calculation,
+            FieldAppliesTo::DispoOrder => $assignment === FieldAppliesTo::DispoOrder,
+            FieldAppliesTo::Both => true,
+        };
     }
 
     private function normalizeProcess(FieldAppliesTo|string $process): FieldAppliesTo

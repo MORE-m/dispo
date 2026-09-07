@@ -23,6 +23,10 @@ class StoreFieldSetAssignmentRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'id' => ['prohibited'],
+            'target_identity' => ['prohibited'],
+            'is_active' => ['prohibited'],
+            'lock_version' => ['prohibited'],
             'field_set_id' => ['required', 'integer', 'exists:field_sets,id'],
             'target_layer' => ['required', Rule::enum(FieldSetAssignmentTargetLayer::class)],
             'advertising_category_id' => ['nullable', 'integer', 'exists:advertising_categories,id'],

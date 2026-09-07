@@ -274,8 +274,12 @@ vorhandenen Werte.
   normalisierte NOT-NULL-`target_identity` (`g`|`c:{id}`|`m:{id}`),
   `applies_to_process`, `is_active`, `sort`, `lock_version`, Timestamps, Audit.
 - Unique `(field_set_id, applies_to_process, target_identity)` – echte Eindeutigkeit
-  auch für globale Ziele (kein nullable Unique). Ziel-XOR: MySQL CHECK /
+  auch für globale Ziele (kein nullable Unique). Ziel-XOR inkl. `target_identity`-
+  Gleichheit sowie erlaubte Enum-Werte für Layer/Prozess: MySQL CHECK /
   SQLite BEFORE-Trigger; zusätzlich serverseitig.
+- Ungültige Assignment-Quellen (z. B. deaktiviertes Feldset) werden in der normalen
+  Kontextvorschau übersprungen und als Warnung ausgewiesen; in Kandidaten-/
+  Aktivierungsvorschau blockieren sie.
 - FKs `restrictOnDelete`; kein physisches Löschen von Assignments.
 - Deterministischer Resolver + Kontext-Preview-API; Activate mit Fingerprint/409.
 - **Noch keine** produktive Runtime-Wirkung; VER-002/003 und Assignment-UI folgen

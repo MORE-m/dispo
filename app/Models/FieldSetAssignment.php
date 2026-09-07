@@ -29,17 +29,12 @@ class FieldSetAssignment extends Model
     /** @use HasFactory<FieldSetAssignmentFactory> */
     use HasFactory;
 
-    protected $fillable = [
-        'field_set_id',
-        'target_layer',
-        'advertising_category_id',
-        'advertising_medium_id',
-        'target_identity',
-        'applies_to_process',
-        'is_active',
-        'sort',
-        'lock_version',
-    ];
+    /**
+     * Writer setzt Attribute explizit. Kein Mass Assignment für serverseitige Felder.
+     *
+     * @var list<string>
+     */
+    protected $fillable = [];
 
     /**
      * @return array<string, string>

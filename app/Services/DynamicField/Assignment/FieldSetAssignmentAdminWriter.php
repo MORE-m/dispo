@@ -16,6 +16,7 @@ use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -167,13 +168,12 @@ final class FieldSetAssignmentAdminWriter
     public function activate(FieldSetAssignment $assignment, array $payload, User $actor): FieldSetAssignment
     {
         return DB::transaction(function () use ($assignment, $payload, $actor): FieldSetAssignment {
-            /** @var FieldSetAssignment $locked */
-            $locked = FieldSetAssignment::query()
-                ->with(['fieldSet'])
-                ->whereKey($assignment->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-            $this->assertLock($locked, (int) $payload['lock_version']);
+            $expectedFingerprint = (string) $payload['fingerprint'];
+            $expectedLock = (int) $payload['lock_version'];
+
+            $locked = $this->acquireConfigurationLocks($assignment);
+
+            $this->assertLock($locked, $expectedLock);
 
             if ($locked->is_active) {
                 throw ValidationException::withMessages([
@@ -181,12 +181,18 @@ final class FieldSetAssignmentAdminWriter
                 ]);
             }
 
-            $fieldSet = FieldSet::query()->whereKey($locked->field_set_id)->lockForUpdate()->firstOrFail();
-            $this->assertAssignableFieldSetModel($fieldSet, $locked->applies_to_process);
-
-            $expectedFingerprint = (string) $payload['fingerprint'];
+            // 1–2: Preview + Fingerprint erst nach allen Locks
             $previews = $this->previewAffectedContexts($locked, asCandidate: true);
+            $canonicalFingerprint = $this->canonicalActivationFingerprint($previews);
 
+            // 3–4: Drift immer 409 – auch wenn Konflikte entstanden sind
+            if (! hash_equals($expectedFingerprint, $canonicalFingerprint)) {
+                throw new FieldSetAssignmentConflictException(
+                    'Preview-Fingerprint veraltet',
+                );
+            }
+
+            // 5–6: Konflikte nur bei identischem Fingerprint
             foreach ($previews as $preview) {
                 if ($preview['has_blocking_conflicts']) {
                     throw ValidationException::withMessages([
@@ -195,29 +201,6 @@ final class FieldSetAssignmentAdminWriter
                             static fn (array $conflict): string => (string) $conflict['message'],
                             $preview['conflicts'],
                         )),
-                    ]);
-                }
-            }
-
-            $canonicalFingerprint = $this->canonicalActivationFingerprint($previews);
-            if (! hash_equals($expectedFingerprint, $canonicalFingerprint)) {
-                throw new FieldSetAssignmentConflictException(
-                    'Der Preview-Fingerprint ist veraltet. Bitte Preview erneut abrufen.',
-                );
-            }
-
-            // Revalidate after locking related rows
-            $rechecked = $this->previewAffectedContexts($locked, asCandidate: true);
-            $reFingerprint = $this->canonicalActivationFingerprint($rechecked);
-            if (! hash_equals($expectedFingerprint, $reFingerprint)) {
-                throw new FieldSetAssignmentConflictException(
-                    'Der Preview-Fingerprint ist veraltet. Bitte Preview erneut abrufen.',
-                );
-            }
-            foreach ($rechecked as $preview) {
-                if ($preview['has_blocking_conflicts']) {
-                    throw ValidationException::withMessages([
-                        'assignment' => 'Aktivierung wegen blockierender Konflikte abgelehnt.',
                     ]);
                 }
             }
@@ -248,8 +231,7 @@ final class FieldSetAssignmentAdminWriter
     public function deactivate(FieldSetAssignment $assignment, array $payload, User $actor): FieldSetAssignment
     {
         return DB::transaction(function () use ($assignment, $payload, $actor): FieldSetAssignment {
-            /** @var FieldSetAssignment $locked */
-            $locked = FieldSetAssignment::query()->whereKey($assignment->id)->lockForUpdate()->firstOrFail();
+            $locked = $this->acquireConfigurationLocks($assignment);
             $this->assertLock($locked, (int) $payload['lock_version']);
 
             if (! $locked->is_active) {
@@ -280,57 +262,222 @@ final class FieldSetAssignmentAdminWriter
      */
     public function previewAffectedContexts(FieldSetAssignment $assignment, bool $asCandidate): array
     {
-        $processes = match ($assignment->applies_to_process) {
-            FieldAppliesTo::Calculation => [FieldAppliesTo::Calculation],
-            FieldAppliesTo::DispoOrder => [FieldAppliesTo::DispoOrder],
-            FieldAppliesTo::Both => [FieldAppliesTo::Calculation, FieldAppliesTo::DispoOrder],
-        };
-
+        $processes = $this->processesForAssignment($assignment);
         $contexts = $this->affectedContexts($assignment);
         $results = [];
         $candidateId = $asCandidate ? $assignment->id : null;
 
         foreach ($processes as $process) {
             foreach ($contexts as $context) {
-                $preview = $this->preview->preview([
+                $results[] = $this->preview->preview([
                     'process' => $process,
                     'scope' => $context['scope'],
                     'advertising_category_id' => $context['advertising_category_id'],
                     'advertising_medium_id' => $context['advertising_medium_id'],
                     'candidate_assignment_id' => $candidateId,
+                    'strict' => true,
                 ]);
-
-                $fieldSet = $assignment->fieldSet;
-                if ($fieldSet === null || $fieldSet->active_version_id === null) {
-                    $preview['conflicts'][] = [
-                        'code' => 'missing_active_version',
-                        'message' => 'Feldset besitzt keine aktive Version.',
-                    ];
-                    $preview['has_blocking_conflicts'] = true;
-                } elseif (
-                    $fieldSet->activeVersion !== null
-                    && $fieldSet->activeVersion->status !== FieldSetVersionStatus::Active
-                ) {
-                    $preview['conflicts'][] = [
-                        'code' => 'active_version_not_active',
-                        'message' => 'Aktive Feldset-Version hat nicht den Status active.',
-                    ];
-                    $preview['has_blocking_conflicts'] = true;
-                }
-
-                if ($fieldSet === null || ! $fieldSet->is_assignable) {
-                    $preview['conflicts'][] = [
-                        'code' => 'fieldset_not_assignable',
-                        'message' => 'Feldset ist nicht assignierbar.',
-                    ];
-                    $preview['has_blocking_conflicts'] = true;
-                }
-
-                $results[] = $preview;
             }
         }
 
         return $results;
+    }
+
+    /**
+     * Deterministische Lockreihenfolge für Activate/Deactivate:
+     * 1. Prozess-Cores (Calc, dann Dispo bei both)
+     * 2. beitragende Assignments nach ID
+     * 3. beteiligte Feldset-Container nach ID
+     * 4. relevante Kategorie-/Werbemittelzeilen nach ID
+     * 5. Kandidaten-Assignment (bereits in 2 enthalten, hier reloaded)
+     */
+    private function acquireConfigurationLocks(FieldSetAssignment $assignment): FieldSetAssignment
+    {
+        $processes = $this->processesForAssignment($assignment);
+        $this->lockProcessCores($processes);
+
+        $contributingIds = $this->contributingAssignmentIds($assignment, $processes);
+        if (! in_array((int) $assignment->id, $contributingIds, true)) {
+            $contributingIds[] = (int) $assignment->id;
+        }
+        sort($contributingIds);
+
+        /** @var Collection<int, FieldSetAssignment> $lockedAssignments */
+        $lockedAssignments = FieldSetAssignment::query()
+            ->whereIn('id', $contributingIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        $fieldSetIds = $lockedAssignments->pluck('field_set_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        if ($fieldSetIds !== []) {
+            FieldSet::query()
+                ->whereIn('id', $fieldSetIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+
+        $this->lockTargetRows($assignment, $processes);
+
+        /** @var FieldSetAssignment $locked */
+        $locked = $lockedAssignments->firstWhere('id', $assignment->id)
+            ?? FieldSetAssignment::query()->whereKey($assignment->id)->lockForUpdate()->firstOrFail();
+        $locked->load(['fieldSet.activeVersion']);
+
+        return $locked;
+    }
+
+    /**
+     * @param  list<FieldAppliesTo>  $processes
+     */
+    private function lockProcessCores(array $processes): void
+    {
+        $keys = [];
+        foreach ($processes as $process) {
+            $keys[] = $process === FieldAppliesTo::DispoOrder
+                ? AdminFieldSetCatalog::DISPO_ORDER_CORE
+                : AdminFieldSetCatalog::CALCULATION_CORE;
+        }
+        $keys = array_values(array_unique($keys));
+        // Stabile Reihenfolge: Calculation-Core vor Dispo-Core
+        usort($keys, static function (string $a, string $b): int {
+            $rank = [
+                AdminFieldSetCatalog::CALCULATION_CORE => 1,
+                AdminFieldSetCatalog::DISPO_ORDER_CORE => 2,
+            ];
+
+            return $rank[$a] <=> $rank[$b];
+        });
+
+        foreach ($keys as $key) {
+            FieldSet::query()->where('key', $key)->lockForUpdate()->firstOrFail();
+        }
+    }
+
+    /**
+     * @param  list<FieldAppliesTo>  $processes
+     * @return list<int>
+     */
+    private function contributingAssignmentIds(FieldSetAssignment $assignment, array $processes): array
+    {
+        $processValues = array_map(
+            static fn (FieldAppliesTo $process): string => $process->value,
+            $processes,
+        );
+        $processValues[] = FieldAppliesTo::Both->value;
+        $processValues = array_values(array_unique($processValues));
+
+        $query = FieldSetAssignment::query()
+            ->whereIn('applies_to_process', $processValues)
+            ->where(function ($q) use ($assignment): void {
+                $q->where('is_active', true)
+                    ->orWhere('id', $assignment->id);
+            });
+
+        // Layer-Filter: alles Globale plus betroffene Kat/Medien der Kontexte
+        $contexts = $this->affectedContexts($assignment);
+        $categoryIds = [];
+        $mediumIds = [];
+        foreach ($contexts as $context) {
+            if ($context['advertising_category_id'] !== null) {
+                $categoryIds[] = (int) $context['advertising_category_id'];
+            }
+            if ($context['advertising_medium_id'] !== null) {
+                $mediumIds[] = (int) $context['advertising_medium_id'];
+            }
+        }
+        $categoryIds = array_values(array_unique($categoryIds));
+        $mediumIds = array_values(array_unique($mediumIds));
+
+        $query->where(function ($q) use ($categoryIds, $mediumIds): void {
+            $q->where('target_layer', FieldSetAssignmentTargetLayer::Global->value);
+            if ($categoryIds !== []) {
+                $q->orWhere(function ($inner) use ($categoryIds): void {
+                    $inner->where('target_layer', FieldSetAssignmentTargetLayer::AdvertisingCategory->value)
+                        ->whereIn('advertising_category_id', $categoryIds);
+                });
+            }
+            if ($mediumIds !== []) {
+                $q->orWhere(function ($inner) use ($mediumIds): void {
+                    $inner->where('target_layer', FieldSetAssignmentTargetLayer::AdvertisingMedium->value)
+                        ->whereIn('advertising_medium_id', $mediumIds);
+                });
+            }
+        });
+
+        return array_values($query->orderBy('id')->pluck('id')->map(static fn ($id): int => (int) $id)->all());
+    }
+
+    /**
+     * @param  list<FieldAppliesTo>  $processes
+     */
+    private function lockTargetRows(FieldSetAssignment $assignment, array $processes): void
+    {
+        unset($processes);
+
+        $categoryIds = [];
+        $mediumIds = [];
+
+        foreach ($this->affectedContexts($assignment) as $context) {
+            if ($context['advertising_category_id'] !== null) {
+                $categoryIds[] = (int) $context['advertising_category_id'];
+            }
+            if ($context['advertising_medium_id'] !== null) {
+                $mediumIds[] = (int) $context['advertising_medium_id'];
+            }
+        }
+
+        if ($assignment->advertising_category_id !== null) {
+            $categoryIds[] = (int) $assignment->advertising_category_id;
+        }
+        if ($assignment->advertising_medium_id !== null) {
+            $mediumIds[] = (int) $assignment->advertising_medium_id;
+        }
+
+        $categoryIds = array_values(array_unique($categoryIds));
+        $mediumIds = array_values(array_unique($mediumIds));
+        sort($categoryIds);
+        sort($mediumIds);
+
+        if ($mediumIds !== []) {
+            $media = AdvertisingMedium::query()
+                ->whereIn('id', $mediumIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id', 'category_id']);
+            foreach ($media as $medium) {
+                $categoryIds[] = (int) $medium->category_id;
+            }
+            $categoryIds = array_values(array_unique($categoryIds));
+            sort($categoryIds);
+        }
+
+        if ($categoryIds !== []) {
+            AdvertisingCategory::query()
+                ->whereIn('id', $categoryIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+    }
+
+    /**
+     * @return list<FieldAppliesTo>
+     */
+    private function processesForAssignment(FieldSetAssignment $assignment): array
+    {
+        return match ($assignment->applies_to_process) {
+            FieldAppliesTo::Calculation => [FieldAppliesTo::Calculation],
+            FieldAppliesTo::DispoOrder => [FieldAppliesTo::DispoOrder],
+            FieldAppliesTo::Both => [FieldAppliesTo::Calculation, FieldAppliesTo::DispoOrder],
+        };
     }
 
     /**
@@ -609,7 +756,9 @@ final class FieldSetAssignmentAdminWriter
     private function assertLock(FieldSetAssignment $assignment, int $expected): void
     {
         if ((int) $assignment->lock_version !== $expected) {
-            throw new FieldSetAssignmentConflictException;
+            throw new FieldSetAssignmentConflictException(
+                'Das Assignment wurde parallel geändert. Bitte neu laden und erneut prüfen.',
+            );
         }
     }
 
