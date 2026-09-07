@@ -284,9 +284,9 @@ final class FieldSetVersionAdminWriter
                 }
                 if (! $definition->is_system) {
                     $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked->key);
-                    if ($definition->scope !== FieldScope::Header) {
+                    if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
                         throw ValidationException::withMessages([
-                            'fields' => 'In DF-3.2a dürfen nur Header-Felder in Feldsets aktiviert werden.',
+                            'fields' => 'In DF-3.2b dürfen nur Header- oder Position-Felder in Feldsets aktiviert werden.',
                         ]);
                     }
                 }
@@ -410,9 +410,9 @@ final class FieldSetVersionAdminWriter
                 ]);
             }
 
-            if ($definition->scope !== FieldScope::Header) {
+            if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
                 throw ValidationException::withMessages([
-                    'field_definition_id' => 'In DF-3.2a sind nur Header-Felder als Membership zulässig.',
+                    'field_definition_id' => 'In DF-3.2b sind nur Header- oder Position-Felder als Membership zulässig.',
                 ]);
             }
 

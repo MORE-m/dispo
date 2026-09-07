@@ -65,6 +65,10 @@ final class CalculationDynamicFieldWriter
             $positionValues = $this->normalizeScopeValues($snapshot, FieldScope::Position, $input, $prefix);
             $positionContexts[] = [
                 'index' => $index,
+                'id' => isset($positionPayload['id']) ? (int) $positionPayload['id'] : null,
+                'client_key' => isset($positionPayload['client_key'])
+                    ? (string) $positionPayload['client_key']
+                    : null,
                 'values' => $positionValues,
             ];
         }
@@ -74,11 +78,20 @@ final class CalculationDynamicFieldWriter
         $this->persistHeaderValues($calculation, $snapshot, $headerValues);
 
         $calculation->loadMissing('positions');
-        $positions = $calculation->positions->values();
+        $byId = $calculation->positions->keyBy('id');
+        $byClient = $calculation->positions->keyBy('client_key');
         foreach ($positionContexts as $context) {
-            $position = $positions->get($context['index']);
+            $position = null;
+            if ($context['id'] !== null) {
+                $position = $byId->get($context['id']);
+            }
+            if ($position === null && $context['client_key'] !== null && $context['client_key'] !== '') {
+                $position = $byClient->get($context['client_key']);
+            }
             if ($position === null) {
-                continue;
+                throw ValidationException::withMessages([
+                    "positions.{$context['index']}" => 'Positionszuordnung für dynamische Felder fehlgeschlagen.',
+                ]);
             }
             $this->persistPositionValues($position, $snapshot, $context['values']);
         }

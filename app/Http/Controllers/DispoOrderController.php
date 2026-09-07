@@ -9,6 +9,7 @@ use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
+use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
@@ -137,6 +138,23 @@ class DispoOrderController extends Controller
         );
 
         return $this->respondSuccess($request, $order, 'Dispoauftrag gespeichert.');
+    }
+
+    public function updatePositionCustoms(
+        UpdateDispoOrderPositionCustomsRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->dynamicFields->updateDraftPositionCustoms(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->positionDynamicFieldValues(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Positionsangaben gespeichert.');
     }
 
     public function syncCalculationDynamicFields(

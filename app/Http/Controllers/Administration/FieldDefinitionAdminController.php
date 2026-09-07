@@ -94,6 +94,7 @@ class FieldDefinitionAdminController extends Controller
         return Inertia::render('administration/dynamic-fields/definitions/create', [
             'defaults' => [
                 'field_type' => 'short_text',
+                'scope' => 'header',
                 'applies_to' => 'both',
                 'sort_default' => 100,
                 'reportable' => false,

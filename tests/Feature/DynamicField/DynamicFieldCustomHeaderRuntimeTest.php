@@ -3,6 +3,7 @@
 namespace Tests\Feature\DynamicField;
 
 use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\Role;
 use App\Models\Calculation;
@@ -167,6 +168,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $definition = app(FieldDefinitionCustomWriter::class)->create([
             'label' => 'Calc Only Guard',
             'field_type' => FieldType::ShortText,
+            'scope' => FieldScope::Header,
             'applies_to' => FieldAppliesTo::Calculation,
         ], $admin);
 
@@ -650,6 +652,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $definition = app(FieldDefinitionCustomWriter::class)->create([
             'label' => $label,
             'field_type' => $fieldType,
+            'scope' => FieldScope::Header,
             'applies_to' => $appliesTo,
             'max_length' => $maxLength,
             'sort_default' => 70,

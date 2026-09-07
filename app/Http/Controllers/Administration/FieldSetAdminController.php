@@ -43,7 +43,7 @@ class FieldSetAdminController extends Controller
             'links' => [
                 [
                     'title' => 'Felddefinitionen',
-                    'description' => 'Systemfelder revisionieren und eigene Header-Textfelder verwalten.',
+                    'description' => 'Systemfelder revisionieren und eigene Header-/Position-Textfelder verwalten.',
                     'href' => '/administration/dynamische-felder/definitionen',
                 ],
                 [
@@ -189,7 +189,7 @@ class FieldSetAdminController extends Controller
         $availableCustomDefinitions = FieldDefinition::query()
             ->where('is_system', false)
             ->where('is_active', true)
-            ->where('scope', FieldScope::Header)
+            ->whereIn('scope', [FieldScope::Header, FieldScope::Position])
             ->whereIn('applies_to', $allowedApplies)
             ->whereNotIn('id', $memberDefinitionIds)
             ->with(['currentRevision', 'revisions' => fn ($q) => $q->orderByDesc('revision')])
@@ -210,6 +210,7 @@ class FieldSetAdminController extends Controller
                     'id' => $definition->id,
                     'key' => $definition->key,
                     'label' => $definition->currentRevision?->label,
+                    'scope' => $definition->scope->value,
                     'applies_to' => $definition->applies_to->value,
                     'field_type' => $definition->field_type->value,
                     'current_revision_id' => $definition->current_revision_id,

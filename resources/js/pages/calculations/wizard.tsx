@@ -26,6 +26,7 @@ import {
 import {
     SchemaTextFields,
     customHeaderTextFieldsFromSchema,
+    customPositionTextFieldsFromSchema,
 } from '@/components/dynamic-fields/schema-text-fields';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
@@ -109,6 +110,7 @@ type PositionDraft = {
     period_open: boolean;
     flight_period_start: string;
     flight_period_end: string;
+    custom_fields: Record<string, string>;
 };
 
 type FieldSchema = {
@@ -291,7 +293,7 @@ type SavedCalculation = {
             custom_label: string | null;
             percent: string;
         }>;
-        dynamic_field_values?: {
+        dynamic_field_values?: Record<string, unknown> & {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
         };
@@ -396,6 +398,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                 period_open: true,
                 flight_period_start: '',
                 flight_period_end: '',
+                custom_fields: {},
             };
         }
     }
@@ -544,6 +547,10 @@ export default function CalculationWizard({
         () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
+    const customPositionFields = useMemo(
+        () => customPositionTextFieldsFromSchema(fieldSchema.fields),
+        [fieldSchema.fields],
+    );
     const [customHeaderValues, setCustomHeaderValues] = useState<
         Record<string, string>
     >(() => {
@@ -643,6 +650,21 @@ export default function CalculationWizard({
                 flight_period_end:
                     position.dynamic_field_values?.position_flight_period
                         ?.end ?? '',
+                custom_fields: Object.fromEntries(
+                    customPositionTextFieldsFromSchema(fieldSchema.fields).map(
+                        (field) => {
+                            const raw =
+                                position.dynamic_field_values?.[field.key];
+                            return [
+                                field.key,
+                                typeof raw === 'string' ||
+                                typeof raw === 'number'
+                                    ? String(raw)
+                                    : '',
+                            ];
+                        },
+                    ),
+                ),
             }));
         }
 
@@ -762,6 +784,12 @@ export default function CalculationWizard({
                                                 null,
                                         }
                                       : null,
+                              ...Object.fromEntries(
+                                  customPositionFields.map((field) => [
+                                      field.key,
+                                      position.custom_fields[field.key] ?? '',
+                                  ]),
+                              ),
                           },
                           plan_rows: ranges.flatMap((range) =>
                               Array.from(
@@ -789,10 +817,10 @@ export default function CalculationWizard({
             campaignPeriodStart,
             campaignPeriodEnd,
             customHeaderFields,
+            customPositionFields,
             customHeaderValues,
             orderDiscounts,
             aeEnabled,
-            targetBudget,
             targetBudget,
             budgetElements,
             budgetPositionDiscounts,
@@ -1107,6 +1135,7 @@ export default function CalculationWizard({
                     period_open: existing?.period_open ?? true,
                     flight_period_start: existing?.flight_period_start ?? '',
                     flight_period_end: existing?.flight_period_end ?? '',
+                    custom_fields: existing?.custom_fields ?? {},
                 };
             }),
         );
@@ -1865,6 +1894,51 @@ export default function CalculationWizard({
                                                                         />
                                                                     </div>
                                                                 </FormField>
+                                                            ) : null}
+                                                            {customPositionFields.length >
+                                                            0 ? (
+                                                                <div
+                                                                    className="space-y-3 sm:col-span-2"
+                                                                    data-test={`calculation-custom-position-fields-${position.client_key}`}
+                                                                >
+                                                                    <h3 className="text-sm font-semibold">
+                                                                        Weitere
+                                                                        Angaben
+                                                                    </h3>
+                                                                    <SchemaTextFields
+                                                                        fields={
+                                                                            customPositionFields
+                                                                        }
+                                                                        values={
+                                                                            position.custom_fields
+                                                                        }
+                                                                        errors={
+                                                                            fieldErrors
+                                                                        }
+                                                                        errorKeyPrefixes={[
+                                                                            `positions.${index}.dynamic_field_values`,
+                                                                        ]}
+                                                                        disabled={
+                                                                            !canEdit
+                                                                        }
+                                                                        idPrefix={`calc-pos-custom-${position.client_key}`}
+                                                                        onChange={(
+                                                                            key,
+                                                                            value,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    custom_fields:
+                                                                                        {
+                                                                                            ...position.custom_fields,
+                                                                                            [key]: value,
+                                                                                        },
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </div>
                                                             ) : null}
                                                             {canEdit &&
                                                             positions.length >

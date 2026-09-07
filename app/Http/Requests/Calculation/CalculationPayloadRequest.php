@@ -107,6 +107,7 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.dynamic_field_values.position_flight_period' => ['nullable', 'array'],
             'positions.*.dynamic_field_values.position_flight_period.start' => ['nullable', 'date'],
             'positions.*.dynamic_field_values.position_flight_period.end' => ['nullable', 'date'],
+            'positions.*.dynamic_field_values.*' => ['nullable'],
         ];
     }
 
@@ -272,7 +273,12 @@ class CalculationPayloadRequest extends FormRequest
                     continue;
                 }
 
-                $this->validateHeaderTextValue($validator, $key, $raw, $headerAllowed[$key]);
+                $this->validateTextValue(
+                    $validator,
+                    'dynamic_field_values.'.$key,
+                    $raw,
+                    $headerAllowed[$key],
+                );
             }
         }
 
@@ -284,7 +290,7 @@ class CalculationPayloadRequest extends FormRequest
             if (! is_array($values)) {
                 continue;
             }
-            foreach (array_keys($values) as $key) {
+            foreach ($values as $key => $raw) {
                 $key = (string) $key;
                 if (! isset($positionAllowed[$key])) {
                     $validator->errors()->add(
@@ -293,7 +299,16 @@ class CalculationPayloadRequest extends FormRequest
                             ? 'Dieses Feld gehört nicht in diesen Bereich.'
                             : 'Unbekanntes dynamisches Feld.',
                     );
+
+                    continue;
                 }
+
+                $this->validateTextValue(
+                    $validator,
+                    "positions.{$index}.dynamic_field_values.{$key}",
+                    $raw,
+                    $positionAllowed[$key],
+                );
             }
         }
     }
@@ -301,7 +316,7 @@ class CalculationPayloadRequest extends FormRequest
     /**
      * @param  array{field_type: string, max_length: int, label: string, required?: bool, visible?: bool}  $meta
      */
-    private function validateHeaderTextValue(Validator $validator, string $key, mixed $raw, array $meta): void
+    private function validateTextValue(Validator $validator, string $errorKey, mixed $raw, array $meta): void
     {
         if (! in_array($meta['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true)) {
             return;
@@ -313,7 +328,7 @@ class CalculationPayloadRequest extends FormRequest
 
         if (! is_string($raw) && ! is_numeric($raw)) {
             $validator->errors()->add(
-                "dynamic_field_values.{$key}",
+                $errorKey,
                 $meta['label'].' muss Text sein.',
             );
 
@@ -323,7 +338,7 @@ class CalculationPayloadRequest extends FormRequest
         $value = (string) $raw;
         if (mb_strlen($value) > $meta['max_length']) {
             $validator->errors()->add(
-                "dynamic_field_values.{$key}",
+                $errorKey,
                 $meta['label'].' darf höchstens '.$meta['max_length'].' Zeichen haben.',
             );
         }

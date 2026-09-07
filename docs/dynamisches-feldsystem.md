@@ -77,12 +77,31 @@ Zweiter Teilslice von DF-3 auf Feature-Branch
   Änderung solange unbenutzt, sonst Revision; Deaktivieren/Reaktivieren/Löschen
   mit `lock_version` und deutscher 409-Meldung.
 - Kern-Feldset-Draft: aktive Custom-Header mit passendem `applies_to`
-  hinzufügen/entfernen; Positions-Memberships abgelehnt (DF-3.2b).
+  hinzufügen/entfernen; Positions-Memberships damals abgelehnt (jetzt DF-3.2b).
 - Runtime: Kalkulations-Wizard Abschnitt „Weitere Angaben“; Dispo-Show
   editierbare native Custom-Header sowie Calc-origin Custom read-only
   „Aus Kalkulation“.
-- Bewusst später: DF-3.2b Position-Custom-Felder, Optionen, Assignments,
+- Bewusst später in DF-3.2a: Position-Custom (DF-3.2b), Optionen, Assignments,
   Regel-Editor.
+
+## Umsetzungsstand DF-3.2b (Custom Position-Textfelder)
+
+Dritter Teilslice von DF-3 auf Feature-Branch
+`feat/df3-2b-custom-position-text-fields` – **DF-3 bleibt unvollständig**.
+
+- Custom-Definitionen: nur `short_text` / `long_text`, Scope fest `position`,
+  `applies_to` calculation|dispo_order|both (both wie DF-3.2a, PO-32b-4).
+- Identity: Calc-Sync über Positions-`id`/`client_key`; Dispo-Zuordnung über
+  `calculation_position_id`.
+- Provenance Calc-Origin: Quell-Snapshot (`source_configuration_snapshot_id` +
+  Key in Source-Defs), kein neues Provenance-Flag (PO-32b-3).
+- Pflicht-Vollständigkeit sichtbarer Positionsfelder nur bei Dispo-Create/Revision
+  aus Calc – nicht bei Calc-Store/Update, Budget-Apply oder Re-Optimize
+  (PO-32b-1).
+- Native Dispo-Positions-Customs: atomarer Partial-Save (PO-32b-2); Calc-Origin
+  read-only.
+- E2E isoliert: `playwright.df32b.config.ts` mit eigener SQLite-DB und Port.
+- Bewusst später: Optionen, Assignments, Regel-Editor.
 
 ## Konfigurationsebenen
 

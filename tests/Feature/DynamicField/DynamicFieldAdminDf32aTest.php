@@ -33,6 +33,7 @@ class DynamicFieldAdminDf32aTest extends TestCase
             ->post(route('administration.dynamic-fields.definitions.store'), [
                 'label' => 'Kampagnen Hinweis',
                 'field_type' => FieldType::ShortText->value,
+                'scope' => FieldScope::Header->value,
                 'applies_to' => FieldAppliesTo::Both->value,
                 'max_length' => 100,
                 'reportable' => true,
@@ -56,6 +57,7 @@ class DynamicFieldAdminDf32aTest extends TestCase
             ->post(route('administration.dynamic-fields.definitions.store'), [
                 'label' => 'System Foo',
                 'field_type' => FieldType::LongText->value,
+                'scope' => FieldScope::Header->value,
                 'applies_to' => FieldAppliesTo::Calculation->value,
             ])
             ->assertSessionHasErrors('label');
@@ -317,6 +319,7 @@ class DynamicFieldAdminDf32aTest extends TestCase
             ->post(route('administration.dynamic-fields.definitions.store'), [
                 'label' => 'X',
                 'field_type' => FieldType::ShortText->value,
+                'scope' => FieldScope::Header->value,
                 'applies_to' => FieldAppliesTo::Both->value,
             ])
             ->assertForbidden();
@@ -379,6 +382,7 @@ class DynamicFieldAdminDf32aTest extends TestCase
             ->post(route('administration.dynamic-fields.definitions.store'), array_merge([
                 'label' => 'Custom Hinweis',
                 'field_type' => FieldType::ShortText->value,
+                'scope' => FieldScope::Header->value,
                 'applies_to' => FieldAppliesTo::Both->value,
                 'sort_default' => 80,
                 'reportable' => false,

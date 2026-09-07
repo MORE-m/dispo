@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -97,15 +98,14 @@ final class CalculationWriter
                 $dynamicPayload['dynamic_field_values'] = $payload['dynamic_field_values']
                     ?? $dynamicPayload['dynamic_field_values'];
                 if (isset($payload['positions']) && is_array($payload['positions'])) {
-                    foreach ($payload['positions'] as $index => $positionPayload) {
-                        if (! isset($dynamicPayload['positions'][$index])) {
-                            continue;
-                        }
-                        if (isset($positionPayload['dynamic_field_values'])) {
-                            $dynamicPayload['positions'][$index]['dynamic_field_values'] =
-                                $positionPayload['dynamic_field_values'];
-                        }
-                    }
+                    /** @var array<int, array<string, mixed>> $basePositions */
+                    $basePositions = $dynamicPayload['positions'];
+                    /** @var array<int|string, mixed> $incomingPositions */
+                    $incomingPositions = $payload['positions'];
+                    $dynamicPayload['positions'] = $this->mergePositionDynamicValuesByIdentity(
+                        $basePositions,
+                        $incomingPositions,
+                    );
                 }
                 $this->dynamicFields->syncFromPayload($locked, $dynamicPayload);
             } else {
@@ -205,6 +205,8 @@ final class CalculationWriter
         $this->applyTotals($calculation, $totals, $user);
         $calculation->save();
 
+        $this->assertPositionIdentitiesBelongToCalculation($payload, $existingById, $existingByClient);
+
         $seenIds = [];
 
         foreach ($resolved as $index => $item) {
@@ -253,6 +255,12 @@ final class CalculationWriter
             $position->save();
             $seenIds[] = $position->id;
 
+            // Identität direkt am Persistenz-Mapping stempeln (kein Index-Matching danach).
+            if (isset($payload['positions'][$index]) && is_array($payload['positions'][$index])) {
+                $payload['positions'][$index]['id'] = $position->id;
+                $payload['positions'][$index]['client_key'] = $position->client_key;
+            }
+
             $this->syncPlanRows($position, $result);
             $this->syncTimeRanges($position, $result);
             $this->syncPositionDiscounts($position, $item['position_discounts']);
@@ -275,6 +283,109 @@ final class CalculationWriter
 
         $calculation->load('positions');
         $this->dynamicFields->syncFromPayload($calculation, $payload);
+    }
+
+    /**
+     * Übernimmt Positions-Dyn-Werte per id/client_key (nie per Array-Index).
+     *
+     * @param  array<int, array<string, mixed>>  $basePositions
+     * @param  array<int|string, mixed>  $incomingPositions
+     * @return array<int, array<string, mixed>>
+     */
+    private function mergePositionDynamicValuesByIdentity(array $basePositions, array $incomingPositions): array
+    {
+        $byId = [];
+        $byClient = [];
+        foreach ($incomingPositions as $incoming) {
+            if (! is_array($incoming) || ! isset($incoming['dynamic_field_values'])) {
+                continue;
+            }
+            if (isset($incoming['id'])) {
+                $byId[(int) $incoming['id']] = $incoming['dynamic_field_values'];
+            }
+            $clientKey = isset($incoming['client_key']) ? (string) $incoming['client_key'] : '';
+            if ($clientKey !== '') {
+                $byClient[$clientKey] = $incoming['dynamic_field_values'];
+            }
+        }
+
+        foreach ($basePositions as $index => $base) {
+            $values = null;
+            if (isset($base['id']) && array_key_exists((int) $base['id'], $byId)) {
+                $values = $byId[(int) $base['id']];
+            } elseif (isset($base['client_key']) && array_key_exists((string) $base['client_key'], $byClient)) {
+                $values = $byClient[(string) $base['client_key']];
+            }
+            if ($values !== null) {
+                $basePositions[$index]['dynamic_field_values'] = $values;
+            }
+        }
+
+        return $basePositions;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  Collection<int, CalculationPosition>  $existingById
+     * @param  Collection<string, CalculationPosition>  $existingByClient
+     */
+    private function assertPositionIdentitiesBelongToCalculation(
+        array $payload,
+        $existingById,
+        $existingByClient,
+    ): void {
+        if (! isset($payload['positions']) || ! is_array($payload['positions'])) {
+            return;
+        }
+
+        $seenIds = [];
+        $seenClientKeys = [];
+
+        foreach ($payload['positions'] as $index => $positionPayload) {
+            if (! is_array($positionPayload)) {
+                continue;
+            }
+
+            if (isset($positionPayload['id'])) {
+                $id = (int) $positionPayload['id'];
+                if ($existingById->get($id) === null) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.id" => 'Unbekannte Position.',
+                    ]);
+                }
+                if (isset($seenIds[$id])) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.id" => 'Doppelte Positions-ID im Payload.',
+                    ]);
+                }
+                $seenIds[$id] = true;
+            }
+
+            $clientKey = isset($positionPayload['client_key']) ? (string) $positionPayload['client_key'] : '';
+            if ($clientKey === '') {
+                continue;
+            }
+
+            if (isset($seenClientKeys[$clientKey])) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.client_key" => 'Doppelter client_key im Payload.',
+                ]);
+            }
+            $seenClientKeys[$clientKey] = true;
+
+            if ($existingByClient->get($clientKey) !== null) {
+                continue;
+            }
+
+            $belongsElsewhere = CalculationPosition::query()
+                ->where('client_key', $clientKey)
+                ->exists();
+            if ($belongsElsewhere) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.client_key" => 'Unbekannte Position.',
+                ]);
+            }
+        }
     }
 
     private function syncPlanRows(CalculationPosition $position, PositionResult $result): void
@@ -532,8 +643,7 @@ final class CalculationWriter
             ];
         }
 
-        usort($normalized, fn (array $a, array $b): int => ($a['id'] ?? 0) <=> ($b['id'] ?? 0));
-
+        // Reihenfolge bleibt erhalten: Umordnen ist keine Header-only-Änderung.
         return $normalized;
     }
 

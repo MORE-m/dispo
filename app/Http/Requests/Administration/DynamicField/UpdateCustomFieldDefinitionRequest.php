@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Administration\DynamicField;
 
 use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
             'lock_version' => ['required', 'integer', 'min:1'],
             'label' => ['sometimes', 'string', 'max:255'],
             'field_type' => ['sometimes', Rule::enum(FieldType::class)->only([FieldType::ShortText, FieldType::LongText])],
+            'scope' => ['sometimes', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['sometimes', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],
             'group_key' => ['nullable', 'string', 'max:64'],
@@ -37,6 +39,7 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
      *     lock_version: int,
      *     label?: string,
      *     field_type?: string,
+     *     scope?: string,
      *     applies_to?: string,
      *     help_text?: string|null,
      *     group_key?: string|null,
@@ -56,6 +59,9 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
         }
         if (array_key_exists('field_type', $data)) {
             $payload['field_type'] = (string) $data['field_type'];
+        }
+        if (array_key_exists('scope', $data)) {
+            $payload['scope'] = (string) $data['scope'];
         }
         if (array_key_exists('applies_to', $data)) {
             $payload['applies_to'] = (string) $data['applies_to'];

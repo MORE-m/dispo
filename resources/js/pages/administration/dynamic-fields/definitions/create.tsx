@@ -20,6 +20,7 @@ export default function DefinitionCreate({
 }: {
     defaults: {
         field_type: string;
+        scope: string;
         applies_to: string;
         sort_default: number;
         reportable: boolean;
@@ -29,6 +30,7 @@ export default function DefinitionCreate({
         label: '',
         key: '',
         field_type: defaults.field_type || 'short_text',
+        scope: defaults.scope || 'header',
         applies_to: defaults.applies_to || 'both',
         help_text: '',
         group_key: '',
@@ -56,7 +58,7 @@ export default function DefinitionCreate({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Eigenes Feld anlegen"
-                    description="Header-Textfeld (short_text / long_text). Scope ist fest: header."
+                    description="Textfeld (short_text / long_text) für Header oder Position."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/administration/dynamische-felder/definitionen">
@@ -163,8 +165,23 @@ export default function DefinitionCreate({
                         </select>
                     </FormField>
 
-                    <FormField label="Scope" htmlFor="scope">
-                        <Input id="scope" value="header" disabled readOnly />
+                    <FormField
+                        label="Scope"
+                        htmlFor="scope"
+                        error={form.errors.scope}
+                    >
+                        <select
+                            id="scope"
+                            className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                            value={form.data.scope}
+                            onChange={(e) =>
+                                form.setData('scope', e.target.value)
+                            }
+                            data-test="custom-field-scope-select"
+                        >
+                            <option value="header">header</option>
+                            <option value="position">position</option>
+                        </select>
                     </FormField>
 
                     <FormField
