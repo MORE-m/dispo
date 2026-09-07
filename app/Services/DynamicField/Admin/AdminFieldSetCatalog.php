@@ -2,8 +2,14 @@
 
 namespace App\Services\DynamicField\Admin;
 
+use App\Models\FieldSet;
+
 /**
- * DF-3.1: nur die beiden Kern-Feldsets sind administrierbar.
+ * DF-3.1 / DF-3.3-fs: Core-Keys und Administrierbarkeit von Feldsets.
+ *
+ * Core-Keys sind historische Literale (gleich Migrations-Backfill). Freie
+ * Feldsets (is_system=false) sind administrierbar. Unbekannte is_system=true
+ * Datensätze sind kein weiteres Core-Feldset.
  */
 final class AdminFieldSetCatalog
 {
@@ -14,7 +20,7 @@ final class AdminFieldSetCatalog
     /**
      * @return list<string>
      */
-    public static function allowedKeys(): array
+    public static function coreKeys(): array
     {
         return [
             self::CALCULATION_CORE,
@@ -22,8 +28,34 @@ final class AdminFieldSetCatalog
         ];
     }
 
+    /**
+     * @return list<string>
+     */
+    public static function allowedKeys(): array
+    {
+        return self::coreKeys();
+    }
+
+    public static function isCoreKey(string $key): bool
+    {
+        return in_array($key, self::coreKeys(), true);
+    }
+
     public static function isAllowed(string $key): bool
     {
-        return in_array($key, self::allowedKeys(), true);
+        return self::isCoreKey($key);
+    }
+
+    public static function isAdministrable(FieldSet $fieldSet): bool
+    {
+        if (self::isCoreKey($fieldSet->key)) {
+            return true;
+        }
+
+        if ($fieldSet->is_system) {
+            return false;
+        }
+
+        return true;
     }
 }

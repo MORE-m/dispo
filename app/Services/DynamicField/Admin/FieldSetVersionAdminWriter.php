@@ -20,7 +20,8 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
 /**
- * DF-3.1 / DYN-003 / VER-005 / VER-006 / ADM-001: Draft, Activate, Copy-as-template.
+ * DF-3.1 / DF-3.3-fs / DYN-003 / VER-005 / VER-006 / ADM-001:
+ * Create freier Feldsets, Draft, Activate, Copy-as-template, Deakt./Reakt.
  * Regeln werden nur kopiert, nie mutiert.
  */
 final class FieldSetVersionAdminWriter
@@ -28,15 +29,282 @@ final class FieldSetVersionAdminWriter
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly SnapshotFieldRuleEvaluator $rules,
+        private readonly FieldSetKeySlugger $slugger,
     ) {}
 
     public function assertAdminFieldSet(FieldSet $fieldSet): void
     {
-        if (! AdminFieldSetCatalog::isAllowed($fieldSet->key)) {
+        if (! AdminFieldSetCatalog::isAdministrable($fieldSet)) {
             throw ValidationException::withMessages([
-                'field_set' => 'Dieses Feldset ist in DF-3.1 nicht administrierbar.',
+                'field_set' => 'Dieses Feldset ist nicht administrierbar.',
             ]);
         }
+    }
+
+    /**
+     * @param  array{
+     *     name: string,
+     *     key?: string|null,
+     *     applies_to: FieldAppliesTo|string
+     * }  $payload
+     */
+    public function createFreeFieldSet(array $payload, User $actor): FieldSet
+    {
+        $name = trim((string) $payload['name']);
+        if ($name === '') {
+            throw ValidationException::withMessages([
+                'name' => 'Der Name ist erforderlich.',
+            ]);
+        }
+
+        $appliesTo = $this->normalizeAppliesTo($payload['applies_to']);
+        $keyCandidate = $payload['key'] ?? null;
+        $explicitKey = is_string($keyCandidate) && trim($keyCandidate) !== ''
+            ? trim($keyCandidate)
+            : null;
+        if ($explicitKey !== null) {
+            $this->slugger->assertKeyAllowed($explicitKey);
+            $key = $explicitKey;
+        } else {
+            $key = $this->slugger->uniqueSlugFromName($name);
+        }
+
+        return DB::transaction(function () use ($name, $key, $appliesTo, $actor): FieldSet {
+            $fieldSet = new FieldSet;
+            $fieldSet->key = $key;
+            $fieldSet->name = $name;
+            $fieldSet->is_system = false;
+            $fieldSet->applies_to = $appliesTo;
+            $fieldSet->is_assignable = false;
+            $fieldSet->active_version_id = null;
+            $fieldSet->lock_version = 1;
+            $fieldSet->save();
+
+            $draft = new FieldSetVersion;
+            $draft->field_set_id = $fieldSet->id;
+            $draft->version = 1;
+            $draft->status = FieldSetVersionStatus::Draft;
+            $draft->created_at = now();
+            $draft->save();
+
+            $this->audit->record(
+                $fieldSet,
+                'field_set.created',
+                $actor,
+                null,
+                [
+                    'key' => $fieldSet->key,
+                    'name' => $fieldSet->name,
+                    'applies_to' => $fieldSet->applies_to->value,
+                    'is_system' => false,
+                    'is_assignable' => false,
+                    'lock_version' => $fieldSet->lock_version,
+                    'draft_version_id' => $draft->id,
+                    'draft_version' => $draft->version,
+                ],
+            );
+
+            return $fieldSet->fresh(['versions', 'activeVersion']) ?? $fieldSet;
+        });
+    }
+
+    /**
+     * @param  array{
+     *     name?: string,
+     *     applies_to?: FieldAppliesTo|string,
+     *     lock_version: int
+     * }  $payload
+     */
+    public function updateContainerMetadata(FieldSet $fieldSet, array $payload, User $actor): FieldSet
+    {
+        $this->assertAdminFieldSet($fieldSet);
+
+        if (AdminFieldSetCatalog::isCoreKey($fieldSet->key) || $fieldSet->is_system) {
+            throw ValidationException::withMessages([
+                'field_set' => 'Kern-Feldsets dürfen nicht über Metadaten geändert werden.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($fieldSet, $payload, $actor): FieldSet {
+            /** @var FieldSet $locked */
+            $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
+            $this->assertLock($locked, (int) $payload['lock_version']);
+
+            $before = [
+                'name' => $locked->name,
+                'applies_to' => $locked->applies_to->value,
+                'is_assignable' => $locked->is_assignable,
+                'lock_version' => $locked->lock_version,
+            ];
+
+            $nameChanged = false;
+            $appliesChanged = false;
+
+            if (array_key_exists('name', $payload)) {
+                $name = trim((string) $payload['name']);
+                if ($name === '') {
+                    throw ValidationException::withMessages([
+                        'name' => 'Der Name ist erforderlich.',
+                    ]);
+                }
+                if ($name !== $locked->name) {
+                    $locked->name = $name;
+                    $nameChanged = true;
+                }
+            }
+
+            if (array_key_exists('applies_to', $payload)) {
+                $newApplies = $this->normalizeAppliesTo($payload['applies_to']);
+                if ($newApplies !== $locked->applies_to) {
+                    if ($this->hasEverBeenActivated($locked)) {
+                        throw ValidationException::withMessages([
+                            'applies_to' => 'Die Gültigkeit darf nach der ersten Aktivierung nicht mehr geändert werden.',
+                        ]);
+                    }
+
+                    $this->assertDraftMembershipsCompatibleWithAppliesTo($locked, $newApplies);
+                    $locked->applies_to = $newApplies;
+                    $appliesChanged = true;
+                }
+            }
+
+            if (! $nameChanged && ! $appliesChanged) {
+                return $locked;
+            }
+
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $action = $nameChanged && ! $appliesChanged
+                ? 'field_set.renamed'
+                : 'field_set.metadata_updated';
+
+            $this->audit->record(
+                $locked,
+                $action,
+                $actor,
+                $before,
+                [
+                    'name' => $locked->name,
+                    'applies_to' => $locked->applies_to->value,
+                    'is_assignable' => $locked->is_assignable,
+                    'lock_version' => $locked->lock_version,
+                    'field_set_key' => $locked->key,
+                ],
+            );
+
+            return $locked;
+        });
+    }
+
+    public function deactivate(FieldSet $fieldSet, User $actor, int $expectedLockVersion): FieldSet
+    {
+        $this->assertAdminFieldSet($fieldSet);
+
+        if (AdminFieldSetCatalog::isCoreKey($fieldSet->key) || $fieldSet->is_system) {
+            throw ValidationException::withMessages([
+                'field_set' => 'Kern-Feldsets können nicht deaktiviert werden.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($fieldSet, $actor, $expectedLockVersion): FieldSet {
+            /** @var FieldSet $locked */
+            $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
+            $this->assertLock($locked, $expectedLockVersion);
+
+            if (! $locked->is_assignable) {
+                throw ValidationException::withMessages([
+                    'field_set' => 'Das Feldset ist bereits deaktiviert bzw. noch nicht nutzbar.',
+                ]);
+            }
+
+            $before = [
+                'is_assignable' => true,
+                'lock_version' => $locked->lock_version,
+                'active_version_id' => $locked->active_version_id,
+            ];
+
+            $locked->is_assignable = false;
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $this->audit->record(
+                $locked,
+                'field_set.deactivated',
+                $actor,
+                $before,
+                [
+                    'is_assignable' => false,
+                    'lock_version' => $locked->lock_version,
+                    'active_version_id' => $locked->active_version_id,
+                    'field_set_key' => $locked->key,
+                ],
+            );
+
+            return $locked;
+        });
+    }
+
+    public function reactivate(FieldSet $fieldSet, User $actor, int $expectedLockVersion): FieldSet
+    {
+        $this->assertAdminFieldSet($fieldSet);
+
+        if (AdminFieldSetCatalog::isCoreKey($fieldSet->key) || $fieldSet->is_system) {
+            throw ValidationException::withMessages([
+                'field_set' => 'Kern-Feldsets können nicht reaktiviert werden.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($fieldSet, $actor, $expectedLockVersion): FieldSet {
+            /** @var FieldSet $locked */
+            $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
+            $this->assertLock($locked, $expectedLockVersion);
+
+            if ($locked->is_assignable) {
+                throw ValidationException::withMessages([
+                    'field_set' => 'Das Feldset ist bereits assignierbar.',
+                ]);
+            }
+
+            if ($locked->active_version_id === null) {
+                throw ValidationException::withMessages([
+                    'field_set' => 'Reaktivierung erfordert eine gültige aktive Version.',
+                ]);
+            }
+
+            /** @var FieldSetVersion $active */
+            $active = FieldSetVersion::query()->whereKey($locked->active_version_id)->lockForUpdate()->firstOrFail();
+            if ($active->status !== FieldSetVersionStatus::Active) {
+                throw ValidationException::withMessages([
+                    'field_set' => 'Reaktivierung erfordert eine gültige aktive Version.',
+                ]);
+            }
+
+            $before = [
+                'is_assignable' => false,
+                'lock_version' => $locked->lock_version,
+                'active_version_id' => $locked->active_version_id,
+            ];
+
+            $locked->is_assignable = true;
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $this->audit->record(
+                $locked,
+                'field_set.reactivated',
+                $actor,
+                $before,
+                [
+                    'is_assignable' => true,
+                    'lock_version' => $locked->lock_version,
+                    'active_version_id' => $locked->active_version_id,
+                    'field_set_key' => $locked->key,
+                ],
+            );
+
+            return $locked;
+        });
     }
 
     public function createDraftFromVersion(FieldSet $fieldSet, FieldSetVersion $source, User $actor, int $expectedLockVersion): FieldSetVersion
@@ -271,6 +539,15 @@ final class FieldSetVersionAdminWriter
             }
 
             $lockedDraft->load(['fields.revision.definition', 'rules']);
+
+            if ($lockedDraft->fields->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'fields' => 'Eine leere Version kann nicht aktiviert werden.',
+                ]);
+            }
+
+            $wasFirstActivation = ! $this->hasEverBeenActivated($locked);
+
             $defsByKey = [];
             foreach ($lockedDraft->fields as $membership) {
                 $definition = $membership->revision?->definition;
@@ -283,12 +560,21 @@ final class FieldSetVersionAdminWriter
                     ]);
                 }
                 if (! $definition->is_system) {
-                    $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked->key);
-                    if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
+                    if (! $definition->is_active) {
                         throw ValidationException::withMessages([
-                            'fields' => 'In DF-3.2b dürfen nur Header- oder Position-Felder in Feldsets aktiviert werden.',
+                            'fields' => "Definition „{$definition->key}“ ist deaktiviert und kann nicht aktiviert werden.",
                         ]);
                     }
+                    $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked);
+                    if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
+                        throw ValidationException::withMessages([
+                            'fields' => 'Nur Header- oder Position-Felder dürfen in Feldsets aktiviert werden.',
+                        ]);
+                    }
+                } elseif (! AdminFieldSetCatalog::isCoreKey($locked->key)) {
+                    throw ValidationException::withMessages([
+                        'fields' => 'Systemdefinitionen dürfen freien Feldsets nicht zugeordnet werden.',
+                    ]);
                 }
                 $defsByKey[$definition->key] = $definition;
             }
@@ -308,6 +594,12 @@ final class FieldSetVersionAdminWriter
             $lockedDraft->save();
 
             $locked->active_version_id = $lockedDraft->id;
+
+            $assignableBefore = $locked->is_assignable;
+            if ($wasFirstActivation && ! $locked->is_system && ! AdminFieldSetCatalog::isCoreKey($locked->key)) {
+                $locked->is_assignable = true;
+            }
+
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
@@ -318,11 +610,14 @@ final class FieldSetVersionAdminWriter
                 [
                     'lock_version' => $expectedLockVersion,
                     'active_version_id' => $previousActiveId,
+                    'is_assignable' => $assignableBefore,
                 ],
                 [
                     'lock_version' => $locked->lock_version,
                     'active_version_id' => $lockedDraft->id,
                     'active_version' => $lockedDraft->version,
+                    'is_assignable' => $locked->is_assignable,
+                    'first_activation' => $wasFirstActivation,
                     'field_set_key' => $locked->key,
                 ],
             );
@@ -412,11 +707,11 @@ final class FieldSetVersionAdminWriter
 
             if (! in_array($definition->scope, [FieldScope::Header, FieldScope::Position], true)) {
                 throw ValidationException::withMessages([
-                    'field_definition_id' => 'In DF-3.2b sind nur Header- oder Position-Felder als Membership zulässig.',
+                    'field_definition_id' => 'Nur Header- oder Position-Felder sind als Membership zulässig.',
                 ]);
             }
 
-            $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked->key);
+            $this->assertAppliesToMatchesFieldSet($definition->applies_to, $locked);
 
             if (FieldSetVersionField::query()
                 ->where('field_set_version_id', $lockedDraft->id)
@@ -577,26 +872,112 @@ final class FieldSetVersionAdminWriter
         });
     }
 
-    private function assertAppliesToMatchesFieldSet(FieldAppliesTo $appliesTo, string $fieldSetKey): void
+    /**
+     * @return list<string>
+     */
+    public static function allowedAppliesToValuesForFieldSet(FieldSet $fieldSet): array
     {
-        $isCalc = $fieldSetKey === AdminFieldSetCatalog::CALCULATION_CORE;
-        $isDispo = $fieldSetKey === AdminFieldSetCatalog::DISPO_ORDER_CORE;
-
-        $allowed = match ($appliesTo) {
-            FieldAppliesTo::Calculation => $isCalc,
-            FieldAppliesTo::DispoOrder => $isDispo,
-            FieldAppliesTo::Both => $isCalc || $isDispo,
+        return match ($fieldSet->applies_to) {
+            FieldAppliesTo::Calculation => [
+                FieldAppliesTo::Calculation->value,
+                FieldAppliesTo::Both->value,
+            ],
+            FieldAppliesTo::DispoOrder => [
+                FieldAppliesTo::DispoOrder->value,
+                FieldAppliesTo::Both->value,
+            ],
+            FieldAppliesTo::Both => [
+                FieldAppliesTo::Calculation->value,
+                FieldAppliesTo::DispoOrder->value,
+                FieldAppliesTo::Both->value,
+            ],
         };
+    }
 
-        if (! $allowed) {
+    private function assertAppliesToMatchesFieldSet(FieldAppliesTo $definitionAppliesTo, FieldSet $fieldSet): void
+    {
+        $allowed = self::allowedAppliesToValuesForFieldSet($fieldSet);
+        if (! in_array($definitionAppliesTo->value, $allowed, true)) {
             throw ValidationException::withMessages([
-                'field_definition_id' => match ($appliesTo) {
-                    FieldAppliesTo::Calculation => 'Felder mit applies_to=calculation dürfen nur dem Kalkulations-Feldset zugeordnet werden.',
-                    FieldAppliesTo::DispoOrder => 'Felder mit applies_to=dispo_order dürfen nur dem Dispo-Feldset zugeordnet werden.',
+                'field_definition_id' => match ($definitionAppliesTo) {
+                    FieldAppliesTo::Calculation => 'Felder mit applies_to=calculation passen nicht zu diesem Feldset.',
+                    FieldAppliesTo::DispoOrder => 'Felder mit applies_to=dispo_order passen nicht zu diesem Feldset.',
                     FieldAppliesTo::Both => 'Dieses Feld kann diesem Feldset nicht zugeordnet werden.',
                 },
             ]);
         }
+    }
+
+    private function assertDraftMembershipsCompatibleWithAppliesTo(FieldSet $fieldSet, FieldAppliesTo $appliesTo): void
+    {
+        $draft = FieldSetVersion::query()
+            ->where('field_set_id', $fieldSet->id)
+            ->where('status', FieldSetVersionStatus::Draft)
+            ->with(['fields.revision.definition', 'fields.definition'])
+            ->first();
+
+        if ($draft === null) {
+            return;
+        }
+
+        $allowed = match ($appliesTo) {
+            FieldAppliesTo::Calculation => [
+                FieldAppliesTo::Calculation->value,
+                FieldAppliesTo::Both->value,
+            ],
+            FieldAppliesTo::DispoOrder => [
+                FieldAppliesTo::DispoOrder->value,
+                FieldAppliesTo::Both->value,
+            ],
+            FieldAppliesTo::Both => [
+                FieldAppliesTo::Calculation->value,
+                FieldAppliesTo::DispoOrder->value,
+                FieldAppliesTo::Both->value,
+            ],
+        };
+
+        foreach ($draft->fields as $membership) {
+            $definition = $membership->revision->definition ?? $membership->definition;
+            if ($definition === null) {
+                throw new RuntimeException('Membership ohne gültige Definition.');
+            }
+            if (! in_array($definition->applies_to->value, $allowed, true)) {
+                throw ValidationException::withMessages([
+                    'field_definition_id' => match ($definition->applies_to) {
+                        FieldAppliesTo::Calculation => 'Felder mit applies_to=calculation passen nicht zu diesem Feldset.',
+                        FieldAppliesTo::DispoOrder => 'Felder mit applies_to=dispo_order passen nicht zu diesem Feldset.',
+                        FieldAppliesTo::Both => 'Dieses Feld kann diesem Feldset nicht zugeordnet werden.',
+                    },
+                ]);
+            }
+        }
+    }
+
+    private function hasEverBeenActivated(FieldSet $fieldSet): bool
+    {
+        return FieldSetVersion::query()
+            ->where('field_set_id', $fieldSet->id)
+            ->whereIn('status', [
+                FieldSetVersionStatus::Active,
+                FieldSetVersionStatus::Archived,
+            ])
+            ->exists();
+    }
+
+    private function normalizeAppliesTo(FieldAppliesTo|string $value): FieldAppliesTo
+    {
+        if ($value instanceof FieldAppliesTo) {
+            return $value;
+        }
+
+        $enum = FieldAppliesTo::tryFrom($value);
+        if ($enum === null) {
+            throw ValidationException::withMessages([
+                'applies_to' => 'Ungültige Gültigkeit.',
+            ]);
+        }
+
+        return $enum;
     }
 
     private function assertDraftOfSet(FieldSet $fieldSet, FieldSetVersion $version): void

@@ -84,6 +84,25 @@ Zweiter Teilslice von DF-3 auf Feature-Branch
 - Bewusst später in DF-3.2a: Position-Custom (DF-3.2b), Optionen, Assignments,
   Regel-Editor.
 
+## Umsetzungsstand DF-3.3-fs (freie Feldsets)
+
+Teilslice nach ADV-001a – **kein** Abschluss von DF-3, **kein** Start von
+DF-3.3a/b. Freie Feldsets haben **noch keine Runtime-Wirkung** auf Kalkulation
+oder Dispoauftrag.
+
+- `field_sets`: `is_system`, `applies_to` (calculation|dispo_order|both),
+  `is_assignable`; Core-Backfill fail-closed nur für
+  `system_calculation_core` / `system_dispo_order_core`.
+- Freie Feldsets anlegen: Key (ohne `system_`, nach Save immutable), Name,
+  Gültigkeit; atomar leerer Draft v1; `is_assignable=false` bis erste Activate.
+- Membership nur Custom-Definitionen; `applies_to=both` darf Calc-/Dispo-/both-
+  Definitionen mischen; leere Version nicht aktivierbar.
+- Deaktivieren setzt `is_assignable=false` (Active-Version bleibt); spätere
+  Versionsaktivierung reaktiviert nicht automatisch; Reaktivieren ist eigene Aktion.
+- Kern-Feldsets: dauerhaft `is_assignable=false`, Metadaten geschützt.
+- Admin unter Dyn-Feld-Teilfreigabe; E2E isoliert `playwright.df33fs.config.ts`.
+- Bewusst nicht: Assignments, Merge, Snapshot-Quellengraph, Runtime-Auswertung.
+
 ## Umsetzungsstand DF-3.2b (Custom Position-Textfelder)
 
 Dritter Teilslice von DF-3 auf Feature-Branch

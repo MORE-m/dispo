@@ -199,11 +199,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text auf `main`)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b)
-- **Geplante Folge:** `ADV-001a` → `DF-3.3-fs` (freie Feldsets) → `DF-3.3a`
-  (Assignments/Freeze/Merge) → `DF-3.3b` (Admin/Runtime)
+- **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
+- **Geplante Folge:** ADV-001a (erledigt) → **DF-3.3-fs** (freie Feldsets, erledigt auf Feature-Branch)
+  → `DF-3.3a` (Assignments/Freeze/Merge) → `DF-3.3b` (Admin/Runtime)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -214,16 +214,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.1 erledigt:** Admin-UI für Systemfeld-Revisionen und Kern-Feldset
   Draft/Activate/statische Vorschau; Regeln nur lesbar; Audit (`ADM-001`,
   `ADM-002` Teil).
-- **DF-3.2a erledigt (Feature-Branch):** Custom Header-Textfelder
-  (`short_text`/`long_text`, `max_length` bis 20000 / MEDIUMTEXT), Admin
-  Anlegen/Revision/Deaktivieren, Membership in Kern-Feldsets, Runtime in
-  Kalkulations-Wizard und Dispo-Show.
-- **DF-3.2b erledigt (Feature-Branch):** Custom Position-Textfelder
-  (`scope=position`, short/long), Identity `id`/`client_key` bzw.
-  `calculation_position_id`, Pflicht erst bei Dispo-Create (PO-32b-1),
-  Partial-Save, Snapshot-Provenance, isolierte E2E-Config.
+- **DF-3.2a/b erledigt:** Custom Header-/Position-Textfelder auf `main`.
+- **DF-3.3-fs erledigt (Feature-Branch):** frei anlegbare versionierte Feldsets
+  inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
+  Wirkung und ohne Assignments (`DYN-002`/`DYN-003` Teil).
   **DF-3 nicht abgeschlossen.**
-- **Offen:** Optionen, Assignments/Vererbung, volle Regelmatrix, Regel-Editor.
+- **Offen:** Optionen, Assignments/Vererbung (DF-3.3a/b), volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
