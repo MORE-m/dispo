@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Console\Scheduling\Schedule;
@@ -34,4 +35,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Konflikte werden immer als JSON ausgeliefert, damit auch Inertia-Posts
+        // die fachliche Meldung statt einer generischen 409-Fehlerseite erhalten.
+        $exceptions->render(function (FieldSetAssignmentConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        });
     })->create();

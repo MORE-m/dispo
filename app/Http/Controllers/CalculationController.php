@@ -16,12 +16,11 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
+use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
 use App\Models\FieldDefinition;
-use App\Models\FieldSet;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
-use App\Models\SnapshotFieldDefinition;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -29,10 +28,11 @@ use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
-use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,6 +44,7 @@ class CalculationController extends Controller
         private readonly AuditLogger $audit,
         private readonly DispoOrderRevisionContext $dispoOrderRevisionContext,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
+        private readonly ConfigurationSnapshotFreezeService $freeze,
     ) {}
 
     public function index(Request $request): Response
@@ -133,6 +134,47 @@ class CalculationController extends Controller
 
         return response()->json([
             'totals' => $this->writer->preview($request->payload(), $user, $existing)->toArray(),
+        ]);
+    }
+
+    /**
+     * DF-3.3a2α: Feldschema für den Wizard. Bestehende Kalkulationen liefern das
+     * eingefrorene Snapshot-Schema, neue das live aufgelöste Freeze-Schema.
+     */
+    public function fieldSchema(Request $request): JsonResponse
+    {
+        $calculationId = (int) $request->input('calculation_id', 0);
+
+        if ($calculationId > 0) {
+            /** @var Calculation $calculation */
+            $calculation = Calculation::query()
+                ->with(['configurationSnapshot.fieldDefinitions', 'configurationSnapshot.rules'])
+                ->findOrFail($calculationId);
+            $this->authorize('view', $calculation);
+
+            return response()->json([
+                'fieldSchema' => $this->fieldSchemaProp($calculation),
+                'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ]);
+        }
+
+        $this->authorize('create', Calculation::class);
+
+        $resolved = $this->freeze->resolveLiveSchemaForCalculation();
+
+        if ($resolved['has_blocking_conflicts']) {
+            throw ValidationException::withMessages([
+                'configuration' => 'Die aktive Feldkonfiguration ist widersprüchlich und kann nicht verwendet werden.',
+                'conflicts' => array_map(
+                    static fn (array $conflict): string => (string) $conflict['message'],
+                    $resolved['conflicts'],
+                ),
+            ]);
+        }
+
+        return response()->json([
+            'fieldSchema' => $this->liveFieldSchemaProp($resolved),
+            'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
         ]);
     }
 
@@ -476,78 +518,90 @@ class CalculationController extends Controller
     }
 
     /**
-     * @return array{fields: array<int, array<string, mixed>>, rules: array<int, array<string, mixed>>}
+     * @return array{
+     *     fields: array<int, array<string, mixed>>,
+     *     rules: array<int, array<string, mixed>>,
+     *     format_version: int,
+     *     schema_fingerprint: string|null
+     * }
      */
     private function fieldSchemaProp(?Calculation $calculation): array
     {
-        if ($calculation?->configurationSnapshot !== null) {
-            $snapshot = $calculation->configurationSnapshot;
-            $snapshot->loadMissing(['fieldDefinitions', 'rules']);
+        $snapshot = $calculation?->configurationSnapshot;
 
-            $systemByDefinitionId = FieldDefinition::query()
-                ->whereIn('id', $snapshot->fieldDefinitions->pluck('field_definition_id')->unique()->all())
-                ->pluck('is_system', 'id');
-
-            return [
-                'fields' => $snapshot->fieldDefinitions->map(fn ($def): array => [
-                    'key' => (string) $def->key,
-                    'field_type' => (string) $def->field_type->value,
-                    'label' => (string) $def->label,
-                    'help_text' => $def->help_text,
-                    'scope' => (string) $def->scope->value,
-                    'applies_to' => (string) $def->applies_to->value,
-                    'sort' => (int) $def->sort,
-                    'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
-                    'required' => (bool) $def->required,
-                    'visible' => (bool) $def->visible,
-                    'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
-                    'validation_json' => $def->validation_json,
-                ])->values()->all(),
-                'rules' => $snapshot->rules->map(fn ($rule): array => [
-                    'condition' => $rule->condition_json,
-                    'action' => $rule->action_json,
-                ])->values()->all(),
-            ];
+        if ($snapshot === null) {
+            return $this->liveFieldSchemaProp($this->freeze->resolveLiveSchemaForCalculation());
         }
 
-        $set = FieldSet::query()
-            ->where('key', ConfigurationSnapshotMaterializer::SYSTEM_CALCULATION_CORE_KEY)
-            ->with(['activeVersion.fields.revision.definition', 'activeVersion.rules'])
-            ->first();
+        $snapshot->assertReadable();
+        $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
-        if ($set?->activeVersion === null) {
-            return ['fields' => [], 'rules' => []];
-        }
-
-        $version = $set->activeVersion;
+        $systemByDefinitionId = FieldDefinition::query()
+            ->whereIn('id', $snapshot->fieldDefinitions->pluck('field_definition_id')->unique()->all())
+            ->pluck('is_system', 'id');
 
         return [
-            'fields' => $version->fields->map(function ($membership): array {
-                $revision = $membership->revision;
-                $definition = $revision->definition;
-
-                return [
-                    'key' => (string) $definition->key,
-                    'field_type' => (string) $definition->field_type->value,
-                    'label' => (string) $revision->label,
-                    'help_text' => $revision->help_text,
-                    'scope' => (string) $definition->scope->value,
-                    'applies_to' => (string) $definition->applies_to->value,
-                    'sort' => (int) $membership->sort,
-                    'is_system' => (bool) $definition->is_system,
-                    'required' => SnapshotFieldDefinition::effectiveRequired($membership->required_override),
-                    'visible' => SnapshotFieldDefinition::effectiveVisible($membership->visible_override),
-                    'max_length' => $this->maxLengthFromValidation(
-                        $revision->validation_json,
-                        (string) $definition->field_type->value,
-                    ),
-                    'validation_json' => $revision->validation_json,
-                ];
-            })->values()->all(),
-            'rules' => $version->rules->map(fn ($rule): array => [
+            'fields' => $snapshot->fieldDefinitions->map(fn ($def): array => [
+                'key' => (string) $def->key,
+                'field_type' => (string) $def->field_type->value,
+                'label' => (string) $def->label,
+                'help_text' => $def->help_text,
+                'scope' => (string) $def->scope->value,
+                'applies_to' => (string) $def->applies_to->value,
+                'sort' => (int) $def->sort,
+                'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+                'required' => (bool) $def->required,
+                'visible' => (bool) $def->visible,
+                'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
+                'validation_json' => $def->validation_json,
+            ])->values()->all(),
+            'rules' => $snapshot->rules->map(fn ($rule): array => [
                 'condition' => $rule->condition_json,
                 'action' => $rule->action_json,
             ])->values()->all(),
+            'format_version' => (int) $snapshot->format_version,
+            'schema_fingerprint' => $snapshot->schema_fingerprint,
+        ];
+    }
+
+    /**
+     * Live aufgelöstes Freeze-Schema (Core + aktive globale Assignments) für
+     * neue Kalkulationen – identische Feldform wie das Snapshot-Schema.
+     *
+     * @param  array<string, mixed>  $resolved
+     * @return array{
+     *     fields: array<int, array<string, mixed>>,
+     *     rules: array<int, array<string, mixed>>,
+     *     format_version: int,
+     *     schema_fingerprint: string|null
+     * }
+     */
+    private function liveFieldSchemaProp(array $resolved): array
+    {
+        return [
+            'fields' => array_map(fn (array $field): array => [
+                'key' => (string) $field['field_key'],
+                'field_type' => (string) $field['field_type'],
+                'label' => (string) $field['label'],
+                'help_text' => $field['help_text'] ?? null,
+                'scope' => (string) $field['field_scope'],
+                'applies_to' => (string) $field['applies_to'],
+                'sort' => (int) $field['sort'],
+                'is_system' => (bool) $field['definition_is_system'],
+                'required' => (bool) $field['effective_required'],
+                'visible' => (bool) $field['effective_visible'],
+                'max_length' => $this->maxLengthFromValidation(
+                    $field['validation_json'] ?? null,
+                    (string) $field['field_type'],
+                ),
+                'validation_json' => $field['validation_json'] ?? null,
+            ], $resolved['fields']),
+            'rules' => array_map(fn (array $rule): array => [
+                'condition' => $rule['condition_json'],
+                'action' => $rule['action_json'],
+            ], $resolved['rules']),
+            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            'schema_fingerprint' => (string) $resolved['schema_fingerprint'],
         ];
     }
 

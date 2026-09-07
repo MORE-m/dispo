@@ -30,12 +30,14 @@ final class DispoOrderDynamicFieldWriter
     public function __construct(
         private readonly SnapshotFieldRuleEvaluator $rules,
         private readonly CalculationDynamicFieldWriter $calculationFields,
-        private readonly DispoConfigurationSnapshotComposer $composer,
+        private readonly ConfigurationSnapshotFreezeService $freeze,
+        private readonly ConfigurationSnapshotCloneService $clone,
         private readonly AuditLogger $audit,
     ) {}
 
     /**
-     * Compose Snapshot und setzt configuration_snapshot_id vor dem ersten Save.
+     * Freeze der Dispo-Konfiguration; setzt configuration_snapshot_id vor dem
+     * ersten Save.
      */
     public function assignComposedSnapshot(DispoOrder $order, Calculation $calculation): void
     {
@@ -51,10 +53,31 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
-        $snapshot = $this->composer->composeFromCalculationSnapshot(
-            $calcSnapshot,
-            expectedCalculationSnapshotId: (int) $calculation->configuration_snapshot_id,
-        );
+        if ((int) $calcSnapshot->id !== (int) $calculation->configuration_snapshot_id) {
+            throw new RuntimeException(
+                'Quellsnapshot stimmt nicht mit der configuration_snapshot_id der Kalkulation überein.',
+            );
+        }
+
+        $snapshot = $this->freeze->freezeDispoV2($calcSnapshot);
+        $order->forceFill([
+            'configuration_snapshot_id' => $snapshot->id,
+        ]);
+    }
+
+    /**
+     * Nachbesserung: historisch eingefrorene Konfiguration wird geklont, nicht
+     * neu aufgelöst.
+     */
+    public function assignClonedSnapshot(DispoOrder $order, DispoOrder $predecessor): void
+    {
+        $predecessor->loadMissing([
+            'configurationSnapshot.fieldDefinitions',
+            'configurationSnapshot.rules',
+        ]);
+
+        // dispo_orders.configuration_snapshot_id ist NOT NULL und restrictOnDelete.
+        $snapshot = $this->clone->cloneForDispoRevision($predecessor->configurationSnapshot);
         $order->forceFill([
             'configuration_snapshot_id' => $snapshot->id,
         ]);

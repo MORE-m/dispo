@@ -424,13 +424,20 @@ return new class extends Migration
             $seenKeys[$membership->key] = true;
         }
 
-        $snapshotId = DB::table('configuration_snapshots')->insertGetId([
+        $snapshotRow = [
             'field_set_id' => $dispoFieldSetId,
             'field_set_version_id' => $dispoFieldSetVersionId,
             'source' => $source,
             'source_configuration_snapshot_id' => $sourceCalcSnapshotId,
             'created_at' => $now,
-        ]);
+        ];
+
+        // DF-3.3a2α: bei späterem Aufruf existiert format_version bereits NOT NULL.
+        if (Schema::hasColumn('configuration_snapshots', 'format_version')) {
+            $snapshotRow['format_version'] = 1;
+        }
+
+        $snapshotId = DB::table('configuration_snapshots')->insertGetId($snapshotRow);
 
         foreach ($calcKeys as $key) {
             $def = $calcDefs->get($key);

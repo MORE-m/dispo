@@ -10,13 +10,13 @@ use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\PlanningMode;
 use App\Enums\SpotCalculationMethod;
+use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\Calculation;
 use App\Models\ConfigurationSnapshot;
-use App\Models\FieldSet;
 use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\TimeRangeValidator;
-use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -24,9 +24,34 @@ use Illuminate\Validation\Validator;
 
 class CalculationPayloadRequest extends FormRequest
 {
+    /** @var array<string, mixed>|null */
+    private ?array $liveSchemaCache = null;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    /**
+     * DF-3.3a2α: Schema-Drift schlägt beim Anlegen als 409 durch, noch bevor
+     * dynamische Feldwerte gegen das Schema geprüft werden (409 vor 422).
+     */
+    protected function prepareForValidation(): void
+    {
+        if (! $this->routeIs('calculations.store')) {
+            return;
+        }
+
+        $expected = $this->input('schema_fingerprint');
+        if (! is_string($expected) || $expected === '') {
+            return;
+        }
+
+        if (! hash_equals((string) $this->liveSchema()['schema_fingerprint'], $expected)) {
+            throw new FieldSetAssignmentConflictException(
+                'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+            );
+        }
     }
 
     /**
@@ -75,6 +100,7 @@ class CalculationPayloadRequest extends FormRequest
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
+            'schema_fingerprint' => ['nullable', 'string', 'max:64'],
             'dynamic_field_values' => ['sometimes', 'array'],
             'dynamic_field_values.campaign_period' => ['nullable', 'array'],
             'dynamic_field_values.campaign_period.start' => ['nullable', 'date'],
@@ -383,7 +409,7 @@ class CalculationPayloadRequest extends FormRequest
             return $this->schemaFromSnapshot($snapshot);
         }
 
-        return $this->schemaFromActiveCalculationSet();
+        return $this->schemaFromLiveFreezeSchema();
     }
 
     private function resolveConfigurationSnapshot(): ?ConfigurationSnapshot
@@ -438,83 +464,63 @@ class CalculationPayloadRequest extends FormRequest
     }
 
     /**
+     * Neuanlage: Core + aktive globale Assignments, damit neu zugewiesene
+     * globale Felder sofort erlaubt sind.
+     *
      * @return array{
      *     header: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>,
      *     position: array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
      * }
      */
-    private function schemaFromActiveCalculationSet(): array
+    private function schemaFromLiveFreezeSchema(): array
     {
-        $set = FieldSet::query()
-            ->where('key', ConfigurationSnapshotMaterializer::SYSTEM_CALCULATION_CORE_KEY)
-            ->with(['activeVersion.fields.revision.definition'])
-            ->first();
-
         $header = [];
         $position = [];
-        foreach ($set?->activeVersion->fields ?? [] as $membership) {
-            $revision = $membership->revision;
-            $definition = $revision?->definition;
-            if ($revision === null || $definition === null) {
-                continue;
-            }
-            $validation = is_array($revision->validation_json) ? $revision->validation_json : [];
-            $max = isset($validation['max_length']) ? (int) $validation['max_length'] : (
-                $definition->field_type === FieldType::ShortText ? 255 : 20000
-            );
-            $meta = [
-                'field_type' => $definition->field_type->value,
-                'max_length' => $max,
-                'label' => $revision->label,
-                'required' => SnapshotFieldDefinition::effectiveRequired($membership->required_override),
-                'visible' => SnapshotFieldDefinition::effectiveVisible($membership->visible_override),
-            ];
-            if ($definition->scope === FieldScope::Header) {
-                $header[$definition->key] = $meta;
-            } elseif ($definition->scope === FieldScope::Position) {
-                $position[$definition->key] = $meta;
-            }
-        }
 
-        if ($header === [] && $position === []) {
-            $header = [
-                'campaign_period' => [
-                    'field_type' => FieldType::Period->value,
-                    'max_length' => 0,
-                    'label' => 'Kampagnenzeitraum',
-                    'required' => false,
-                    'visible' => true,
-                ],
+        foreach ($this->liveSchema()['fields'] as $field) {
+            $fieldType = (string) $field['field_type'];
+            $meta = [
+                'field_type' => $fieldType,
+                'max_length' => $this->maxLengthFromValidation($field['validation_json'] ?? null, $fieldType),
+                'label' => (string) $field['label'],
+                'required' => (bool) $field['effective_required'],
+                'visible' => (bool) $field['effective_visible'],
             ];
-            $position = [
-                'period_open' => [
-                    'field_type' => FieldType::Boolean->value,
-                    'max_length' => 0,
-                    'label' => 'Zeitraum offen',
-                    'required' => false,
-                    'visible' => true,
-                ],
-                'position_flight_period' => [
-                    'field_type' => FieldType::Period->value,
-                    'max_length' => 0,
-                    'label' => 'Flugzeitraum',
-                    'required' => false,
-                    'visible' => true,
-                ],
-            ];
+
+            match (FieldScope::from((string) $field['field_scope'])) {
+                FieldScope::Header => $header[(string) $field['field_key']] = $meta,
+                FieldScope::Position => $position[(string) $field['field_key']] = $meta,
+            };
         }
 
         return ['header' => $header, 'position' => $position];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    private function liveSchema(): array
+    {
+        return $this->liveSchemaCache ??= app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation();
+    }
+
     private function maxLengthForDefinition(SnapshotFieldDefinition $def): int
     {
-        $fromJson = is_array($def->validation_json) ? ($def->validation_json['max_length'] ?? null) : null;
+        return $this->maxLengthFromValidation($def->validation_json, $def->field_type->value);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $validation
+     */
+    private function maxLengthFromValidation(?array $validation, string $fieldType): int
+    {
+        $fromJson = is_array($validation) ? ($validation['max_length'] ?? null) : null;
         if (is_numeric($fromJson)) {
             return (int) $fromJson;
         }
 
-        return $def->field_type === FieldType::ShortText ? 255 : 20000;
+        return $fieldType === FieldType::ShortText->value ? 255 : 20000;
     }
 
     private function validateDynamicPeriods(Validator $validator): void

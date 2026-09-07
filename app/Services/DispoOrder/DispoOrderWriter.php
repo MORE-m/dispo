@@ -207,7 +207,12 @@ final class DispoOrderWriter
             $order->revises_dispo_order_id = $revises->id;
         }
         $order->fill($this->mapper->headerFromCalculation($calculation, $selected));
-        $this->dynamicFields->assignComposedSnapshot($order, $calculation);
+        if ($revises !== null) {
+            // Nachbesserung erbt die eingefrorene Konfiguration des Vorgängers.
+            $this->dynamicFields->assignClonedSnapshot($order, $revises);
+        } else {
+            $this->dynamicFields->assignComposedSnapshot($order, $calculation);
+        }
         $order->save();
 
         $sort = 0;

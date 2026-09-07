@@ -5,12 +5,8 @@ namespace App\Services\DynamicField\Assignment;
 use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldSetAssignmentTargetLayer;
-use App\Enums\FieldSetVersionStatus;
 use App\Models\AdvertisingMedium;
-use App\Models\FieldSet;
 use App\Models\FieldSetAssignment;
-use App\Models\FieldSetVersion;
-use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\SnapshotFieldRuleEvaluator;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -24,6 +20,7 @@ final class FieldSetAssignmentPreviewService
     public function __construct(
         private readonly FieldSetAssignmentMergeResolver $resolver,
         private readonly SnapshotFieldRuleEvaluator $ruleEvaluator,
+        private readonly AssignmentSourceLoader $sources,
     ) {}
 
     /**
@@ -77,7 +74,7 @@ final class FieldSetAssignmentPreviewService
             'skipped_assignments' => [],
         ];
 
-        $core = $this->loadPrimaryCoreSource($process);
+        $core = $this->sources->loadPrimaryCoreSource($process);
         $sourcesPayload[] = $core['source'];
         $fingerprintParts['primary_core'] = $core['fingerprint'];
 
@@ -96,10 +93,10 @@ final class FieldSetAssignmentPreviewService
 
         foreach ($loaded as $assignment) {
             $isCandidate = $candidateId !== null && (int) $assignment->id === $candidateId;
-            $validity = $this->assessAssignmentSourceValidity($assignment, $process);
+            $validity = $this->sources->assessAssignmentSourceValidity($assignment, $process);
 
             if ($validity['valid']) {
-                $built = $this->buildAssignmentSource($assignment);
+                $built = $this->sources->buildAssignmentSource($assignment);
                 $sourcesPayload[] = $built['source'];
                 $fingerprintParts['assignments'][] = $built['fingerprint'];
                 $includedAssignments[] = [
@@ -228,158 +225,7 @@ final class FieldSetAssignmentPreviewService
      */
     public function fingerprint(array $fingerprintParts, array $resolved): string
     {
-        $fields = [];
-        foreach ($resolved['fields'] ?? [] as $field) {
-            $fields[] = [
-                'field_definition_id' => $field['field_definition_id'],
-                'field_definition_revision_id' => $field['field_definition_revision_id'],
-                'field_key' => $field['field_key'],
-                'sort' => $field['sort'],
-                'group_key' => $field['group_key'] ?? null,
-                'required_override' => $field['required_override'],
-                'visible_override' => $field['visible_override'],
-                'winning_merge_order' => $field['winning_merge_order'],
-                'winning_layer' => $field['winning_layer'],
-            ];
-        }
-
-        $rules = [];
-        foreach ($resolved['rules'] ?? [] as $rule) {
-            $rules[] = [
-                'field_rule_id' => $rule['field_rule_id'],
-                'sort' => $rule['sort'],
-                'condition_json' => $rule['condition_json'],
-                'action_json' => $rule['action_json'],
-                'merge_order' => $rule['merge_order'],
-            ];
-        }
-
-        $canonical = [
-            'context' => $fingerprintParts,
-            'fields' => $fields,
-            'rules' => $rules,
-            'conflicts' => $resolved['conflicts'] ?? [],
-        ];
-
-        return hash('sha256', json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
-    }
-
-    /**
-     * @return array{valid: bool, code: string, message: string}
-     */
-    public function assessAssignmentSourceValidity(FieldSetAssignment $assignment, FieldAppliesTo $process): array
-    {
-        $fieldSet = $assignment->fieldSet;
-        if ($fieldSet === null) {
-            throw new RuntimeException("Assignment {$assignment->id}: Feldset-FK beschädigt.");
-        }
-
-        if ($fieldSet->is_system || AdminFieldSetCatalog::isCoreKey($fieldSet->key)) {
-            return [
-                'valid' => false,
-                'code' => 'system_fieldset',
-                'message' => 'Core-/System-Feldsets dürfen nicht als Assignment-Quelle dienen.',
-            ];
-        }
-
-        if (! $fieldSet->is_assignable) {
-            return [
-                'valid' => false,
-                'code' => 'fieldset_not_assignable',
-                'message' => 'Feldset ist nicht assignierbar.',
-            ];
-        }
-
-        if (! $assignment->appliesToProcess($process)) {
-            return [
-                'valid' => false,
-                'code' => 'process_incompatible',
-                'message' => 'Assignment-Prozessgültigkeit passt nicht zum Preview-Prozess.',
-            ];
-        }
-
-        if (! $this->processIsSubsetOfFieldSet($assignment->applies_to_process, $fieldSet->applies_to)) {
-            return [
-                'valid' => false,
-                'code' => 'fieldset_process_incompatible',
-                'message' => 'Feldset-Gültigkeit ist nicht mehr kompatibel zum Assignment.',
-            ];
-        }
-
-        if ($fieldSet->active_version_id === null) {
-            return [
-                'valid' => false,
-                'code' => 'missing_active_version',
-                'message' => 'Feldset besitzt keine aktive Version.',
-            ];
-        }
-
-        $version = $fieldSet->activeVersion;
-        if ($version === null) {
-            throw new RuntimeException("Assignment {$assignment->id}: active_version_id beschädigt.");
-        }
-
-        if ($version->status !== FieldSetVersionStatus::Active) {
-            return [
-                'valid' => false,
-                'code' => 'active_version_not_active',
-                'message' => 'Aktive Feldset-Version hat nicht den Status active.',
-            ];
-        }
-
-        return [
-            'valid' => true,
-            'code' => 'ok',
-            'message' => 'ok',
-        ];
-    }
-
-    /**
-     * @return array{source: array<string, mixed>, fingerprint: array<string, mixed>}
-     */
-    private function loadPrimaryCoreSource(FieldAppliesTo $process): array
-    {
-        $key = $process === FieldAppliesTo::DispoOrder
-            ? AdminFieldSetCatalog::DISPO_ORDER_CORE
-            : AdminFieldSetCatalog::CALCULATION_CORE;
-
-        /** @var FieldSet $fieldSet */
-        $fieldSet = FieldSet::query()->where('key', $key)->firstOrFail();
-        if ($fieldSet->active_version_id === null) {
-            throw new RuntimeException("Primary-Core {$key} hat keine aktive Version.");
-        }
-
-        /** @var FieldSetVersion $version */
-        $version = FieldSetVersion::query()
-            ->with(['fields.revision.definition', 'fields.definition', 'rules'])
-            ->whereKey($fieldSet->active_version_id)
-            ->firstOrFail();
-
-        if ($version->status !== FieldSetVersionStatus::Active) {
-            throw new RuntimeException("Primary-Core-Version von {$key} ist nicht aktiv.");
-        }
-
-        $source = $this->versionToSource(
-            layer: FieldSetAssignmentMergeResolver::LAYER_PRIMARY_CORE,
-            assignmentId: null,
-            assignmentSort: null,
-            fieldSet: $fieldSet,
-            version: $version,
-            isSystemCore: true,
-        );
-
-        return [
-            'source' => $source,
-            'fingerprint' => [
-                'field_set_id' => $fieldSet->id,
-                'field_set_key' => $fieldSet->key,
-                'active_version_id' => $fieldSet->active_version_id,
-                'version_id' => $version->id,
-                'version_number' => $version->version,
-                'memberships' => $this->membershipFingerprint($version),
-                'rules' => $this->ruleFingerprint($version),
-            ],
-        ];
+        return $this->sources->fingerprintForResolved($fingerprintParts, $resolved);
     }
 
     /**
@@ -558,161 +404,6 @@ final class FieldSetAssignmentPreviewService
                 && (int) $assignment->advertising_category_id === $categoryId,
             FieldSetAssignmentTargetLayer::AdvertisingMedium => $mediumId !== null
                 && (int) $assignment->advertising_medium_id === $mediumId,
-        };
-    }
-
-    /**
-     * @return array{source: array<string, mixed>, fingerprint: array<string, mixed>}
-     */
-    private function buildAssignmentSource(FieldSetAssignment $assignment): array
-    {
-        $fieldSet = $assignment->fieldSet;
-        if ($fieldSet === null) {
-            throw new RuntimeException("Assignment {$assignment->id}: Feldset-FK beschädigt.");
-        }
-
-        /** @var FieldSetVersion $version */
-        $version = $fieldSet->activeVersion
-            ?? FieldSetVersion::query()
-                ->with(['fields.revision.definition', 'fields.definition', 'rules'])
-                ->whereKey($fieldSet->active_version_id)
-                ->firstOrFail();
-
-        $source = $this->versionToSource(
-            layer: FieldSetAssignmentMergeResolver::layerFromTarget($assignment->target_layer),
-            assignmentId: $assignment->id,
-            assignmentSort: $assignment->sort,
-            fieldSet: $fieldSet,
-            version: $version,
-            isSystemCore: false,
-        );
-
-        return [
-            'source' => $source,
-            'fingerprint' => [
-                'assignment_id' => $assignment->id,
-                'lock_version' => $assignment->lock_version,
-                'is_active' => $assignment->is_active,
-                'sort' => $assignment->sort,
-                'applies_to_process' => $assignment->applies_to_process->value,
-                'target_layer' => $assignment->target_layer->value,
-                'target_identity' => $assignment->target_identity,
-                'field_set_id' => $fieldSet->id,
-                'is_assignable' => $fieldSet->is_assignable,
-                'active_version_id' => $fieldSet->active_version_id,
-                'version_id' => $version->id,
-                'version_status' => $version->status->value,
-                'memberships' => $this->membershipFingerprint($version),
-                'rules' => $this->ruleFingerprint($version),
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function versionToSource(
-        string $layer,
-        ?int $assignmentId,
-        ?int $assignmentSort,
-        FieldSet $fieldSet,
-        FieldSetVersion $version,
-        bool $isSystemCore,
-    ): array {
-        $memberships = [];
-        foreach ($version->fields as $membership) {
-            $definition = $membership->revision !== null
-                ? $membership->revision->definition
-                : $membership->definition;
-            $revision = $membership->revision;
-            if ($definition === null || $revision === null) {
-                throw new RuntimeException('Membership ohne Definition/Revision.');
-            }
-            $memberships[] = [
-                'field_definition_id' => $definition->id,
-                'field_definition_revision_id' => $revision->id,
-                'field_key' => $definition->key,
-                'field_scope' => $definition->scope->value,
-                'field_applies_to' => $definition->applies_to->value,
-                'definition_is_active' => $definition->is_active,
-                'definition_is_system' => $definition->is_system,
-                'group_key' => $revision->group_key,
-                'sort' => $membership->sort,
-                'required_override' => $membership->required_override,
-                'visible_override' => $membership->visible_override,
-                'label' => $revision->label,
-                'field_type' => $definition->field_type->value,
-            ];
-        }
-
-        $rules = [];
-        foreach ($version->rules as $rule) {
-            $rules[] = [
-                'field_rule_id' => $rule->id,
-                'sort' => $rule->sort,
-                'condition_json' => $rule->condition_json,
-                'action_json' => $rule->action_json,
-            ];
-        }
-
-        return [
-            'layer' => $layer,
-            'assignment_id' => $assignmentId,
-            'assignment_sort' => $assignmentSort,
-            'field_set_id' => $fieldSet->id,
-            'field_set_key' => $fieldSet->key,
-            'field_set_version_id' => $version->id,
-            'field_set_version_number' => $version->version,
-            'is_system_core' => $isSystemCore,
-            'memberships' => $memberships,
-            'rules' => $rules,
-        ];
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function membershipFingerprint(FieldSetVersion $version): array
-    {
-        $rows = [];
-        foreach ($version->fields as $membership) {
-            $rows[] = [
-                'id' => $membership->id,
-                'field_definition_id' => $membership->field_definition_id,
-                'field_definition_revision_id' => $membership->field_definition_revision_id,
-                'sort' => $membership->sort,
-                'required_override' => $membership->required_override,
-                'visible_override' => $membership->visible_override,
-            ];
-        }
-
-        return $rows;
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function ruleFingerprint(FieldSetVersion $version): array
-    {
-        $rows = [];
-        foreach ($version->rules as $rule) {
-            $rows[] = [
-                'id' => $rule->id,
-                'sort' => $rule->sort,
-                'condition_json' => $rule->condition_json,
-                'action_json' => $rule->action_json,
-            ];
-        }
-
-        return $rows;
-    }
-
-    private function processIsSubsetOfFieldSet(FieldAppliesTo $assignment, FieldAppliesTo $fieldSet): bool
-    {
-        return match ($fieldSet) {
-            FieldAppliesTo::Calculation => $assignment === FieldAppliesTo::Calculation,
-            FieldAppliesTo::DispoOrder => $assignment === FieldAppliesTo::DispoOrder,
-            FieldAppliesTo::Both => true,
         };
     }
 

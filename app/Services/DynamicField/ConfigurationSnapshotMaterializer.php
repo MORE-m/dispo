@@ -14,6 +14,10 @@ use RuntimeException;
 
 /**
  * VER-002: materialisiert aktive Feldset-Version in unveränderlichen Snapshot.
+ *
+ * Erzeugt Snapshots der Generation 1 (Core-only, ohne Quellengraph). Produktive
+ * Kalkulations-Freezes laufen seit DF-3.3a2α über den
+ * {@see ConfigurationSnapshotFreezeService}.
  */
 final class ConfigurationSnapshotMaterializer
 {
@@ -78,6 +82,7 @@ final class ConfigurationSnapshotMaterializer
             $snapshot->field_set_id = $set->id;
             $snapshot->field_set_version_id = $version->id;
             $snapshot->source = $source;
+            $snapshot->format_version = ConfigurationSnapshot::FORMAT_VERSION_LEGACY;
             $snapshot->created_at = now();
             $snapshot->save();
 

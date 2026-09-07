@@ -2,20 +2,35 @@
 
 namespace App\Models;
 
-use App\Enums\ConfigurationSnapshotSource;
+use App\Enums\ConfigurationSnapshotSource as ConfigurationSnapshotSourceEnum;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use RuntimeException;
 
 /**
  * @property int $id
  * @property int $field_set_id
  * @property int $field_set_version_id
- * @property ConfigurationSnapshotSource $source
+ * @property ConfigurationSnapshotSourceEnum $source
  * @property int|null $source_configuration_snapshot_id
+ * @property int $format_version
+ * @property string|null $schema_fingerprint
  */
 class ConfigurationSnapshot extends Model
 {
+    /** Generation 1: Legacy/Core-only Materialisierung. */
+    public const FORMAT_VERSION_LEGACY = 1;
+
+    /** Generation 2: Core + globale Assignments inkl. Quellengraph. */
+    public const FORMAT_VERSION_GLOBAL_FREEZE = 2;
+
+    /** @var list<int> */
+    public const SUPPORTED_FORMAT_VERSIONS = [
+        self::FORMAT_VERSION_LEGACY,
+        self::FORMAT_VERSION_GLOBAL_FREEZE,
+    ];
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -23,6 +38,8 @@ class ConfigurationSnapshot extends Model
         'field_set_version_id',
         'source',
         'source_configuration_snapshot_id',
+        'format_version',
+        'schema_fingerprint',
         'created_at',
     ];
 
@@ -32,9 +49,24 @@ class ConfigurationSnapshot extends Model
     protected function casts(): array
     {
         return [
-            'source' => ConfigurationSnapshotSource::class,
+            'source' => ConfigurationSnapshotSourceEnum::class,
+            'format_version' => 'integer',
             'created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Fail-closed: unbekannte Snapshot-Generationen dürfen nicht gelesen werden.
+     */
+    public function assertReadable(): void
+    {
+        $version = (int) $this->format_version;
+
+        if (! in_array($version, self::SUPPORTED_FORMAT_VERSIONS, true)) {
+            throw new RuntimeException(
+                "Konfigurationssnapshot {$this->id} hat unbekannte format_version {$version}.",
+            );
+        }
     }
 
     /**
@@ -75,5 +107,15 @@ class ConfigurationSnapshot extends Model
     public function rules(): HasMany
     {
         return $this->hasMany(SnapshotFieldRule::class)->orderBy('sort');
+    }
+
+    /**
+     * DF-3.3a2α: eingefrorener Quellengraph (nur format_version 2).
+     *
+     * @return HasMany<ConfigurationSnapshotSource, $this>
+     */
+    public function sources(): HasMany
+    {
+        return $this->hasMany(ConfigurationSnapshotSource::class)->orderBy('merge_order');
     }
 }

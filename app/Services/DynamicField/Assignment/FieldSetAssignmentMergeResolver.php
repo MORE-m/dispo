@@ -20,6 +20,11 @@ use App\Models\SnapshotFieldDefinition;
  * 2. globale Assignments (sort ASC, assignment.id ASC)
  * 3. Oberkategorie-Assignments (sort ASC, id ASC)
  * 4. Werbemittel-Assignments (sort ASC, id ASC)
+ *
+ * DF-3.3a2α: Je Feld werden zusätzlich Property-Provenance-`merge_order`s
+ * geliefert. Definition/Revision zeigen auf die erste Quelle, Sort/Gruppe auf
+ * die gewinnende, Required/Visible auf die letzte Quelle mit non-null Override
+ * (sonst erste).
  */
 final class FieldSetAssignmentMergeResolver
 {
@@ -302,6 +307,12 @@ final class FieldSetAssignmentMergeResolver
         }
 
         if (! $this->definitionAppliesToProcess($fieldAppliesTo, $process)) {
+            // Primary-Core: applies_to filtert Memberships (wie Scope), kein Blocker.
+            // Assignment-Quellen bleiben konfliktbehaftet.
+            if ($isCore || $layer === self::LAYER_PRIMARY_CORE) {
+                return;
+            }
+
             $conflicts[] = [
                 'code' => 'process_incompatible_definition',
                 'message' => "Feld „{$fieldKey}“ passt nicht zum Prozess {$process->value}.",
@@ -380,8 +391,14 @@ final class FieldSetAssignmentMergeResolver
                 'field_definition_revision_id' => $revisionId,
                 'field_key' => $fieldKey,
                 'field_scope' => $fieldScope->value,
+                'applies_to' => $fieldAppliesTo->value,
                 'field_type' => (string) $membership['field_type'],
                 'label' => (string) $membership['label'],
+                'help_text' => $membership['help_text'] ?? null,
+                'validation_json' => $membership['validation_json'] ?? null,
+                'reportable' => array_key_exists('reportable', $membership)
+                    ? (bool) $membership['reportable']
+                    : true,
                 'definition_is_system' => (bool) $membership['definition_is_system'],
                 'group_key' => $membership['group_key'] ?? null,
                 'sort' => (int) $membership['sort'],
@@ -395,6 +412,12 @@ final class FieldSetAssignmentMergeResolver
                 'winning_field_set_id' => $fieldSetId,
                 'winning_field_set_key' => $fieldSetKey,
                 'winning_field_set_version_id' => $fieldSetVersionId,
+                'provenance_definition_merge_order' => $mergeOrder,
+                'provenance_revision_merge_order' => $mergeOrder,
+                'provenance_required_merge_order' => $mergeOrder,
+                'provenance_visible_merge_order' => $mergeOrder,
+                'provenance_sort_merge_order' => $mergeOrder,
+                'provenance_group_merge_order' => $mergeOrder,
                 'origin' => [
                     [
                         'merge_order' => $mergeOrder,
@@ -517,14 +540,18 @@ final class FieldSetAssignmentMergeResolver
                 // schützt nur Core-Pflichtkern nicht vor erlaubten Overrides.
             }
             $existing['required_override'] = $requiredOverride;
+            $existing['provenance_required_merge_order'] = $mergeOrder;
         }
         if ($visibleOverride !== null) {
             $existing['visible_override'] = $visibleOverride;
+            $existing['provenance_visible_merge_order'] = $mergeOrder;
         }
 
         // Gruppe/Sort der fachlich gewinnenden (spezifischeren) Membership
         $existing['group_key'] = $membership['group_key'] ?? null;
         $existing['sort'] = (int) $membership['sort'];
+        $existing['provenance_sort_merge_order'] = $mergeOrder;
+        $existing['provenance_group_merge_order'] = $mergeOrder;
         $existing['winning_layer'] = $layer;
         $existing['winning_merge_order'] = $mergeOrder;
         $existing['winning_assignment_id'] = $assignmentId;

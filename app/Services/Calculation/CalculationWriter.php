@@ -18,7 +18,7 @@ use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
-use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -33,7 +33,7 @@ final class CalculationWriter
         private readonly CalculationEngine $engine,
         private readonly AuditLogger $audit,
         private readonly CalculationNumberSequencer $numbers,
-        private readonly ConfigurationSnapshotMaterializer $snapshots,
+        private readonly ConfigurationSnapshotFreezeService $snapshots,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
     ) {}
 
@@ -60,7 +60,14 @@ final class CalculationWriter
             $calculation->status = CalculationStatus::Draft;
             $calculation->advisor_id = $user->id;
             $calculation->lock_version = 1;
-            $calculation->configuration_snapshot_id = $this->snapshots->materializeFromActiveSet()->id;
+            $expectedFingerprint = isset($payload['schema_fingerprint'])
+                && is_string($payload['schema_fingerprint'])
+                && $payload['schema_fingerprint'] !== ''
+                    ? $payload['schema_fingerprint']
+                    : null;
+            $calculation->configuration_snapshot_id = $this->snapshots
+                ->freezeCalculationV2($expectedFingerprint)
+                ->id;
 
             $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
 

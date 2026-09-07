@@ -3,7 +3,6 @@
 namespace App\Services\DynamicField\Assignment;
 
 use App\Enums\FieldAppliesTo;
-use App\Enums\FieldScope;
 use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Enums\FieldSetVersionStatus;
 use App\Exceptions\FieldSetAssignmentConflictException;
@@ -16,7 +15,6 @@ use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +27,7 @@ final class FieldSetAssignmentAdminWriter
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly FieldSetAssignmentPreviewService $preview,
+        private readonly AssignmentConfigurationLockCoordinator $locks,
     ) {}
 
     /**
@@ -171,7 +170,7 @@ final class FieldSetAssignmentAdminWriter
             $expectedFingerprint = (string) $payload['fingerprint'];
             $expectedLock = (int) $payload['lock_version'];
 
-            $locked = $this->acquireConfigurationLocks($assignment);
+            $locked = $this->locks->lockForAssignment($assignment);
 
             $this->assertLock($locked, $expectedLock);
 
@@ -231,7 +230,7 @@ final class FieldSetAssignmentAdminWriter
     public function deactivate(FieldSetAssignment $assignment, array $payload, User $actor): FieldSetAssignment
     {
         return DB::transaction(function () use ($assignment, $payload, $actor): FieldSetAssignment {
-            $locked = $this->acquireConfigurationLocks($assignment);
+            $locked = $this->locks->lockForAssignment($assignment);
             $this->assertLock($locked, (int) $payload['lock_version']);
 
             if (! $locked->is_active) {
@@ -262,8 +261,8 @@ final class FieldSetAssignmentAdminWriter
      */
     public function previewAffectedContexts(FieldSetAssignment $assignment, bool $asCandidate): array
     {
-        $processes = $this->processesForAssignment($assignment);
-        $contexts = $this->affectedContexts($assignment);
+        $processes = $this->locks->processesFor($assignment->applies_to_process);
+        $contexts = $this->locks->affectedContexts($assignment);
         $results = [];
         $candidateId = $asCandidate ? $assignment->id : null;
 
@@ -281,203 +280,6 @@ final class FieldSetAssignmentAdminWriter
         }
 
         return $results;
-    }
-
-    /**
-     * Deterministische Lockreihenfolge für Activate/Deactivate:
-     * 1. Prozess-Cores (Calc, dann Dispo bei both)
-     * 2. beitragende Assignments nach ID
-     * 3. beteiligte Feldset-Container nach ID
-     * 4. relevante Kategorie-/Werbemittelzeilen nach ID
-     * 5. Kandidaten-Assignment (bereits in 2 enthalten, hier reloaded)
-     */
-    private function acquireConfigurationLocks(FieldSetAssignment $assignment): FieldSetAssignment
-    {
-        $processes = $this->processesForAssignment($assignment);
-        $this->lockProcessCores($processes);
-
-        $contributingIds = $this->contributingAssignmentIds($assignment, $processes);
-        if (! in_array((int) $assignment->id, $contributingIds, true)) {
-            $contributingIds[] = (int) $assignment->id;
-        }
-        sort($contributingIds);
-
-        /** @var Collection<int, FieldSetAssignment> $lockedAssignments */
-        $lockedAssignments = FieldSetAssignment::query()
-            ->whereIn('id', $contributingIds)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
-
-        $fieldSetIds = $lockedAssignments->pluck('field_set_id')
-            ->map(static fn ($id): int => (int) $id)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-
-        if ($fieldSetIds !== []) {
-            FieldSet::query()
-                ->whereIn('id', $fieldSetIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-        }
-
-        $this->lockTargetRows($assignment, $processes);
-
-        /** @var FieldSetAssignment $locked */
-        $locked = $lockedAssignments->firstWhere('id', $assignment->id)
-            ?? FieldSetAssignment::query()->whereKey($assignment->id)->lockForUpdate()->firstOrFail();
-        $locked->load(['fieldSet.activeVersion']);
-
-        return $locked;
-    }
-
-    /**
-     * @param  list<FieldAppliesTo>  $processes
-     */
-    private function lockProcessCores(array $processes): void
-    {
-        $keys = [];
-        foreach ($processes as $process) {
-            $keys[] = $process === FieldAppliesTo::DispoOrder
-                ? AdminFieldSetCatalog::DISPO_ORDER_CORE
-                : AdminFieldSetCatalog::CALCULATION_CORE;
-        }
-        $keys = array_values(array_unique($keys));
-        // Stabile Reihenfolge: Calculation-Core vor Dispo-Core
-        usort($keys, static function (string $a, string $b): int {
-            $rank = [
-                AdminFieldSetCatalog::CALCULATION_CORE => 1,
-                AdminFieldSetCatalog::DISPO_ORDER_CORE => 2,
-            ];
-
-            return $rank[$a] <=> $rank[$b];
-        });
-
-        foreach ($keys as $key) {
-            FieldSet::query()->where('key', $key)->lockForUpdate()->firstOrFail();
-        }
-    }
-
-    /**
-     * @param  list<FieldAppliesTo>  $processes
-     * @return list<int>
-     */
-    private function contributingAssignmentIds(FieldSetAssignment $assignment, array $processes): array
-    {
-        $processValues = array_map(
-            static fn (FieldAppliesTo $process): string => $process->value,
-            $processes,
-        );
-        $processValues[] = FieldAppliesTo::Both->value;
-        $processValues = array_values(array_unique($processValues));
-
-        $query = FieldSetAssignment::query()
-            ->whereIn('applies_to_process', $processValues)
-            ->where(function ($q) use ($assignment): void {
-                $q->where('is_active', true)
-                    ->orWhere('id', $assignment->id);
-            });
-
-        // Layer-Filter: alles Globale plus betroffene Kat/Medien der Kontexte
-        $contexts = $this->affectedContexts($assignment);
-        $categoryIds = [];
-        $mediumIds = [];
-        foreach ($contexts as $context) {
-            if ($context['advertising_category_id'] !== null) {
-                $categoryIds[] = (int) $context['advertising_category_id'];
-            }
-            if ($context['advertising_medium_id'] !== null) {
-                $mediumIds[] = (int) $context['advertising_medium_id'];
-            }
-        }
-        $categoryIds = array_values(array_unique($categoryIds));
-        $mediumIds = array_values(array_unique($mediumIds));
-
-        $query->where(function ($q) use ($categoryIds, $mediumIds): void {
-            $q->where('target_layer', FieldSetAssignmentTargetLayer::Global->value);
-            if ($categoryIds !== []) {
-                $q->orWhere(function ($inner) use ($categoryIds): void {
-                    $inner->where('target_layer', FieldSetAssignmentTargetLayer::AdvertisingCategory->value)
-                        ->whereIn('advertising_category_id', $categoryIds);
-                });
-            }
-            if ($mediumIds !== []) {
-                $q->orWhere(function ($inner) use ($mediumIds): void {
-                    $inner->where('target_layer', FieldSetAssignmentTargetLayer::AdvertisingMedium->value)
-                        ->whereIn('advertising_medium_id', $mediumIds);
-                });
-            }
-        });
-
-        return array_values($query->orderBy('id')->pluck('id')->map(static fn ($id): int => (int) $id)->all());
-    }
-
-    /**
-     * @param  list<FieldAppliesTo>  $processes
-     */
-    private function lockTargetRows(FieldSetAssignment $assignment, array $processes): void
-    {
-        unset($processes);
-
-        $categoryIds = [];
-        $mediumIds = [];
-
-        foreach ($this->affectedContexts($assignment) as $context) {
-            if ($context['advertising_category_id'] !== null) {
-                $categoryIds[] = (int) $context['advertising_category_id'];
-            }
-            if ($context['advertising_medium_id'] !== null) {
-                $mediumIds[] = (int) $context['advertising_medium_id'];
-            }
-        }
-
-        if ($assignment->advertising_category_id !== null) {
-            $categoryIds[] = (int) $assignment->advertising_category_id;
-        }
-        if ($assignment->advertising_medium_id !== null) {
-            $mediumIds[] = (int) $assignment->advertising_medium_id;
-        }
-
-        $categoryIds = array_values(array_unique($categoryIds));
-        $mediumIds = array_values(array_unique($mediumIds));
-        sort($categoryIds);
-        sort($mediumIds);
-
-        if ($mediumIds !== []) {
-            $media = AdvertisingMedium::query()
-                ->whereIn('id', $mediumIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get(['id', 'category_id']);
-            foreach ($media as $medium) {
-                $categoryIds[] = (int) $medium->category_id;
-            }
-            $categoryIds = array_values(array_unique($categoryIds));
-            sort($categoryIds);
-        }
-
-        if ($categoryIds !== []) {
-            AdvertisingCategory::query()
-                ->whereIn('id', $categoryIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-        }
-    }
-
-    /**
-     * @return list<FieldAppliesTo>
-     */
-    private function processesForAssignment(FieldSetAssignment $assignment): array
-    {
-        return match ($assignment->applies_to_process) {
-            FieldAppliesTo::Calculation => [FieldAppliesTo::Calculation],
-            FieldAppliesTo::DispoOrder => [FieldAppliesTo::DispoOrder],
-            FieldAppliesTo::Both => [FieldAppliesTo::Calculation, FieldAppliesTo::DispoOrder],
-        };
     }
 
     /**
@@ -512,87 +314,6 @@ final class FieldSetAssignmentAdminWriter
         });
 
         return hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
-    }
-
-    /**
-     * @return list<array{scope: string, advertising_category_id: int|null, advertising_medium_id: int|null}>
-     */
-    private function affectedContexts(FieldSetAssignment $assignment): array
-    {
-        return match ($assignment->target_layer) {
-            FieldSetAssignmentTargetLayer::Global => $this->globalContexts(),
-            FieldSetAssignmentTargetLayer::AdvertisingCategory => $this->categoryContexts(
-                (int) $assignment->advertising_category_id,
-            ),
-            FieldSetAssignmentTargetLayer::AdvertisingMedium => [[
-                'scope' => FieldScope::Position->value,
-                'advertising_category_id' => null,
-                'advertising_medium_id' => (int) $assignment->advertising_medium_id,
-            ]],
-        };
-    }
-
-    /**
-     * @return list<array{scope: string, advertising_category_id: int|null, advertising_medium_id: int|null}>
-     */
-    private function globalContexts(): array
-    {
-        $contexts = [
-            [
-                'scope' => FieldScope::Header->value,
-                'advertising_category_id' => null,
-                'advertising_medium_id' => null,
-            ],
-        ];
-
-        $categoryIds = AdvertisingCategory::query()->orderBy('id')->pluck('id');
-        foreach ($categoryIds as $categoryId) {
-            $contexts[] = [
-                'scope' => FieldScope::Position->value,
-                'advertising_category_id' => (int) $categoryId,
-                'advertising_medium_id' => null,
-            ];
-        }
-
-        $media = AdvertisingMedium::query()->orderBy('id')->get(['id', 'category_id']);
-        foreach ($media as $medium) {
-            $contexts[] = [
-                'scope' => FieldScope::Position->value,
-                'advertising_category_id' => (int) $medium->category_id,
-                'advertising_medium_id' => (int) $medium->id,
-            ];
-        }
-
-        return $contexts;
-    }
-
-    /**
-     * @return list<array{scope: string, advertising_category_id: int|null, advertising_medium_id: int|null}>
-     */
-    private function categoryContexts(int $categoryId): array
-    {
-        $contexts = [
-            [
-                'scope' => FieldScope::Position->value,
-                'advertising_category_id' => $categoryId,
-                'advertising_medium_id' => null,
-            ],
-        ];
-
-        $media = AdvertisingMedium::query()
-            ->where('category_id', $categoryId)
-            ->orderBy('id')
-            ->pluck('id');
-
-        foreach ($media as $mediumId) {
-            $contexts[] = [
-                'scope' => FieldScope::Position->value,
-                'advertising_category_id' => $categoryId,
-                'advertising_medium_id' => (int) $mediumId,
-            ];
-        }
-
-        return $contexts;
     }
 
     /**

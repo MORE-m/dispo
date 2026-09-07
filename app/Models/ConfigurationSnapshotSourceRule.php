@@ -6,26 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * DF-3.3a2α / VER-002: eingefrorene Regel einer Snapshot-Quelle.
+ *
  * @property int $id
- * @property int $configuration_snapshot_id
+ * @property int $configuration_snapshot_source_id
  * @property int|null $source_field_rule_id
  * @property int $sort
  * @property array<string, mixed> $condition_json
  * @property array<string, mixed> $action_json
- * @property int|null $provenance_source_id
- * @property string|null $dedupe_key
+ * @property string $dedupe_key
  */
-class SnapshotFieldRule extends Model
+class ConfigurationSnapshotSourceRule extends Model
 {
     public $timestamps = false;
 
     protected $fillable = [
-        'configuration_snapshot_id',
+        'configuration_snapshot_source_id',
         'source_field_rule_id',
         'sort',
         'condition_json',
         'action_json',
-        'provenance_source_id',
         'dedupe_key',
     ];
 
@@ -41,10 +41,13 @@ class SnapshotFieldRule extends Model
     }
 
     /**
-     * @return BelongsTo<ConfigurationSnapshot, $this>
+     * @return BelongsTo<ConfigurationSnapshotSource, $this>
      */
-    public function snapshot(): BelongsTo
+    public function source(): BelongsTo
     {
-        return $this->belongsTo(ConfigurationSnapshot::class, 'configuration_snapshot_id');
+        return $this->belongsTo(
+            ConfigurationSnapshotSource::class,
+            'configuration_snapshot_source_id',
+        );
     }
 }

@@ -84,11 +84,56 @@ Zweiter Teilslice von DF-3 auf Feature-Branch
 - Bewusst später in DF-3.2a: Position-Custom (DF-3.2b), Optionen, Assignments,
   Regel-Editor.
 
+## Umsetzungsstand DF-3.3a2α (globaler Snapshot-Freeze)
+
+Teilslice nach DF-3.3a1 auf Feature-Branch `feat/df3-3a2a-global-snapshot-freeze`
+– **kein** Abschluss von DF-3, **kein** Start von `DF-3.3a2β`/`DF-3.3b`.
+
+Erstmals wirken freie Feldsets produktiv – aber **ausschließlich über aktive
+globale Assignments**. Kategorie- und Werbemittelzuweisungen bleiben in der
+Runtime wirkungslos.
+
+- **Generation 2:** `configuration_snapshots.format_version` (NOT NULL) trennt
+  Generation 1 (Legacy/Core) von Generation 2 (Core + globale Assignments).
+  Lesepfade sind fail-closed; unbekannte Generationen werden abgewiesen.
+- **Freeze Kalkulation:** Primary-Core plus aktive globale Calc-Assignments,
+  aufgelöst über den Resolver aus DF-3.3a1, für Header **und** Position.
+- **Freeze Dispoauftrag:** Dispo-Core plus aktive globale Dispo-Assignments plus
+  eine Calc-Origin-Quelle aus dem Kalkulationssnapshot; bei Key-Kollision gewinnt
+  Calc-Origin. Die Regeln beider Seiten werden über `dedupe_key` zusammengeführt.
+- **Quellengraph (VER-002):** jede beteiligte Quelle wird mit `merge_order`,
+  Ebene, Rolle, Feldset-/Versions-/Assignment-Metadaten sowie ihren
+  Memberships und Regeln eingefroren.
+- **Property-Provenance:** jede Snapshot-Definition speichert pro gewonnener
+  Eigenschaft (Definition, Revision, Required, Visible, Sort, Group) die Quelle.
+  Zusammengesetzte Fremdschlüssel verhindern Verweise auf fremde Snapshots.
+- **Fingerprint und Drift:** Wizard und `POST kalkulationen/feldschema` liefern
+  `schema_fingerprint`. Beim Anlegen führt ein veralteter Fingerprint zu **409
+  vor** der Feldwert-Validierung (422) – die Kalkulation entsteht nicht.
+  Der Freeze selbst läuft in einer Transaktion mit Sperre auf der globalen
+  Konfigurationsebene.
+- **Historie:** Update bestehender Vorgänge behält Snapshot und Generation.
+  Dispo-Revision **klont** den Vorgängersnapshot (gleiche Generation, gleicher
+  Fingerprint, geklonte Quellen) statt aktuelle Assignments neu aufzulösen.
+- **Admin:** unverändert nur JSON-API aus DF-3.3a1, **keine** Assignment-UI.
+- E2E isoliert: `playwright.df33a2a.config.ts` (eigene SQLite-DB, Port 8004).
+
+### Bewusst nicht in DF-3.3a2α (Grenzen für DF-3.3a2β)
+
+1. **Kategorie-/Werbemittelebene:** Assignments auf `advertising_category` und
+   `advertising_medium` sind anlegbar und aktivierbar, wirken aber **nicht** im
+   Freeze. Der Quellengraph kennt dafür noch keine Quellen.
+2. **VER-003 Positions-Effektiv-Snapshot:** **nicht begonnen**. Positionsfelder
+   werden weiterhin aus der einen Snapshot-Konfiguration des Vorgangs bedient,
+   nicht positionsscharf je Werbemittel eingefroren.
+3. **Assignment-Admin-UI:** **nicht begonnen** (`DF-3.3b`); Herkunft und
+   Konflikte sind bislang nur über die JSON-Preview sichtbar.
+4. **Optionen, volle Regelmatrix, Regel-Editor:** unverändert offen.
+
 ## Umsetzungsstand DF-3.3a1 (Field-Set-Assignments)
 
-Teilslice nach DF-3.3-fs – **kein** Abschluss von DF-3, **kein** Start von
-`DF-3.3a2`/`DF-3.3b`. Assignments haben **noch keine Runtime-Wirkung** auf
-Kalkulation oder Dispoauftrag.
+Teilslice nach DF-3.3-fs auf `main`. Assignments hatten in DF-3.3a1 **noch keine
+Runtime-Wirkung**; die globale Ebene wirkt erst ab DF-3.3a2α.
 
 - Tabelle `field_set_assignments` mit Ziel-XOR und `target_identity`-Unique.
 - Nur freie, assignierbare Feldsets mit aktiver Version; Cores nie assignierbar.
@@ -102,22 +147,23 @@ Kalkulation oder Dispoauftrag.
   widersprüchliche Overrides derselben Ebene blockieren.
 - Minimale JSON-API unter `access-administration` (Kontext-Preview, Aktivierungs-
   Preview, CRUD); **keine** Assignment-Admin-UI.
-- Bewusst nicht: VER-002 Quellengraph, VER-003 Positions-Effektiv, Writer-/Composer-
-  Umbau, produktive Feldwirkung.
+- Bewusst nicht in a1: VER-002 Quellengraph, VER-003 Positions-Effektiv,
+  Writer-/Composer-Umbau, produktive Feldwirkung.
 
-### Verbindliche Grenzen für DF-3.3a2 (noch nicht implementiert)
+### Verbindliche Grenzen aus DF-3.3a1 – Stand nach DF-3.3a2α
 
 1. **Revision** bestehender Kalkulation/Dispo: historisch eingefrorene Konfiguration
    bleibt; keine stillschweigende Neuauflösung aktueller Assignments.
+   → in DF-3.3a2α umgesetzt (Update behält Snapshot; Dispo-Revision klont).
 2. **Explizites Kopieren** als neuer Vorgang: neuer Freeze anhand dann aktueller
-   Assignments; Quellvorgang unverändert.
+   Assignments; Quellvorgang unverändert. → in DF-3.3a2α umgesetzt.
 3. **Kalkulation → Dispo:** Calc-Herkunft/Werte bleiben historisch; zusätzlich müssen
-   für `dispo_order` geltende globale/Kategorie-/Werbemittel-Assignments separat
-   aufgelöst werden. Dispo darf nicht ausschließlich die Calc-Positionskonfiguration
-   kopieren; Calc-Origin-Capture und Dispo-eigene Effektiv-Konfiguration müssen
-   konfliktfrei zusammengesetzt und eingefroren werden.
-4. **VER-002/VER-003:** erst in `DF-3.3a2`; kein vorsorgliches leeres Snapshot-Schema
-   in DF-3.3a1.
+   für `dispo_order` geltende Assignments separat aufgelöst werden. Dispo darf nicht
+   ausschließlich die Calc-Positionskonfiguration kopieren; Calc-Origin-Capture und
+   Dispo-eigene Effektiv-Konfiguration müssen konfliktfrei zusammengesetzt und
+   eingefroren werden. → in DF-3.3a2α für die **globale** Ebene umgesetzt;
+   Kategorie/Werbemittel offen (`DF-3.3a2β`).
+4. **VER-002:** in DF-3.3a2α umgesetzt. **VER-003: nicht begonnen** (`DF-3.3a2β`).
 
 ## Umsetzungsstand DF-3.3-fs (freie Feldsets)
 
@@ -135,7 +181,8 @@ Teilslice nach ADV-001a – **kein** Abschluss von DF-3. Freie Feldsets haben
   Versionsaktivierung reaktiviert nicht automatisch; Reaktivieren ist eigene Aktion.
 - Kern-Feldsets: dauerhaft `is_assignable=false`, Metadaten geschützt.
 - Admin unter Dyn-Feld-Teilfreigabe; E2E isoliert `playwright.df33fs.config.ts`.
-- Bewusst später in fs: Assignments (→ DF-3.3a1), Snapshot-Quellengraph, Runtime.
+- Bewusst später in fs: Assignments (→ DF-3.3a1), Snapshot-Quellengraph und
+  Runtime (→ DF-3.3a2α, global).
 
 ## Umsetzungsstand DF-3.2b (Custom Position-Textfelder)
 

@@ -18,6 +18,10 @@ use RuntimeException;
 
 /**
  * VER-004 / DF-2 / DF-3.2b: Compose eines Dispo-Config-Snapshots aus Calc-Snapshot + system_dispo_order_core.
+ *
+ * Erzeugt Snapshots der Generation 1. Der produktive Dispo-Freeze läuft seit
+ * DF-3.3a2α über den {@see ConfigurationSnapshotFreezeService}; diese Klasse
+ * bleibt für Legacy-Backfill und die Calc-Origin-Semantik erhalten.
  */
 final class DispoConfigurationSnapshotComposer
 {
@@ -37,7 +41,7 @@ final class DispoConfigurationSnapshotComposer
     ];
 
     /** @var array<string, array{type: FieldType, scope: FieldScope, applies_to: list<FieldAppliesTo>}> */
-    private const CALC_ORIGIN_EXPECTATIONS = [
+    public const CALC_ORIGIN_EXPECTATIONS = [
         'campaign_period' => [
             'type' => FieldType::Period,
             'scope' => FieldScope::Header,
@@ -217,6 +221,7 @@ final class DispoConfigurationSnapshotComposer
             $snapshot->field_set_version_id = $version->id;
             $snapshot->source = $source;
             $snapshot->source_configuration_snapshot_id = $calculationSnapshot->id;
+            $snapshot->format_version = ConfigurationSnapshot::FORMAT_VERSION_LEGACY;
             $snapshot->created_at = now();
             $snapshot->save();
 

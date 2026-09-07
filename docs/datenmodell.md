@@ -217,8 +217,8 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 | `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version`; DF-3.3-fs: `is_system`, `applies_to`, `is_assignable` (Cores: system + nicht assignierbar; freie Sets: Draft→Activate, Deakt./Reakt.) |
 | `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |
 | `field_rules` | Regeln der Feldset-Version (`field_equals` / `require_field` in DF-1) |
-| `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill) |
-| `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis |
+| `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill); ab DF-3.3a2α zusätzlich `format_version` (NOT NULL) und `schema_fingerprint` |
+| `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis; ab DF-3.3a2α mit Property-Provenance |
 | `snapshot_field_rules` | kopierte Regeln des Snapshots |
 | `calculation_field_values` | typisierte Kopfwerte einer Kalkulation (`value_text` MEDIUMTEXT ab DF-3.2a) |
 | `calculation_position_field_values` | typisierte Positionswerte (`value_text` MEDIUMTEXT ab DF-3.2b) |
@@ -267,7 +267,7 @@ vorhandenen Werte.
   Deakt./Reakt. am Container; keine physische Löschung; keine Runtime-Compose-
   Einbindung.
 
-### DF-3.3a1 – Field-Set-Assignments (Feature-Branch)
+### DF-3.3a1 – Field-Set-Assignments (`main`)
 
 - Tabelle `field_set_assignments`: `field_set_id`, `target_layer`
   (`global`|`advertising_category`|`advertising_medium`), nullable Ziel-FKs,
@@ -282,18 +282,68 @@ vorhandenen Werte.
   Aktivierungsvorschau blockieren sie.
 - FKs `restrictOnDelete`; kein physisches Löschen von Assignments.
 - Deterministischer Resolver + Kontext-Preview-API; Activate mit Fingerprint/409.
-- **Noch keine** produktive Runtime-Wirkung; VER-002/003 und Assignment-UI folgen
-  in `DF-3.3a2` / `DF-3.3b`.
+- In DF-3.3a1 **noch keine** produktive Runtime-Wirkung; die globale Ebene wirkt
+  ab `DF-3.3a2α`, Kategorie/Werbemittel und die Assignment-UI folgen in
+  `DF-3.3a2β` / `DF-3.3b`.
 
-### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a/b Text-Custom; DF-3.3-fs Container)
+### DF-3.3a2α – Snapshot-Generation 2, Quellengraph und Provenance (Feature-Branch)
 
-Konzeptuell vorgesehen; **DF-3.3-fs** liefert freie Feldset-Container, aber noch nicht:
+Feature-Branch `feat/df3-3a2a-global-snapshot-freeze` (`VER-002`).
+
+**Generationen (`configuration_snapshots.format_version`, NOT NULL ohne DEFAULT):**
+
+| Generation | Bedeutung | Quellen |
+|---|---|---|
+| 1 | `FORMAT_VERSION_LEGACY` – Altbestand/Legacy-Backfill | nur Kern-Feldset, kein Quellengraph |
+| 2 | `FORMAT_VERSION_GLOBAL_FREEZE` – Core + globale Assignments | Quellengraph + Property-Provenance vollständig |
+
+Bestandszeilen werden per Backfill auf `1` gesetzt; die Migration bricht ab, wenn
+danach noch `NULL` übrig ist. Neue Inserts müssen die Generation explizit setzen
+(MySQL `NOT NULL` ohne DEFAULT). Lesepfade sind fail-closed: eine unbekannte
+`format_version` wird abgewiesen statt still auf einen Default zu fallen.
+Generation 1 wird **nicht** nachträglich migriert; Updates behalten Snapshot und
+Generation.
+
+**Neue Tabellen und Spalten:**
+
+| Tabelle / Spalte | Rolle |
+|---|---|
+| `configuration_snapshots.format_version` | Generationsmarker, NOT NULL |
+| `configuration_snapshots.schema_fingerprint` | kanonischer Fingerprint der aufgelösten Konfiguration (Drift-Erkennung) |
+| `configuration_snapshot_sources` | Quellengraph: `merge_order`, `layer`, `role` (`core`/`assignment`/`additional`), eingefrorene Feldset-/Versions-/Assignment-Metadaten, `target_layer`/`target_identity` |
+| `configuration_snapshot_source_fields` | je Quelle eingefrorene Membership inkl. `required_override`/`visible_override`/`validation_json` |
+| `configuration_snapshot_source_rules` | je Quelle eingefrorene Regeln inkl. `dedupe_key` |
+| `snapshot_field_definitions.provenance_*_source_id` | Property-Provenance: welche Quelle Definition, Revision, Required, Visible, Sort und Group gewonnen hat |
+| `snapshot_field_rules.provenance_source_id` / `dedupe_key` | Herkunft und Deduplizierung kopierter Regeln |
+
+- `configuration_snapshot_sources` ist unique über `(configuration_snapshot_id, merge_order)`
+  und zusätzlich über `(configuration_snapshot_id, id)`. Alle Provenance-FKs sind
+  **zusammengesetzt** (`configuration_snapshot_id` + Quell-ID) – dadurch kann eine
+  Provenance-Spalte technisch nicht auf eine Quelle eines fremden Snapshots zeigen.
+- Quellen kaskadieren mit ihrem Snapshot; Feldsets, Versionen und Assignments sind
+  `restrictOnDelete`.
+- Dispo-Freeze ergänzt eine Zusatzquelle mit `target_identity = calc_origin`, die
+  die historischen Kalkulationsdefinitionen importiert; bei Key-Kollision gewinnt
+  Calc-Origin.
+- Dispo-Revision **klont** den Vorgänger-Snapshot (gleiche `format_version`,
+  gleicher Fingerprint, gleiche Keys, geklonte Quellen) statt neu aufzulösen.
+- Bewusst **nicht** enthalten: Kategorie-/Werbemittelquellen im Quellengraph und
+  `VER-003` (positionsscharfe Effektiv-Konfiguration) – beides `DF-3.3a2β`.
+
+### Spätere Ausbaustufen
+
+Konzeptuell vorgesehen, aber **nicht implementiert**:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
-- `FieldSetAssignment` an Kategorien/Werbemittel,
-- Regel-Editor / volle Regelmatrix,
-- Runtime-Auswertung freier Feldsets.
+- Runtime-Wirkung der Assignments an Oberkategorien/Werbemittel (`DF-3.3a2β`);
+  die Zuweisungen selbst existieren seit DF-3.3a1,
+- `VER-003` positionsscharfer Effektiv-Snapshot (`DF-3.3a2β`),
+- Assignment-Admin-UI (`DF-3.3b`),
+- Regel-Editor / volle Regelmatrix.
+
+Die Runtime-Auswertung freier Feldsets ist seit `DF-3.3a2α` für die **globale**
+Ebene umgesetzt.
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.
