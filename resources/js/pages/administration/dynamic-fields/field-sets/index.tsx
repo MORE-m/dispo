@@ -62,17 +62,15 @@ function FieldSetTable({
                 <tbody>
                     {rows.map((row) => (
                         <tr key={row.id} className="border-t">
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-2">{row.name}</td>
+                            <td className="px-4 py-2 font-mono text-xs">
                                 <Link
                                     href={`/administration/dynamische-felder/feldsets/${row.id}`}
                                     className="font-medium underline-offset-4 hover:underline"
                                     data-test={`fieldset-link-${row.key}`}
                                 >
-                                    {row.name}
+                                    {row.key}
                                 </Link>
-                            </td>
-                            <td className="px-4 py-2 font-mono text-xs">
-                                {row.key}
                             </td>
                             <td className="px-4 py-2">
                                 {appliesToLabel(row.applies_to)}
