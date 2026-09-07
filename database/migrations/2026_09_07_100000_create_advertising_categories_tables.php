@@ -1,6 +1,5 @@
 <?php
 
-use App\Support\Advertising\CanonicalAdvertisingCategories;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -9,9 +8,40 @@ use Illuminate\Support\Facades\Schema;
 /**
  * ADV-001a: Oberkategorie-Datenbasis (AdvertisingCategory + category_id am Werbemittel).
  * Keine Assignments, keine Snapshot-Änderung, keine Admin-UI.
+ *
+ * Bewusste Duplizierung: Die Literale unten frieren den historischen Stand dieser
+ * Migration ein. Der Runtime-Katalog
+ * App\Support\Advertising\CanonicalAdvertisingCategories beschreibt die aktuelle
+ * technische Schnittstelle und darf diese Migration nicht speisen.
  */
 return new class extends Migration
 {
+    /**
+     * Historischer Seed-Stand ADV-001a (unveränderlich in dieser Migration).
+     *
+     * @var list<array{key: string, name: string, sort: int}>
+     */
+    private const CATEGORY_DEFINITIONS = [
+        ['key' => 'spots', 'name' => 'Spots', 'sort' => 10],
+        ['key' => 'special_advertising_formats', 'name' => 'SWF / Sonderwerbeformen', 'sort' => 20],
+        ['key' => 'online_audio', 'name' => 'Online Audio', 'sort' => 30],
+        ['key' => 'social_online', 'name' => 'Social Media / Online', 'sort' => 40],
+        ['key' => 'events_promotion', 'name' => 'Events / Promotion', 'sort' => 50],
+        ['key' => 'barter', 'name' => 'Gegengeschäft', 'sort' => 60],
+    ];
+
+    /**
+     * Explizite Bestands-Map zum Migrationszeitpunkt.
+     * Nur Codes, die vor ADV-001a als Bestandsdaten vorkommen können
+     * (Factory-Default / E2E-Seeder: spot_classic). spot_classic_alt entsteht
+     * ausschließlich nachträglich in Tests und gehört nicht in diesen Backfill.
+     *
+     * @var array<string, string>
+     */
+    private const MEDIUM_CODE_TO_CATEGORY_KEY = [
+        'spot_classic' => 'spots',
+    ];
+
     public function up(): void
     {
         if (! Schema::hasTable('advertising_categories')) {
@@ -29,14 +59,17 @@ return new class extends Migration
 
         if (! Schema::hasColumn('advertising_media', 'category_id')) {
             Schema::disableForeignKeyConstraints();
-            if (Schema::getConnection()->getDriverName() === 'sqlite') {
-                DB::statement('ALTER TABLE advertising_media ADD COLUMN category_id INTEGER NULL');
-            } else {
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->unsignedBigInteger('category_id')->nullable()->after('id');
-                });
+            try {
+                if (Schema::getConnection()->getDriverName() === 'sqlite') {
+                    DB::statement('ALTER TABLE advertising_media ADD COLUMN category_id INTEGER NULL');
+                } else {
+                    Schema::table('advertising_media', function (Blueprint $table) {
+                        $table->unsignedBigInteger('category_id')->nullable()->after('id');
+                    });
+                }
+            } finally {
+                Schema::enableForeignKeyConstraints();
             }
-            Schema::enableForeignKeyConstraints();
         }
 
         $this->backfillMediumCategories();
@@ -47,38 +80,40 @@ return new class extends Migration
     public function down(): void
     {
         Schema::disableForeignKeyConstraints();
-
-        if (Schema::hasColumn('advertising_media', 'category_id')) {
-            if (Schema::getConnection()->getDriverName() === 'mysql') {
-                if ($this->foreignKeyExists('advertising_media', 'advertising_media_category_id_fk')) {
+        try {
+            if (Schema::hasColumn('advertising_media', 'category_id')) {
+                if (Schema::getConnection()->getDriverName() === 'mysql') {
+                    if ($this->foreignKeyExists('advertising_media', 'advertising_media_category_id_fk')) {
+                        Schema::table('advertising_media', function (Blueprint $table) {
+                            $table->dropForeign('advertising_media_category_id_fk');
+                        });
+                    }
                     Schema::table('advertising_media', function (Blueprint $table) {
-                        $table->dropForeign('advertising_media_category_id_fk');
+                        $table->dropColumn('category_id');
+                    });
+                } else {
+                    if ($this->sqliteForeignKeyExists('advertising_media', 'category_id')) {
+                        Schema::table('advertising_media', function (Blueprint $table) {
+                            $table->dropForeign(['category_id']);
+                        });
+                    }
+                    Schema::table('advertising_media', function (Blueprint $table) {
+                        $table->dropColumn('category_id');
                     });
                 }
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->dropColumn('category_id');
-                });
-            } else {
-                if ($this->sqliteForeignKeyExists('advertising_media', 'category_id')) {
-                    Schema::table('advertising_media', function (Blueprint $table) {
-                        $table->dropForeign(['category_id']);
-                    });
-                }
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->dropColumn('category_id');
-                });
             }
-        }
 
-        Schema::dropIfExists('advertising_categories');
-        Schema::enableForeignKeyConstraints();
+            Schema::dropIfExists('advertising_categories');
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
     }
 
     private function seedCanonicalCategories(): void
     {
         $now = now();
 
-        foreach (CanonicalAdvertisingCategories::definitions() as $definition) {
+        foreach (self::CATEGORY_DEFINITIONS as $definition) {
             $existing = DB::table('advertising_categories')->where('key', $definition['key'])->first();
             if ($existing !== null) {
                 continue;
@@ -97,14 +132,16 @@ return new class extends Migration
 
     private function backfillMediumCategories(): void
     {
+        $categoryKeys = array_column(self::CATEGORY_DEFINITIONS, 'key');
+
         /** @var array<string, int> $categoryIdsByKey */
         $categoryIdsByKey = DB::table('advertising_categories')
-            ->whereIn('key', CanonicalAdvertisingCategories::keys())
+            ->whereIn('key', $categoryKeys)
             ->pluck('id', 'key')
             ->map(fn ($id): int => (int) $id)
             ->all();
 
-        foreach (CanonicalAdvertisingCategories::MEDIUM_CODE_TO_CATEGORY_KEY as $mediumCode => $categoryKey) {
+        foreach (self::MEDIUM_CODE_TO_CATEGORY_KEY as $mediumCode => $categoryKey) {
             $categoryId = $categoryIdsByKey[$categoryKey] ?? null;
             if ($categoryId === null) {
                 throw new RuntimeException(
@@ -137,7 +174,7 @@ return new class extends Migration
         throw new RuntimeException(
             'ADV-001a Backfill abgebrochen: Werbemittel ohne explizite Kategorie-Zuordnung: '.$details
             .'. Bekannte Codes: '
-            .implode(', ', array_keys(CanonicalAdvertisingCategories::MEDIUM_CODE_TO_CATEGORY_KEY))
+            .implode(', ', array_keys(self::MEDIUM_CODE_TO_CATEGORY_KEY))
             .'. Keine pauschale Default-Kategorie.',
         );
     }
@@ -145,36 +182,37 @@ return new class extends Migration
     private function enforceCategoryIdNotNullAndForeignKey(): void
     {
         Schema::disableForeignKeyConstraints();
+        try {
+            if (Schema::getConnection()->getDriverName() === 'sqlite') {
+                if (! $this->sqliteColumnIsNotNull('advertising_media', 'category_id')) {
+                    Schema::table('advertising_media', function (Blueprint $table) {
+                        $table->unsignedBigInteger('category_id')->nullable(false)->change();
+                    });
+                }
 
-        if (Schema::getConnection()->getDriverName() === 'sqlite') {
-            if (! $this->sqliteColumnIsNotNull('advertising_media', 'category_id')) {
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->unsignedBigInteger('category_id')->nullable(false)->change();
-                });
-            }
+                if (! $this->sqliteForeignKeyExists('advertising_media', 'category_id')) {
+                    Schema::table('advertising_media', function (Blueprint $table) {
+                        $table->foreign('category_id', 'advertising_media_category_id_fk')
+                            ->references('id')
+                            ->on('advertising_categories')
+                            ->restrictOnDelete();
+                    });
+                }
+            } else {
+                if (! $this->foreignKeyExists('advertising_media', 'advertising_media_category_id_fk')) {
+                    Schema::table('advertising_media', function (Blueprint $table) {
+                        $table->foreign('category_id', 'advertising_media_category_id_fk')
+                            ->references('id')
+                            ->on('advertising_categories')
+                            ->restrictOnDelete();
+                    });
+                }
 
-            if (! $this->sqliteForeignKeyExists('advertising_media', 'category_id')) {
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->foreign('category_id', 'advertising_media_category_id_fk')
-                        ->references('id')
-                        ->on('advertising_categories')
-                        ->restrictOnDelete();
-                });
+                DB::statement('ALTER TABLE advertising_media MODIFY category_id BIGINT UNSIGNED NOT NULL');
             }
-        } else {
-            if (! $this->foreignKeyExists('advertising_media', 'advertising_media_category_id_fk')) {
-                Schema::table('advertising_media', function (Blueprint $table) {
-                    $table->foreign('category_id', 'advertising_media_category_id_fk')
-                        ->references('id')
-                        ->on('advertising_categories')
-                        ->restrictOnDelete();
-                });
-            }
-
-            DB::statement('ALTER TABLE advertising_media MODIFY category_id BIGINT UNSIGNED NOT NULL');
+        } finally {
+            Schema::enableForeignKeyConstraints();
         }
-
-        Schema::enableForeignKeyConstraints();
     }
 
     private function sqliteColumnIsNotNull(string $table, string $column): bool

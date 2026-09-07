@@ -44,9 +44,10 @@ technische Keys; nicht beiläufig umbenennen):
 | `events_promotion` | Events / Promotion |
 | `barter` | Gegengeschäft |
 
-Bekannte Bestands-Codes (explizite Map, fail-closed): `spot_classic` und
-`spot_classic_alt` → `spots`. Unbekannte Codes dürfen nicht pauschal zugeordnet
-werden.
+Bekannte Bestands-Codes der ADV-001a-Migration (explizite Map, fail-closed):
+`spot_classic` → `spots`. Unbekannte Codes dürfen nicht pauschal zugeordnet
+werden. Test-only-Codes wie `spot_classic_alt` entstehen erst nach der Migration
+und gehören nicht zum historischen Produktions-Backfill.
 
 Produktion/Sonstiges ist keine Oberkategorie für normale Werbemittel, sondern eine
 Zusatzzeile innerhalb einer Position.

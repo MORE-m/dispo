@@ -5,6 +5,9 @@ namespace App\Support\Advertising;
 /**
  * ADV-001a: kanonische Oberkategorien (stabile technische Keys).
  * Keys sind Schnittstellenbestandteil und dürfen nicht beiläufig umbenannt werden.
+ *
+ * Historische Migrationsdaten leben bewusst separat in der ADV-001a-Migration
+ * und werden nicht aus dieser Klasse gelesen.
  */
 final class CanonicalAdvertisingCategories
 {
@@ -19,17 +22,6 @@ final class CanonicalAdvertisingCategories
     public const EVENTS_PROMOTION = 'events_promotion';
 
     public const BARTER = 'barter';
-
-    /**
-     * Bekannte Bestands-Werbemittel-Codes → Kategorie-Key.
-     * Unbekannte Codes dürfen nicht pauschal gemappt werden (Migration fail-closed).
-     *
-     * @var array<string, string>
-     */
-    public const MEDIUM_CODE_TO_CATEGORY_KEY = [
-        'spot_classic' => self::SPOTS,
-        'spot_classic_alt' => self::SPOTS,
-    ];
 
     /**
      * @return list<array{key: string, name: string, sort: int}>
