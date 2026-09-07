@@ -25,6 +25,10 @@ class UpdateFieldSetMetadataRequest extends FormRequest
             'lock_version' => ['required', 'integer', 'min:1'],
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'applies_to' => ['sometimes', 'required', 'string', Rule::enum(FieldAppliesTo::class)],
+            'key' => ['prohibited'],
+            'is_system' => ['prohibited'],
+            'is_assignable' => ['prohibited'],
+            'active_version_id' => ['prohibited'],
         ];
     }
 
@@ -37,6 +41,23 @@ class UpdateFieldSetMetadataRequest extends FormRequest
             'lock_version' => 'Sperrversion',
             'name' => 'Name',
             'applies_to' => 'Gültigkeit',
+            'key' => 'Schlüssel',
+            'is_system' => 'Systemstatus',
+            'is_assignable' => 'Assignierbarkeit',
+            'active_version_id' => 'Aktive Version',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'key.prohibited' => 'Der technische Schlüssel darf nach dem Anlegen nicht geändert werden.',
+            'is_system.prohibited' => 'Der Systemstatus darf nicht geändert werden.',
+            'is_assignable.prohibited' => 'Die Assignierbarkeit darf nicht über Metadaten gesetzt werden.',
+            'active_version_id.prohibited' => 'Die aktive Version darf nicht über Metadaten gesetzt werden.',
         ];
     }
 

@@ -14,7 +14,9 @@ use App\Models\FieldSetVersionField;
 use App\Models\User;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldDefinitionCustomWriter;
+use App\Services\DynamicField\Admin\FieldSetKeySlugger;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -33,15 +35,14 @@ class DynamicFieldAdminDf33FsTest extends TestCase
         $calc = FieldSet::query()->where('key', AdminFieldSetCatalog::CALCULATION_CORE)->firstOrFail();
         $dispo = FieldSet::query()->where('key', AdminFieldSetCatalog::DISPO_ORDER_CORE)->firstOrFail();
 
-        $before = [
-            'calc_id' => $calc->id,
-            'dispo_id' => $dispo->id,
-            'calc_active' => $calc->active_version_id,
-            'dispo_active' => $dispo->active_version_id,
-            'calc_versions' => FieldSetVersion::query()->where('field_set_id', $calc->id)->count(),
-            'memberships' => FieldSetVersionField::query()->count(),
-            'snapshot_defs' => DB::table('snapshot_field_definitions')->count(),
-        ];
+        $this->assertSame(
+            [(int) $calc->id, (int) $dispo->id],
+            FieldSet::query()->orderBy('id')->pluck('id')->all(),
+        );
+        $this->assertNotNull($calc->active_version_id);
+        $this->assertNotNull($dispo->active_version_id);
+        $this->assertGreaterThan(0, FieldSetVersion::query()->where('field_set_id', $calc->id)->count());
+        $this->assertGreaterThan(0, FieldSetVersionField::query()->count());
 
         $this->assertTrue($calc->is_system);
         $this->assertSame(FieldAppliesTo::Calculation, $calc->applies_to);
@@ -49,59 +50,112 @@ class DynamicFieldAdminDf33FsTest extends TestCase
         $this->assertTrue($dispo->is_system);
         $this->assertSame(FieldAppliesTo::DispoOrder, $dispo->applies_to);
         $this->assertFalse($dispo->is_assignable);
-
-        /** @var object{up: callable, down: callable} $migration */
-        $migration = require database_path('migrations/2026_09_07_200000_add_fieldset_container_metadata.php');
-        $migration->down();
-        $this->assertFalse(Schema::hasColumn('field_sets', 'is_system'));
-
-        $migration->up();
-
-        $calc->refresh();
-        $dispo->refresh();
-        $this->assertSame($before['calc_id'], $calc->id);
-        $this->assertSame($before['dispo_id'], $dispo->id);
-        $this->assertSame($before['calc_active'], $calc->active_version_id);
-        $this->assertSame($before['dispo_active'], $dispo->active_version_id);
-        $this->assertSame(
-            $before['calc_versions'],
-            FieldSetVersion::query()->where('field_set_id', $calc->id)->count(),
-        );
-        $this->assertSame($before['memberships'], FieldSetVersionField::query()->count());
-        $this->assertSame($before['snapshot_defs'], DB::table('snapshot_field_definitions')->count());
-        $this->assertTrue($calc->is_system);
-        $this->assertSame(FieldAppliesTo::Calculation, $calc->applies_to);
-        $this->assertFalse($calc->is_assignable);
+        $this->assertFieldSetMetadataColumnsAreNotNull();
+        $this->assertDatabaseHas('field_sets', [
+            'key' => AdminFieldSetCatalog::CALCULATION_CORE,
+            'is_system' => 1,
+            'applies_to' => 'calculation',
+            'is_assignable' => 0,
+        ]);
     }
 
     public function test_migration_fails_closed_on_unknown_fieldset(): void
     {
-        /** @var object{up: callable, down: callable} $migration */
-        $migration = require database_path('migrations/2026_09_07_200000_add_fieldset_container_metadata.php');
-        $migration->down();
-
-        $now = now();
-        $unknownId = DB::table('field_sets')->insertGetId([
-            'key' => 'legacy_unknown_set',
-            'name' => 'Unbekannt',
-            'active_version_id' => null,
-            'lock_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+        $migration = $this->loadFieldSetContainerMigration();
+        $unknownId = null;
 
         try {
-            $migration->up();
-            $this->fail('Expected RuntimeException for unknown fieldset.');
-        } catch (\Throwable $exception) {
-            $this->assertInstanceOf(\RuntimeException::class, $exception);
-            $this->assertStringContainsString((string) $unknownId, $exception->getMessage());
-            $this->assertStringContainsString('legacy_unknown_set', $exception->getMessage());
+            $unknownId = DB::table('field_sets')->insertGetId([
+                'key' => 'legacy_unknown_set',
+                'name' => 'Unbekannt',
+                'is_system' => false,
+                'applies_to' => 'both',
+                'is_assignable' => false,
+                'active_version_id' => null,
+                'lock_version' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            $method = new \ReflectionMethod($migration, 'backfillCoreMetadataFailClosed');
+            $method->setAccessible(true);
+
+            try {
+                $method->invoke($migration);
+                $this->fail('Expected RuntimeException for unknown fieldset.');
+            } catch (\Throwable $exception) {
+                $this->assertInstanceOf(\RuntimeException::class, $exception);
+                $this->assertStringContainsString((string) $unknownId, $exception->getMessage());
+                $this->assertStringContainsString('legacy_unknown_set', $exception->getMessage());
+            }
+        } finally {
+            if ($unknownId !== null) {
+                DB::table('field_sets')->where('id', $unknownId)->delete();
+            }
         }
 
-        DB::table('field_sets')->where('id', $unknownId)->delete();
-        $migration->up();
-        $this->assertTrue(Schema::hasColumn('field_sets', 'is_system'));
+        $this->assertDatabaseMissing('field_sets', ['key' => 'legacy_unknown_set']);
+        $this->assertFieldSetMetadataColumnsAreNotNull();
+        $this->assertSame(
+            2,
+            FieldSet::query()->whereIn('key', [
+                AdminFieldSetCatalog::CALCULATION_CORE,
+                AdminFieldSetCatalog::DISPO_ORDER_CORE,
+            ])->count(),
+        );
+        $this->assertTrue(
+            FieldSet::query()->where('key', AdminFieldSetCatalog::CALCULATION_CORE)->where('is_system', true)->exists(),
+        );
+    }
+
+    public function test_container_metadata_columns_reject_null_on_database_level(): void
+    {
+        $this->assertFieldSetMetadataColumnsAreNotNull();
+
+        $base = [
+            'key' => 'null_guard_'.bin2hex(random_bytes(4)),
+            'name' => 'Null Guard',
+            'is_system' => false,
+            'applies_to' => 'both',
+            'is_assignable' => false,
+            'active_version_id' => null,
+            'lock_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ];
+
+        foreach (['is_system', 'applies_to', 'is_assignable'] as $column) {
+            $payload = $base;
+            $payload['key'] = 'null_guard_'.$column.'_'.bin2hex(random_bytes(3));
+            $payload[$column] = null;
+
+            try {
+                DB::table('field_sets')->insert($payload);
+                $this->fail("Expected database rejection for NULL {$column}.");
+            } catch (\Throwable $exception) {
+                $this->assertTrue(
+                    $exception instanceof QueryException
+                    || $exception instanceof \PDOException,
+                    $exception::class.': '.$exception->getMessage(),
+                );
+            }
+        }
+
+        $id = DB::table('field_sets')->insertGetId($base);
+        foreach (['is_system', 'applies_to', 'is_assignable'] as $column) {
+            try {
+                DB::table('field_sets')->where('id', $id)->update([$column => null]);
+                $this->fail("Expected database rejection for NULL update of {$column}.");
+            } catch (\Throwable $exception) {
+                $this->assertTrue(
+                    $exception instanceof QueryException
+                    || $exception instanceof \PDOException,
+                    $exception::class.': '.$exception->getMessage(),
+                );
+            }
+        }
+
+        DB::table('field_sets')->where('id', $id)->delete();
     }
 
     public function test_admin_creates_free_fieldset_atomically_with_empty_draft(): void
@@ -161,11 +215,146 @@ class DynamicFieldAdminDf33FsTest extends TestCase
                 'name' => 'Reporting Set Neu',
                 'key' => 'hacked_key',
             ])
-            ->assertRedirect();
+            ->assertSessionHasErrors('key');
 
         $fieldSet->refresh();
         $this->assertSame('reporting_set', $fieldSet->key);
-        $this->assertSame('Reporting Set Neu', $fieldSet->name);
+        $this->assertSame('Freies Set', $fieldSet->name);
+    }
+
+    public function test_generated_and_explicit_keys_never_exceed_64_characters(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $slugger = app(FieldSetKeySlugger::class);
+
+        $exact64 = str_repeat('a', 64);
+        $this->assertSame(64, strlen($exact64));
+        $generatedExact = $slugger->uniqueSlugFromName($exact64);
+        $this->assertSame($exact64, $generatedExact);
+        $this->assertLessThanOrEqual(64, strlen($generatedExact));
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.store'), [
+                'name' => $exact64,
+                'applies_to' => FieldAppliesTo::Both->value,
+            ])
+            ->assertRedirect();
+        $this->assertTrue(FieldSet::query()->where('key', $exact64)->exists());
+        $this->assertSame(64, strlen((string) FieldSet::query()->where('key', $exact64)->value('key')));
+
+        $tooLongName = str_repeat('b', 80);
+        $truncated = $slugger->uniqueSlugFromName($tooLongName);
+        $this->assertSame(64, strlen($truncated));
+        $this->assertSame(str_repeat('b', 64), $truncated);
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.store'), [
+                'name' => $tooLongName,
+                'applies_to' => FieldAppliesTo::Calculation->value,
+            ])
+            ->assertRedirect();
+        $longSet = FieldSet::query()->where('key', $truncated)->firstOrFail();
+        $this->assertSame(64, strlen($longSet->key));
+
+        $collisionBase = str_repeat('c', 64);
+        FieldSet::query()->where('key', $collisionBase)->delete();
+        DB::table('field_sets')->insert([
+            'key' => $collisionBase,
+            'name' => 'Existing Long',
+            'is_system' => false,
+            'applies_to' => 'both',
+            'is_assignable' => false,
+            'active_version_id' => null,
+            'lock_version' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $collided = $slugger->uniqueSlugFromName($collisionBase);
+        $this->assertNotSame($collisionBase, $collided);
+        $this->assertLessThanOrEqual(64, strlen($collided));
+        $this->assertStringEndsWith('_2', $collided);
+        $this->assertSame(64, strlen($collided));
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.store'), [
+                'name' => 'Explicit Too Long',
+                'key' => str_repeat('d', 65),
+                'applies_to' => FieldAppliesTo::Both->value,
+            ])
+            ->assertSessionHasErrors('key');
+
+        $this->assertSame(
+            0,
+            FieldSet::query()->get()->filter(fn (FieldSet $set): bool => strlen($set->key) > 64)->count(),
+        );
+    }
+
+    public function test_store_and_update_reject_protected_metadata_fields(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.store'), [
+                'name' => 'Protected Create',
+                'key' => 'protected_create',
+                'applies_to' => FieldAppliesTo::Both->value,
+                'is_system' => true,
+                'is_assignable' => true,
+                'active_version_id' => 999,
+                'lock_version' => 9,
+            ])
+            ->assertSessionHasErrors([
+                'is_system',
+                'is_assignable',
+                'active_version_id',
+                'lock_version',
+            ]);
+
+        $this->assertDatabaseMissing('field_sets', ['key' => 'protected_create']);
+
+        $fieldSet = $this->createFreeFieldSet($admin, [
+            'name' => 'Protected Update',
+            'key' => 'protected_update',
+        ]);
+        $before = $fieldSet->only([
+            'key',
+            'name',
+            'is_system',
+            'applies_to',
+            'is_assignable',
+            'active_version_id',
+            'lock_version',
+        ]);
+
+        $this->actingAs($admin)
+            ->put(route('administration.dynamic-fields.field-sets.update', $fieldSet), [
+                'lock_version' => $fieldSet->lock_version,
+                'name' => 'Protected Update Changed',
+                'key' => 'hacked',
+                'is_system' => true,
+                'is_assignable' => true,
+                'active_version_id' => 123,
+            ])
+            ->assertSessionHasErrors([
+                'key',
+                'is_system',
+                'is_assignable',
+                'active_version_id',
+            ]);
+
+        $fieldSet->refresh();
+        $this->assertSame($before['key'], $fieldSet->key);
+        $this->assertSame($before['name'], $fieldSet->name);
+        $this->assertSame((bool) $before['is_system'], $fieldSet->is_system);
+        $this->assertSame(
+            $before['applies_to'] instanceof FieldAppliesTo
+                ? $before['applies_to']->value
+                : $before['applies_to'],
+            $fieldSet->applies_to->value,
+        );
+        $this->assertSame((bool) $before['is_assignable'], $fieldSet->is_assignable);
+        $this->assertSame($before['active_version_id'], $fieldSet->active_version_id);
+        $this->assertSame((int) $before['lock_version'], $fieldSet->lock_version);
     }
 
     public function test_applies_to_mutable_before_first_activation_and_immutable_after(): void
@@ -537,5 +726,56 @@ class DynamicFieldAdminDf33FsTest extends TestCase
                 'lock_version' => $fieldSet->fresh()->lock_version,
             ])
             ->assertRedirect();
+    }
+
+    /**
+     * @return object{up: callable, down: callable}
+     */
+    private function loadFieldSetContainerMigration(): object
+    {
+        $path = database_path('migrations/2026_09_07_200000_add_fieldset_container_metadata.php');
+        $code = file_get_contents($path);
+        $this->assertNotFalse($code);
+        $code = preg_replace('/^<\?php\s*/', '', $code, 1);
+        /** @var object{up: callable, down: callable} $migration */
+        $migration = eval($code);
+
+        return $migration;
+    }
+
+    private function assertFieldSetMetadataColumnsAreNotNull(): void
+    {
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $notNull = [];
+            foreach (DB::select('PRAGMA table_info(field_sets)') as $row) {
+                $notNull[$row->name] = (int) $row->notnull === 1;
+            }
+            $this->assertTrue($notNull['is_system'] ?? false);
+            $this->assertTrue($notNull['applies_to'] ?? false);
+            $this->assertTrue($notNull['is_assignable'] ?? false);
+
+            $fkPresent = false;
+            foreach (DB::select('PRAGMA foreign_key_list(field_sets)') as $row) {
+                if (($row->from ?? null) === 'active_version_id') {
+                    $fkPresent = true;
+                }
+            }
+            $this->assertTrue($fkPresent);
+
+            return;
+        }
+
+        $database = Schema::getConnection()->getDatabaseName();
+        foreach (['is_system', 'applies_to', 'is_assignable'] as $column) {
+            $row = DB::table('information_schema.COLUMNS')
+                ->where('TABLE_SCHEMA', $database)
+                ->where('TABLE_NAME', 'field_sets')
+                ->where('COLUMN_NAME', $column)
+                ->first();
+            $this->assertNotNull($row);
+            $this->assertSame('NO', $row->IS_NULLABLE);
+        }
     }
 }

@@ -7,10 +7,12 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * DF-3.3-fs: Key aus Name (snake_case, ascii, ohne system_-Prefix, global unique).
+ * DF-3.3-fs: Key aus Name (snake_case, ascii, ohne system_-Prefix, global unique, max. 64).
  */
 final class FieldSetKeySlugger
 {
+    public const MAX_KEY_LENGTH = 64;
+
     public function slugFromName(string $name): string
     {
         $slug = Str::of($name)
@@ -37,24 +39,32 @@ final class FieldSetKeySlugger
 
     public function uniqueSlugFromName(string $name, ?int $exceptFieldSetId = null): string
     {
-        $base = $this->slugFromName($name);
+        $raw = $this->slugFromName($name);
+        $base = $this->truncateToMaxLength($raw, self::MAX_KEY_LENGTH);
         $candidate = $base;
         $suffix = 2;
 
         while ($this->keyExists($candidate, $exceptFieldSetId)) {
-            $candidate = $base.'_'.$suffix;
-            $suffix++;
-            if (str_starts_with($candidate, 'system_')) {
+            $suffixPart = '_'.$suffix;
+            $maxBaseLength = self::MAX_KEY_LENGTH - strlen($suffixPart);
+            if ($maxBaseLength < 1) {
                 throw ValidationException::withMessages([
-                    'name' => 'Der Feldset-Schlüssel darf nicht mit „system_“ beginnen.',
+                    'name' => 'Aus dem Namen konnte kein eindeutiger Feldset-Schlüssel (max. 64 Zeichen) abgeleitet werden.',
                 ]);
             }
-            if (strlen($candidate) > 64) {
+
+            $candidate = $this->truncateToMaxLength($raw, $maxBaseLength).$suffixPart;
+            $this->assertGeneratedCandidateShape($candidate);
+            $suffix++;
+
+            if ($suffix > 10_000) {
                 throw ValidationException::withMessages([
                     'name' => 'Aus dem Namen konnte kein eindeutiger Feldset-Schlüssel (max. 64 Zeichen) abgeleitet werden.',
                 ]);
             }
         }
+
+        $this->assertGeneratedCandidateShape($candidate);
 
         return $candidate;
     }
@@ -67,7 +77,7 @@ final class FieldSetKeySlugger
             ]);
         }
 
-        if (strlen($key) > 64) {
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
             throw ValidationException::withMessages([
                 'key' => 'Der Feldset-Schlüssel darf höchstens 64 Zeichen lang sein.',
             ]);
@@ -82,6 +92,53 @@ final class FieldSetKeySlugger
         if ($this->keyExists($key, $exceptFieldSetId)) {
             throw ValidationException::withMessages([
                 'key' => 'Dieser Feldset-Schlüssel ist bereits vergeben.',
+            ]);
+        }
+    }
+
+    private function truncateToMaxLength(string $slug, int $maxLength): string
+    {
+        if ($maxLength < 1) {
+            throw ValidationException::withMessages([
+                'name' => 'Aus dem Namen konnte kein gültiger Feldset-Schlüssel (max. 64 Zeichen) abgeleitet werden.',
+            ]);
+        }
+
+        if (strlen($slug) <= $maxLength) {
+            $this->assertGeneratedCandidateShape($slug);
+
+            return $slug;
+        }
+
+        $truncated = rtrim(substr($slug, 0, $maxLength), '_');
+        if ($truncated === '' || ! preg_match('/^[a-z]/', $truncated)) {
+            throw ValidationException::withMessages([
+                'name' => 'Aus dem Namen konnte kein gültiger Feldset-Schlüssel (max. 64 Zeichen) abgeleitet werden.',
+            ]);
+        }
+
+        $this->assertGeneratedCandidateShape($truncated);
+
+        return $truncated;
+    }
+
+    private function assertGeneratedCandidateShape(string $key): void
+    {
+        if (strlen($key) > self::MAX_KEY_LENGTH) {
+            throw ValidationException::withMessages([
+                'name' => 'Aus dem Namen konnte kein gültiger Feldset-Schlüssel (max. 64 Zeichen) abgeleitet werden.',
+            ]);
+        }
+
+        if ($key === '' || ! preg_match('/^[a-z][a-z0-9_]*$/', $key)) {
+            throw ValidationException::withMessages([
+                'name' => 'Aus dem Namen konnte kein gültiger Feldset-Schlüssel abgeleitet werden.',
+            ]);
+        }
+
+        if (str_starts_with($key, 'system_')) {
+            throw ValidationException::withMessages([
+                'name' => 'Der Feldset-Schlüssel darf nicht mit „system_“ beginnen.',
             ]);
         }
     }

@@ -38,9 +38,14 @@ return new class extends Migration
             return;
         }
 
-        Schema::table('field_sets', function (Blueprint $table) {
-            $table->dropColumn(['is_system', 'applies_to', 'is_assignable']);
-        });
+        Schema::disableForeignKeyConstraints();
+        try {
+            Schema::table('field_sets', function (Blueprint $table) {
+                $table->dropColumn(['is_system', 'applies_to', 'is_assignable']);
+            });
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
     }
 
     private function backfillCoreMetadataFailClosed(): void
@@ -115,13 +120,77 @@ return new class extends Migration
         $driver = Schema::getConnection()->getDriverName();
 
         if ($driver === 'sqlite') {
-            // SQLite: NOT NULL nachträglich nicht portabel ohne Table-Rebuild.
-            // Pflichtwerte sind per Backfill gesetzt; App-Invarianten decken Create ab.
+            $this->enforceSqliteNotNullWithoutDefaults();
+
             return;
         }
 
+        // Keine DEFAULT-Werte: Inserts müssen is_system/applies_to/is_assignable explizit setzen.
         DB::statement('ALTER TABLE field_sets MODIFY is_system TINYINT(1) NOT NULL');
         DB::statement('ALTER TABLE field_sets MODIFY applies_to VARCHAR(32) NOT NULL');
         DB::statement('ALTER TABLE field_sets MODIFY is_assignable TINYINT(1) NOT NULL');
+    }
+
+    /**
+     * SQLite: NOT NULL per change() (wie ADV-001a), ohne Defaults und ohne FK-Verlust.
+     */
+    private function enforceSqliteNotNullWithoutDefaults(): void
+    {
+        Schema::disableForeignKeyConstraints();
+        try {
+            if (! $this->sqliteColumnIsNotNull('field_sets', 'is_system')) {
+                Schema::table('field_sets', function (Blueprint $table) {
+                    $table->boolean('is_system')->nullable(false)->change();
+                });
+            }
+            if (! $this->sqliteColumnIsNotNull('field_sets', 'applies_to')) {
+                Schema::table('field_sets', function (Blueprint $table) {
+                    $table->string('applies_to', 32)->nullable(false)->change();
+                });
+            }
+            if (! $this->sqliteColumnIsNotNull('field_sets', 'is_assignable')) {
+                Schema::table('field_sets', function (Blueprint $table) {
+                    $table->boolean('is_assignable')->nullable(false)->change();
+                });
+            }
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+
+        foreach (['is_system', 'applies_to', 'is_assignable'] as $column) {
+            if (! $this->sqliteColumnIsNotNull('field_sets', $column)) {
+                throw new RuntimeException(
+                    "DF-3.3-fs Migration: Spalte field_sets.{$column} ist unter SQLite nicht NOT NULL.",
+                );
+            }
+        }
+
+        if (! $this->sqliteForeignKeyExists('field_sets', 'active_version_id')) {
+            throw new RuntimeException(
+                'DF-3.3-fs Migration: FK field_sets.active_version_id fehlt nach SQLite-NOT-NULL-Änderung.',
+            );
+        }
+    }
+
+    private function sqliteColumnIsNotNull(string $table, string $column): bool
+    {
+        foreach (DB::select("PRAGMA table_info({$table})") as $row) {
+            if (($row->name ?? null) === $column) {
+                return (int) ($row->notnull ?? 0) === 1;
+            }
+        }
+
+        return false;
+    }
+
+    private function sqliteForeignKeyExists(string $table, string $column): bool
+    {
+        foreach (DB::select("PRAGMA foreign_key_list({$table})") as $row) {
+            if (($row->from ?? null) === $column) {
+                return true;
+            }
+        }
+
+        return false;
     }
 };

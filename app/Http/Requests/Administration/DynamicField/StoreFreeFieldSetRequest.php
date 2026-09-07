@@ -25,6 +25,10 @@ class StoreFreeFieldSetRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'key' => ['nullable', 'string', 'max:64'],
             'applies_to' => ['required', 'string', Rule::enum(FieldAppliesTo::class)],
+            'is_system' => ['prohibited'],
+            'is_assignable' => ['prohibited'],
+            'active_version_id' => ['prohibited'],
+            'lock_version' => ['prohibited'],
         ];
     }
 
@@ -37,6 +41,23 @@ class StoreFreeFieldSetRequest extends FormRequest
             'name' => 'Name',
             'key' => 'Schlüssel',
             'applies_to' => 'Gültigkeit',
+            'is_system' => 'Systemstatus',
+            'is_assignable' => 'Assignierbarkeit',
+            'active_version_id' => 'Aktive Version',
+            'lock_version' => 'Sperrversion',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'is_system.prohibited' => 'Der Systemstatus darf beim Anlegen nicht gesetzt werden.',
+            'is_assignable.prohibited' => 'Die Assignierbarkeit darf beim Anlegen nicht gesetzt werden.',
+            'active_version_id.prohibited' => 'Die aktive Version darf beim Anlegen nicht gesetzt werden.',
+            'lock_version.prohibited' => 'Die Sperrversion darf beim Anlegen nicht gesetzt werden.',
         ];
     }
 

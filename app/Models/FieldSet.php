@@ -20,12 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class FieldSet extends Model
 {
     protected $fillable = [
-        'key',
         'name',
-        'is_system',
-        'applies_to',
-        'is_assignable',
-        'active_version_id',
     ];
 
     /**
