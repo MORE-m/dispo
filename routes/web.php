@@ -76,8 +76,18 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.definitions.destroy');
         Route::get('administration/dynamische-felder/feldsets', [FieldSetAdminController::class, 'index'])
             ->name('administration.dynamic-fields.field-sets.index');
+        Route::get('administration/dynamische-felder/feldsets/neu', [FieldSetAdminController::class, 'create'])
+            ->name('administration.dynamic-fields.field-sets.create');
+        Route::post('administration/dynamische-felder/feldsets', [FieldSetAdminController::class, 'store'])
+            ->name('administration.dynamic-fields.field-sets.store');
         Route::get('administration/dynamische-felder/feldsets/{fieldSet}', [FieldSetAdminController::class, 'show'])
             ->name('administration.dynamic-fields.field-sets.show');
+        Route::put('administration/dynamische-felder/feldsets/{fieldSet}', [FieldSetAdminController::class, 'updateMetadata'])
+            ->name('administration.dynamic-fields.field-sets.update');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/deaktivieren', [FieldSetAdminController::class, 'deactivate'])
+            ->name('administration.dynamic-fields.field-sets.deactivate');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/reaktivieren', [FieldSetAdminController::class, 'reactivate'])
+            ->name('administration.dynamic-fields.field-sets.reactivate');
         Route::post('administration/dynamische-felder/feldsets/{fieldSet}/entwuerfe', [FieldSetAdminController::class, 'createDraft'])
             ->name('administration.dynamic-fields.field-sets.drafts.store');
         Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}', [FieldSetAdminController::class, 'editVersion'])

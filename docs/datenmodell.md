@@ -214,7 +214,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 |---|---|
 | `field_definitions` | stabile Feldidentität (`key`, Typ, Scope, `current_revision_id`) |
 | `field_definition_revisions` | unveränderliche Revisionszeilen (Label, Hilfe, Reportflag) |
-| `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version` am Feldset |
+| `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version`; DF-3.3-fs: `is_system`, `applies_to`, `is_assignable` (Cores: system + nicht assignierbar; freie Sets: Draft→Activate, Deakt./Reakt.) |
 | `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |
 | `field_rules` | Regeln der Feldset-Version (`field_equals` / `require_field` in DF-1) |
 | `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill) |
@@ -258,14 +258,24 @@ vorhandenen Werte.
   `dispo_order_position_field_values`: `value_string` (255) + `value_text` (MEDIUMTEXT).
 - Calc-Origin-Provenance weiter über Source-Snapshot (kein neues Value-Flag).
 
-### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a/b Text-Custom)
+### DF-3.3-fs – Freie Feldsets (Feature-Branch)
 
-Konzeptuell vorgesehen; **DF-3.2a/b** liefern Custom Header-/Position-Texte, aber noch nicht:
+- `field_sets.is_system`, `applies_to`, `is_assignable` (NOT NULL nach Backfill; SQLite
+  App-seitig erzwungen).
+- Cores: `is_system=true`, `is_assignable=false`, feste `applies_to`.
+- Freie Sets: Create mit leerem Draft; Assignable erst nach erster Activate;
+  Deakt./Reakt. am Container; keine physische Löschung; keine Runtime-Compose-
+  Einbindung.
+
+### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a/b Text-Custom; DF-3.3-fs Container)
+
+Konzeptuell vorgesehen; **DF-3.3-fs** liefert freie Feldset-Container, aber noch nicht:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
 - `FieldSetAssignment` an Kategorien/Werbemittel,
-- Regel-Editor / volle Regelmatrix.
+- Regel-Editor / volle Regelmatrix,
+- Runtime-Auswertung freier Feldsets.
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.

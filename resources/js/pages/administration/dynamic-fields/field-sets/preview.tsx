@@ -33,6 +33,8 @@ type Props = {
         id: number;
         key: string;
         name: string;
+        is_system?: boolean;
+        applies_to?: string;
         lock_version: number;
     };
     preview: {
@@ -47,6 +49,7 @@ type Props = {
         };
     };
     canActivate: boolean;
+    runtimeNote?: string | null;
 };
 
 function formatExample(value: unknown): string {
@@ -136,13 +139,18 @@ export default function FieldSetPreview({
     fieldSet,
     preview,
     canActivate,
+    runtimeNote = null,
 }: Props) {
     const flash = usePage().props.flash;
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
 
-    const isCalcSet = fieldSet.key === 'system_calculation_core';
-    const isDispoSet = fieldSet.key === 'system_dispo_order_core';
+    const isCalcSet =
+        fieldSet.key === 'system_calculation_core' ||
+        fieldSet.applies_to === 'calculation';
+    const isDispoSet =
+        fieldSet.key === 'system_dispo_order_core' ||
+        fieldSet.applies_to === 'dispo_order';
     const headerFields = preview.fields.filter(
         (field) => field.scope === 'header',
     );
@@ -217,6 +225,14 @@ export default function FieldSetPreview({
                     <SuccessState message={flash.success} />
                 ) : null}
                 {error ? <ErrorState message={error} /> : null}
+                {runtimeNote ? (
+                    <p
+                        className="text-muted-foreground text-sm"
+                        data-test="fieldset-preview-runtime-note"
+                    >
+                        {runtimeNote}
+                    </p>
+                ) : null}
 
                 <section className="space-y-3">
                     <h2 className="text-base font-semibold">

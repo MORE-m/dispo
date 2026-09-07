@@ -28,6 +28,8 @@ type Membership = {
     key: string | null;
     label: string | null;
     is_system: boolean;
+    scope?: string;
+    applies_to?: string;
     sort: number;
     required_override: boolean | null;
     visible_override: boolean | null;
@@ -57,6 +59,8 @@ type Props = {
         id: number;
         key: string;
         name: string;
+        is_system?: boolean;
+        applies_to?: string;
         lock_version: number;
     };
     version: {
@@ -331,6 +335,16 @@ export default function FieldSetVersionEdit({
                                                         Eigen
                                                     </Badge>
                                                 )}
+                                                {field.scope ? (
+                                                    <Badge variant="outline">
+                                                        {field.scope}
+                                                    </Badge>
+                                                ) : null}
+                                                {field.applies_to ? (
+                                                    <Badge variant="outline">
+                                                        {field.applies_to}
+                                                    </Badge>
+                                                ) : null}
                                             </div>
                                             <div className="text-muted-foreground">
                                                 {field.label}
