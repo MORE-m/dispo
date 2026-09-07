@@ -199,11 +199,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
-- **Geplante Folge:** ADV-001a (erledigt) → **DF-3.3-fs** (freie Feldsets, erledigt auf Feature-Branch)
-  → `DF-3.3a` (Assignments/Freeze/Merge) → `DF-3.3b` (Admin/Runtime)
+- **Geplante Folge:** ADV-001a → DF-3.3-fs → **DF-3.3a1** (Assignments/Resolver/Preview)
+  → `DF-3.3a2` (VER-002/003 + Runtime) → `DF-3.3b` (Admin-UI)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -215,11 +215,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Draft/Activate/statische Vorschau; Regeln nur lesbar; Audit (`ADM-001`,
   `ADM-002` Teil).
 - **DF-3.2a/b erledigt:** Custom Header-/Position-Textfelder auf `main`.
-- **DF-3.3-fs erledigt (Feature-Branch):** frei anlegbare versionierte Feldsets
+- **DF-3.3-fs erledigt (`main`):** frei anlegbare versionierte Feldsets
   inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
-  Wirkung und ohne Assignments (`DYN-002`/`DYN-003` Teil).
-  **DF-3 nicht abgeschlossen.**
-- **Offen:** Optionen, Assignments/Vererbung (DF-3.3a/b), volle Regelmatrix, Regel-Editor.
+  Wirkung (`DYN-002`/`DYN-003` Teil).
+- **DF-3.3a1 erledigt (Feature-Branch):** `field_set_assignments`, deterministischer
+  Resolver, Kontext-Preview/Activate-Fingerprint; **keine** Runtime-Wirkung;
+  VER-002/003 und Assignment-UI folgen. **DF-3 nicht abgeschlossen.**
+- **Offen:** Runtime-Vererbung (`DF-3.3a2`), Assignment-UI (`DF-3.3b`), Optionen,
+  volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 

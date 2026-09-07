@@ -51,4 +51,12 @@ class FieldSet extends Model
     {
         return $this->hasMany(FieldSetVersion::class);
     }
+
+    /**
+     * @return HasMany<FieldSetAssignment, $this>
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(FieldSetAssignment::class);
+    }
 }

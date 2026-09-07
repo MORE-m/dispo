@@ -258,7 +258,7 @@ vorhandenen Werte.
   `dispo_order_position_field_values`: `value_string` (255) + `value_text` (MEDIUMTEXT).
 - Calc-Origin-Provenance weiter über Source-Snapshot (kein neues Value-Flag).
 
-### DF-3.3-fs – Freie Feldsets (Feature-Branch)
+### DF-3.3-fs – Freie Feldsets (auf `main`)
 
 - `field_sets.is_system`, `applies_to`, `is_assignable` (NOT NULL nach Backfill; SQLite
   App-seitig erzwungen).
@@ -266,6 +266,24 @@ vorhandenen Werte.
 - Freie Sets: Create mit leerem Draft; Assignable erst nach erster Activate;
   Deakt./Reakt. am Container; keine physische Löschung; keine Runtime-Compose-
   Einbindung.
+
+### DF-3.3a1 – Field-Set-Assignments (Feature-Branch)
+
+- Tabelle `field_set_assignments`: `field_set_id`, `target_layer`
+  (`global`|`advertising_category`|`advertising_medium`), nullable Ziel-FKs,
+  normalisierte NOT-NULL-`target_identity` (`g`|`c:{id}`|`m:{id}`),
+  `applies_to_process`, `is_active`, `sort`, `lock_version`, Timestamps, Audit.
+- Unique `(field_set_id, applies_to_process, target_identity)` – echte Eindeutigkeit
+  auch für globale Ziele (kein nullable Unique). Ziel-XOR inkl. `target_identity`-
+  Gleichheit sowie erlaubte Enum-Werte für Layer/Prozess: MySQL CHECK /
+  SQLite BEFORE-Trigger; zusätzlich serverseitig.
+- Ungültige Assignment-Quellen (z. B. deaktiviertes Feldset) werden in der normalen
+  Kontextvorschau übersprungen und als Warnung ausgewiesen; in Kandidaten-/
+  Aktivierungsvorschau blockieren sie.
+- FKs `restrictOnDelete`; kein physisches Löschen von Assignments.
+- Deterministischer Resolver + Kontext-Preview-API; Activate mit Fingerprint/409.
+- **Noch keine** produktive Runtime-Wirkung; VER-002/003 und Assignment-UI folgen
+  in `DF-3.3a2` / `DF-3.3b`.
 
 ### Spätere Ausbaustufen (nicht DF-1/DF-2; DF-3.1 Admin-Seeds; DF-3.2a/b Text-Custom; DF-3.3-fs Container)
 

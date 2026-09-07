@@ -3,6 +3,7 @@
 use App\Http\Controllers\Administration\AdministrationHubController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
+use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
@@ -104,6 +105,20 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.field-sets.versions.preview');
         Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktivieren', [FieldSetAdminController::class, 'activate'])
             ->name('administration.dynamic-fields.field-sets.versions.activate');
+
+        // DF-3.3a1: Assignments + Kontext-Preview (JSON, keine Admin-UI)
+        Route::post('administration/dynamische-felder/assignments', [FieldSetAssignmentAdminController::class, 'store'])
+            ->name('administration.dynamic-fields.assignments.store');
+        Route::put('administration/dynamische-felder/assignments/{assignment}', [FieldSetAssignmentAdminController::class, 'update'])
+            ->name('administration.dynamic-fields.assignments.update');
+        Route::post('administration/dynamische-felder/assignments/kontext-vorschau', [FieldSetAssignmentAdminController::class, 'previewContext'])
+            ->name('administration.dynamic-fields.assignments.context-preview');
+        Route::post('administration/dynamische-felder/assignments/{assignment}/aktivierungs-vorschau', [FieldSetAssignmentAdminController::class, 'previewActivation'])
+            ->name('administration.dynamic-fields.assignments.activation-preview');
+        Route::post('administration/dynamische-felder/assignments/{assignment}/aktivieren', [FieldSetAssignmentAdminController::class, 'activate'])
+            ->name('administration.dynamic-fields.assignments.activate');
+        Route::post('administration/dynamische-felder/assignments/{assignment}/deaktivieren', [FieldSetAssignmentAdminController::class, 'deactivate'])
+            ->name('administration.dynamic-fields.assignments.deactivate');
     });
 
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
