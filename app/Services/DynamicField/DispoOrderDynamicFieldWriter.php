@@ -53,6 +53,8 @@ final class DispoOrderDynamicFieldWriter
             ]);
         }
 
+        $calcSnapshot->assertReadable();
+
         if ((int) $calcSnapshot->id !== (int) $calculation->configuration_snapshot_id) {
             throw new RuntimeException(
                 'Quellsnapshot stimmt nicht mit der configuration_snapshot_id der Kalkulation überein.',
@@ -539,6 +541,7 @@ final class DispoOrderDynamicFieldWriter
     public function fieldSchemaProp(DispoOrder $order): array
     {
         $snapshot = $order->configurationSnapshot;
+        $snapshot->assertReadable();
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
         $systemByDefinitionId = FieldDefinition::query()
@@ -902,6 +905,7 @@ final class DispoOrderDynamicFieldWriter
         if ($calcSnapshot === null) {
             return;
         }
+        $calcSnapshot->assertReadable();
         $calcSnapshot->loadMissing('fieldDefinitions');
         $calcPositions = $calculation->positions->keyBy('id');
 
@@ -1130,7 +1134,10 @@ final class DispoOrderDynamicFieldWriter
     {
         $order->loadMissing('configurationSnapshot.fieldDefinitions', 'configurationSnapshot.rules');
 
-        return $order->configurationSnapshot;
+        $snapshot = $order->configurationSnapshot;
+        $snapshot->assertReadable();
+
+        return $snapshot;
     }
 
     private function assertReadyForRules(DispoOrder $order, ConfigurationSnapshot $snapshot): void

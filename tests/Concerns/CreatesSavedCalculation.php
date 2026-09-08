@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 
 trait CreatesSavedCalculation
 {
@@ -30,6 +31,8 @@ trait CreatesSavedCalculation
             'product_title' => 'Produkt A',
             'order_discount_percent' => (string) ($options['order_discount_percent'] ?? '0'),
             'ae_enabled' => (bool) ($options['ae_enabled'] ?? false),
+            'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
+                ->resolveLiveSchemaForCalculation()['schema_fingerprint'],
             'positions' => array_map(function (array $spot, int $index) use ($catalog, $options): array {
                 $positionDiscount = $spot['position_discount_percent']
                     ?? ($index === 0 ? ($options['first_position_discount_percent'] ?? '0') : '0');

@@ -17,6 +17,7 @@ use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\TimeRangeValidator;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -35,6 +36,7 @@ class CalculationPayloadRequest extends FormRequest
     /**
      * DF-3.3a2α: Schema-Drift schlägt beim Anlegen als 409 durch, noch bevor
      * dynamische Feldwerte gegen das Schema geprüft werden (409 vor 422).
+     * Formal ungültige Fingerprints bleiben der Regel-Validierung (422) überlassen.
      */
     protected function prepareForValidation(): void
     {
@@ -43,7 +45,7 @@ class CalculationPayloadRequest extends FormRequest
         }
 
         $expected = $this->input('schema_fingerprint');
-        if (! is_string($expected) || $expected === '') {
+        if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expected)) {
             return;
         }
 
@@ -100,7 +102,9 @@ class CalculationPayloadRequest extends FormRequest
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
-            'schema_fingerprint' => ['nullable', 'string', 'max:64'],
+            'schema_fingerprint' => $this->routeIs('calculations.store')
+                ? ['required', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN]
+                : ['nullable', 'string', 'max:64'],
             'dynamic_field_values' => ['sometimes', 'array'],
             'dynamic_field_values.campaign_period' => ['nullable', 'array'],
             'dynamic_field_values.campaign_period.start' => ['nullable', 'date'],
@@ -442,6 +446,7 @@ class CalculationPayloadRequest extends FormRequest
      */
     private function schemaFromSnapshot(ConfigurationSnapshot $snapshot): array
     {
+        $snapshot->assertReadable();
         $snapshot->loadMissing('fieldDefinitions');
         $header = [];
         $position = [];

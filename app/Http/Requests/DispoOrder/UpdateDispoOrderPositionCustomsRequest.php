@@ -47,6 +47,7 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             if ($snapshot === null) {
                 return;
             }
+            $snapshot->assertReadable();
 
             $order->loadMissing('positions');
             $positionsById = $order->positions->keyBy('id');

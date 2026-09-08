@@ -139,22 +139,28 @@ class CalculationController extends Controller
 
     /**
      * DF-3.3a2α: Feldschema für den Wizard. Bestehende Kalkulationen liefern das
-     * eingefrorene Snapshot-Schema, neue das live aufgelöste Freeze-Schema.
+     * eingefrorene Snapshot-Schema (Ist-Generation), neue das live aufgelöste
+     * Freeze-Schema als Zielgeneration 2.
      */
     public function fieldSchema(Request $request): JsonResponse
     {
-        $calculationId = (int) $request->input('calculation_id', 0);
+        $validated = $request->validate([
+            'calculation_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
 
-        if ($calculationId > 0) {
+        if (array_key_exists('calculation_id', $validated) && $validated['calculation_id'] !== null) {
             /** @var Calculation $calculation */
             $calculation = Calculation::query()
                 ->with(['configurationSnapshot.fieldDefinitions', 'configurationSnapshot.rules'])
-                ->findOrFail($calculationId);
+                ->findOrFail((int) $validated['calculation_id']);
             $this->authorize('view', $calculation);
 
+            $fieldSchema = $this->fieldSchemaProp($calculation);
+
             return response()->json([
-                'fieldSchema' => $this->fieldSchemaProp($calculation),
-                'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+                'fieldSchema' => $fieldSchema,
+                'format_version' => $fieldSchema['format_version'],
+                'target_format_version' => $fieldSchema['format_version'],
             ]);
         }
 
@@ -172,8 +178,11 @@ class CalculationController extends Controller
             ]);
         }
 
+        $fieldSchema = $this->liveFieldSchemaProp($resolved);
+
         return response()->json([
-            'fieldSchema' => $this->liveFieldSchemaProp($resolved),
+            'fieldSchema' => $fieldSchema,
+            'format_version' => $fieldSchema['format_version'],
             'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
         ]);
     }

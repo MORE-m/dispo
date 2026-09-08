@@ -56,7 +56,10 @@ final class ConfigurationSnapshotCloneService
                 $this->cloneRule($rule, $clone, $sourceIdMap);
             }
 
-            return $clone->load(['fieldDefinitions', 'rules', 'sources']);
+            $fresh = $clone->load(['fieldDefinitions', 'rules', 'sources']);
+            $fresh->assertReadable();
+
+            return $fresh;
         });
     }
 

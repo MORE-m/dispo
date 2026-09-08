@@ -155,6 +155,7 @@ class SpotClassicCalculationTest extends TestCase
         return [
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => array_map(fn (array $spot): array => [
                 'inventory_id' => $spot['inventory_id'],
                 'advertising_medium_id' => $catalog['medium']->id,

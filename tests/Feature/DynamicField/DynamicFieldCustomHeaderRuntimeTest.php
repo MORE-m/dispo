@@ -215,6 +215,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $payload = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -257,6 +258,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $this->actingAs($user)
             ->post(route('calculations.store'), [
                 'planning_mode' => 'manual',
+                'schema_fingerprint' => $this->liveSchemaFingerprint(),
                 'customer_name' => 'Kunde',
                 'campaign' => 'C',
                 'product_title' => 'P',
@@ -437,6 +439,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $sales = User::factory()->role(Role::Sales)->create();
         $base = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -616,6 +619,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
 
         return app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Testkunde GmbH',
             'agency_name' => 'Testagentur',
             'campaign' => 'Frühjahr 2026',

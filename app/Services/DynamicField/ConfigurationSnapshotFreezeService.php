@@ -36,9 +36,18 @@ final class ConfigurationSnapshotFreezeService
 
     /**
      * Kalkulations-Freeze: Calculation-Core + aktive globale Calc-Assignments.
+     *
+     * Der erwartete Fingerprint ist im produktiven Create-Pfad zwingend und wird
+     * unter den kanonischen Locks erneut gegen die Live-Auflösung geprüft.
      */
-    public function freezeCalculationV2(?string $expectedFingerprint = null): ConfigurationSnapshot
+    public function freezeCalculationV2(string $expectedFingerprint): ConfigurationSnapshot
     {
+        if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expectedFingerprint)) {
+            throw ValidationException::withMessages([
+                'schema_fingerprint' => 'Schema-Fingerprint fehlt oder ist ungültig.',
+            ]);
+        }
+
         return DB::transaction(function () use ($expectedFingerprint): ConfigurationSnapshot {
             $this->locks->lockForProcess(FieldAppliesTo::Calculation, globalOnly: true);
 
@@ -80,9 +89,10 @@ final class ConfigurationSnapshotFreezeService
                 );
             }
 
-            $this->assertProvenanceIntegrity($snapshot);
+            $fresh = $this->reload($snapshot);
+            $fresh->assertReadable();
 
-            return $this->reload($snapshot);
+            return $fresh;
         });
     }
 
@@ -151,9 +161,18 @@ final class ConfigurationSnapshotFreezeService
             foreach ($plan['calc_rules'] as $rule) {
                 $dedupeKey = $this->ruleDedupeKey($rule->condition_json, $rule->action_json);
                 $seenRuleKeys[$dedupeKey] = true;
+                $sourceFieldRuleId = (int) ($rule->source_field_rule_id ?? $rule->id);
+                ConfigurationSnapshotSourceRule::query()->create([
+                    'configuration_snapshot_source_id' => $calcOriginSourceId,
+                    'source_field_rule_id' => $sourceFieldRuleId,
+                    'sort' => (int) $rule->sort,
+                    'condition_json' => $rule->condition_json,
+                    'action_json' => $rule->action_json,
+                    'dedupe_key' => $dedupeKey,
+                ]);
                 $this->persistRule(
                     $snapshot,
-                    (int) ($rule->source_field_rule_id ?? $rule->id),
+                    $sourceFieldRuleId,
                     (int) $rule->sort,
                     $rule->condition_json,
                     $rule->action_json,
@@ -177,9 +196,8 @@ final class ConfigurationSnapshotFreezeService
                 );
             }
 
-            $this->assertProvenanceIntegrity($snapshot);
-
             $fresh = $this->reload($snapshot);
+            $fresh->assertReadable();
             $this->ruleEvaluator->assertRulesCompatibleWithDefinitions(
                 $fresh->fieldDefinitions->keyBy('key')->all(),
                 $fresh->rules,
@@ -327,6 +345,8 @@ final class ConfigurationSnapshotFreezeService
 
     private function assertFingerprint(?string $expected, string $actual): void
     {
+        // Dispo-Freeze darf ohne Client-Fingerprint laufen; Calc-Create übergibt
+        // immer einen formal gültigen Fingerprint (siehe freezeCalculationV2).
         if ($expected === null) {
             return;
         }
@@ -747,52 +767,6 @@ final class ConfigurationSnapshotFreezeService
     }
 
     /**
-     * Alle Provenance-FKs müssen auf Quellen genau dieses Snapshots zeigen.
-     */
-    private function assertProvenanceIntegrity(ConfigurationSnapshot $snapshot): void
-    {
-        $ownSourceIds = ConfigurationSnapshotSource::query()
-            ->where('configuration_snapshot_id', $snapshot->id)
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
-        $ownSourceIds = array_fill_keys($ownSourceIds, true);
-
-        $definitions = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $snapshot->id)
-            ->get();
-
-        foreach ($definitions as $definition) {
-            foreach (SnapshotFieldDefinition::PROVENANCE_COLUMNS as $column) {
-                $sourceId = $definition->{$column};
-                if ($sourceId === null) {
-                    throw new RuntimeException(
-                        "Snapshot {$snapshot->id}: Feld „{$definition->key}“ ohne {$column}.",
-                    );
-                }
-                if (! isset($ownSourceIds[(int) $sourceId])) {
-                    throw new RuntimeException(
-                        "Snapshot {$snapshot->id}: {$column} verweist auf fremde Quelle.",
-                    );
-                }
-            }
-        }
-
-        $rules = SnapshotFieldRule::query()
-            ->where('configuration_snapshot_id', $snapshot->id)
-            ->get();
-
-        foreach ($rules as $rule) {
-            if ($rule->provenance_source_id === null
-                || ! isset($ownSourceIds[(int) $rule->provenance_source_id])) {
-                throw new RuntimeException(
-                    "Snapshot {$snapshot->id}: Regel {$rule->id} ohne gültige Provenance-Quelle.",
-                );
-            }
-        }
-    }
-
-    /**
      * @param  array<int, int>  $sourceIdByMergeOrder
      */
     private function nextMergeOrder(array $sourceIdByMergeOrder): int
@@ -835,6 +809,11 @@ final class ConfigurationSnapshotFreezeService
 
     private function reload(ConfigurationSnapshot $snapshot): ConfigurationSnapshot
     {
-        return $snapshot->load(['fieldDefinitions', 'rules', 'sources']);
+        return $snapshot->load([
+            'fieldDefinitions',
+            'rules',
+            'sources.fields',
+            'sources.rules',
+        ]);
     }
 }

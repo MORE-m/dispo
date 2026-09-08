@@ -171,6 +171,14 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             $snapshot->schema_fingerprint,
             $existing->json('fieldSchema.schema_fingerprint'),
         );
+        $this->assertSame(
+            (int) $snapshot->format_version,
+            $existing->json('target_format_version'),
+        );
+        $this->assertSame(
+            (int) $snapshot->format_version,
+            $existing->json('format_version'),
+        );
     }
 
     public function test_stale_schema_fingerprint_on_create_is_rejected_with_409_before_field_validation(): void
@@ -444,6 +452,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             'product_title' => 'Titel',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'dynamic_field_values' => [
                 'campaign_period' => null,
             ],

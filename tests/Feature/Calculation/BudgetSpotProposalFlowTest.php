@@ -26,6 +26,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $response = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'budget_wish_inventory_ids' => [
                 $catalog['hamburg']->id,
@@ -110,6 +111,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'order_discounts' => [],
@@ -155,6 +157,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -187,6 +190,7 @@ class BudgetSpotProposalFlowTest extends TestCase
         $this->actingAs($user)
             ->post(route('calculations.store'), [
                 'planning_mode' => PlanningMode::Manual->value,
+                'schema_fingerprint' => $this->liveSchemaFingerprint(),
                 'order_discount_percent' => '0',
                 'positions' => [
                     [
@@ -212,6 +216,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'order_discounts' => [],
@@ -264,6 +269,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -372,6 +378,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $response = $this->actingAs($user)->postJson(route('calculations.preview'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'order_discounts' => [],
@@ -409,6 +416,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -451,6 +459,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -496,6 +505,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -543,6 +553,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '5000',
             'order_discount_percent' => '0',
             'positions' => [],
@@ -693,6 +704,7 @@ class BudgetSpotProposalFlowTest extends TestCase
 
         return [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => (string) $calculation->target_budget_nn,
             'budget_strategy' => $calculation->budget_strategy?->value,
             'order_discount_percent' => (string) $calculation->order_discount_percent,

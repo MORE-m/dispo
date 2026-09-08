@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\ConfigurationSnapshotSource as ConfigurationSnapshotSourceEnum;
+use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use RuntimeException;
 
 /**
  * @property int $id
@@ -56,17 +56,11 @@ class ConfigurationSnapshot extends Model
     }
 
     /**
-     * Fail-closed: unbekannte Snapshot-Generationen dürfen nicht gelesen werden.
+     * Fail-closed: unbekannte bzw. beschädigte Snapshots dürfen nicht gelesen werden.
      */
     public function assertReadable(): void
     {
-        $version = (int) $this->format_version;
-
-        if (! in_array($version, self::SUPPORTED_FORMAT_VERSIONS, true)) {
-            throw new RuntimeException(
-                "Konfigurationssnapshot {$this->id} hat unbekannte format_version {$version}.",
-            );
-        }
+        app(ConfigurationSnapshotIntegrity::class)->assertReadable($this);
     }
 
     /**

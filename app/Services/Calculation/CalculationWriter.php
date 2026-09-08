@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -50,7 +51,14 @@ final class CalculationWriter
      */
     public function create(array $payload, User $user): Calculation
     {
-        return DB::transaction(function () use ($payload, $user): Calculation {
+        $fingerprint = $payload['schema_fingerprint'] ?? null;
+        if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
+            throw ValidationException::withMessages([
+                'schema_fingerprint' => 'Schema-Fingerprint fehlt oder ist ungültig.',
+            ]);
+        }
+
+        return DB::transaction(function () use ($payload, $user, $fingerprint): Calculation {
             [$year, $seq, $number] = $this->numbers->next();
 
             $calculation = new Calculation;
@@ -60,13 +68,8 @@ final class CalculationWriter
             $calculation->status = CalculationStatus::Draft;
             $calculation->advisor_id = $user->id;
             $calculation->lock_version = 1;
-            $expectedFingerprint = isset($payload['schema_fingerprint'])
-                && is_string($payload['schema_fingerprint'])
-                && $payload['schema_fingerprint'] !== ''
-                    ? $payload['schema_fingerprint']
-                    : null;
             $calculation->configuration_snapshot_id = $this->snapshots
-                ->freezeCalculationV2($expectedFingerprint)
+                ->freezeCalculationV2($fingerprint)
                 ->id;
 
             $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
