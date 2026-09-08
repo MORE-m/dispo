@@ -801,10 +801,7 @@ final class ConfigurationSnapshotFreezeService
      */
     private function ruleDedupeKey(array $condition, array $action): string
     {
-        return hash('sha256', json_encode([
-            'condition' => $condition,
-            'action' => $action,
-        ], JSON_THROW_ON_ERROR));
+        return SnapshotFieldRuleDedupeKey::from($condition, $action);
     }
 
     private function reload(ConfigurationSnapshot $snapshot): ConfigurationSnapshot
