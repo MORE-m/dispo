@@ -187,18 +187,20 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
             ->where('configuration_snapshot_id', $snapshot->id)
             ->firstOrFail();
 
-        $sourceRule = ConfigurationSnapshotSourceRule::query()
-            ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
-            ->where('source_field_rule_id', $rule->source_field_rule_id)
-            ->firstOrFail();
+        $tamperedAction = array_merge($rule->action_json, ['tampered' => true]);
+        $rule->action_json = $tamperedAction;
+        $rule->save();
+        $rule->refresh();
+        $rule->dedupe_key = SnapshotFieldRuleDedupeKey::from($rule->condition_json, $rule->action_json);
+        $rule->save();
 
-        $tamperedAction = array_merge($sourceRule->action_json, ['tampered' => true]);
-        $sourceRule->action_json = $tamperedAction;
-        $sourceRule->dedupe_key = SnapshotFieldRuleDedupeKey::from(
-            $sourceRule->condition_json,
-            $tamperedAction,
+        $this->assertNotSame(
+            $rule->dedupe_key,
+            ConfigurationSnapshotSourceRule::query()
+                ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
+                ->where('source_field_rule_id', $rule->source_field_rule_id)
+                ->value('dedupe_key'),
         );
-        $sourceRule->save();
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/passende Source-Rule \(Rule-ID und Dedupe-Key\)/');
