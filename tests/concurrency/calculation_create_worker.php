@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Str;
@@ -49,9 +50,12 @@ while (count(glob($runDir.'/worker-*.ready')) < 2) {
 try {
     $user = User::query()->where('role', Role::Sales->value)->firstOrFail();
     $writer = $app->make(CalculationWriter::class);
+    $fingerprint = $app->make(ConfigurationSnapshotFreezeService::class)
+        ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
 
     $calculation = $writer->create([
         'planning_mode' => 'manual',
+        'schema_fingerprint' => $fingerprint,
         'order_discount_percent' => '0',
         'positions' => [[
             'inventory_id' => $hamburgId,

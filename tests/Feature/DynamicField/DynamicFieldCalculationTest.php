@@ -650,6 +650,7 @@ class DynamicFieldCalculationTest extends TestCase
             'product_title' => 'Titel',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'dynamic_field_values' => [
                 'campaign_period' => null,
             ],

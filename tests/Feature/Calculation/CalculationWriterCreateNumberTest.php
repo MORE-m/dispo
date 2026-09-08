@@ -29,6 +29,7 @@ class CalculationWriterCreateNumberTest extends TestCase
         $catalog['hamburg']->update(['is_active' => false]);
         $invalidPayload = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'order_discount_percent' => '0',
             'positions' => [[
                 'inventory_id' => $catalog['hamburg']->id,
@@ -56,6 +57,7 @@ class CalculationWriterCreateNumberTest extends TestCase
         $catalog['hamburg']->update(['is_active' => true]);
         $validPayload = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'order_discount_percent' => '0',
             'positions' => [[
                 'inventory_id' => $catalog['hamburg']->id,
@@ -83,6 +85,7 @@ class CalculationWriterCreateNumberTest extends TestCase
         $writer = app(CalculationWriter::class);
         $payload = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'order_discount_percent' => '0',
             'positions' => [[
                 'inventory_id' => $catalog['hamburg']->id,

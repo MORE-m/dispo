@@ -56,6 +56,7 @@ Zufallswerte werden kontrolliert, damit Ergebnisse reproduzierbar bleiben.
 - Rolle ohne Berechtigung,
 - Ersteller = Freigeber,
 - veraltete Versionsnummer bei konkurrierender Bearbeitung,
+- veralteter Schema-Fingerprint beim Anlegen (Konfigurationsdrift, 409 vor 422),
 - deaktivierte Kombination oder Option,
 - ungültiger Statusübergang,
 - fehlende Pflichtbegründung,

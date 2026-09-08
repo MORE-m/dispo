@@ -1,3 +1,4 @@
+import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -123,6 +124,7 @@ type FieldSchema = {
         sort: number;
         is_system?: boolean;
         required?: boolean;
+        visible?: boolean;
         max_length?: number | null;
         validation_json?: { max_length?: number } | null;
     }>;
@@ -130,6 +132,8 @@ type FieldSchema = {
         condition: { op?: string; field_key?: string; value?: unknown };
         action: { op?: string; field_key?: string };
     }>;
+    schema_fingerprint?: string | null;
+    format_version?: number;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -473,6 +477,24 @@ function draftTimeRanges(
     return [emptyTimeRange()];
 }
 
+function conflictMessage(
+    data: string | Record<string, unknown>,
+): string | null {
+    let payload: unknown = data;
+
+    if (typeof payload === 'string') {
+        try {
+            payload = JSON.parse(payload);
+        } catch {
+            return null;
+        }
+    }
+
+    const message = (payload as { message?: unknown } | null)?.message;
+
+    return typeof message === 'string' && message !== '' ? message : null;
+}
+
 export default function CalculationWizard({
     catalog,
     dayGroups,
@@ -747,6 +769,12 @@ export default function CalculationWizard({
             budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
+            ...(calculation
+                ? {}
+                : {
+                      schema_fingerprint:
+                          fieldSchema.schema_fingerprint ?? null,
+                  }),
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
@@ -819,6 +847,7 @@ export default function CalculationWizard({
             customHeaderFields,
             customPositionFields,
             customHeaderValues,
+            fieldSchema.schema_fingerprint,
             orderDiscounts,
             aeEnabled,
             targetBudget,
@@ -957,6 +986,20 @@ export default function CalculationWizard({
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setBusy(false),
+            // Freeze-Konflikt: keine Validierung, sondern veraltetes Feldschema.
+            onHttpException: (response: HttpExceptionResponse) => {
+                if (response.status !== 409) {
+                    return;
+                }
+
+                setSaveError(
+                    conflictMessage(response.data) ??
+                        'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+                );
+                setBusy(false);
+
+                return false;
+            },
             onError: (errors: Record<string, string | string[]>) => {
                 const mapped = mapValidationErrors(errors);
                 setSaveFieldErrors(mapped);

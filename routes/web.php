@@ -24,6 +24,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('kalkulationen', [CalculationController::class, 'store'])->name('calculations.store');
     Route::post('kalkulationen/vorschau', [CalculationController::class, 'preview'])->name('calculations.preview');
     Route::post('kalkulationen/budget-vorschlag', [CalculationController::class, 'proposeBudget'])->name('calculations.budget-propose');
+    Route::post('kalkulationen/feldschema', [CalculationController::class, 'fieldSchema'])
+        ->name('calculations.field-schema');
     Route::get('kalkulationen/{calculation}', [CalculationController::class, 'edit'])->name('calculations.edit');
     Route::put('kalkulationen/{calculation}', [CalculationController::class, 'update'])->name('calculations.update');
     Route::post('kalkulationen/{calculation}/budget-vorschlaege/{proposal}/uebernehmen', [CalculationController::class, 'applyBudget'])

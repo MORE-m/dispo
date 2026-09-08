@@ -25,6 +25,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $required
  * @property bool $visible
  * @property array<string, mixed>|null $validation_json
+ * @property int|null $provenance_definition_source_id
+ * @property int|null $provenance_revision_source_id
+ * @property int|null $provenance_required_source_id
+ * @property int|null $provenance_visible_source_id
+ * @property int|null $provenance_sort_source_id
+ * @property int|null $provenance_group_source_id
  */
 class SnapshotFieldDefinition extends Model
 {
@@ -46,6 +52,22 @@ class SnapshotFieldDefinition extends Model
         'required',
         'visible',
         'validation_json',
+        'provenance_definition_source_id',
+        'provenance_revision_source_id',
+        'provenance_required_source_id',
+        'provenance_visible_source_id',
+        'provenance_sort_source_id',
+        'provenance_group_source_id',
+    ];
+
+    /** @var list<string> */
+    public const PROVENANCE_COLUMNS = [
+        'provenance_definition_source_id',
+        'provenance_revision_source_id',
+        'provenance_required_source_id',
+        'provenance_visible_source_id',
+        'provenance_sort_source_id',
+        'provenance_group_source_id',
     ];
 
     /**

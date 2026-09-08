@@ -61,6 +61,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -100,6 +101,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $update = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -143,6 +145,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = $writer->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -188,6 +191,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $other = $writer->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Andere',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -202,6 +206,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = $writer->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -216,6 +221,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $own = $calculation->positions()->orderBy('sort')->get();
         $base = [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -316,6 +322,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $this->actingAs($user)->post(route('calculations.store'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'order_discount_percent' => '0',
             'order_discounts' => [],
@@ -327,6 +334,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
             'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'target_budget_nn' => '500',
             'budget_wish_inventory_ids' => [
                 $catalog['hamburg']->id,
@@ -380,6 +388,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $empty = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -408,6 +417,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $filled = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -493,6 +503,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -513,6 +524,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = app(CalculationWriter::class)->update($calculation, [
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -737,6 +749,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',

@@ -34,6 +34,7 @@ final class CalculationDynamicFieldWriter
             ]);
         }
 
+        $snapshot->assertReadable();
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
         $headerInput = is_array($payload['dynamic_field_values'] ?? null)
             ? $payload['dynamic_field_values']

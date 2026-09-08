@@ -602,6 +602,7 @@ class CalculationSnapshotBlockerTest extends TestCase
         return [
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => [[
                 'inventory_id' => $inventoryId ?? $catalog['hamburg']->id,
                 'advertising_medium_id' => $catalog['medium']->id,
@@ -627,6 +628,7 @@ class CalculationSnapshotBlockerTest extends TestCase
         return [
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => [
                 [
                     'inventory_id' => $catalog['hamburg']->id,

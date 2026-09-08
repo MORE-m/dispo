@@ -69,6 +69,9 @@ class UpdateDispoOrderDraftRequest extends FormRequest
 
             $order = $this->dispoOrder();
             $snapshot = $order?->configurationSnapshot;
+            if ($snapshot instanceof ConfigurationSnapshot) {
+                $snapshot->assertReadable();
+            }
 
             foreach (array_keys($values) as $key) {
                 $key = (string) $key;
@@ -152,6 +155,8 @@ class UpdateDispoOrderDraftRequest extends FormRequest
         if (! $snapshot instanceof ConfigurationSnapshot) {
             return [];
         }
+
+        $snapshot->assertReadable();
 
         $calcKeys = $this->calcOriginKeys($snapshot);
         $editable = [];

@@ -866,7 +866,7 @@ class DynamicFieldDispoOrderTest extends TestCase
         $this->assertSame(DispoOrderStatus::AwaitingSalesApproval, $order->status);
     }
 
-    public function test_revision_fails_when_protected_dispo_definition_missing_from_fieldset(): void
+    public function test_revision_inherits_frozen_configuration_when_fieldset_changed(): void
     {
         $calculation = $this->savedCalculation();
         $creator = User::factory()->role(Role::Sales)->create();
@@ -894,6 +894,12 @@ class DynamicFieldDispoOrderTest extends TestCase
         $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');
         $predecessor->refresh();
 
+        $predecessor->load('configurationSnapshot.fieldDefinitions');
+        $predecessorSnapshot = $predecessor->configurationSnapshot;
+        $this->assertNotNull($predecessorSnapshot);
+        $predecessorKeys = $predecessorSnapshot->fieldDefinitions->pluck('key')->sort()->values()->all();
+        $this->assertContains('billing_special_features', $predecessorKeys);
+
         $set = FieldSet::query()
             ->where('key', DispoConfigurationSnapshotComposer::SYSTEM_DISPO_ORDER_CORE_KEY)
             ->firstOrFail();
@@ -905,51 +911,28 @@ class DynamicFieldDispoOrderTest extends TestCase
             ->where('field_definition_id', $definitionId)
             ->delete();
 
-        $snapshotsBefore = ConfigurationSnapshot::query()
-            ->where('source', ConfigurationSnapshotSource::DispoOrderCreate)
-            ->count();
-        $ordersBefore = DispoOrder::query()->count();
-        $revisionAuditsBefore = AuditEvent::query()
-            ->where('action', 'dispo_order.revision_created')
-            ->count();
-
-        try {
-            $writer->createRevision(
-                $predecessor,
-                $calculation->fresh(['positions', 'configurationSnapshot']),
-                $calculation->positions()->pluck('id')->all(),
-                $creator,
-            );
-            $this->fail('Expected RuntimeException for missing protected dispo definition');
-        } catch (RuntimeException $exception) {
-            $this->assertStringContainsString(
-                'system_dispo_order_core fehlt Definition „billing_special_features“',
-                $exception->getMessage(),
-            );
-        }
-
-        $this->assertSame($ordersBefore, DispoOrder::query()->count());
-        $this->assertSame(
-            $snapshotsBefore,
-            ConfigurationSnapshot::query()
-                ->where('source', ConfigurationSnapshotSource::DispoOrderCreate)
-                ->count(),
-        );
-        $this->assertSame(
-            $revisionAuditsBefore,
-            AuditEvent::query()
-                ->where('action', 'dispo_order.revision_created')
-                ->count(),
+        $result = $writer->createRevision(
+            $predecessor,
+            $calculation->fresh(['positions', 'configurationSnapshot']),
+            $calculation->positions()->pluck('id')->all(),
+            $creator,
         );
 
-        $predecessor->refresh();
-        $this->assertSame(DispoOrderStatus::ApprovalRejected, $predecessor->status);
-        $this->assertFalse($predecessor->hasRevision());
+        $successor = $result->order->fresh(['configurationSnapshot.fieldDefinitions']);
+        $successorSnapshot = $successor->configurationSnapshot;
+        $this->assertNotNull($successorSnapshot);
+        $this->assertNotSame($predecessorSnapshot->id, $successorSnapshot->id);
         $this->assertSame(
-            'Vorgänger-Hinweis',
-            $predecessor->fieldValues()
-                ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', 'billing_special_features'))
-                ->value('value_text'),
+            (int) $predecessorSnapshot->format_version,
+            (int) $successorSnapshot->format_version,
+        );
+        $this->assertSame(
+            $predecessorKeys,
+            $successorSnapshot->fieldDefinitions->pluck('key')->sort()->values()->all(),
+        );
+        $this->assertContains(
+            'billing_special_features',
+            $successorSnapshot->fieldDefinitions->pluck('key')->all(),
         );
     }
 

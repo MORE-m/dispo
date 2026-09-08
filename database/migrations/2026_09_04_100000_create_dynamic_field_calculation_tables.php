@@ -416,12 +416,19 @@ return new class extends Migration
     {
         $now = now();
 
-        $snapshotId = DB::table('configuration_snapshots')->insertGetId([
+        $snapshotRow = [
             'field_set_id' => $fieldSetId,
             'field_set_version_id' => $fieldSetVersionId,
             'source' => $source,
             'created_at' => $now,
-        ]);
+        ];
+
+        // DF-3.3a2α: bei späterem Aufruf existiert format_version bereits NOT NULL.
+        if (Schema::hasColumn('configuration_snapshots', 'format_version')) {
+            $snapshotRow['format_version'] = 1;
+        }
+
+        $snapshotId = DB::table('configuration_snapshots')->insertGetId($snapshotRow);
 
         $memberships = DB::table('field_set_version_fields as m')
             ->join('field_definition_revisions as r', 'r.id', '=', 'm.field_definition_revision_id')

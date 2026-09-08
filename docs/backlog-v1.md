@@ -199,11 +199,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
-- **Geplante Folge:** ADV-001a → DF-3.3-fs → **DF-3.3a1** (Assignments/Resolver/Preview)
-  → `DF-3.3a2` (VER-002/003 + Runtime) → `DF-3.3b` (Admin-UI)
+- **Geplante Folge:** ADV-001a → DF-3.3-fs → DF-3.3a1 (Assignments/Resolver/Preview)
+  → **DF-3.3a2α** (VER-002-Freeze + globale Runtime) → `DF-3.3a2β` (Kat/Medium +
+  VER-003) → `DF-3.3b` (Admin-UI)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -218,16 +219,20 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.3-fs erledigt (`main`):** frei anlegbare versionierte Feldsets
   inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
   Wirkung (`DYN-002`/`DYN-003` Teil).
-- **DF-3.3a1 erledigt (Feature-Branch):** `field_set_assignments`, deterministischer
-  Resolver, Kontext-Preview/Activate-Fingerprint; **keine** Runtime-Wirkung;
-  VER-002/003 und Assignment-UI folgen. **DF-3 nicht abgeschlossen.**
-- **Offen:** Runtime-Vererbung (`DF-3.3a2`), Assignment-UI (`DF-3.3b`), Optionen,
-  volle Regelmatrix, Regel-Editor.
+- **DF-3.3a1 erledigt (`main`):** `field_set_assignments`, deterministischer
+  Resolver, Kontext-Preview/Activate-Fingerprint; noch **keine** Runtime-Wirkung.
+- **DF-3.3a2α erledigt (Feature-Branch `feat/df3-3a2a-global-snapshot-freeze`):**
+  aktive **globale** Assignments wirken produktiv auf Kalkulation und Dispoauftrag
+  (Kopf- und Positionsfelder). Kategorie- und Werbemittelebene bleiben ohne
+  Runtime-Wirkung. **DF-3 nicht abgeschlossen.**
+- **Offen:** Kat/Medium-Runtime + VER-003 (`DF-3.3a2β`, **nicht begonnen**),
+  Assignment-UI (`DF-3.3b`, **nicht begonnen**), Optionen, volle Regelmatrix,
+  Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a/b Custom-Text)
+- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a/b Custom-Text + DF-3.3a2α VER-002-Quellengraph)
 - **Anforderungen:** `VER-001` bis `VER-007`
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
@@ -240,8 +245,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **DF-3.1:** Admin-Activate ändert historische Snapshots nicht (AT-14).
   **DF-3.2a:** Custom-Header in neuen Snapshots nach Activate; Historie unverändert.
   **DF-3.2b:** Position-Custom in Snapshots; Calc-Origin über Source-Snapshot;
-  Historie unverändert. **DF-3 nicht abgeschlossen.**
-  **Offen:** Positionskonfig-Snapshot voll laut Doku; Mehrquellen-Provenance.
+  Historie unverändert.
+  **DF-3.3a2α:** `VER-002`-Quellengraph (`configuration_snapshot_sources` inkl.
+  eingefrorener Quellfelder/-regeln), Property-Provenance je Snapshot-Definition,
+  `format_version` als Generationsmarker mit fail-closed Lesepfad,
+  `schema_fingerprint` + 409 bei Drift, Dispo-Revision klont Snapshot statt neu
+  aufzulösen. **DF-3 nicht abgeschlossen.**
+  **Offen:** `VER-003` Positionskonfig-Snapshot (**nicht begonnen**),
+  Kategorie-/Werbemittelquellen im Quellengraph (`DF-3.3a2β`).
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

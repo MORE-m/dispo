@@ -14,6 +14,7 @@ use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Database\Seeder;
 
 /**
@@ -92,8 +93,11 @@ class E2ECalculationSeeder extends Seeder
 
         $limited = User::query()->where('email', 'sales-limited@example.com')->firstOrFail();
         $hamburg = $inventories['RH'];
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
+            'schema_fingerprint' => $fingerprint,
             'customer_name' => 'Sonderfreigabe E2E GmbH',
             'campaign' => 'Sonderfreigabe-Kampagne',
             'product_title' => 'Sonderfreigabe Produkt',
