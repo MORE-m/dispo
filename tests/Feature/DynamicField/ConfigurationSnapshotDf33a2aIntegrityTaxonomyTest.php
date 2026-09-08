@@ -193,14 +193,12 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
             ->firstOrFail();
 
         $tamperedAction = array_merge($sourceRule->action_json, ['tampered' => true]);
-        $newDedupe = SnapshotFieldRuleDedupeKey::from($sourceRule->condition_json, $tamperedAction);
-
-        DB::table('configuration_snapshot_source_rules')
-            ->where('id', $sourceRule->id)
-            ->update([
-                'action_json' => json_encode($tamperedAction, JSON_THROW_ON_ERROR),
-                'dedupe_key' => $newDedupe,
-            ]);
+        $sourceRule->action_json = $tamperedAction;
+        $sourceRule->dedupe_key = SnapshotFieldRuleDedupeKey::from(
+            $sourceRule->condition_json,
+            $tamperedAction,
+        );
+        $sourceRule->save();
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessageMatches('/passende Source-Rule \(Rule-ID und Dedupe-Key\)/');
