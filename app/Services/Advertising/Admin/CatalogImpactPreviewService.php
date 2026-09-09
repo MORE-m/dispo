@@ -30,10 +30,21 @@ final class CatalogImpactPreviewService
      */
     public function previewCategoryDeactivate(AdvertisingCategory $category, array $payload = []): array
     {
-        $category->loadMissing('advertisingMedia');
+        // Wenn der Lock-Coordinator die Relation gesetzt hat, diese nutzen
+        // (Locking-Read). Sonst frische Query – nie eine veraltete Eager-Load-Kopie
+        // aus dem Request-Objekt ohne erneutes Laden.
+        if ($category->relationLoaded('advertisingMedia')) {
+            $media = $category->advertisingMedia;
+        } else {
+            $media = AdvertisingMedium::query()
+                ->where('category_id', $category->id)
+                ->orderBy('id')
+                ->get();
+            $category->setRelation('advertisingMedia', $media);
+        }
 
-        $activeMedia = $category->advertisingMedia->where('is_active', true)->values();
-        $inactiveMedia = $category->advertisingMedia->where('is_active', false)->values();
+        $activeMedia = $media->where('is_active', true)->values();
+        $inactiveMedia = $media->where('is_active', false)->values();
 
         $assignmentCounts = $this->assignmentCountsForCategory((int) $category->id);
         $blocking = [];
@@ -143,7 +154,12 @@ final class CatalogImpactPreviewService
             ]);
         }
 
-        $target = AdvertisingCategory::query()->whereKey($targetId)->first();
+        // Unter Mutation: gesperrte Zielkategorie übergeben – kein non-locking SELECT
+        // (MySQL RR-Snapshot könnte sonst is_active veraltet lesen).
+        $target = $payload['locked_target_category'] ?? null;
+        if (! $target instanceof AdvertisingCategory) {
+            $target = AdvertisingCategory::query()->whereKey($targetId)->first();
+        }
         if ($target === null) {
             throw ValidationException::withMessages([
                 'category_id' => 'Die Ziel-Oberkategorie wurde nicht gefunden.',

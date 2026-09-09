@@ -26,6 +26,7 @@ final class AdvertisingMediumAdminWriter
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly CatalogImpactPreviewService $impact,
+        private readonly CatalogLifecycleLockCoordinator $locks,
     ) {}
 
     /**
@@ -40,7 +41,13 @@ final class AdvertisingMediumAdminWriter
             $this->assertName($name);
 
             $kind = $this->parseKind($payload['kind'] ?? null);
-            $category = $this->resolveActiveCategory((int) $payload['category_id']);
+            // Kategorie unter lockForUpdate prüfen – verhindert Race mit Deaktivierung.
+            $category = $this->locks->lockCategory((int) ($payload['category_id'] ?? 0));
+            if (! $category->is_active) {
+                throw ValidationException::withMessages([
+                    'category_id' => 'Neue Werbemittel können nur aktiven Oberkategorien zugeordnet werden.',
+                ]);
+            }
             AdvertisingKindCategoryCompatibility::assertCompatible($kind, $category->key);
 
             $length = $this->normalizeLength($payload['default_length_seconds'] ?? 30);
@@ -152,12 +159,21 @@ final class AdvertisingMediumAdminWriter
     public function changeCategory(AdvertisingMedium $medium, array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($medium, $payload, $actor): AdvertisingMedium {
-            /** @var AdvertisingMedium $locked */
-            $locked = AdvertisingMedium::query()->whereKey($medium->id)->lockForUpdate()->firstOrFail();
+            $targetCategoryId = (int) ($payload['category_id'] ?? 0);
+
+            // Rows sperren → Zustand neu lesen → Preview neu → Fingerprint → mutieren
+            $lockedBundle = $this->locks->lockMediumAndCategories(
+                (int) $medium->id,
+                [$targetCategoryId],
+            );
+            $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
 
+            /** @var AdvertisingCategory|null $lockedTarget */
+            $lockedTarget = $lockedBundle['categories']->firstWhere('id', $targetCategoryId);
             $preview = $this->impact->previewMediumCategoryChange($locked, [
-                'target_category_id' => (int) $payload['category_id'],
+                'target_category_id' => $targetCategoryId,
+                'locked_target_category' => $lockedTarget,
             ]);
             $this->impact->assertFingerprint($preview, (string) $payload['fingerprint']);
 
@@ -215,6 +231,7 @@ final class AdvertisingMediumAdminWriter
                 ]);
             }
 
+            // Preview erst nach Zeilensperre neu berechnen (Fingerprint-Sicherheit).
             $preview = $this->impact->previewMediumDeactivate($locked);
             $this->impact->assertFingerprint($preview, (string) $payload['fingerprint']);
 
@@ -250,8 +267,8 @@ final class AdvertisingMediumAdminWriter
     public function reactivate(AdvertisingMedium $medium, array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($medium, $payload, $actor): AdvertisingMedium {
-            /** @var AdvertisingMedium $locked */
-            $locked = AdvertisingMedium::query()->whereKey($medium->id)->lockForUpdate()->firstOrFail();
+            $lockedBundle = $this->locks->lockMediumAndCategories((int) $medium->id);
+            $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
 
             if ($locked->is_active) {
@@ -260,9 +277,13 @@ final class AdvertisingMediumAdminWriter
                 ]);
             }
 
-            $locked->loadMissing('category');
-            $category = $locked->category;
-            if ($category === null || ! $category->is_active) {
+            /** @var AdvertisingCategory|null $category */
+            $category = $lockedBundle['categories']->firstWhere('id', (int) $locked->category_id);
+            if ($category === null) {
+                $category = $this->locks->lockCategory((int) $locked->category_id);
+            }
+
+            if (! $category->is_active) {
                 throw ValidationException::withMessages([
                     'medium' => 'Reaktivierung nur möglich, wenn die zugeordnete Oberkategorie aktiv ist.',
                 ]);
@@ -325,30 +346,6 @@ final class AdvertisingMediumAdminWriter
                 'kind' => 'Unbekannte oder nicht unterstützte Berechnungsart.',
             ]);
         }
-    }
-
-    private function resolveActiveCategory(int $categoryId): AdvertisingCategory
-    {
-        if ($categoryId < 1) {
-            throw ValidationException::withMessages([
-                'category_id' => 'Eine Oberkategorie ist erforderlich.',
-            ]);
-        }
-
-        $category = AdvertisingCategory::query()->whereKey($categoryId)->first();
-        if ($category === null) {
-            throw ValidationException::withMessages([
-                'category_id' => 'Die Oberkategorie wurde nicht gefunden.',
-            ]);
-        }
-
-        if (! $category->is_active) {
-            throw ValidationException::withMessages([
-                'category_id' => 'Neue Werbemittel können nur aktiven Oberkategorien zugeordnet werden.',
-            ]);
-        }
-
-        return $category;
     }
 
     private function assertName(string $name): void

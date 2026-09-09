@@ -20,6 +20,7 @@ final class AdvertisingCategoryAdminWriter
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly CatalogImpactPreviewService $impact,
+        private readonly CatalogLifecycleLockCoordinator $locks,
     ) {}
 
     /**
@@ -112,8 +113,8 @@ final class AdvertisingCategoryAdminWriter
     public function deactivate(AdvertisingCategory $category, array $payload, User $actor): AdvertisingCategory
     {
         return DB::transaction(function () use ($category, $payload, $actor): AdvertisingCategory {
-            /** @var AdvertisingCategory $locked */
-            $locked = AdvertisingCategory::query()->whereKey($category->id)->lockForUpdate()->firstOrFail();
+            // Media zuerst, dann Kategorie – kompatibel zum Assignment-Coordinator.
+            $locked = $this->locks->lockCategoryWithOwnedMedia((int) $category->id);
             $this->assertLock($locked, (int) $payload['lock_version']);
 
             if (! $locked->is_active) {
@@ -122,6 +123,7 @@ final class AdvertisingCategoryAdminWriter
                 ]);
             }
 
+            // Preview erst nach Zeilensperren neu berechnen (Fingerprint-Sicherheit).
             $preview = $this->impact->previewCategoryDeactivate($locked);
             $this->impact->assertFingerprint($preview, (string) $payload['fingerprint']);
 
