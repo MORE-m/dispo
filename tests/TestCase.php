@@ -7,6 +7,7 @@ use App\Models\ConfigurationSnapshot;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Laravel\Fortify\Features;
+use Tests\Support\MysqlTestDatabaseGuard;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -15,6 +16,19 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         $this->withoutVite();
+    }
+
+    /**
+     * Läuft nach Application-Bootstrap und vor RefreshDatabase/DatabaseMigrations.
+     * Damit greift MysqlTestDatabaseGuard garantiert vor destruktiven Traits.
+     *
+     * @return array<int, string>
+     */
+    protected function setUpTraits(): array
+    {
+        MysqlTestDatabaseGuard::assertSafeBeforeDestructiveTraits();
+
+        return parent::setUpTraits();
     }
 
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void

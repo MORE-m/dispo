@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Services\Calculation\CalculationNumberSequencer;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -16,11 +15,8 @@ if ($runId === '' || $workerId < 0) {
     exit(1);
 }
 
-require __DIR__.'/../../vendor/autoload.php';
-
 /** @var Application $app */
-$app = require __DIR__.'/../../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$app = require __DIR__.'/bootstrap_mysql_worker.php';
 
 DB::table('calc_number_concurrency_barrier')->updateOrInsert(
     ['run_id' => $runId, 'worker_id' => $workerId],

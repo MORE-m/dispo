@@ -6,12 +6,23 @@ import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
+import { firstValidationMessage } from '@/lib/validation-errors';
 
 type VersionRow = {
     id: number;
     version: number;
     status: string;
     created_at: string | null;
+};
+
+type ActiveAssignmentRow = {
+    id: number;
+    applies_to_process: string;
+    applies_to_process_label: string;
+    target_layer: string;
+    target_layer_label: string;
+    target_label: string;
+    href: string;
 };
 
 type FieldSetDetail = {
@@ -27,6 +38,9 @@ type FieldSetDetail = {
     can_edit_applies_to: boolean;
     can_deactivate: boolean;
     can_reactivate: boolean;
+    active_assignment_count: number;
+    active_assignments: ActiveAssignmentRow[];
+    has_inconsistent_active_assignments: boolean;
     versions: VersionRow[];
 };
 
@@ -63,6 +77,11 @@ export default function FieldSetShow({
               fieldSet.versions.find((v) => v.status === 'active')?.id ??
               fieldSet.versions[0]?.id)
             : null;
+    const hasActiveAssignments = fieldSet.active_assignment_count > 0;
+    const deactivateBlockedByAssignments =
+        fieldSet.is_assignable &&
+        hasActiveAssignments &&
+        !fieldSet.can_deactivate;
 
     const metaForm = useForm({
         lock_version: fieldSet.lock_version,
@@ -92,8 +111,9 @@ export default function FieldSetShow({
                 setError(
                     caught.isConflict
                         ? caught.message
-                        : caught.message ||
-                              'Der Entwurf konnte nicht angelegt werden.',
+                        : (firstValidationMessage(caught.fieldErrors) ??
+                              (caught.message ||
+                                  'Der Entwurf konnte nicht angelegt werden.')),
                 );
             } else {
                 setError('Der Entwurf konnte nicht angelegt werden.');
@@ -103,7 +123,7 @@ export default function FieldSetShow({
     }
 
     async function deactivate() {
-        if (busy) {
+        if (busy || !fieldSet.can_deactivate) {
             return;
         }
         setBusy(true);
@@ -116,7 +136,10 @@ export default function FieldSetShow({
             router.visit(result.redirect);
         } catch (caught) {
             if (caught instanceof JsonPostError) {
-                setError(caught.message);
+                setError(
+                    firstValidationMessage(caught.fieldErrors) ??
+                        caught.message,
+                );
             } else {
                 setError('Deaktivieren fehlgeschlagen.');
             }
@@ -138,7 +161,10 @@ export default function FieldSetShow({
             router.visit(result.redirect);
         } catch (caught) {
             if (caught instanceof JsonPostError) {
-                setError(caught.message);
+                setError(
+                    firstValidationMessage(caught.fieldErrors) ??
+                        caught.message,
+                );
             } else {
                 setError('Reaktivieren fehlgeschlagen.');
             }
@@ -192,6 +218,17 @@ export default function FieldSetShow({
                                     Deaktivieren
                                 </Button>
                             ) : null}
+                            {deactivateBlockedByAssignments ? (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    data-test="fieldset-deactivate-blocked"
+                                    disabled
+                                    title="Zuerst aktive Assignments deaktivieren"
+                                >
+                                    Deaktivieren (blockiert)
+                                </Button>
+                            ) : null}
                             {fieldSet.can_reactivate ? (
                                 <Button
                                     type="button"
@@ -214,7 +251,12 @@ export default function FieldSetShow({
                 {flash.success ? (
                     <SuccessState message={flash.success} />
                 ) : null}
-                {error ? <ErrorState message={error} /> : null}
+                {error ? (
+                    <ErrorState
+                        message={error}
+                        data-test="fieldset-lifecycle-error"
+                    />
+                ) : null}
                 {runtimeNote ? (
                     <p
                         className="text-muted-foreground text-sm"
@@ -222,6 +264,93 @@ export default function FieldSetShow({
                     >
                         {runtimeNote}
                     </p>
+                ) : null}
+
+                {fieldSet.has_inconsistent_active_assignments ? (
+                    <div
+                        className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+                        data-test="fieldset-inconsistent-active-assignments"
+                    >
+                        <p className="font-medium">
+                            Inkonsistenter Zustand: Feldset ist nicht
+                            assignierbar, verweist aber noch auf aktive
+                            Assignments.
+                        </p>
+                        <p className="mt-1">
+                            Keine automatische Bereinigung. Sicherer
+                            Reparaturweg: Feldset reaktivieren, danach
+                            Assignments bewusst deaktivieren, anschließend
+                            Feldset erneut deaktivieren.
+                        </p>
+                    </div>
+                ) : null}
+
+                {!fieldSet.is_system ? (
+                    <section
+                        className="max-w-3xl space-y-3 rounded-xl border p-4"
+                        data-test="fieldset-active-assignments"
+                    >
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                            <h2 className="font-semibold">
+                                Aktive Assignments
+                            </h2>
+                            <p
+                                className="text-muted-foreground text-sm"
+                                data-test="fieldset-active-assignment-count"
+                            >
+                                {fieldSet.active_assignment_count} aktiv
+                            </p>
+                        </div>
+                        {deactivateBlockedByAssignments ? (
+                            <p
+                                className="text-sm"
+                                data-test="fieldset-deactivate-blocker"
+                            >
+                                Das Feldset kann nicht deaktiviert werden,
+                                solange aktive Assignments darauf verweisen.
+                                Deaktiviere zuerst die aufgeführten Assignments.
+                            </p>
+                        ) : null}
+                        {hasActiveAssignments ? (
+                            <ul className="space-y-2 text-sm">
+                                {fieldSet.active_assignments.map(
+                                    (assignment) => (
+                                        <li
+                                            key={assignment.id}
+                                            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t pt-2 first:border-t-0 first:pt-0"
+                                            data-test="fieldset-active-assignment-row"
+                                            data-assignment-id={assignment.id}
+                                        >
+                                            <Link
+                                                href={assignment.href}
+                                                className="font-medium underline-offset-2 hover:underline"
+                                                data-test="fieldset-active-assignment-link"
+                                            >
+                                                Assignment #{assignment.id}
+                                            </Link>
+                                            <span>
+                                                {
+                                                    assignment.applies_to_process_label
+                                                }
+                                            </span>
+                                            <span>
+                                                {assignment.target_layer_label}
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                {assignment.target_label}
+                                            </span>
+                                        </li>
+                                    ),
+                                )}
+                            </ul>
+                        ) : (
+                            <p className="text-muted-foreground text-sm">
+                                Keine aktiven Assignments. Deaktivierung ist
+                                freigegeben, sofern das Feldset assignierbar
+                                ist.
+                            </p>
+                        )}
+                    </section>
                 ) : null}
 
                 <section

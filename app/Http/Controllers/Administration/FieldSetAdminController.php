@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Administration;
 
 use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
+use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Enums\FieldSetVersionStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\DynamicField\ActivateFieldSetVersionRequest;
@@ -19,6 +20,7 @@ use App\Http\Requests\Administration\DynamicField\UpdateFieldSetMetadataRequest;
 use App\Models\FieldDefinition;
 use App\Models\FieldDefinitionRevision;
 use App\Models\FieldSet;
+use App\Models\FieldSetAssignment;
 use App\Models\FieldSetVersion;
 use App\Models\FieldSetVersionField;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
@@ -129,6 +131,17 @@ class FieldSetAdminController extends Controller
             ),
         );
 
+        $activeAssignments = [];
+        $hasInconsistentActiveAssignments = false;
+
+        if (! $fieldSet->is_system) {
+            $activeAssignments = $this->serializeActiveAssignments($fieldSet);
+            $hasInconsistentActiveAssignments = ! $fieldSet->is_assignable
+                && $activeAssignments !== [];
+        }
+
+        $activeAssignmentCount = count($activeAssignments);
+
         return Inertia::render('administration/dynamic-fields/field-sets/show', [
             'fieldSet' => [
                 'id' => $fieldSet->id,
@@ -141,10 +154,15 @@ class FieldSetAdminController extends Controller
                 'active_version_id' => $fieldSet->active_version_id,
                 'has_ever_been_activated' => $hasEverBeenActivated,
                 'can_edit_applies_to' => ! $fieldSet->is_system && ! $hasEverBeenActivated,
-                'can_deactivate' => ! $fieldSet->is_system && $fieldSet->is_assignable,
+                'can_deactivate' => ! $fieldSet->is_system
+                    && $fieldSet->is_assignable
+                    && $activeAssignmentCount === 0,
                 'can_reactivate' => ! $fieldSet->is_system
                     && ! $fieldSet->is_assignable
                     && $fieldSet->active_version_id !== null,
+                'active_assignment_count' => $activeAssignmentCount,
+                'active_assignments' => $activeAssignments,
+                'has_inconsistent_active_assignments' => $hasInconsistentActiveAssignments,
                 'versions' => $fieldSet->versions->map(fn (FieldSetVersion $version): array => [
                     'id' => $version->id,
                     'version' => $version->version,
@@ -159,7 +177,7 @@ class FieldSetAdminController extends Controller
             ],
             'runtimeNote' => $fieldSet->is_system
                 ? null
-                : 'Freie Feldsets wirken in diesem Stand noch nicht auf Kalkulation oder Dispoauftrag. Assignments folgen in späteren Slices.',
+                : 'Freie Feldsets wirken über Assignments auf neue Kalkulationen und Dispoaufträge. Bestehende Snapshots bleiben unverändert.',
         ]);
     }
 
@@ -604,5 +622,107 @@ class FieldSetAdminController extends Controller
                 'status' => $set->activeVersion->status->value,
             ],
         ];
+    }
+
+    /**
+     * DF-3.3-fs-HF1: aktive Assignments für Deaktivierungs-Guard und Admin-Hinweis.
+     *
+     * @return list<array{
+     *     id: int,
+     *     applies_to_process: string,
+     *     applies_to_process_label: string,
+     *     target_layer: string,
+     *     target_layer_label: string,
+     *     target_label: string,
+     *     href: string
+     * }>
+     */
+    private function serializeActiveAssignments(FieldSet $fieldSet): array
+    {
+        /** @var list<array{
+         *     id: int,
+         *     applies_to_process: string,
+         *     applies_to_process_label: string,
+         *     target_layer: string,
+         *     target_layer_label: string,
+         *     target_label: string,
+         *     href: string
+         * }> $rows
+         */
+        $rows = [];
+
+        $assignments = FieldSetAssignment::query()
+            ->where('field_set_id', $fieldSet->id)
+            ->where('is_active', true)
+            ->with(['advertisingCategory', 'advertisingMedium.category'])
+            ->orderBy('id')
+            ->get();
+
+        foreach ($assignments as $assignment) {
+            $rows[] = [
+                'id' => (int) $assignment->id,
+                'applies_to_process' => $assignment->applies_to_process->value,
+                'applies_to_process_label' => $this->processLabel($assignment->applies_to_process),
+                'target_layer' => $assignment->target_layer->value,
+                'target_layer_label' => $this->targetLayerLabel($assignment->target_layer),
+                'target_label' => $this->assignmentTargetLabel($assignment),
+                'href' => route('administration.dynamic-fields.assignments.show', $assignment),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function processLabel(FieldAppliesTo $process): string
+    {
+        return match ($process) {
+            FieldAppliesTo::Calculation => 'Kalkulation',
+            FieldAppliesTo::DispoOrder => 'Dispoauftrag',
+            FieldAppliesTo::Both => 'Beide',
+        };
+    }
+
+    private function targetLayerLabel(FieldSetAssignmentTargetLayer $layer): string
+    {
+        return match ($layer) {
+            FieldSetAssignmentTargetLayer::Global => 'Global',
+            FieldSetAssignmentTargetLayer::AdvertisingCategory => 'Oberkategorie',
+            FieldSetAssignmentTargetLayer::AdvertisingMedium => 'Werbemittel',
+        };
+    }
+
+    private function assignmentTargetLabel(FieldSetAssignment $assignment): string
+    {
+        return match ($assignment->target_layer) {
+            FieldSetAssignmentTargetLayer::Global => 'Global',
+            FieldSetAssignmentTargetLayer::AdvertisingCategory => $this->categoryTargetLabel($assignment),
+            FieldSetAssignmentTargetLayer::AdvertisingMedium => $this->mediumTargetLabel($assignment),
+        };
+    }
+
+    private function categoryTargetLabel(FieldSetAssignment $assignment): string
+    {
+        $category = $assignment->advertisingCategory;
+        if ($category === null) {
+            return 'Oberkategorie #'.(string) $assignment->advertising_category_id.' (nicht gefunden)';
+        }
+
+        $label = "{$category->name} ({$category->key})";
+
+        return $category->is_active ? $label : "{$label} – deaktiviert";
+    }
+
+    private function mediumTargetLabel(FieldSetAssignment $assignment): string
+    {
+        $medium = $assignment->advertisingMedium;
+        if ($medium === null) {
+            return 'Werbemittel #'.(string) $assignment->advertising_medium_id.' (nicht gefunden)';
+        }
+
+        $category = $medium->category;
+        $categoryName = $category !== null ? $category->name : 'ohne Oberkategorie';
+        $label = "{$medium->name} ({$medium->code}) · {$categoryName}";
+
+        return $medium->is_active ? $label : "{$label} – deaktiviert";
     }
 }

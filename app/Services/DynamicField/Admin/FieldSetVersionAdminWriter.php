@@ -10,6 +10,7 @@ use App\Models\FieldDefinition;
 use App\Models\FieldDefinitionRevision;
 use App\Models\FieldRule;
 use App\Models\FieldSet;
+use App\Models\FieldSetAssignment;
 use App\Models\FieldSetVersion;
 use App\Models\FieldSetVersionField;
 use App\Models\User;
@@ -208,6 +209,8 @@ final class FieldSetVersionAdminWriter
         }
 
         return DB::transaction(function () use ($fieldSet, $actor, $expectedLockVersion): FieldSet {
+            // Serialisierungsgrenze: nur Feldset-Container. Kein Assignment-FOR-UPDATE
+            // (Assignment-Activate sperrt Assignment → Feldset; Gegenrichtung wäre Deadlock-Risiko).
             /** @var FieldSet $locked */
             $locked = FieldSet::query()->whereKey($fieldSet->id)->lockForUpdate()->firstOrFail();
             $this->assertLock($locked, $expectedLockVersion);
@@ -215,6 +218,26 @@ final class FieldSetVersionAdminWriter
             if (! $locked->is_assignable) {
                 throw ValidationException::withMessages([
                     'field_set' => 'Das Feldset ist bereits deaktiviert bzw. noch nicht nutzbar.',
+                ]);
+            }
+
+            // Frischer nicht sperrender Read nach Feldset-Lock (DF-3.3-fs-HF1).
+            $activeAssignmentIds = FieldSetAssignment::query()
+                ->where('field_set_id', $locked->id)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+
+            if ($activeAssignmentIds !== []) {
+                $listed = implode(', ', array_map(
+                    static fn (int $id): string => '#'.$id,
+                    $activeAssignmentIds,
+                ));
+
+                throw ValidationException::withMessages([
+                    'field_set' => 'Das Feldset kann nicht deaktiviert werden, solange aktive Assignments darauf verweisen. Deaktiviere zuerst die aufgeführten Assignments ('.$listed.').',
                 ]);
             }
 

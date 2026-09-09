@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\DispoOrder;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Str;
 
@@ -26,11 +25,8 @@ if (! is_dir($runDir) && ! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
     exit(1);
 }
 
-require __DIR__.'/../../vendor/autoload.php';
-
 /** @var Application $app */
-$app = require __DIR__.'/../../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$app = require __DIR__.'/bootstrap_mysql_worker.php';
 
 $readyFile = $runDir.'/worker-'.$workerId.'.ready';
 $resultFile = $runDir.'/worker-'.$workerId.'.result';

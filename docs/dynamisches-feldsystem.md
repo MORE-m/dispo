@@ -173,6 +173,10 @@ Teilslice nach ADV-001a – **kein** Abschluss von DF-3. Freie Feldsets haben
   Definitionen mischen; leere Version nicht aktivierbar.
 - Deaktivieren setzt `is_assignable=false` (Active-Version bleibt); spätere
   Versionsaktivierung reaktiviert nicht automatisch; Reaktivieren ist eigene Aktion.
+- **Hotfix DF-3.3-fs-HF1:** Deaktivierung ist blockiert, solange aktive
+  Assignments auf das Feldset verweisen (keine Kaskaden-Deaktivierung). Admin-
+  Ablauf: Assignments prüfen → Assignments deaktivieren → Feldset deaktivieren.
+  Runtime bleibt fail-closed bei inkonsistenten aktiven Assignments.
 - Kern-Feldsets: dauerhaft `is_assignable=false`, Metadaten geschützt.
 - Admin unter Dyn-Feld-Teilfreigabe; E2E isoliert `playwright.df33fs.config.ts`.
 - Bewusst später in fs: Assignments (→ DF-3.3a1), Snapshot-Quellengraph und

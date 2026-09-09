@@ -201,6 +201,17 @@ final class FieldSetAssignmentAdminWriter
                 );
             }
 
+            // DF-3.3-fs-HF1: nach Locks + Fingerprint aktuellen Feldset-Zustand erneut prüfen
+            // (Race gegen Feldset-Deaktivierung über denselben Container-Lock).
+            // Wichtig unter MySQL REPEATABLE READ: kein Relation-load/refresh-Snapshot,
+            // sondern erneuter sperrender Read der bereits gehaltenen Container-Zeile.
+            /** @var FieldSet $fieldSet */
+            $fieldSet = FieldSet::query()
+                ->whereKey((int) $locked->field_set_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $this->assertAssignableFieldSetModel($fieldSet, $locked->applies_to_process);
+
             // 5–6: Konflikte nur bei identischem Fingerprint
             foreach ($previews as $preview) {
                 if ($preview['has_blocking_conflicts']) {

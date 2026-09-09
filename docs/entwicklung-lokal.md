@@ -81,6 +81,11 @@ npm audit --omit=dev
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
 MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
 (benötigt eine Datenbank `dispo_test` und die Zugangsdaten aus `phpunit.mysql.xml`).
+`phpunit.mysql.xml` erzwingt `DB_DATABASE=dispo_test` per `force="true"` – eine äußere
+Shell-Variable wie `DB_DATABASE=dispo` darf die Entwicklungsdatenbank nicht treffen.
+Zusätzlich bricht `Tests\Support\MysqlTestDatabaseGuard` vor `RefreshDatabase` /
+`DatabaseMigrations` und in MySQL-Parallelworkern ab, wenn nicht exakt `dispo_test`
+aktiv ist.
 
 ## Produktion (nicht lokal)
 

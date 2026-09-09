@@ -219,7 +219,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.2a/b erledigt:** Custom Header-/Position-Textfelder auf `main`.
 - **DF-3.3-fs erledigt (`main`):** frei anlegbare versionierte Feldsets
   inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
-  Wirkung (`DYN-002`/`DYN-003` Teil).
+  Wirkung (`DYN-002`/`DYN-003` Teil). **HF1:** Deaktivierung bei aktiven
+  Assignments blockiert (keine Kaskade; Runtime fail-closed).
 - **DF-3.3a1 erledigt (`main`):** `field_set_assignments`, deterministischer
   Resolver, Kontext-Preview/Activate-Fingerprint; Runtime folgt a2.
 - **DF-3.3a2α erledigt (`main`, PR #24 / `8edcbd7`):**

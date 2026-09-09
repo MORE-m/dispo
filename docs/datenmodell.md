@@ -271,6 +271,9 @@ vorhandenen Werte.
 - Freie Sets: Create mit leerem Draft; Assignable erst nach erster Activate;
   Deakt./Reakt. am Container; keine physische Löschung; keine Runtime-Compose-
   Einbindung.
+- **DF-3.3-fs-HF1:** Feldset-Deaktivierung blockiert bei aktiven Assignments
+  (Invariante: nie `is_assignable=false` mit `field_set_assignments.is_active=true`
+  über den Writer-Pfad). Keine Kaskade; Runtime fail-closed unverändert.
 
 ### DF-3.3a1 – Field-Set-Assignments (`main`)
 

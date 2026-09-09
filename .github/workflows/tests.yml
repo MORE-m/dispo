@@ -108,11 +108,11 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_DATABASE: dispo_test
-          MYSQL_ROOT_PASSWORD: password
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ppassword"
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -141,7 +141,7 @@ jobs:
           DB_PORT: 3306
           DB_DATABASE: dispo_test
           DB_USERNAME: root
-          DB_PASSWORD: password
+          DB_PASSWORD: ""
           QUEUE_CONNECTION: database
           CACHE_STORE: database
           SESSION_DRIVER: database
