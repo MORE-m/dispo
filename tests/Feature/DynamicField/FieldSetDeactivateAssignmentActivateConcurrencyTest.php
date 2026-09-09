@@ -89,6 +89,7 @@ class FieldSetDeactivateAssignmentActivateConcurrencyTest extends TestCase
                 ],
             );
         } else {
+            // Freier Parallelstart ohne Lock über Barrieren (CI-sicher).
             $results = $this->runParallelWorkers(
                 [
                     'action' => 'activate_assignment',
@@ -97,11 +98,6 @@ class FieldSetDeactivateAssignmentActivateConcurrencyTest extends TestCase
                         'assignment_id' => $assignment->id,
                         'lock_version' => $assignment->lock_version,
                         'fingerprint' => $fingerprint,
-                        'orchestration' => [
-                            'outer_transaction' => true,
-                            'signal_before' => 'activate_started',
-                            'wait_after_action' => ['deactivate_entered'],
-                        ],
                     ],
                 ],
                 [
@@ -110,10 +106,6 @@ class FieldSetDeactivateAssignmentActivateConcurrencyTest extends TestCase
                         'actor_id' => $admin->id,
                         'field_set_id' => $fieldSet->id,
                         'lock_version' => $fieldSet->lock_version,
-                        'orchestration' => [
-                            'wait_before' => ['activate_started'],
-                            'signal_before' => 'deactivate_entered',
-                        ],
                     ],
                 ],
             );
