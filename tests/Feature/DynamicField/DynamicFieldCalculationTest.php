@@ -536,6 +536,7 @@ class DynamicFieldCalculationTest extends TestCase
 
         $update = $this->basePayload($catalog);
         $update['lock_version'] = $calculation->lock_version;
+        $update['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $update['dynamic_field_values'] = [
             'campaign_period' => ['start' => '2026-04-01', 'end' => '2026-04-30'],
         ];
@@ -576,6 +577,7 @@ class DynamicFieldCalculationTest extends TestCase
                 ],
             ],
         ];
+        $update['positions'] = $this->withPositionSchemaFingerprints($calculation, $update['positions']);
 
         $this->actingAs($user)
             ->from(route('calculations.edit', $calculation))
@@ -626,12 +628,14 @@ class DynamicFieldCalculationTest extends TestCase
 
         $payload = $this->basePayload($catalog);
         $payload['lock_version'] = $calculation->lock_version;
+        $payload['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $payload['positions'][0]['id'] = $calculation->positions()->first()->id;
         $payload['positions'][0]['client_key'] = $calculation->positions()->first()->client_key;
         $payload['positions'][0]['dynamic_field_values'] = [
             'period_open' => false,
             'position_flight_period' => null,
         ];
+        $payload['positions'] = $this->withPositionSchemaFingerprints($calculation, $payload['positions']);
 
         $this->actingAs($user)
             ->put(route('calculations.update', $calculation), $payload)

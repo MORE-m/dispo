@@ -8,6 +8,7 @@ use App\Enums\CalculationKind;
 use App\Enums\CalculationStatus;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
+use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
@@ -109,6 +110,7 @@ final class CalculationWriter
             }
 
             $locked->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+            $this->assertClientFingerprintsForGen3Update($locked, $payload);
             $before = $this->calculationSnapshot($locked);
 
             if ($this->isHeaderOnlyChange($payload, $locked) && ! $this->hasPositionsWithMissingClientKey($locked)) {
@@ -357,6 +359,64 @@ final class CalculationWriter
         }
 
         return $inputs;
+    }
+
+    /**
+     * Normale Gen-3-Updates: Client-Basis- und Positions-Fingerprints gegen den
+     * eingefrorenen Basissnapshot prüfen (kein Live-Graph). Budget-/Re-Optimize
+     * umgeht diesen Pfad und darf Fingerprints serverseitig ableiten.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertClientFingerprintsForGen3Update(Calculation $calculation, array $payload): void
+    {
+        $base = $this->contextualBaseSnapshot($calculation);
+        if ($base === null) {
+            return;
+        }
+
+        $expectedBase = $payload['schema_fingerprint'] ?? null;
+        if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expectedBase)) {
+            throw ValidationException::withMessages([
+                'schema_fingerprint' => 'Schema-Fingerprint fehlt oder ist ungültig.',
+            ]);
+        }
+
+        if (! hash_equals((string) $base->schema_fingerprint, (string) $expectedBase)) {
+            throw new FieldSetAssignmentConflictException(
+                'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+            );
+        }
+
+        if (! isset($payload['positions']) || ! is_array($payload['positions'])) {
+            return;
+        }
+
+        foreach ($payload['positions'] as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId < 1) {
+                continue;
+            }
+
+            $expectedPosition = $position['schema_fingerprint'] ?? null;
+            if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expectedPosition)) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.schema_fingerprint" => 'Schema-Fingerprint fehlt oder ist ungültig.',
+                ]);
+            }
+
+            $actual = (string) $this->snapshots
+                ->resolvePositionSchemaFromBase($base, $mediumId)['schema_fingerprint'];
+            if (! hash_equals((string) $expectedPosition, $actual)) {
+                throw new FieldSetAssignmentConflictException(
+                    'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+                );
+            }
+        }
     }
 
     /**
@@ -858,6 +918,13 @@ final class CalculationWriter
                 'client_key' => $position->client_key,
                 'inventory_id' => $position->inventory_id,
                 'advertising_medium_id' => $position->advertising_medium_id,
+                'schema_fingerprint' => $snapshot !== null
+                    && (int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+                    ? (string) $this->snapshots->resolvePositionSchemaFromBase(
+                        $snapshot,
+                        (int) $position->advertising_medium_id,
+                    )['schema_fingerprint']
+                    : null,
                 'spot_method' => $position->spot_method->value,
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,
@@ -889,6 +956,7 @@ final class CalculationWriter
             'campaign' => $calculation->campaign,
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,
+            'schema_fingerprint' => $snapshot?->schema_fingerprint,
             'order_discount_percent' => (string) $calculation->order_discount_percent,
             'order_discounts' => $calculation->orderDiscounts->map(fn (CalculationOrderDiscount $discount): array => [
                 'type' => $discount->type->value,

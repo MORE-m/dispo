@@ -10,6 +10,7 @@ use App\Enums\Role;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
@@ -424,7 +425,324 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
             ->deleteEffectiveIfUnreferenced($effective);
     }
 
-    public function test_effective_rejects_empty_context_string_and_mismatched_source_name(): void
+    public function test_effective_rejects_empty_context_and_mismatched_frozen_sources(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $medium = $catalog['medium'];
+
+        $categoryKey = $this->activateScopedPositionField(
+            $admin,
+            'advertising_category',
+            ['advertising_category_id' => $medium->category_id],
+        );
+        $mediumKey = $this->activateScopedPositionField(
+            $admin,
+            'advertising_medium',
+            ['advertising_medium_id' => $medium->id],
+        );
+        $this->assertNotSame('', $categoryKey);
+        $this->assertNotSame('', $mediumKey);
+
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $position = $calculation->positions()->firstOrFail();
+        $effective = ConfigurationSnapshot::query()
+            ->findOrFail($position->effective_configuration_snapshot_id);
+
+        $categorySource = $effective->sources()->where('layer', 'advertising_category')->first();
+        $mediumSource = $effective->sources()->where('layer', 'advertising_medium')->first();
+        $this->assertNotNull($categorySource, 'Kategorie-Assignment-Source muss vorhanden sein');
+        $this->assertNotNull($mediumSource, 'Werbemittel-Assignment-Source muss vorhanden sein');
+
+        $originalMediumName = (string) $effective->context_advertising_medium_name;
+        $effective->forceFill(['context_advertising_medium_name' => ''])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Leerer Kontextname muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('vollständigen eingefrorenen Kontext', $exception->getMessage());
+        }
+        $effective->forceFill(['context_advertising_medium_name' => $originalMediumName])->save();
+
+        $mediumSource->forceFill(['target_id' => ((int) $mediumSource->target_id) + 999])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Abweichende Medium-Source-ID muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertTrue(
+                str_contains($exception->getMessage(), 'weicht vom eingefrorenen Kontext')
+                || str_contains($exception->getMessage(), 'target_identity')
+                || str_contains($exception->getMessage(), 'passt nicht zum eingefrorenen Kontext'),
+                $exception->getMessage(),
+            );
+        }
+        $mediumSource->forceFill([
+            'target_id' => (int) $effective->context_advertising_medium_id,
+        ])->save();
+
+        $originalMediumId = (int) $effective->context_advertising_medium_id;
+        $otherMedium = AdvertisingMedium::factory()->create([
+            'code' => 'df33a2b_ctx_mismatch',
+            'category_id' => $medium->category_id,
+            'is_active' => true,
+            'default_length_seconds' => 30,
+        ]);
+        $effective->forceFill(['context_advertising_medium_id' => $otherMedium->id])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Abweichende Kontext-Medium-ID muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertTrue(
+                str_contains($exception->getMessage(), 'weicht vom eingefrorenen Kontext')
+                || str_contains($exception->getMessage(), 'passt nicht zum eingefrorenen Kontext'),
+                $exception->getMessage(),
+            );
+        }
+        $effective->forceFill(['context_advertising_medium_id' => $originalMediumId])->save();
+
+        $mediumSource->forceFill(['target_key' => 'wrong_code'])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Abweichender Medium-Code muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('weicht vom eingefrorenen Kontext', $exception->getMessage());
+        }
+        $mediumSource->forceFill(['target_key' => (string) $effective->context_advertising_medium_code])->save();
+
+        $mediumSource->forceFill(['target_name' => 'Abweichender Name'])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Abweichender Medium-Name muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('weicht vom eingefrorenen Kontext', $exception->getMessage());
+        }
+        $mediumSource->forceFill(['target_name' => (string) $effective->context_advertising_medium_name])->save();
+
+        $categorySource->forceFill(['target_key' => 'wrong_key'])->save();
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Abweichender Kategorie-Key muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('weicht vom eingefrorenen Kontext', $exception->getMessage());
+        }
+        $categorySource->forceFill(['target_key' => (string) $effective->context_advertising_category_key])->save();
+
+        $categorySource->forceFill(['target_name' => 'Abweichende Kategorie'])->save();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('weicht vom eingefrorenen Kontext');
+        $effective->fresh()->assertReadable();
+    }
+
+    public function test_gen3_update_requires_base_and_position_fingerprints(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $create = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'FP Update',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 5,
+                'position_discount_percent' => '0',
+                'ae_percent' => '0',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+            ]],
+        ]);
+        $this->actingAs($user)->post(route('calculations.store'), $create)->assertRedirect();
+        $calculation = Calculation::query()->latest('id')->firstOrFail();
+        $baseFingerprint = (string) $calculation->configurationSnapshot->schema_fingerprint;
+        $positions = $this->withPositionSchemaFingerprints(
+            $calculation,
+            $calculation->positions->map(fn ($position): array => [
+                'id' => $position->id,
+                'inventory_id' => $position->inventory_id,
+                'advertising_medium_id' => $position->advertising_medium_id,
+                'spot_method' => $position->spot_method->value,
+                'length_seconds' => $position->length_seconds,
+                'total_spot_count' => $position->total_spot_count,
+                'position_discount_percent' => (string) $position->position_discount_percent,
+                'ae_percent' => (string) $position->ae_percent,
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+            ])->all(),
+        );
+
+        $this->actingAs($user)->putJson(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'order_discount_percent' => '0',
+            'lock_version' => $calculation->lock_version,
+            'positions' => $positions,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['schema_fingerprint']);
+
+        $this->actingAs($user)->putJson(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'order_discount_percent' => '0',
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => 'not-a-sha256',
+            'positions' => $positions,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['schema_fingerprint']);
+
+        $positionsWithoutFp = $positions;
+        unset($positionsWithoutFp[0]['schema_fingerprint']);
+        $this->actingAs($user)->putJson(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'order_discount_percent' => '0',
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => $baseFingerprint,
+            'positions' => $positionsWithoutFp,
+        ])->assertUnprocessable()->assertJsonValidationErrors(['positions.0.schema_fingerprint']);
+
+        $this->actingAs($user)->putJson(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'order_discount_percent' => '0',
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => str_repeat('b', 64),
+            'positions' => $positions,
+            'dynamic_field_values' => ['unknown_custom_field' => 'x'],
+        ])->assertStatus(409);
+
+        $stalePositions = $positions;
+        $stalePositions[0]['schema_fingerprint'] = str_repeat('c', 64);
+        $stalePositions[0]['dynamic_field_values'] = ['unknown_custom_field' => 'x'];
+        $this->actingAs($user)->putJson(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'order_discount_percent' => '0',
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => $baseFingerprint,
+            'positions' => $stalePositions,
+        ])->assertStatus(409);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'customer_name' => 'FP Update OK',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => $baseFingerprint,
+            'positions' => $positions,
+        ])->assertRedirect();
+
+        $calculation->refresh();
+        $this->actingAs($user)->put(route('calculations.update', $calculation), [
+            'planning_mode' => 'manual',
+            'customer_name' => 'Header Only',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'lock_version' => $calculation->lock_version,
+            'schema_fingerprint' => $baseFingerprint,
+            'briefing' => 'Nur Kopf',
+        ])->assertRedirect();
+        $this->assertSame('Header Only', $calculation->fresh()->customer_name);
+    }
+
+    public function test_gen3_source_and_origin_combinations_are_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $calcBase = $calculation->configurationSnapshot()->firstOrFail();
+        $calcEffective = ConfigurationSnapshot::query()
+            ->findOrFail($calculation->positions()->firstOrFail()->effective_configuration_snapshot_id);
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
+            ->order;
+        $dispoBase = $order->configurationSnapshot()->firstOrFail();
+        $dispoEffective = ConfigurationSnapshot::query()
+            ->findOrFail($order->positions()->firstOrFail()->effective_configuration_snapshot_id);
+
+        $calcBase->forceFill(['source' => ConfigurationSnapshotSource::LegacyBackfill])->save();
+        try {
+            $calcBase->fresh()->assertReadable();
+            $this->fail('legacy_backfill als Gen-3-Calc-Basis muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('seed_active', $exception->getMessage());
+        }
+        $calcBase->forceFill(['source' => ConfigurationSnapshotSource::SeedActive])->save();
+
+        $calcBase->forceFill(['source_configuration_snapshot_id' => $calcBase->id])->save();
+        try {
+            $calcBase->fresh()->assertReadable();
+            $this->fail('Selbstreferenz der Calc-Basis muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertTrue(
+                str_contains($exception->getMessage(), 'sich selbst')
+                || str_contains($exception->getMessage(), 'keine Herkunft'),
+            );
+        }
+        $calcBase->forceFill(['source_configuration_snapshot_id' => null])->save();
+
+        $dispoBase->forceFill(['source' => ConfigurationSnapshotSource::DispoOrderLegacyBackfill])->save();
+        try {
+            $dispoBase->fresh()->assertReadable();
+            $this->fail('dispo_order_legacy_backfill als Gen-3-Dispo-Basis muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('dispo_order_create', $exception->getMessage());
+        }
+        $dispoBase->forceFill(['source' => ConfigurationSnapshotSource::DispoOrderCreate])->save();
+
+        $dispoBase->forceFill(['source_configuration_snapshot_id' => $calcEffective->id])->save();
+        try {
+            $dispoBase->fresh()->assertReadable();
+            $this->fail('Dispo-Basis mit Effektiv-Herkunft muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Calc-Basis', $exception->getMessage());
+        }
+        $dispoBase->forceFill(['source_configuration_snapshot_id' => $calcBase->id])->save();
+
+        $calcEffective->forceFill(['parent_configuration_snapshot_id' => $dispoBase->id])->save();
+        try {
+            $calcEffective->fresh()->assertReadable();
+            $this->fail('Calc-Effektiv mit Dispo-Parent muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertTrue(
+                str_contains($exception->getMessage(), 'Calc-Basis')
+                || str_contains($exception->getMessage(), 'Prozessfamilie'),
+            );
+        }
+        $calcEffective->forceFill(['parent_configuration_snapshot_id' => $calcBase->id])->save();
+
+        $calcEffective->forceFill(['source_configuration_snapshot_id' => $calcBase->id])->save();
+        try {
+            $calcEffective->fresh()->assertReadable();
+            $this->fail('Calc-Effektiv mit Herkunft muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('keine Herkunft', $exception->getMessage());
+        }
+        $calcEffective->forceFill(['source_configuration_snapshot_id' => null])->save();
+
+        $dispoEffective->forceFill(['source_configuration_snapshot_id' => $calcBase->id])->save();
+        try {
+            $dispoEffective->fresh()->assertReadable();
+            $this->fail('Dispo-Effektiv mit Basis-Herkunft muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('Calc-Effektiv', $exception->getMessage());
+        }
+        $dispoEffective->forceFill(['source_configuration_snapshot_id' => $calcEffective->id])->save();
+
+        $dispoEffective->forceFill([
+            'context_advertising_medium_name' => 'Abweichend vom Calc-Effektiv',
+        ])->save();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('weicht von der Calc-Herkunft ab');
+        $dispoEffective->fresh()->assertReadable();
+    }
+
+    public function test_delete_effective_fails_closed_for_each_residual_reference_kind(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $calculation = $this->createSavedCalculation($catalog, [
@@ -433,33 +751,170 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
         $position = $calculation->positions()->firstOrFail();
         $effective = ConfigurationSnapshot::query()
             ->findOrFail($position->effective_configuration_snapshot_id);
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
 
-        $effective->forceFill([
-            'context_advertising_medium_name' => '',
-        ])->save();
+        try {
+            $freeze->deleteEffectiveIfUnreferenced($effective);
+            $this->fail('Calc-Positionsreferenz muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('unerwartete Restreferenzen', $exception->getMessage());
+            $this->assertStringContainsString('calc=[', $exception->getMessage());
+        }
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, [$position->id], $user)
+            ->order;
+        $dispoEffective = ConfigurationSnapshot::query()
+            ->findOrFail($order->positions()->firstOrFail()->effective_configuration_snapshot_id);
+
+        try {
+            $freeze->deleteEffectiveIfUnreferenced($dispoEffective);
+            $this->fail('Dispo-Positionsreferenz muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('dispo=[', $exception->getMessage());
+        }
+
+        $position->forceFill(['effective_configuration_snapshot_id' => null])->save();
+        $child = ConfigurationSnapshot::query()->create([
+            'field_set_id' => $effective->field_set_id,
+            'field_set_version_id' => $effective->field_set_version_id,
+            'source' => ConfigurationSnapshotSource::SeedActive,
+            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_LEGACY,
+            'schema_fingerprint' => str_repeat('d', 64),
+            'parent_configuration_snapshot_id' => $effective->id,
+            'created_at' => now(),
+        ]);
+        try {
+            $freeze->deleteEffectiveIfUnreferenced($effective->fresh());
+            $this->fail('Parent-Restreferenz muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('parent=[', $exception->getMessage());
+        }
+        $child->forceFill(['parent_configuration_snapshot_id' => null])->save();
+
+        $child->forceFill(['source_configuration_snapshot_id' => $effective->id])->save();
+        try {
+            $freeze->deleteEffectiveIfUnreferenced($effective->fresh());
+            $this->fail('Herkunfts-Restreferenz muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('origin=[', $exception->getMessage());
+        }
+    }
+
+    public function test_replace_rolls_back_when_old_effective_has_residual_reference(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $mediumB = AdvertisingMedium::factory()->create([
+            'code' => 'df33a2b_replace_rollback',
+            'is_active' => true,
+            'default_length_seconds' => 30,
+            'category_id' => $catalog['medium']->category_id,
+        ]);
+        $catalog['hamburg']->mediumRules()->create([
+            'advertising_medium_id' => $mediumB->id,
+        ]);
+
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $position = $calculation->positions()->firstOrFail();
+        $oldEffectiveId = (int) $position->effective_configuration_snapshot_id;
+        $oldContextName = (string) $position->advertising_medium_name;
+        $oldValueCount = DB::table('calculation_position_field_values')
+            ->where('calculation_position_id', $position->id)
+            ->count();
+
+        ConfigurationSnapshot::query()->create([
+            'field_set_id' => $calculation->configurationSnapshot->field_set_id,
+            'field_set_version_id' => $calculation->configurationSnapshot->field_set_version_id,
+            'source' => ConfigurationSnapshotSource::SeedActive,
+            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_LEGACY,
+            'schema_fingerprint' => str_repeat('e', 64),
+            'parent_configuration_snapshot_id' => $oldEffectiveId,
+            'created_at' => now(),
+        ]);
+
+        $base = $calculation->configurationSnapshot()->firstOrFail();
+        $fingerprint = (string) app(ConfigurationSnapshotFreezeService::class)
+            ->resolvePositionSchemaFromBase($base, (int) $mediumB->id)['schema_fingerprint'];
+
+        try {
+            app(ConfigurationSnapshotFreezeService::class)->replacePositionEffective(
+                $position,
+                $base,
+                (int) $mediumB->id,
+                $fingerprint,
+            );
+            $this->fail('Replace mit Restreferenz muss rollbacken.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('unerwartete Restreferenzen', $exception->getMessage());
+        }
+
+        $position->refresh();
+        $this->assertSame($oldEffectiveId, (int) $position->effective_configuration_snapshot_id);
+        $this->assertSame($oldContextName, (string) $position->advertising_medium_name);
+        $this->assertSame(
+            $oldValueCount,
+            DB::table('calculation_position_field_values')
+                ->where('calculation_position_id', $position->id)
+                ->count(),
+        );
+        $this->assertTrue(
+            ConfigurationSnapshot::query()->whereKey($oldEffectiveId)->exists(),
+            'Alter Effektiv-Snapshot muss erhalten bleiben',
+        );
+
+        $candidateIds = ConfigurationSnapshot::query()
+            ->where('parent_configuration_snapshot_id', $base->id)
+            ->where('source', ConfigurationSnapshotSource::CalculationPositionEffective)
+            ->where('id', '!=', $oldEffectiveId)
+            ->pluck('id');
+        foreach ($candidateIds as $candidateId) {
+            $this->assertTrue(
+                CalculationPosition::query()
+                    ->where('effective_configuration_snapshot_id', $candidateId)
+                    ->exists(),
+                'Kein ownerloser neuer Effektiv-Snapshot nach Rollback',
+            );
+        }
+    }
+
+    public function test_effective_rejects_wrong_owner_base(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $first = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $second = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['rock']->id],
+        ]);
+        $position = $first->positions()->firstOrFail();
+        $foreignBaseId = (int) $second->configuration_snapshot_id;
+        $effective = ConfigurationSnapshot::query()
+            ->findOrFail($position->effective_configuration_snapshot_id);
+
+        $effective->forceFill(['parent_configuration_snapshot_id' => $foreignBaseId])->save();
 
         try {
             $effective->fresh()->assertReadable();
-            $this->fail('Leerer Kontextname muss fail-closed sein.');
+            $this->fail('Falsche Parent-Basis muss fail-closed sein.');
         } catch (\RuntimeException $exception) {
-            $this->assertStringContainsString('vollständigen eingefrorenen Kontext', $exception->getMessage());
+            $this->assertTrue(
+                str_contains($exception->getMessage(), 'Parent')
+                || str_contains($exception->getMessage(), 'Calc-Position gehört nicht')
+                || str_contains($exception->getMessage(), 'Prozessfamilie')
+                || str_contains($exception->getMessage(), 'Calc-Basis'),
+            );
         }
 
         $effective->forceFill([
-            'context_advertising_medium_name' => 'Histor Name',
+            'parent_configuration_snapshot_id' => $first->configuration_snapshot_id,
         ])->save();
+        $first->forceFill(['configuration_snapshot_id' => $foreignBaseId])->save();
 
-        $mediumSource = $effective->sources()
-            ->where('layer', 'advertising_medium')
-            ->first();
-        if ($mediumSource !== null) {
-            $mediumSource->forceFill(['target_name' => 'Abweichender Name'])->save();
-            $this->expectException(\RuntimeException::class);
-            $this->expectExceptionMessage('weicht vom eingefrorenen Kontext');
-            $effective->fresh()->assertReadable();
-        } else {
-            $this->assertTrue(true);
-        }
+        $this->expectException(\RuntimeException::class);
+        $effective->fresh()->assertReadable();
     }
 
     public function test_stale_position_fingerprint_returns_409_before_field_422(): void

@@ -140,14 +140,22 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
         ], $user);
         $position = $calculation->positions()->firstOrFail();
         $update = $this->basePayload($catalog);
-        unset($update['schema_fingerprint']);
+        $update['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $update['lock_version'] = $calculation->lock_version;
         $update['positions'][0]['id'] = $position->id;
         $update['positions'][0]['client_key'] = $position->client_key;
+        $update['positions'] = $this->withPositionSchemaFingerprints($calculation, $update['positions']);
 
         $this->actingAs($user)
             ->put(route('calculations.update', $calculation), $update)
             ->assertRedirect();
+
+        // Preview und Budget-Propose bleiben ohne Client-Fingerprint zulässig.
+        $preview = $this->basePayload($catalog);
+        unset($preview['schema_fingerprint']);
+        $this->actingAs($user)
+            ->postJson(route('calculations.preview'), $preview)
+            ->assertOk();
 
         $this->actingAs($user)
             ->postJson(route('calculations.budget-propose'), [

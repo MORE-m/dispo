@@ -699,11 +699,19 @@ class BudgetSpotProposalFlowTest extends TestCase
 
     private function appliedSavePayload(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $calculation->loadMissing([
+            'configurationSnapshot',
+            'positions.timeRanges',
+            'positions.discounts',
+            'orderDiscounts',
+        ]);
+
+        $baseFingerprint = (string) ($calculation->configurationSnapshot?->schema_fingerprint
+            ?? $this->liveSchemaFingerprint());
 
         return [
             'planning_mode' => PlanningMode::Budget->value,
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'schema_fingerprint' => $baseFingerprint,
             'target_budget_nn' => (string) $calculation->target_budget_nn,
             'budget_strategy' => $calculation->budget_strategy?->value,
             'order_discount_percent' => (string) $calculation->order_discount_percent,
@@ -715,40 +723,43 @@ class BudgetSpotProposalFlowTest extends TestCase
             'ae_enabled' => (bool) $calculation->ae_enabled,
             'budget_proposal_manual' => false,
             'lock_version' => $calculation->lock_version,
-            'positions' => $calculation->positions->map(fn ($position): array => [
-                'id' => $position->id,
-                'client_key' => $position->client_key,
-                'inventory_id' => $position->inventory_id,
-                'advertising_medium_id' => $position->advertising_medium_id,
-                'spot_method' => $position->spot_method->value,
-                'length_seconds' => $position->length_seconds,
-                'total_spot_count' => $position->total_spot_count,
-                'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
-                'position_discount_percent' => (string) $position->position_discount_percent,
-                'ae_percent' => (string) $position->ae_percent,
-                'time_ranges' => $position->timeRanges->map(fn ($range): array => [
-                    'start_hour' => $range->start_hour,
-                    'end_hour_exclusive' => $range->end_hour_exclusive,
-                    'day_group' => $range->day_group->value,
-                    'spot_count' => $range->spot_count,
-                ])->all(),
-                'position_discounts' => $position->discounts->map(fn ($discount): array => [
-                    'type' => $discount->type->value,
-                    'custom_label' => $discount->custom_label,
-                    'percent' => (string) $discount->percent,
-                ])->all(),
-                'plan_rows' => $position->timeRanges->flatMap(function ($range) {
-                    $rows = [];
-                    for ($hour = $range->start_hour; $hour < $range->end_hour_exclusive; $hour++) {
-                        $rows[] = [
-                            'hour' => $hour,
-                            'day_group' => $range->day_group->value,
-                        ];
-                    }
+            'positions' => $this->withPositionSchemaFingerprints(
+                $calculation,
+                $calculation->positions->map(fn ($position): array => [
+                    'id' => $position->id,
+                    'client_key' => $position->client_key,
+                    'inventory_id' => $position->inventory_id,
+                    'advertising_medium_id' => $position->advertising_medium_id,
+                    'spot_method' => $position->spot_method->value,
+                    'length_seconds' => $position->length_seconds,
+                    'total_spot_count' => $position->total_spot_count,
+                    'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
+                    'position_discount_percent' => (string) $position->position_discount_percent,
+                    'ae_percent' => (string) $position->ae_percent,
+                    'time_ranges' => $position->timeRanges->map(fn ($range): array => [
+                        'start_hour' => $range->start_hour,
+                        'end_hour_exclusive' => $range->end_hour_exclusive,
+                        'day_group' => $range->day_group->value,
+                        'spot_count' => $range->spot_count,
+                    ])->all(),
+                    'position_discounts' => $position->discounts->map(fn ($discount): array => [
+                        'type' => $discount->type->value,
+                        'custom_label' => $discount->custom_label,
+                        'percent' => (string) $discount->percent,
+                    ])->all(),
+                    'plan_rows' => $position->timeRanges->flatMap(function ($range) {
+                        $rows = [];
+                        for ($hour = $range->start_hour; $hour < $range->end_hour_exclusive; $hour++) {
+                            $rows[] = [
+                                'hour' => $hour,
+                                'day_group' => $range->day_group->value,
+                            ];
+                        }
 
-                    return $rows;
-                })->all(),
-            ])->all(),
+                        return $rows;
+                    })->all(),
+                ])->all(),
+            ),
         ];
     }
 }

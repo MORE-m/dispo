@@ -404,6 +404,55 @@ final class ConfigurationSnapshotIntegrity
         // Parent muss selbst ein vollständig lesbarer Gen-3-Basissnapshot sein.
         $this->assertReadableInternal($parent);
 
+        if ((int) $snapshot->source_configuration_snapshot_id === (int) $snapshot->id) {
+            $this->fail($snapshot, 'Effektiv-Snapshot darf nicht auf sich selbst als Herkunft verweisen');
+        }
+
+        if ($snapshot->source === ConfigurationSnapshotSourceEnum::CalculationPositionEffective) {
+            if ($snapshot->source_configuration_snapshot_id !== null) {
+                $this->fail($snapshot, 'Calc-Effektiv darf keine Herkunft tragen');
+            }
+
+            if ($this->isDispoSnapshot($parent) || $parent->source !== ConfigurationSnapshotSourceEnum::SeedActive) {
+                $this->fail($snapshot, 'Calc-Effektiv braucht eine Calc-Basis (seed_active) als Parent');
+            }
+        }
+
+        if ($snapshot->source === ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective) {
+            if ($snapshot->source_configuration_snapshot_id === null) {
+                $this->fail($snapshot, 'Dispo-Effektiv ohne Calc-Effektiv-Herkunft');
+            }
+
+            if (! $this->isDispoSnapshot($parent)
+                || $parent->source !== ConfigurationSnapshotSourceEnum::DispoOrderCreate
+            ) {
+                $this->fail($snapshot, 'Dispo-Effektiv braucht eine Dispo-Basis als Parent');
+            }
+
+            $snapshot->loadMissing('sourceConfigurationSnapshot');
+            $origin = $snapshot->sourceConfigurationSnapshot;
+            if ($origin === null) {
+                $this->fail($snapshot, 'source_configuration_snapshot_id verweist ins Leere');
+            }
+
+            if ((int) $origin->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+                || $origin->source !== ConfigurationSnapshotSourceEnum::CalculationPositionEffective
+            ) {
+                $this->fail($snapshot, 'Dispo-Effektiv-Herkunft muss ein Calc-Effektiv der Generation 3 sein');
+            }
+
+            foreach (self::CONTEXT_COLUMNS as $column) {
+                if ((string) $snapshot->{$column} !== (string) $origin->{$column}) {
+                    $this->fail(
+                        $snapshot,
+                        "Dispo-Effektiv-Kontext ({$column}) weicht von der Calc-Herkunft ab",
+                    );
+                }
+            }
+
+            $this->assertReadableInternal($origin);
+        }
+
         $this->assertProcessFamily($snapshot);
 
         // Bewusst kein Live-Abgleich Werbemittel → Oberkategorie: der Kontext ist
@@ -434,6 +483,56 @@ final class ConfigurationSnapshotIntegrity
 
         if ($snapshot->parent_configuration_snapshot_id !== null) {
             $this->fail($snapshot, 'Basis-Snapshot darf keinen Parent besitzen');
+        }
+
+        if ((int) $snapshot->source_configuration_snapshot_id === (int) $snapshot->id) {
+            $this->fail($snapshot, 'Basis-Snapshot darf nicht auf sich selbst als Herkunft verweisen');
+        }
+
+        $isDispo = $this->isDispoSnapshot($snapshot);
+
+        if ($isDispo) {
+            if ($snapshot->source !== ConfigurationSnapshotSourceEnum::DispoOrderCreate) {
+                $this->fail(
+                    $snapshot,
+                    'Dispo-Basis der Generation 3 muss source=dispo_order_create haben',
+                );
+            }
+
+            if ($snapshot->source_configuration_snapshot_id === null) {
+                $this->fail($snapshot, 'Dispo-Basis der Generation 3 ohne Calc-Herkunft');
+            }
+
+            $snapshot->loadMissing('sourceConfigurationSnapshot');
+            $origin = $snapshot->sourceConfigurationSnapshot;
+            if ($origin === null) {
+                $this->fail($snapshot, 'source_configuration_snapshot_id verweist ins Leere');
+            }
+
+            if ((int) $origin->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+                $this->fail($snapshot, 'Dispo-Basis-Herkunft ist kein Snapshot der Generation 3');
+            }
+
+            if ($origin->isEffectiveSnapshot() || $this->isDispoSnapshot($origin)) {
+                $this->fail($snapshot, 'Dispo-Basis-Herkunft muss eine Calc-Basis der Generation 3 sein');
+            }
+
+            if ($origin->source !== ConfigurationSnapshotSourceEnum::SeedActive) {
+                $this->fail($snapshot, 'Dispo-Basis-Herkunft muss source=seed_active haben');
+            }
+
+            $this->assertReadableInternal($origin);
+        } else {
+            if ($snapshot->source !== ConfigurationSnapshotSourceEnum::SeedActive) {
+                $this->fail(
+                    $snapshot,
+                    'Calc-Basis der Generation 3 muss source=seed_active haben',
+                );
+            }
+
+            if ($snapshot->source_configuration_snapshot_id !== null) {
+                $this->fail($snapshot, 'Calc-Basis der Generation 3 darf keine Herkunft tragen');
+            }
         }
 
         foreach ($snapshot->fieldDefinitions as $definition) {

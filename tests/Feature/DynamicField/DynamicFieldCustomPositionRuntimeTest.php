@@ -101,21 +101,21 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $update = [
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'schema_fingerprint' => (string) $calculation->configurationSnapshot->schema_fingerprint,
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
             'lock_version' => $calculation->lock_version,
-            'positions' => [
+            'positions' => $this->withPositionSchemaFingerprints($calculation, [
                 $this->positionPayload($catalog, $catalog['rock']->id, $storedKeyB, [
                     $definition->key => 'Wert B',
                 ], $idB),
                 $this->positionPayload($catalog, $catalog['hamburg']->id, $storedKeyA, [
                     $definition->key => 'Wert A',
                 ], $idA),
-            ],
+            ]),
         ];
 
         $fresh = app(CalculationWriter::class)->update($calculation, $update, $user);
@@ -217,7 +217,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $own = $calculation->positions()->orderBy('sort')->get();
         $base = [
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'schema_fingerprint' => (string) $calculation->configurationSnapshot->schema_fingerprint,
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -229,9 +229,9 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         try {
             $writer->update($calculation, [
                 ...$base,
-                'positions' => [
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [
                     $this->positionPayload($catalog, $catalog['hamburg']->id, (string) $own[0]->client_key, [], $foreignId),
-                ],
+                ]),
             ], $user);
             $this->fail('Expected ValidationException for foreign position id.');
         } catch (ValidationException $exception) {
@@ -242,9 +242,9 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             $writer->update($calculation->fresh(), [
                 ...$base,
                 'lock_version' => $calculation->fresh()->lock_version,
-                'positions' => [
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [
                     $this->positionPayload($catalog, $catalog['hamburg']->id, $foreignKey, []),
-                ],
+                ]),
             ], $user);
             $this->fail('Expected ValidationException for foreign client_key.');
         } catch (ValidationException $exception) {
@@ -255,10 +255,10 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             $writer->update($calculation->fresh(), [
                 ...$base,
                 'lock_version' => $calculation->fresh()->lock_version,
-                'positions' => [
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [
                     $this->positionPayload($catalog, $catalog['hamburg']->id, (string) $own[0]->client_key, [], (int) $own[0]->id),
                     $this->positionPayload($catalog, $catalog['rock']->id, (string) $own[1]->client_key, [], (int) $own[0]->id),
-                ],
+                ]),
             ], $user);
             $this->fail('Expected ValidationException for duplicate position id.');
         } catch (ValidationException $exception) {
@@ -516,18 +516,18 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $calculation = app(CalculationWriter::class)->update($calculation, [
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'schema_fingerprint' => (string) $calculation->configurationSnapshot->schema_fingerprint,
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
             'lock_version' => $calculation->lock_version,
-            'positions' => [
+            'positions' => $this->withPositionSchemaFingerprints($calculation, [
                 $this->positionPayload($catalog, $catalog['hamburg']->id, $keyKeep, [
                     $calcOrigin->key => 'Keep',
                 ], $keepId),
-            ],
+            ]),
         ], $user);
 
         $order = app(DispoOrderWriter::class)

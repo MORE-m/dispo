@@ -641,6 +641,11 @@ class CalculationController extends Controller
 
         $effective->assertReadable();
 
+        $resolved = $this->freeze->resolvePositionSchemaFromBase(
+            $base,
+            (int) $position->advertising_medium_id,
+        );
+
         $systemByDefinitionId = FieldDefinition::query()
             ->whereIn('id', $effective->fieldDefinitions->pluck('field_definition_id')->unique()->all())
             ->pluck('is_system', 'id');
@@ -665,7 +670,9 @@ class CalculationController extends Controller
                 'action' => $rule->action_json,
             ])->values()->all(),
             'format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
-            'schema_fingerprint' => $effective->schema_fingerprint,
+            // Client-Vertrag: Fingerprint der kanonischen Basisauflösung, nicht
+            // der materialisierte Effektiv-Fingerprint (kann abweichen).
+            'schema_fingerprint' => (string) $resolved['schema_fingerprint'],
         ];
     }
 

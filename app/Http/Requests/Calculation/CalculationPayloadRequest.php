@@ -40,8 +40,8 @@ class CalculationPayloadRequest extends FormRequest
      * dynamische Feldwerte gegen das Schema geprüft werden (409 vor 422).
      * Formal ungültige Fingerprints bleiben der Regel-Validierung (422) überlassen.
      *
-     * DF-3.3a2β: dieselbe Reihenfolge gilt auch für Positions-Fingerprints und
-     * für kontextändernde Updates einer Gen-3-Kalkulation.
+     * DF-3.3a2β: dieselbe Reihenfolge gilt für Basis- und Positions-Fingerprints
+     * bei Create und normalen Gen-3-Updates (gegen den eingefrorenen Basissnapshot).
      */
     protected function prepareForValidation(): void
     {
@@ -52,7 +52,7 @@ class CalculationPayloadRequest extends FormRequest
         }
 
         if ($this->routeIs('calculations.update')) {
-            $this->assertUpdatePositionFingerprintDriftOrDefer();
+            $this->assertGen3UpdateFingerprintDriftOrDefer();
         }
     }
 
@@ -94,24 +94,23 @@ class CalculationPayloadRequest extends FormRequest
         }
     }
 
-    private function assertUpdatePositionFingerprintDriftOrDefer(): void
+    private function assertGen3UpdateFingerprintDriftOrDefer(): void
     {
-        $calculation = $this->route('calculation');
-        if (! $calculation instanceof Calculation) {
+        $base = $this->gen3BaseSnapshotForUpdate();
+        if ($base === null) {
             return;
         }
 
-        $calculation->loadMissing(['configurationSnapshot', 'positions']);
-        $base = $calculation->configurationSnapshot;
-        if ($base === null
-            || (int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        $expectedBase = $this->input('schema_fingerprint');
+        if (ConfigurationSnapshotIntegrity::isValidFingerprint($expectedBase)
+            && ! hash_equals((string) $base->schema_fingerprint, (string) $expectedBase)
         ) {
-            return;
+            throw new FieldSetAssignmentConflictException(
+                'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+            );
         }
 
-        $existingById = $calculation->positions->keyBy('id');
         $freeze = app(ConfigurationSnapshotFreezeService::class);
-
         foreach ($this->input('positions', []) as $position) {
             if (! is_array($position)) {
                 continue;
@@ -122,18 +121,8 @@ class CalculationPayloadRequest extends FormRequest
                 continue;
             }
 
-            $existingId = isset($position['id']) ? (int) $position['id'] : 0;
-            $existing = $existingId > 0 ? $existingById->get($existingId) : null;
-            $contextChanging = $existing === null
-                || (int) $existing->advertising_medium_id !== $mediumId;
-
-            if (! $contextChanging) {
-                continue;
-            }
-
             $fingerprint = $position['schema_fingerprint'] ?? null;
             if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
-                // Formale 422 übernimmt die Regel-Validierung / Writer.
                 continue;
             }
 
@@ -145,6 +134,38 @@ class CalculationPayloadRequest extends FormRequest
                 );
             }
         }
+    }
+
+    private function gen3BaseSnapshotForUpdate(): ?ConfigurationSnapshot
+    {
+        if (! $this->routeIs('calculations.update')) {
+            return null;
+        }
+
+        $calculation = $this->route('calculation');
+        if (! $calculation instanceof Calculation) {
+            return null;
+        }
+
+        $calculation->loadMissing('configurationSnapshot');
+        $base = $calculation->configurationSnapshot;
+        if ($base === null
+            || (int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        ) {
+            return null;
+        }
+
+        return $base;
+    }
+
+    private function requiresGen3UpdateBaseFingerprint(): bool
+    {
+        return $this->gen3BaseSnapshotForUpdate() !== null;
+    }
+
+    private function requiresGen3UpdatePositionFingerprints(): bool
+    {
+        return $this->gen3BaseSnapshotForUpdate() !== null;
     }
 
     /**
@@ -193,7 +214,7 @@ class CalculationPayloadRequest extends FormRequest
             'budget_proposal_status' => ['nullable', Rule::enum(BudgetProposalStatus::class)],
             'lock_version' => ['nullable', 'integer', 'min:1'],
             'calculation_id' => ['nullable', 'integer', 'min:1'],
-            'schema_fingerprint' => $this->routeIs('calculations.store')
+            'schema_fingerprint' => $this->routeIs('calculations.store') || $this->requiresGen3UpdateBaseFingerprint()
                 ? ['required', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN]
                 : ['nullable', 'string', 'max:64'],
             'dynamic_field_values' => ['sometimes', 'array'],
@@ -204,7 +225,7 @@ class CalculationPayloadRequest extends FormRequest
             'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
-            'positions.*.schema_fingerprint' => $this->routeIs('calculations.store')
+            'positions.*.schema_fingerprint' => $this->routeIs('calculations.store') || $this->requiresGen3UpdatePositionFingerprints()
                 ? ['required', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN]
                 : ['nullable', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN],
             'positions.*.inventory_id' => ['required', 'integer', 'exists:inventories,id'],
@@ -269,7 +290,6 @@ class CalculationPayloadRequest extends FormRequest
             $this->validateDynamicFieldKeys($validator);
             // PO-32b-1: leere Custom-Pflichtfelder blockieren Calc Create/Update
             // nicht allein deshalb; Snapshot-Regeln/Typvalidierung bleiben aktiv.
-            $this->assertRequiredPositionFingerprintsForContextualUpdate($validator);
 
             $isPreview = $this->routeIs('calculations.preview');
             $rangeValidator = new TimeRangeValidator;
@@ -737,60 +757,6 @@ class CalculationPayloadRequest extends FormRequest
                 $errorKey,
                 $meta['label'].' darf höchstens '.$meta['max_length'].' Zeichen haben.',
             );
-        }
-    }
-
-    /**
-     * Gen-3-Update: neue Position oder Mediumwechsel erfordert einen formal
-     * gültigen Positions-Fingerprint (422, bevor fachliche Feldfehler greifen).
-     */
-    private function assertRequiredPositionFingerprintsForContextualUpdate(Validator $validator): void
-    {
-        if (! $this->routeIs('calculations.update')) {
-            return;
-        }
-
-        $calculation = $this->route('calculation');
-        if (! $calculation instanceof Calculation) {
-            return;
-        }
-
-        $calculation->loadMissing(['configurationSnapshot', 'positions']);
-        $base = $calculation->configurationSnapshot;
-        if ($base === null
-            || (int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
-        ) {
-            return;
-        }
-
-        $existingById = $calculation->positions->keyBy('id');
-
-        foreach ($this->input('positions', []) as $index => $position) {
-            if (! is_array($position)) {
-                continue;
-            }
-
-            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
-            if ($mediumId < 1) {
-                continue;
-            }
-
-            $existingId = isset($position['id']) ? (int) $position['id'] : 0;
-            $existing = $existingId > 0 ? $existingById->get($existingId) : null;
-            $contextChanging = $existing === null
-                || (int) $existing->advertising_medium_id !== $mediumId;
-
-            if (! $contextChanging) {
-                continue;
-            }
-
-            $fingerprint = $position['schema_fingerprint'] ?? null;
-            if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
-                $validator->errors()->add(
-                    "positions.{$index}.schema_fingerprint",
-                    'Schema-Fingerprint fehlt oder ist ungültig.',
-                );
-            }
         }
     }
 

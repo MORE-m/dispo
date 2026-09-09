@@ -741,10 +741,6 @@ export default function CalculationWizard({
 
     // DF-3.3a2β: Positions-Fingerprints und -Schemas nachladen (Create oder Mediumwechsel).
     useEffect(() => {
-        if (calculation !== null) {
-            return;
-        }
-
         const missing = positions.filter(
             (position) =>
                 position.advertising_medium_id > 0 &&
@@ -772,6 +768,9 @@ export default function CalculationWizard({
                         fieldSchema?: FieldSchema;
                     }>('/kalkulationen/feldschema', {
                         advertising_medium_id: position.advertising_medium_id,
+                        ...(calculation?.id
+                            ? { calculation_id: calculation.id }
+                            : {}),
                     });
                     const nextSchema = response.fieldSchema;
                     const fingerprint = nextSchema?.schema_fingerprint ?? null;
@@ -782,7 +781,7 @@ export default function CalculationWizard({
                         });
                     }
                 } catch {
-                    // Fingerprint wird beim Speichern serverseitig erneut geprüft.
+                    // Nachladen fehlgeschlagen: Speichern bleibt fail-closed.
                 }
             }
 
@@ -820,7 +819,7 @@ export default function CalculationWizard({
         return () => {
             cancelled = true;
         };
-    }, [calculation, positions]);
+    }, [calculation?.id, positions]);
 
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
@@ -894,12 +893,7 @@ export default function CalculationWizard({
             budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            ...(calculation
-                ? {}
-                : {
-                      schema_fingerprint:
-                          fieldSchema.schema_fingerprint ?? null,
-                  }),
+            schema_fingerprint: fieldSchema.schema_fingerprint ?? null,
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
