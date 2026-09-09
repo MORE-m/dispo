@@ -42,6 +42,7 @@ Feature-Branch, **kein** Abschluss von DF-3.
 | Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
 | Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
 | Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
+| Review-Härtung: Teilselektion-Dispo, fail-closed Effektiv-Lifecycle, Gen-3-Integrity, Fingerprint-Vertrag, PO-32b-1 Header | umgesetzt |
 | Schema-API mit Medium; Wizard Positions-Fingerprints | umgesetzt |
 | E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
 | Assignment-Admin-UI | **nicht** (DF-3.3b) |

@@ -146,6 +146,7 @@ class CalculationSnapshotBlockerTest extends TestCase
             'client_key' => '550e8400-e29b-41d4-a716-446655440001',
             'inventory_id' => $catalog['rock']->id,
             'advertising_medium_id' => $catalog['medium']->id,
+            'schema_fingerprint' => $this->positionSchemaFingerprintFor($calculation, (int) $catalog['medium']->id),
             'spot_method' => 'average',
             'length_seconds' => 30,
             'total_spot_count' => 2,
@@ -302,6 +303,7 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         $positions = $this->positionsFromCalculation($calculation);
         $positions[0]['advertising_medium_id'] = $mediumB->id;
+        $positions = $this->withPositionSchemaFingerprints($calculation, $positions);
 
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             ...$payload,
@@ -439,6 +441,7 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         $positions = $this->positionsFromCalculation($calculation);
         $positions[0]['advertising_medium_id'] = $mediumB->id;
+        $positions = $this->withPositionSchemaFingerprints($calculation, $positions);
 
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             ...$payload,
@@ -469,6 +472,7 @@ class CalculationSnapshotBlockerTest extends TestCase
 
         $positions = $this->positionsFromCalculation($calculation);
         $positions[0]['advertising_medium_id'] = $mediumB->id;
+        $positions = $this->withPositionSchemaFingerprints($calculation, $positions);
 
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             ...$payload,
@@ -688,7 +692,7 @@ class CalculationSnapshotBlockerTest extends TestCase
     {
         $calculation->load('positions.planRows');
 
-        return $calculation->positions->map(fn ($position): array => [
+        return $this->withPositionSchemaFingerprints($calculation, $calculation->positions->map(fn ($position): array => [
             'id' => $position->id,
             'client_key' => $position->client_key,
             'inventory_id' => $position->inventory_id,
@@ -702,6 +706,6 @@ class CalculationSnapshotBlockerTest extends TestCase
                 'hour' => $row->hour,
                 'day_group' => $row->day_group->value,
             ])->all(),
-        ])->all();
+        ])->all());
     }
 }

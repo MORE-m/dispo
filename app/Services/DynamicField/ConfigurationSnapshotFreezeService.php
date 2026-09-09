@@ -283,9 +283,10 @@ final class ConfigurationSnapshotFreezeService
                     (int) $context['context_advertising_category_id'],
                     (int) $context['context_advertising_medium_id'],
                 );
-                $this->assertFingerprint(
+                $this->assertRequiredFingerprint(
                     isset($position['schema_fingerprint']) ? (string) $position['schema_fingerprint'] : null,
                     $resolved['fingerprint'],
+                    "positions.{$index}.schema_fingerprint",
                 );
 
                 $plans[$key] = ['context' => $context, 'resolved' => $resolved];
@@ -529,16 +530,28 @@ final class ConfigurationSnapshotFreezeService
 
     /**
      * Dispo-Freeze der Generation 3: Dispo-Basis aus dem Dispo-Quellenuniversum
-     * plus Calc-Origin-Header, dazu je Kalkulationsposition ein Dispo-Effektiv-
-     * Snapshot im **historischen** Kontext der Kalkulationsposition.
+     * plus Calc-Origin-Header, dazu **nur für die ausgewählten** Kalkulations-
+     * positionen Dispo-Effektiv-Snapshots im historischen Calc-Kontext.
+     *
+     * @param  list<int>  $selectedCalculationPositionIds
      */
-    public function freezeDispoV3(ConfigurationSnapshot $calculationSnapshot): ConfigurationSnapshot
-    {
+    public function freezeDispoV3(
+        ConfigurationSnapshot $calculationSnapshot,
+        array $selectedCalculationPositionIds,
+    ): ConfigurationSnapshot {
         $this->assertSupportedFormatVersion($calculationSnapshot);
         $this->assertCalculationOriginSnapshot($calculationSnapshot);
         $this->assertGenerationThreeBase($calculationSnapshot);
 
-        return DB::transaction(function () use ($calculationSnapshot): ConfigurationSnapshot {
+        $selectedEffectives = $this->selectedCalculationPositionEffectives(
+            $calculationSnapshot,
+            $selectedCalculationPositionIds,
+        );
+
+        return DB::transaction(function () use (
+            $calculationSnapshot,
+            $selectedEffectives,
+        ): ConfigurationSnapshot {
             $this->locks->lockForProcess(FieldAppliesTo::DispoOrder, globalOnly: false);
 
             $calculationSnapshot->loadMissing(['fieldDefinitions', 'rules', 'fieldSet', 'fieldSetVersion']);
@@ -576,7 +589,7 @@ final class ConfigurationSnapshotFreezeService
                 ],
             ]);
 
-            foreach ($this->calculationPositionEffectives($calculationSnapshot) as $calcEffective) {
+            foreach ($selectedEffectives as $calcEffective) {
                 $resolved = $this->resolvePositionLayer(
                     $universe,
                     (int) $calcEffective->context_advertising_category_id,
@@ -1287,28 +1300,79 @@ final class ConfigurationSnapshotFreezeService
     }
 
     /**
-     * Kalkulations-Effektiv-Snapshots einer Basis, in stabiler Reihenfolge.
+     * Fail-closed Auswahl der Calc-Effektivs für einen Teil-Dispo-Freeze.
      *
+     * @param  list<int>  $selectedCalculationPositionIds
      * @return list<ConfigurationSnapshot>
      */
-    private function calculationPositionEffectives(ConfigurationSnapshot $base): array
-    {
-        /** @var list<ConfigurationSnapshot> $effectives */
-        $effectives = ConfigurationSnapshot::query()
-            ->where('parent_configuration_snapshot_id', $base->id)
-            ->where('source', ConfigurationSnapshotSourceEnum::CalculationPositionEffective->value)
+    private function selectedCalculationPositionEffectives(
+        ConfigurationSnapshot $calculationBase,
+        array $selectedCalculationPositionIds,
+    ): array {
+        $uniqueIds = array_values(array_unique(array_map(
+            static fn (mixed $id): int => (int) $id,
+            $selectedCalculationPositionIds,
+        )));
+
+        if ($uniqueIds === [] || count($uniqueIds) !== count($selectedCalculationPositionIds)) {
+            throw ValidationException::withMessages([
+                'position_ids' => 'Positionsauswahl für den Dispo-Freeze ist leer oder nicht eindeutig.',
+            ]);
+        }
+
+        $positions = CalculationPosition::query()
+            ->whereIn('id', $uniqueIds)
+            ->with(['calculation', 'effectiveConfigurationSnapshot'])
             ->orderBy('id')
             ->get()
-            ->all();
+            ->keyBy('id');
 
-        foreach ($effectives as $effective) {
+        if ($positions->count() !== count($uniqueIds)) {
+            throw ValidationException::withMessages([
+                'position_ids' => 'Eine oder mehrere Kalkulationspositionen existieren nicht.',
+            ]);
+        }
+
+        /** @var list<ConfigurationSnapshot> $effectives */
+        $effectives = [];
+
+        foreach ($uniqueIds as $positionId) {
+            /** @var CalculationPosition $position */
+            $position = $positions->get($positionId);
+            $calculation = $position->calculation;
+            if ($calculation === null
+                || (int) $calculation->configuration_snapshot_id !== (int) $calculationBase->id
+            ) {
+                throw ValidationException::withMessages([
+                    'position_ids' => "Kalkulationsposition {$positionId} gehört nicht zur Quellkalkulation.",
+                ]);
+            }
+
+            $effective = $position->effectiveConfigurationSnapshot;
+            if ($effective === null) {
+                throw new RuntimeException(
+                    "Kalkulationsposition {$positionId} hat keinen lesbaren Effektiv-Snapshot.",
+                );
+            }
+
+            if ((int) $effective->parent_configuration_snapshot_id !== (int) $calculationBase->id) {
+                throw new RuntimeException(
+                    "Effektiv-Snapshot {$effective->id} gehört nicht zur Calc-Basis {$calculationBase->id}.",
+                );
+            }
+
             $effective->assertReadable();
+            $effectives[] = $effective;
         }
 
         return $effectives;
     }
 
-    private function deleteEffectiveIfUnreferenced(ConfigurationSnapshot $effective): void
+    /**
+     * Löscht einen Effektiv-Snapshot nur, wenn keinerlei Restreferenz existiert.
+     * Jede unerwartete Restreferenz ist ein Integritätsfehler (Transaktions-Rollback).
+     */
+    public function deleteEffectiveIfUnreferenced(ConfigurationSnapshot $effective): void
     {
         if (! $effective->isEffectiveSnapshot()) {
             throw new RuntimeException(
@@ -1316,21 +1380,35 @@ final class ConfigurationSnapshotFreezeService
             );
         }
 
-        $referenced = CalculationPosition::query()
+        $calculationRefs = CalculationPosition::query()
             ->where('effective_configuration_snapshot_id', $effective->id)
-            ->exists()
-            || DispoOrderPosition::query()
-                ->where('effective_configuration_snapshot_id', $effective->id)
-                ->exists()
-            || ConfigurationSnapshot::query()
-                ->where('parent_configuration_snapshot_id', $effective->id)
-                ->exists()
-            || ConfigurationSnapshot::query()
-                ->where('source_configuration_snapshot_id', $effective->id)
-                ->exists();
+            ->pluck('id')
+            ->all();
+        $dispoRefs = DispoOrderPosition::query()
+            ->where('effective_configuration_snapshot_id', $effective->id)
+            ->pluck('id')
+            ->all();
+        $childParents = ConfigurationSnapshot::query()
+            ->where('parent_configuration_snapshot_id', $effective->id)
+            ->pluck('id')
+            ->all();
+        $originRefs = ConfigurationSnapshot::query()
+            ->where('source_configuration_snapshot_id', $effective->id)
+            ->pluck('id')
+            ->all();
 
-        if ($referenced) {
-            return;
+        if ($calculationRefs !== []
+            || $dispoRefs !== []
+            || $childParents !== []
+            || $originRefs !== []
+        ) {
+            throw new RuntimeException(
+                "Effektiv-Snapshot {$effective->id} besitzt unerwartete Restreferenzen "
+                .'(calc=['.implode(',', $calculationRefs).'] '
+                .'dispo=['.implode(',', $dispoRefs).'] '
+                .'parent=['.implode(',', $childParents).'] '
+                .'origin=['.implode(',', $originRefs).']).',
+            );
         }
 
         $sourceIds = ConfigurationSnapshotSource::query()
@@ -1508,6 +1586,21 @@ final class ConfigurationSnapshotFreezeService
         }
 
         if (! hash_equals($expected, $actual)) {
+            throw new FieldSetAssignmentConflictException(
+                'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+            );
+        }
+    }
+
+    private function assertRequiredFingerprint(?string $expected, string $actual, string $errorKey): void
+    {
+        if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expected)) {
+            throw ValidationException::withMessages([
+                $errorKey => 'Schema-Fingerprint fehlt oder ist ungültig.',
+            ]);
+        }
+
+        if (! hash_equals((string) $expected, $actual)) {
             throw new FieldSetAssignmentConflictException(
                 'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
             );

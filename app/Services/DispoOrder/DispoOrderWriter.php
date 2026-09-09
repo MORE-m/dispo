@@ -211,7 +211,7 @@ final class DispoOrderWriter
             // Nachbesserung erbt die eingefrorene Konfiguration des Vorgängers.
             $this->dynamicFields->assignClonedSnapshot($order, $revises);
         } else {
-            $this->dynamicFields->assignComposedSnapshot($order, $calculation);
+            $this->dynamicFields->assignComposedSnapshot($order, $calculation, $uniqueIds);
         }
         $order->save();
 

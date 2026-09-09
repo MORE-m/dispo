@@ -81,26 +81,54 @@ final class ConfigurationSnapshotIntegrity
     {
         $calculationOwners = CalculationPosition::query()
             ->where('effective_configuration_snapshot_id', $effective->id)
-            ->count();
+            ->with('calculation')
+            ->get();
         $dispoOwners = DispoOrderPosition::query()
             ->where('effective_configuration_snapshot_id', $effective->id)
-            ->count();
+            ->with('dispoOrder')
+            ->get();
 
-        $owners = $calculationOwners + $dispoOwners;
+        $owners = $calculationOwners->count() + $dispoOwners->count();
         if ($owners !== 1) {
             $this->fail($effective, "Effektiv-Snapshot erwartet genau einen Eigentümer, gefunden {$owners}");
         }
 
-        if ($calculationOwners === 1
-            && $effective->source !== ConfigurationSnapshotSourceEnum::CalculationPositionEffective
-        ) {
-            $this->fail($effective, 'Kalkulationsposition besitzt einen Snapshot fremder Source');
+        if ($calculationOwners->count() === 1) {
+            if ($effective->source !== ConfigurationSnapshotSourceEnum::CalculationPositionEffective) {
+                $this->fail($effective, 'Kalkulationsposition besitzt einen Snapshot fremder Source');
+            }
+
+            $owner = $calculationOwners->first();
+            $calculation = $owner->calculation;
+            if ($calculation === null) {
+                $this->fail($effective, 'Kalkulationsposition ohne zugehörige Kalkulation');
+            }
+
+            if ((int) $calculation->configuration_snapshot_id !== (int) $effective->parent_configuration_snapshot_id) {
+                $this->fail(
+                    $effective,
+                    'Calc-Position gehört nicht zur Kalkulation des Parent-Basissnapshots',
+                );
+            }
         }
 
-        if ($dispoOwners === 1
-            && $effective->source !== ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective
-        ) {
-            $this->fail($effective, 'Dispoposition besitzt einen Snapshot fremder Source');
+        if ($dispoOwners->count() === 1) {
+            if ($effective->source !== ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective) {
+                $this->fail($effective, 'Dispoposition besitzt einen Snapshot fremder Source');
+            }
+
+            $owner = $dispoOwners->first();
+            $order = $owner->dispoOrder;
+            if ($order === null) {
+                $this->fail($effective, 'Dispoposition ohne zugehörigen Dispoauftrag');
+            }
+
+            if ((int) $order->configuration_snapshot_id !== (int) $effective->parent_configuration_snapshot_id) {
+                $this->fail(
+                    $effective,
+                    'Dispo-Position gehört nicht zum Dispoauftrag des Parent-Basissnapshots',
+                );
+            }
         }
 
         $this->assertProcessFamily($effective);
@@ -344,9 +372,16 @@ final class ConfigurationSnapshotIntegrity
         }
 
         foreach (self::CONTEXT_COLUMNS as $column) {
-            if ($snapshot->{$column} === null) {
-                $this->fail($snapshot, "Effektiv-Snapshot ohne eingefrorenen Kontext ({$column})");
+            $value = $snapshot->{$column};
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                $this->fail($snapshot, "Effektiv-Snapshot ohne vollständigen eingefrorenen Kontext ({$column})");
             }
+        }
+
+        if ((int) $snapshot->context_advertising_medium_id < 1
+            || (int) $snapshot->context_advertising_category_id < 1
+        ) {
+            $this->fail($snapshot, 'Effektiv-Snapshot mit ungültigen Kontext-IDs');
         }
 
         if ($snapshot->parent_configuration_snapshot_id === null) {
@@ -365,6 +400,9 @@ final class ConfigurationSnapshotIntegrity
         if ($parent->isEffectiveSnapshot()) {
             $this->fail($snapshot, 'Parent-Snapshot ist selbst ein Effektiv-Snapshot');
         }
+
+        // Parent muss selbst ein vollständig lesbarer Gen-3-Basissnapshot sein.
+        $this->assertReadableInternal($parent);
 
         $this->assertProcessFamily($snapshot);
 
@@ -410,7 +448,7 @@ final class ConfigurationSnapshotIntegrity
 
     /**
      * Eingefrorene Kategorie-/Werbemittelquellen müssen zum eingefrorenen
-     * Positionskontext passen.
+     * Positionskontext passen (ID + Key/Code + Name) – ohne Live-Stammdaten.
      *
      * @param  array<string, list<int>>  $frozenTargetIds
      */
@@ -420,6 +458,10 @@ final class ConfigurationSnapshotIntegrity
     ): void {
         $categoryId = (int) $snapshot->context_advertising_category_id;
         $mediumId = (int) $snapshot->context_advertising_medium_id;
+        $categoryKey = (string) $snapshot->context_advertising_category_key;
+        $categoryName = (string) $snapshot->context_advertising_category_name;
+        $mediumCode = (string) $snapshot->context_advertising_medium_code;
+        $mediumName = (string) $snapshot->context_advertising_medium_name;
 
         foreach ($frozenTargetIds[FieldSetAssignmentMergeResolver::LAYER_ADVERTISING_CATEGORY] as $targetId) {
             if ($targetId !== $categoryId) {
@@ -436,6 +478,38 @@ final class ConfigurationSnapshotIntegrity
                     $snapshot,
                     "Werbemittel-Quelle {$targetId} passt nicht zum eingefrorenen Kontext {$mediumId}",
                 );
+            }
+        }
+
+        $snapshot->loadMissing('sources');
+        foreach ($snapshot->sources as $source) {
+            if ((string) $source->role !== ConfigurationSnapshotSource::ROLE_ASSIGNMENT) {
+                continue;
+            }
+
+            $layer = (string) $source->layer;
+            if ($layer === FieldSetAssignmentMergeResolver::LAYER_ADVERTISING_CATEGORY) {
+                if ((int) $source->target_id !== $categoryId
+                    || (string) $source->target_key !== $categoryKey
+                    || (string) $source->target_name !== $categoryName
+                ) {
+                    $this->fail(
+                        $snapshot,
+                        "Kategorie-Quelle {$source->id} weicht vom eingefrorenen Kontext (ID/Key/Name) ab",
+                    );
+                }
+            }
+
+            if ($layer === FieldSetAssignmentMergeResolver::LAYER_ADVERTISING_MEDIUM) {
+                if ((int) $source->target_id !== $mediumId
+                    || (string) $source->target_key !== $mediumCode
+                    || (string) $source->target_name !== $mediumName
+                ) {
+                    $this->fail(
+                        $snapshot,
+                        "Werbemittel-Quelle {$source->id} weicht vom eingefrorenen Kontext (ID/Code/Name) ab",
+                    );
+                }
             }
         }
     }

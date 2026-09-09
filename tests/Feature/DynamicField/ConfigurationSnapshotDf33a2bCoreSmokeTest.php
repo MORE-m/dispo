@@ -108,17 +108,28 @@ class ConfigurationSnapshotDf33a2bCoreSmokeTest extends TestCase
         $otherSchema = $freeze->resolveLivePositionSchema((int) $otherMedium->id);
         $this->assertNotSame($positionSchema['schema_fingerprint'], $otherSchema['schema_fingerprint']);
 
-        // Ownership: erst nach Bindung lesbar.
+        // Ownership: erst nach Bindung lesbar. Die Freeze-Basis wird der
+        // Testkalkulation zugeordnet, damit Parent- und Owner-Familie passen.
         $calculation = $this->createSavedCalculation($catalog, [
             ['inventory_id' => $catalog['hamburg']->id],
             ['inventory_id' => $catalog['rock']->id],
         ]);
+        $calculation->forceFill([
+            'configuration_snapshot_id' => $base->id,
+        ])->save();
         $positions = CalculationPosition::query()
             ->where('calculation_id', $calculation->id)
             ->orderBy('id')
             ->get();
         $position = $positions->first();
         $secondPosition = $positions->last();
+
+        // Bestehende Gen-3-Effektivs der createSavedCalculation-Anlage lösen,
+        // damit die Unique-Bindung an die Freeze-Effektivs greifen kann.
+        foreach ($positions as $owned) {
+            $owned->effective_configuration_snapshot_id = null;
+            $owned->save();
+        }
 
         $position->effective_configuration_snapshot_id = $effective->id;
         $position->save();
@@ -196,16 +207,16 @@ class ConfigurationSnapshotDf33a2bCoreSmokeTest extends TestCase
             'Wert folgt der neuen Definition',
         );
 
-        // Dispo-Freeze der Generation 3.
-        $position->refresh();
-        $dispoBase = $freeze->freezeDispoV3($base);
+        // Dispo-Freeze der Generation 3 – nur für gebundene Calc-Positionen.
+        $positionIds = $positions->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $dispoBase = $freeze->freezeDispoV3($base, $positionIds);
         $this->assertSame(ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE, (int) $dispoBase->format_version);
         $this->assertSame((int) $base->id, (int) $dispoBase->source_configuration_snapshot_id);
 
         $dispoEffectives = ConfigurationSnapshot::query()
             ->where('parent_configuration_snapshot_id', $dispoBase->id)
             ->get();
-        $this->assertCount(2, $dispoEffectives, 'Je Kalkulations-Effektiv ein Dispo-Effektiv');
+        $this->assertCount(2, $dispoEffectives, 'Je ausgewählter Kalkulationsposition ein Dispo-Effektiv');
 
         foreach ($dispoEffectives as $dispoEffective) {
             $this->assertNotNull($dispoEffective->context_advertising_medium_id);

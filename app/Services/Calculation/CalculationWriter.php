@@ -187,7 +187,7 @@ final class CalculationWriter
                 );
             }
 
-            $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false);
+            $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false, derivePositionFingerprints: true);
             $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
             $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Applied;
             $lockedCalculation->save();
@@ -214,6 +214,7 @@ final class CalculationWriter
         User $user,
         bool $isCreate,
         array $positionEffectives = [],
+        bool $derivePositionFingerprints = false,
     ): void {
         $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
         $existingById = $calculation->positions->keyBy('id');
@@ -298,6 +299,7 @@ final class CalculationWriter
                     $frozenEffective,
                     $payloadPosition,
                     $previousMediumId,
+                    $derivePositionFingerprints,
                 );
             }
 
@@ -386,6 +388,7 @@ final class CalculationWriter
         ?ConfigurationSnapshot $frozen,
         array $payloadPosition,
         ?int $previousMediumId,
+        bool $derivePositionFingerprints = false,
     ): void {
         $mediumId = (int) $position->advertising_medium_id;
 
@@ -399,7 +402,7 @@ final class CalculationWriter
             $this->attachPositionEffective($position, $this->snapshots->freezePositionEffectiveFromBase(
                 $base,
                 $mediumId,
-                $this->positionFingerprint($base, $mediumId, $payloadPosition),
+                $this->positionFingerprint($base, $mediumId, $payloadPosition, $derivePositionFingerprints),
             ));
 
             return;
@@ -414,7 +417,7 @@ final class CalculationWriter
             $position,
             $base,
             $mediumId,
-            $this->positionFingerprint($base, $mediumId, $payloadPosition),
+            $this->positionFingerprint($base, $mediumId, $payloadPosition, $derivePositionFingerprints),
         );
     }
 
@@ -435,8 +438,8 @@ final class CalculationWriter
     }
 
     /**
-     * Der Client liefert den erwarteten Fingerprint; interne Payloads (Budget-
-     * vorschlag) lösen ihn aus den eingefrorenen Basisquellen auf.
+     * Client-Fingerprint ist bei normalen Create-/Update-Pfaden verbindlich.
+     * Interne Budget-/Re-Optimize-Abläufe dürfen aus der eingefrorenen Basis ableiten.
      *
      * @param  array<string, mixed>  $payloadPosition
      */
@@ -444,6 +447,7 @@ final class CalculationWriter
         ConfigurationSnapshot $base,
         int $mediumId,
         array $payloadPosition,
+        bool $allowDerived = false,
     ): string {
         $expected = $payloadPosition['schema_fingerprint'] ?? null;
 
@@ -451,7 +455,13 @@ final class CalculationWriter
             return (string) $expected;
         }
 
-        return (string) $this->snapshots->resolvePositionSchemaFromBase($base, $mediumId)['schema_fingerprint'];
+        if ($allowDerived) {
+            return (string) $this->snapshots->resolvePositionSchemaFromBase($base, $mediumId)['schema_fingerprint'];
+        }
+
+        throw ValidationException::withMessages([
+            'schema_fingerprint' => 'Schema-Fingerprint fehlt oder ist ungültig.',
+        ]);
     }
 
     /**

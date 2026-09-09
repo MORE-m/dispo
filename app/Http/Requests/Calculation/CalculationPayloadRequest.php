@@ -39,13 +39,25 @@ class CalculationPayloadRequest extends FormRequest
      * DF-3.3a2α: Schema-Drift schlägt beim Anlegen als 409 durch, noch bevor
      * dynamische Feldwerte gegen das Schema geprüft werden (409 vor 422).
      * Formal ungültige Fingerprints bleiben der Regel-Validierung (422) überlassen.
+     *
+     * DF-3.3a2β: dieselbe Reihenfolge gilt auch für Positions-Fingerprints und
+     * für kontextändernde Updates einer Gen-3-Kalkulation.
      */
     protected function prepareForValidation(): void
     {
-        if (! $this->routeIs('calculations.store')) {
+        if ($this->routeIs('calculations.store')) {
+            $this->assertLiveFingerprintDriftOrDefer();
+
             return;
         }
 
+        if ($this->routeIs('calculations.update')) {
+            $this->assertUpdatePositionFingerprintDriftOrDefer();
+        }
+    }
+
+    private function assertLiveFingerprintDriftOrDefer(): void
+    {
         $expected = $this->input('schema_fingerprint');
         if (! ConfigurationSnapshotIntegrity::isValidFingerprint($expected)) {
             return;
@@ -55,6 +67,83 @@ class CalculationPayloadRequest extends FormRequest
             throw new FieldSetAssignmentConflictException(
                 'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
             );
+        }
+
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $fingerprint = $position['schema_fingerprint'] ?? null;
+            if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
+                continue;
+            }
+
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId < 1) {
+                continue;
+            }
+
+            $actual = (string) $freeze->resolveLivePositionSchema($mediumId)['schema_fingerprint'];
+            if (! hash_equals((string) $fingerprint, $actual)) {
+                throw new FieldSetAssignmentConflictException(
+                    'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+                );
+            }
+        }
+    }
+
+    private function assertUpdatePositionFingerprintDriftOrDefer(): void
+    {
+        $calculation = $this->route('calculation');
+        if (! $calculation instanceof Calculation) {
+            return;
+        }
+
+        $calculation->loadMissing(['configurationSnapshot', 'positions']);
+        $base = $calculation->configurationSnapshot;
+        if ($base === null
+            || (int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        ) {
+            return;
+        }
+
+        $existingById = $calculation->positions->keyBy('id');
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
+
+        foreach ($this->input('positions', []) as $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId < 1) {
+                continue;
+            }
+
+            $existingId = isset($position['id']) ? (int) $position['id'] : 0;
+            $existing = $existingId > 0 ? $existingById->get($existingId) : null;
+            $contextChanging = $existing === null
+                || (int) $existing->advertising_medium_id !== $mediumId;
+
+            if (! $contextChanging) {
+                continue;
+            }
+
+            $fingerprint = $position['schema_fingerprint'] ?? null;
+            if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
+                // Formale 422 übernimmt die Regel-Validierung / Writer.
+                continue;
+            }
+
+            $actual = (string) $freeze
+                ->resolvePositionSchemaFromBase($base, $mediumId)['schema_fingerprint'];
+            if (! hash_equals((string) $fingerprint, $actual)) {
+                throw new FieldSetAssignmentConflictException(
+                    'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.',
+                );
+            }
         }
     }
 
@@ -178,9 +267,9 @@ class CalculationPayloadRequest extends FormRequest
 
             $this->validateDynamicPeriods($validator);
             $this->validateDynamicFieldKeys($validator);
-            if (! $this->routeIs('calculations.preview')) {
-                $this->validateRequiredDynamicFields($validator);
-            }
+            // PO-32b-1: leere Custom-Pflichtfelder blockieren Calc Create/Update
+            // nicht allein deshalb; Snapshot-Regeln/Typvalidierung bleiben aktiv.
+            $this->assertRequiredPositionFingerprintsForContextualUpdate($validator);
 
             $isPreview = $this->routeIs('calculations.preview');
             $rangeValidator = new TimeRangeValidator;
@@ -651,27 +740,55 @@ class CalculationPayloadRequest extends FormRequest
         }
     }
 
-    private function validateRequiredDynamicFields(Validator $validator): void
+    /**
+     * Gen-3-Update: neue Position oder Mediumwechsel erfordert einen formal
+     * gültigen Positions-Fingerprint (422, bevor fachliche Feldfehler greifen).
+     */
+    private function assertRequiredPositionFingerprintsForContextualUpdate(Validator $validator): void
     {
-        $schema = $this->resolveDynamicFieldSchema();
-        $header = $this->input('dynamic_field_values', []);
-        if (! is_array($header)) {
-            $header = [];
+        if (! $this->routeIs('calculations.update')) {
+            return;
         }
 
-        foreach ($schema['header'] as $key => $meta) {
-            if (! in_array($meta['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true)) {
-                continue;
-            }
-            if ($meta['required'] !== true || $meta['visible'] !== true) {
+        $calculation = $this->route('calculation');
+        if (! $calculation instanceof Calculation) {
+            return;
+        }
+
+        $calculation->loadMissing(['configurationSnapshot', 'positions']);
+        $base = $calculation->configurationSnapshot;
+        if ($base === null
+            || (int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        ) {
+            return;
+        }
+
+        $existingById = $calculation->positions->keyBy('id');
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
                 continue;
             }
 
-            $raw = $header[$key] ?? null;
-            if ($raw === null || $raw === '') {
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId < 1) {
+                continue;
+            }
+
+            $existingId = isset($position['id']) ? (int) $position['id'] : 0;
+            $existing = $existingId > 0 ? $existingById->get($existingId) : null;
+            $contextChanging = $existing === null
+                || (int) $existing->advertising_medium_id !== $mediumId;
+
+            if (! $contextChanging) {
+                continue;
+            }
+
+            $fingerprint = $position['schema_fingerprint'] ?? null;
+            if (! ConfigurationSnapshotIntegrity::isValidFingerprint($fingerprint)) {
                 $validator->errors()->add(
-                    "dynamic_field_values.{$key}",
-                    $meta['label'].' ist erforderlich.',
+                    "positions.{$index}.schema_fingerprint",
+                    'Schema-Fingerprint fehlt oder ist ungültig.',
                 );
             }
         }

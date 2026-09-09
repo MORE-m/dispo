@@ -23,8 +23,14 @@ trait CreatesMinimalDispoConfigurationSnapshot
         }
 
         if ((int) $calcSnapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            $calculation->loadMissing('positions');
+            $positionIds = $calculation->positions
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->values()
+                ->all();
             $snapshot = app(ConfigurationSnapshotFreezeService::class)
-                ->freezeDispoV3($calcSnapshot);
+                ->freezeDispoV3($calcSnapshot, $positionIds);
 
             return (int) $snapshot->id;
         }

@@ -213,9 +213,8 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
 
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
-        $payload = [
+        $payload = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -234,7 +233,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
                 'ae_percent' => '15',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ];
+        ]);
 
         $calculation = app(CalculationWriter::class)->create($payload, $user);
         $snapDef = SnapshotFieldDefinition::query()
@@ -464,18 +463,14 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
                     $optional->key => '',
                 ],
             ])
-            ->assertSessionHasErrors("dynamic_field_values.{$required->key}")
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors("dynamic_field_values.{$required->key}")
             ->assertSessionDoesntHaveErrors("dynamic_field_values.{$invisibleRequired->key}")
             ->assertSessionDoesntHaveErrors("dynamic_field_values.{$optional->key}");
 
-        $this->actingAs($sales)
-            ->post(route('calculations.store'), [
-                ...$base,
-                'dynamic_field_values' => [
-                    $required->key => 'OK',
-                ],
-            ])
-            ->assertRedirect();
+        $this->assertDatabaseHas('calculations', [
+            'customer_name' => 'Kunde',
+        ]);
     }
 
     public function test_dispo_partial_saves_do_not_null_other_area_or_calc_origin(): void
@@ -615,9 +610,8 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
 
-        return app(CalculationWriter::class)->create([
+        return app(CalculationWriter::class)->create($this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Testkunde GmbH',
             'agency_name' => 'Testagentur',
             'campaign' => 'Frühjahr 2026',
@@ -637,7 +631,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
                 'ae_percent' => '15',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ], $user);
+        ]), $user);
     }
 
     private function createAndActivateOnSets(

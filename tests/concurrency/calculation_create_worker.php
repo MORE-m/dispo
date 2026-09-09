@@ -50,8 +50,9 @@ while (count(glob($runDir.'/worker-*.ready')) < 2) {
 try {
     $user = User::query()->where('role', Role::Sales->value)->firstOrFail();
     $writer = $app->make(CalculationWriter::class);
-    $fingerprint = $app->make(ConfigurationSnapshotFreezeService::class)
-        ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
+    $freeze = $app->make(ConfigurationSnapshotFreezeService::class);
+    $fingerprint = $freeze->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
+    $positionFingerprint = $freeze->resolveLivePositionSchema($mediumId)['schema_fingerprint'];
 
     $calculation = $writer->create([
         'planning_mode' => 'manual',
@@ -60,6 +61,7 @@ try {
         'positions' => [[
             'inventory_id' => $hamburgId,
             'advertising_medium_id' => $mediumId,
+            'schema_fingerprint' => $positionFingerprint,
             'spot_method' => 'average',
             'length_seconds' => 30,
             'total_spot_count' => 1,

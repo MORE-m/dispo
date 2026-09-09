@@ -366,6 +366,262 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
             );
     }
 
+    public function test_partial_dispo_selection_creates_only_one_effective(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+            ['inventory_id' => $catalog['rock']->id],
+        ], $user);
+        $positions = $calculation->positions()->orderBy('id')->get();
+        $this->assertCount(2, $positions);
+
+        $selectedId = (int) $positions[0]->id;
+        $skippedId = (int) $positions[1]->id;
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, [$selectedId], $user)
+            ->order;
+
+        $dispoEffectives = ConfigurationSnapshot::query()
+            ->where('parent_configuration_snapshot_id', $order->configuration_snapshot_id)
+            ->where('source', ConfigurationSnapshotSource::DispoOrderPositionEffective->value)
+            ->get();
+        $this->assertCount(1, $dispoEffectives);
+
+        $bound = $order->positions()->firstOrFail();
+        $this->assertSame($selectedId, (int) $bound->calculation_position_id);
+        $this->assertSame(
+            (int) $dispoEffectives->first()->id,
+            (int) $bound->effective_configuration_snapshot_id,
+        );
+        $dispoEffectives->first()->assertReadable();
+
+        $this->assertNull(
+            ConfigurationSnapshot::query()
+                ->where('parent_configuration_snapshot_id', $order->configuration_snapshot_id)
+                ->where('source_configuration_snapshot_id', $positions[1]->effective_configuration_snapshot_id)
+                ->first(),
+            'Nicht ausgewählte Calc-Position darf kein Dispo-Effektiv erzeugen',
+        );
+        $this->assertSame($skippedId, (int) $positions[1]->id);
+    }
+
+    public function test_delete_effective_fails_closed_on_unexpected_position_reference(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $position = $calculation->positions()->firstOrFail();
+        $effective = ConfigurationSnapshot::query()
+            ->findOrFail($position->effective_configuration_snapshot_id);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('unerwartete Restreferenzen');
+        app(ConfigurationSnapshotFreezeService::class)
+            ->deleteEffectiveIfUnreferenced($effective);
+    }
+
+    public function test_effective_rejects_empty_context_string_and_mismatched_source_name(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $position = $calculation->positions()->firstOrFail();
+        $effective = ConfigurationSnapshot::query()
+            ->findOrFail($position->effective_configuration_snapshot_id);
+
+        $effective->forceFill([
+            'context_advertising_medium_name' => '',
+        ])->save();
+
+        try {
+            $effective->fresh()->assertReadable();
+            $this->fail('Leerer Kontextname muss fail-closed sein.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('vollständigen eingefrorenen Kontext', $exception->getMessage());
+        }
+
+        $effective->forceFill([
+            'context_advertising_medium_name' => 'Histor Name',
+        ])->save();
+
+        $mediumSource = $effective->sources()
+            ->where('layer', 'advertising_medium')
+            ->first();
+        if ($mediumSource !== null) {
+            $mediumSource->forceFill(['target_name' => 'Abweichender Name'])->save();
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('weicht vom eingefrorenen Kontext');
+            $effective->fresh()->assertReadable();
+        } else {
+            $this->assertTrue(true);
+        }
+    }
+
+    public function test_stale_position_fingerprint_returns_409_before_field_422(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Fingerprint Drift',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => ['campaign_period' => null],
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 10,
+                'position_discount_percent' => '0',
+                'ae_percent' => '15',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                'dynamic_field_values' => [
+                    'period_open' => true,
+                    'position_flight_period' => null,
+                    'unknown_custom_field' => 'x',
+                ],
+            ]],
+        ]);
+        $payload['positions'][0]['schema_fingerprint'] = str_repeat('a', 64);
+
+        $this->actingAs($user)
+            ->postJson(route('calculations.store'), $payload)
+            ->assertStatus(409)
+            ->assertJsonFragment(['message' => 'Die Feldkonfiguration hat sich geändert. Bitte neu laden und erneut speichern.']);
+    }
+
+    public function test_missing_position_fingerprint_on_create_returns_422(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Missing FP',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 10,
+                'position_discount_percent' => '0',
+                'ae_percent' => '15',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+            ]],
+        ]);
+        unset($payload['positions'][0]['schema_fingerprint']);
+
+        $this->actingAs($user)
+            ->postJson(route('calculations.store'), $payload)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['positions.0.schema_fingerprint']);
+    }
+
+    public function test_empty_required_custom_header_does_not_block_calc_but_blocks_dispo(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = app(FieldDefinitionCustomWriter::class)->create([
+            'label' => 'Pflicht Kopf β',
+            'field_type' => FieldType::ShortText,
+            'scope' => FieldScope::Header,
+            'applies_to' => FieldAppliesTo::Both,
+            'max_length' => 80,
+        ], $admin);
+
+        $fieldSet = FieldSet::query()->where('key', 'system_calculation_core')->firstOrFail();
+        $draft = app(FieldSetVersionAdminWriter::class)
+            ->createDraftFromVersion(
+                $fieldSet,
+                FieldSetVersion::query()->whereKey($fieldSet->active_version_id)->firstOrFail(),
+                $admin,
+                $fieldSet->lock_version,
+            );
+        $fieldSet->refresh();
+        app(FieldSetVersionAdminWriter::class)->addCustomMembership(
+            $fieldSet,
+            $draft,
+            [
+                'field_definition_id' => $definition->id,
+                'field_definition_revision_id' => (int) $definition->current_revision_id,
+                'sort' => 90,
+                'required_override' => true,
+                'visible_override' => true,
+                'lock_version' => $fieldSet->lock_version,
+            ],
+            $admin,
+        );
+        $fieldSet->refresh();
+        app(FieldSetVersionAdminWriter::class)->activateDraft(
+            $fieldSet,
+            $draft,
+            $admin,
+            $fieldSet->lock_version,
+        );
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'PO-32b-1 Header',
+            'campaign' => 'C',
+            'product_title' => 'P',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => [
+                'campaign_period' => null,
+                $definition->key => null,
+            ],
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 10,
+                'position_discount_percent' => '0',
+                'ae_percent' => '15',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                'dynamic_field_values' => [
+                    'period_open' => true,
+                    'position_flight_period' => null,
+                ],
+            ]],
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('calculations.store'), $payload)
+            ->assertRedirect();
+
+        $calculation = Calculation::query()
+            ->where('customer_name', 'PO-32b-1 Header')
+            ->latest('id')
+            ->firstOrFail();
+
+        try {
+            app(DispoOrderWriter::class)->createFromCalculation(
+                $calculation,
+                $calculation->positions()->pluck('id')->all(),
+                $user,
+            );
+            $this->fail('Dispo-Create muss leeres Header-Pflichtfeld blockieren.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey(
+                'dynamic_field_values.'.$definition->key,
+                $exception->errors(),
+            );
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $target
      */

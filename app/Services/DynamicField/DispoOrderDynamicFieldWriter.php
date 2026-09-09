@@ -2,6 +2,7 @@
 
 namespace App\Services\DynamicField;
 
+use App\Enums\ConfigurationSnapshotSource as ConfigurationSnapshotSourceEnum;
 use App\Enums\DispoOrderStatus;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
@@ -41,9 +42,14 @@ final class DispoOrderDynamicFieldWriter
     /**
      * Freeze der Dispo-Konfiguration; setzt configuration_snapshot_id vor dem
      * ersten Save.
+     *
+     * @param  list<int>  $selectedCalculationPositionIds
      */
-    public function assignComposedSnapshot(DispoOrder $order, Calculation $calculation): void
-    {
+    public function assignComposedSnapshot(
+        DispoOrder $order,
+        Calculation $calculation,
+        array $selectedCalculationPositionIds,
+    ): void {
         $calculation->loadMissing([
             'configurationSnapshot.fieldDefinitions',
             'configurationSnapshot.rules',
@@ -65,9 +71,9 @@ final class DispoOrderDynamicFieldWriter
         }
 
         // DF-3.3a2β: Kalkulationen der Generation 3 frieren Dispo-Basis plus
-        // positionsscharfe Effektiv-Snapshots ein.
+        // Effektiv-Snapshots nur für die ausgewählten Positionen ein.
         $snapshot = $this->isContextualFreeze($calcSnapshot)
-            ? $this->freeze->freezeDispoV3($calcSnapshot)
+            ? $this->freeze->freezeDispoV3($calcSnapshot, $selectedCalculationPositionIds)
             : $this->freeze->freezeDispoV2($calcSnapshot);
 
         $order->forceFill([
@@ -124,6 +130,19 @@ final class DispoOrderDynamicFieldWriter
             $position->setRelation('effectiveConfigurationSnapshot', $effective);
 
             $this->integrity->assertOwnership($effective);
+        }
+
+        if ($predecessor === null) {
+            $createdEffectives = ConfigurationSnapshot::query()
+                ->where('parent_configuration_snapshot_id', $base->id)
+                ->where('source', ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective->value)
+                ->count();
+            if ($createdEffectives !== $order->positions->count()) {
+                throw new RuntimeException(
+                    "Dispo-Freeze erzeugte {$createdEffectives} Effektiv-Snapshots, "
+                    ."aber {$order->positions->count()} Positionen wurden gebunden.",
+                );
+            }
         }
     }
 
@@ -1179,6 +1198,23 @@ final class DispoOrderDynamicFieldWriter
         $calcPositions = $calculation->positions->keyBy('id');
 
         $errors = [];
+
+        // PO-32b-1: sichtbare Custom-Header-Pflichtfelder der Calc blockieren Dispo-Create.
+        $headerValues = $this->calculationFields->headerValuesForPayload($calculation);
+        foreach ($calcSnapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if (! $def->required || ! $def->visible) {
+                continue;
+            }
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+
+            $raw = $headerValues[$def->key] ?? null;
+            if ($raw === null || $raw === '') {
+                $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
+            }
+        }
+
         foreach ($selectedCalculationPositionIds as $index => $calcPositionId) {
             $calcPosition = $calcPositions->get($calcPositionId);
             if ($calcPosition === null) {
