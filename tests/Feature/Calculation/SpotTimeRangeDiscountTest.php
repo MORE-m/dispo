@@ -242,10 +242,9 @@ class SpotTimeRangeDiscountTest extends TestCase
      */
     private function legacyPayload(array $catalog, array $spots): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => array_map(fn (array $spot): array => [
                 'inventory_id' => $spot['inventory_id'],
                 'advertising_medium_id' => $catalog['medium']->id,
@@ -256,7 +255,7 @@ class SpotTimeRangeDiscountTest extends TestCase
                 'ae_percent' => '0',
                 'plan_rows' => [['hour' => $spot['hour'], 'day_group' => 'mo_fr']],
             ], $spots),
-        ];
+        ]);
     }
 
     /**
@@ -266,11 +265,10 @@ class SpotTimeRangeDiscountTest extends TestCase
      */
     private function rangePayload(array $catalog, array $ranges, int $length = 30): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => [[
                 'inventory_id' => $catalog['hamburg']->id,
                 'advertising_medium_id' => $catalog['medium']->id,
@@ -285,6 +283,6 @@ class SpotTimeRangeDiscountTest extends TestCase
                     'spot_count' => $range['spots'],
                 ], $ranges),
             ]],
-        ];
+        ]);
     }
 }

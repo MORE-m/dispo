@@ -599,7 +599,7 @@ class CalculationSnapshotBlockerTest extends TestCase
      */
     private function payload(array $catalog, array $hours, int $totalSpots, int $length, ?int $inventoryId = null): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $this->liveSchemaFingerprint(),
@@ -616,7 +616,7 @@ class CalculationSnapshotBlockerTest extends TestCase
                     $hours,
                 ),
             ]],
-        ];
+        ]);
     }
 
     /**
@@ -625,10 +625,9 @@ class CalculationSnapshotBlockerTest extends TestCase
      */
     private function twoPositionPayload(array $catalog): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'positions' => [
                 [
                     'inventory_id' => $catalog['hamburg']->id,
@@ -651,7 +650,7 @@ class CalculationSnapshotBlockerTest extends TestCase
                     'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
                 ],
             ],
-        ];
+        ]);
     }
 
     /**

@@ -8,7 +8,9 @@ use App\Enums\FieldType;
 use App\Enums\PlanningMode;
 use App\Enums\Role;
 use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\CalculationPositionFieldValue;
+use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
 use App\Models\FieldDefinition;
 use App\Models\FieldSet;
@@ -21,6 +23,7 @@ use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldDefinitionCustomWriter;
 use App\Services\DynamicField\Admin\FieldSetVersionAdminWriter;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -84,15 +87,12 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         $idA = (int) $positions[0]->id;
         $idB = (int) $positions[1]->id;
 
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
+        $valueFor = function ($position) use ($definition): ?string {
+            $def = $this->positionSnapDef($position, $definition->key);
 
-        $valueFor = function ($position) use ($snapDef): ?string {
             return CalculationPositionFieldValue::query()
                 ->where('calculation_position_id', $position->id)
-                ->where('snapshot_field_definition_id', $snapDef->id)
+                ->where('snapshot_field_definition_id', $def->id)
                 ->value('value_string');
         };
 
@@ -167,14 +167,10 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 
         $fresh = $writer->update($calculation, $payload, $user);
         $reordered = $fresh->positions()->orderBy('sort')->get();
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $fresh->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
 
         $valueFor = fn ($position): ?string => CalculationPositionFieldValue::query()
             ->where('calculation_position_id', $position->id)
-            ->where('snapshot_field_definition_id', $snapDef->id)
+            ->where('snapshot_field_definition_id', $this->positionSnapDef($position, $definition->key)->id)
             ->value('value_string');
 
         $this->assertSame($payload['positions'][0]['client_key'], $reordered[0]->client_key);
@@ -434,12 +430,10 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             ->createFromCalculation($filled, $filled->positions()->pluck('id')->all(), $user)
             ->order;
 
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $order->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
+        $dispoPosition = $order->positions()->firstOrFail();
+        $snapDef = $this->dispoPositionSnapDef($dispoPosition, $definition->key);
         $row = DispoOrderPositionFieldValue::query()
-            ->where('dispo_order_position_id', $order->positions()->firstOrFail()->id)
+            ->where('dispo_order_position_id', $dispoPosition->id)
             ->where('snapshot_field_definition_id', $snapDef->id)
             ->firstOrFail();
         $this->assertSame('Erfüllt', $row->value_string);
@@ -463,13 +457,11 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
             ->order;
 
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $order->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
+        $dispoPosition = $order->positions()->firstOrFail();
+        $snapDef = $this->dispoPositionSnapDef($dispoPosition, $definition->key);
 
         $row = DispoOrderPositionFieldValue::query()
-            ->where('dispo_order_position_id', $order->positions()->firstOrFail()->id)
+            ->where('dispo_order_position_id', $dispoPosition->id)
             ->where('snapshot_field_definition_id', $snapDef->id)
             ->firstOrFail();
         $this->assertNull($row->value_string);
@@ -567,10 +559,8 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             ->assertRedirect();
 
         $order->refresh();
-        $nativeSnap = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $order->configuration_snapshot_id)
-            ->where('key', $native->key)
-            ->firstOrFail();
+        $dispoPosition = $order->positions()->firstOrFail();
+        $nativeSnap = $this->dispoPositionSnapDef($dispoPosition, $native->key);
         $this->assertSame(
             1,
             DispoOrderPositionFieldValue::query()
@@ -630,7 +620,8 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         }
 
         $positionId = (int) $order->positions()->firstOrFail()->id;
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
+            ->from(route('dispo-orders.show', $order))
             ->patch(route('dispo-orders.update-position-customs', $order), [
                 'lock_version' => $order->lock_version,
                 'position_dynamic_field_values' => [
@@ -638,8 +629,8 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
                         $definition->key => 'Bereit',
                     ],
                 ],
-            ])
-            ->assertRedirect();
+            ]);
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         $order->refresh();
         app(DispoOrderDynamicFieldWriter::class)->assertReadyForSubmit($order);
@@ -705,10 +696,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             $creator,
         )->order;
 
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $second->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
+        $snapDef = $this->dispoPositionSnapDef($second->positions()->firstOrFail(), $definition->key);
         $secondPositionId = (int) $second->positions()->firstOrFail()->id;
         $this->assertSame(
             'Alt Pos Native',
@@ -762,10 +750,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             ],
         ], $user);
 
-        $snapDef = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
-            ->where('key', $definition->key)
-            ->firstOrFail();
+        $snapDef = $this->positionSnapDef($calculation->positions()->firstOrFail(), $definition->key);
 
         $stored = CalculationPositionFieldValue::query()
             ->where('calculation_position_id', $calculation->positions()->firstOrFail()->id)
@@ -786,10 +771,13 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         array $dynamic,
         ?int $id = null,
     ): array {
+        $mediumId = (int) $catalog['medium']->id;
         $payload = [
             'client_key' => $clientKey,
             'inventory_id' => $inventoryId,
-            'advertising_medium_id' => $catalog['medium']->id,
+            'advertising_medium_id' => $mediumId,
+            'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
+                ->resolveLivePositionSchema($mediumId)['schema_fingerprint'],
             'spot_method' => 'average',
             'length_seconds' => 30,
             'total_spot_count' => 10,
@@ -805,6 +793,25 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         }
 
         return $payload;
+    }
+
+    /**
+     * Gen3: Positionsfelder liegen am Effektiv-Snapshot der Position.
+     */
+    private function positionSnapDef(CalculationPosition $position, string $key): SnapshotFieldDefinition
+    {
+        return SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $position->effective_configuration_snapshot_id)
+            ->where('key', $key)
+            ->firstOrFail();
+    }
+
+    private function dispoPositionSnapDef(DispoOrderPosition $position, string $key): SnapshotFieldDefinition
+    {
+        return SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $position->effective_configuration_snapshot_id)
+            ->where('key', $key)
+            ->firstOrFail();
     }
 
     private function savedCalculation(): Calculation

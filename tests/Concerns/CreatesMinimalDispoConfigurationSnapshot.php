@@ -3,7 +3,9 @@
 namespace Tests\Concerns;
 
 use App\Models\Calculation;
+use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 
 trait CreatesMinimalDispoConfigurationSnapshot
@@ -18,6 +20,13 @@ trait CreatesMinimalDispoConfigurationSnapshot
         $calcSnapshot = $calculation->configurationSnapshot;
         if ($calcSnapshot === null) {
             throw new \RuntimeException('Test-Kalkulation ohne configuration_snapshot_id.');
+        }
+
+        if ((int) $calcSnapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            $snapshot = app(ConfigurationSnapshotFreezeService::class)
+                ->freezeDispoV3($calcSnapshot);
+
+            return (int) $snapshot->id;
         }
 
         $snapshot = app(DispoConfigurationSnapshotComposer::class)->composeFromCalculationSnapshot(

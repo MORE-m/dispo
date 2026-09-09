@@ -199,11 +199,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime + DF-3.3a2β Kat/Medium + VER-003)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
 - **Geplante Folge:** ADV-001a → DF-3.3-fs → DF-3.3a1 (Assignments/Resolver/Preview)
-  → **DF-3.3a2α** (VER-002-Freeze + globale Runtime) → `DF-3.3a2β` (Kat/Medium +
+  → DF-3.3a2α (VER-002-Freeze + globale Runtime) → **DF-3.3a2β** (Kat/Medium +
   VER-003) → `DF-3.3b` (Admin-UI)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
@@ -221,13 +221,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Wirkung (`DYN-002`/`DYN-003` Teil).
 - **DF-3.3a1 erledigt (`main`):** `field_set_assignments`, deterministischer
   Resolver, Kontext-Preview/Activate-Fingerprint; noch **keine** Runtime-Wirkung.
-- **DF-3.3a2α erledigt (Feature-Branch `feat/df3-3a2a-global-snapshot-freeze`):**
+- **DF-3.3a2α erledigt (`main`, PR #24 / `8edcbd7`):**
   aktive **globale** Assignments wirken produktiv auf Kalkulation und Dispoauftrag
-  (Kopf- und Positionsfelder). Kategorie- und Werbemittelebene bleiben ohne
-  Runtime-Wirkung. **DF-3 nicht abgeschlossen.**
-- **Offen:** Kat/Medium-Runtime + VER-003 (`DF-3.3a2β`, **nicht begonnen**),
-  Assignment-UI (`DF-3.3b`, **nicht begonnen**), Optionen, volle Regelmatrix,
-  Regel-Editor.
+  (Kopf- und Positionsfelder).
+- **DF-3.3a2β in Arbeit (Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze`):**
+  Generation 3, Kategorie-/Werbemittel-Runtime, VER-003 Positions-Effektivs,
+  historischer Kontext, Unique-Ownership. **DF-3 nicht abgeschlossen.**
+- **Offen:** Assignment-UI (`DF-3.3b`, **nicht begonnen**), Optionen, volle
+  Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 

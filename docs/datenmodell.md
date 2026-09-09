@@ -283,12 +283,12 @@ vorhandenen Werte.
 - FKs `restrictOnDelete`; kein physisches Löschen von Assignments.
 - Deterministischer Resolver + Kontext-Preview-API; Activate mit Fingerprint/409.
 - In DF-3.3a1 **noch keine** produktive Runtime-Wirkung; die globale Ebene wirkt
-  ab `DF-3.3a2α`, Kategorie/Werbemittel und die Assignment-UI folgen in
-  `DF-3.3a2β` / `DF-3.3b`.
+  ab `DF-3.3a2α`, Kategorie/Werbemittel und VER-003 ab `DF-3.3a2β`, die
+  Assignment-UI folgt in `DF-3.3b`.
 
-### DF-3.3a2α – Snapshot-Generation 2, Quellengraph und Provenance (Feature-Branch)
+### DF-3.3a2α – Snapshot-Generation 2, Quellengraph und Provenance (`main`)
 
-Feature-Branch `feat/df3-3a2a-global-snapshot-freeze` (`VER-002`).
+PR #24 / `8edcbd7` (`VER-002`).
 
 **Generationen (`configuration_snapshots.format_version`, NOT NULL ohne DEFAULT):**
 
@@ -296,15 +296,16 @@ Feature-Branch `feat/df3-3a2a-global-snapshot-freeze` (`VER-002`).
 |---|---|---|
 | 1 | `FORMAT_VERSION_LEGACY` – Altbestand/Legacy-Backfill | nur Kern-Feldset, kein Quellengraph |
 | 2 | `FORMAT_VERSION_GLOBAL_FREEZE` – Core + globale Assignments | Quellengraph + Property-Provenance vollständig |
+| 3 | `FORMAT_VERSION_CONTEXTUAL_FREEZE` – siehe DF-3.3a2β | Basis Header + Effektiv Position inkl. Kat/Medium |
 
 Bestandszeilen werden per Backfill auf `1` gesetzt; die Migration bricht ab, wenn
 danach noch `NULL` übrig ist. Neue Inserts müssen die Generation explizit setzen
 (MySQL `NOT NULL` ohne DEFAULT). Lesepfade sind fail-closed: eine unbekannte
 `format_version` wird abgewiesen statt still auf einen Default zu fallen.
-Generation 1 wird **nicht** nachträglich migriert; Updates behalten Snapshot und
+Generation 1/2 wird **nicht** nachträglich migriert; Updates behalten Snapshot und
 Generation.
 
-**Neue Tabellen und Spalten:**
+**Neue Tabellen und Spalten (α):**
 
 | Tabelle / Spalte | Rolle |
 |---|---|
@@ -313,22 +314,32 @@ Generation.
 | `configuration_snapshot_sources` | Quellengraph: `merge_order`, `layer`, `role` (`core`/`assignment`/`additional`), eingefrorene Feldset-/Versions-/Assignment-Metadaten, `target_layer`/`target_identity` |
 | `configuration_snapshot_source_fields` | je Quelle eingefrorene Membership inkl. `required_override`/`visible_override`/`validation_json` |
 | `configuration_snapshot_source_rules` | je Quelle eingefrorene Regeln inkl. `dedupe_key` |
-| `snapshot_field_definitions.provenance_*_source_id` | Property-Provenance: welche Quelle Definition, Revision, Required, Visible, Sort und Group gewonnen hat |
+| `snapshot_field_definitions.provenance_*_source_id` | Property-Provenance |
 | `snapshot_field_rules.provenance_source_id` / `dedupe_key` | Herkunft und Deduplizierung kopierter Regeln |
 
-- `configuration_snapshot_sources` ist unique über `(configuration_snapshot_id, merge_order)`
-  und zusätzlich über `(configuration_snapshot_id, id)`. Alle Provenance-FKs sind
-  **zusammengesetzt** (`configuration_snapshot_id` + Quell-ID) – dadurch kann eine
-  Provenance-Spalte technisch nicht auf eine Quelle eines fremden Snapshots zeigen.
-- Quellen kaskadieren mit ihrem Snapshot; Feldsets, Versionen und Assignments sind
-  `restrictOnDelete`.
-- Dispo-Freeze ergänzt eine Zusatzquelle mit `target_identity = calc_origin`, die
-  die historischen Kalkulationsdefinitionen importiert; bei Key-Kollision gewinnt
-  Calc-Origin.
 - Dispo-Revision **klont** den Vorgänger-Snapshot (gleiche `format_version`,
   gleicher Fingerprint, gleiche Keys, geklonte Quellen) statt neu aufzulösen.
-- Bewusst **nicht** enthalten: Kategorie-/Werbemittelquellen im Quellengraph und
-  `VER-003` (positionsscharfe Effektiv-Konfiguration) – beides `DF-3.3a2β`.
+
+### DF-3.3a2β – Snapshot-Generation 3, VER-003 Positions-Effektivs (Feature-Branch)
+
+Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze`.
+
+| Tabelle / Spalte | Rolle |
+|---|---|
+| `configuration_snapshots.parent_configuration_snapshot_id` | Effektiv → Basis |
+| `configuration_snapshots.context_advertising_*` | sechs Kontextspalten (IDs + Code/Key/Name), FK `restrictOnDelete` |
+| `calculation_positions.effective_configuration_snapshot_id` | nullable Unique 1:1 |
+| `dispo_order_positions.effective_configuration_snapshot_id` | nullable Unique 1:1 |
+| Positions-Denorm (Medium/Kategorie) | Lesepfad ohne Live-Revalidierung |
+
+- Basis friert Header (Core→global) und das Kat-/Medium-Universum ein; Effektivs
+  mergen Positionsfelder nur aus dem eingefrorenen Basisgraph.
+- Ownership: genau ein Owner in Calc- **oder** Dispo-Positionstabelle; Source passt
+  zur Owner-Tabelle; Cross-Table fail-closed.
+- Calc→Dispo Gen3 übernimmt den historischen Calc-Effektiv-Kontext (keine
+  Live-Ableitung Medium→Kategorie).
+- Remap nur per `field_definition_id`; PO-32b-1 (leeres Custom-Pflichtfeld blockiert
+  Dispo-Create, nicht Calc).
 
 ### Spätere Ausbaustufen
 
@@ -336,14 +347,11 @@ Konzeptuell vorgesehen, aber **nicht implementiert**:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
-- Runtime-Wirkung der Assignments an Oberkategorien/Werbemittel (`DF-3.3a2β`);
-  die Zuweisungen selbst existieren seit DF-3.3a1,
-- `VER-003` positionsscharfer Effektiv-Snapshot (`DF-3.3a2β`),
 - Assignment-Admin-UI (`DF-3.3b`),
 - Regel-Editor / volle Regelmatrix.
 
 Die Runtime-Auswertung freier Feldsets ist seit `DF-3.3a2α` für die **globale**
-Ebene umgesetzt.
+Ebene und seit `DF-3.3a2β` für Kategorie/Werbemittel inkl. VER-003 umgesetzt.
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.

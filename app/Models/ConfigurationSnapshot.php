@@ -14,8 +14,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $field_set_version_id
  * @property ConfigurationSnapshotSourceEnum $source
  * @property int|null $source_configuration_snapshot_id
+ * @property int|null $parent_configuration_snapshot_id
  * @property int $format_version
  * @property string|null $schema_fingerprint
+ * @property int|null $context_advertising_medium_id
+ * @property string|null $context_advertising_medium_code
+ * @property string|null $context_advertising_medium_name
+ * @property int|null $context_advertising_category_id
+ * @property string|null $context_advertising_category_key
+ * @property string|null $context_advertising_category_name
  */
 class ConfigurationSnapshot extends Model
 {
@@ -25,10 +32,14 @@ class ConfigurationSnapshot extends Model
     /** Generation 2: Core + globale Assignments inkl. Quellengraph. */
     public const FORMAT_VERSION_GLOBAL_FREEZE = 2;
 
+    /** Generation 3: Core + global + Kat/Medium; Basis oder Positions-Effektiv. */
+    public const FORMAT_VERSION_CONTEXTUAL_FREEZE = 3;
+
     /** @var list<int> */
     public const SUPPORTED_FORMAT_VERSIONS = [
         self::FORMAT_VERSION_LEGACY,
         self::FORMAT_VERSION_GLOBAL_FREEZE,
+        self::FORMAT_VERSION_CONTEXTUAL_FREEZE,
     ];
 
     public $timestamps = false;
@@ -38,8 +49,15 @@ class ConfigurationSnapshot extends Model
         'field_set_version_id',
         'source',
         'source_configuration_snapshot_id',
+        'parent_configuration_snapshot_id',
         'format_version',
         'schema_fingerprint',
+        'context_advertising_medium_id',
+        'context_advertising_medium_code',
+        'context_advertising_medium_name',
+        'context_advertising_category_id',
+        'context_advertising_category_key',
+        'context_advertising_category_name',
         'created_at',
     ];
 
@@ -63,12 +81,45 @@ class ConfigurationSnapshot extends Model
         app(ConfigurationSnapshotIntegrity::class)->assertReadable($this);
     }
 
+    public function isEffectiveSnapshot(): bool
+    {
+        return $this->parent_configuration_snapshot_id !== null
+            || in_array($this->source, [
+                ConfigurationSnapshotSourceEnum::CalculationPositionEffective,
+                ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective,
+            ], true);
+    }
+
     /**
      * @return BelongsTo<ConfigurationSnapshot, $this>
      */
     public function sourceConfigurationSnapshot(): BelongsTo
     {
         return $this->belongsTo(self::class, 'source_configuration_snapshot_id');
+    }
+
+    /**
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function parentConfigurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_configuration_snapshot_id');
+    }
+
+    /**
+     * @return BelongsTo<AdvertisingMedium, $this>
+     */
+    public function contextAdvertisingMedium(): BelongsTo
+    {
+        return $this->belongsTo(AdvertisingMedium::class, 'context_advertising_medium_id');
+    }
+
+    /**
+     * @return BelongsTo<AdvertisingCategory, $this>
+     */
+    public function contextAdvertisingCategory(): BelongsTo
+    {
+        return $this->belongsTo(AdvertisingCategory::class, 'context_advertising_category_id');
     }
 
     /**
@@ -104,7 +155,7 @@ class ConfigurationSnapshot extends Model
     }
 
     /**
-     * DF-3.3a2α: eingefrorener Quellengraph (nur format_version 2).
+     * DF-3.3a2α / DF-3.3a2β: eingefrorener Quellengraph (format_version 2 und 3).
      *
      * @return HasMany<ConfigurationSnapshotSource, $this>
      */

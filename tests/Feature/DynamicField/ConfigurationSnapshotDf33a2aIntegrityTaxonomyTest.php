@@ -19,6 +19,7 @@ use App\Services\DynamicField\Admin\FieldDefinitionCustomWriter;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentAdminWriter;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentMergeResolver;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use App\Services\DynamicField\SnapshotFieldRuleDedupeKey;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -68,7 +69,7 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
             ]);
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessageMatches('/target_layer=global|Kategorie-/');
+        $this->expectExceptionMessageMatches('/target_layer=global|Kategorie-|passt nicht zu target_layer/');
         $snapshot->fresh(['sources'])->assertReadable();
     }
 
@@ -286,27 +287,24 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
 
     private function calcSnapshotWithGlobalAssignment(): ConfigurationSnapshot
     {
-        $catalog = $this->createSpotClassicCatalog();
         $this->activateGlobalCalculationField(User::factory()->role(Role::Admin)->create());
-        $calculation = $this->createSavedCalculation($catalog, [
-            ['inventory_id' => $catalog['hamburg']->id],
-        ]);
 
-        return ConfigurationSnapshot::query()
-            ->with(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules'])
-            ->findOrFail($calculation->configuration_snapshot_id);
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
+
+        return app(ConfigurationSnapshotFreezeService::class)
+            ->freezeCalculationV2($fingerprint)
+            ->load(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules']);
     }
 
     private function freshV2CalcSnapshot(): ConfigurationSnapshot
     {
-        $catalog = $this->createSpotClassicCatalog();
-        $calculation = $this->createSavedCalculation($catalog, [
-            ['inventory_id' => $catalog['hamburg']->id],
-        ]);
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
 
-        return ConfigurationSnapshot::query()
-            ->with(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules'])
-            ->findOrFail($calculation->configuration_snapshot_id);
+        return app(ConfigurationSnapshotFreezeService::class)
+            ->freezeCalculationV2($fingerprint)
+            ->load(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules']);
     }
 
     private function firstAssignmentSource(ConfigurationSnapshot $snapshot): ConfigurationSnapshotSource

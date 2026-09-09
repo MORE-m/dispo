@@ -12,6 +12,7 @@ use App\Enums\PlanningMode;
 use App\Enums\SpotCalculationMethod;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\DiscountValidator;
@@ -19,6 +20,7 @@ use App\Services\Calculation\TimeRangeValidator;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator;
@@ -113,6 +115,9 @@ class CalculationPayloadRequest extends FormRequest
             'positions' => ['sometimes', 'array'],
             'positions.*.id' => ['nullable', 'integer', 'min:1'],
             'positions.*.client_key' => ['nullable', 'uuid'],
+            'positions.*.schema_fingerprint' => $this->routeIs('calculations.store')
+                ? ['required', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN]
+                : ['nullable', 'string', 'size:64', 'regex:'.ConfigurationSnapshotIntegrity::FINGERPRINT_PATTERN],
             'positions.*.inventory_id' => ['required', 'integer', 'exists:inventories,id'],
             'positions.*.advertising_medium_id' => ['required', 'integer', 'exists:advertising_media,id'],
             'positions.*.spot_method' => ['nullable', Rule::enum(SpotCalculationMethod::class)],
@@ -284,6 +289,23 @@ class CalculationPayloadRequest extends FormRequest
 
     private function validateDynamicFieldKeys(Validator $validator): void
     {
+        $snapshot = $this->resolveConfigurationSnapshot();
+        if ($snapshot !== null
+            && (int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        ) {
+            $this->validateDynamicFieldKeysForContextualFreeze($validator, $snapshot);
+
+            return;
+        }
+
+        // Gen-3-Neuanlage / Preview ohne Snapshot: Header gegen Live-Basis,
+        // Positionsfelder gegen das Live-Positionsschema je Werbemittel.
+        if ($snapshot === null) {
+            $this->validateDynamicFieldKeysForLiveContextualFreeze($validator);
+
+            return;
+        }
+
         $schema = $this->resolveDynamicFieldSchema();
         $headerAllowed = $schema['header'];
         $positionAllowed = $schema['position'];
@@ -341,6 +363,261 @@ class CalculationPayloadRequest extends FormRequest
                 );
             }
         }
+    }
+
+    /**
+     * Live Gen 3 ohne persistierte Basis: Header = Core + global,
+     * Position = Primary-Core → global → Oberkategorie → Werbemittel.
+     */
+    private function validateDynamicFieldKeysForLiveContextualFreeze(Validator $validator): void
+    {
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
+        $baseSchema = $this->schemaFromLiveFreezeSchema();
+        $headerAllowed = $baseSchema['header'];
+        $unionPositionAllowed = [];
+        /** @var array<int, array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>> $positionSchemaByMedium */
+        $positionSchemaByMedium = [];
+
+        $header = $this->input('dynamic_field_values', []);
+        if (is_array($header)) {
+            foreach ($header as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($headerAllowed[$key])) {
+                    $validator->errors()->add(
+                        'dynamic_field_values.'.$key,
+                        'Unbekanntes dynamisches Feld.',
+                    );
+
+                    continue;
+                }
+
+                $this->validateTextValue(
+                    $validator,
+                    'dynamic_field_values.'.$key,
+                    $raw,
+                    $headerAllowed[$key],
+                );
+            }
+        }
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId > 0) {
+                if (! isset($positionSchemaByMedium[$mediumId])) {
+                    $resolved = $freeze->resolveLivePositionSchema($mediumId);
+                    $positionSchemaByMedium[$mediumId] = $this->positionMetaFromResolvedFields(
+                        $resolved['fields'],
+                    );
+                }
+                $positionAllowed = $positionSchemaByMedium[$mediumId];
+            } else {
+                $positionAllowed = $baseSchema['position'];
+            }
+
+            foreach ($positionAllowed as $key => $meta) {
+                $unionPositionAllowed[$key] = $meta;
+            }
+
+            $values = $position['dynamic_field_values'] ?? null;
+            if (! is_array($values)) {
+                continue;
+            }
+
+            foreach ($values as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($positionAllowed[$key])) {
+                    $validator->errors()->add(
+                        "positions.{$index}.dynamic_field_values.{$key}",
+                        isset($headerAllowed[$key])
+                            ? 'Dieses Feld gehört nicht in diesen Bereich.'
+                            : 'Unbekanntes dynamisches Feld.',
+                    );
+
+                    continue;
+                }
+
+                $this->validateTextValue(
+                    $validator,
+                    "positions.{$index}.dynamic_field_values.{$key}",
+                    $raw,
+                    $positionAllowed[$key],
+                );
+            }
+        }
+
+        if (is_array($header)) {
+            foreach ($header as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($headerAllowed[$key]) && isset($unionPositionAllowed[$key])) {
+                    $validator->errors()->add(
+                        'dynamic_field_values.'.$key,
+                        'Dieses Feld gehört nicht in diesen Bereich.',
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Generation 3: Header gegen die Basis, Positionsfelder gegen den
+     * jeweiligen Effektiv- bzw. aus der Basis abgeleiteten Kontext.
+     */
+    private function validateDynamicFieldKeysForContextualFreeze(
+        Validator $validator,
+        ConfigurationSnapshot $base,
+    ): void {
+        $schema = $this->schemaFromSnapshot($base);
+        $headerAllowed = $schema['header'];
+        $unionPositionAllowed = [];
+
+        $header = $this->input('dynamic_field_values', []);
+        if (is_array($header)) {
+            foreach ($header as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($headerAllowed[$key])) {
+                    $validator->errors()->add(
+                        'dynamic_field_values.'.$key,
+                        'Unbekanntes dynamisches Feld.',
+                    );
+
+                    continue;
+                }
+
+                $this->validateTextValue(
+                    $validator,
+                    'dynamic_field_values.'.$key,
+                    $raw,
+                    $headerAllowed[$key],
+                );
+            }
+        }
+
+        $calculation = $this->route('calculation');
+        $positionsById = collect();
+        if ($calculation instanceof Calculation) {
+            $calculation->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
+            $positionsById = $calculation->positions->keyBy('id');
+        }
+
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $positionAllowed = $this->positionSchemaForContextualPayload(
+                $freeze,
+                $base,
+                $positionsById,
+                $position,
+            );
+            foreach ($positionAllowed as $key => $meta) {
+                $unionPositionAllowed[$key] = $meta;
+            }
+
+            $values = $position['dynamic_field_values'] ?? null;
+            if (! is_array($values)) {
+                continue;
+            }
+
+            foreach ($values as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($positionAllowed[$key])) {
+                    $validator->errors()->add(
+                        "positions.{$index}.dynamic_field_values.{$key}",
+                        isset($headerAllowed[$key])
+                            ? 'Dieses Feld gehört nicht in diesen Bereich.'
+                            : 'Unbekanntes dynamisches Feld.',
+                    );
+
+                    continue;
+                }
+
+                $this->validateTextValue(
+                    $validator,
+                    "positions.{$index}.dynamic_field_values.{$key}",
+                    $raw,
+                    $positionAllowed[$key],
+                );
+            }
+        }
+
+        // Unbekannte Header-Keys, die nur in Positions-Schemas existieren
+        if (is_array($header)) {
+            foreach ($header as $key => $raw) {
+                $key = (string) $key;
+                if (! isset($headerAllowed[$key]) && isset($unionPositionAllowed[$key])) {
+                    $validator->errors()->add(
+                        'dynamic_field_values.'.$key,
+                        'Dieses Feld gehört nicht in diesen Bereich.',
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * @param  Collection<int|string, CalculationPosition>  $positionsById
+     * @param  array<string, mixed>  $position
+     * @return array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
+     */
+    private function positionSchemaForContextualPayload(
+        ConfigurationSnapshotFreezeService $freeze,
+        ConfigurationSnapshot $base,
+        $positionsById,
+        array $position,
+    ): array {
+        $existingId = isset($position['id']) ? (int) $position['id'] : 0;
+        $existing = $existingId > 0 ? $positionsById->get($existingId) : null;
+        $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+
+        if ($existing !== null
+            && $existing->effective_configuration_snapshot_id !== null
+            && ($mediumId < 1 || $mediumId === (int) $existing->advertising_medium_id)
+        ) {
+            $existing->loadMissing('effectiveConfigurationSnapshot.fieldDefinitions');
+            $effective = $existing->effectiveConfigurationSnapshot;
+            if ($effective !== null) {
+                return $this->schemaFromSnapshot($effective)['position'];
+            }
+        }
+
+        if ($mediumId > 0) {
+            $resolved = $freeze->resolvePositionSchemaFromBase($base, $mediumId);
+
+            return $this->positionMetaFromResolvedFields($resolved['fields']);
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $fields
+     * @return array<string, array{field_type: string, max_length: int, label: string, required: bool, visible: bool}>
+     */
+    private function positionMetaFromResolvedFields(array $fields): array
+    {
+        $position = [];
+        foreach ($fields as $field) {
+            if (FieldScope::from((string) $field['field_scope']) !== FieldScope::Position) {
+                continue;
+            }
+            $fieldType = (string) $field['field_type'];
+            $position[(string) $field['field_key']] = [
+                'field_type' => $fieldType,
+                'max_length' => $this->maxLengthFromValidation($field['validation_json'] ?? null, $fieldType),
+                'label' => (string) $field['label'],
+                'required' => (bool) $field['effective_required'],
+                'visible' => (bool) $field['effective_visible'],
+            ];
+        }
+
+        return $position;
     }
 
     /**
@@ -506,8 +783,9 @@ class CalculationPayloadRequest extends FormRequest
      */
     private function liveSchema(): array
     {
+        // DF-3.3a2β: Create zielt auf Generation 3 (Universum + Header-Basis).
         return $this->liveSchemaCache ??= app(ConfigurationSnapshotFreezeService::class)
-            ->resolveLiveSchemaForCalculation();
+            ->resolveLiveSchemaForCalculationV3();
     }
 
     private function maxLengthForDefinition(SnapshotFieldDefinition $def): int

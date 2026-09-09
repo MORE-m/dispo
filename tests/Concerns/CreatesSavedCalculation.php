@@ -32,7 +32,7 @@ trait CreatesSavedCalculation
             'order_discount_percent' => (string) ($options['order_discount_percent'] ?? '0'),
             'ae_enabled' => (bool) ($options['ae_enabled'] ?? false),
             'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
-                ->resolveLiveSchemaForCalculation()['schema_fingerprint'],
+                ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'],
             'positions' => array_map(function (array $spot, int $index) use ($catalog, $options): array {
                 $positionDiscount = $spot['position_discount_percent']
                     ?? ($index === 0 ? ($options['first_position_discount_percent'] ?? '0') : '0');
@@ -40,6 +40,8 @@ trait CreatesSavedCalculation
                 return [
                     'inventory_id' => $spot['inventory_id'],
                     'advertising_medium_id' => $catalog['medium']->id,
+                    'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
+                        ->resolveLivePositionSchema((int) $catalog['medium']->id)['schema_fingerprint'],
                     'spot_method' => 'average',
                     'length_seconds' => $spot['length_seconds'] ?? 30,
                     'total_spot_count' => $spot['total_spot_count'] ?? 10,

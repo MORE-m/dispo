@@ -276,7 +276,7 @@ class CalculationReviewNacharbeitTest extends TestCase
      */
     private function basePayload(array $catalog, int $totalSpots): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $this->liveSchemaFingerprint(),
@@ -290,7 +290,7 @@ class CalculationReviewNacharbeitTest extends TestCase
                 'ae_percent' => '0',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ];
+        ]);
     }
 
     /**

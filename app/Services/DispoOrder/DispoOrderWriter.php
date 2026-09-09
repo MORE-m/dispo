@@ -225,6 +225,9 @@ final class DispoOrderWriter
             $sort++;
         }
 
+        // DF-3.3a2β: Effektiv-Snapshots binden, bevor Positionswerte entstehen.
+        $this->dynamicFields->attachPositionEffectives($order, $calculation, $revises);
+
         $this->dynamicFields->persistCopiedValues(
             $order,
             $calculation,

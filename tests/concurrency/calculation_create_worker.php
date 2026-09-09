@@ -51,7 +51,7 @@ try {
     $user = User::query()->where('role', Role::Sales->value)->firstOrFail();
     $writer = $app->make(CalculationWriter::class);
     $fingerprint = $app->make(ConfigurationSnapshotFreezeService::class)
-        ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
+        ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
 
     $calculation = $writer->create([
         'planning_mode' => 'manual',

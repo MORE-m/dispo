@@ -1,13 +1,14 @@
 # Fortschritt V1
 
-Stand: 8. September 2026 (DF-3.3a2α auf Feature-Branch – kein Abschluss von DF-3)
+Stand: 9. September 2026 (DF-3.3a2β auf Feature-Branch – kein Abschluss von DF-3)
 
 ## Aktuelle Phase
 
-Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs
-und DF-3.3a1 auf `main`** (PR #15–#23). **DF-3.3a2α** (globaler Snapshot-Freeze,
-Generation 2) auf Feature-Branch `feat/df3-3a2a-global-snapshot-freeze`.
-Gesamtziel DF-3 bleibt offen (`DF-3.3a2β`, `DF-3.3b`, Optionen, Regel-Editor).
+Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
+DF-3.3a1 und DF-3.3a2α auf `main`** (PR #15–#24). **DF-3.3a2β** (Generation-3-
+Freeze, VER-003 Positions-Effektivs, Kat/Medium-Runtime) auf Feature-Branch
+`feat/df3-3a2b-contextual-snapshot-freeze`. Gesamtziel DF-3 bleibt offen
+(`DF-3.3b`, Optionen, Regel-Editor).
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -16,38 +17,33 @@ Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin. Katalog-Admin
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/df3-3a2a-global-snapshot-freeze` – **DF-3.3a2α**: VER-002-
-Basis-Freeze der Generation 2 aus Kern-Feldset **und aktiven globalen
-Assignments**, inklusive Quellengraph und Property-Provenance. Damit haben freie
-Feldsets erstmals produktive Runtime-Wirkung – aber **ausschließlich über die
-globale Ebene**. **Kein** Start von `DF-3.3a2β` / `DF-3.3b`.
+Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze` – **DF-3.3a2β**:
+Generation 3 mit Positions-Effektiv-Snapshots (VER-003), historischem
+Werbemittel-/Kategoriekontext, Unique-1:1-Ownership und produktiver
+Kat-/Medium-Runtime. **Kein** Start von `DF-3.3b`.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3.3a1 Assignments/Resolver/Preview – PR [#23](https://github.com/MORE-m/dispo/pull/23)
-gemergt in `main` (`c928169`).
+DF-3.3a2α globaler Snapshot-Freeze – PR [#24](https://github.com/MORE-m/dispo/pull/24)
+gemergt in `main` (`8edcbd7`).
 
-Davor: DF-3.3-fs – PR [#22](https://github.com/MORE-m/dispo/pull/22) (`8078a8d`).
+Davor: DF-3.3a1 – PR [#23](https://github.com/MORE-m/dispo/pull/23) (`c928169`).
 
-## DF-3.3a2α – Globaler Snapshot-Freeze (September 2026)
+## DF-3.3a2β – Contextual Freeze / VER-003 (September 2026)
 
 Feature-Branch, **kein** Abschluss von DF-3.
 
 | Kriterium | Status |
 |---|---|
-| `configuration_snapshots.format_version` NOT NULL + `schema_fingerprint` | umgesetzt |
-| Quellengraph `configuration_snapshot_sources` (+ `_source_fields`, `_source_rules`) | umgesetzt |
-| Property-Provenance je Snapshot-Definition (Definition/Revision/Required/Visible/Sort/Group) | umgesetzt |
-| Freeze Kalkulation: Core + aktive globale Calc-Assignments | umgesetzt |
-| Freeze Dispo-Create: Dispo-Core + globale Dispo-Assignments + Calc-Origin-Quelle | umgesetzt |
-| Live-Schema im Wizard inkl. `schema_fingerprint` (Header und Position) | umgesetzt |
-| Schema-Drift beim Anlegen → 409 **vor** Feldwert-Validierung (422) | umgesetzt |
-| Dispo-Revision klont Snapshot inkl. `format_version`, Fingerprint, Quellen | umgesetzt |
-| Update bestehender Vorgänge behält Snapshot und Generation | umgesetzt |
-| Fail-closed gegen unbekannte Generationen (`assertReadable`) | umgesetzt |
-| E2E isoliert: `playwright.df33a2a.config.ts` (eigene DB, Port 8004) | umgesetzt |
-| Kategorie-/Werbemittel-Assignments in der Runtime | **nicht** (DF-3.3a2β) |
-| VER-003 Positions-Effektiv-Snapshot | **nicht** (DF-3.3a2β) |
+| `format_version = 3` (`FORMAT_VERSION_CONTEXTUAL_FREEZE`) | umgesetzt |
+| Basis = Header (Core→global); Effektiv = Position (Core→global→Kat→Medium) | umgesetzt |
+| `parent_configuration_snapshot_id` + sechs Kontextspalten (FK `restrictOnDelete`) | umgesetzt |
+| `effective_configuration_snapshot_id` nullable Unique je Positionstabelle | umgesetzt |
+| Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
+| Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
+| Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
+| Schema-API mit Medium; Wizard Positions-Fingerprints | umgesetzt |
+| E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
 | Assignment-Admin-UI | **nicht** (DF-3.3b) |
 
 ### Snapshot-Generationen (Matrix)
@@ -55,12 +51,27 @@ Feature-Branch, **kein** Abschluss von DF-3.
 | Generation | `format_version` | Quellen | Entsteht bei |
 |---|---|---|---|
 | Generation 1 (Legacy) | `FORMAT_VERSION_LEGACY` | nur Kern-Feldset, kein Quellengraph | Altbestand, Legacy-Backfill, `materializeFromActiveSet()` |
-| Generation 2 (α) | `FORMAT_VERSION_GLOBAL_FREEZE` | Core + globale Assignments (+ Calc-Origin bei Dispo) | neue Kalkulation, Dispo-Create, Dispo-Revision (Klon) |
-| Folgegeneration | noch nicht vergeben | zusätzlich Kategorie/Werbemittel, VER-003 | **nicht implementiert** (DF-3.3a2β) |
+| Generation 2 (α) | `FORMAT_VERSION_GLOBAL_FREEZE` | Core + globale Assignments (+ Calc-Origin bei Dispo) | Altbestand Gen2; produktiver Create seit β → Gen3 |
+| Generation 3 (β) | `FORMAT_VERSION_CONTEXTUAL_FREEZE` | Basis Header + Universum; Effektiv Position inkl. Kat/Medium | neue Kalkulation/Dispo, Revision (Klon) |
 
 Lesepfade sind fail-closed: unbekannte `format_version` wird abgewiesen, statt
-still auf einen Default zurückzufallen. Bestehende Generation-1-Snapshots werden
+still auf einen Default zurückzufallen. Bestehende Generation-1/2-Snapshots werden
 **nicht** migriert und beim Update unverändert weitergeführt.
+
+## DF-3.3a2α – Globaler Snapshot-Freeze (September 2026, `main`)
+
+PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren seit
+β als Generation 3 ein.
+
+| Kriterium | Status |
+|---|---|
+| `configuration_snapshots.format_version` NOT NULL + `schema_fingerprint` | umgesetzt |
+| Quellengraph `configuration_snapshot_sources` (+ `_source_fields`, `_source_rules`) | umgesetzt |
+| Property-Provenance je Snapshot-Definition | umgesetzt |
+| Freeze Gen2: Core + aktive globale Assignments | umgesetzt (Bestand) |
+| Kategorie-/Werbemittel-Assignments in der Runtime | in DF-3.3a2β nachgezogen |
+| VER-003 Positions-Effektiv-Snapshot | in DF-3.3a2β nachgezogen |
+| Assignment-Admin-UI | **nicht** (DF-3.3b) |
 
 ## DF-3.3a1 – Field-Set-Assignments (September 2026, `main`)
 
@@ -72,9 +83,9 @@ still auf einen Default zurückzufallen. Bestehende Generation-1-Snapshots werde
 | Kontext-Preview JSON-API unter `access-administration` | umgesetzt |
 | Audit + `lock_version` + 409 | umgesetzt |
 | SQLite + MySQL Migration-/Unique-/Restrict-Tests | umgesetzt |
-| Produktive Runtime-Wirkung freier Sets | in DF-3.3a2α global nachgezogen |
+| Produktive Runtime-Wirkung freier Sets | global ab DF-3.3a2α; Kat/Medium ab DF-3.3a2β |
 | VER-002 Quellengraph | in DF-3.3a2α umgesetzt |
-| VER-003 Positions-Effektiv | **nicht** (DF-3.3a2β) |
+| VER-003 Positions-Effektiv | in DF-3.3a2β umgesetzt |
 | Assignment-Admin-UI | **nicht** (DF-3.3b) |
 
 ## DF-3.3-fs – Freie Feldsets (September 2026)
@@ -94,14 +105,9 @@ still auf einen Default zurückzufallen. Bestehende Generation-1-Snapshots werde
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- `DF-3.3a2β`: Kategorie-/Werbemittel-Ebene in der Runtime + VER-003
-  Positions-Effektiv-Snapshot
-- `VER-003`: positionsscharfe Effektiv-Konfiguration – **nicht begonnen**
 - `DF-3.3b`: Assignment-Admin-UI, Herkunft/Konflikte UX – **nicht begonnen**
-- Header-Vererbung V1 nur global; Kat/Medium-Assignments nur Positionsfelder
-- Overrides dreistufig `null`/`true`/`false`, spezifischere Ebene gewinnt
-- Slice-Reihenfolge: ADV-001a → DF-3.3-fs → DF-3.3a1 → **DF-3.3a2α** →
-  DF-3.3a2β → DF-3.3b
+- Optionen / Auswahlfelder, volle Regelmatrix, Regel-Editor
+- Slice-Reihenfolge ab hier: **DF-3.3a2β** → DF-3.3b
 
 ## ADV-001a – Oberkategorie-Datenbasis (September 2026)
 
@@ -190,12 +196,10 @@ still auf einen Default zurückzufallen. Bestehende Generation-1-Snapshots werde
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.3a2α
+## Bewusst offen nach DF-3.3a2β
 
-- DF-3.3a2β: Kategorie-/Werbemittel-Ebene in der Runtime, VER-003
-  Positions-Effektiv-Snapshot – **nicht begonnen**
 - DF-3.3b: Assignment-Admin-UI, Herkunft/Konflikte – **nicht begonnen**
-- ADV-001 Rest: Kategorie-Defaults, historische Positions-Provenance, Admin
+- ADV-001 Rest: Kategorie-Defaults, Admin
 - ADV-002 / SystemFieldSetting
 - Optionen, Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Kataloge, Preislisten, …)

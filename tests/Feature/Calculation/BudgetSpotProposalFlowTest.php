@@ -188,9 +188,8 @@ class BudgetSpotProposalFlowTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
 
         $this->actingAs($user)
-            ->post(route('calculations.store'), [
+            ->post(route('calculations.store'), $this->withLiveSchemaFingerprint([
                 'planning_mode' => PlanningMode::Manual->value,
-                'schema_fingerprint' => $this->liveSchemaFingerprint(),
                 'order_discount_percent' => '0',
                 'positions' => [
                     [
@@ -205,7 +204,7 @@ class BudgetSpotProposalFlowTest extends TestCase
                         'time_ranges' => [],
                     ],
                 ],
-            ])
+            ]))
             ->assertSessionHasErrors('positions.0.time_ranges');
     }
 

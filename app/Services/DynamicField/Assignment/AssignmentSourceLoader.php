@@ -58,20 +58,101 @@ final class AssignmentSourceLoader
     }
 
     /**
+     * DF-3.3a2β / VER-003: vollständige Freeze-Ebene – Primary-Core plus **alle**
+     * aktiven Assignments des Prozesses (global, Oberkategorie, Werbemittel).
+     *
+     * Reihenfolge und Fingerprint sind deterministisch: global vor Kategorie vor
+     * Werbemittel, je Ebene `sort`/`id` ASC. Ungültige aktive Quellen blockieren
+     * fail-closed – identisch zu {@see loadGlobalSources}.
+     *
+     * @return array{sources: list<array<string, mixed>>, fingerprint_parts: array<string, mixed>}
+     */
+    public function loadUniverseSources(FieldAppliesTo $process): array
+    {
+        $core = $this->loadPrimaryCoreSource($process);
+
+        $sources = [$core['source']];
+        $fingerprintParts = [
+            'process' => $process->value,
+            'layers' => [
+                FieldSetAssignmentMergeResolver::LAYER_PRIMARY_CORE,
+                FieldSetAssignmentMergeResolver::LAYER_GLOBAL,
+                FieldSetAssignmentMergeResolver::LAYER_ADVERTISING_CATEGORY,
+                FieldSetAssignmentMergeResolver::LAYER_ADVERTISING_MEDIUM,
+            ],
+            'primary_core' => $core['fingerprint'],
+            'assignments' => [],
+        ];
+
+        foreach ($this->loadUniverseAssignments($process) as $assignment) {
+            $validity = $this->assessAssignmentSourceValidity($assignment, $process);
+            if (! $validity['valid']) {
+                throw ValidationException::withMessages([
+                    'configuration' => "Aktives Assignment {$assignment->id} ist nicht mehr auflösbar: {$validity['message']}",
+                ]);
+            }
+
+            $built = $this->buildAssignmentSource($assignment);
+            $sources[] = $built['source'];
+            $fingerprintParts['assignments'][] = $built['fingerprint'];
+        }
+
+        return [
+            'sources' => $sources,
+            'fingerprint_parts' => $fingerprintParts,
+        ];
+    }
+
+    /**
      * Aktive globale Assignments für den Prozess (inkl. `both`), sort/id ASC.
      *
      * @return list<FieldSetAssignment>
      */
     public function loadGlobalAssignments(FieldAppliesTo $process): array
     {
+        return $this->loadAssignmentsForTargetLayer($process, FieldSetAssignmentTargetLayer::Global);
+    }
+
+    /**
+     * Alle aktiven Assignments des Prozesses in kanonischer Ebenenreihenfolge.
+     *
+     * @return list<FieldSetAssignment>
+     */
+    public function loadUniverseAssignments(FieldAppliesTo $process): array
+    {
+        /** @var list<FieldSetAssignment> $rows */
+        $rows = [];
+
+        foreach ([
+            FieldSetAssignmentTargetLayer::Global,
+            FieldSetAssignmentTargetLayer::AdvertisingCategory,
+            FieldSetAssignmentTargetLayer::AdvertisingMedium,
+        ] as $targetLayer) {
+            foreach ($this->loadAssignmentsForTargetLayer($process, $targetLayer) as $assignment) {
+                $rows[] = $assignment;
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return list<FieldSetAssignment>
+     */
+    private function loadAssignmentsForTargetLayer(
+        FieldAppliesTo $process,
+        FieldSetAssignmentTargetLayer $targetLayer,
+    ): array {
         /** @var list<FieldSetAssignment> $rows */
         $rows = FieldSetAssignment::query()
             ->with([
                 'fieldSet.activeVersion.fields.revision.definition',
                 'fieldSet.activeVersion.fields.definition',
                 'fieldSet.activeVersion.rules',
+                'advertisingCategory',
+                'advertisingMedium',
             ])
-            ->where('target_layer', FieldSetAssignmentTargetLayer::Global->value)
+            ->where('target_layer', $targetLayer->value)
             ->where('is_active', true)
             ->where(function ($q) use ($process): void {
                 $q->where('applies_to_process', $process->value)
@@ -336,6 +417,8 @@ final class AssignmentSourceLoader
             ];
         }
 
+        $target = $this->targetReference($assignment);
+
         return [
             'layer' => $layer,
             'assignment_id' => $assignment?->id,
@@ -349,6 +432,9 @@ final class AssignmentSourceLoader
             'target_identity' => $assignment !== null
                 ? $assignment->target_identity
                 : FieldSetAssignment::buildTargetIdentity(FieldSetAssignmentTargetLayer::Global, null, null),
+            'target_id' => $target['id'],
+            'target_key' => $target['key'],
+            'target_name' => $target['name'],
             'field_set_id' => $fieldSet->id,
             'field_set_key' => $fieldSet->key,
             'field_set_name' => $fieldSet->name,
@@ -357,6 +443,43 @@ final class AssignmentSourceLoader
             'is_system_core' => $isSystemCore,
             'memberships' => $memberships,
             'rules' => $rules,
+        ];
+    }
+
+    /**
+     * DF-3.3a2β: eingefrorene Zielreferenz einer Quelle. Global und Primary-Core
+     * tragen bewusst keine Kategorie-/Werbemittelreferenz.
+     *
+     * @return array{id: int|null, key: string|null, name: string|null}
+     */
+    private function targetReference(?FieldSetAssignment $assignment): array
+    {
+        if ($assignment === null || $assignment->target_layer === FieldSetAssignmentTargetLayer::Global) {
+            return ['id' => null, 'key' => null, 'name' => null];
+        }
+
+        if ($assignment->target_layer === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+            $category = $assignment->advertisingCategory;
+            if ($category === null) {
+                throw new RuntimeException("Assignment {$assignment->id}: Oberkategorie-FK beschädigt.");
+            }
+
+            return [
+                'id' => (int) $category->id,
+                'key' => (string) $category->key,
+                'name' => (string) $category->name,
+            ];
+        }
+
+        $medium = $assignment->advertisingMedium;
+        if ($medium === null) {
+            throw new RuntimeException("Assignment {$assignment->id}: Werbemittel-FK beschädigt.");
+        }
+
+        return [
+            'id' => (int) $medium->id,
+            'key' => (string) $medium->code,
+            'name' => (string) $medium->name,
         ];
     }
 

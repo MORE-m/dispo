@@ -289,7 +289,7 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
             schema.target_format_version,
         );
 
-        const payload = (fingerprint: string) => ({
+        const payload = (fingerprint: string, positionFingerprint: string) => ({
             planning_mode: 'manual',
             customer_name: `Drift ${stamp}`,
             agency_name: null,
@@ -303,6 +303,7 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
                 {
                     inventory_id: catalog.inventories[0].id,
                     advertising_medium_id: catalog.media[0].id,
+                    schema_fingerprint: positionFingerprint,
                     spot_method: 'average',
                     length_seconds: 30,
                     total_spot_count: 10,
@@ -317,8 +318,21 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
             ],
         });
 
+        const positionSchemaResponse = await postJson(
+            page,
+            '/kalkulationen/feldschema',
+            { advertising_medium_id: catalog.media[0].id },
+        );
+        expect(positionSchemaResponse.status()).toBe(200);
+        const positionSchema = await positionSchemaResponse.json();
+        const positionFingerprint = positionSchema.fieldSchema
+            .schema_fingerprint as string;
+
         // Drift schlägt als 409 durch, noch bevor Feldwerte geprüft werden.
-        const drifted = payload('a'.repeat(64)) as Record<string, unknown>;
+        const drifted = payload(
+            'a'.repeat(64),
+            positionFingerprint,
+        ) as Record<string, unknown>;
         (
             drifted.dynamic_field_values as Record<string, unknown>
         ).unknown_field = 'x';
@@ -330,7 +344,7 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
         const accepted = await postJson(
             page,
             '/kalkulationen',
-            payload(schema.fieldSchema.schema_fingerprint),
+            payload(schema.fieldSchema.schema_fingerprint, positionFingerprint),
         );
         expect(accepted.status(), await accepted.text()).not.toBe(409);
     });

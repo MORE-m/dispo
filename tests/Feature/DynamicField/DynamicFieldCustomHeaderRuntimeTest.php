@@ -256,9 +256,8 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
         $user = User::factory()->role(Role::Sales)->create();
 
         $this->actingAs($user)
-            ->post(route('calculations.store'), [
+            ->post(route('calculations.store'), $this->withLiveSchemaFingerprint([
                 'planning_mode' => 'manual',
-                'schema_fingerprint' => $this->liveSchemaFingerprint(),
                 'customer_name' => 'Kunde',
                 'campaign' => 'C',
                 'product_title' => 'P',
@@ -277,7 +276,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
                     'ae_percent' => '15',
                     'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
                 ]],
-            ])
+            ]))
             ->assertSessionHasErrors('dynamic_field_values.unknown_custom');
     }
 
@@ -437,9 +436,8 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
 
         $catalog = $this->createSpotClassicCatalog();
         $sales = User::factory()->role(Role::Sales)->create();
-        $base = [
+        $base = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'customer_name' => 'Kunde',
             'campaign' => 'C',
             'product_title' => 'P',
@@ -455,7 +453,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
                 'ae_percent' => '15',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ];
+        ]);
 
         $this->actingAs($sales)
             ->post(route('calculations.store'), [

@@ -79,12 +79,10 @@ Umfang:
 Relevante Anforderungen: `DYN-*`, `VER-*`, `ADM-001`, `ADM-002`.
 
 Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
-Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview (alles auf `main`) sowie
-DF-3.3a2α auf Feature-Branch: VER-002-Freeze der Generation 2 mit Quellengraph und
-Property-Provenance; **aktive globale** Assignments wirken produktiv auf
-Kalkulation und Dispoauftrag.
-Offen: Kategorie-/Werbemittel-Runtime und VER-003 (`DF-3.3a2β`, nicht begonnen),
-Assignment-UI (`DF-3.3b`, nicht begonnen), Optionen, Regel-Editor.
+Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview und DF-3.3a2α Gen2-Freeze
+(alles auf `main`, α via PR #24) sowie DF-3.3a2β auf Feature-Branch: Generation-3-
+Freeze mit VER-003 Positions-Effektivs und Kat-/Medium-Runtime.
+Offen: Assignment-UI (`DF-3.3b`, nicht begonnen), Optionen, Regel-Editor.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

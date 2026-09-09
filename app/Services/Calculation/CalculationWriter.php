@@ -14,6 +14,7 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
+use App\Models\ConfigurationSnapshot;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -36,6 +37,7 @@ final class CalculationWriter
         private readonly CalculationNumberSequencer $numbers,
         private readonly ConfigurationSnapshotFreezeService $snapshots,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
+        private readonly ConfigurationSnapshotIntegrity $integrity,
     ) {}
 
     /**
@@ -68,11 +70,22 @@ final class CalculationWriter
             $calculation->status = CalculationStatus::Draft;
             $calculation->advisor_id = $user->id;
             $calculation->lock_version = 1;
-            $calculation->configuration_snapshot_id = $this->snapshots
-                ->freezeCalculationV2($fingerprint)
-                ->id;
 
-            $this->fillAndPersist($calculation, $payload, $user, isCreate: true);
+            // DF-3.3a2β / VER-003: Basis (Header) plus je Position ein
+            // Effektiv-Snapshot im eingefrorenen Werbemittelkontext.
+            $frozen = $this->snapshots->freezeCalculationV3(
+                $fingerprint,
+                $this->positionFreezeInputs($payload),
+            );
+            $calculation->configuration_snapshot_id = $frozen['base']->id;
+
+            $this->fillAndPersist(
+                $calculation,
+                $payload,
+                $user,
+                isCreate: true,
+                positionEffectives: $frozen['effectives_by_client_key'],
+            );
 
             $fresh = $this->reloadCalculation($calculation);
             $this->audit->record($fresh, 'calculation.created', $user, null, $this->calculationSnapshot($fresh));
@@ -193,9 +206,15 @@ final class CalculationWriter
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array<string, ConfigurationSnapshot>  $positionEffectives  Payload-Index → Effektiv-Snapshot (nur beim Anlegen)
      */
-    private function fillAndPersist(Calculation $calculation, array $payload, User $user, bool $isCreate): void
-    {
+    private function fillAndPersist(
+        Calculation $calculation,
+        array $payload,
+        User $user,
+        bool $isCreate,
+        array $positionEffectives = [],
+    ): void {
         $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
         $existingById = $calculation->positions->keyBy('id');
         $existingByClient = $calculation->positions->keyBy('client_key');
@@ -217,6 +236,7 @@ final class CalculationWriter
 
         $this->assertPositionIdentitiesBelongToCalculation($payload, $existingById, $existingByClient);
 
+        $base = $this->contextualBaseSnapshot($calculation);
         $seenIds = [];
 
         foreach ($resolved as $index => $item) {
@@ -231,6 +251,7 @@ final class CalculationWriter
             }
 
             $clientKey = $this->resolveClientKey($existing);
+            $previousMediumId = $existing === null ? null : (int) $existing->advertising_medium_id;
 
             $position = $existing ?? new CalculationPosition;
             $position->fill([
@@ -265,6 +286,21 @@ final class CalculationWriter
             $position->save();
             $seenIds[] = $position->id;
 
+            if ($base !== null) {
+                $effectiveKey = (string) $index;
+                $frozenEffective = null;
+                if ($isCreate && array_key_exists($effectiveKey, $positionEffectives)) {
+                    $frozenEffective = $positionEffectives[$effectiveKey];
+                }
+                $this->syncPositionEffective(
+                    $position,
+                    $base,
+                    $frozenEffective,
+                    $payloadPosition,
+                    $previousMediumId,
+                );
+            }
+
             // Identität direkt am Persistenz-Mapping stempeln (kein Index-Matching danach).
             if (isset($payload['positions'][$index]) && is_array($payload['positions'][$index])) {
                 $payload['positions'][$index]['id'] = $position->id;
@@ -288,11 +324,134 @@ final class CalculationWriter
                     $orphan->discounts()->delete();
                     $orphan->fieldValues()->delete();
                     $orphan->delete();
+                    // Der Effektiv-Snapshot verliert mit der Position seinen Eigentümer.
+                    $this->snapshots->deletePositionEffective($orphan);
                 });
         }
 
         $calculation->load('positions');
         $this->dynamicFields->syncFromPayload($calculation, $payload);
+    }
+
+    /**
+     * DF-3.3a2β: Freeze-Eingaben je Position. Der Positionsschlüssel ist der
+     * Payload-Index, weil `client_key` erst beim Persistieren entsteht.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function positionFreezeInputs(array $payload): array
+    {
+        $inputs = [];
+
+        foreach ($this->resolvedPositions($payload) as $index => $item) {
+            $positionPayload = $payload['positions'][$index] ?? [];
+
+            $inputs[] = [
+                'client_key' => (string) $index,
+                'advertising_medium_id' => (int) $item['medium']->id,
+                'schema_fingerprint' => $positionPayload['schema_fingerprint'] ?? null,
+            ];
+        }
+
+        return $inputs;
+    }
+
+    /**
+     * Basissnapshot der Generation 3; Generation 1/2 kennt keine Effektiv-Snapshots.
+     */
+    private function contextualBaseSnapshot(Calculation $calculation): ?ConfigurationSnapshot
+    {
+        $calculation->loadMissing('configurationSnapshot');
+        $snapshot = $calculation->configurationSnapshot;
+
+        if ($snapshot === null
+            || (int) $snapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        ) {
+            return null;
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Bindet den Effektiv-Snapshot an die Position: beim Anlegen aus dem
+     * Gesamt-Freeze, sonst neu aus der Basis bzw. per Werbemittelwechsel.
+     *
+     * @param  array<string, mixed>  $payloadPosition
+     */
+    private function syncPositionEffective(
+        CalculationPosition $position,
+        ConfigurationSnapshot $base,
+        ?ConfigurationSnapshot $frozen,
+        array $payloadPosition,
+        ?int $previousMediumId,
+    ): void {
+        $mediumId = (int) $position->advertising_medium_id;
+
+        if ($frozen !== null) {
+            $this->attachPositionEffective($position, $frozen);
+
+            return;
+        }
+
+        if ($previousMediumId === null || $position->effective_configuration_snapshot_id === null) {
+            $this->attachPositionEffective($position, $this->snapshots->freezePositionEffectiveFromBase(
+                $base,
+                $mediumId,
+                $this->positionFingerprint($base, $mediumId, $payloadPosition),
+            ));
+
+            return;
+        }
+
+        if ($previousMediumId === $mediumId) {
+            return;
+        }
+
+        // Werbemittelwechsel: neuer Effektiv-Snapshot inklusive Werteübernahme.
+        $this->snapshots->replacePositionEffective(
+            $position,
+            $base,
+            $mediumId,
+            $this->positionFingerprint($base, $mediumId, $payloadPosition),
+        );
+    }
+
+    private function attachPositionEffective(CalculationPosition $position, ConfigurationSnapshot $effective): void
+    {
+        $position->forceFill([
+            'advertising_medium_code' => $effective->context_advertising_medium_code,
+            'advertising_medium_name' => $effective->context_advertising_medium_name,
+            'advertising_category_id' => (int) $effective->context_advertising_category_id,
+            'advertising_category_key' => $effective->context_advertising_category_key,
+            'advertising_category_name' => $effective->context_advertising_category_name,
+            'effective_configuration_snapshot_id' => (int) $effective->id,
+        ]);
+        $position->save();
+        $position->setRelation('effectiveConfigurationSnapshot', $effective);
+
+        $this->integrity->assertOwnership($effective);
+    }
+
+    /**
+     * Der Client liefert den erwarteten Fingerprint; interne Payloads (Budget-
+     * vorschlag) lösen ihn aus den eingefrorenen Basisquellen auf.
+     *
+     * @param  array<string, mixed>  $payloadPosition
+     */
+    private function positionFingerprint(
+        ConfigurationSnapshot $base,
+        int $mediumId,
+        array $payloadPosition,
+    ): string {
+        $expected = $payloadPosition['schema_fingerprint'] ?? null;
+
+        if (ConfigurationSnapshotIntegrity::isValidFingerprint($expected)) {
+            return (string) $expected;
+        }
+
+        return (string) $this->snapshots->resolvePositionSchemaFromBase($base, $mediumId)['schema_fingerprint'];
     }
 
     /**

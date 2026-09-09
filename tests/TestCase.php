@@ -23,21 +23,37 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Live-Fingerprint für Calc-Create (HTTP und Writer).
+     * Live-Fingerprint der Basis für Calc-Create (HTTP und Writer).
      */
     protected function liveSchemaFingerprint(): string
     {
         return (string) app(ConfigurationSnapshotFreezeService::class)
-            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
+            ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
     }
 
     /**
+     * DF-3.3a2β: Basis-Fingerprint plus je Position der Fingerprint im
+     * gewählten Werbemittelkontext.
+     *
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     protected function withLiveSchemaFingerprint(array $payload): array
     {
         $payload['schema_fingerprint'] = $this->liveSchemaFingerprint();
+
+        if (is_array($payload['positions'] ?? null)) {
+            $freeze = app(ConfigurationSnapshotFreezeService::class);
+
+            foreach ($payload['positions'] as $index => $position) {
+                $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+                if ($mediumId < 1) {
+                    continue;
+                }
+                $payload['positions'][$index]['schema_fingerprint'] = (string) $freeze
+                    ->resolveLivePositionSchema($mediumId)['schema_fingerprint'];
+            }
+        }
 
         return $payload;
     }

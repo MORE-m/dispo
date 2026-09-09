@@ -15,6 +15,9 @@ use RuntimeException;
  *
  * Es findet bewusst **keine** Neuauflösung aktueller Assignments statt; der
  * Klon behält `format_version`, Feldset-Referenz und Calc-Herkunft.
+ *
+ * DF-3.3a2β: Ab Generation 3 klont der Aufrufer zusätzlich je Position den
+ * Effektiv-Snapshot über {@see cloneEffectiveForDispoRevision}.
  */
 final class ConfigurationSnapshotCloneService
 {
@@ -39,12 +42,13 @@ final class ConfigurationSnapshotCloneService
             $clone->field_set_version_id = $predecessor->field_set_version_id;
             $clone->source = ConfigurationSnapshotSourceEnum::DispoOrderCreate;
             $clone->source_configuration_snapshot_id = $predecessor->source_configuration_snapshot_id;
+            $clone->parent_configuration_snapshot_id = null;
             $clone->format_version = (int) $predecessor->format_version;
             $clone->schema_fingerprint = $predecessor->schema_fingerprint;
             $clone->created_at = now();
             $clone->save();
 
-            $sourceIdMap = $clone->format_version === ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE
+            $sourceIdMap = $this->hasSourceGraph($clone)
                 ? $this->cloneSources($predecessor, $clone)
                 : [];
 
@@ -61,6 +65,76 @@ final class ConfigurationSnapshotCloneService
 
             return $fresh;
         });
+    }
+
+    /**
+     * DF-3.3a2β / VER-003: Nachbesserung erbt auch die positionsscharfen
+     * Effektiv-Snapshots. Der Klon behält den historischen Kontext und hängt am
+     * neuen Dispo-Basissnapshot.
+     *
+     * Der Aufrufer (DispoOrderWriter) klont je Position einzeln und bindet den
+     * Klon anschließend an die neue Positionszeile.
+     */
+    public function cloneEffectiveForDispoRevision(
+        ConfigurationSnapshot $predecessorEffective,
+        ConfigurationSnapshot $newDispoBase,
+    ): ConfigurationSnapshot {
+        if ($predecessorEffective->source !== ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective) {
+            throw new RuntimeException(
+                "Snapshot {$predecessorEffective->id} ist kein Dispo-Positions-Effektiv-Snapshot.",
+            );
+        }
+
+        if ((int) $newDispoBase->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            throw new RuntimeException(
+                "Ziel-Basissnapshot {$newDispoBase->id} ist kein Snapshot der Generation 3.",
+            );
+        }
+
+        return DB::transaction(function () use ($predecessorEffective, $newDispoBase): ConfigurationSnapshot {
+            $predecessorEffective->loadMissing(['fieldDefinitions', 'rules']);
+
+            $clone = new ConfigurationSnapshot;
+            $clone->field_set_id = $predecessorEffective->field_set_id;
+            $clone->field_set_version_id = $predecessorEffective->field_set_version_id;
+            $clone->source = ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective;
+            $clone->source_configuration_snapshot_id = $predecessorEffective->source_configuration_snapshot_id;
+            $clone->parent_configuration_snapshot_id = (int) $newDispoBase->id;
+            $clone->format_version = (int) $predecessorEffective->format_version;
+            $clone->schema_fingerprint = $predecessorEffective->schema_fingerprint;
+            $clone->context_advertising_medium_id = $predecessorEffective->context_advertising_medium_id;
+            $clone->context_advertising_medium_code = $predecessorEffective->context_advertising_medium_code;
+            $clone->context_advertising_medium_name = $predecessorEffective->context_advertising_medium_name;
+            $clone->context_advertising_category_id = $predecessorEffective->context_advertising_category_id;
+            $clone->context_advertising_category_key = $predecessorEffective->context_advertising_category_key;
+            $clone->context_advertising_category_name = $predecessorEffective->context_advertising_category_name;
+            $clone->created_at = now();
+            $clone->save();
+
+            $sourceIdMap = $this->cloneSources($predecessorEffective, $clone);
+
+            foreach ($predecessorEffective->fieldDefinitions as $definition) {
+                $this->cloneDefinition($definition, $clone, $sourceIdMap);
+            }
+
+            foreach ($predecessorEffective->rules as $rule) {
+                $this->cloneRule($rule, $clone, $sourceIdMap);
+            }
+
+            $fresh = $clone->load(['fieldDefinitions', 'rules', 'sources']);
+            // Eigentümerbindung entsteht erst mit der neuen Positionszeile.
+            app(ConfigurationSnapshotIntegrity::class)->assertReadableInternal($fresh);
+
+            return $fresh;
+        });
+    }
+
+    private function hasSourceGraph(ConfigurationSnapshot $snapshot): bool
+    {
+        return in_array((int) $snapshot->format_version, [
+            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
+        ], true);
     }
 
     /**
