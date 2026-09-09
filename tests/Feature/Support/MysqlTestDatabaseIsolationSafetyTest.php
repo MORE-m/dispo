@@ -40,11 +40,19 @@ class MysqlTestDatabaseIsolationSafetyTest extends TestCase
         $process->setTimeout(60);
         $process->run();
 
+        $output = $process->getOutput()."\n".$process->getErrorOutput();
         $this->assertTrue(
             $process->isSuccessful(),
-            $process->getErrorOutput()."\n".$process->getOutput(),
+            $output,
         );
-        $this->assertStringContainsString('"result":"passed"', $process->getOutput());
+        // Lokal (JSON-Reporter) oder CI (Text): beide Formate akzeptieren.
+        $passedViaJson = str_contains($output, '"result":"passed"');
+        $passedViaText = str_contains($output, 'resolved laravel mysql database is dispo test')
+            && (str_contains($output, 'PASS') || str_contains($output, '1 passed'));
+        $this->assertTrue(
+            $passedViaJson || $passedViaText,
+            "Subprozess-Schutzprobe ohne erkennbares PASS:\n{$output}",
+        );
     }
 
     public function test_resolved_laravel_mysql_database_is_dispo_test(): void
