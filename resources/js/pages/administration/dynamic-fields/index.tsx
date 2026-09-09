@@ -15,7 +15,7 @@ export default function DynamicFieldsHome({ links }: { links: LinkItem[] }) {
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Dynamische Felder"
-                    description="DF-3.1: Systemfeld-Revisionen und Kern-Feldset-Versionierung. Kein Abschluss von DF-3."
+                    description="Systemfeld-Revisionen, Custom-Felder, Feldsets und Assignments. Kein Abschluss von DF-3."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/administration">

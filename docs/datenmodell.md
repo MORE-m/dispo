@@ -284,7 +284,10 @@ vorhandenen Werte.
 - Deterministischer Resolver + Kontext-Preview-API; Activate mit Fingerprint/409.
 - In DF-3.3a1 **noch keine** produktive Runtime-Wirkung; die globale Ebene wirkt
   ab `DF-3.3a2α`, Kategorie/Werbemittel und VER-003 ab `DF-3.3a2β`, die
-  Assignment-UI folgt in `DF-3.3b`.
+  Assignment-UI ab `DF-3.3b`.
+- **PO-33b-1:** neue Assignment-Bindungen nur auf aktive Katalogziele; bestehende
+  Assignments mit später deaktiviertem Ziel bleiben lesbar. Katalog-Admin bleibt
+  verbindlicher Folgeslice.
 
 ### DF-3.3a2α – Snapshot-Generation 2, Quellengraph und Provenance (`main`)
 
@@ -320,9 +323,9 @@ Generation.
 - Dispo-Revision **klont** den Vorgänger-Snapshot (gleiche `format_version`,
   gleicher Fingerprint, gleiche Keys, geklonte Quellen) statt neu aufzulösen.
 
-### DF-3.3a2β – Snapshot-Generation 3, VER-003 Positions-Effektivs (Feature-Branch)
+### DF-3.3a2β – Snapshot-Generation 3, VER-003 Positions-Effektivs (`main`)
 
-Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze`.
+PR #25 / `100c79a`.
 
 | Tabelle / Spalte | Rolle |
 |---|---|
@@ -347,11 +350,14 @@ Konzeptuell vorgesehen, aber **nicht implementiert**:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
-- Assignment-Admin-UI (`DF-3.3b`),
+- **Katalog-Admin** für Oberkategorien und Werbemittel (ADV; nach PO-33b-1
+  **verbindlich offen** – Administratoren sollen Stammdaten später anlegen,
+  ändern, deaktivieren, reaktivieren und fachlich zuordnen können),
 - Regel-Editor / volle Regelmatrix.
 
 Die Runtime-Auswertung freier Feldsets ist seit `DF-3.3a2α` für die **globale**
 Ebene und seit `DF-3.3a2β` für Kategorie/Werbemittel inkl. VER-003 umgesetzt.
+Die Assignment-Admin-UI ist seit `DF-3.3b` vorhanden.
 
 JSON darf für unveränderbare Snapshotdarstellung ergänzend genutzt werden, ersetzt
 aber nicht die relationalen, filter- und reportrelevanten Werte.

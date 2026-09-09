@@ -2,12 +2,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
+/**
+ * DF-3.3b isolierte E2E-Suite: Assignment-Admin-UI (eigene SQLite-DB, Port 8006).
+ */
 const e2eDb = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    'database/e2e.sqlite',
+    'database/e2e-df33b.sqlite',
 );
 
-const e2ePort = process.env.E2E_PORT ?? '8001';
+const e2ePort = process.env.E2E_DF33B_PORT ?? '8006';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
 const e2eEnv = {
@@ -20,15 +23,7 @@ const e2eEnv = {
 
 export default defineConfig({
     testDir: 'tests/e2e',
-    testIgnore: [
-        '**/df32b-*.spec.ts',
-        '**/df33fs-*.spec.ts',
-        '**/df33a2a-*.spec.ts',
-        '**/df33a2b-*.spec.ts',
-        '**/df33b-*.spec.ts',
-    ],
-    // Hauptsuite: seriell (u. a. DF-3.2a mutiert Feldsets). DF-3.2b / DF-3.3-fs /
-    // DF-3.3a2α / DF-3.3a2β / DF-3.3b laufen separat mit eigener DB/Port.
+    testMatch: '**/df33b-*.spec.ts',
     fullyParallel: false,
     workers: 1,
     forbidOnly: !!process.env.CI,
@@ -39,7 +34,7 @@ export default defineConfig({
     },
     projects: [
         {
-            name: 'chromium',
+            name: 'chromium-df33b',
             use: { ...devices['Desktop Chrome'] },
         },
     ],

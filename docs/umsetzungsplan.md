@@ -79,10 +79,10 @@ Umfang:
 Relevante Anforderungen: `DYN-*`, `VER-*`, `ADM-001`, `ADM-002`.
 
 Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
-Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview und DF-3.3a2α Gen2-Freeze
-(alles auf `main`, α via PR #24) sowie DF-3.3a2β auf Feature-Branch: Generation-3-
-Freeze mit VER-003 Positions-Effektivs und Kat-/Medium-Runtime.
-Offen: Assignment-UI (`DF-3.3b`, nicht begonnen), Optionen, Regel-Editor.
+Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview, DF-3.3a2α Gen2-Freeze,
+DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI (alles auf `main`; β via
+PR #25, b via Feature-Branch `feat/df3-3b-assignment-admin-ui`).
+Offen: Katalog-Admin (ADV, verbindlich), Optionen, Regel-Editor.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

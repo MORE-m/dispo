@@ -161,6 +161,16 @@ freigegeben:
 - Custom Header-Textfelder (DF-3.2a) inkl. Runtime in Kalkulation/Dispo
 - Navigation Administration → Hub mit freigeschaltetem Dyn-Feld-Modul
 
+**Product-Owner-Teilfreigabe (September 2026, PO-33b-2):** Innerhalb der bereits
+freigegebenen Administration dynamischer Felder zusätzlich freigegeben:
+
+- Field-Set-Assignment-Admin-UI (Liste, Anlegen, Detail, Preview, Activate/Deactivate)
+- Herkunfts- und Konfliktvorschau für Assignments
+
+Diese Entscheidung gibt **ausschließlich** die Assignment-Verwaltung im Bereich
+„Dynamische Felder“ frei. Sie öffnet weder den allgemeinen Katalog-Admin noch
+andere UX-GATE-D-Module.
+
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition
@@ -168,8 +178,11 @@ freigegeben:
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der übrigen Initialkataloge (Inventare, Werbemittel, Preislisten, …)
+- Administration der übrigen Initialkataloge (Inventare, Werbemittel,
+  Oberkategorien, Preislisten, …) – **Katalog-Admin bleibt verbindlich offen**
+  (PO-33b-1 / ADV)
 - Auswertungen und abschließende Fachoberflächen
+- Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
 
 Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
 technisch und fachlich umgesetzt. Der abgelehnte Dispoauftrag bleibt als
@@ -183,7 +196,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (DF-3.1/DF-3.2a Header-Custom); operative Disposition und übrige Admin-Kataloge weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b Assignments, PO-33b-2); operative Disposition und Katalog-Admin weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

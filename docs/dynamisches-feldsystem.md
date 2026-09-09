@@ -92,8 +92,7 @@ friert DF-3.3a2β als Generation 3 ein.
 
 ## Umsetzungsstand DF-3.3a2β (contextual Freeze / VER-003)
 
-Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze` – **kein** Abschluss von
-DF-3, **kein** Start von `DF-3.3b`.
+Auf `main` (PR #25 / `100c79a`). **Kein** Abschluss von DF-3.
 
 - **Generation 3:** Basis (Header, Core→global) + Positions-Effektivs
   (Core→global→Kat→Medium) mit Parent-FK und historischem Kontext.
@@ -107,9 +106,24 @@ DF-3, **kein** Start von `DF-3.3b`.
 
 ### Bewusst nicht in DF-3.3a2β
 
-1. **Assignment-Admin-UI:** `DF-3.3b`
+1. **Assignment-Admin-UI:** nachgezogen in `DF-3.3b`
 2. **Optionen, volle Regelmatrix, Regel-Editor:** unverändert offen
 3. **Migration/Rekonstruktion** bestehender Gen1/Gen2-Inhalte: nicht vorgesehen
+
+## Umsetzungsstand DF-3.3b (Assignment-Admin-UI)
+
+Inertia-Admin unter Dyn-Feld-Teilfreigabe (PO-33b-2). Nutzt die a1-JSON-Lifecycle-
+API und Server-Preview als Autorität – keine zweite Merge-Engine.
+
+- Liste / Anlegen / Detail; Bearbeiten nur inaktiv; Activate/Deactivate
+- Kontext- und Aktivierungsvorschau mit Winning-Layer, Overrides und Konflikten
+- Fingerprint/`lock_version`/409 in der UI
+- **PO-33b-1:** bestehende aktive Oberkategorien/Werbemittel nur als Auswahlwerte;
+  deaktivierte nicht für neue Bindungen; historische Ziele lesbar
+- **Katalog-Admin** für Oberkategorien und Werbemittel bleibt **verbindlich offen**
+  (ADV-Folgeslice: anlegen, ändern, deaktivieren, reaktivieren, fachlich zuordnen)
+- E2E isoliert: `playwright.df33b.config.ts` (Port 8006)
+- Snapshot-/Runtime-Verträge unverändert
 
 ## Umsetzungsstand DF-3.3a1 (Field-Set-Assignments)
 
@@ -127,7 +141,7 @@ Runtime-Wirkung**; die globale Ebene wirkt erst ab DF-3.3a2α.
 - Overrides dreistufig `null`/`true`/`false`; spezifischere Ebene gewinnt;
   widersprüchliche Overrides derselben Ebene blockieren.
 - Minimale JSON-API unter `access-administration` (Kontext-Preview, Aktivierungs-
-  Preview, CRUD); **keine** Assignment-Admin-UI.
+  Preview, CRUD); Assignment-Admin-UI in DF-3.3b.
 - Bewusst nicht in a1: VER-002 Quellengraph, VER-003 Positions-Effektiv,
   Writer-/Composer-Umbau, produktive Feldwirkung.
 
