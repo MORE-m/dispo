@@ -55,6 +55,11 @@ class FieldSetAdminController extends Controller
                     'description' => 'Kern-Feldsets und freie Feldsets versionieren und aktivieren.',
                     'href' => '/administration/dynamische-felder/feldsets',
                 ],
+                [
+                    'title' => 'Assignments',
+                    'description' => 'Freie Feldsets global, an Oberkategorien oder Werbemitteln zuordnen; Herkunft und Konflikte prüfen.',
+                    'href' => '/administration/dynamische-felder/assignments',
+                ],
             ],
         ]);
     }

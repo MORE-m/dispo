@@ -108,7 +108,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktivieren', [FieldSetAdminController::class, 'activate'])
             ->name('administration.dynamic-fields.field-sets.versions.activate');
 
-        // DF-3.3a1: Assignments + Kontext-Preview (JSON, keine Admin-UI)
+        // DF-3.3a1 JSON-Lifecycle + DF-3.3b Inertia-Admin-UI (PO-33b-2 Dyn-Feld-Admin)
+        Route::get('administration/dynamische-felder/assignments', [FieldSetAssignmentAdminController::class, 'index'])
+            ->name('administration.dynamic-fields.assignments.index');
+        Route::get('administration/dynamische-felder/assignments/neu', [FieldSetAssignmentAdminController::class, 'create'])
+            ->name('administration.dynamic-fields.assignments.create');
+        Route::get('administration/dynamische-felder/assignments/{assignment}', [FieldSetAssignmentAdminController::class, 'show'])
+            ->name('administration.dynamic-fields.assignments.show');
         Route::post('administration/dynamische-felder/assignments', [FieldSetAssignmentAdminController::class, 'store'])
             ->name('administration.dynamic-fields.assignments.store');
         Route::put('administration/dynamische-felder/assignments/{assignment}', [FieldSetAssignmentAdminController::class, 'update'])

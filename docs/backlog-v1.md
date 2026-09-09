@@ -199,12 +199,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime + DF-3.3a2β Kat/Medium + VER-003)
+- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime + DF-3.3a2β Kat/Medium + VER-003 + DF-3.3b Assignment-UI)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
 - **Geplante Folge:** ADV-001a → DF-3.3-fs → DF-3.3a1 (Assignments/Resolver/Preview)
-  → DF-3.3a2α (VER-002-Freeze + globale Runtime) → **DF-3.3a2β** (Kat/Medium +
-  VER-003) → `DF-3.3b` (Admin-UI)
+  → DF-3.3a2α (VER-002-Freeze + globale Runtime) → DF-3.3a2β (Kat/Medium +
+  VER-003) → **DF-3.3b** (Admin-UI) → Katalog-Admin (ADV) / Optionen / Regel-Editor
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -220,15 +220,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
   Wirkung (`DYN-002`/`DYN-003` Teil).
 - **DF-3.3a1 erledigt (`main`):** `field_set_assignments`, deterministischer
-  Resolver, Kontext-Preview/Activate-Fingerprint; noch **keine** Runtime-Wirkung.
+  Resolver, Kontext-Preview/Activate-Fingerprint; Runtime folgt a2.
 - **DF-3.3a2α erledigt (`main`, PR #24 / `8edcbd7`):**
   aktive **globale** Assignments wirken produktiv auf Kalkulation und Dispoauftrag
   (Kopf- und Positionsfelder).
-- **DF-3.3a2β in Arbeit (Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze`):**
+- **DF-3.3a2β erledigt (`main`, PR #25 / `100c79a`):**
   Generation 3, Kategorie-/Werbemittel-Runtime, VER-003 Positions-Effektivs,
-  historischer Kontext, Unique-Ownership. **DF-3 nicht abgeschlossen.**
-- **Offen:** Assignment-UI (`DF-3.3b`, **nicht begonnen**), Optionen, volle
-  Regelmatrix, Regel-Editor.
+  historischer Kontext, Unique-Ownership.
+- **DF-3.3b erledigt (Feature-Branch `feat/df3-3b-assignment-admin-ui`):**
+  Assignment-Admin-UI mit Herkunft/Konfliktvorschau; PO-33b-1 Read-only-Katalogwahl;
+  PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
+- **Offen:** Katalog-Admin Oberkategorien/Werbemittel (**verbindlich**), Optionen,
+  volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
@@ -252,8 +255,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `format_version` als Generationsmarker mit fail-closed Lesepfad,
   `schema_fingerprint` + 409 bei Drift, Dispo-Revision klont Snapshot statt neu
   aufzulösen. **DF-3 nicht abgeschlossen.**
-  **Offen:** `VER-003` Positionskonfig-Snapshot (**nicht begonnen**),
-  Kategorie-/Werbemittelquellen im Quellengraph (`DF-3.3a2β`).
+  **DF-3.3a2β (`main`, PR #25):** `VER-003` Positions-Effektiv-Snapshots,
+  Kategorie-/Werbemittelquellen im Quellengraph, historischer Kontext.
+  **DF-3.3b:** Assignment-Admin-UI (keine Schemaänderung).
+  **Offen:** Optionen, Regel-Editor; Katalog-Admin (ADV) verbindlich.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

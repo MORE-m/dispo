@@ -1,37 +1,53 @@
 # Fortschritt V1
 
-Stand: 9. September 2026 (DF-3.3a2β auf Feature-Branch – kein Abschluss von DF-3)
+Stand: 9. September 2026 (DF-3.3b Assignment-Admin-UI – kein Abschluss von DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1 und DF-3.3a2α auf `main`** (PR #15–#24). **DF-3.3a2β** (Generation-3-
-Freeze, VER-003 Positions-Effektivs, Kat/Medium-Runtime) auf Feature-Branch
-`feat/df3-3a2b-contextual-snapshot-freeze`. Gesamtziel DF-3 bleibt offen
-(`DF-3.3b`, Optionen, Regel-Editor).
+DF-3.3a1, DF-3.3a2α, DF-3.3a2β und DF-3.3b auf `main`** (PR #15–#26).
+Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor).
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
-Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin. Katalog-Admin
-(Inventare, Werbemittel, Oberkategorien, …) bleibt gesperrt.
+Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin inkl. Assignments
+(PO-33b-2). Katalog-Admin (Inventare, Werbemittel, Oberkategorien, …) bleibt
+gesperrt und ist nach PO-33b-1 **verbindlich offen** als Folgeslice.
 
 ## Aktuelle Aufgabe
 
-Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze` – **DF-3.3a2β**:
-Generation 3 mit Positions-Effektiv-Snapshots (VER-003), historischem
-Werbemittel-/Kategoriekontext, Unique-1:1-Ownership und produktiver
-Kat-/Medium-Runtime. **Kein** Start von `DF-3.3b`.
+DF-3.3b Assignment-Admin-UI abgeschlossen (Feature-Branch
+`feat/df3-3b-assignment-admin-ui`). Nächste sinnvolle Schritte: Optionen /
+Regel-Editor oder Katalog-Admin (ADV).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3.3a2α globaler Snapshot-Freeze – PR [#24](https://github.com/MORE-m/dispo/pull/24)
-gemergt in `main` (`8edcbd7`).
+DF-3.3b Assignment-Admin-UI mit Herkunft-/Konfliktvorschau – Feature-Branch
+`feat/df3-3b-assignment-admin-ui` (nach PR #25 / DF-3.3a2β auf `main`).
 
-Davor: DF-3.3a1 – PR [#23](https://github.com/MORE-m/dispo/pull/23) (`c928169`).
+Davor: DF-3.3a2β contextual Freeze – PR [#25](https://github.com/MORE-m/dispo/pull/25)
+gemergt in `main` (`100c79a`). Feature-HEAD `81d75b7`.
 
-## DF-3.3a2β – Contextual Freeze / VER-003 (September 2026)
+## DF-3.3b – Assignment-Admin-UI (September 2026)
 
-Feature-Branch, **kein** Abschluss von DF-3.
+Inertia-Admin unter Dyn-Feld-Teilfreigabe (PO-33b-2). **Kein** Abschluss von DF-3.
+
+| Kriterium | Status |
+|---|---|
+| Hub-Link Assignments + Index/Create/Show | umgesetzt |
+| Anlegen inaktiv; Bearbeiten nur inaktiv; Activate/Deactivate | umgesetzt |
+| Kontext- und Aktivierungsvorschau mit Herkunft/Konflikten | umgesetzt (Server-Preview a1) |
+| Fingerprint/`lock_version`/409 in der UI | umgesetzt |
+| PO-33b-1: aktive Kat/Medien nur read-only auswählbar | umgesetzt |
+| Historische/deaktivierte Ziele weiterhin lesbar | umgesetzt |
+| E2E isoliert: `playwright.df33b.config.ts` (Port 8006) | umgesetzt |
+| Snapshot-/Runtime-Verträge | **unverändert** |
+| Katalog-Admin Oberkategorien/Werbemittel | **verbindlich offen** (Folgeslice) |
+| Optionen / Regel-Editor | **nicht** |
+
+## DF-3.3a2β – Contextual Freeze / VER-003 (September 2026, `main`)
+
+PR #25 / `100c79a` (Feature-HEAD `81d75b7`). Generation 3 auf `main`.
 
 | Kriterium | Status |
 |---|---|
@@ -42,10 +58,8 @@ Feature-Branch, **kein** Abschluss von DF-3.
 | Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
 | Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
 | Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
-| Review-Härtung: Teilselektion-Dispo, fail-closed Effektiv-Lifecycle, Gen-3-Integrity, Fingerprint-Vertrag, PO-32b-1 Header | umgesetzt |
-| Schema-API mit Medium; Wizard Positions-Fingerprints | umgesetzt |
 | E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
-| Assignment-Admin-UI | **nicht** (DF-3.3b) |
+| Assignment-Admin-UI | umgesetzt in DF-3.3b |
 
 ### Snapshot-Generationen (Matrix)
 
@@ -70,9 +84,9 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Quellengraph `configuration_snapshot_sources` (+ `_source_fields`, `_source_rules`) | umgesetzt |
 | Property-Provenance je Snapshot-Definition | umgesetzt |
 | Freeze Gen2: Core + aktive globale Assignments | umgesetzt (Bestand) |
-| Kategorie-/Werbemittel-Assignments in der Runtime | in DF-3.3a2β nachgezogen |
-| VER-003 Positions-Effektiv-Snapshot | in DF-3.3a2β nachgezogen |
-| Assignment-Admin-UI | **nicht** (DF-3.3b) |
+| Kategorie-/Werbemittel-Assignments in der Runtime | in DF-3.3a2β |
+| VER-003 Positions-Effektiv-Snapshot | in DF-3.3a2β |
+| Assignment-Admin-UI | in DF-3.3b |
 
 ## DF-3.3a1 – Field-Set-Assignments (September 2026, `main`)
 
@@ -87,7 +101,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Produktive Runtime-Wirkung freier Sets | global ab DF-3.3a2α; Kat/Medium ab DF-3.3a2β |
 | VER-002 Quellengraph | in DF-3.3a2α umgesetzt |
 | VER-003 Positions-Effektiv | in DF-3.3a2β umgesetzt |
-| Assignment-Admin-UI | **nicht** (DF-3.3b) |
+| Assignment-Admin-UI | in DF-3.3b umgesetzt |
 
 ## DF-3.3-fs – Freie Feldsets (September 2026)
 
@@ -106,9 +120,10 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- `DF-3.3b`: Assignment-Admin-UI, Herkunft/Konflikte UX – **nicht begonnen**
+- **Katalog-Admin** für Oberkategorien und Werbemittel (ADV) – **verbindlich offen**
+  nach PO-33b-1: anlegen, ändern, deaktivieren, reaktivieren, fachlich zuordnen
 - Optionen / Auswahlfelder, volle Regelmatrix, Regel-Editor
-- Slice-Reihenfolge ab hier: **DF-3.3a2β** → DF-3.3b
+- Slice-Reihenfolge ab hier: Optionen/Regel-Editor und/oder Katalog-Admin
 
 ## ADV-001a – Oberkategorie-Datenbasis (September 2026)
 
@@ -119,7 +134,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | `advertising_media.category_id` NOT NULL, `restrictOnDelete` | umgesetzt |
 | Explizite Bestands-Map, fail-closed ohne Default | umgesetzt |
 | Models/Relations/Factories/Tests | umgesetzt |
-| Katalog-Admin-UI | **nicht** (UX-GATE-D) |
+| Katalog-Admin-UI | **nicht** (UX-GATE-D; verbindlicher Folgeslice) |
 | Kategorie-Defaults, Snapshot-Provenance | **nicht** (spätere Slices) |
 
 ## DF-3.2b – Custom Position-Textfelder (September 2026)
@@ -133,7 +148,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Provenance Calc-Origin über Source-Snapshot (kein neues Flag) | umgesetzt |
 | Atomarer Partial-Save nativer Positions-Customs (PO-32b-2) | umgesetzt |
 | E2E isoliert: `playwright.df32b.config.ts` (eigene DB/Port) | umgesetzt |
-| Assignments / Optionen / Regel-Editor | **nicht** in DF-3.2b |
+| Assignments / Optionen / Regel-Editor | Assignments in DF-3.3b; Optionen/Regeln offen |
 
 ## DF-3.2a – Custom Header-Textfelder (September 2026)
 
@@ -146,7 +161,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt (Position in DF-3.2b) |
 | Runtime: Wizard „Weitere Angaben“, Dispo editierbar + Calc-origin read-only | umgesetzt |
 | DF-3.2b Position-Custom-Felder | **umgesetzt** (auf `main`) |
-| Assignments / Optionen / Regel-Editor | **nicht** in DF-3.2a |
+| Assignments / Optionen / Regel-Editor | Assignments in DF-3.3b; Optionen/Regeln offen |
 
 ## DF-3.1 – Admin Systemfelder / Kern-Feldsets (September 2026)
 
@@ -157,7 +172,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Draft/Activate/Copy-as-template für zwei Kern-Feldsets | umgesetzt |
 | Statische Vorschau mit Beispielwerten; Regeln nur lesbar | umgesetzt |
 | Audit + `lock_version` + AT-14 (Historie unverändert) | umgesetzt |
-| Custom Fields / Optionen / Assignments / Regel-Editor | **nicht** in DF-3.1 (teilweise DF-3.2a/b) |
+| Custom Fields / Optionen / Assignments / Regel-Editor | teilweise später (Custom DF-3.2a/b; Assignments DF-3.3b) |
 
 ## DF-2 – Dispo-Config-Snapshot und Hinweise (September 2026)
 
@@ -182,6 +197,10 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
   Regeln in DF-3.1 nur lesbar.
 - **PO-32b-1…4:** siehe Entscheidungslog (Pflicht erst Dispo-Create; Partial-Save;
   Snapshot-Provenance; both wie 3.2a).
+- **PO-33b-1:** In DF-3.3b nur bestehende aktive Oberkategorien/Werbemittel als
+  Assignment-Ziele auswählen; Katalog-Admin bleibt verbindlicher Folgeslice.
+- **PO-33b-2:** Assignment-Admin-UI gehört zur Teilfreigabe „Administration
+  dynamischer Felder“; keine zusätzliche UX-GATE-D-Freigabe.
 
 ## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
 
@@ -197,13 +216,15 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.3a2β
+## Bewusst offen nach DF-3.3b
 
-- DF-3.3b: Assignment-Admin-UI, Herkunft/Konflikte – **nicht begonnen**
+- **Katalog-Admin** für Oberkategorien und Werbemittel – **verbindlich offen**
+  (ADV; Administratoren sollen Stammdaten später anlegen, ändern, deaktivieren,
+  reaktivieren und fachlich zuordnen können)
 - ADV-001 Rest: Kategorie-Defaults, Admin
 - ADV-002 / SystemFieldSetting
 - Optionen, Regelmatrix, Regel-Editor
-- übrige UX-GATE-D-Adminmodule (Inventare, Kataloge, Preislisten, …)
+- übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, …)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 
 ## Echte Blocker
@@ -211,6 +232,6 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin teilfreigegeben; Katalog-Admin gesperrt) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin inkl. Assignments teilfreigegeben; Katalog-Admin gesperrt) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |

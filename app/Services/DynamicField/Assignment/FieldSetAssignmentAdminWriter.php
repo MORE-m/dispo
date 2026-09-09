@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * DF-3.3a1 / DYN-002 / AUD-001: Assignment CRUD, Activate/Deactivate.
- * Keine produktive Runtime-Wirkung freier Feldsets.
+ * DF-3.3a1 / DF-3.3b / DYN-002 / AUD-001: Assignment CRUD, Activate/Deactivate.
+ * Runtime-Wirkung freier Sets erfolgt über Freeze (a2α/β); diese Klasse bleibt die Admin-Autorität.
  */
 final class FieldSetAssignmentAdminWriter
 {
@@ -45,6 +45,8 @@ final class FieldSetAssignmentAdminWriter
         return DB::transaction(function () use ($payload, $actor): FieldSetAssignment {
             $normalized = $this->normalizeStructuralPayload($payload);
             $this->assertAssignableFieldSet($normalized['field_set_id'], $normalized['applies_to_process']);
+            // PO-33b-1: neue Bindungen nur auf aktive Katalogziele.
+            $this->assertSelectableActiveTargets($normalized);
 
             try {
                 $assignment = new FieldSetAssignment;
@@ -122,6 +124,14 @@ final class FieldSetAssignmentAdminWriter
             ];
             $normalized = $this->normalizeStructuralPayload($merged);
             $this->assertAssignableFieldSet($normalized['field_set_id'], $normalized['applies_to_process']);
+
+            $targetChanged = $locked->target_layer !== $normalized['target_layer']
+                || (int) ($locked->advertising_category_id ?? 0) !== (int) ($normalized['advertising_category_id'] ?? 0)
+                || (int) ($locked->advertising_medium_id ?? 0) !== (int) ($normalized['advertising_medium_id'] ?? 0);
+            // PO-33b-1: Zielwechsel nur auf aktive Katalogziele; bestehende deaktivierte Ziele bleiben les-/haltbar.
+            if ($targetChanged) {
+                $this->assertSelectableActiveTargets($normalized);
+            }
 
             $before = $this->auditPayload($locked);
 
@@ -413,6 +423,38 @@ final class FieldSetAssignmentAdminWriter
             FieldAppliesTo::DispoOrder => $assignment === FieldAppliesTo::DispoOrder,
             FieldAppliesTo::Both => true,
         };
+    }
+
+    /**
+     * @param  array{
+     *     target_layer: FieldSetAssignmentTargetLayer,
+     *     advertising_category_id: int|null,
+     *     advertising_medium_id: int|null
+     * }  $normalized
+     */
+    private function assertSelectableActiveTargets(array $normalized): void
+    {
+        if ($normalized['target_layer'] === FieldSetAssignmentTargetLayer::AdvertisingCategory) {
+            $category = AdvertisingCategory::query()
+                ->whereKey($normalized['advertising_category_id'])
+                ->firstOrFail();
+            if (! $category->is_active) {
+                throw ValidationException::withMessages([
+                    'advertising_category_id' => 'Deaktivierte Oberkategorien können nicht als neues Assignment-Ziel gewählt werden.',
+                ]);
+            }
+        }
+
+        if ($normalized['target_layer'] === FieldSetAssignmentTargetLayer::AdvertisingMedium) {
+            $medium = AdvertisingMedium::query()
+                ->whereKey($normalized['advertising_medium_id'])
+                ->firstOrFail();
+            if (! $medium->is_active) {
+                throw ValidationException::withMessages([
+                    'advertising_medium_id' => 'Deaktivierte Werbemittel können nicht als neues Assignment-Ziel gewählt werden.',
+                ]);
+            }
+        }
     }
 
     private function assertGlobalTargets(?int $categoryId, ?int $mediumId): void
