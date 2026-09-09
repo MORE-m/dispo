@@ -580,7 +580,24 @@ class FieldSetAssignmentDf33a1Test extends TestCase
         ]);
         $this->assertContains($customKey, array_column($beforeDeactivate['fields'], 'field_key'));
 
-        $fieldSetWriter->deactivate($fieldSet->fresh(), $admin, (int) $fieldSet->fresh()->lock_version);
+        // DF-3.3-fs-HF1: Writer blockiert Deaktivierung bei aktivem Assignment.
+        try {
+            $fieldSetWriter->deactivate($fieldSet->fresh(), $admin, (int) $fieldSet->fresh()->lock_version);
+            $this->fail('Feldset-Deaktivierung muss bei aktivem Assignment scheitern.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('field_set', $exception->errors());
+            $this->assertStringContainsString(
+                'aktive Assignments',
+                $exception->errors()['field_set'][0],
+            );
+        }
+
+        $this->assertTrue($fieldSet->fresh()->is_assignable);
+        $this->assertTrue($assignment->fresh()->is_active);
+
+        // Preview-Skip für inkonsistenten Zustand absichtlich per Direktupdate erzeugen
+        // (kein Writer-Pfad; Preview bleibt skippend, Freeze fail-closed).
+        $fieldSet->forceFill(['is_assignable' => false])->save();
 
         $after = $preview->preview([
             'process' => 'calculation',

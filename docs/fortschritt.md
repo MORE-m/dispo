@@ -131,6 +131,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Membership/`applies_to`-Guards inkl. `both` mischt Calc/Dispo/both | umgesetzt |
 | Activate: leer abgelehnt; erste Activate setzt `is_assignable`; spätere respektiert Deakt. | umgesetzt |
 | Deaktivieren / explizites Reaktivieren; keine physische Löschung | umgesetzt |
+| **DF-3.3-fs-HF1:** Deaktivierung bei aktiven Assignments blockiert (keine Kaskade; Runtime fail-closed) | umgesetzt |
 | Kern-Feldsets geschützt, dauerhaft nicht assignierbar | umgesetzt |
 | Admin-Liste/Create/Detail/Editor/Vorschau; Runtime-Hinweis | umgesetzt |
 | E2E isoliert: `playwright.df33fs.config.ts` | umgesetzt |
