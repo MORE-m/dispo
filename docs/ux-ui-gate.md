@@ -171,6 +171,16 @@ Diese Entscheidung gibt **ausschließlich** die Assignment-Verwaltung im Bereich
 „Dynamische Felder“ frei. Sie öffnet weder den allgemeinen Katalog-Admin noch
 andere UX-GATE-D-Module.
 
+**Product-Owner-Teilfreigabe (September 2026, PO-ADV001b-1):** Zusätzlich
+freigegeben:
+
+- Administration Oberkategorien und Werbemittel (ADV-001b)
+- Anlegen, Bearbeiten, Deaktivieren/Reaktivieren, Sortierung, fachliche Zuordnung
+- Auswirkungsvorschau für kritische Änderungen
+
+Nicht freigegeben bleiben Inventar-Admin, Preislisten-Admin, Kombinationstabellen-
+Admin, SystemFieldSettings und weitere Kalkulationsarten.
+
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition
@@ -178,9 +188,8 @@ andere UX-GATE-D-Module.
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der übrigen Initialkataloge (Inventare, Werbemittel,
-  Oberkategorien, Preislisten, …) – **Katalog-Admin bleibt verbindlich offen**
-  (PO-33b-1 / ADV)
+- Administration der übrigen Initialkataloge (Inventare, Preislisten,
+  Kombinationstabelle, …) – Oberkategorien/Werbemittel freigegeben (ADV-001b)
 - Auswertungen und abschließende Fachoberflächen
 - Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
 
@@ -196,7 +205,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b Assignments, PO-33b-2); operative Disposition und Katalog-Admin weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b); operative Disposition sowie Inventar-/Preislisten-Admin weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\CatalogAdminConflictException;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -39,6 +40,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Konflikte werden immer als JSON ausgeliefert, damit auch Inertia-Posts
         // die fachliche Meldung statt einer generischen 409-Fehlerseite erhalten.
         $exceptions->render(function (FieldSetAssignmentConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        });
+
+        $exceptions->render(function (CatalogAdminConflictException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         });
     })->create();

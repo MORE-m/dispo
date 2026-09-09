@@ -173,16 +173,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** teilweise (`ADV-001a` Datenbasis; Rest offen)
+- **Status:** teilweise (`ADV-001a` Datenbasis; `ADV-001b` Katalog-Admin; Defaults offen)
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
-- **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a braucht BL-P2-01 nicht)
+- **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a/b braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern
 - **Akzeptanz:** nur aktive erlaubte Kombinationen auswählbar; `MAT-004` nicht umsetzen
 - **Tests:** Pest Filter, Planungsverbot, eindeutiger fachlicher Schlüssel
 - **ADV-001a erledigt:** `advertising_categories` + `advertising_media.category_id`
-  NOT NULL; sechs kanonische Keys; explizite Bestands-Map; keine Katalog-Admin-UI
-  (UX-GATE-D). **ADV-001 nicht vollständig** (Defaults, Snapshot-Provenance,
-  Assignments, Admin fehlen).
+  NOT NULL; sechs kanonische Keys; explizite Bestands-Map
+- **ADV-001b erledigt:** Katalog-Admin CRUD/Lifecycle/Impact-Preview; Key/Code
+  immutable; kein Hard Delete; `spot_classic`↔`spots`. **ADV-001 nicht vollständig**
+  (Defaults fehlen). Kombinationstabelle-Admin (`MAT-*`) offen.
 
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 
@@ -204,7 +205,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
 - **Geplante Folge:** ADV-001a → DF-3.3-fs → DF-3.3a1 (Assignments/Resolver/Preview)
   → DF-3.3a2α (VER-002-Freeze + globale Runtime) → DF-3.3a2β (Kat/Medium +
-  VER-003) → **DF-3.3b** (Admin-UI) → Katalog-Admin (ADV) / Optionen / Regel-Editor
+  VER-003) → **DF-3.3b** (Admin-UI) → **ADV-001b** (Katalog-Admin) → Optionen / Regel-Editor
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
 - **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
@@ -230,8 +231,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.3b erledigt (Feature-Branch `feat/df3-3b-assignment-admin-ui`):**
   Assignment-Admin-UI mit Herkunft/Konfliktvorschau; PO-33b-1 Read-only-Katalogwahl;
   PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
-- **Offen:** Katalog-Admin Oberkategorien/Werbemittel (**verbindlich**), Optionen,
-  volle Regelmatrix, Regel-Editor.
+- **Offen:** Optionen, volle Regelmatrix, Regel-Editor.
 
 ### BL-P3-02 – Snapshot-Fundament
 
@@ -258,7 +258,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **DF-3.3a2β (`main`, PR #25):** `VER-003` Positions-Effektiv-Snapshots,
   Kategorie-/Werbemittelquellen im Quellengraph, historischer Kontext.
   **DF-3.3b:** Assignment-Admin-UI (keine Schemaänderung).
-  **Offen:** Optionen, Regel-Editor; Katalog-Admin (ADV) verbindlich.
+  **Offen:** Optionen, Regel-Editor.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 

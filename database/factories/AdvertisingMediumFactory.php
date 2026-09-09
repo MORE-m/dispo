@@ -25,6 +25,8 @@ class AdvertisingMediumFactory extends Factory
             'is_discountable' => true,
             'is_ae_eligible' => true,
             'is_active' => true,
+            'sort' => 0,
+            'lock_version' => 1,
         ];
     }
 

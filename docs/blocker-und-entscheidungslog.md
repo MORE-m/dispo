@@ -57,13 +57,14 @@ Keine stillschweigenden ADR-Änderungen.
 | 09.09.2026 | DF-3.3a2β Nachhärtung | Gen-3-Update: Basis- und Positions-Fingerprints verbindlich; Wizard sendet Basis-FP; Source-/Herkunftskombinationen fail-closed; Negative Tests inkl. Replace-Rollback. **DF-3.3b bleibt Nicht-Ziel.** | VER-003, DF-3.3a2β |
 | 09.09.2026 | DF-3.3a2β gemergt | PR #25 in `main` (`100c79a`, Feature-HEAD `81d75b7`). | DF-3.3a2β |
 | 09.09.2026 | DF-3.3b Assignment-Admin-UI | Inertia Index/Create/Show; JSON-Lifecycle a1 wiederverwendet; Herkunft/Konfliktvorschau; Fingerprint/`lock_version`/409. **PO-33b-1:** bestehende aktive Oberkategorien/Werbemittel nur read-only als Assignment-Ziele; deaktivierte nicht für neue Bindungen; historische Ziele lesbar; **Katalog-Admin bleibt verbindlicher Folgeslice.** **PO-33b-2:** UI unter Teilfreigabe „Administration dynamischer Felder“, keine zusätzliche UX-GATE-D-Freigabe; Katalog-/Dispo-Abschluss-/Freigabe-Admin/Standardangebote bleiben gesperrt. E2E `playwright.df33b.config.ts` (Port 8006). Keine Migration; Snapshot-/Runtime unverändert. **DF-3 bleibt unvollständig.** | DYN-002, ADM-002, PO-33b-1/2, DF-3.3b |
+| 09.09.2026 | ADV-001b Katalog-Admin | Migration `lock_version` + `advertising_media.sort`. Admin-CRUD Oberkategorien/Werbemittel; Key/Code immutable; kein Hard Delete; Kategorie-Deakt. blockiert bei aktiven Medien; Assignments bleiben lesbar inkl. Wiederwirkungs-Warnung; Kategoriewechsel mit Impact-Fingerprint/`lock_version`; `spot_classic` nur `spots` (PO-ADV001b-8). UX-GATE-D Teilfreigabe PO-ADV001b-1; Inventare/Preislisten gesperrt. Systemfelder/Kern-Feldsets unverändert. E2E `playwright.adv001b.config.ts` (Port 8007). **ADV-001 Defaults und ADV-002 bleiben offen; DF-3 bleibt unvollständig.** | ADV-001, PO-ADV001b-1…9, AUD-001 |
 
 ## Offene Blocker
 
 | ID | Betrifft | Beschreibung | Wirkung |
 |---|---|---|---|
 | BLK-005 | UX-GATE-C | Trailer/SWF, Influencer, Social Media und weitere Werbeelement-Oberflächen nicht freigegeben | Keine Fachseiten für diese Elemente |
-| BLK-006 | UX-GATE-D | Operative Disposition, Standardangebote, übrige Admin-Initialkataloge und Auswertungen nicht freigegeben. Teilfreigaben: Dispo/Vier-Augen; Dynamische-Felder-Admin (DF-3.1/DF-3.2a/b/DF-3.3-fs/DF-3.3a1–a2β/DF-3.3b Assignment-UI, PO-33b-2). Katalog-Admin Oberkategorien/Werbemittel bleibt gesperrt und ist nach PO-33b-1 **verbindlich offen**. | Nur Sperrzustände für nicht freigegebene Module |
+| BLK-006 | UX-GATE-D | Operative Disposition, Standardangebote, Inventar-/Preislisten-Admin und Auswertungen nicht freigegeben. Teilfreigaben: Dispo/Vier-Augen; Dynamische-Felder-Admin; Katalog Oberkategorien/Werbemittel (ADV-001b, PO-ADV001b-1). | Nur Sperrzustände für nicht freigegebene Module |
 | BLK-001 | BL-P11-01 | Initialkataloge Kapitel 27 noch nicht als geprüfte Lieferdaten im Repo | Produktivsetzung; UI zeigt Leerzustände |
 | BLK-002 | BL-P11-01 | Speedit-Parameter (Domain, SMTP, SSH-Pfad, MySQL-Version, Cron, Backup, PHP-Extensions, Speicher, **PHP-CLI-Pfad**) unverifiziert | Produktiv-Deploy |
 

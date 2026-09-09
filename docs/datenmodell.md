@@ -56,9 +56,14 @@ verbindliches `category_id` (`restrictOnDelete`). Kanonische Keys:
 `events_promotion`, `barter`. Kategorie-IDs sind nicht als fachliche Konstanten
 im Anwendungscode zu verwenden; Auflösung über den Key.
 
+**ADV-001b (umgesetzt):** Admin-Lifecycle für Oberkategorien und Werbemittel.
+`lock_version` an beiden Tabellen; `advertising_media.sort`. Key/Code nach dem
+ersten Speichern unveränderlich. Kein Hard Delete. Deaktivierung statt Löschung.
+`spot_classic` nur mit Kategorie-Key `spots` kompatibel. Impact-Preview für
+kritische Aktionen. Historische Gen-3-Snapshots bleiben unverändert.
+
 **ADV-001 insgesamt noch offen:** Kategorie-Defaults (Kalkulationsarten,
-Standard-/Pflichtfelder, Dispo-Feldsets, Rabatt/AE/Preisdefaults), historische
-Positions-Provenance der Oberkategorie, Assignments und Admin-CRUD.
+Standard-/Pflichtfelder, Dispo-Feldsets, Rabatt/AE/Preisdefaults).
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert
@@ -286,8 +291,8 @@ vorhandenen Werte.
   ab `DF-3.3a2α`, Kategorie/Werbemittel und VER-003 ab `DF-3.3a2β`, die
   Assignment-UI ab `DF-3.3b`.
 - **PO-33b-1:** neue Assignment-Bindungen nur auf aktive Katalogziele; bestehende
-  Assignments mit später deaktiviertem Ziel bleiben lesbar. Katalog-Admin bleibt
-  verbindlicher Folgeslice.
+  Assignments mit später deaktiviertem Ziel bleiben lesbar. Katalog-Admin folgte
+  als ADV-001b.
 
 ### DF-3.3a2α – Snapshot-Generation 2, Quellengraph und Provenance (`main`)
 
@@ -350,10 +355,10 @@ Konzeptuell vorgesehen, aber **nicht implementiert**:
 
 - `FieldOption` / Auswahloptionen,
 - `SystemFieldSetting`,
-- **Katalog-Admin** für Oberkategorien und Werbemittel (ADV; nach PO-33b-1
-  **verbindlich offen** – Administratoren sollen Stammdaten später anlegen,
-  ändern, deaktivieren, reaktivieren und fachlich zuordnen können),
 - Regel-Editor / volle Regelmatrix.
+
+**ADV-001b Katalog-Admin** für Oberkategorien und Werbemittel ist umgesetzt
+(Lifecycle, Impact-Preview, kein Hard Delete).
 
 Die Runtime-Auswertung freier Feldsets ist seit `DF-3.3a2α` für die **globale**
 Ebene und seit `DF-3.3a2β` für Kategorie/Werbemittel inkl. VER-003 umgesetzt.

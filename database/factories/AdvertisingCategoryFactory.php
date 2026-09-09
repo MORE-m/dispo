@@ -18,6 +18,7 @@ class AdvertisingCategoryFactory extends Factory
             'name' => fake()->unique()->words(2, true),
             'is_active' => true,
             'sort' => 100,
+            'lock_version' => 1,
         ];
     }
 

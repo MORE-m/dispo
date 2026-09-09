@@ -24,7 +24,7 @@ export default function AdministrationIndex({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Administration"
-                    description="UX-GATE-D Teilfreigabe: Dynamische Felder (DF-3.1). Weitere Adminmodule bleiben gesperrt."
+                    description="UX-GATE-D Teilfreigabe: Dynamische Felder und Katalog (Oberkategorien/Werbemittel). Inventare und Preislisten bleiben gesperrt."
                 />
                 {flash.success ? (
                     <SuccessState message={flash.success} />

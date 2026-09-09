@@ -120,8 +120,7 @@ API und Server-Preview als Autorität – keine zweite Merge-Engine.
 - Fingerprint/`lock_version`/409 in der UI
 - **PO-33b-1:** bestehende aktive Oberkategorien/Werbemittel nur als Auswahlwerte;
   deaktivierte nicht für neue Bindungen; historische Ziele lesbar
-- **Katalog-Admin** für Oberkategorien und Werbemittel bleibt **verbindlich offen**
-  (ADV-Folgeslice: anlegen, ändern, deaktivieren, reaktivieren, fachlich zuordnen)
+- **Katalog-Admin** für Oberkategorien und Werbemittel ist **umgesetzt** (ADV-001b)
 - E2E isoliert: `playwright.df33b.config.ts` (Port 8006)
 - Snapshot-/Runtime-Verträge unverändert
 
