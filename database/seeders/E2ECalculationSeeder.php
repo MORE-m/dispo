@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
+use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
@@ -15,6 +16,7 @@ use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Support\Advertising\CanonicalAdvertisingCategories;
 use Illuminate\Database\Seeder;
 
 /**
@@ -48,7 +50,23 @@ class E2ECalculationSeeder extends Seeder
         }
 
         $organization = Organization::factory()->create(['name' => 'E2E Sendergruppe']);
-        $medium = AdvertisingMedium::factory()->create(['code' => 'spot_classic']);
+        $spotsCategoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::SPOTS)
+            ->value('id');
+        $onlineCategoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
+            ->value('id');
+
+        $medium = AdvertisingMedium::factory()->create([
+            'code' => 'spot_classic',
+            'category_id' => $spotsCategoryId,
+        ]);
+        // Zweites Werbemittel in anderer Oberkategorie für Gen-3-E2E (unterschiedliche Effektiv-Schemas).
+        $secondMedium = AdvertisingMedium::factory()->create([
+            'code' => 'online_audio_e2e',
+            'name' => 'Online Audio E2E',
+            'category_id' => $onlineCategoryId,
+        ]);
 
         /** @var array<string, Inventory> $inventories */
         $inventories = [];
@@ -66,10 +84,12 @@ class E2ECalculationSeeder extends Seeder
             ]);
             $inventories[$code] = $inventory;
 
-            InventoryMediumRule::factory()->create([
-                'inventory_id' => $inventory->id,
-                'advertising_medium_id' => $medium->id,
-            ]);
+            foreach ([$medium, $secondMedium] as $catalogMedium) {
+                InventoryMediumRule::factory()->create([
+                    'inventory_id' => $inventory->id,
+                    'advertising_medium_id' => $catalogMedium->id,
+                ]);
+            }
 
             $list = PriceList::factory()->create([
                 'inventory_id' => $inventory->id,
@@ -93,11 +113,12 @@ class E2ECalculationSeeder extends Seeder
 
         $limited = User::query()->where('email', 'sales-limited@example.com')->firstOrFail();
         $hamburg = $inventories['RH'];
-        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
-            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
+        $freeze = app(ConfigurationSnapshotFreezeService::class);
+        $baseFingerprint = $freeze->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
+        $positionFingerprint = $freeze->resolveLivePositionSchema((int) $medium->id)['schema_fingerprint'];
         $calculation = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $fingerprint,
+            'schema_fingerprint' => $baseFingerprint,
             'customer_name' => 'Sonderfreigabe E2E GmbH',
             'campaign' => 'Sonderfreigabe-Kampagne',
             'product_title' => 'Sonderfreigabe Produkt',
@@ -106,6 +127,7 @@ class E2ECalculationSeeder extends Seeder
             'positions' => [[
                 'inventory_id' => $hamburg->id,
                 'advertising_medium_id' => $medium->id,
+                'schema_fingerprint' => $positionFingerprint,
                 'spot_method' => 'average',
                 'length_seconds' => 30,
                 'total_spot_count' => 10,

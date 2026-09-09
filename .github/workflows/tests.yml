@@ -91,6 +91,9 @@ jobs:
       - name: Browser DF-3.3a2α isolated tests
         run: npx playwright test -c playwright.df33a2a.config.ts
 
+      - name: Browser DF-3.3a2β isolated tests
+        run: npx playwright test -c playwright.df33a2b.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

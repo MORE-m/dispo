@@ -306,8 +306,12 @@ final class DispoConfigurationSnapshotComposer
             ConfigurationSnapshotSource::SeedActive,
             ConfigurationSnapshotSource::LegacyBackfill => null,
             ConfigurationSnapshotSource::DispoOrderCreate,
-            ConfigurationSnapshotSource::DispoOrderLegacyBackfill => throw new RuntimeException(
+            ConfigurationSnapshotSource::DispoOrderLegacyBackfill,
+            ConfigurationSnapshotSource::DispoOrderPositionEffective => throw new RuntimeException(
                 'Quellsnapshot ist bereits ein Dispo-Snapshot und darf nicht erneut als Calc-Quelle dienen.',
+            ),
+            ConfigurationSnapshotSource::CalculationPositionEffective => throw new RuntimeException(
+                'Quellsnapshot ist ein Positions-Effektiv-Snapshot; als Calc-Quelle dient nur die Basis.',
             ),
         };
     }

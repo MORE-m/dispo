@@ -276,7 +276,7 @@ class CalculationReviewNacharbeitTest extends TestCase
      */
     private function basePayload(array $catalog, int $totalSpots): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $this->liveSchemaFingerprint(),
@@ -290,7 +290,7 @@ class CalculationReviewNacharbeitTest extends TestCase
                 'ae_percent' => '0',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ];
+        ]);
     }
 
     /**
@@ -300,7 +300,7 @@ class CalculationReviewNacharbeitTest extends TestCase
     {
         $calculation->load('positions.planRows');
 
-        return $calculation->positions->map(fn ($position): array => [
+        return $this->withPositionSchemaFingerprints($calculation, $calculation->positions->map(fn ($position): array => [
             'id' => $position->id,
             'client_key' => $position->client_key,
             'inventory_id' => $position->inventory_id,
@@ -315,6 +315,6 @@ class CalculationReviewNacharbeitTest extends TestCase
                 'day_group' => $row->day_group->value,
                 'second_price' => (string) $row->second_price,
             ])->all(),
-        ])->all();
+        ])->all());
     }
 }

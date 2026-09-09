@@ -11,6 +11,7 @@ use App\Models\SnapshotFieldRule;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -139,14 +140,22 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
         ], $user);
         $position = $calculation->positions()->firstOrFail();
         $update = $this->basePayload($catalog);
-        unset($update['schema_fingerprint']);
+        $update['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $update['lock_version'] = $calculation->lock_version;
         $update['positions'][0]['id'] = $position->id;
         $update['positions'][0]['client_key'] = $position->client_key;
+        $update['positions'] = $this->withPositionSchemaFingerprints($calculation, $update['positions']);
 
         $this->actingAs($user)
             ->put(route('calculations.update', $calculation), $update)
             ->assertRedirect();
+
+        // Preview und Budget-Propose bleiben ohne Client-Fingerprint zulässig.
+        $preview = $this->basePayload($catalog);
+        unset($preview['schema_fingerprint']);
+        $this->actingAs($user)
+            ->postJson(route('calculations.preview'), $preview)
+            ->assertOk();
 
         $this->actingAs($user)
             ->postJson(route('calculations.budget-propose'), [
@@ -165,7 +174,7 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
             ->assertOk();
     }
 
-    public function test_field_schema_api_returns_generation_two_for_new_calculation(): void
+    public function test_field_schema_api_returns_generation_three_for_new_calculation(): void
     {
         $user = User::factory()->role(Role::Sales)->create();
 
@@ -174,11 +183,11 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
             ->assertOk();
 
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $response->json('fieldSchema.format_version'),
         );
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $response->json('target_format_version'),
         );
         $this->assertSame(
@@ -220,7 +229,7 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
         );
     }
 
-    public function test_field_schema_api_returns_generation_two_for_existing_v2_calculation(): void
+    public function test_field_schema_api_returns_generation_three_for_existing_v3_calculation(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -233,11 +242,11 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
             ->assertOk();
 
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $response->json('fieldSchema.format_version'),
         );
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $response->json('target_format_version'),
         );
     }
@@ -378,14 +387,12 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
 
     private function freshV2CalcSnapshot(): ConfigurationSnapshot
     {
-        $catalog = $this->createSpotClassicCatalog();
-        $calculation = $this->createSavedCalculation($catalog, [
-            ['inventory_id' => $catalog['hamburg']->id],
-        ]);
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
 
-        return ConfigurationSnapshot::query()
-            ->with(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules'])
-            ->findOrFail($calculation->configuration_snapshot_id);
+        return app(ConfigurationSnapshotFreezeService::class)
+            ->freezeCalculationV2($fingerprint)
+            ->load(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules']);
     }
 
     private function corruptV2ByRemovingSources(int $snapshotId): void
@@ -430,7 +437,7 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
      */
     private function basePayload(array $catalog): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'customer_name' => 'Härtung Kunde',
             'agency_name' => null,
@@ -438,7 +445,6 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
             'product_title' => 'Titel',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'dynamic_field_values' => [
                 'campaign_period' => null,
             ],
@@ -456,6 +462,6 @@ class ConfigurationSnapshotDf33a2aHardeningTest extends TestCase
                     'position_flight_period' => null,
                 ],
             ]],
-        ];
+        ]);
     }
 }

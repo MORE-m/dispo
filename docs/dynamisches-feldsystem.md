@@ -86,49 +86,30 @@ Zweiter Teilslice von DF-3 auf Feature-Branch
 
 ## Umsetzungsstand DF-3.3a2α (globaler Snapshot-Freeze)
 
-Teilslice nach DF-3.3a1 auf Feature-Branch `feat/df3-3a2a-global-snapshot-freeze`
-– **kein** Abschluss von DF-3, **kein** Start von `DF-3.3a2β`/`DF-3.3b`.
+Auf `main` (PR #24). Erstmals wirken freie Feldsets produktiv über aktive
+**globale** Assignments. Generation-2-Bestand bleibt unverändert; neue Vorgänge
+friert DF-3.3a2β als Generation 3 ein.
 
-Erstmals wirken freie Feldsets produktiv – aber **ausschließlich über aktive
-globale Assignments**. Kategorie- und Werbemittelzuweisungen bleiben in der
-Runtime wirkungslos.
+## Umsetzungsstand DF-3.3a2β (contextual Freeze / VER-003)
 
-- **Generation 2:** `configuration_snapshots.format_version` (NOT NULL) trennt
-  Generation 1 (Legacy/Core) von Generation 2 (Core + globale Assignments).
-  Lesepfade sind fail-closed; unbekannte Generationen werden abgewiesen.
-- **Freeze Kalkulation:** Primary-Core plus aktive globale Calc-Assignments,
-  aufgelöst über den Resolver aus DF-3.3a1, für Header **und** Position.
-- **Freeze Dispoauftrag:** Dispo-Core plus aktive globale Dispo-Assignments plus
-  eine Calc-Origin-Quelle aus dem Kalkulationssnapshot; bei Key-Kollision gewinnt
-  Calc-Origin. Die Regeln beider Seiten werden über `dedupe_key` zusammengeführt.
-- **Quellengraph (VER-002):** jede beteiligte Quelle wird mit `merge_order`,
-  Ebene, Rolle, Feldset-/Versions-/Assignment-Metadaten sowie ihren
-  Memberships und Regeln eingefroren.
-- **Property-Provenance:** jede Snapshot-Definition speichert pro gewonnener
-  Eigenschaft (Definition, Revision, Required, Visible, Sort, Group) die Quelle.
-  Zusammengesetzte Fremdschlüssel verhindern Verweise auf fremde Snapshots.
-- **Fingerprint und Drift:** Wizard und `POST kalkulationen/feldschema` liefern
-  `schema_fingerprint`. Beim Anlegen führt ein veralteter Fingerprint zu **409
-  vor** der Feldwert-Validierung (422) – die Kalkulation entsteht nicht.
-  Der Freeze selbst läuft in einer Transaktion mit Sperre auf der globalen
-  Konfigurationsebene.
-- **Historie:** Update bestehender Vorgänge behält Snapshot und Generation.
-  Dispo-Revision **klont** den Vorgängersnapshot (gleiche Generation, gleicher
-  Fingerprint, geklonte Quellen) statt aktuelle Assignments neu aufzulösen.
-- **Admin:** unverändert nur JSON-API aus DF-3.3a1, **keine** Assignment-UI.
-- E2E isoliert: `playwright.df33a2a.config.ts` (eigene SQLite-DB, Port 8004).
+Feature-Branch `feat/df3-3a2b-contextual-snapshot-freeze` – **kein** Abschluss von
+DF-3, **kein** Start von `DF-3.3b`.
 
-### Bewusst nicht in DF-3.3a2α (Grenzen für DF-3.3a2β)
+- **Generation 3:** Basis (Header, Core→global) + Positions-Effektivs
+  (Core→global→Kat→Medium) mit Parent-FK und historischem Kontext.
+- **VER-003:** `effective_configuration_snapshot_id` mit nullable Unique und
+  Cross-Table-Ownership.
+- **Calc→Dispo:** historischer Calc-Effektiv-Kontext, keine Live-Revalidierung
+  Medium→Kategorie.
+- **Wizard/API:** Positions-`schema_fingerprint`, Schema-API mit Medium.
+- **PO-32b-1:** leeres Custom-Pflichtfeld blockiert Dispo-Create, nicht Calc.
+- E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005).
 
-1. **Kategorie-/Werbemittelebene:** Assignments auf `advertising_category` und
-   `advertising_medium` sind anlegbar und aktivierbar, wirken aber **nicht** im
-   Freeze. Der Quellengraph kennt dafür noch keine Quellen.
-2. **VER-003 Positions-Effektiv-Snapshot:** **nicht begonnen**. Positionsfelder
-   werden weiterhin aus der einen Snapshot-Konfiguration des Vorgangs bedient,
-   nicht positionsscharf je Werbemittel eingefroren.
-3. **Assignment-Admin-UI:** **nicht begonnen** (`DF-3.3b`); Herkunft und
-   Konflikte sind bislang nur über die JSON-Preview sichtbar.
-4. **Optionen, volle Regelmatrix, Regel-Editor:** unverändert offen.
+### Bewusst nicht in DF-3.3a2β
+
+1. **Assignment-Admin-UI:** `DF-3.3b`
+2. **Optionen, volle Regelmatrix, Regel-Editor:** unverändert offen
+3. **Migration/Rekonstruktion** bestehender Gen1/Gen2-Inhalte: nicht vorgesehen
 
 ## Umsetzungsstand DF-3.3a1 (Field-Set-Assignments)
 

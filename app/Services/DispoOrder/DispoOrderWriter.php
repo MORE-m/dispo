@@ -211,7 +211,7 @@ final class DispoOrderWriter
             // Nachbesserung erbt die eingefrorene Konfiguration des Vorgängers.
             $this->dynamicFields->assignClonedSnapshot($order, $revises);
         } else {
-            $this->dynamicFields->assignComposedSnapshot($order, $calculation);
+            $this->dynamicFields->assignComposedSnapshot($order, $calculation, $uniqueIds);
         }
         $order->save();
 
@@ -224,6 +224,9 @@ final class DispoOrderWriter
             $orderPosition->save();
             $sort++;
         }
+
+        // DF-3.3a2β: Effektiv-Snapshots binden, bevor Positionswerte entstehen.
+        $this->dynamicFields->attachPositionEffectives($order, $calculation, $revises);
 
         $this->dynamicFields->persistCopiedValues(
             $order,

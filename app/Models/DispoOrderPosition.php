@@ -14,6 +14,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $calculation_position_id
  * @property string $inventory_name
  * @property string $advertising_medium_name
+ * @property string|null $advertising_medium_code
+ * @property int|null $advertising_category_id
+ * @property string|null $advertising_category_key
+ * @property string|null $advertising_category_name
+ * @property int|null $effective_configuration_snapshot_id
  * @property CalculationKind $kind
  * @property SpotCalculationMethod $spot_method
  */
@@ -29,6 +34,10 @@ class DispoOrderPosition extends Model
         'advertising_medium_id',
         'advertising_medium_name',
         'advertising_medium_code',
+        'advertising_category_id',
+        'advertising_category_key',
+        'advertising_category_name',
+        'effective_configuration_snapshot_id',
         'kind',
         'spot_method',
         'length_seconds',
@@ -94,6 +103,26 @@ class DispoOrderPosition extends Model
     public function calculationPosition(): BelongsTo
     {
         return $this->belongsTo(CalculationPosition::class);
+    }
+
+    /**
+     * DF-3.3a2β: historisch eingefrorene Oberkategorie der Position.
+     *
+     * @return BelongsTo<AdvertisingCategory, $this>
+     */
+    public function advertisingCategory(): BelongsTo
+    {
+        return $this->belongsTo(AdvertisingCategory::class, 'advertising_category_id');
+    }
+
+    /**
+     * DF-3.3a2β / VER-003: positionsscharfer Effektiv-Snapshot.
+     *
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function effectiveConfigurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(ConfigurationSnapshot::class, 'effective_configuration_snapshot_id');
     }
 
     /**

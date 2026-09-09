@@ -152,7 +152,7 @@ class SpotClassicCalculationTest extends TestCase
      */
     private function payload(array $catalog, array $spots, array $conditions = []): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $this->liveSchemaFingerprint(),
@@ -169,6 +169,6 @@ class SpotClassicCalculationTest extends TestCase
                     'day_group' => 'mo_fr',
                 ]],
             ], $spots),
-        ];
+        ]);
     }
 }

@@ -11,10 +11,16 @@ use App\Models\CalculationPositionFieldValue;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 /**
  * Persistiert typisierte Dyn-Werte gegen Snapshot-Definitionen.
+ *
+ * DF-3.3a2β / VER-003: Ab Generation 3 trägt der Kalkulationssnapshot nur noch
+ * Headerfelder; die Positionsfelder stammen je Position aus dem eigenen
+ * Effektiv-Snapshot.
  */
 final class CalculationDynamicFieldWriter
 {
@@ -53,8 +59,17 @@ final class CalculationDynamicFieldWriter
             'dynamic_field_values',
         );
 
+        // Die Position muss vor der Normalisierung feststehen: ab Generation 3
+        // bestimmt ihr Effektiv-Snapshot die erlaubten Keys und Regeln.
+        $calculation->loadMissing('positions');
+        $byId = $calculation->positions->keyBy('id');
+        $byClient = $calculation->positions->keyBy('client_key');
+
         $positionContexts = [];
         foreach (array_values($payload['positions'] ?? []) as $index => $positionPayload) {
+            $position = $this->matchPosition($byId, $byClient, $positionPayload, $index);
+            $scopeSnapshot = $this->positionScopeSnapshot($position, $snapshot);
+
             $input = is_array($positionPayload['dynamic_field_values'] ?? null)
                 ? $positionPayload['dynamic_field_values']
                 : [];
@@ -62,40 +77,109 @@ final class CalculationDynamicFieldWriter
                 $input['period_open'] = true;
             }
             $prefix = "positions.{$index}.dynamic_field_values";
-            $this->rejectUnknownKeys($snapshot, FieldScope::Position, $input, $prefix);
-            $positionValues = $this->normalizeScopeValues($snapshot, FieldScope::Position, $input, $prefix);
+            $this->rejectUnknownKeys($scopeSnapshot, FieldScope::Position, $input, $prefix);
             $positionContexts[] = [
                 'index' => $index,
-                'id' => isset($positionPayload['id']) ? (int) $positionPayload['id'] : null,
-                'client_key' => isset($positionPayload['client_key'])
-                    ? (string) $positionPayload['client_key']
-                    : null,
-                'values' => $positionValues,
+                'position' => $position,
+                'snapshot' => $scopeSnapshot,
+                'values' => $this->normalizeScopeValues($scopeSnapshot, FieldScope::Position, $input, $prefix),
             ];
         }
 
-        $this->rules->validate($snapshot, $headerValues, $positionContexts);
+        $this->validateRules($snapshot, $headerValues, $positionContexts);
 
         $this->persistHeaderValues($calculation, $snapshot, $headerValues);
 
-        $calculation->loadMissing('positions');
-        $byId = $calculation->positions->keyBy('id');
-        $byClient = $calculation->positions->keyBy('client_key');
         foreach ($positionContexts as $context) {
-            $position = null;
-            if ($context['id'] !== null) {
-                $position = $byId->get($context['id']);
-            }
-            if ($position === null && $context['client_key'] !== null && $context['client_key'] !== '') {
-                $position = $byClient->get($context['client_key']);
-            }
-            if ($position === null) {
-                throw ValidationException::withMessages([
-                    "positions.{$context['index']}" => 'Positionszuordnung für dynamische Felder fehlgeschlagen.',
-                ]);
-            }
-            $this->persistPositionValues($position, $snapshot, $context['values']);
+            $this->persistPositionValues($context['position'], $context['snapshot'], $context['values']);
         }
+    }
+
+    /**
+     * Positionsscharfer Bewertungsrahmen: ab Generation 3 der Effektiv-Snapshot
+     * der Position, davor der Kalkulationssnapshot selbst.
+     */
+    public function positionScopeSnapshot(
+        CalculationPosition $position,
+        ConfigurationSnapshot $snapshot,
+    ): ConfigurationSnapshot {
+        if ((int) $snapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            return $snapshot;
+        }
+
+        $position->loadMissing('effectiveConfigurationSnapshot');
+        $effective = $position->effectiveConfigurationSnapshot;
+
+        if ($effective === null) {
+            throw new RuntimeException(
+                "Kalkulationsposition {$position->id} hat keinen Effektiv-Snapshot.",
+            );
+        }
+
+        $effective->assertReadable();
+        $effective->loadMissing(['fieldDefinitions', 'rules']);
+
+        return $effective;
+    }
+
+    /**
+     * Headerregeln liegen im Basissnapshot, Positionsregeln je Effektiv-Snapshot.
+     *
+     * @param  array<string, mixed>  $headerValues
+     * @param  list<array{index: int, position: CalculationPosition, snapshot: ConfigurationSnapshot, values: array<string, mixed>}>  $positionContexts
+     */
+    private function validateRules(
+        ConfigurationSnapshot $snapshot,
+        array $headerValues,
+        array $positionContexts,
+    ): void {
+        $flattened = array_map(
+            static fn (array $context): array => [
+                'index' => $context['index'],
+                'values' => $context['values'],
+            ],
+            $positionContexts,
+        );
+
+        $this->rules->validate($snapshot, $headerValues, $flattened);
+
+        if ((int) $snapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            return;
+        }
+
+        foreach ($positionContexts as $context) {
+            $this->rules->validate($context['snapshot'], $headerValues, [[
+                'index' => $context['index'],
+                'values' => $context['values'],
+            ]]);
+        }
+    }
+
+    /**
+     * @param  Collection<int, CalculationPosition>  $byId
+     * @param  Collection<string, CalculationPosition>  $byClient
+     * @param  array<string, mixed>  $positionPayload
+     */
+    private function matchPosition($byId, $byClient, array $positionPayload, int $index): CalculationPosition
+    {
+        $position = null;
+
+        if (isset($positionPayload['id'])) {
+            $position = $byId->get((int) $positionPayload['id']);
+        }
+
+        $clientKey = isset($positionPayload['client_key']) ? (string) $positionPayload['client_key'] : '';
+        if ($position === null && $clientKey !== '') {
+            $position = $byClient->get($clientKey);
+        }
+
+        if ($position === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}" => 'Positionszuordnung für dynamische Felder fehlgeschlagen.',
+            ]);
+        }
+
+        return $position;
     }
 
     /**
@@ -130,6 +214,7 @@ final class CalculationDynamicFieldWriter
      */
     public function positionValuesForPayload(CalculationPosition $position, ConfigurationSnapshot $snapshot): array
     {
+        $snapshot = $this->positionScopeSnapshot($position, $snapshot);
         $position->loadMissing('fieldValues.snapshotFieldDefinition');
         $byKey = [];
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {

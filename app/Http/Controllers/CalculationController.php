@@ -95,6 +95,8 @@ class CalculationController extends Controller
             'positions.advertisingMedium',
             'positions.priceList',
             'positions.fieldValues.snapshotFieldDefinition',
+            'positions.effectiveConfigurationSnapshot.fieldDefinitions',
+            'positions.effectiveConfigurationSnapshot.rules',
             'orderDiscounts',
             'configurationSnapshot.fieldDefinitions',
             'configurationSnapshot.rules',
@@ -138,15 +140,21 @@ class CalculationController extends Controller
     }
 
     /**
-     * DF-3.3a2α: Feldschema für den Wizard. Bestehende Kalkulationen liefern das
-     * eingefrorene Snapshot-Schema (Ist-Generation), neue das live aufgelöste
-     * Freeze-Schema als Zielgeneration 2.
+     * DF-3.3a2β: Feldschema für den Wizard.
+     * Bestehende Kalkulationen: eingefrorenes Schema (Gen 1–3).
+     * Neue Kalkulationen: Live Gen-3-Basis; mit `advertising_medium_id` das
+     * positionsbezogene Live-Schema im Werbemittelkontext.
      */
     public function fieldSchema(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'calculation_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'advertising_medium_id' => ['sometimes', 'nullable', 'integer', 'min:1', 'exists:advertising_media,id'],
         ]);
+
+        $mediumId = isset($validated['advertising_medium_id'])
+            ? (int) $validated['advertising_medium_id']
+            : null;
 
         if (array_key_exists('calculation_id', $validated) && $validated['calculation_id'] !== null) {
             /** @var Calculation $calculation */
@@ -155,7 +163,7 @@ class CalculationController extends Controller
                 ->findOrFail((int) $validated['calculation_id']);
             $this->authorize('view', $calculation);
 
-            $fieldSchema = $this->fieldSchemaProp($calculation);
+            $fieldSchema = $this->fieldSchemaProp($calculation, $mediumId);
 
             return response()->json([
                 'fieldSchema' => $fieldSchema,
@@ -166,7 +174,9 @@ class CalculationController extends Controller
 
         $this->authorize('create', Calculation::class);
 
-        $resolved = $this->freeze->resolveLiveSchemaForCalculation();
+        $resolved = $mediumId !== null && $mediumId > 0
+            ? $this->freeze->resolveLivePositionSchema($mediumId)
+            : $this->freeze->resolveLiveSchemaForCalculationV3();
 
         if ($resolved['has_blocking_conflicts']) {
             throw ValidationException::withMessages([
@@ -183,7 +193,7 @@ class CalculationController extends Controller
         return response()->json([
             'fieldSchema' => $fieldSchema,
             'format_version' => $fieldSchema['format_version'],
-            'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
         ]);
     }
 
@@ -317,7 +327,7 @@ class CalculationController extends Controller
 
         $activeMedia = AdvertisingMedium::query()
             ->where('is_active', true)
-            ->get(['id', 'name', 'code', 'kind', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
 
         $historicalMediumIds = $calculation !== null
             ? $calculation->positions->pluck('advertising_medium_id')->unique()->values()
@@ -326,7 +336,7 @@ class CalculationController extends Controller
         $historicalMedia = AdvertisingMedium::query()
             ->whereIn('id', $historicalMediumIds)
             ->where('is_active', false)
-            ->get(['id', 'name', 'code', 'kind', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
 
         $media = $activeMedia->concat($historicalMedia)->values();
 
@@ -479,12 +489,15 @@ class CalculationController extends Controller
                 ])->all(),
                 'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($calculation): array {
                     $snapshot = $calculation->configurationSnapshot;
+                    $positionFieldSchema = $this->positionFieldSchemaProp($calculation, $position);
 
                     return [
                         'id' => $position->id,
                         'client_key' => $position->client_key,
                         'inventory_id' => $position->inventory_id,
                         'advertising_medium_id' => $position->advertising_medium_id,
+                        'schema_fingerprint' => $positionFieldSchema['schema_fingerprint'] ?? null,
+                        'field_schema' => $positionFieldSchema,
                         'spot_method' => $position->spot_method->value,
                         'length_seconds' => $position->length_seconds,
                         'total_spot_count' => $position->total_spot_count,
@@ -534,15 +547,38 @@ class CalculationController extends Controller
      *     schema_fingerprint: string|null
      * }
      */
-    private function fieldSchemaProp(?Calculation $calculation): array
+    private function fieldSchemaProp(?Calculation $calculation, ?int $mediumId = null): array
     {
         $snapshot = $calculation?->configurationSnapshot;
 
         if ($snapshot === null) {
-            return $this->liveFieldSchemaProp($this->freeze->resolveLiveSchemaForCalculation());
+            $resolved = $mediumId !== null && $mediumId > 0
+                ? $this->freeze->resolveLivePositionSchema($mediumId)
+                : $this->freeze->resolveLiveSchemaForCalculationV3();
+
+            return $this->liveFieldSchemaProp($resolved);
         }
 
         $snapshot->assertReadable();
+
+        // Gen 3: Positions-Schema aus eingefrorener Basis für gewähltes Medium.
+        if ((int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+            && $mediumId !== null
+            && $mediumId > 0
+        ) {
+            $resolved = $this->freeze->resolvePositionSchemaFromBase($snapshot, $mediumId);
+            if ($resolved['has_blocking_conflicts']) {
+                throw ValidationException::withMessages([
+                    'configuration' => 'Die eingefrorene Positionskonfiguration ist widersprüchlich.',
+                ]);
+            }
+
+            $prop = $this->liveFieldSchemaProp($resolved);
+            $prop['format_version'] = ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE;
+
+            return $prop;
+        }
+
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
         $systemByDefinitionId = FieldDefinition::query()
@@ -570,6 +606,73 @@ class CalculationController extends Controller
             ])->values()->all(),
             'format_version' => (int) $snapshot->format_version,
             'schema_fingerprint' => $snapshot->schema_fingerprint,
+        ];
+    }
+
+    /**
+     * Positionsbezogenes Schema für den Wizard (Gen 3: Effektiv-Snapshot).
+     *
+     * @return array{
+     *     fields: array<int, array<string, mixed>>,
+     *     rules: array<int, array<string, mixed>>,
+     *     format_version: int,
+     *     schema_fingerprint: string|null
+     * }|null
+     */
+    private function positionFieldSchemaProp(Calculation $calculation, CalculationPosition $position): ?array
+    {
+        $base = $calculation->configurationSnapshot;
+        if ($base === null) {
+            return null;
+        }
+
+        if ((int) $base->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            return null;
+        }
+
+        $position->loadMissing([
+            'effectiveConfigurationSnapshot.fieldDefinitions',
+            'effectiveConfigurationSnapshot.rules',
+        ]);
+        $effective = $position->effectiveConfigurationSnapshot;
+        if ($effective === null) {
+            return null;
+        }
+
+        $effective->assertReadable();
+
+        $resolved = $this->freeze->resolvePositionSchemaFromBase(
+            $base,
+            (int) $position->advertising_medium_id,
+        );
+
+        $systemByDefinitionId = FieldDefinition::query()
+            ->whereIn('id', $effective->fieldDefinitions->pluck('field_definition_id')->unique()->all())
+            ->pluck('is_system', 'id');
+
+        return [
+            'fields' => $effective->fieldDefinitions->map(fn ($def): array => [
+                'key' => (string) $def->key,
+                'field_type' => (string) $def->field_type->value,
+                'label' => (string) $def->label,
+                'help_text' => $def->help_text,
+                'scope' => (string) $def->scope->value,
+                'applies_to' => (string) $def->applies_to->value,
+                'sort' => (int) $def->sort,
+                'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+                'required' => (bool) $def->required,
+                'visible' => (bool) $def->visible,
+                'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
+                'validation_json' => $def->validation_json,
+            ])->values()->all(),
+            'rules' => $effective->rules->map(fn ($rule): array => [
+                'condition' => $rule->condition_json,
+                'action' => $rule->action_json,
+            ])->values()->all(),
+            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
+            // Client-Vertrag: Fingerprint der kanonischen Basisauflösung, nicht
+            // der materialisierte Effektiv-Fingerprint (kann abweichen).
+            'schema_fingerprint' => (string) $resolved['schema_fingerprint'],
         ];
     }
 
@@ -609,7 +712,7 @@ class CalculationController extends Controller
                 'condition' => $rule['condition_json'],
                 'action' => $rule['action_json'],
             ], $resolved['rules']),
-            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            'format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             'schema_fingerprint' => (string) $resolved['schema_fingerprint'],
         ];
     }

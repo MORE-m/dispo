@@ -19,6 +19,7 @@ use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderWriter;
+use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Illuminate\Database\QueryException;
@@ -77,9 +78,7 @@ class DynamicFieldDispoOrderTest extends TestCase
             'billing_special_features',
             'campaign_period',
             'disposition_notes',
-            'period_open',
-            'position_flight_period',
-        ], $keys);
+        ], $keys, 'Gen3-Dispo-Basis enthält nur Headerfelder');
 
         $this->assertSame(0, DispoOrderFieldValue::query()->where('dispo_order_id', $order->id)->whereHas(
             'snapshotFieldDefinition',
@@ -94,6 +93,14 @@ class DynamicFieldDispoOrderTest extends TestCase
         );
 
         foreach ($order->positions as $position) {
+            $this->assertNotNull($position->effective_configuration_snapshot_id);
+            $effectiveKeys = SnapshotFieldDefinition::query()
+                ->where('configuration_snapshot_id', $position->effective_configuration_snapshot_id)
+                ->pluck('key')
+                ->all();
+            $this->assertContains('period_open', $effectiveKeys);
+            $this->assertContains('position_flight_period', $effectiveKeys);
+
             $this->assertTrue(
                 $position->fieldValues()
                     ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', 'period_open'))
@@ -292,6 +299,15 @@ class DynamicFieldDispoOrderTest extends TestCase
     {
         $calculation = $this->savedCalculation();
         $user = User::factory()->role(Role::Sales)->create();
+
+        // DF-2-Compose erwartet einen Calc-Snapshot mit Header- und Positionsfeldern
+        // (Generation 1). Generation-3-Basen haben nur Header – daher Legacy-Materialisierung.
+        $legacy = app(ConfigurationSnapshotMaterializer::class)
+            ->materializeFromActiveSet();
+        foreach ($calculation->positions as $position) {
+            $position->forceFill(['effective_configuration_snapshot_id' => null])->save();
+        }
+        $calculation->forceFill(['configuration_snapshot_id' => $legacy->id])->save();
 
         /** @var object $migration */
         $migration = require database_path('migrations/2026_09_04_140000_create_dynamic_field_dispo_tables.php');
@@ -605,18 +621,18 @@ class DynamicFieldDispoOrderTest extends TestCase
     {
         $calculation = $this->savedCalculation();
         $user = User::factory()->role(Role::Sales)->create();
-        $calcSnapshotId = (int) $calculation->configuration_snapshot_id;
-
-        $periodOpenDefId = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calcSnapshotId)
-            ->where('key', 'period_open')
-            ->value('id');
-        $flightDefId = SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calcSnapshotId)
-            ->where('key', 'position_flight_period')
-            ->value('id');
 
         foreach ($calculation->positions as $position) {
+            $effectiveId = (int) $position->effective_configuration_snapshot_id;
+            $periodOpenDefId = SnapshotFieldDefinition::query()
+                ->where('configuration_snapshot_id', $effectiveId)
+                ->where('key', 'period_open')
+                ->value('id');
+            $flightDefId = SnapshotFieldDefinition::query()
+                ->where('configuration_snapshot_id', $effectiveId)
+                ->where('key', 'position_flight_period')
+                ->value('id');
+
             DB::table('calculation_position_field_values')
                 ->where('calculation_position_id', $position->id)
                 ->where('snapshot_field_definition_id', $periodOpenDefId)
@@ -697,26 +713,33 @@ class DynamicFieldDispoOrderTest extends TestCase
         $calcPositions = $calculation->positions()->orderBy('id')->get();
         $this->assertCount(2, $calcPositions);
 
-        $calcSnapshotId = (int) $calculation->configuration_snapshot_id;
-        $periodOpenDefId = (int) SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calcSnapshotId)
-            ->where('key', 'period_open')
-            ->value('id');
-        $flightDefId = (int) SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $calcSnapshotId)
-            ->where('key', 'position_flight_period')
-            ->value('id');
-
         $calcA = $calcPositions[0];
         $calcB = $calcPositions[1];
 
+        $periodOpenDefIdA = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcA->effective_configuration_snapshot_id)
+            ->where('key', 'period_open')
+            ->value('id');
+        $flightDefIdA = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcA->effective_configuration_snapshot_id)
+            ->where('key', 'position_flight_period')
+            ->value('id');
+        $periodOpenDefIdB = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcB->effective_configuration_snapshot_id)
+            ->where('key', 'period_open')
+            ->value('id');
+        $flightDefIdB = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calcB->effective_configuration_snapshot_id)
+            ->where('key', 'position_flight_period')
+            ->value('id');
+
         DB::table('calculation_position_field_values')
             ->where('calculation_position_id', $calcA->id)
-            ->where('snapshot_field_definition_id', $periodOpenDefId)
+            ->where('snapshot_field_definition_id', $periodOpenDefIdA)
             ->update(['value_boolean' => false]);
         DB::table('calculation_position_field_values')
             ->where('calculation_position_id', $calcA->id)
-            ->where('snapshot_field_definition_id', $flightDefId)
+            ->where('snapshot_field_definition_id', $flightDefIdA)
             ->update([
                 'value_period_start' => '2026-01-01',
                 'value_period_end' => '2026-01-31',
@@ -724,11 +747,11 @@ class DynamicFieldDispoOrderTest extends TestCase
 
         DB::table('calculation_position_field_values')
             ->where('calculation_position_id', $calcB->id)
-            ->where('snapshot_field_definition_id', $periodOpenDefId)
+            ->where('snapshot_field_definition_id', $periodOpenDefIdB)
             ->update(['value_boolean' => true]);
         DB::table('calculation_position_field_values')
             ->where('calculation_position_id', $calcB->id)
-            ->where('snapshot_field_definition_id', $flightDefId)
+            ->where('snapshot_field_definition_id', $flightDefIdB)
             ->update([
                 'value_period_start' => null,
                 'value_period_end' => null,
@@ -766,12 +789,20 @@ class DynamicFieldDispoOrderTest extends TestCase
         $dispoB->forceFill(['sort' => $sortA])->save();
 
         $snapshotId = (int) $order->configuration_snapshot_id;
-        $dispoPeriodOpenDefId = (int) SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $snapshotId)
+        $dispoPeriodOpenDefIdA = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $dispoA->effective_configuration_snapshot_id)
             ->where('key', 'period_open')
             ->value('id');
-        $dispoFlightDefId = (int) SnapshotFieldDefinition::query()
-            ->where('configuration_snapshot_id', $snapshotId)
+        $dispoFlightDefIdA = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $dispoA->effective_configuration_snapshot_id)
+            ->where('key', 'position_flight_period')
+            ->value('id');
+        $dispoPeriodOpenDefIdB = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $dispoB->effective_configuration_snapshot_id)
+            ->where('key', 'period_open')
+            ->value('id');
+        $dispoFlightDefIdB = (int) SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $dispoB->effective_configuration_snapshot_id)
             ->where('key', 'position_flight_period')
             ->value('id');
         $campaignDefId = (int) SnapshotFieldDefinition::query()
@@ -781,18 +812,18 @@ class DynamicFieldDispoOrderTest extends TestCase
 
         $keptPeriodOpen = DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoA->id)
-            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefId)
+            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefIdA)
             ->firstOrFail();
         $keptPeriodOpen->value_boolean = true;
         $keptPeriodOpen->save();
 
         DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoA->id)
-            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->where('snapshot_field_definition_id', $dispoFlightDefIdA)
             ->delete();
         DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoB->id)
-            ->whereIn('snapshot_field_definition_id', [$dispoPeriodOpenDefId, $dispoFlightDefId])
+            ->whereIn('snapshot_field_definition_id', [$dispoPeriodOpenDefIdB, $dispoFlightDefIdB])
             ->delete();
         DispoOrderFieldValue::query()
             ->where('dispo_order_id', $order->id)
@@ -824,20 +855,20 @@ class DynamicFieldDispoOrderTest extends TestCase
 
         $flightA = DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoA->id)
-            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->where('snapshot_field_definition_id', $dispoFlightDefIdA)
             ->firstOrFail();
         $this->assertSame('2026-01-01', $flightA->value_period_start?->toDateString());
         $this->assertSame('2026-01-31', $flightA->value_period_end?->toDateString());
 
         $periodOpenB = DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoB->id)
-            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefId)
+            ->where('snapshot_field_definition_id', $dispoPeriodOpenDefIdB)
             ->firstOrFail();
         $this->assertTrue((bool) $periodOpenB->value_boolean);
 
         $flightB = DispoOrderPositionFieldValue::query()
             ->where('dispo_order_position_id', $dispoB->id)
-            ->where('snapshot_field_definition_id', $dispoFlightDefId)
+            ->where('snapshot_field_definition_id', $dispoFlightDefIdB)
             ->firstOrFail();
         $this->assertNull($flightB->value_period_start);
         $this->assertNull($flightB->value_period_end);

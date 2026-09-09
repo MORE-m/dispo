@@ -6,6 +6,7 @@ use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderPosition;
 use App\Models\SnapshotFieldDefinition;
 use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 use Illuminate\Contracts\Validation\Validator;
@@ -49,19 +50,13 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             }
             $snapshot->assertReadable();
 
-            $order->loadMissing('positions');
+            $order->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
             $positionsById = $order->positions->keyBy('id');
-            $editableByKey = [];
-            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
-                if ($this->isNativeEditable($snapshot, $def)) {
-                    $editableByKey[$def->key] = $def;
-                }
-            }
-            $calcKeys = $this->calcOriginKeys($snapshot);
 
             foreach ($byPosition as $positionId => $values) {
                 $positionId = (int) $positionId;
-                if (! $positionsById->has($positionId)) {
+                $position = $positionsById->get($positionId);
+                if ($position === null) {
                     $validator->errors()->add(
                         "position_dynamic_field_values.{$positionId}",
                         'Unbekannte Position.',
@@ -73,10 +68,19 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
                     continue;
                 }
 
+                $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+                $editableByKey = [];
+                foreach ($positionSnapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+                    if ($this->isNativeEditable($positionSnapshot, $def)) {
+                        $editableByKey[$def->key] = $def;
+                    }
+                }
+                $calcKeys = $this->calcOriginKeys($positionSnapshot);
+
                 foreach ($values as $key => $raw) {
                     $key = (string) $key;
                     if (! isset($editableByKey[$key])) {
-                        $known = $snapshot->fieldDefinitions->firstWhere('key', $key) !== null;
+                        $known = $positionSnapshot->fieldDefinitions->firstWhere('key', $key) !== null;
                         $validator->errors()->add(
                             "position_dynamic_field_values.{$positionId}.{$key}",
                             $known || isset($calcKeys[$key])
@@ -141,10 +145,35 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
         /** @var DispoOrder|null $order */
         $order = $this->route('dispoOrder');
         if ($order instanceof DispoOrder) {
-            $order->loadMissing('configurationSnapshot.fieldDefinitions', 'positions');
+            $order->loadMissing(
+                'configurationSnapshot.fieldDefinitions',
+                'positions.effectiveConfigurationSnapshot.fieldDefinitions',
+            );
         }
 
         return $order instanceof DispoOrder ? $order : null;
+    }
+
+    private function positionSnapshot(
+        ConfigurationSnapshot $orderSnapshot,
+        DispoOrderPosition $position,
+    ): ConfigurationSnapshot {
+        if ((int) $orderSnapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            $orderSnapshot->loadMissing('fieldDefinitions');
+
+            return $orderSnapshot;
+        }
+
+        $position->loadMissing('effectiveConfigurationSnapshot.fieldDefinitions');
+        $effective = $position->effectiveConfigurationSnapshot;
+        if ($effective === null) {
+            return $orderSnapshot;
+        }
+
+        $effective->assertReadable();
+        $effective->loadMissing('fieldDefinitions');
+
+        return $effective;
     }
 
     private function isNativeEditable(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
@@ -182,6 +211,24 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
 
         foreach ($calcSnapshot->fieldDefinitions as $def) {
             $keys[$def->key] = true;
+        }
+
+        // Generation 3: Positions-Calc-Origin kann am Kind-Effektiv der Calc-Basis liegen,
+        // wenn die Dispo-Basis (nicht der Positions-Effektiv) geprüft wird.
+        if ((int) $calcSnapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+            && $calcSnapshot->parent_configuration_snapshot_id === null
+        ) {
+            $childKeys = SnapshotFieldDefinition::query()
+                ->whereIn(
+                    'configuration_snapshot_id',
+                    ConfigurationSnapshot::query()
+                        ->where('parent_configuration_snapshot_id', $calcSnapshot->id)
+                        ->select('id'),
+                )
+                ->pluck('key');
+            foreach ($childKeys as $key) {
+                $keys[(string) $key] = true;
+            }
         }
 
         return $keys;

@@ -39,78 +39,92 @@ class DynamicFieldCalculationTest extends TestCase
     {
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_04_100000_create_dynamic_field_calculation_tables.php');
-        $migration->down();
 
-        $this->assertFalse(Schema::hasTable('field_definitions'));
-        $this->assertFalse(Schema::hasColumn('calculations', 'configuration_snapshot_id'));
+        // DF-3.3a2β: calculation_positions und dispo_order_positions tragen seit
+        // Generation 3 Fremdschlüssel auf configuration_snapshots. Vor dem
+        // DF-1-Rollback muss diese Migration zurückgedreht werden, sonst zeigen die
+        // Fremdschlüssel auf eine entfernte Tabelle. Der Testfall prüft nur den
+        // DF-1-Backfill und braucht Generation 3 danach nicht wieder.
+        /** @var object{up: callable, down: callable} $contextualFreeze */
+        $contextualFreeze = require database_path('migrations/2026_09_09_100000_add_configuration_snapshot_v3_contextual_freeze.php');
 
-        $user = User::factory()->role(Role::Sales)->create();
-        $catalog = $this->createSpotClassicCatalog();
-        $now = now();
+        [$calculationId, $positionId] = (function () use ($migration, $contextualFreeze): array {
+            $contextualFreeze->down();
+            $migration->down();
 
-        $calculationId = DB::table('calculations')->insertGetId([
-            'number' => 'K-2026-00999',
-            'number_year' => 2026,
-            'number_seq' => 999,
-            'status' => 'draft',
-            'planning_mode' => 'manual',
-            'advisor_id' => $user->id,
-            'customer_name' => 'Legacy Kunde',
-            'agency_name' => null,
-            'campaign' => 'Legacy',
-            'product_title' => 'Titel',
-            'briefing' => null,
-            'order_discount_percent' => 0,
-            'ae_enabled' => false,
-            'target_budget_nn' => null,
-            'budget_strategy' => null,
-            'budget_proposal_status' => null,
-            'media_gross' => 0,
-            'position_discount_total' => 0,
-            'order_discount_total' => 0,
-            'ae_total' => 0,
-            'nn_invest' => 0,
-            'requires_special_approval' => false,
-            'special_approval_reasons' => null,
-            'personal_discount_limit_percent' => null,
-            'lock_version' => 1,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            $this->assertFalse(Schema::hasTable('field_definitions'));
+            $this->assertFalse(Schema::hasColumn('calculations', 'configuration_snapshot_id'));
 
-        $positionId = DB::table('calculation_positions')->insertGetId([
-            'calculation_id' => $calculationId,
-            'client_key' => (string) Str::uuid(),
-            'inventory_id' => $catalog['hamburg']->id,
-            'advertising_medium_id' => $catalog['medium']->id,
-            'inventory_medium_rule_id' => null,
-            'price_list_id' => null,
-            'kind' => 'spot_classic',
-            'spot_method' => 'average',
-            'length_seconds' => 30,
-            'total_spot_count' => 10,
-            'needs_spot_redistribution' => false,
-            'average_second_price' => null,
-            'length_index' => null,
-            'surcharge_percent' => 0,
-            'position_discount_percent' => 0,
-            'ae_percent' => 15,
-            'is_discountable' => true,
-            'is_ae_eligible' => true,
-            'price_list_version' => null,
-            'media_gross' => 0,
-            'position_discount_amount' => 0,
-            'order_discount_amount' => 0,
-            'ae_amount' => 0,
-            'nn_invest' => 0,
-            'sort' => 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
+            $user = User::factory()->role(Role::Sales)->create();
+            $catalog = $this->createSpotClassicCatalog();
+            $now = now();
 
-        $this->assertSame(1, DB::table('calculation_positions')->where('id', $positionId)->count(), 'pre-up');
+            $calculationId = DB::table('calculations')->insertGetId([
+                'number' => 'K-2026-00999',
+                'number_year' => 2026,
+                'number_seq' => 999,
+                'status' => 'draft',
+                'planning_mode' => 'manual',
+                'advisor_id' => $user->id,
+                'customer_name' => 'Legacy Kunde',
+                'agency_name' => null,
+                'campaign' => 'Legacy',
+                'product_title' => 'Titel',
+                'briefing' => null,
+                'order_discount_percent' => 0,
+                'ae_enabled' => false,
+                'target_budget_nn' => null,
+                'budget_strategy' => null,
+                'budget_proposal_status' => null,
+                'media_gross' => 0,
+                'position_discount_total' => 0,
+                'order_discount_total' => 0,
+                'ae_total' => 0,
+                'nn_invest' => 0,
+                'requires_special_approval' => false,
+                'special_approval_reasons' => null,
+                'personal_discount_limit_percent' => null,
+                'lock_version' => 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
 
-        $migration->up();
+            $positionId = DB::table('calculation_positions')->insertGetId([
+                'calculation_id' => $calculationId,
+                'client_key' => (string) Str::uuid(),
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'inventory_medium_rule_id' => null,
+                'price_list_id' => null,
+                'kind' => 'spot_classic',
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 10,
+                'needs_spot_redistribution' => false,
+                'average_second_price' => null,
+                'length_index' => null,
+                'surcharge_percent' => 0,
+                'position_discount_percent' => 0,
+                'ae_percent' => 15,
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'price_list_version' => null,
+                'media_gross' => 0,
+                'position_discount_amount' => 0,
+                'order_discount_amount' => 0,
+                'ae_amount' => 0,
+                'nn_invest' => 0,
+                'sort' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $this->assertSame(1, DB::table('calculation_positions')->where('id', $positionId)->count(), 'pre-up');
+
+            $migration->up();
+
+            return [$calculationId, $positionId];
+        })();
 
         $calculation = DB::table('calculations')->where('id', $calculationId)->first();
         $this->assertNotNull($calculation->configuration_snapshot_id);
@@ -507,6 +521,7 @@ class DynamicFieldCalculationTest extends TestCase
                 'position_flight_period' => null,
             ],
         ];
+        $payload = $this->withLiveSchemaFingerprint($payload);
 
         $this->actingAs($user)->post(route('calculations.store'), $payload)->assertRedirect();
         $calculation = Calculation::query()->latest('id')->firstOrFail();
@@ -521,6 +536,7 @@ class DynamicFieldCalculationTest extends TestCase
 
         $update = $this->basePayload($catalog);
         $update['lock_version'] = $calculation->lock_version;
+        $update['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $update['dynamic_field_values'] = [
             'campaign_period' => ['start' => '2026-04-01', 'end' => '2026-04-30'],
         ];
@@ -561,9 +577,12 @@ class DynamicFieldCalculationTest extends TestCase
                 ],
             ],
         ];
+        $update['positions'] = $this->withPositionSchemaFingerprints($calculation, $update['positions']);
 
         $this->actingAs($user)
+            ->from(route('calculations.edit', $calculation))
             ->put(route('calculations.update', $calculation), $update)
+            ->assertSessionHasNoErrors()
             ->assertRedirect();
 
         $event = AuditEvent::query()
@@ -609,12 +628,14 @@ class DynamicFieldCalculationTest extends TestCase
 
         $payload = $this->basePayload($catalog);
         $payload['lock_version'] = $calculation->lock_version;
+        $payload['schema_fingerprint'] = (string) $calculation->configurationSnapshot->schema_fingerprint;
         $payload['positions'][0]['id'] = $calculation->positions()->first()->id;
         $payload['positions'][0]['client_key'] = $calculation->positions()->first()->client_key;
         $payload['positions'][0]['dynamic_field_values'] = [
             'period_open' => false,
             'position_flight_period' => null,
         ];
+        $payload['positions'] = $this->withPositionSchemaFingerprints($calculation, $payload['positions']);
 
         $this->actingAs($user)
             ->put(route('calculations.update', $calculation), $payload)
@@ -642,7 +663,7 @@ class DynamicFieldCalculationTest extends TestCase
      */
     private function basePayload(array $catalog): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'customer_name' => 'Dyn Kunde',
             'agency_name' => null,
@@ -650,7 +671,6 @@ class DynamicFieldCalculationTest extends TestCase
             'product_title' => 'Titel',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'dynamic_field_values' => [
                 'campaign_period' => null,
             ],
@@ -668,6 +688,6 @@ class DynamicFieldCalculationTest extends TestCase
                     'position_flight_period' => null,
                 ],
             ]],
-        ];
+        ]);
     }
 }

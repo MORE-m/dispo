@@ -1,7 +1,7 @@
 import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
 import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
@@ -94,26 +94,6 @@ type PlanRow = {
     second_price?: string | null;
 };
 
-type PositionDraft = {
-    id?: number;
-    client_key: string;
-    inventory_id: number;
-    advertising_medium_id: number;
-    spot_method: string;
-    length_seconds: number;
-    total_spot_count: number;
-    needs_spot_redistribution?: boolean;
-    position_discount_percent: string;
-    ae_percent: string;
-    plan_rows: PlanRow[];
-    time_ranges: TimeRangeDraft[];
-    position_discounts: DiscountDraft[];
-    period_open: boolean;
-    flight_period_start: string;
-    flight_period_end: string;
-    custom_fields: Record<string, string>;
-};
-
 type FieldSchema = {
     fields: Array<{
         key: string;
@@ -134,6 +114,30 @@ type FieldSchema = {
     }>;
     schema_fingerprint?: string | null;
     format_version?: number;
+};
+
+type PositionDraft = {
+    id?: number;
+    client_key: string;
+    inventory_id: number;
+    advertising_medium_id: number;
+    /** DF-3.3a2β: Fingerprint des positionsbezogenen Effektiv-Schemas. */
+    schema_fingerprint?: string | null;
+    /** DF-3.3a2β: Positions-Schema (Effektiv bzw. Live je Medium). */
+    field_schema?: FieldSchema | null;
+    spot_method: string;
+    length_seconds: number;
+    total_spot_count: number;
+    needs_spot_redistribution?: boolean;
+    position_discount_percent: string;
+    ae_percent: string;
+    plan_rows: PlanRow[];
+    time_ranges: TimeRangeDraft[];
+    position_discounts: DiscountDraft[];
+    period_open: boolean;
+    flight_period_start: string;
+    flight_period_end: string;
+    custom_fields: Record<string, string>;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -279,6 +283,8 @@ type SavedCalculation = {
         client_key: string | null;
         inventory_id: number;
         advertising_medium_id: number;
+        schema_fingerprint?: string | null;
+        field_schema?: FieldSchema | null;
         spot_method: string;
         length_seconds: number;
         total_spot_count: number;
@@ -310,6 +316,39 @@ const MANUAL_STEPS = [
     'Konditionen',
     'Zusammenfassung',
 ] as const;
+
+function schemaFieldsForPosition(
+    position: Pick<PositionDraft, 'field_schema'>,
+    fieldSchema: FieldSchema,
+    existingGen3: boolean,
+): FieldSchema['fields'] {
+    if (position.field_schema?.fields) {
+        return position.field_schema.fields;
+    }
+
+    // Gen-3-Edit ohne Effektiv-Schema: keine Positionsfelder aus der Header-Basis.
+    if (existingGen3) {
+        return [];
+    }
+
+    return fieldSchema.fields;
+}
+
+function schemaRulesForPosition(
+    position: Pick<PositionDraft, 'field_schema'>,
+    fieldSchema: FieldSchema,
+    existingGen3: boolean,
+): FieldSchema['rules'] {
+    if (position.field_schema?.rules) {
+        return position.field_schema.rules;
+    }
+
+    if (existingGen3) {
+        return [];
+    }
+
+    return fieldSchema.rules;
+}
 
 const BUDGET_STEPS = [
     'Grunddaten',
@@ -569,10 +608,8 @@ export default function CalculationWizard({
         () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
-    const customPositionFields = useMemo(
-        () => customPositionTextFieldsFromSchema(fieldSchema.fields),
-        [fieldSchema.fields],
-    );
+    const existingGen3 =
+        calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
     const [customHeaderValues, setCustomHeaderValues] = useState<
         Record<string, string>
     >(() => {
@@ -647,6 +684,8 @@ export default function CalculationWizard({
                 client_key: position.client_key ?? newClientKey(),
                 inventory_id: position.inventory_id,
                 advertising_medium_id: position.advertising_medium_id,
+                schema_fingerprint: position.schema_fingerprint ?? null,
+                field_schema: position.field_schema ?? null,
                 spot_method: position.spot_method ?? 'average',
                 length_seconds: position.length_seconds,
                 total_spot_count: position.total_spot_count,
@@ -673,19 +712,21 @@ export default function CalculationWizard({
                     position.dynamic_field_values?.position_flight_period
                         ?.end ?? '',
                 custom_fields: Object.fromEntries(
-                    customPositionTextFieldsFromSchema(fieldSchema.fields).map(
-                        (field) => {
-                            const raw =
-                                position.dynamic_field_values?.[field.key];
-                            return [
-                                field.key,
-                                typeof raw === 'string' ||
-                                typeof raw === 'number'
-                                    ? String(raw)
-                                    : '',
-                            ];
-                        },
-                    ),
+                    customPositionTextFieldsFromSchema(
+                        schemaFieldsForPosition(
+                            { field_schema: position.field_schema ?? null },
+                            fieldSchema,
+                            (fieldSchema.format_version ?? 0) >= 3,
+                        ),
+                    ).map((field) => {
+                        const raw = position.dynamic_field_values?.[field.key];
+                        return [
+                            field.key,
+                            typeof raw === 'string' || typeof raw === 'number'
+                                ? String(raw)
+                                : '',
+                        ];
+                    }),
                 ),
             }));
         }
@@ -697,6 +738,89 @@ export default function CalculationWizard({
         const first = firstValidPosition(catalog);
         return first ? [first] : [];
     });
+
+    // DF-3.3a2β: Positions-Fingerprints und -Schemas nachladen (Create oder Mediumwechsel).
+    useEffect(() => {
+        const missing = positions.filter(
+            (position) =>
+                position.advertising_medium_id > 0 &&
+                (position.schema_fingerprint === null ||
+                    position.schema_fingerprint === undefined ||
+                    position.schema_fingerprint === '' ||
+                    position.field_schema == null),
+        );
+
+        if (missing.length === 0) {
+            return;
+        }
+
+        let cancelled = false;
+
+        void (async () => {
+            const updates = new Map<
+                string,
+                { fingerprint: string; fieldSchema: FieldSchema }
+            >();
+
+            for (const position of missing) {
+                try {
+                    const response = await jsonPost<{
+                        fieldSchema?: FieldSchema;
+                    }>('/kalkulationen/feldschema', {
+                        advertising_medium_id: position.advertising_medium_id,
+                        ...(calculation?.id
+                            ? { calculation_id: calculation.id }
+                            : {}),
+                    });
+                    const nextSchema = response.fieldSchema;
+                    const fingerprint = nextSchema?.schema_fingerprint ?? null;
+                    if (fingerprint && nextSchema) {
+                        updates.set(position.client_key, {
+                            fingerprint,
+                            fieldSchema: nextSchema,
+                        });
+                    }
+                } catch {
+                    // Nachladen fehlgeschlagen: Speichern bleibt fail-closed.
+                }
+            }
+
+            if (cancelled || updates.size === 0) {
+                return;
+            }
+
+            setPositions((current) =>
+                current.map((position) => {
+                    const next = updates.get(position.client_key);
+                    if (!next) {
+                        return position;
+                    }
+
+                    const nextCustomKeys = customPositionTextFieldsFromSchema(
+                        next.fieldSchema.fields,
+                    );
+                    const custom_fields = Object.fromEntries(
+                        nextCustomKeys.map((field) => [
+                            field.key,
+                            position.custom_fields[field.key] ?? '',
+                        ]),
+                    );
+
+                    return {
+                        ...position,
+                        schema_fingerprint: next.fingerprint,
+                        field_schema: next.fieldSchema,
+                        custom_fields,
+                    };
+                }),
+            );
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [calculation?.id, positions]);
+
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
     );
@@ -769,12 +893,7 @@ export default function CalculationWizard({
             budget_proposal_manual: budgetProposalManual,
             lock_version: calculation?.lock_version,
             calculation_id: calculation?.id,
-            ...(calculation
-                ? {}
-                : {
-                      schema_fingerprint:
-                          fieldSchema.schema_fingerprint ?? null,
-                  }),
+            schema_fingerprint: fieldSchema.schema_fingerprint ?? null,
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
@@ -785,6 +904,8 @@ export default function CalculationWizard({
                           client_key: position.client_key,
                           inventory_id: position.inventory_id,
                           advertising_medium_id: position.advertising_medium_id,
+                          schema_fingerprint:
+                              position.schema_fingerprint ?? null,
                           spot_method: position.spot_method,
                           length_seconds: position.length_seconds,
                           total_spot_count: totalSpotCount(
@@ -813,7 +934,13 @@ export default function CalculationWizard({
                                         }
                                       : null,
                               ...Object.fromEntries(
-                                  customPositionFields.map((field) => [
+                                  customPositionTextFieldsFromSchema(
+                                      schemaFieldsForPosition(
+                                          position,
+                                          fieldSchema,
+                                          existingGen3,
+                                      ),
+                                  ).map((field) => [
                                       field.key,
                                       position.custom_fields[field.key] ?? '',
                                   ]),
@@ -845,9 +972,9 @@ export default function CalculationWizard({
             campaignPeriodStart,
             campaignPeriodEnd,
             customHeaderFields,
-            customPositionFields,
+            existingGen3,
             customHeaderValues,
-            fieldSchema.schema_fingerprint,
+            fieldSchema,
             orderDiscounts,
             aeEnabled,
             targetBudget,
@@ -924,6 +1051,18 @@ export default function CalculationWizard({
                 }
 
                 let next = { ...item, ...patch };
+
+                if (
+                    patch.inventory_id !== undefined ||
+                    patch.advertising_medium_id !== undefined
+                ) {
+                    // Mediumwechsel: Fingerprint und Schema müssen neu geladen werden.
+                    next = {
+                        ...next,
+                        schema_fingerprint: null,
+                        field_schema: null,
+                    };
+                }
 
                 if (patch.inventory_id !== undefined) {
                     const media = allowedMediaFor(patch.inventory_id);
@@ -1592,6 +1731,23 @@ export default function CalculationWizard({
                             ) : (
                                 <div className="space-y-6">
                                     {positions.map((position, index) => {
+                                        const positionFields =
+                                            schemaFieldsForPosition(
+                                                position,
+                                                fieldSchema,
+                                                existingGen3,
+                                            );
+                                        const positionRules =
+                                            schemaRulesForPosition(
+                                                position,
+                                                fieldSchema,
+                                                existingGen3,
+                                            );
+                                        const positionCustomFields =
+                                            customPositionTextFieldsFromSchema(
+                                                positionFields,
+                                            );
+
                                         return (
                                             <section
                                                 key={position.client_key}
@@ -1788,7 +1944,7 @@ export default function CalculationWizard({
                                                             </FormField>
                                                             <FormField
                                                                 label={
-                                                                    fieldSchema.fields.find(
+                                                                    positionFields.find(
                                                                         (
                                                                             field,
                                                                         ) =>
@@ -1799,7 +1955,7 @@ export default function CalculationWizard({
                                                                 }
                                                                 htmlFor={`period-open-${index}`}
                                                                 hint={
-                                                                    fieldSchema.fields.find(
+                                                                    positionFields.find(
                                                                         (
                                                                             field,
                                                                         ) =>
@@ -1820,7 +1976,7 @@ export default function CalculationWizard({
                                                                     }
                                                                     data-test={`period-open-${index}`}
                                                                     aria-label={
-                                                                        fieldSchema.fields.find(
+                                                                        positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -1845,7 +2001,7 @@ export default function CalculationWizard({
                                                                 />
                                                             </FormField>
                                                             {requiredPositionFieldKeysFromSnapshotRules(
-                                                                fieldSchema.rules,
+                                                                positionRules,
                                                                 {
                                                                     period_open:
                                                                         position.period_open,
@@ -1863,7 +2019,7 @@ export default function CalculationWizard({
                                                             ) ? (
                                                                 <FormField
                                                                     label={
-                                                                        fieldSchema.fields.find(
+                                                                        positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -1875,7 +2031,7 @@ export default function CalculationWizard({
                                                                     }
                                                                     htmlFor={`flight-start-${index}`}
                                                                     hint={
-                                                                        fieldSchema.fields.find(
+                                                                        positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -1938,7 +2094,7 @@ export default function CalculationWizard({
                                                                     </div>
                                                                 </FormField>
                                                             ) : null}
-                                                            {customPositionFields.length >
+                                                            {positionCustomFields.length >
                                                             0 ? (
                                                                 <div
                                                                     className="space-y-3 sm:col-span-2"
@@ -1950,7 +2106,7 @@ export default function CalculationWizard({
                                                                     </h3>
                                                                     <SchemaTextFields
                                                                         fields={
-                                                                            customPositionFields
+                                                                            positionCustomFields
                                                                         }
                                                                         values={
                                                                             position.custom_fields

@@ -2,11 +2,13 @@
 
 namespace App\Services\DynamicField;
 
+use App\Enums\ConfigurationSnapshotSource as ConfigurationSnapshotSourceEnum;
 use App\Enums\DispoOrderStatus;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderFieldValue;
@@ -18,6 +20,7 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -32,15 +35,21 @@ final class DispoOrderDynamicFieldWriter
         private readonly CalculationDynamicFieldWriter $calculationFields,
         private readonly ConfigurationSnapshotFreezeService $freeze,
         private readonly ConfigurationSnapshotCloneService $clone,
+        private readonly ConfigurationSnapshotIntegrity $integrity,
         private readonly AuditLogger $audit,
     ) {}
 
     /**
      * Freeze der Dispo-Konfiguration; setzt configuration_snapshot_id vor dem
      * ersten Save.
+     *
+     * @param  list<int>  $selectedCalculationPositionIds
      */
-    public function assignComposedSnapshot(DispoOrder $order, Calculation $calculation): void
-    {
+    public function assignComposedSnapshot(
+        DispoOrder $order,
+        Calculation $calculation,
+        array $selectedCalculationPositionIds,
+    ): void {
         $calculation->loadMissing([
             'configurationSnapshot.fieldDefinitions',
             'configurationSnapshot.rules',
@@ -61,10 +70,158 @@ final class DispoOrderDynamicFieldWriter
             );
         }
 
-        $snapshot = $this->freeze->freezeDispoV2($calcSnapshot);
+        // DF-3.3a2β: Kalkulationen der Generation 3 frieren Dispo-Basis plus
+        // Effektiv-Snapshots nur für die ausgewählten Positionen ein.
+        $snapshot = $this->isContextualFreeze($calcSnapshot)
+            ? $this->freeze->freezeDispoV3($calcSnapshot, $selectedCalculationPositionIds)
+            : $this->freeze->freezeDispoV2($calcSnapshot);
+
         $order->forceFill([
             'configuration_snapshot_id' => $snapshot->id,
         ]);
+    }
+
+    /**
+     * DF-3.3a2β / VER-003: bindet je Dispoposition den Effektiv-Snapshot und
+     * übernimmt den historischen Werbemittel-/Kategoriekontext.
+     *
+     * Neuanlage nutzt die beim Dispo-Freeze entstandenen Effektiv-Snapshots,
+     * die Nachbesserung klont die des Vorgängers.
+     */
+    public function attachPositionEffectives(
+        DispoOrder $order,
+        Calculation $calculation,
+        ?DispoOrder $predecessor = null,
+    ): void {
+        $order->loadMissing('configurationSnapshot');
+        $base = $order->configurationSnapshot;
+
+        if (! $this->isContextualFreeze($base)) {
+            return;
+        }
+
+        $order->load('positions');
+
+        $predecessorByCalcId = collect();
+        if ($predecessor !== null) {
+            $predecessor->loadMissing('positions.effectiveConfigurationSnapshot');
+            $predecessorByCalcId = $predecessor->positions->keyBy('calculation_position_id');
+        }
+
+        $calculation->loadMissing('positions.effectiveConfigurationSnapshot');
+        $calcPositions = $calculation->positions->keyBy('id');
+
+        foreach ($order->positions as $position) {
+            $calcPositionId = (int) $position->calculation_position_id;
+
+            $effective = $predecessor !== null
+                ? $this->clonedPredecessorEffective($predecessorByCalcId->get($calcPositionId), $base, $calcPositionId)
+                : $this->frozenDispoEffective($calcPositions->get($calcPositionId), $base, $calcPositionId);
+
+            $position->forceFill([
+                'advertising_medium_code' => $effective->context_advertising_medium_code,
+                'advertising_medium_name' => $effective->context_advertising_medium_name,
+                'advertising_category_id' => (int) $effective->context_advertising_category_id,
+                'advertising_category_key' => $effective->context_advertising_category_key,
+                'advertising_category_name' => $effective->context_advertising_category_name,
+                'effective_configuration_snapshot_id' => (int) $effective->id,
+            ]);
+            $position->save();
+            $position->setRelation('effectiveConfigurationSnapshot', $effective);
+
+            $this->integrity->assertOwnership($effective);
+        }
+
+        if ($predecessor === null) {
+            $createdEffectives = ConfigurationSnapshot::query()
+                ->where('parent_configuration_snapshot_id', $base->id)
+                ->where('source', ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective->value)
+                ->count();
+            if ($createdEffectives !== $order->positions->count()) {
+                throw new RuntimeException(
+                    "Dispo-Freeze erzeugte {$createdEffectives} Effektiv-Snapshots, "
+                    ."aber {$order->positions->count()} Positionen wurden gebunden.",
+                );
+            }
+        }
+    }
+
+    private function frozenDispoEffective(
+        ?CalculationPosition $calcPosition,
+        ConfigurationSnapshot $base,
+        int $calcPositionId,
+    ): ConfigurationSnapshot {
+        $calcEffective = $calcPosition?->effectiveConfigurationSnapshot;
+        if ($calcEffective === null) {
+            throw new RuntimeException(
+                "Kalkulationsposition {$calcPositionId} hat keinen Effektiv-Snapshot.",
+            );
+        }
+
+        $effective = $this->freeze->findDispoPositionEffective($base, $calcEffective);
+        if ($effective === null) {
+            throw new RuntimeException(
+                "Dispo-Freeze ohne Effektiv-Snapshot zu Kalkulationsposition {$calcPositionId}.",
+            );
+        }
+
+        return $effective;
+    }
+
+    private function clonedPredecessorEffective(
+        ?DispoOrderPosition $predecessorPosition,
+        ConfigurationSnapshot $base,
+        int $calcPositionId,
+    ): ConfigurationSnapshot {
+        $predecessorEffective = $predecessorPosition?->effectiveConfigurationSnapshot;
+        if ($predecessorEffective === null) {
+            throw new RuntimeException(
+                "Nachbesserung ohne Effektiv-Snapshot zu Kalkulationsposition {$calcPositionId}.",
+            );
+        }
+
+        return $this->clone->cloneEffectiveForDispoRevision($predecessorEffective, $base);
+    }
+
+    private function isContextualFreeze(?ConfigurationSnapshot $snapshot): bool
+    {
+        return $snapshot !== null
+            && (int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE;
+    }
+
+    /**
+     * Positionsscharfer Bewertungsrahmen: ab Generation 3 der Effektiv-Snapshot
+     * der Dispoposition, davor der Dispo-Basissnapshot selbst.
+     */
+    private function positionSnapshot(
+        ConfigurationSnapshot $snapshot,
+        DispoOrderPosition $position,
+    ): ConfigurationSnapshot {
+        if (! $this->isContextualFreeze($snapshot)) {
+            return $snapshot;
+        }
+
+        $position->loadMissing('effectiveConfigurationSnapshot');
+        $effective = $position->effectiveConfigurationSnapshot;
+
+        if ($effective === null) {
+            throw new RuntimeException("Dispoposition {$position->id} hat keinen Effektiv-Snapshot.");
+        }
+
+        $effective->assertReadable();
+        $effective->loadMissing(['fieldDefinitions', 'rules']);
+
+        return $effective;
+    }
+
+    /**
+     * @return Collection<int, SnapshotFieldDefinition>
+     */
+    private function positionDefinitions(ConfigurationSnapshot $snapshot, DispoOrderPosition $position)
+    {
+        return $this->positionSnapshot($snapshot, $position)
+            ->fieldDefinitions
+            ->where('scope', FieldScope::Position);
     }
 
     /**
@@ -136,9 +293,15 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
-            $this->persistPositionValues($dispoPosition, $snapshot, $values, $calcSnapshot);
+            $this->persistPositionValues(
+                $dispoPosition,
+                $this->positionSnapshot($snapshot, $dispoPosition),
+                $values,
+                $this->calculationFields->positionScopeSnapshot($calcPosition, $calcSnapshot),
+            );
             $positionContexts[] = [
                 'index' => $index,
+                'position' => $dispoPosition,
                 'values' => $values,
             ];
             $index++;
@@ -149,7 +312,39 @@ final class DispoOrderDynamicFieldWriter
         }
 
         $headerValues = $this->headerValuesForValidation($order, $snapshot);
-        $this->rules->validate($snapshot, $headerValues, $positionContexts);
+        $this->validateRules($snapshot, $headerValues, $positionContexts);
+    }
+
+    /**
+     * Headerregeln liegen im Dispo-Basissnapshot, Positionsregeln je Effektiv-Snapshot.
+     *
+     * @param  array<string, mixed>  $headerValues
+     * @param  list<array{index: int, position: DispoOrderPosition, values: array<string, mixed>}>  $positionContexts
+     */
+    private function validateRules(
+        ConfigurationSnapshot $snapshot,
+        array $headerValues,
+        array $positionContexts,
+    ): void {
+        $this->rules->validate($snapshot, $headerValues, array_map(
+            static fn (array $context): array => [
+                'index' => $context['index'],
+                'values' => $context['values'],
+            ],
+            $positionContexts,
+        ));
+
+        if (! $this->isContextualFreeze($snapshot)) {
+            return;
+        }
+
+        foreach ($positionContexts as $context) {
+            $this->rules->validate(
+                $this->positionSnapshot($snapshot, $context['position']),
+                $headerValues,
+                [['index' => $context['index'], 'values' => $context['values']]],
+            );
+        }
     }
 
     /**
@@ -276,9 +471,10 @@ final class DispoOrderDynamicFieldWriter
                     continue;
                 }
 
+                $positionSnapshot = $this->positionSnapshot($snapshot, $position);
                 $editableKeys = [];
-                foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
-                    if ($this->isNativeEditablePositionText($snapshot, $def)) {
+                foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+                    if ($this->isNativeEditablePositionText($positionSnapshot, $def)) {
                         $editableKeys[$def->key] = $def;
                     }
                 }
@@ -286,10 +482,10 @@ final class DispoOrderDynamicFieldWriter
                 foreach (array_keys($values) as $key) {
                     $key = (string) $key;
                     if (! isset($editableKeys[$key])) {
-                        if ($this->isCalcOriginKey($snapshot, $key)) {
+                        if ($this->isCalcOriginKey($positionSnapshot, $key)) {
                             $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
                                 'Dieses Feld ist im Dispoauftrag nicht bearbeitbar.';
-                        } elseif ($snapshot->fieldDefinitions->firstWhere('key', $key) !== null) {
+                        } elseif ($positionSnapshot->fieldDefinitions->firstWhere('key', $key) !== null) {
                             $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
                                 'Dieses Feld ist im Dispoauftrag nicht bearbeitbar.';
                         } else {
@@ -326,7 +522,7 @@ final class DispoOrderDynamicFieldWriter
                     if ($old === $value) {
                         continue;
                     }
-                    $this->upsertPositionTextValue($position, $snapshot, $key, $value);
+                    $this->upsertPositionTextValue($position, $positionSnapshot, $key, $value);
                     $changed = true;
                 }
             }
@@ -421,16 +617,18 @@ final class DispoOrderDynamicFieldWriter
                     continue;
                 }
                 $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
-                foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
-                    if (! $this->isCalcOriginKey($snapshot, $def->key, $calcSnapshot)) {
+                $positionSnapshot = $this->positionSnapshot($snapshot, $dispoPosition);
+                $calcPositionSnapshot = $this->calculationFields->positionScopeSnapshot($calcPosition, $calcSnapshot);
+                foreach ($this->positionDefinitions($snapshot, $dispoPosition) as $def) {
+                    if (! $this->isCalcOriginKey($positionSnapshot, $def->key, $calcPositionSnapshot)) {
                         continue;
                     }
-                    if ($this->hasPositionValue($dispoPosition, $snapshot, $def->key)) {
+                    if ($this->hasPositionValue($dispoPosition, $positionSnapshot, $def->key)) {
                         continue;
                     }
                     $this->persistPositionFieldValue(
                         $dispoPosition,
-                        $snapshot,
+                        $positionSnapshot,
                         $def->key,
                         $values[$def->key] ?? null,
                     );
@@ -501,14 +699,15 @@ final class DispoOrderDynamicFieldWriter
             }
         }
         foreach ($order->positions as $position) {
-            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
                 if (! $def->required || ! $def->visible) {
                     continue;
                 }
                 if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                     continue;
                 }
-                if ($this->isCalcOriginKey($snapshot, $def->key)) {
+                if ($this->isCalcOriginKey($positionSnapshot, $def->key)) {
                     continue;
                 }
 
@@ -528,11 +727,12 @@ final class DispoOrderDynamicFieldWriter
         foreach ($order->positions->values() as $index => $position) {
             $positionContexts[] = [
                 'index' => $index,
+                'position' => $position,
                 'values' => $this->positionValuesForValidation($position, $snapshot),
             ];
         }
 
-        $this->rules->validate($snapshot, $headerValues, $positionContexts);
+        $this->validateRules($snapshot, $headerValues, $positionContexts);
     }
 
     /**
@@ -544,29 +744,41 @@ final class DispoOrderDynamicFieldWriter
         $snapshot->assertReadable();
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
 
+        $entries = $this->schemaDefinitions($order, $snapshot);
+
         $systemByDefinitionId = FieldDefinition::query()
-            ->whereIn('id', $snapshot->fieldDefinitions->pluck('field_definition_id')->unique()->all())
+            ->whereIn('id', array_values(array_unique(array_map(
+                static fn (array $entry): int => (int) $entry['def']->field_definition_id,
+                $entries,
+            ))))
             ->pluck('is_system', 'id');
 
-        $fields = array_values($snapshot->fieldDefinitions->map(fn (SnapshotFieldDefinition $def): array => [
-            'key' => $def->key,
-            'label' => $def->label,
-            'help_text' => $def->help_text,
-            'field_type' => $def->field_type->value,
-            'scope' => $def->scope->value,
-            'sort' => $def->sort,
-            'group_key' => $def->group_key,
-            'applies_to' => $def->applies_to->value,
-            'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
-            'required' => (bool) $def->required,
-            'visible' => (bool) $def->visible,
-            'editable' => $def->scope === FieldScope::Header
-                ? $this->isNativeEditableHeaderText($snapshot, $def)
-                : $this->isNativeEditablePositionText($snapshot, $def),
-            'calc_origin' => $this->isCalcOriginKey($snapshot, $def->key),
-            'max_length' => $this->maxLengthForDefinition($def),
-            'validation_json' => $def->validation_json,
-        ])->all());
+        $fields = array_map(function (array $entry) use ($systemByDefinitionId): array {
+            /** @var SnapshotFieldDefinition $def */
+            $def = $entry['def'];
+            /** @var ConfigurationSnapshot $owner */
+            $owner = $entry['snapshot'];
+
+            return [
+                'key' => $def->key,
+                'label' => $def->label,
+                'help_text' => $def->help_text,
+                'field_type' => $def->field_type->value,
+                'scope' => $def->scope->value,
+                'sort' => $def->sort,
+                'group_key' => $def->group_key,
+                'applies_to' => $def->applies_to->value,
+                'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+                'required' => (bool) $def->required,
+                'visible' => (bool) $def->visible,
+                'editable' => $def->scope === FieldScope::Header
+                    ? $this->isNativeEditableHeaderText($owner, $def)
+                    : $this->isNativeEditablePositionText($owner, $def),
+                'calc_origin' => $this->isCalcOriginKey($owner, $def->key),
+                'max_length' => $this->maxLengthForDefinition($def),
+                'validation_json' => $def->validation_json,
+            ];
+        }, $entries);
 
         $editableCustom = array_values(array_filter(
             $fields,
@@ -603,16 +815,87 @@ final class DispoOrderDynamicFieldWriter
 
         return [
             'fields' => $fields,
-            'rules' => array_values($snapshot->rules->map(fn ($rule): array => [
-                'sort' => $rule->sort,
-                'condition' => $rule->condition_json,
-                'action' => $rule->action_json,
-            ])->all()),
+            'rules' => $this->schemaRules($order, $snapshot),
             'editable_custom_header_fields' => $editableCustom,
             'calc_origin_custom_header_fields' => $calcOriginCustom,
             'editable_custom_position_fields' => $editableCustomPosition,
             'calc_origin_custom_position_fields' => $calcOriginCustomPosition,
         ];
+    }
+
+    /**
+     * DF-3.3a2β: Ab Generation 3 liegen die Positionsfelder in den Effektiv-
+     * Snapshots. Für die Oberfläche werden sie über alle Positionen vereinigt;
+     * jeder Key erscheint genau einmal mit seinem Herkunftssnapshot.
+     *
+     * @return list<array{def: SnapshotFieldDefinition, snapshot: ConfigurationSnapshot}>
+     */
+    private function schemaDefinitions(DispoOrder $order, ConfigurationSnapshot $snapshot): array
+    {
+        /** @var list<array{def: SnapshotFieldDefinition, snapshot: ConfigurationSnapshot}> $entries */
+        $entries = [];
+        /** @var array<string, true> $seen */
+        $seen = [];
+
+        foreach ($snapshot->fieldDefinitions as $def) {
+            $seen[$def->key] = true;
+            $entries[] = ['def' => $def, 'snapshot' => $snapshot];
+        }
+
+        if (! $this->isContextualFreeze($snapshot)) {
+            return $entries;
+        }
+
+        $order->loadMissing('positions.effectiveConfigurationSnapshot');
+
+        foreach ($order->positions as $position) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            foreach ($positionSnapshot->fieldDefinitions as $def) {
+                if (isset($seen[$def->key])) {
+                    continue;
+                }
+                $seen[$def->key] = true;
+                $entries[] = ['def' => $def, 'snapshot' => $positionSnapshot];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function schemaRules(DispoOrder $order, ConfigurationSnapshot $snapshot): array
+    {
+        /** @var list<array<string, mixed>> $rules */
+        $rules = [];
+        /** @var array<string, true> $seen */
+        $seen = [];
+
+        $collect = function (ConfigurationSnapshot $source) use (&$rules, &$seen): void {
+            foreach ($source->rules as $rule) {
+                $dedupeKey = (string) $rule->dedupe_key;
+                if ($dedupeKey !== '' && isset($seen[$dedupeKey])) {
+                    continue;
+                }
+                $seen[$dedupeKey] = true;
+                $rules[] = [
+                    'sort' => $rule->sort,
+                    'condition' => $rule->condition_json,
+                    'action' => $rule->action_json,
+                ];
+            }
+        };
+
+        $collect($snapshot);
+
+        if ($this->isContextualFreeze($snapshot)) {
+            foreach ($order->positions as $position) {
+                $collect($this->positionSnapshot($snapshot, $position));
+            }
+        }
+
+        return $rules;
     }
 
     /**
@@ -645,10 +928,11 @@ final class DispoOrderDynamicFieldWriter
         $positions = [];
         $positionsCaptured = [];
         foreach ($order->positions as $position) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
             $values = [];
             $captured = [];
-            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
-                $captured[$def->key] = $this->hasPositionValue($position, $snapshot, $def->key);
+            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+                $captured[$def->key] = $this->hasPositionValue($position, $positionSnapshot, $def->key);
                 $values[$def->key] = $this->readPositionValue($position, $def);
             }
             $positions[(int) $position->id] = $values;
@@ -731,12 +1015,15 @@ final class DispoOrderDynamicFieldWriter
                 continue;
             }
 
-            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $newDef) {
-                if (! $this->isNativeEditablePositionText($snapshot, $newDef)) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $dispoPosition);
+            $predPositionSnapshot = $this->positionSnapshot($predSnapshot, $predPosition);
+
+            foreach ($this->positionDefinitions($snapshot, $dispoPosition) as $newDef) {
+                if (! $this->isNativeEditablePositionText($positionSnapshot, $newDef)) {
                     continue;
                 }
 
-                $predDef = $predSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
+                $predDef = $predPositionSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
                 if ($predDef === null
                     || ! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                     continue;
@@ -751,7 +1038,7 @@ final class DispoOrderDynamicFieldWriter
                     continue;
                 }
 
-                $this->upsertPositionTextValue($dispoPosition, $snapshot, $newDef->key, $text);
+                $this->upsertPositionTextValue($dispoPosition, $positionSnapshot, $newDef->key, $text);
             }
         }
     }
@@ -907,24 +1194,44 @@ final class DispoOrderDynamicFieldWriter
         }
         $calcSnapshot->assertReadable();
         $calcSnapshot->loadMissing('fieldDefinitions');
+        $calculation->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
         $calcPositions = $calculation->positions->keyBy('id');
 
-        $requiredDefs = $calcSnapshot->fieldDefinitions
-            ->where('scope', FieldScope::Position)
-            ->filter(fn (SnapshotFieldDefinition $def): bool => $def->required
-                && $def->visible
-                && in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true));
+        $errors = [];
 
-        if ($requiredDefs->isEmpty()) {
-            return;
+        // PO-32b-1: sichtbare Custom-Header-Pflichtfelder der Calc blockieren Dispo-Create.
+        $headerValues = $this->calculationFields->headerValuesForPayload($calculation);
+        foreach ($calcSnapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if (! $def->required || ! $def->visible) {
+                continue;
+            }
+            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                continue;
+            }
+
+            $raw = $headerValues[$def->key] ?? null;
+            if ($raw === null || $raw === '') {
+                $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
+            }
         }
 
-        $errors = [];
         foreach ($selectedCalculationPositionIds as $index => $calcPositionId) {
             $calcPosition = $calcPositions->get($calcPositionId);
             if ($calcPosition === null) {
                 continue;
             }
+
+            $scopeSnapshot = $this->calculationFields->positionScopeSnapshot($calcPosition, $calcSnapshot);
+            $requiredDefs = $scopeSnapshot->fieldDefinitions
+                ->where('scope', FieldScope::Position)
+                ->filter(fn (SnapshotFieldDefinition $def): bool => $def->required
+                    && $def->visible
+                    && in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true));
+
+            if ($requiredDefs->isEmpty()) {
+                continue;
+            }
+
             $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
             foreach ($requiredDefs as $def) {
                 $raw = $values[$def->key] ?? null;
@@ -964,7 +1271,29 @@ final class DispoOrderDynamicFieldWriter
             $calcSnapshot->loadMissing('fieldDefinitions');
         }
 
-        return $calcSnapshot->fieldDefinitions->contains('key', $key);
+        if ($calcSnapshot->fieldDefinitions->contains('key', $key)) {
+            return true;
+        }
+
+        // Generation 3: Positions-Calc-Origin liegt am Effektiv, nicht an der Basis.
+        if ((int) $calcSnapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            return false;
+        }
+
+        if ($calcSnapshot->parent_configuration_snapshot_id !== null) {
+            // Quelle ist bereits ein Calc-Effektiv.
+            return false;
+        }
+
+        return SnapshotFieldDefinition::query()
+            ->where('key', $key)
+            ->whereIn(
+                'configuration_snapshot_id',
+                ConfigurationSnapshot::query()
+                    ->where('parent_configuration_snapshot_id', $calcSnapshot->id)
+                    ->select('id'),
+            )
+            ->exists();
     }
 
     private function maxLengthForDefinition(SnapshotFieldDefinition $def): int
@@ -1148,10 +1477,11 @@ final class DispoOrderDynamicFieldWriter
         foreach ($order->positions->values() as $index => $position) {
             $positionContexts[] = [
                 'index' => $index,
+                'position' => $position,
                 'values' => $this->positionValuesForValidation($position, $snapshot),
             ];
         }
-        $this->rules->validate($snapshot, $headerValues, $positionContexts);
+        $this->validateRules($snapshot, $headerValues, $positionContexts);
     }
 
     /**
@@ -1175,7 +1505,7 @@ final class DispoOrderDynamicFieldWriter
     {
         $position->loadMissing('fieldValues.snapshotFieldDefinition');
         $values = [];
-        foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+        foreach ($this->positionDefinitions($snapshot, $position) as $def) {
             $values[$def->key] = $this->readPositionValue($position, $def);
         }
 
@@ -1255,13 +1585,21 @@ final class DispoOrderDynamicFieldWriter
 
     private function hasPositionValue(DispoOrderPosition $position, ConfigurationSnapshot $snapshot, string $key): bool
     {
-        $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+        $def = $this->positionDefinition($snapshot, $position, $key);
         if ($def === null) {
             return false;
         }
         $position->loadMissing('fieldValues');
 
         return $position->fieldValues->contains('snapshot_field_definition_id', $def->id);
+    }
+
+    private function positionDefinition(
+        ConfigurationSnapshot $snapshot,
+        DispoOrderPosition $position,
+        string $key,
+    ): ?SnapshotFieldDefinition {
+        return $this->positionSnapshot($snapshot, $position)->fieldDefinitions->firstWhere('key', $key);
     }
 
     /**
@@ -1303,7 +1641,7 @@ final class DispoOrderDynamicFieldWriter
                     'reason' => 'missing_row',
                 ];
             } else {
-                $periodOpenDef = $snapshot->fieldDefinitions->firstWhere('key', 'period_open');
+                $periodOpenDef = $this->positionDefinition($snapshot, $position, 'period_open');
                 $periodOpen = $periodOpenDef === null
                     ? null
                     : $this->readPositionValue($position, $periodOpenDef);
@@ -1379,7 +1717,7 @@ final class DispoOrderDynamicFieldWriter
         foreach ($order->positions as $position) {
             $values = [];
             foreach (['period_open', 'position_flight_period'] as $key) {
-                $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+                $def = $this->positionDefinition($snapshot, $position, $key);
                 $values[$key] = $def === null ? null : $this->readPositionValue($position, $def);
             }
             $positions[(int) $position->id] = $values;
@@ -1396,13 +1734,14 @@ final class DispoOrderDynamicFieldWriter
         $order->loadMissing('positions.fieldValues.snapshotFieldDefinition');
         $out = [];
         foreach ($order->positions as $position) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
             $values = [];
-            foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
                 if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                     continue;
                 }
-                if (! $this->isNativeEditablePositionText($snapshot, $def)
-                    && ! $this->isCalcOriginKey($snapshot, $def->key)) {
+                if (! $this->isNativeEditablePositionText($positionSnapshot, $def)
+                    && ! $this->isCalcOriginKey($positionSnapshot, $def->key)) {
                     continue;
                 }
                 $raw = $this->readPositionValue($position, $def);

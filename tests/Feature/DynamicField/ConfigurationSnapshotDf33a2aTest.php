@@ -68,7 +68,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         ]);
     }
 
-    public function test_new_calculation_freezes_generation_two_with_sources_and_provenance(): void
+    public function test_new_calculation_freezes_generation_three_with_sources_and_provenance(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $calculation = $this->createSavedCalculation($catalog, [
@@ -78,7 +78,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         $snapshot = ConfigurationSnapshot::query()->findOrFail($calculation->configuration_snapshot_id);
 
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             (int) $snapshot->format_version,
         );
         $this->assertNotNull($snapshot->schema_fingerprint);
@@ -90,10 +90,14 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
                 ->exists(),
         );
 
+        // Gen 3: Basis trägt nur Header-Definitionen.
         $definitions = SnapshotFieldDefinition::query()
             ->where('configuration_snapshot_id', $snapshot->id)
             ->get();
-        $this->assertGreaterThanOrEqual(3, $definitions->count());
+        $this->assertGreaterThanOrEqual(1, $definitions->count());
+        $this->assertTrue($definitions->every(
+            fn (SnapshotFieldDefinition $definition): bool => $definition->scope === FieldScope::Header,
+        ));
 
         foreach ($definitions as $definition) {
             foreach (SnapshotFieldDefinition::PROVENANCE_COLUMNS as $column) {
@@ -104,14 +108,45 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             }
         }
 
+        $position = $calculation->positions()->firstOrFail();
+        $this->assertNotNull($position->effective_configuration_snapshot_id);
+        $effectiveDefs = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $position->effective_configuration_snapshot_id)
+            ->get();
+        $this->assertGreaterThanOrEqual(2, $effectiveDefs->count());
+        $this->assertTrue($effectiveDefs->every(
+            fn (SnapshotFieldDefinition $definition): bool => $definition->scope === FieldScope::Position,
+        ));
+
         $rules = SnapshotFieldRule::query()
-            ->where('configuration_snapshot_id', $snapshot->id)
+            ->where('configuration_snapshot_id', $position->effective_configuration_snapshot_id)
             ->get();
         $this->assertGreaterThanOrEqual(1, $rules->count());
 
         foreach ($rules as $rule) {
             $this->assertNotNull($rule->provenance_source_id);
         }
+    }
+
+    public function test_freeze_calculation_v2_still_produces_generation_two(): void
+    {
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
+
+        $snapshot = app(ConfigurationSnapshotFreezeService::class)
+            ->freezeCalculationV2($fingerprint);
+
+        $this->assertSame(
+            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            (int) $snapshot->format_version,
+        );
+        $this->assertGreaterThanOrEqual(1, $snapshot->sources()->count());
+        $this->assertFalse(
+            ConfigurationSnapshotSource::query()
+                ->where('configuration_snapshot_id', $snapshot->id)
+                ->whereIn('layer', ['advertising_category', 'advertising_medium'])
+                ->exists(),
+        );
     }
 
     public function test_active_global_assignment_field_is_offered_and_frozen_for_new_calculations(): void
@@ -124,7 +159,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             ->get(route('calculations.create'))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('fieldSchema.format_version', ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE)
+                ->where('fieldSchema.format_version', ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE)
                 ->where('fieldSchema.fields', fn ($fields): bool => collect($fields)
                     ->pluck('key')
                     ->contains($customKey))
@@ -136,11 +171,11 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
 
         $this->assertContains($customKey, array_column($created->json('fieldSchema.fields'), 'key'));
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $created->json('fieldSchema.format_version'),
         );
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             $created->json('target_format_version'),
         );
         $this->assertNotEmpty($created->json('fieldSchema.schema_fingerprint'));
@@ -197,8 +232,6 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         $this->assertSame(0, Calculation::query()->count());
 
         $fresh = $this->basePayload($catalog);
-        $fresh['schema_fingerprint'] = app(ConfigurationSnapshotFreezeService::class)
-            ->resolveLiveSchemaForCalculation()['schema_fingerprint'];
 
         $this->actingAs($user)
             ->post(route('calculations.store'), $fresh)
@@ -214,22 +247,30 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         $calculation = $this->createSavedCalculation($catalog, [
             ['inventory_id' => $catalog['hamburg']->id],
         ], $user);
-        $snapshotId = (int) $calculation->configuration_snapshot_id;
 
-        DB::table('configuration_snapshots')
-            ->where('id', $snapshotId)
-            ->update(['format_version' => ConfigurationSnapshot::FORMAT_VERSION_LEGACY]);
+        $legacy = app(ConfigurationSnapshotMaterializer::class)->materializeFromActiveSet();
+
+        foreach ($calculation->positions as $position) {
+            $position->forceFill(['effective_configuration_snapshot_id' => null])->save();
+        }
+
+        $calculation->forceFill(['configuration_snapshot_id' => $legacy->id])->save();
+        $snapshotId = (int) $legacy->id;
 
         $position = $calculation->positions()->firstOrFail();
         $payload = $this->basePayload($catalog);
         $payload['customer_name'] = 'Generation 1';
-        $payload['lock_version'] = $calculation->lock_version;
+        $payload['lock_version'] = $calculation->fresh()->lock_version;
         $payload['positions'][0]['id'] = $position->id;
         $payload['positions'][0]['client_key'] = $position->client_key;
+        unset($payload['schema_fingerprint']);
+        unset($payload['positions'][0]['schema_fingerprint']);
 
-        $this->actingAs($user)
-            ->put(route('calculations.update', $calculation), $payload)
-            ->assertRedirect();
+        $response = $this->actingAs($user)
+            ->from(route('calculations.edit', $calculation))
+            ->put(route('calculations.update', $calculation), $payload);
+
+        $response->assertSessionHasNoErrors()->assertRedirect();
 
         $calculation->refresh();
         $this->assertSame('Generation 1', $calculation->customer_name);
@@ -240,7 +281,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         );
     }
 
-    public function test_dispo_order_create_freezes_generation_two_from_calculation_snapshot(): void
+    public function test_dispo_order_create_freezes_generation_three_from_calculation_snapshot(): void
     {
         $calculation = $this->savedCalculation();
         $user = User::factory()->role(Role::Sales)->create();
@@ -253,7 +294,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         $snapshot = ConfigurationSnapshot::query()->findOrFail($order->configuration_snapshot_id);
 
         $this->assertSame(
-            ConfigurationSnapshot::FORMAT_VERSION_GLOBAL_FREEZE,
+            ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
             (int) $snapshot->format_version,
         );
         $this->assertSame(
@@ -444,7 +485,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
      */
     private function basePayload(array $catalog): array
     {
-        return [
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'customer_name' => 'Freeze Kunde',
             'agency_name' => null,
@@ -452,7 +493,6 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             'product_title' => 'Titel',
             'order_discount_percent' => '0',
             'ae_enabled' => false,
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'dynamic_field_values' => [
                 'campaign_period' => null,
             ],
@@ -470,6 +510,6 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
                     'position_flight_period' => null,
                 ],
             ]],
-        ];
+        ]);
     }
 }

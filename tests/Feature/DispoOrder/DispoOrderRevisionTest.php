@@ -421,13 +421,22 @@ class DispoOrderRevisionTest extends TestCase
      */
     private function calculationUpdatePayload(Calculation $calculation, array $overrides = []): array
     {
-        $calculation->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $calculation->load([
+            'configurationSnapshot',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'orderDiscounts',
+        ]);
 
         $firstDiscount = $overrides['first_position_discount_percent'] ?? null;
+        $baseFingerprint = (string) ($calculation->configurationSnapshot?->schema_fingerprint
+            ?? $this->liveSchemaFingerprint());
 
         return [
             'lock_version' => $calculation->lock_version,
             'planning_mode' => $calculation->planning_mode->value,
+            'schema_fingerprint' => $baseFingerprint,
             'customer_name' => $overrides['customer_name'] ?? $calculation->customer_name,
             'agency_name' => $calculation->agency_name,
             'campaign' => $calculation->campaign,
@@ -440,46 +449,49 @@ class DispoOrderRevisionTest extends TestCase
                 'custom_label' => $discount->custom_label,
                 'percent' => (string) $discount->percent,
             ])->all(),
-            'positions' => $calculation->positions->values()->map(function ($position, int $index) use ($firstDiscount): array {
-                $discount = $firstDiscount !== null && $index === 0
-                    ? $firstDiscount
-                    : (string) $position->position_discount_percent;
+            'positions' => $this->withPositionSchemaFingerprints(
+                $calculation,
+                $calculation->positions->values()->map(function ($position, int $index) use ($firstDiscount): array {
+                    $discount = $firstDiscount !== null && $index === 0
+                        ? $firstDiscount
+                        : (string) $position->position_discount_percent;
 
-                $positionDiscounts = $firstDiscount !== null && $index === 0
-                    ? (
-                        (float) $discount > 0
-                            ? [['type' => 'quantity', 'custom_label' => null, 'percent' => $discount]]
-                            : []
-                    )
-                    : $position->discounts->map(fn ($d): array => [
-                        'type' => $d->type->value,
-                        'custom_label' => $d->custom_label,
-                        'percent' => (string) $d->percent,
-                    ])->all();
+                    $positionDiscounts = $firstDiscount !== null && $index === 0
+                        ? (
+                            (float) $discount > 0
+                                ? [['type' => 'quantity', 'custom_label' => null, 'percent' => $discount]]
+                                : []
+                        )
+                        : $position->discounts->map(fn ($d): array => [
+                            'type' => $d->type->value,
+                            'custom_label' => $d->custom_label,
+                            'percent' => (string) $d->percent,
+                        ])->all();
 
-                return [
-                    'id' => $position->id,
-                    'client_key' => $position->client_key,
-                    'inventory_id' => $position->inventory_id,
-                    'advertising_medium_id' => $position->advertising_medium_id,
-                    'spot_method' => $position->spot_method->value,
-                    'length_seconds' => $position->length_seconds,
-                    'total_spot_count' => $position->total_spot_count,
-                    'position_discount_percent' => $discount,
-                    'ae_percent' => (string) $position->ae_percent,
-                    'plan_rows' => $position->planRows->map(fn ($row): array => [
-                        'hour' => $row->hour,
-                        'day_group' => $row->day_group->value,
-                    ])->all(),
-                    'time_ranges' => $position->timeRanges->map(fn ($range): array => [
-                        'start_hour' => $range->start_hour,
-                        'end_hour_exclusive' => $range->end_hour_exclusive,
-                        'day_group' => $range->day_group->value,
-                        'spot_count' => $range->spot_count,
-                    ])->all(),
-                    'position_discounts' => $positionDiscounts,
-                ];
-            })->all(),
+                    return [
+                        'id' => $position->id,
+                        'client_key' => $position->client_key,
+                        'inventory_id' => $position->inventory_id,
+                        'advertising_medium_id' => $position->advertising_medium_id,
+                        'spot_method' => $position->spot_method->value,
+                        'length_seconds' => $position->length_seconds,
+                        'total_spot_count' => $position->total_spot_count,
+                        'position_discount_percent' => $discount,
+                        'ae_percent' => (string) $position->ae_percent,
+                        'plan_rows' => $position->planRows->map(fn ($row): array => [
+                            'hour' => $row->hour,
+                            'day_group' => $row->day_group->value,
+                        ])->all(),
+                        'time_ranges' => $position->timeRanges->map(fn ($range): array => [
+                            'start_hour' => $range->start_hour,
+                            'end_hour_exclusive' => $range->end_hour_exclusive,
+                            'day_group' => $range->day_group->value,
+                            'spot_count' => $range->spot_count,
+                        ])->all(),
+                        'position_discounts' => $positionDiscounts,
+                    ];
+                })->all(),
+            ),
         ];
     }
 }

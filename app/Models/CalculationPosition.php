@@ -18,6 +18,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $total_spot_count
  * @property bool $needs_spot_redistribution
  * @property int $advertising_medium_id
+ * @property string|null $advertising_medium_name
+ * @property string|null $advertising_medium_code
+ * @property int|null $advertising_category_id
+ * @property string|null $advertising_category_key
+ * @property string|null $advertising_category_name
+ * @property int|null $effective_configuration_snapshot_id
  * @property-read Collection<int, CalculationPositionTimeRange> $timeRanges
  * @property-read Collection<int, CalculationPositionDiscount> $discounts
  * @property int $length_seconds
@@ -34,6 +40,12 @@ class CalculationPosition extends Model
         'client_key',
         'inventory_id',
         'advertising_medium_id',
+        'advertising_medium_name',
+        'advertising_medium_code',
+        'advertising_category_id',
+        'advertising_category_key',
+        'advertising_category_name',
+        'effective_configuration_snapshot_id',
         'inventory_medium_rule_id',
         'price_list_id',
         'kind',
@@ -103,6 +115,26 @@ class CalculationPosition extends Model
     public function advertisingMedium(): BelongsTo
     {
         return $this->belongsTo(AdvertisingMedium::class);
+    }
+
+    /**
+     * DF-3.3a2β: historisch eingefrorene Oberkategorie der Position.
+     *
+     * @return BelongsTo<AdvertisingCategory, $this>
+     */
+    public function advertisingCategory(): BelongsTo
+    {
+        return $this->belongsTo(AdvertisingCategory::class, 'advertising_category_id');
+    }
+
+    /**
+     * DF-3.3a2β / VER-003: positionsscharfer Effektiv-Snapshot.
+     *
+     * @return BelongsTo<ConfigurationSnapshot, $this>
+     */
+    public function effectiveConfigurationSnapshot(): BelongsTo
+    {
+        return $this->belongsTo(ConfigurationSnapshot::class, 'effective_configuration_snapshot_id');
     }
 
     /**

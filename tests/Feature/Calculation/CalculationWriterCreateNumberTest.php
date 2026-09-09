@@ -27,21 +27,7 @@ class CalculationWriterCreateNumberTest extends TestCase
         $seqBefore = CalculationNumberSequence::query()->where('year', $year)->value('last_seq') ?? 0;
 
         $catalog['hamburg']->update(['is_active' => false]);
-        $invalidPayload = [
-            'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
-            'order_discount_percent' => '0',
-            'positions' => [[
-                'inventory_id' => $catalog['hamburg']->id,
-                'advertising_medium_id' => $catalog['medium']->id,
-                'spot_method' => 'average',
-                'length_seconds' => 30,
-                'total_spot_count' => 1,
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
-            ]],
-        ];
+        $invalidPayload = $this->spotPayload($catalog);
 
         try {
             $writer->create($invalidPayload, $user);
@@ -55,23 +41,7 @@ class CalculationWriterCreateNumberTest extends TestCase
         $this->assertSame(0, Calculation::query()->count());
 
         $catalog['hamburg']->update(['is_active' => true]);
-        $validPayload = [
-            'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
-            'order_discount_percent' => '0',
-            'positions' => [[
-                'inventory_id' => $catalog['hamburg']->id,
-                'advertising_medium_id' => $catalog['medium']->id,
-                'spot_method' => 'average',
-                'length_seconds' => 30,
-                'total_spot_count' => 1,
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
-            ]],
-        ];
-
-        $calculation = $writer->create($validPayload, $user);
+        $calculation = $writer->create($this->spotPayload($catalog), $user);
         $seqAfterSuccess = CalculationNumberSequence::query()->where('year', $year)->value('last_seq') ?? 0;
 
         $this->assertSame($seqBefore + 1, $seqAfterSuccess);
@@ -83,9 +53,25 @@ class CalculationWriterCreateNumberTest extends TestCase
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
         $writer = app(CalculationWriter::class);
-        $payload = [
+        $payload = $this->spotPayload($catalog);
+
+        $first = $writer->create($payload, $user);
+        $second = $writer->create($payload, $user);
+
+        $this->assertSame(
+            ((int) substr($first->number, -5)) + 1,
+            (int) substr($second->number, -5),
+        );
+    }
+
+    /**
+     * @param  array{hamburg: mixed, medium: mixed}  $catalog
+     * @return array<string, mixed>
+     */
+    private function spotPayload(array $catalog): array
+    {
+        return $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
-            'schema_fingerprint' => $this->liveSchemaFingerprint(),
             'order_discount_percent' => '0',
             'positions' => [[
                 'inventory_id' => $catalog['hamburg']->id,
@@ -97,15 +83,6 @@ class CalculationWriterCreateNumberTest extends TestCase
                 'ae_percent' => '0',
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
-        ];
-
-        $first = $writer->create($payload, $user);
-        $second = $writer->create($payload, $user);
-
-        preg_match('/^K-(\d{4})-(\d{5})$/', $first->number, $firstParts);
-        preg_match('/^K-(\d{4})-(\d{5})$/', $second->number, $secondParts);
-
-        $this->assertSame($firstParts[1], $secondParts[1]);
-        $this->assertSame(1, (int) $secondParts[2] - (int) $firstParts[2]);
+        ]);
     }
 }
