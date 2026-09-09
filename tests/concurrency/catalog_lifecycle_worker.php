@@ -5,7 +5,8 @@ declare(strict_types=1);
 /**
  * ADV-001b MySQL-Parallelitätsworker für Katalog-Lifecycle-Races.
  *
- * Orchestrierung über Datei-Signale (Lock-Zustand), nicht über Sleeps.
+ * Orchestrierung ausschließlich hier (tests/): äußere Transaktionen,
+ * explizite vorbereitende Zeilenlocks und Dateibarrieren.
  */
 
 use App\Enums\CalculationKind;
@@ -71,11 +72,27 @@ $signal = static function (string $file) use ($runDir): void {
     file_put_contents($runDir.'/'.$file, '1');
 };
 
+$applyPrelock = static function (array $prelock): void {
+    if (isset($prelock['category_id'])) {
+        AdvertisingCategory::query()
+            ->whereKey((int) $prelock['category_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+    if (isset($prelock['medium_id'])) {
+        AdvertisingMedium::query()
+            ->whereKey((int) $prelock['medium_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+};
+
 try {
     $actorId = (int) ($payload['actor_id'] ?? 0);
     $actor = $actorId > 0 ? User::query()->findOrFail($actorId) : null;
 
     $orch = is_array($payload['orchestration'] ?? null) ? $payload['orchestration'] : [];
+    $useOuter = (bool) ($orch['outer_transaction'] ?? false);
 
     if (isset($orch['wait_before']) && is_array($orch['wait_before'])) {
         $waitForFiles(array_map('strval', $orch['wait_before']));
@@ -84,80 +101,96 @@ try {
         $signal($orch['signal_before']);
     }
 
-    $result = match ($action) {
-        'create_medium' => (function () use ($app, $actor, $payload): string {
-            $writer = $app->make(AdvertisingMediumAdminWriter::class);
-            $medium = $writer->create([
-                'code' => (string) $payload['code'],
-                'name' => (string) ($payload['name'] ?? $payload['code']),
-                'kind' => (string) ($payload['kind'] ?? CalculationKind::SpotClassic->value),
-                'category_id' => (int) $payload['category_id'],
-                'default_length_seconds' => (int) ($payload['default_length_seconds'] ?? 30),
-                'is_active' => true,
-            ], $actor);
-
-            return 'OK:create_medium|'.$medium->id.'|'.$medium->category_id.'|'.($medium->is_active ? '1' : '0');
-        })(),
-        'deactivate_category' => (function () use ($app, $actor, $payload): string {
-            $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
-            $impact = $app->make(CatalogImpactPreviewService::class);
-            // Fingerprint vor dem Lock nur als Client-Vorschau; Writer berechnet neu.
-            $preview = $impact->previewCategoryDeactivate($category->fresh());
-            $writer = $app->make(AdvertisingCategoryAdminWriter::class);
-            $updated = $writer->deactivate($category, [
-                'lock_version' => (int) ($payload['lock_version'] ?? $category->lock_version),
-                'fingerprint' => (string) ($payload['fingerprint'] ?? $preview['fingerprint']),
-            ], $actor);
-
-            return 'OK:deactivate_category|'.$updated->id.'|'.($updated->is_active ? '1' : '0');
-        })(),
-        'reactivate_medium' => (function () use ($app, $actor, $payload): string {
-            $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
-            $writer = $app->make(AdvertisingMediumAdminWriter::class);
-            $updated = $writer->reactivate($medium, [
-                'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
-            ], $actor);
-
-            return 'OK:reactivate_medium|'.$updated->id.'|'.$updated->category_id.'|'.($updated->is_active ? '1' : '0');
-        })(),
-        'change_category' => (function () use ($app, $actor, $payload): string {
-            $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
-            $writer = $app->make(AdvertisingMediumAdminWriter::class);
-            $updated = $writer->changeCategory($medium, [
-                'category_id' => (int) $payload['target_category_id'],
-                'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
-                'fingerprint' => (string) $payload['fingerprint'],
-            ], $actor);
-
-            return 'OK:change_category|'.$updated->id.'|'.$updated->category_id.'|'.($updated->is_active ? '1' : '0');
-        })(),
-        'assignment_lock_hold' => (function () use ($app, $payload, $waitForFiles, $signal): string {
-            $assignment = FieldSetAssignment::query()->findOrFail((int) $payload['assignment_id']);
-            $coordinator = $app->make(AssignmentConfigurationLockCoordinator::class);
-
-            DB::beginTransaction();
-            try {
-                $coordinator->lockForAssignment($assignment);
-                $signal('assignment_full_locks_held');
-                if (isset($payload['wait_after_full_lock']) && is_array($payload['wait_after_full_lock'])) {
-                    $waitForFiles(array_map('strval', $payload['wait_after_full_lock']));
-                }
-                DB::commit();
-            } catch (Throwable $exception) {
-                DB::rollBack();
-                throw $exception;
-            }
-
-            return 'OK:assignment_lock_hold|'.$assignment->id;
-        })(),
-        default => throw new InvalidArgumentException('Unknown action: '.$action),
-    };
-
-    if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
-        $signal($orch['signal_after']);
+    if ($useOuter) {
+        DB::beginTransaction();
     }
 
-    file_put_contents($resultFile, $result);
+    try {
+        if ($useOuter && isset($orch['prelock']) && is_array($orch['prelock'])) {
+            $applyPrelock($orch['prelock']);
+            if (isset($orch['signal_after_prelock']) && is_string($orch['signal_after_prelock']) && $orch['signal_after_prelock'] !== '') {
+                $signal($orch['signal_after_prelock']);
+            }
+            if (isset($orch['wait_after_prelock']) && is_array($orch['wait_after_prelock'])) {
+                $waitForFiles(array_map('strval', $orch['wait_after_prelock']));
+            }
+        }
+
+        $result = match ($action) {
+            'create_medium' => (function () use ($app, $actor, $payload): string {
+                $writer = $app->make(AdvertisingMediumAdminWriter::class);
+                $medium = $writer->create([
+                    'code' => (string) $payload['code'],
+                    'name' => (string) ($payload['name'] ?? $payload['code']),
+                    'kind' => (string) ($payload['kind'] ?? CalculationKind::SpotClassic->value),
+                    'category_id' => (int) $payload['category_id'],
+                    'default_length_seconds' => (int) ($payload['default_length_seconds'] ?? 30),
+                    'is_active' => true,
+                ], $actor);
+
+                return 'OK:create_medium|'.$medium->id.'|'.$medium->category_id.'|'.($medium->is_active ? '1' : '0');
+            })(),
+            'deactivate_category' => (function () use ($app, $actor, $payload): string {
+                $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
+                $impact = $app->make(CatalogImpactPreviewService::class);
+                $preview = $impact->previewCategoryDeactivate($category->fresh());
+                $writer = $app->make(AdvertisingCategoryAdminWriter::class);
+                $updated = $writer->deactivate($category, [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $category->lock_version),
+                    'fingerprint' => (string) ($payload['fingerprint'] ?? $preview['fingerprint']),
+                ], $actor);
+
+                return 'OK:deactivate_category|'.$updated->id.'|'.($updated->is_active ? '1' : '0');
+            })(),
+            'reactivate_medium' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $writer = $app->make(AdvertisingMediumAdminWriter::class);
+                $updated = $writer->reactivate($medium, [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
+                ], $actor);
+
+                return 'OK:reactivate_medium|'.$updated->id.'|'.$updated->category_id.'|'.($updated->is_active ? '1' : '0');
+            })(),
+            'change_category' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $writer = $app->make(AdvertisingMediumAdminWriter::class);
+                $updated = $writer->changeCategory($medium, [
+                    'category_id' => (int) $payload['target_category_id'],
+                    'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
+                    'fingerprint' => (string) $payload['fingerprint'],
+                ], $actor);
+
+                return 'OK:change_category|'.$updated->id.'|'.$updated->category_id.'|'.($updated->is_active ? '1' : '0');
+            })(),
+            'assignment_lock_hold' => (function () use ($app, $payload): string {
+                $assignment = FieldSetAssignment::query()->findOrFail((int) $payload['assignment_id']);
+                $coordinator = $app->make(AssignmentConfigurationLockCoordinator::class);
+                $coordinator->lockForAssignment($assignment);
+
+                return 'OK:assignment_lock_hold|'.$assignment->id;
+            })(),
+            default => throw new InvalidArgumentException('Unknown action: '.$action),
+        };
+
+        if (isset($orch['wait_after_action']) && is_array($orch['wait_after_action'])) {
+            $waitForFiles(array_map('strval', $orch['wait_after_action']));
+        }
+
+        if ($useOuter) {
+            DB::commit();
+        }
+
+        if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
+            $signal($orch['signal_after']);
+        }
+
+        file_put_contents($resultFile, $result);
+    } catch (Throwable $inner) {
+        if ($useOuter && DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
+        throw $inner;
+    }
 } catch (Throwable $exception) {
     $class = $exception::class;
     $message = Str::limit($exception->getMessage(), 240);

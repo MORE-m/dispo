@@ -53,8 +53,6 @@ final class CatalogLifecycleLockCoordinator
             ]);
         }
 
-        $this->testGateAfterCategoryLock();
-
         return $category;
     }
 
@@ -90,8 +88,6 @@ final class CatalogLifecycleLockCoordinator
             ->whereKey($mediumId)
             ->lockForUpdate()
             ->firstOrFail();
-
-        $this->testGateAfterMediumLock();
 
         $categoryIds = array_merge([(int) $medium->category_id], $extraCategoryIds);
         $categories = $this->lockCategoriesByIds($categoryIds);
@@ -159,54 +155,6 @@ final class CatalogLifecycleLockCoordinator
             ->lockForUpdate()
             ->get();
 
-        $this->testGateAfterCategoryLock();
-
         return $locked;
-    }
-
-    /**
-     * Test-only: deterministische Überlappung an Lock-Grenzen (MySQL-Paralleltests).
-     * Produktion: Env unset → no-op.
-     */
-    private function testGateAfterCategoryLock(): void
-    {
-        $this->runTestGate('CATALOG_LOCK_GATE_AFTER_CATEGORY');
-    }
-
-    private function testGateAfterMediumLock(): void
-    {
-        $this->runTestGate('CATALOG_LOCK_GATE_AFTER_MEDIUM');
-    }
-
-    private function runTestGate(string $envKey): void
-    {
-        $dir = getenv('CATALOG_LOCK_TEST_GATE_DIR');
-        if (! is_string($dir) || $dir === '') {
-            return;
-        }
-
-        $spec = getenv($envKey);
-        if (! is_string($spec) || $spec === '') {
-            return;
-        }
-
-        // Format: signalFile|waitForFile|waitForFile2...
-        $parts = array_values(array_filter(explode('|', $spec), static fn (string $p): bool => $p !== ''));
-        if ($parts === []) {
-            return;
-        }
-
-        $signal = array_shift($parts);
-        file_put_contents($dir.'/'.$signal, '1');
-
-        $deadline = microtime(true) + 45.0;
-        foreach ($parts as $waitFile) {
-            while (! is_file($dir.'/'.$waitFile)) {
-                if (microtime(true) > $deadline) {
-                    throw new \RuntimeException("Catalog lock test gate timeout waiting for {$waitFile}");
-                }
-                usleep(5_000);
-            }
-        }
     }
 }

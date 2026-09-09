@@ -23,9 +23,10 @@ use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
- * ADV-001b C-RACE: echte parallele MySQL-Transaktionen mit Lock-Zustands-Barrieren.
+ * ADV-001b C-RACE: echte parallele MySQL-Transaktionen.
  *
- * Invariante: nie Kategorie inaktiv + Medium aktiv.
+ * Orchestrierung nur in tests/: äußere Worker-Transaktionen, explizite
+ * Zeilenlocks und Dateibarrieren – keine Test-Hooks unter app/.
  */
 class CatalogLifecycleConcurrencyTest extends TestCase
 {
@@ -42,7 +43,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         $code = 'race_create_'.bin2hex(random_bytes(3));
         $preview = app(CatalogImpactPreviewService::class)->previewCategoryDeactivate($spots->fresh());
 
-        // Deactivate hält Kategorie zuerst; Create kontendiert danach deterministisch.
         $results = $this->runParallelWorkers(
             [
                 'action' => 'deactivate_category',
@@ -51,9 +51,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'category_id' => $spots->id,
                     'lock_version' => $spots->lock_version,
                     'fingerprint' => $preview['fingerprint'],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_CATEGORY' => 'holder_category_locked|waiter_entered',
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['category_id' => $spots->id],
+                        'signal_after_prelock' => 'holder_category_locked',
+                        'wait_after_prelock' => ['waiter_entered'],
+                    ],
                 ],
             ],
             [
@@ -100,9 +103,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'name' => 'Race Create Holder',
                     'kind' => CalculationKind::SpotClassic->value,
                     'category_id' => $spots->id,
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_CATEGORY' => 'holder_category_locked|waiter_entered',
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['category_id' => $spots->id],
+                        'signal_after_prelock' => 'holder_category_locked',
+                        'wait_after_prelock' => ['waiter_entered'],
+                    ],
                 ],
             ],
             [
@@ -145,8 +151,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         ]);
         $preview = app(CatalogImpactPreviewService::class)->previewCategoryDeactivate($spots->fresh());
 
-        // Deactivate hält Kategorie; Reactivate sperrt Medium und wartet auf Kategorie.
-        // Altes Media-nach-Kategorie-Nachsperren würde hier deadlocken.
         $results = $this->runParallelWorkers(
             [
                 'action' => 'deactivate_category',
@@ -155,9 +159,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'category_id' => $spots->id,
                     'lock_version' => $spots->lock_version,
                     'fingerprint' => $preview['fingerprint'],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_CATEGORY' => 'holder_category_locked|waiter_holds_medium',
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['category_id' => $spots->id],
+                        'signal_after_prelock' => 'holder_category_locked',
+                        'wait_after_prelock' => ['waiter_holds_medium'],
+                    ],
                 ],
             ],
             [
@@ -168,10 +175,10 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'lock_version' => $medium->lock_version,
                     'orchestration' => [
                         'wait_before' => ['holder_category_locked'],
+                        'outer_transaction' => true,
+                        'prelock' => ['medium_id' => $medium->id],
+                        'signal_after_prelock' => 'waiter_holds_medium',
                     ],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_MEDIUM' => 'waiter_holds_medium',
                 ],
             ],
         );
@@ -237,9 +244,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'category_id' => $spots->id,
                     'lock_version' => $spots->fresh()->lock_version,
                     'fingerprint' => $deactivatePreview['fingerprint'],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_CATEGORY' => 'holder_category_locked|waiter_holds_medium',
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['category_id' => $spots->id],
+                        'signal_after_prelock' => 'holder_category_locked',
+                        'wait_after_prelock' => ['waiter_holds_medium'],
+                    ],
                 ],
             ],
             [
@@ -252,10 +262,10 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'fingerprint' => $changePreview['fingerprint'],
                     'orchestration' => [
                         'wait_before' => ['holder_category_locked'],
+                        'outer_transaction' => true,
+                        'prelock' => ['medium_id' => $medium->id],
+                        'signal_after_prelock' => 'waiter_holds_medium',
                     ],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_MEDIUM' => 'waiter_holds_medium',
                 ],
             ],
         );
@@ -281,7 +291,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         $spots = $this->spotsCategory();
         $this->deactivateAllMediaInCategory($spots->id);
 
-        // Niedrige Medium-ID in der Zielkategorie (kritisch für Media→Kategorie vs. Kat→Media).
         $lowMedium = AdvertisingMedium::factory()->create([
             'category_id' => $spots->id,
             'code' => 'race_low_'.bin2hex(random_bytes(3)),
@@ -312,11 +321,13 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                 'action' => 'assignment_lock_hold',
                 'payload' => [
                     'assignment_id' => $assignment->id,
-                    'wait_after_full_lock' => ['deactivate_done'],
-                ],
-                'env' => [
-                    // Hält Medium, wartet bis Deactivate die Kategorie hält, dann Kategorie-Lock.
-                    'ASSIGNMENT_LOCK_GATE_AFTER_MEDIA' => 'assignment_holds_medium|deactivate_holds_category',
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['medium_id' => $lowMedium->id],
+                        'signal_after_prelock' => 'assignment_holds_medium',
+                        'wait_after_prelock' => ['deactivate_holds_category'],
+                        'wait_after_action' => ['deactivate_done'],
+                    ],
                 ],
             ],
             [
@@ -328,12 +339,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'fingerprint' => $preview['fingerprint'],
                     'orchestration' => [
                         'wait_before' => ['assignment_holds_medium'],
+                        'outer_transaction' => true,
+                        'prelock' => ['category_id' => $spots->id],
+                        'signal_after_prelock' => 'deactivate_holds_category',
                         'signal_after' => 'deactivate_done',
                         'signal_after_error' => 'deactivate_done',
                     ],
-                ],
-                'env' => [
-                    'CATALOG_LOCK_GATE_AFTER_CATEGORY' => 'deactivate_holds_category',
                 ],
             ],
         );
@@ -346,7 +357,7 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         );
         $this->assertTrue(
             collect($results)->contains(fn (string $line): bool => str_starts_with($line, 'OK:deactivate_category')),
-            'Kategorie-Deaktivierung muss ohne Nachsperren von Medien durchkommen: '.implode(' || ', $results),
+            'Kategorie-Deaktivierung muss ohne Medienlock durchkommen: '.implode(' || ', $results),
         );
         $this->assertInvariantNoActiveMediumUnderInactiveCategory();
 
@@ -442,8 +453,8 @@ class CatalogLifecycleConcurrencyTest extends TestCase
     }
 
     /**
-     * @param  array{action: string, payload: array<string, mixed>, env?: array<string, string>}  $workerA
-     * @param  array{action: string, payload: array<string, mixed>, env?: array<string, string>}  $workerB
+     * @param  array{action: string, payload: array<string, mixed>}  $workerA
+     * @param  array{action: string, payload: array<string, mixed>}  $workerB
      * @return list<string>
      */
     private function runParallelWorkers(array $workerA, array $workerB): array
@@ -456,7 +467,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         try {
             $script = base_path('tests/concurrency/catalog_lifecycle_worker.php');
             $baseEnv = $this->workerEnvironment();
-            $baseEnv['CATALOG_LOCK_TEST_GATE_DIR'] = $runDir;
 
             $processA = $this->makeWorkerProcess($script, $runDir, '0', $workerA, $baseEnv);
             $processB = $this->makeWorkerProcess($script, $runDir, '1', $workerB, $baseEnv);
@@ -490,7 +500,7 @@ class CatalogLifecycleConcurrencyTest extends TestCase
     }
 
     /**
-     * @param  array{action: string, payload: array<string, mixed>, env?: array<string, string>}  $worker
+     * @param  array{action: string, payload: array<string, mixed>}  $worker
      * @param  array<string, string>  $baseEnv
      */
     private function makeWorkerProcess(
@@ -500,8 +510,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         array $worker,
         array $baseEnv,
     ): Process {
-        $env = array_merge($baseEnv, $worker['env'] ?? []);
-
         return new Process(
             [
                 PHP_BINARY,
@@ -512,7 +520,7 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                 json_encode($worker['payload'], JSON_THROW_ON_ERROR),
             ],
             null,
-            $env,
+            $baseEnv,
         );
     }
 
