@@ -15,7 +15,6 @@ use App\Models\FieldSetAssignment;
 use App\Models\User;
 use App\Services\DynamicField\Admin\FieldSetVersionAdminWriter;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentAdminWriter;
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -39,11 +38,8 @@ if (! is_dir($runDir) && ! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
 /** @var array<string, mixed> $payload */
 $payload = json_decode($payloadJson, true, 512, JSON_THROW_ON_ERROR);
 
-require __DIR__.'/../../vendor/autoload.php';
-
 /** @var Application $app */
-$app = require __DIR__.'/../../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+$app = require __DIR__.'/bootstrap_mysql_worker.php';
 
 $resultFile = $runDir.'/worker-'.$workerId.'.result';
 
