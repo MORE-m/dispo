@@ -303,6 +303,7 @@ class FieldSetAssignmentDf33bAdminUiTest extends TestCase
         $activation = $this->actingAs($admin)
             ->postJson(route('administration.dynamic-fields.assignments.activation-preview', $second))
             ->assertOk()
+            ->assertJsonPath('lock_version', $second->lock_version)
             ->json();
 
         $this->assertTrue($activation['has_blocking_conflicts']);

@@ -127,6 +127,7 @@ class FieldSetAssignmentAdminController extends Controller
         return response()->json([
             'fingerprint' => $writer->canonicalActivationFingerprint($previews),
             'previews' => $previews,
+            'lock_version' => (int) $assignment->lock_version,
             'has_blocking_conflicts' => (bool) array_reduce(
                 $previews,
                 static fn (bool $carry, array $preview): bool => $carry || (bool) $preview['has_blocking_conflicts'],

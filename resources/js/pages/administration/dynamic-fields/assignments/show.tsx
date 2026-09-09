@@ -6,6 +6,10 @@ import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { JsonPostError, jsonPost, jsonPut } from '@/lib/json-post';
+import {
+    filterAssignmentProcessOptions,
+    resolveAssignmentProcess,
+} from '@/lib/field-set-assignment-process';
 
 type Option = { value: string; label: string };
 
@@ -426,18 +430,14 @@ export default function AssignmentShow({
         [fieldSetId, formOptions.fieldSets],
     );
 
-    const processChoices = useMemo(() => {
-        if (!selectedFieldSet) {
-            return formOptions.processOptions;
-        }
-        if (selectedFieldSet.applies_to === 'both') {
-            return formOptions.processOptions;
-        }
-
-        return formOptions.processOptions.filter(
-            (option) => option.value === selectedFieldSet.applies_to,
-        );
-    }, [formOptions.processOptions, selectedFieldSet]);
+    const processChoices = useMemo(
+        () =>
+            filterAssignmentProcessOptions(
+                formOptions.processOptions,
+                selectedFieldSet?.applies_to,
+            ),
+        [formOptions.processOptions, selectedFieldSet],
+    );
 
     function resetMessages() {
         setError(null);
@@ -588,11 +588,15 @@ export default function AssignmentShow({
             const result = await jsonPost<{
                 fingerprint: string;
                 previews: ContextPreview[];
+                lock_version: number;
                 has_blocking_conflicts: boolean;
             }>(routes.activationPreview, {});
             setActivationFingerprint(result.fingerprint);
             setActivationPreviews(result.previews);
             setHasBlockingConflicts(result.has_blocking_conflicts);
+            if (typeof result.lock_version === 'number') {
+                setLockVersion(result.lock_version);
+            }
             setSuccess(
                 result.has_blocking_conflicts
                     ? 'Aktivierungsvorschau geladen – Konflikte blockieren die Aktivierung.'
@@ -652,6 +656,8 @@ export default function AssignmentShow({
                 );
                 if (caught.isConflict) {
                     setActivationFingerprint(null);
+                    setActivationPreviews([]);
+                    setHasBlockingConflicts(false);
                 }
             } else {
                 setError('Aktivierung fehlgeschlagen.');
@@ -794,9 +800,19 @@ export default function AssignmentShow({
                                 id="field_set_id"
                                 className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                                 value={fieldSetId}
-                                onChange={(event) =>
-                                    setFieldSetId(event.target.value)
-                                }
+                                onChange={(event) => {
+                                    const nextId = event.target.value;
+                                    const next = formOptions.fieldSets.find(
+                                        (set) => set.id.toString() === nextId,
+                                    );
+                                    setFieldSetId(nextId);
+                                    setProcess((current) =>
+                                        resolveAssignmentProcess(
+                                            next?.applies_to,
+                                            current,
+                                        ),
+                                    );
+                                }}
                                 data-test="assignment-edit-fieldset-select"
                             >
                                 {formOptions.fieldSets.map((set) => (

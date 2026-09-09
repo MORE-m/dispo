@@ -5,6 +5,10 @@ import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    filterAssignmentProcessOptions,
+    resolveAssignmentProcess,
+} from '@/lib/field-set-assignment-process';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 
 type Option = { value: string; label: string };
@@ -57,8 +61,9 @@ export default function AssignmentCreate({
     formOptions: FormOptions;
     catalogNote: string;
 }) {
+    const initialFieldSet = formOptions.fieldSets[0];
     const [fieldSetId, setFieldSetId] = useState(
-        formOptions.fieldSets[0]?.id?.toString() ?? '',
+        initialFieldSet?.id?.toString() ?? '',
     );
     const [targetLayer, setTargetLayer] = useState('global');
     const [categoryId, setCategoryId] = useState(
@@ -67,7 +72,9 @@ export default function AssignmentCreate({
     const [mediumId, setMediumId] = useState(
         formOptions.media.find((m) => m.is_active)?.id?.toString() ?? '',
     );
-    const [process, setProcess] = useState('calculation');
+    const [process, setProcess] = useState(() =>
+        resolveAssignmentProcess(initialFieldSet?.applies_to),
+    );
     const [sort, setSort] = useState('0');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -83,23 +90,18 @@ export default function AssignmentCreate({
         [fieldSetId, formOptions.fieldSets],
     );
 
-    const processChoices = useMemo(() => {
-        if (!selectedFieldSet) {
-            return formOptions.processOptions;
-        }
-
-        if (selectedFieldSet.applies_to === 'both') {
-            return formOptions.processOptions;
-        }
-
-        return formOptions.processOptions.filter(
-            (option) => option.value === selectedFieldSet.applies_to,
-        );
-    }, [formOptions.processOptions, selectedFieldSet]);
+    const processChoices = useMemo(
+        () =>
+            filterAssignmentProcessOptions(
+                formOptions.processOptions,
+                selectedFieldSet?.applies_to,
+            ),
+        [formOptions.processOptions, selectedFieldSet],
+    );
 
     async function submit(event: React.FormEvent) {
         event.preventDefault();
-        if (busy) {
+        if (busy || fieldSetId === '' || process === '') {
             return;
         }
 
@@ -194,19 +196,17 @@ export default function AssignmentCreate({
                                 className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                                 value={fieldSetId}
                                 onChange={(event) => {
-                                    setFieldSetId(event.target.value);
+                                    const nextId = event.target.value;
                                     const next = formOptions.fieldSets.find(
-                                        (set) =>
-                                            set.id.toString() ===
-                                            event.target.value,
+                                        (set) => set.id.toString() === nextId,
                                     );
-                                    if (
-                                        next &&
-                                        next.applies_to !== 'both' &&
-                                        process !== next.applies_to
-                                    ) {
-                                        setProcess(next.applies_to);
-                                    }
+                                    setFieldSetId(nextId);
+                                    setProcess((current) =>
+                                        resolveAssignmentProcess(
+                                            next?.applies_to,
+                                            current,
+                                        ),
+                                    );
                                 }}
                                 data-test="assignment-fieldset-select"
                                 required
@@ -383,7 +383,7 @@ export default function AssignmentCreate({
                         <div className="flex gap-2">
                             <Button
                                 type="submit"
-                                disabled={busy}
+                                disabled={busy || process === ''}
                                 data-test="assignment-create-submit"
                             >
                                 {busy ? 'Wird angelegt…' : 'Inaktiv anlegen'}
