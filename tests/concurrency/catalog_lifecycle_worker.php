@@ -5,18 +5,21 @@ declare(strict_types=1);
 /**
  * ADV-001b MySQL-Parallelitätsworker für Katalog-Lifecycle-Races.
  *
- * Barrier: wartet bis zwei Worker `.ready` geschrieben haben, dann Aktion.
+ * Orchestrierung über Datei-Signale (Lock-Zustand), nicht über Sleeps.
  */
 
 use App\Enums\CalculationKind;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
+use App\Models\FieldSetAssignment;
 use App\Models\User;
 use App\Services\Advertising\Admin\AdvertisingCategoryAdminWriter;
 use App\Services\Advertising\Admin\AdvertisingMediumAdminWriter;
 use App\Services\Advertising\Admin\CatalogImpactPreviewService;
+use App\Services\DynamicField\Assignment\AssignmentConfigurationLockCoordinator;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -44,23 +47,42 @@ require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-$readyFile = $runDir.'/worker-'.$workerId.'.ready';
 $resultFile = $runDir.'/worker-'.$workerId.'.result';
 
-file_put_contents($readyFile, '1');
+/** @var array<string, mixed> $orch */
+$orch = [];
 
-$deadline = microtime(true) + 30.0;
-while (count(glob($runDir.'/worker-*.ready')) < 2) {
-    if (microtime(true) > $deadline) {
-        fwrite(STDERR, "Barrier timeout for worker {$workerId}\n");
-        exit(2);
+/**
+ * @param  list<string>  $files
+ */
+$waitForFiles = static function (array $files, float $seconds = 45.0) use ($runDir): void {
+    $deadline = microtime(true) + $seconds;
+    foreach ($files as $file) {
+        while (! is_file($runDir.'/'.$file)) {
+            if (microtime(true) > $deadline) {
+                throw new RuntimeException('Barrier timeout waiting for '.$file);
+            }
+            usleep(5_000);
+        }
     }
-    usleep(10_000);
-}
+};
+
+$signal = static function (string $file) use ($runDir): void {
+    file_put_contents($runDir.'/'.$file, '1');
+};
 
 try {
     $actorId = (int) ($payload['actor_id'] ?? 0);
-    $actor = User::query()->findOrFail($actorId);
+    $actor = $actorId > 0 ? User::query()->findOrFail($actorId) : null;
+
+    $orch = is_array($payload['orchestration'] ?? null) ? $payload['orchestration'] : [];
+
+    if (isset($orch['wait_before']) && is_array($orch['wait_before'])) {
+        $waitForFiles(array_map('strval', $orch['wait_before']));
+    }
+    if (isset($orch['signal_before']) && is_string($orch['signal_before']) && $orch['signal_before'] !== '') {
+        $signal($orch['signal_before']);
+    }
 
     $result = match ($action) {
         'create_medium' => (function () use ($app, $actor, $payload): string {
@@ -79,11 +101,12 @@ try {
         'deactivate_category' => (function () use ($app, $actor, $payload): string {
             $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
             $impact = $app->make(CatalogImpactPreviewService::class);
-            $preview = $impact->previewCategoryDeactivate($category);
+            // Fingerprint vor dem Lock nur als Client-Vorschau; Writer berechnet neu.
+            $preview = $impact->previewCategoryDeactivate($category->fresh());
             $writer = $app->make(AdvertisingCategoryAdminWriter::class);
             $updated = $writer->deactivate($category, [
                 'lock_version' => (int) ($payload['lock_version'] ?? $category->lock_version),
-                'fingerprint' => $preview['fingerprint'],
+                'fingerprint' => (string) ($payload['fingerprint'] ?? $preview['fingerprint']),
             ], $actor);
 
             return 'OK:deactivate_category|'.$updated->id.'|'.($updated->is_active ? '1' : '0');
@@ -108,8 +131,31 @@ try {
 
             return 'OK:change_category|'.$updated->id.'|'.$updated->category_id.'|'.($updated->is_active ? '1' : '0');
         })(),
+        'assignment_lock_hold' => (function () use ($app, $payload, $waitForFiles, $signal): string {
+            $assignment = FieldSetAssignment::query()->findOrFail((int) $payload['assignment_id']);
+            $coordinator = $app->make(AssignmentConfigurationLockCoordinator::class);
+
+            DB::beginTransaction();
+            try {
+                $coordinator->lockForAssignment($assignment);
+                $signal('assignment_full_locks_held');
+                if (isset($payload['wait_after_full_lock']) && is_array($payload['wait_after_full_lock'])) {
+                    $waitForFiles(array_map('strval', $payload['wait_after_full_lock']));
+                }
+                DB::commit();
+            } catch (Throwable $exception) {
+                DB::rollBack();
+                throw $exception;
+            }
+
+            return 'OK:assignment_lock_hold|'.$assignment->id;
+        })(),
         default => throw new InvalidArgumentException('Unknown action: '.$action),
     };
+
+    if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
+        $signal($orch['signal_after']);
+    }
 
     file_put_contents($resultFile, $result);
 } catch (Throwable $exception) {
@@ -117,6 +163,9 @@ try {
     $message = Str::limit($exception->getMessage(), 240);
     if ($exception instanceof ValidationException) {
         $message = Str::limit(json_encode($exception->errors(), JSON_UNESCAPED_UNICODE) ?: $message, 240);
+    }
+    if (isset($orch['signal_after_error']) && is_string($orch['signal_after_error']) && $orch['signal_after_error'] !== '') {
+        file_put_contents($runDir.'/'.$orch['signal_after_error'], '1');
     }
     file_put_contents($resultFile, 'ERROR:'.$class.'|'.$message);
 }

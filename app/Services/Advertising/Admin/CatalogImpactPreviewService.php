@@ -30,9 +30,8 @@ final class CatalogImpactPreviewService
      */
     public function previewCategoryDeactivate(AdvertisingCategory $category, array $payload = []): array
     {
-        // Wenn der Lock-Coordinator die Relation gesetzt hat, diese nutzen
-        // (Locking-Read). Sonst frische Query – nie eine veraltete Eager-Load-Kopie
-        // aus dem Request-Objekt ohne erneutes Laden.
+        // Wenn der Lock-Coordinator die Relation unter Kategorie-Sperre gesetzt hat,
+        // diese nutzen (frischer Read ohne Media-FOR-UPDATE). Sonst frische Query.
         if ($category->relationLoaded('advertisingMedia')) {
             $media = $category->advertisingMedia;
         } else {

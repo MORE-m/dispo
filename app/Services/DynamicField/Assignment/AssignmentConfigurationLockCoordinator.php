@@ -249,6 +249,9 @@ final class AssignmentConfigurationLockCoordinator
             }
             $categoryIds = array_values(array_unique($categoryIds));
             sort($categoryIds);
+
+            // Test-only: Überlappung Media→Kategorie (CATALOG_LOCK_TEST_GATE_DIR).
+            $this->testGateAfterMediaBeforeCategories();
         }
 
         if ($categoryIds !== []) {
@@ -257,6 +260,40 @@ final class AssignmentConfigurationLockCoordinator
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
+        }
+    }
+
+    /**
+     * Test-only Gate zwischen Media- und Kategorie-Locks (MySQL-Deadlock-Probe).
+     */
+    private function testGateAfterMediaBeforeCategories(): void
+    {
+        $dir = getenv('CATALOG_LOCK_TEST_GATE_DIR');
+        if (! is_string($dir) || $dir === '') {
+            return;
+        }
+
+        $spec = getenv('ASSIGNMENT_LOCK_GATE_AFTER_MEDIA');
+        if (! is_string($spec) || $spec === '') {
+            return;
+        }
+
+        $parts = array_values(array_filter(explode('|', $spec), static fn (string $p): bool => $p !== ''));
+        if ($parts === []) {
+            return;
+        }
+
+        $signal = array_shift($parts);
+        file_put_contents($dir.'/'.$signal, '1');
+
+        $deadline = microtime(true) + 45.0;
+        foreach ($parts as $waitFile) {
+            while (! is_file($dir.'/'.$waitFile)) {
+                if (microtime(true) > $deadline) {
+                    throw new \RuntimeException("Assignment lock test gate timeout waiting for {$waitFile}");
+                }
+                usleep(5_000);
+            }
         }
     }
 

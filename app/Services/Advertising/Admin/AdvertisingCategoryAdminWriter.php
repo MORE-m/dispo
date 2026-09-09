@@ -113,8 +113,8 @@ final class AdvertisingCategoryAdminWriter
     public function deactivate(AdvertisingCategory $category, array $payload, User $actor): AdvertisingCategory
     {
         return DB::transaction(function () use ($category, $payload, $actor): AdvertisingCategory {
-            // Media zuerst, dann Kategorie – kompatibel zum Assignment-Coordinator.
-            $locked = $this->locks->lockCategoryWithOwnedMedia((int) $category->id);
+            // Erster DB-Read der TX: nur Kategorie. Kein Media-FOR-UPDATE danach.
+            $locked = $this->locks->lockCategoryForDeactivate((int) $category->id);
             $this->assertLock($locked, (int) $payload['lock_version']);
 
             if (! $locked->is_active) {
@@ -123,7 +123,7 @@ final class AdvertisingCategoryAdminWriter
                 ]);
             }
 
-            // Preview erst nach Zeilensperren neu berechnen (Fingerprint-Sicherheit).
+            // Preview erst nach Kategorie-Lock aus dem frischen Medien-Read.
             $preview = $this->impact->previewCategoryDeactivate($locked);
             $this->impact->assertFingerprint($preview, (string) $payload['fingerprint']);
 

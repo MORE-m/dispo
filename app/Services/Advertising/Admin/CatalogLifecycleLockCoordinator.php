@@ -9,18 +9,25 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
- * ADV-001b Locking-Härtung: schützt die Invariante
- * „Ein aktives Werbemittel darf niemals einer inaktiven Oberkategorie zugeordnet sein.“
+ * ADV-001b: schützt „aktives Werbemittel nie unter inaktiver Oberkategorie“.
  *
- * Lock-Reihenfolge (kompatibel zu
- * {@see AssignmentConfigurationLockCoordinator::lockTargetRows}):
- * 1. `advertising_media` nach `id` ASC (falls beteiligt)
- * 2. `advertising_categories` nach `id` ASC
+ * Protokolle:
+ * - Bestehendes Medium + Kategorien: Medium zuerst, danach Kategorien nach id ASC
+ *   (wie {@see AssignmentConfigurationLockCoordinator::lockTargetRows}).
+ * - Create ohne Mediumzeile: nur Zielkategorie sperren, prüfen, dann anlegen.
+ * - Kategorie-Deaktivierung: ausschließlich die Kategoriezeile als
+ *   Lifecycle-Serialisierungsgrenze (erster DB-Read der Transaktion). Danach
+ *   frischer Medien-Read ohne FOR UPDATE. Niemals Kategorie halten und auf
+ *   Medienzeilen warten – das würde mit Assignment/Freeze (Media→Kategorie)
+ *   deadlocken.
  *
- * Ein normales SELECT reicht nicht: Prüfung und Mutation müssen unter derselben
- * Zeilensperre liegen, sonst kann eine parallele Kategorie-Deaktivierung die
- * Invariante zwischen Check und Write verletzen. Keine abweichende Reihenfolge
- * gegenüber dem Assignment-/Freeze-Coordinator, um Deadlocks zu vermeiden.
+ * Warum der Medien-Read nach Kategorie-Lock ohne FOR UPDATE sicher ist:
+ * Create/Reactivate/Change sperren die Zielkategorie vor der Mutation. Ein
+ * konkurrierender Writer hat damit nur: bereits vor unserem Kategorie-Lock
+ * committed (sichtbar im frischen Read) oder wartet auf die Kategorie und
+ * wird nach Deaktivierung fachlich abgelehnt. Der Kategorie-Lock muss der
+ * erste Read der Deactivate-Transaktion sein, damit kein früherer Consistent
+ * Read unter MySQL REPEATABLE READ einen veralteten Snapshot eröffnet.
  */
 final class CatalogLifecycleLockCoordinator
 {
@@ -46,61 +53,28 @@ final class CatalogLifecycleLockCoordinator
             ]);
         }
 
+        $this->testGateAfterCategoryLock();
+
         return $category;
     }
 
     /**
-     * Kategorie-Deaktivierung: zuerst Mediumzeilen (id ASC), dann die Kategorie.
+     * Kategorie-Deaktivierung: Kategorie zuerst und ausschließlich sperren,
+     * danach Medienrelation frisch ohne Zeilensperre laden.
      *
-     * Danach erneutes `lockForUpdate` auf alle Medien der Kategorie: unter MySQL
-     * REPEATABLE READ reicht ein frühes non-locking SELECT nicht – parallele
-     * Inserts/Moves (Phantome) und Zustandsänderungen wären sonst unsichtbar.
-     * Die Relation `advertisingMedia` wird mit dem Locking-Ergebnis gesetzt.
+     * Aufrufer: dieser Aufruf muss der erste DB-Read innerhalb der Transaktion sein.
      */
-    public function lockCategoryWithOwnedMedia(int $categoryId): AdvertisingCategory
+    public function lockCategoryForDeactivate(int $categoryId): AdvertisingCategory
     {
-        $discoveredIds = array_values(AdvertisingMedium::query()
-            ->where('category_id', $categoryId)
-            ->orderBy('id')
-            ->pluck('id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all());
-
-        $this->lockMediaByIds($discoveredIds);
         $category = $this->lockCategory($categoryId);
 
-        $lockedMediaIds = $discoveredIds;
-        sort($lockedMediaIds);
+        $media = AdvertisingMedium::query()
+            ->where('category_id', $categoryId)
+            ->orderBy('id')
+            ->get();
+        $category->setRelation('advertisingMedia', $media);
 
-        for ($attempt = 0; $attempt < 8; $attempt++) {
-            /** @var Collection<int, AdvertisingMedium> $media */
-            $media = AdvertisingMedium::query()
-                ->where('category_id', $categoryId)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            $currentIds = array_values($media
-                ->map(static fn (AdvertisingMedium $medium): int => (int) $medium->id)
-                ->all());
-            sort($currentIds);
-
-            $missing = array_values(array_diff($currentIds, $lockedMediaIds));
-            if ($missing === []) {
-                $category->setRelation('advertisingMedia', $media);
-
-                return $category;
-            }
-
-            // Neu erschienene Zeilen nachziehen (Reihenfolge bleibt media → bereits gehaltene Kategorie).
-            $this->lockMediaByIds($missing);
-            $lockedMediaIds = array_values(array_unique(array_merge($lockedMediaIds, $currentIds)));
-            sort($lockedMediaIds);
-        }
-
-        throw ValidationException::withMessages([
-            'category' => 'Die Oberkategorie konnte wegen paralleler Medienänderungen nicht sicher gesperrt werden. Bitte erneut versuchen.',
-        ]);
+        return $category;
     }
 
     /**
@@ -116,6 +90,8 @@ final class CatalogLifecycleLockCoordinator
             ->whereKey($mediumId)
             ->lockForUpdate()
             ->firstOrFail();
+
+        $this->testGateAfterMediumLock();
 
         $categoryIds = array_merge([(int) $medium->category_id], $extraCategoryIds);
         $categories = $this->lockCategoriesByIds($categoryIds);
@@ -183,6 +159,54 @@ final class CatalogLifecycleLockCoordinator
             ->lockForUpdate()
             ->get();
 
+        $this->testGateAfterCategoryLock();
+
         return $locked;
+    }
+
+    /**
+     * Test-only: deterministische Überlappung an Lock-Grenzen (MySQL-Paralleltests).
+     * Produktion: Env unset → no-op.
+     */
+    private function testGateAfterCategoryLock(): void
+    {
+        $this->runTestGate('CATALOG_LOCK_GATE_AFTER_CATEGORY');
+    }
+
+    private function testGateAfterMediumLock(): void
+    {
+        $this->runTestGate('CATALOG_LOCK_GATE_AFTER_MEDIUM');
+    }
+
+    private function runTestGate(string $envKey): void
+    {
+        $dir = getenv('CATALOG_LOCK_TEST_GATE_DIR');
+        if (! is_string($dir) || $dir === '') {
+            return;
+        }
+
+        $spec = getenv($envKey);
+        if (! is_string($spec) || $spec === '') {
+            return;
+        }
+
+        // Format: signalFile|waitForFile|waitForFile2...
+        $parts = array_values(array_filter(explode('|', $spec), static fn (string $p): bool => $p !== ''));
+        if ($parts === []) {
+            return;
+        }
+
+        $signal = array_shift($parts);
+        file_put_contents($dir.'/'.$signal, '1');
+
+        $deadline = microtime(true) + 45.0;
+        foreach ($parts as $waitFile) {
+            while (! is_file($dir.'/'.$waitFile)) {
+                if (microtime(true) > $deadline) {
+                    throw new \RuntimeException("Catalog lock test gate timeout waiting for {$waitFile}");
+                }
+                usleep(5_000);
+            }
+        }
     }
 }

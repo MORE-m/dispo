@@ -40,7 +40,7 @@ Inertia-Admin unter UX-GATE-D Teilfreigabe (PO-ADV001b-1). **Kein** Hard Delete.
 | Kategoriewechsel mit Impact-Fingerprint/`lock_version` (PO-ADV001b-5) | umgesetzt |
 | `spot_classic` nur Kategorie `spots` (PO-ADV001b-8) | umgesetzt |
 | Impact-Preview ohne zweite Snapshot-/Assignment-Auflösung | umgesetzt |
-| Lifecycle-Locking + MySQL C-RACE-01..03 (aktives Medium ≠ inaktive Kat.) | umgesetzt |
+| Lifecycle-Locking + MySQL C-RACE-01..04 (Kat-Serialisierung, Cross-Coordinator) | umgesetzt |
 | Audit Alt/Neu via `AuditLogger` | umgesetzt |
 | E2E isoliert: `playwright.adv001b.config.ts` (Port 8007) | umgesetzt |
 | Inventar-/Preislisten-Admin | **weiterhin gesperrt** |
