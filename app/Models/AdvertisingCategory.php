@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * ADV-001a: Oberkategorie (Stammdatenbasis; Defaults/Assignments folgen später).
+ * ADV-001a/ADV-001b: Oberkategorie (Stammdaten; Admin-Lifecycle ADV-001b).
  *
  * @property string $key
  * @property string $name
  * @property bool $is_active
  * @property int $sort
+ * @property int $lock_version
  */
 class AdvertisingCategory extends Model
 {
@@ -21,7 +22,6 @@ class AdvertisingCategory extends Model
     use HasFactory;
 
     protected $fillable = [
-        'key',
         'name',
         'is_active',
         'sort',
@@ -35,6 +35,7 @@ class AdvertisingCategory extends Model
         return [
             'is_active' => 'boolean',
             'sort' => 'integer',
+            'lock_version' => 'integer',
         ];
     }
 

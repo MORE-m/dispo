@@ -9,11 +9,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * ADV-001b: Werbemittel-Stammdaten mit Admin-Lifecycle.
+ *
  * @property int $category_id
  * @property CalculationKind $kind
  * @property int $default_length_seconds
  * @property bool $is_discountable
  * @property bool $is_ae_eligible
+ * @property bool $is_active
+ * @property int $sort
+ * @property int $lock_version
  */
 class AdvertisingMedium extends Model
 {
@@ -21,14 +26,12 @@ class AdvertisingMedium extends Model
     use HasFactory;
 
     protected $fillable = [
-        'category_id',
         'name',
-        'code',
-        'kind',
         'default_length_seconds',
         'is_discountable',
         'is_ae_eligible',
         'is_active',
+        'sort',
     ];
 
     /**
@@ -41,6 +44,8 @@ class AdvertisingMedium extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'is_active' => 'boolean',
+            'sort' => 'integer',
+            'lock_version' => 'integer',
         ];
     }
 

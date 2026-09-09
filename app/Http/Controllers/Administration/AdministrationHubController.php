@@ -8,7 +8,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * DF-3.1 / UX-GATE-D Teilfreigabe: Admin-Hub; nur Dyn-Felder freigeschaltet.
+ * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b); Inventare/Preislisten gesperrt.
  */
 class AdministrationHubController extends Controller
 {
@@ -35,9 +35,9 @@ class AdministrationHubController extends Controller
                 [
                     'key' => 'catalog',
                     'title' => 'Werbemittel / Kategorien',
-                    'description' => 'Noch nicht freigegeben (UX-GATE-D).',
-                    'href' => null,
-                    'available' => false,
+                    'description' => 'Oberkategorien und Werbemittel verwalten (ADV-001b / UX-GATE-D Teilfreigabe).',
+                    'href' => '/administration/katalog',
+                    'available' => true,
                 ],
                 [
                     'key' => 'price-lists',

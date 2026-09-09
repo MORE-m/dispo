@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\Administration\AdministrationHubController;
+use App\Http\Controllers\Administration\AdvertisingCategoryAdminController;
+use App\Http\Controllers\Administration\AdvertisingMediumAdminController;
+use App\Http\Controllers\Administration\CatalogHubController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
@@ -127,6 +130,47 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.assignments.activate');
         Route::post('administration/dynamische-felder/assignments/{assignment}/deaktivieren', [FieldSetAssignmentAdminController::class, 'deactivate'])
             ->name('administration.dynamic-fields.assignments.deactivate');
+
+        // ADV-001b Katalog-Admin (PO-ADV001b-1 UX-GATE-D Teilfreigabe)
+        Route::get('administration/katalog', CatalogHubController::class)
+            ->name('administration.catalog.index');
+        Route::get('administration/katalog/oberkategorien', [AdvertisingCategoryAdminController::class, 'index'])
+            ->name('administration.catalog.categories.index');
+        Route::get('administration/katalog/oberkategorien/neu', [AdvertisingCategoryAdminController::class, 'create'])
+            ->name('administration.catalog.categories.create');
+        Route::post('administration/katalog/oberkategorien', [AdvertisingCategoryAdminController::class, 'store'])
+            ->name('administration.catalog.categories.store');
+        Route::get('administration/katalog/oberkategorien/{category}', [AdvertisingCategoryAdminController::class, 'show'])
+            ->name('administration.catalog.categories.show');
+        Route::put('administration/katalog/oberkategorien/{category}', [AdvertisingCategoryAdminController::class, 'update'])
+            ->name('administration.catalog.categories.update');
+        Route::post('administration/katalog/oberkategorien/{category}/deaktivierungs-vorschau', [AdvertisingCategoryAdminController::class, 'deactivatePreview'])
+            ->name('administration.catalog.categories.deactivate-preview');
+        Route::post('administration/katalog/oberkategorien/{category}/deaktivieren', [AdvertisingCategoryAdminController::class, 'deactivate'])
+            ->name('administration.catalog.categories.deactivate');
+        Route::post('administration/katalog/oberkategorien/{category}/reaktivieren', [AdvertisingCategoryAdminController::class, 'reactivate'])
+            ->name('administration.catalog.categories.reactivate');
+
+        Route::get('administration/katalog/werbemittel', [AdvertisingMediumAdminController::class, 'index'])
+            ->name('administration.catalog.media.index');
+        Route::get('administration/katalog/werbemittel/neu', [AdvertisingMediumAdminController::class, 'create'])
+            ->name('administration.catalog.media.create');
+        Route::post('administration/katalog/werbemittel', [AdvertisingMediumAdminController::class, 'store'])
+            ->name('administration.catalog.media.store');
+        Route::get('administration/katalog/werbemittel/{medium}', [AdvertisingMediumAdminController::class, 'show'])
+            ->name('administration.catalog.media.show');
+        Route::put('administration/katalog/werbemittel/{medium}', [AdvertisingMediumAdminController::class, 'update'])
+            ->name('administration.catalog.media.update');
+        Route::post('administration/katalog/werbemittel/{medium}/deaktivierungs-vorschau', [AdvertisingMediumAdminController::class, 'deactivatePreview'])
+            ->name('administration.catalog.media.deactivate-preview');
+        Route::post('administration/katalog/werbemittel/{medium}/deaktivieren', [AdvertisingMediumAdminController::class, 'deactivate'])
+            ->name('administration.catalog.media.deactivate');
+        Route::post('administration/katalog/werbemittel/{medium}/reaktivieren', [AdvertisingMediumAdminController::class, 'reactivate'])
+            ->name('administration.catalog.media.reactivate');
+        Route::post('administration/katalog/werbemittel/{medium}/kategorie-wechsel-vorschau', [AdvertisingMediumAdminController::class, 'categoryChangePreview'])
+            ->name('administration.catalog.media.category-change-preview');
+        Route::post('administration/katalog/werbemittel/{medium}/kategorie-wechseln', [AdvertisingMediumAdminController::class, 'changeCategory'])
+            ->name('administration.catalog.media.category-change');
     });
 
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');

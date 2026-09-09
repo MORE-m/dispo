@@ -1,32 +1,50 @@
 # Fortschritt V1
 
-Stand: 9. September 2026 (DF-3.3b Assignment-Admin-UI – kein Abschluss von DF-3)
+Stand: 9. September 2026 (ADV-001b Katalog-Admin – kein Abschluss von DF-3 / ADV-001)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1, DF-3.3a2α, DF-3.3a2β und DF-3.3b auf `main`** (PR #15–#26).
-Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor).
+DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b und ADV-001b auf `main`** (bzw. Feature-PR).
+Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor). ADV-001 Defaults bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
-Teilfreigaben für Dispo/Vier-Augen und Dynamische-Felder-Admin inkl. Assignments
-(PO-33b-2). Katalog-Admin (Inventare, Werbemittel, Oberkategorien, …) bleibt
-gesperrt und ist nach PO-33b-1 **verbindlich offen** als Folgeslice.
+Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin inkl. Assignments
+(PO-33b-2) und **Katalog-Admin Oberkategorien/Werbemittel (PO-ADV001b-1)**.
+Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-DF-3.3b Assignment-Admin-UI abgeschlossen (Feature-Branch
-`feat/df3-3b-assignment-admin-ui`). Nächste sinnvolle Schritte: Optionen /
-Regel-Editor oder Katalog-Admin (ADV).
+ADV-001b Katalog-Admin abgeschlossen. Nächste sinnvolle Schritte: Optionen /
+Regel-Editor; ADV-001 Rest (Defaults); Inventar-/Preislisten-Admin.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3.3b Assignment-Admin-UI mit Herkunft-/Konfliktvorschau – Feature-Branch
-`feat/df3-3b-assignment-admin-ui` (nach PR #25 / DF-3.3a2β auf `main`).
+ADV-001b Katalog-Admin für Oberkategorien und Werbemittel – Feature-Branch
+`feat/adv-001b-catalog-admin` (nach PR #26 / DF-3.3b auf `main`).
 
-Davor: DF-3.3a2β contextual Freeze – PR [#25](https://github.com/MORE-m/dispo/pull/25)
-gemergt in `main` (`100c79a`). Feature-HEAD `81d75b7`.
+## ADV-001b – Katalog-Admin (September 2026)
+
+Inertia-Admin unter UX-GATE-D Teilfreigabe (PO-ADV001b-1). **Kein** Hard Delete.
+**Keine** neuen `CalculationKind`-Fälle. Systemfelder/Kern-Feldsets unverändert.
+
+| Kriterium | Status |
+|---|---|
+| Migration `lock_version` (Kat/Medium) + `advertising_media.sort` | umgesetzt |
+| Admin-CRUD Oberkategorien: anlegen, Name/Sort, Deakt./Reakt. | umgesetzt |
+| Admin-CRUD Werbemittel: anlegen, Metadaten, Kategoriewechsel, Deakt./Reakt. | umgesetzt |
+| Key/Code nach Save unveränderlich (PO-ADV001b-2) | umgesetzt |
+| Kategorie-Deaktivierung blockiert bei aktiven Medien (PO-ADV001b-3) | umgesetzt |
+| Assignments bleiben lesbar; Wiederwirkungs-Warnung (PO-ADV001b-4) | umgesetzt |
+| Kategoriewechsel mit Impact-Fingerprint/`lock_version` (PO-ADV001b-5) | umgesetzt |
+| `spot_classic` nur Kategorie `spots` (PO-ADV001b-8) | umgesetzt |
+| Impact-Preview ohne zweite Snapshot-/Assignment-Auflösung | umgesetzt |
+| Lifecycle-Locking + MySQL C-RACE-01..04 (Kat-Serialisierung, Cross-Coordinator) | umgesetzt |
+| Audit Alt/Neu via `AuditLogger` | umgesetzt |
+| E2E isoliert: `playwright.adv001b.config.ts` (Port 8007) | umgesetzt |
+| Inventar-/Preislisten-Admin | **weiterhin gesperrt** |
+| Optionen / Regel-Editor / ADV-002 | **nicht** |
 
 ## DF-3.3b – Assignment-Admin-UI (September 2026)
 
@@ -42,7 +60,7 @@ Inertia-Admin unter Dyn-Feld-Teilfreigabe (PO-33b-2). **Kein** Abschluss von DF-
 | Historische/deaktivierte Ziele weiterhin lesbar | umgesetzt |
 | E2E isoliert: `playwright.df33b.config.ts` (Port 8006) | umgesetzt |
 | Snapshot-/Runtime-Verträge | **unverändert** |
-| Katalog-Admin Oberkategorien/Werbemittel | **verbindlich offen** (Folgeslice) |
+| Katalog-Admin Oberkategorien/Werbemittel | **umgesetzt** (ADV-001b) |
 | Optionen / Regel-Editor | **nicht** |
 
 ## DF-3.3a2β – Contextual Freeze / VER-003 (September 2026, `main`)
@@ -120,10 +138,10 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- **Katalog-Admin** für Oberkategorien und Werbemittel (ADV) – **verbindlich offen**
-  nach PO-33b-1: anlegen, ändern, deaktivieren, reaktivieren, fachlich zuordnen
 - Optionen / Auswahlfelder, volle Regelmatrix, Regel-Editor
-- Slice-Reihenfolge ab hier: Optionen/Regel-Editor und/oder Katalog-Admin
+- ADV-001 Rest: Kategorie-Defaults
+- Inventar-/Preislisten-/Kombinations-Admin
+- Slice-Reihenfolge ab hier: Optionen/Regel-Editor; ADV-001 Defaults
 
 ## ADV-001a – Oberkategorie-Datenbasis (September 2026)
 
@@ -134,8 +152,8 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | `advertising_media.category_id` NOT NULL, `restrictOnDelete` | umgesetzt |
 | Explizite Bestands-Map, fail-closed ohne Default | umgesetzt |
 | Models/Relations/Factories/Tests | umgesetzt |
-| Katalog-Admin-UI | **nicht** (UX-GATE-D; verbindlicher Folgeslice) |
-| Kategorie-Defaults, Snapshot-Provenance | **nicht** (spätere Slices) |
+| Katalog-Admin-UI | **umgesetzt** (ADV-001b) |
+| Kategorie-Defaults | **nicht** (spätere Slices) |
 
 ## DF-3.2b – Custom Position-Textfelder (September 2026)
 
@@ -198,9 +216,13 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 - **PO-32b-1…4:** siehe Entscheidungslog (Pflicht erst Dispo-Create; Partial-Save;
   Snapshot-Provenance; both wie 3.2a).
 - **PO-33b-1:** In DF-3.3b nur bestehende aktive Oberkategorien/Werbemittel als
-  Assignment-Ziele auswählen; Katalog-Admin bleibt verbindlicher Folgeslice.
+  Assignment-Ziele auswählen; Katalog-Admin war verbindlicher Folgeslice → ADV-001b.
 - **PO-33b-2:** Assignment-Admin-UI gehört zur Teilfreigabe „Administration
-  dynamischer Felder“; keine zusätzliche UX-GATE-D-Freigabe.
+  dynamischer Felder“; keine zusätzliche UX-GATE-D-Freigabe für Katalog damals.
+- **PO-ADV001b-1…9:** Katalog-Admin UX-GATE-D Teilfreigabe; Key/Code immutable;
+  Kategorie-Deakt. ohne aktive Medien; Assignments lesbar mit Wiederwirkungs-Warnung;
+  Kategoriewechsel mit Impact-Fingerprint; kein Hard Delete; Medium-`sort`;
+  `spot_classic` nur `spots`; Systemfelder/Kern-Feldsets unverändert.
 
 ## DF-1 – Dynamische Systemfelder Kalkulation (September 2026)
 
@@ -216,22 +238,20 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach DF-3.3b
+## Bewusst offen nach ADV-001b
 
-- **Katalog-Admin** für Oberkategorien und Werbemittel – **verbindlich offen**
-  (ADV; Administratoren sollen Stammdaten später anlegen, ändern, deaktivieren,
-  reaktivieren und fachlich zuordnen können)
-- ADV-001 Rest: Kategorie-Defaults, Admin
+- ADV-001 Rest: Kategorie-Defaults (Kalkulationsarten, Default-Feldsets, …)
 - ADV-002 / SystemFieldSetting
 - Optionen, Regelmatrix, Regel-Editor
-- übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, …)
+- übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
+- weitere `CalculationKind`-Fälle (eigene Fachslices)
 
 ## Echte Blocker
 
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin inkl. Assignments teilfreigegeben; Katalog-Admin gesperrt) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin und Katalog Kat/Medien teilfreigegeben; Inventare/Preislisten gesperrt) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
