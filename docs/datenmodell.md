@@ -62,12 +62,27 @@ ersten Speichern unveränderlich. Kein Hard Delete. Deaktivierung statt Löschun
 `spot_classic` nur mit Kategorie-Key `spots` kompatibel. Impact-Preview für
 kritische Aktionen. Historische Gen-3-Snapshots bleiben unverändert.
 
-**ADV-001 insgesamt noch offen:** Kategorie-Defaults (Kalkulationsarten,
-Standard-/Pflichtfelder, Dispo-Feldsets, Rabatt/AE/Preisdefaults).
+**ADV-001c1 (Schema-Fundament, umgesetzt):** Tabellen `calculation_methods`
+(systemseitig literal geseedet: `average`, `calendar`, `fixed_price`, `tkp`,
+`free_position`), `advertising_category_calculation_methods`,
+`advertising_medium_calculation_methods`. Unique je Ziel+Methode (höchstens ein
+`engine_profile_key`, nullable = vorbereitet/nicht buchbar). Am Medium:
+`calculation_method_mode` (`inherit`\|`override`, Default `inherit`). Defaults
+über nullable `default_calculation_method_id` an Kategorie und Medium (kein
+`is_default` in Zuordnungszeilen). Engine-Profile rein codebasiert
+(`EngineProfileRegistry`); späterer Dispatch
+`(engine_profile_key, calculation_method_key, algorithm_version)`. **Keine**
+Runtime-Anbindung in c1; **kein** Zuordnungs-Backfill; `advertising_media.kind`
+unverändert NOT NULL.
+
+**ADV-001 insgesamt noch offen:** c2 Dual-Read/Write + Freeze + `kind` nullable;
+c3 Katalog-Methoden-Admin inkl. Default-Mitgliedschaft; c4 Positionsauswahl;
+weitere Defaults (Feldsets, Rabatt/AE/Preisdefaults).
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert
-Neuanlage, entfernt aber keine historische Referenz.
+Neuanlage, entfernt aber keine historische Referenz. Keine rückwirkende
+Snapshot-Mutation.
 
 ### Kombinationstabelle
 
