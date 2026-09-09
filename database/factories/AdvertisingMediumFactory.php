@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\CalculationKind;
+use App\Enums\CalculationMethodMode;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
@@ -21,6 +22,8 @@ class AdvertisingMediumFactory extends Factory
             'name' => 'Spot Classic',
             'code' => 'spot_classic',
             'kind' => CalculationKind::SpotClassic,
+            'calculation_method_mode' => CalculationMethodMode::Inherit,
+            'default_calculation_method_id' => null,
             'default_length_seconds' => 30,
             'is_discountable' => true,
             'is_ae_eligible' => true,
