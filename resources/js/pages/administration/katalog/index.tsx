@@ -44,7 +44,7 @@ export default function CatalogHome({
                         <div
                             key={item.href}
                             className="rounded-xl border p-4"
-                            data-test={`catalog-tile-${item.href.includes('werbemittel') ? 'media' : 'categories'}`}
+                            data-test={`catalog-tile-${item.href.includes('berechnungsmethoden') ? 'methods' : item.href.includes('werbemittel') ? 'media' : 'categories'}`}
                         >
                             <h2 className="text-base font-semibold">
                                 {item.title}

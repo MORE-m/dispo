@@ -28,8 +28,13 @@ class CatalogHubController extends Controller
                     'description' => 'Codes, fachliche Eigenschaften und Zuordnung zur Oberkategorie.',
                     'href' => '/administration/katalog/werbemittel',
                 ],
+                [
+                    'title' => 'Berechnungsmethoden',
+                    'description' => 'Systemdefinierte Methodenstammdaten, Registry-Status und Lifecycle.',
+                    'href' => '/administration/katalog/berechnungsmethoden',
+                ],
             ],
-            'boundaryNote' => 'Dynamische Felder definieren Eingabefelder und Regeln. Der Katalog verwaltet fachliche Werbemittel und ihre Oberkategorien.',
+            'boundaryNote' => 'Dynamische Felder definieren Eingabefelder und Regeln. Der Katalog verwaltet fachliche Werbemittel, Oberkategorien und Berechnungsmethoden.',
         ]);
     }
 }

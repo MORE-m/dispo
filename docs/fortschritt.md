@@ -1,13 +1,13 @@
 # Fortschritt V1
 
-Stand: 10. September 2026 (ADV-001c3a engine-unabhängige Medienpflege – kein Abschluss von ADV-001 / DF-3)
+Stand: 10. September 2026 (ADV-001c3b1 Methoden-Lifecycle – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2 und
-ADV-001c3a auf Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen
-(Optionen, Regel-Editor). ADV-001 Methoden-Admin (c3b/c3c) und Positionsauswahl
+DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
+ADV-001c3a und ADV-001c3b1 auf Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen
+(Optionen, Regel-Editor). ADV-001 c3b2/c3c und Positionsauswahl
 (c4) bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
@@ -18,14 +18,34 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c3a engine-unabhängige Werbemittelpflege + Wizard-Buchbarkeitsfilter
-(Feature-Branch `feat/adv001c3a-engine-independent-media-admin`). Nächste
-sinnvolle Schritte: ADV-001c3b Methodenstammdaten/Kategoriezuordnungen; c3c
-Medium-Overrides; c4 Positionsauswahl; parallel Optionen / Regel-Editor.
+ADV-001c3b1 Methodenstammdaten und sicherer Lifecycle (Feature-Branch
+`feat/adv001c3b1-calculation-method-lifecycle`). Nächste sinnvolle Schritte:
+ADV-001c3b2 Kategorie-Desired-State/Default; c3c Medium-Overrides; c4
+Positionsauswahl; parallel Optionen / Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c2 Dual-Read/Write + Freeze auf `main` (Merge PR #30).
+ADV-001c3a engine-unabhängige Medienpflege auf `main` (Merge PR #32).
+
+## ADV-001c3b1 – Methodenstammdaten und Lifecycle (September 2026)
+
+Systemdefinierte Berechnungsmethoden im Katalog-Admin. Keys unveränderlich;
+kein Create/Delete. Metadaten: Name, Hilfetext, Sortierung. `is_active` nur über
+Preview/Deaktivieren/Reaktivieren. Deaktivierung blockiert bei aktiven
+Kategorie- oder Mediumzuordnungen (kein Force, keine Kaskade). Registry-Paare
+read-only (0..n Profile je Methode). Keine `engine_profile_key`-Ableitung.
+Künftige Assignment-Aktivierung: Method-Lock + Aktivitätsprüfung. Keine Migration.
+
+| Kriterium | Status |
+|---|---|
+| Hub-Kachel + Index/Detail | umgesetzt |
+| Metadaten-PUT ohne is_active/key/Profil | umgesetzt |
+| Deaktivierung nur ohne aktive Assignments | umgesetzt |
+| Preview/Fingerprint/lock_version/Audit | umgesetzt |
+| Registry-Paare deterministisch read-only | umgesetzt |
+| Kategorie-Desired-State / Default | **c3b2** |
+| Medium-Overrides / Mode | **c3c** |
+| Positions-Methodenwahl | **c4** |
 
 ## ADV-001c3a – Engine-unabhängige Medienpflege (September 2026)
 
@@ -44,7 +64,7 @@ Methodenkarte; Methoden-Admin folgt in c3b/c3c; Positionsauswahl in c4.
 | Legacy Compatibility nur bei gesetztem kind | umgesetzt |
 | Admin-Status Katalog vs. Buchbarkeit | umgesetzt |
 | Zentrale Live-Buchbarkeit + Wizard-Filter | umgesetzt |
-| Methoden-Admin / Defaults / Overrides | **c3b/c3c** |
+| Methoden-Admin / Defaults / Overrides | **c3b1 Lifecycle; c3b2/c3c offen** |
 | Positions-Methodenwahl | **c4** |
 
 ## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
@@ -309,9 +329,10 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c3a
+## Bewusst offen nach ADV-001c3b1
 
-- ADV-001c3b/c3c: Methodenstammdaten, Kategorie-/Medium-Zuordnungen, Mode/Defaults
+- ADV-001c3b2: Kategorie-Desired-State und Kategorie-Default
+- ADV-001c3c: Medium-Overrides / Mode / Medium-Default
 - ADV-001c4: Positionsauswahl und Selectability
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden

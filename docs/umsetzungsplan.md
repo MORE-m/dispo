@@ -82,8 +82,9 @@ Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
 Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview, DF-3.3a2α Gen2-Freeze,
 DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI (alles auf `main`; β via
 PR #25, b via Feature-Branch `feat/df3-3b-assignment-admin-ui`).
-Offen: Optionen, Regel-Editor; ADV-001c3b/c3c Katalog-Methoden-Admin / c4
-Positionsauswahl; Inventar-/Preislisten-Admin.
+Offen: Optionen, Regel-Editor; ADV-001c3b2 Kategorie-Desired-State; c3c
+Medium-Overrides; c4 Positionsauswahl; Inventar-/Preislisten-Admin.
+ADV-001c3b1 (Methodenstammdaten/-Lifecycle) ist umgesetzt.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

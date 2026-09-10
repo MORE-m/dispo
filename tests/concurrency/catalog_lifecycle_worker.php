@@ -10,13 +10,18 @@ declare(strict_types=1);
  */
 
 use App\Models\AdvertisingCategory;
+use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
+use App\Models\CalculationMethod;
 use App\Models\FieldSetAssignment;
 use App\Models\User;
 use App\Services\Advertising\Admin\AdvertisingCategoryAdminWriter;
 use App\Services\Advertising\Admin\AdvertisingMediumAdminWriter;
+use App\Services\Advertising\Admin\CalculationMethodAdminWriter;
+use App\Services\Advertising\Admin\CalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\CatalogImpactPreviewService;
 use App\Services\DynamicField\Assignment\AssignmentConfigurationLockCoordinator;
+use App\Support\Advertising\CalculationMethodAssignmentActivationGuard;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -77,6 +82,12 @@ $applyPrelock = static function (array $prelock): void {
     if (isset($prelock['medium_id'])) {
         AdvertisingMedium::query()
             ->whereKey((int) $prelock['medium_id'])
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+    if (isset($prelock['method_id'])) {
+        CalculationMethod::query()
+            ->whereKey((int) $prelock['method_id'])
             ->lockForUpdate()
             ->firstOrFail();
     }
@@ -162,6 +173,67 @@ try {
                 $coordinator->lockForAssignment($assignment);
 
                 return 'OK:assignment_lock_hold|'.$assignment->id;
+            })(),
+            'update_method_metadata' => (function () use ($app, $actor, $payload): string {
+                $method = CalculationMethod::query()->findOrFail((int) $payload['method_id']);
+                $writer = $app->make(CalculationMethodAdminWriter::class);
+                $updated = $writer->update($method, [
+                    'name' => (string) $payload['name'],
+                    'help_text' => $payload['help_text'] ?? $method->help_text,
+                    'sort' => (int) ($payload['sort'] ?? $method->sort),
+                    'lock_version' => (int) ($payload['lock_version'] ?? $method->lock_version),
+                ], $actor);
+
+                return 'OK:update_method_metadata|'.$updated->id.'|'.$updated->lock_version.'|'.($updated->is_active ? '1' : '0');
+            })(),
+            'deactivate_method' => (function () use ($app, $actor, $payload): string {
+                $method = CalculationMethod::query()->findOrFail((int) $payload['method_id']);
+                $impact = $app->make(CalculationMethodImpactPreviewService::class);
+                $preview = $impact->previewDeactivate($method->fresh());
+                $writer = $app->make(CalculationMethodAdminWriter::class);
+                $updated = $writer->deactivate($method, [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $method->lock_version),
+                    'fingerprint' => (string) ($payload['fingerprint'] ?? $preview['fingerprint']),
+                ], $actor);
+
+                return 'OK:deactivate_method|'.$updated->id.'|'.($updated->is_active ? '1' : '0').'|'.$updated->lock_version;
+            })(),
+            'activate_category_assignment_guarded' => (function () use ($payload): string {
+                // Künftiger c3b2-Vertrag: Method zuerst sperren und auf aktiv prüfen.
+                return DB::transaction(function () use ($payload): string {
+                    $guard = new CalculationMethodAssignmentActivationGuard;
+                    $method = $guard->lockActiveMethod((int) $payload['method_id']);
+
+                    /** @var AdvertisingCategoryCalculationMethod $assignment */
+                    $assignment = AdvertisingCategoryCalculationMethod::query()
+                        ->whereKey((int) $payload['assignment_id'])
+                        ->lockForUpdate()
+                        ->firstOrFail();
+
+                    if ((int) $assignment->calculation_method_id !== (int) $method->id) {
+                        throw new InvalidArgumentException('Assignment gehört nicht zur Methode.');
+                    }
+
+                    $assignment->is_active = true;
+                    $assignment->lock_version = (int) $assignment->lock_version + 1;
+                    $assignment->save();
+
+                    return 'OK:activate_category_assignment_guarded|'.$assignment->id.'|'.$method->id;
+                });
+            })(),
+            'update_medium_metadata' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $writer = $app->make(AdvertisingMediumAdminWriter::class);
+                $updated = $writer->update($medium, [
+                    'name' => (string) $payload['name'],
+                    'default_length_seconds' => (int) $medium->default_length_seconds,
+                    'is_discountable' => (bool) $medium->is_discountable,
+                    'is_ae_eligible' => (bool) $medium->is_ae_eligible,
+                    'sort' => (int) $medium->sort,
+                    'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
+                ], $actor);
+
+                return 'OK:update_medium_metadata|'.$updated->id.'|'.$updated->lock_version;
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),
         };

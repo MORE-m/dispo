@@ -3,6 +3,7 @@
 use App\Http\Controllers\Administration\AdministrationHubController;
 use App\Http\Controllers\Administration\AdvertisingCategoryAdminController;
 use App\Http\Controllers\Administration\AdvertisingMediumAdminController;
+use App\Http\Controllers\Administration\CalculationMethodAdminController;
 use App\Http\Controllers\Administration\CatalogHubController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
@@ -171,6 +172,19 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.catalog.media.category-change-preview');
         Route::post('administration/katalog/werbemittel/{medium}/kategorie-wechseln', [AdvertisingMediumAdminController::class, 'changeCategory'])
             ->name('administration.catalog.media.category-change');
+
+        Route::get('administration/katalog/berechnungsmethoden', [CalculationMethodAdminController::class, 'index'])
+            ->name('administration.catalog.methods.index');
+        Route::get('administration/katalog/berechnungsmethoden/{method}', [CalculationMethodAdminController::class, 'show'])
+            ->name('administration.catalog.methods.show');
+        Route::put('administration/katalog/berechnungsmethoden/{method}', [CalculationMethodAdminController::class, 'update'])
+            ->name('administration.catalog.methods.update');
+        Route::post('administration/katalog/berechnungsmethoden/{method}/deaktivierungs-vorschau', [CalculationMethodAdminController::class, 'deactivatePreview'])
+            ->name('administration.catalog.methods.deactivate-preview');
+        Route::post('administration/katalog/berechnungsmethoden/{method}/deaktivieren', [CalculationMethodAdminController::class, 'deactivate'])
+            ->name('administration.catalog.methods.deactivate');
+        Route::post('administration/katalog/berechnungsmethoden/{method}/reaktivieren', [CalculationMethodAdminController::class, 'reactivate'])
+            ->name('administration.catalog.methods.reactivate');
     });
 
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
