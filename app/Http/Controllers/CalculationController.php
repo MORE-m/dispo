@@ -29,6 +29,7 @@ use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,7 @@ class CalculationController extends Controller
         private readonly DispoOrderRevisionContext $dispoOrderRevisionContext,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
         private readonly ConfigurationSnapshotFreezeService $freeze,
+        private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
     ) {}
 
     public function index(Request $request): Response
@@ -326,19 +328,49 @@ class CalculationController extends Controller
         $inventories = $activeInventories->concat($historicalInventories)->values();
 
         $activeMedia = AdvertisingMedium::query()
+            ->with([
+                'category.defaultCalculationMethod',
+                'category.calculationMethodAssignments.calculationMethod',
+                'defaultCalculationMethod',
+                'calculationMethodAssignments.calculationMethod',
+            ])
             ->where('is_active', true)
-            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id']);
 
         $historicalMediumIds = $calculation !== null
             ? $calculation->positions->pluck('advertising_medium_id')->unique()->values()
             : collect();
 
         $historicalMedia = AdvertisingMedium::query()
+            ->with([
+                'category.defaultCalculationMethod',
+                'category.calculationMethodAssignments.calculationMethod',
+                'defaultCalculationMethod',
+                'calculationMethodAssignments.calculationMethod',
+            ])
             ->whereIn('id', $historicalMediumIds)
             ->where('is_active', false)
-            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id']);
 
-        $media = $activeMedia->concat($historicalMedia)->values();
+        $media = $activeMedia->concat($historicalMedia)->values()->map(
+            function (AdvertisingMedium $medium): array {
+                $bookability = $this->liveBookability->payloadForMedium($medium);
+
+                return [
+                    'id' => $medium->id,
+                    'name' => $medium->name,
+                    'code' => $medium->code,
+                    'kind' => $medium->kind?->value,
+                    'category_id' => $medium->category_id,
+                    'default_length_seconds' => $medium->default_length_seconds,
+                    'is_discountable' => $medium->is_discountable,
+                    'is_ae_eligible' => $medium->is_ae_eligible,
+                    'is_active' => $medium->is_active,
+                    'is_bookable_for_new_positions' => $bookability['is_bookable_for_new_positions'],
+                    'unbookable_reason' => $bookability['unbookable_reason'],
+                ];
+            },
+        )->values();
 
         $activeRules = InventoryMediumRule::query()
             ->where('is_active', true)

@@ -163,7 +163,7 @@ class CatalogAdminAdv001bTest extends TestCase
         $this->assertTrue(AuditEvent::query()->where('action', 'advertising_category.reactivated')->exists());
     }
 
-    public function test_medium_create_rejects_incompatible_kind_category_and_duplicate_code(): void
+    public function test_medium_create_rejects_kind_payload_and_duplicate_code(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();
         $spots = AdvertisingCategory::query()->where('key', CanonicalAdvertisingCategories::SPOTS)->firstOrFail();
@@ -177,24 +177,25 @@ class CatalogAdminAdv001bTest extends TestCase
                 'category_id' => $online->id,
                 'default_length_seconds' => 20,
             ])
-            ->assertSessionHasErrors(['category_id', 'kind']);
+            ->assertSessionHasErrors(['kind']);
 
         $this->actingAs($admin)
             ->post(route('administration.catalog.media.store'), [
                 'code' => 'spot_ui_one',
                 'name' => 'Spot UI One',
-                'kind' => CalculationKind::SpotClassic->value,
                 'category_id' => $spots->id,
                 'default_length_seconds' => 20,
                 'sort' => 5,
             ])
             ->assertRedirect();
 
+        $created = AdvertisingMedium::query()->where('code', 'spot_ui_one')->firstOrFail();
+        $this->assertNull($created->getAttributes()['kind'] ?? null);
+
         $this->actingAs($admin)
             ->post(route('administration.catalog.media.store'), [
                 'code' => 'spot_ui_one',
                 'name' => 'Duplikat',
-                'kind' => CalculationKind::SpotClassic->value,
                 'category_id' => $spots->id,
             ])
             ->assertSessionHasErrors('code');

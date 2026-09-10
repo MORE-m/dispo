@@ -2,7 +2,6 @@
 
 namespace App\Services\Calculation;
 
-use App\Enums\CalculationKind;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
 use App\Enums\SpotCalculationMethod;
@@ -12,6 +11,7 @@ use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use Illuminate\Support\Collection;
@@ -21,6 +21,7 @@ final class CatalogResolver
 {
     public function __construct(
         private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
+        private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
     ) {}
 
     /**
@@ -202,17 +203,19 @@ final class CatalogResolver
             ->where('is_active', true)
             ->first();
 
-        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
-        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
+        if ($medium === null) {
             throw ValidationException::withMessages([
-                'positions' => 'Nur Spot Classic ist in diesem Umfang zulässig.',
+                'positions' => 'Nur Spot Classic ist derzeit für neue Kalkulationen freigegeben.',
             ]);
         }
 
-        $medium->loadMissing('category');
-        if ($medium->category === null || ! $medium->category->is_active) {
+        $bookability = $this->liveBookability->evaluate(
+            $medium,
+            isset($position['spot_method']) ? (string) $position['spot_method'] : null,
+        );
+        if (! $bookability->isBookableForNewPositions) {
             throw ValidationException::withMessages([
-                'positions' => 'Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.',
+                'positions' => (string) $bookability->unbookableReason,
             ]);
         }
 
@@ -586,10 +589,19 @@ final class CatalogResolver
             ->whereKey($mediumId)
             ->where('is_active', true)
             ->first();
-        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
-        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
+        if ($medium === null) {
             throw ValidationException::withMessages([
                 'budget_wish_inventory_ids' => 'Spot Classic ist nicht verfügbar.',
+            ]);
+        }
+
+        $bookability = $this->liveBookability->evaluate(
+            $medium,
+            SpotCalculationMethod::Average->value,
+        );
+        if (! $bookability->isBookableForNewPositions) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => (string) $bookability->unbookableReason,
             ]);
         }
 

@@ -173,7 +173,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** teilweise (`ADV-001a` Datenbasis; `ADV-001b` Katalog-Admin; `ADV-001c1` Methoden-Schema; `ADV-001c2` Dual-Read/Write + Freeze; Katalog-Methoden-Admin/Positionsauswahl offen)
+- **Status:** teilweise (`ADV-001a` Datenbasis; `ADV-001b` Katalog-Admin; `ADV-001c1` Methoden-Schema; `ADV-001c2` Dual-Read/Write + Freeze; `ADV-001c3a` engine-unabhängige Medienpflege; Methoden-Admin c3b/c3c und Positionsauswahl c4 offen)
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
 - **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a/b/c1 braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern

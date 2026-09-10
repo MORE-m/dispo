@@ -100,6 +100,9 @@ jobs:
       - name: Browser ADV-001b isolated tests
         run: npx playwright test -c playwright.adv001b.config.ts
 
+      - name: Browser ADV-001c3a isolated tests
+        run: npx playwright test -c playwright.adv001c3a.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

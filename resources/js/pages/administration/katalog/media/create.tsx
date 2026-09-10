@@ -4,44 +4,28 @@ import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-type KindOption = {
-    value: string;
-    label: string;
-    allowed_category_keys: string[];
-};
-
 type CategoryOption = {
     id: number;
     key: string;
     name: string;
-    compatible_with_spot_classic: boolean;
 };
 
 export default function MediaCreate({
     formOptions,
-    kindCompatibilityNote,
+    catalogNote,
 }: {
-    formOptions: { kinds: KindOption[]; categories: CategoryOption[] };
-    kindCompatibilityNote: string;
+    formOptions: { categories: CategoryOption[] };
+    catalogNote: string;
 }) {
-    const spotsCategory = formOptions.categories.find(
-        (c) => c.compatible_with_spot_classic,
-    );
     const form = useForm({
         code: '',
         name: '',
-        kind: formOptions.kinds[0]?.value ?? 'spot_classic',
-        category_id: spotsCategory?.id ?? ('' as number | ''),
+        category_id: (formOptions.categories[0]?.id ?? '') as number | '',
         default_length_seconds: 30,
         is_discountable: true,
         is_ae_eligible: true,
         sort: 0,
         is_active: true,
-    });
-
-    const compatibleCategories = formOptions.categories.filter((c) => {
-        const kind = formOptions.kinds.find((k) => k.value === form.data.kind);
-        return kind?.allowed_category_keys.includes(c.key);
     });
 
     return (
@@ -50,7 +34,7 @@ export default function MediaCreate({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Werbemittel anlegen"
-                    description="Code und Berechnungsart werden nach dem Speichern geschützt."
+                    description="Der technische Code ist nach dem Speichern unveränderlich."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/administration/katalog/werbemittel">
@@ -62,9 +46,9 @@ export default function MediaCreate({
 
                 <p
                     className="text-muted-foreground max-w-3xl text-sm"
-                    data-test="medium-kind-note"
+                    data-test="medium-catalog-note"
                 >
-                    {kindCompatibilityNote}
+                    {catalogNote}
                 </p>
 
                 <form
@@ -105,47 +89,6 @@ export default function MediaCreate({
                         />
                     </FormField>
                     <FormField
-                        label="Berechnungsart"
-                        htmlFor="kind"
-                        error={form.errors.kind}
-                    >
-                        <select
-                            id="kind"
-                            className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
-                            value={form.data.kind}
-                            onChange={(e) => {
-                                const nextKind = e.target.value;
-                                form.setData('kind', nextKind);
-                                const allowed = formOptions.kinds.find(
-                                    (k) => k.value === nextKind,
-                                )?.allowed_category_keys;
-                                const current = formOptions.categories.find(
-                                    (c) => c.id === form.data.category_id,
-                                );
-                                if (
-                                    current &&
-                                    allowed &&
-                                    !allowed.includes(current.key)
-                                ) {
-                                    const first = formOptions.categories.find(
-                                        (c) => allowed.includes(c.key),
-                                    );
-                                    form.setData(
-                                        'category_id',
-                                        first?.id ?? '',
-                                    );
-                                }
-                            }}
-                            data-test="medium-kind-select"
-                        >
-                            {formOptions.kinds.map((k) => (
-                                <option key={k.value} value={k.value}>
-                                    {k.label}
-                                </option>
-                            ))}
-                        </select>
-                    </FormField>
-                    <FormField
                         label="Oberkategorie"
                         htmlFor="category_id"
                         error={form.errors.category_id}
@@ -165,7 +108,7 @@ export default function MediaCreate({
                             data-test="medium-category-select"
                         >
                             <option value="">Bitte wählen</option>
-                            {compatibleCategories.map((c) => (
+                            {formOptions.categories.map((c) => (
                                 <option key={c.id} value={c.id}>
                                     {c.name} ({c.key})
                                 </option>

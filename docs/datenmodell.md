@@ -88,9 +88,18 @@ Kalkulationsposition. Historische unveränderte Kombinationen nutzen den Freeze
 unverändert. Ab c3 (Methoden-Admin) bzw. Legacy-Entfernung ist vollständiger
 Schema-Rollback von c2 erwartbar nicht mehr möglich.
 
-**ADV-001 insgesamt noch offen:** c3 Katalog-Methoden-Admin inkl.
-Default-Mitgliedschaft; c4 Positionsauswahl; weitere Defaults (Feldsets,
-Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
+**ADV-001c3a (engine-unabhängige Medienpflege, umgesetzt):** Neue Werbemittel
+erhalten `kind=null`; `kind` ist im normalen Admin-Payload prohibited und kein
+UI-Feld. Legacy-`kind` (Spot Classic) bleibt erhalten; Compatibility nur wenn
+gesetzt. Katalogaktivität ≠ technische Buchbarkeit. Zentrale Auswertung
+`AdvertisingMediumLiveBookability` für Admin, Wizard-Props und Live-Pfad.
+Wizard filtert neue Positionen auf `is_bookable_for_new_positions` (Inventar/
+Preisliste bleiben kombinatorisch). Kein Methoden-Admin, keine Overrides, keine
+Positions-Methodenwahl.
+
+**ADV-001 insgesamt noch offen:** c3b/c3c Katalog-Methoden-Admin inkl.
+Default-Mitgliedschaft/Overrides; c4 Positionsauswahl; weitere Defaults
+(Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert
