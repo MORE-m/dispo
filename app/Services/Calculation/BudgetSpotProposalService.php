@@ -231,7 +231,7 @@ final class BudgetSpotProposalService
 
         if ($medium === null) {
             throw ValidationException::withMessages([
-                'positions' => 'Spot Classic ist nicht verfügbar.',
+                'budget_wish_inventory_ids' => 'Spot Classic ist nicht verfügbar.',
             ]);
         }
 

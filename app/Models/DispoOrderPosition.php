@@ -21,6 +21,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $effective_configuration_snapshot_id
  * @property CalculationKind $kind
  * @property SpotCalculationMethod $spot_method
+ * @property string|null $engine_profile_key
+ * @property string|null $calculation_method_key
+ * @property string|null $calculation_method_name
+ * @property string|null $algorithm_version
  */
 class DispoOrderPosition extends Model
 {
@@ -40,6 +44,10 @@ class DispoOrderPosition extends Model
         'effective_configuration_snapshot_id',
         'kind',
         'spot_method',
+        'engine_profile_key',
+        'calculation_method_key',
+        'calculation_method_name',
+        'algorithm_version',
         'length_seconds',
         'total_spot_count',
         'needs_spot_redistribution',

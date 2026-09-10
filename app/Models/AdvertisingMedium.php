@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * ADV-001b/ADV-001c1: Werbemittel-Stammdaten mit Admin-Lifecycle.
  *
  * @property int $category_id
- * @property CalculationKind $kind
+ * @property CalculationKind|null $kind
  * @property CalculationMethodMode $calculation_method_mode
  * @property int|null $default_calculation_method_id
  * @property int $default_length_seconds

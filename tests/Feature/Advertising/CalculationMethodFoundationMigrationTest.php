@@ -50,8 +50,12 @@ class CalculationMethodFoundationMigrationTest extends TestCase
             ? (int) DB::table('configuration_snapshots')->count()
             : 0;
 
+        /** @var object{up: callable, down: callable} $c2 */
+        $c2 = require database_path('migrations/2026_09_10_100000_adv001c2_dual_read_write_and_engine_freeze.php');
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_09_160000_create_calculation_method_foundation_tables.php');
+        // c2 zuerst zurücknehmen, sonst blockiert der härtere Down-Vertrag den TearDown.
+        $c2->down();
         $migration->down();
 
         $this->assertFalse(Schema::hasTable('calculation_methods'));
@@ -87,6 +91,8 @@ class CalculationMethodFoundationMigrationTest extends TestCase
         if (Schema::hasTable('configuration_snapshots')) {
             $this->assertSame($snapshotCount, (int) DB::table('configuration_snapshots')->count());
         }
+
+        $c2->up();
     }
 
     public function test_migration_down_up_roundtrip_restores_schema_and_guards(): void
@@ -95,9 +101,12 @@ class CalculationMethodFoundationMigrationTest extends TestCase
         $mediumId = (int) $medium->id;
         $mediumCode = (string) $medium->code;
 
+        /** @var object{up: callable, down: callable} $c2 */
+        $c2 = require database_path('migrations/2026_09_10_100000_adv001c2_dual_read_write_and_engine_freeze.php');
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_09_160000_create_calculation_method_foundation_tables.php');
 
+        $c2->down();
         $migration->down();
         $this->assertFalse(Schema::hasTable('calculation_methods'));
         $this->assertFalse(Schema::hasTable('advertising_category_calculation_methods'));
@@ -113,7 +122,8 @@ class CalculationMethodFoundationMigrationTest extends TestCase
         $this->assertNotNull($preserved);
         $this->assertSame($mediumCode, $preserved->code);
         $this->assertSame('spot_classic', $preserved->kind);
-        $this->assertKindColumnNotNullable();
+        $this->assertTrue(Schema::hasColumn('advertising_media', 'kind'));
+        // ADV-001c2 macht kind nullable; c1-down entfernt diese Änderung nicht.
 
         $migration->up();
         $this->assertSame(
@@ -133,6 +143,8 @@ class CalculationMethodFoundationMigrationTest extends TestCase
             $this->assertTrue($this->mysqlModeCheckExists());
         }
 
+        $c2->up();
+
         $this->expectException(QueryException::class);
         DB::table('advertising_media')->where('id', $mediumId)->update([
             'calculation_method_mode' => 'merge',
@@ -141,8 +153,11 @@ class CalculationMethodFoundationMigrationTest extends TestCase
 
     public function test_partial_schema_state_is_fail_closed(): void
     {
+        /** @var object{up: callable, down: callable} $c2 */
+        $c2 = require database_path('migrations/2026_09_10_100000_adv001c2_dual_read_write_and_engine_freeze.php');
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_09_160000_create_calculation_method_foundation_tables.php');
+        $c2->down();
         $migration->down();
 
         Schema::create('calculation_methods', function ($table): void {
@@ -166,19 +181,12 @@ class CalculationMethodFoundationMigrationTest extends TestCase
             Schema::dropIfExists('advertising_category_calculation_methods');
             Schema::dropIfExists('advertising_medium_calculation_methods');
             $migration->up();
+            $c2->up();
         }
 
         $this->assertInstanceOf(RuntimeException::class, $caught);
         $this->assertTrue(Schema::hasTable('calculation_methods'));
         $this->assertTrue(Schema::hasColumn('advertising_media', 'calculation_method_mode'));
-    }
-
-    private function assertKindColumnNotNullable(): void
-    {
-        $column = collect(Schema::getColumns('advertising_media'))
-            ->firstWhere('name', 'kind');
-        $this->assertNotNull($column);
-        $this->assertFalse($column['nullable'], 'advertising_media.kind muss NOT NULL bleiben.');
     }
 
     private function sqliteModeTriggersExist(): bool

@@ -12,11 +12,17 @@ use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Support\Calculation\CalculationMethodFreezeDescriptor;
+use App\Support\Calculation\CalculationMethodFreezeResolver;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 final class CatalogResolver
 {
+    public function __construct(
+        private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $position
      * @return array{
@@ -29,6 +35,7 @@ final class CatalogResolver
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
      *     surcharge_percent: string,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
@@ -66,6 +73,7 @@ final class CatalogResolver
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
      *     surcharge_percent: string,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
@@ -82,6 +90,12 @@ final class CatalogResolver
         bool $inventoryChanged,
         bool $mediumChanged,
     ): array {
+        $incomingMethod = isset($position['spot_method']) ? (string) $position['spot_method'] : null;
+        $this->freezeResolver->assertMethodUnchangedOnExisting($existing, $incomingMethod);
+
+        // Historischer Freeze ist maßgeblich – nicht Live-Kind, Aktivstatus oder Zuordnungen.
+        $freeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: true);
+
         $inventory = Inventory::query()->find($inventoryId);
         if ($inventory === null) {
             throw ValidationException::withMessages([
@@ -90,7 +104,7 @@ final class CatalogResolver
         }
 
         $medium = AdvertisingMedium::query()->find($mediumId);
-        if ($medium === null || (string) $medium->getAttributes()['kind'] !== CalculationKind::SpotClassic->value) {
+        if ($medium === null) {
             throw ValidationException::withMessages([
                 'positions' => 'Das gespeicherte Werbemittel ist ungültig.',
             ]);
@@ -116,16 +130,6 @@ final class CatalogResolver
                 ->where('advertising_medium_id', $medium->id)
                 ->first();
 
-        $spotMethod = isset($position['spot_method'])
-            ? SpotCalculationMethod::from((string) $position['spot_method'])
-            : $existing->spot_method;
-
-        if (! $spotMethod->isImplementedInGateB()) {
-            throw ValidationException::withMessages([
-                'positions' => 'Kalkulationsart '.$spotMethod->label().' ist noch nicht freigegeben.',
-            ]);
-        }
-
         [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
@@ -143,7 +147,8 @@ final class CatalogResolver
             'time_ranges' => $timeRanges,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
-            'spot_method' => $spotMethod,
+            'spot_method' => $freeze->legacySpotMethod(),
+            'freeze' => $freeze,
             'surcharge_percent' => (string) $existing->surcharge_percent,
             'is_discountable' => (bool) $existing->is_discountable,
             'is_ae_eligible' => (bool) $existing->is_ae_eligible,
@@ -165,6 +170,7 @@ final class CatalogResolver
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
      *     surcharge_percent: string,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
@@ -196,9 +202,17 @@ final class CatalogResolver
             ->where('is_active', true)
             ->first();
 
-        if ($medium === null || (string) $medium->getAttributes()['kind'] !== CalculationKind::SpotClassic->value) {
+        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
+        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
             throw ValidationException::withMessages([
                 'positions' => 'Nur Spot Classic ist in diesem Umfang zulässig.',
+            ]);
+        }
+
+        $medium->loadMissing('category');
+        if ($medium->category === null || ! $medium->category->is_active) {
+            throw ValidationException::withMessages([
+                'positions' => 'Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.',
             ]);
         }
 
@@ -214,15 +228,11 @@ final class CatalogResolver
             ]);
         }
 
-        $spotMethod = isset($position['spot_method'])
-            ? SpotCalculationMethod::from((string) $position['spot_method'])
-            : SpotCalculationMethod::Average;
+        $requestedMethod = isset($position['spot_method'])
+            ? (string) $position['spot_method']
+            : null;
 
-        if (! $spotMethod->isImplementedInGateB()) {
-            throw ValidationException::withMessages([
-                'positions' => 'Kalkulationsart '.$spotMethod->label().' ist noch nicht freigegeben.',
-            ]);
-        }
+        $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
 
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {
@@ -248,7 +258,8 @@ final class CatalogResolver
             'time_ranges' => $timeRanges,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
-            'spot_method' => $spotMethod,
+            'spot_method' => $freeze->legacySpotMethod(),
+            'freeze' => $freeze,
             'surcharge_percent' => (string) $rule->surcharge_percent,
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
@@ -548,11 +559,14 @@ final class CatalogResolver
     }
 
     /**
+     * Budget-/Re-Optimierung: aktuelle Live-Katalogoperation (kein historischer Freeze).
+     *
      * @return array{
      *     inventory: Inventory,
      *     medium: AdvertisingMedium,
      *     rule: InventoryMediumRule,
      *     priceList: PriceList,
+     *     freeze: CalculationMethodFreezeDescriptor,
      *     surcharge_percent: string,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
@@ -568,8 +582,12 @@ final class CatalogResolver
             ]);
         }
 
-        $medium = AdvertisingMedium::query()->find($mediumId);
-        if ($medium === null || (string) $medium->getAttributes()['kind'] !== CalculationKind::SpotClassic->value) {
+        $medium = AdvertisingMedium::query()
+            ->whereKey($mediumId)
+            ->where('is_active', true)
+            ->first();
+        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
+        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
             throw ValidationException::withMessages([
                 'budget_wish_inventory_ids' => 'Spot Classic ist nicht verfügbar.',
             ]);
@@ -587,6 +605,24 @@ final class CatalogResolver
             ]);
         }
 
+        try {
+            $freeze = $this->freezeResolver->resolveForNewCombination(
+                $medium,
+                SpotCalculationMethod::Average->value,
+            );
+        } catch (ValidationException $exception) {
+            $messages = [];
+            foreach ($exception->errors() as $fieldMessages) {
+                foreach ($fieldMessages as $message) {
+                    $messages[] = $message;
+                }
+            }
+
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => array_values(array_unique($messages)),
+            ]);
+        }
+
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {
             throw ValidationException::withMessages([
@@ -599,6 +635,7 @@ final class CatalogResolver
             'medium' => $medium,
             'rule' => $rule,
             'priceList' => $priceList,
+            'freeze' => $freeze,
             'surcharge_percent' => (string) $rule->surcharge_percent,
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,

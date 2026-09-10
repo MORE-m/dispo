@@ -70,14 +70,27 @@ kritische Aktionen. Historische Gen-3-Snapshots bleiben unverändert.
 `calculation_method_mode` (`inherit`\|`override`, Default `inherit`). Defaults
 über nullable `default_calculation_method_id` an Kategorie und Medium (kein
 `is_default` in Zuordnungszeilen). Engine-Profile rein codebasiert
-(`EngineProfileRegistry`); späterer Dispatch
-`(engine_profile_key, calculation_method_key, algorithm_version)`. **Keine**
-Runtime-Anbindung in c1; **kein** Zuordnungs-Backfill; `advertising_media.kind`
-unverändert NOT NULL.
+(`EngineProfileRegistry`); Dispatch-Vertrag
+`(engine_profile_key, calculation_method_key, algorithm_version)`.
 
-**ADV-001 insgesamt noch offen:** c2 Dual-Read/Write + Freeze + `kind` nullable;
-c3 Katalog-Methoden-Admin inkl. Default-Mitgliedschaft; c4 Positionsauswahl;
-weitere Defaults (Feldsets, Rabatt/AE/Preisdefaults).
+**ADV-001c2 (Dual-Read/Write + Freeze, umgesetzt):** An
+`calculation_positions` und `dispo_order_positions` die vier Freeze-Felder
+`engine_profile_key`, `calculation_method_key`, `calculation_method_name`,
+`algorithm_version` (unteilbar: alle gesetzt oder alle `NULL`). Backfill
+bekannter Spot-Classic-Average-Positionen auf
+`spot_classic`/`average`/`Durchschnitt`/`v1`. Spot-Kategorie erhält Zuordnungen
+zu `average`/`calendar`/`fixed_price` mit `engine_profile_key=spot_classic`;
+Default `average`; Spot-Medien bleiben `inherit`. Dual-Write schreibt Legacy
+(`kind`, `spot_method`) und Freeze gemeinsam über
+`CalculationMethodFreezeResolver`. Dispo übernimmt Freeze exakt aus der
+Kalkulationsposition. Historische unveränderte Kombinationen nutzen den Freeze
+(nicht Live-Katalog/Registry). `advertising_media.kind` nullable; Gen-3
+unverändert. Ab c3 (Methoden-Admin) bzw. Legacy-Entfernung ist vollständiger
+Schema-Rollback von c2 erwartbar nicht mehr möglich.
+
+**ADV-001 insgesamt noch offen:** c3 Katalog-Methoden-Admin inkl.
+Default-Mitgliedschaft; c4 Positionsauswahl; weitere Defaults (Feldsets,
+Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert
