@@ -27,14 +27,23 @@ use ValueError;
  *
  * ADV-001c3b2: optionaler {@see CategoryMethodCatalogSnapshot} für Inherit-
  * Simulation ohne DB-Mutation (expliziter Evaluationskontext).
+ * ADV-001c3c: optionaler {@see MediumMethodCatalogSnapshot} für Override-
+ * Simulation. Nie beide Snapshots gleichzeitig; Snapshot muss zum Mode passen.
  */
 final class AdvertisingMediumLiveBookability
 {
+    public const SOURCE_CATEGORY = 'Oberkategorie';
+
+    public const SOURCE_MEDIUM_OVERRIDE = 'Werbemittel-Override';
+
     public function evaluate(
         AdvertisingMedium $medium,
         ?string $requestedMethodKey = null,
         ?CategoryMethodCatalogSnapshot $inheritCatalog = null,
+        ?MediumMethodCatalogSnapshot $overrideCatalog = null,
     ): AdvertisingMediumLiveBookabilityResult {
+        $this->assertSnapshotContract($medium, $inheritCatalog, $overrideCatalog);
+
         if (! $medium->is_active) {
             return $this->blocked('Das Werbemittel ist im Katalog deaktiviert.');
         }
@@ -61,17 +70,11 @@ final class AdvertisingMediumLiveBookability
             return $this->blocked('Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.');
         }
 
-        if ($inheritCatalog !== null && $medium->calculation_method_mode === CalculationMethodMode::Override) {
-            throw new InvalidArgumentException(
-                'CategoryMethodCatalogSnapshot darf nur für inherit-Medien verwendet werden.',
-            );
-        }
-
         $requested = $requestedMethodKey !== null ? trim($requestedMethodKey) : '';
         if ($requested !== '') {
             $methodKey = $requested;
         } else {
-            $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog);
+            $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog, $overrideCatalog);
             if ($defaultKey === null) {
                 if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
                     return $this->blocked('Für dieses Werbemittel ist keine Standard-Berechnungsmethode hinterlegt.');
@@ -82,19 +85,19 @@ final class AdvertisingMediumLiveBookability
             $methodKey = $defaultKey;
         }
 
-        $method = $this->resolveLoadedMethod($medium, $methodKey, $inheritCatalog);
+        $method = $this->resolveLoadedMethod($medium, $methodKey, $inheritCatalog, $overrideCatalog);
         if ($method === null || ! $method->is_active) {
             return $this->blocked('Die Berechnungsmethode ist unbekannt oder inaktiv.');
         }
 
-        $assignmentProfile = $this->resolveActiveEngineProfileKey($medium, $methodKey, $inheritCatalog);
+        $assignmentProfile = $this->resolveActiveEngineProfileKey($medium, $methodKey, $inheritCatalog, $overrideCatalog);
         if ($assignmentProfile === null) {
             return $this->blocked('Die gewählte Berechnungsmethode ist für dieses Werbemittel nicht aktiv zugeordnet.');
         }
 
-        $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog);
+        $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog, $overrideCatalog);
         if ($defaultKey !== null) {
-            $defaultProfile = $this->resolveActiveEngineProfileKey($medium, $defaultKey, $inheritCatalog);
+            $defaultProfile = $this->resolveActiveEngineProfileKey($medium, $defaultKey, $inheritCatalog, $overrideCatalog);
             if ($defaultProfile === null) {
                 return $this->blocked('Die Standard-Berechnungsmethode ist keiner aktiven Zuordnung zugeordnet.');
             }
@@ -142,6 +145,37 @@ final class AdvertisingMediumLiveBookability
         return $this->evaluate($medium, null)->toPayload();
     }
 
+    public function configurationSource(AdvertisingMedium $medium): string
+    {
+        return $medium->calculation_method_mode === CalculationMethodMode::Override
+            ? self::SOURCE_MEDIUM_OVERRIDE
+            : self::SOURCE_CATEGORY;
+    }
+
+    private function assertSnapshotContract(
+        AdvertisingMedium $medium,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog,
+        ?MediumMethodCatalogSnapshot $overrideCatalog,
+    ): void {
+        if ($inheritCatalog !== null && $overrideCatalog !== null) {
+            throw new InvalidArgumentException(
+                'CategoryMethodCatalogSnapshot und MediumMethodCatalogSnapshot dürfen nicht gleichzeitig gesetzt sein.',
+            );
+        }
+
+        if ($inheritCatalog !== null && $medium->calculation_method_mode === CalculationMethodMode::Override) {
+            throw new InvalidArgumentException(
+                'CategoryMethodCatalogSnapshot darf nur für inherit-Medien verwendet werden.',
+            );
+        }
+
+        if ($overrideCatalog !== null && $medium->calculation_method_mode === CalculationMethodMode::Inherit) {
+            throw new InvalidArgumentException(
+                'MediumMethodCatalogSnapshot darf nur für override-Medien verwendet werden.',
+            );
+        }
+    }
+
     private function blocked(string $reason): AdvertisingMediumLiveBookabilityResult
     {
         return new AdvertisingMediumLiveBookabilityResult(
@@ -153,10 +187,16 @@ final class AdvertisingMediumLiveBookability
     private function resolveDefaultMethodKey(
         AdvertisingMedium $medium,
         ?CategoryMethodCatalogSnapshot $inheritCatalog,
+        ?MediumMethodCatalogSnapshot $overrideCatalog,
     ): ?string {
-        $medium->loadMissing(['defaultCalculationMethod', 'category.defaultCalculationMethod']);
-
         if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
+            if ($overrideCatalog !== null) {
+                $key = $overrideCatalog->defaultCalculationMethod?->key;
+
+                return ($key !== null && $key !== '') ? $key : null;
+            }
+
+            $medium->loadMissing(['defaultCalculationMethod']);
             $key = $medium->defaultCalculationMethod?->key;
 
             return ($key !== null && $key !== '') ? $key : null;
@@ -168,6 +208,7 @@ final class AdvertisingMediumLiveBookability
             return ($key !== null && $key !== '') ? $key : null;
         }
 
+        $medium->loadMissing(['category.defaultCalculationMethod']);
         $key = $medium->category?->defaultCalculationMethod?->key;
 
         return ($key !== null && $key !== '') ? $key : null;
@@ -180,12 +221,22 @@ final class AdvertisingMediumLiveBookability
         AdvertisingMedium $medium,
         string $methodKey,
         ?CategoryMethodCatalogSnapshot $inheritCatalog,
+        ?MediumMethodCatalogSnapshot $overrideCatalog,
     ): ?CalculationMethod {
-        foreach ($this->assignmentCandidates($medium, $inheritCatalog) as $assignment) {
+        foreach ($this->assignmentCandidates($medium, $inheritCatalog, $overrideCatalog) as $assignment) {
             $method = $assignment->calculationMethod;
             if ($method !== null && $method->key === $methodKey) {
                 return $method;
             }
+        }
+
+        if ($overrideCatalog !== null) {
+            $default = $overrideCatalog->defaultCalculationMethod;
+            if ($default !== null && $default->key === $methodKey) {
+                return $default;
+            }
+
+            return null;
         }
 
         if ($inheritCatalog !== null && $medium->calculation_method_mode !== CalculationMethodMode::Override) {
@@ -195,15 +246,20 @@ final class AdvertisingMediumLiveBookability
             }
         }
 
-        $defaults = [
-            $medium->defaultCalculationMethod,
-            $medium->category?->defaultCalculationMethod,
-        ];
-
-        foreach ($defaults as $method) {
+        if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
+            $medium->loadMissing(['defaultCalculationMethod']);
+            $method = $medium->defaultCalculationMethod;
             if ($method !== null && $method->key === $methodKey) {
                 return $method;
             }
+
+            return null;
+        }
+
+        $medium->loadMissing(['category.defaultCalculationMethod']);
+        $method = $medium->category?->defaultCalculationMethod;
+        if ($method !== null && $method->key === $methodKey) {
+            return $method;
         }
 
         return null;
@@ -215,8 +271,15 @@ final class AdvertisingMediumLiveBookability
     private function assignmentCandidates(
         AdvertisingMedium $medium,
         ?CategoryMethodCatalogSnapshot $inheritCatalog,
+        ?MediumMethodCatalogSnapshot $overrideCatalog,
     ): iterable {
         if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
+            if ($overrideCatalog !== null) {
+                yield from $overrideCatalog->assignments;
+
+                return;
+            }
+
             yield from $medium->calculationMethodAssignments;
 
             return;
@@ -240,14 +303,14 @@ final class AdvertisingMediumLiveBookability
         AdvertisingMedium $medium,
         string $methodKey,
         ?CategoryMethodCatalogSnapshot $inheritCatalog,
+        ?MediumMethodCatalogSnapshot $overrideCatalog,
     ): ?string {
-        $medium->loadMissing([
-            'calculationMethodAssignments.calculationMethod',
-            'category.calculationMethodAssignments.calculationMethod',
-        ]);
-
         if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
-            foreach ($medium->calculationMethodAssignments as $assignment) {
+            $assignments = $overrideCatalog !== null
+                ? $overrideCatalog->assignments
+                : $medium->calculationMethodAssignments;
+
+            foreach ($assignments as $assignment) {
                 if (! $assignment->is_active) {
                     continue;
                 }

@@ -176,6 +176,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.catalog.media.category-change-preview');
         Route::post('administration/katalog/werbemittel/{medium}/kategorie-wechseln', [AdvertisingMediumAdminController::class, 'changeCategory'])
             ->name('administration.catalog.media.category-change');
+        Route::post('administration/katalog/werbemittel/{medium}/berechnungsmethoden-vorschau', [AdvertisingMediumAdminController::class, 'calculationMethodsPreview'])
+            ->name('administration.catalog.media.calculation-methods-preview');
+        Route::put('administration/katalog/werbemittel/{medium}/berechnungsmethoden', [AdvertisingMediumAdminController::class, 'calculationMethodsReplace'])
+            ->name('administration.catalog.media.calculation-methods');
 
         Route::get('administration/katalog/berechnungsmethoden', [CalculationMethodAdminController::class, 'index'])
             ->name('administration.catalog.methods.index');

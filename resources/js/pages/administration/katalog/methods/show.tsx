@@ -438,13 +438,27 @@ export default function MethodShow({
                         {method.active_medium_assignments.length === 0 ? (
                             <p className="text-muted-foreground">Keine</p>
                         ) : (
-                            <ul>
-                                {method.active_medium_assignments.map((row) => (
-                                    <li key={row.assignment_id}>
-                                        {row.medium_name} ({row.medium_code})
-                                    </li>
-                                ))}
-                            </ul>
+                            <>
+                                <p
+                                    className="text-muted-foreground mb-2"
+                                    data-test="method-medium-assignment-inherit-note"
+                                >
+                                    Diese Methode wird in einer gespeicherten
+                                    Werbemittel-Konfiguration verwendet. Die
+                                    Zuordnung kann auch bei Vererbung
+                                    gespeichert sein.
+                                </p>
+                                <ul>
+                                    {method.active_medium_assignments.map(
+                                        (row) => (
+                                            <li key={row.assignment_id}>
+                                                {row.medium_name} (
+                                                {row.medium_code})
+                                            </li>
+                                        ),
+                                    )}
+                                </ul>
+                            </>
                         )}
                     </div>
                 </section>
