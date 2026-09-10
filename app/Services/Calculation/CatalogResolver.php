@@ -2,7 +2,6 @@
 
 namespace App\Services\Calculation;
 
-use App\Enums\CalculationKind;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
 use App\Enums\SpotCalculationMethod;
@@ -202,17 +201,9 @@ final class CatalogResolver
             ->where('is_active', true)
             ->first();
 
-        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
-        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
+        if ($medium === null) {
             throw ValidationException::withMessages([
-                'positions' => 'Nur Spot Classic ist in diesem Umfang zulässig.',
-            ]);
-        }
-
-        $medium->loadMissing('category');
-        if ($medium->category === null || ! $medium->category->is_active) {
-            throw ValidationException::withMessages([
-                'positions' => 'Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.',
+                'positions' => 'Nur Spot Classic ist derzeit für neue Kalkulationen freigegeben.',
             ]);
         }
 
@@ -232,6 +223,7 @@ final class CatalogResolver
             ? (string) $position['spot_method']
             : null;
 
+        // Eine maßgebliche Live-Prüfung: FreezeResolver → AdvertisingMediumLiveBookability.
         $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
 
         $priceList = $this->activePriceList($inventory->id);
@@ -586,8 +578,7 @@ final class CatalogResolver
             ->whereKey($mediumId)
             ->where('is_active', true)
             ->first();
-        $kindRaw = $medium !== null ? ($medium->getAttributes()['kind'] ?? null) : null;
-        if ($medium === null || (string) $kindRaw !== CalculationKind::SpotClassic->value) {
+        if ($medium === null) {
             throw ValidationException::withMessages([
                 'budget_wish_inventory_ids' => 'Spot Classic ist nicht verfügbar.',
             ]);
@@ -606,6 +597,7 @@ final class CatalogResolver
         }
 
         try {
+            // Eine maßgebliche Live-Prüfung (kein vorausgehender Doppel-Evaluate).
             $freeze = $this->freezeResolver->resolveForNewCombination(
                 $medium,
                 SpotCalculationMethod::Average->value,

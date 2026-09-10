@@ -10,7 +10,7 @@ type Medium = {
     id: number;
     name: string;
     code: string;
-    kind: string;
+    kind: string | null;
     category_id: number;
     category_name: string | null;
     category_key: string | null;
@@ -21,6 +21,9 @@ type Medium = {
     sort: number;
     is_active: boolean;
     status_label: string;
+    is_bookable_for_new_positions: boolean;
+    unbookable_reason: string | null;
+    bookability_label: string;
     lock_version: number;
     has_position_reference: boolean;
     calculation_positions_count: number;
@@ -34,7 +37,6 @@ type CategoryOption = {
     id: number;
     key: string;
     name: string;
-    compatible_with_spot_classic: boolean;
 };
 
 type Routes = {
@@ -78,12 +80,12 @@ async function csrfHeaders(): Promise<Record<string, string>> {
 export default function MediaShow({
     medium,
     formOptions,
-    kindCompatibilityNote,
+    catalogNote,
     routes,
 }: {
     medium: Medium;
-    formOptions: { categories: CategoryOption[]; kinds: unknown[] };
-    kindCompatibilityNote: string;
+    formOptions: { categories: CategoryOption[] };
+    catalogNote: string;
     routes: Routes;
 }) {
     const flash = usePage().props.flash;
@@ -338,7 +340,7 @@ export default function MediaShow({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title={medium.name}
-                    description={`Code ${medium.code} (unveränderlich) · ${medium.kind} · Sperrversion ${lockVersion}`}
+                    description={`Code ${medium.code} (unveränderlich) · Sperrversion ${lockVersion}`}
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" asChild>
@@ -373,21 +375,45 @@ export default function MediaShow({
 
                 <p
                     className="text-muted-foreground max-w-3xl text-sm"
-                    data-test="medium-kind-note"
+                    data-test="medium-catalog-note"
                 >
-                    {kindCompatibilityNote}
+                    {catalogNote}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-3 text-sm">
-                    <span data-test="medium-status-badge">{statusLabel}</span>
-                    <span className="text-muted-foreground">
+                <div
+                    className="grid max-w-xl gap-2 rounded-xl border p-4 text-sm"
+                    data-test="medium-status-panel"
+                >
+                    <div>
+                        <span className="font-medium">Katalog: </span>
+                        <span data-test="medium-status-badge">
+                            {statusLabel}
+                        </span>
+                    </div>
+                    <div>
+                        <span className="font-medium">
+                            Neue Kalkulationen:{' '}
+                        </span>
+                        <span data-test="medium-bookability-badge">
+                            {medium.bookability_label}
+                        </span>
+                    </div>
+                    {medium.unbookable_reason ? (
+                        <p
+                            className="text-muted-foreground"
+                            data-test="medium-unbookable-reason"
+                        >
+                            Grund: {medium.unbookable_reason}
+                        </p>
+                    ) : null}
+                    <p className="text-muted-foreground">
                         Oberkategorie: {categoryName} ({categoryKey}) · Calc{' '}
                         {medium.calculation_positions_count} · Dispo{' '}
                         {medium.dispo_order_positions_count} · Rules{' '}
                         {medium.inventory_medium_rules_count} · Assignments{' '}
                         {medium.assignments_active_count} aktiv /{' '}
                         {medium.assignments_inactive_count} inaktiv
-                    </span>
+                    </p>
                 </div>
 
                 {error ? (
@@ -420,14 +446,6 @@ export default function MediaShow({
                             disabled
                             className="font-mono"
                             data-test="medium-code-readonly"
-                        />
-                    </FormField>
-                    <FormField label="Berechnungsart" htmlFor="kind">
-                        <Input
-                            id="kind"
-                            value={medium.kind}
-                            disabled
-                            data-test="medium-kind-readonly"
                         />
                     </FormField>
                     <FormField

@@ -1,13 +1,14 @@
 # Fortschritt V1
 
-Stand: 10. September 2026 (ADV-001c2 Dual-Read/Write + Freeze – kein Abschluss von ADV-001 / DF-3)
+Stand: 10. September 2026 (ADV-001c3a engine-unabhängige Medienpflege – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1 und ADV-001c2 auf
-Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen (Optionen,
-Regel-Editor). ADV-001 Katalog-Methoden-Admin und Positionsauswahl bleiben offen.
+DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2 und
+ADV-001c3a auf Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen
+(Optionen, Regel-Editor). ADV-001 Methoden-Admin (c3b/c3c) und Positionsauswahl
+(c4) bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -17,15 +18,34 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c2 Dual-Read/Write + Positions-Freeze (Feature-Branch
-`feat/adv001c2-dual-read-write-freeze`). Nächste sinnvolle Schritte: ADV-001c3
-Katalog-Methoden-Admin; danach Positionsauswahl (c4); parallel Optionen /
-Regel-Editor; Inventar-/Preislisten-Admin.
+ADV-001c3a engine-unabhängige Werbemittelpflege + Wizard-Buchbarkeitsfilter
+(Feature-Branch `feat/adv001c3a-engine-independent-media-admin`). Nächste
+sinnvolle Schritte: ADV-001c3b Methodenstammdaten/Kategoriezuordnungen; c3c
+Medium-Overrides; c4 Positionsauswahl; parallel Optionen / Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c2 Dual-Read/Write + Freeze auf Branch `feat/adv001c2-dual-read-write-freeze`
-(Basis `main` nach PR #29 / ADV-001c1).
+ADV-001c2 Dual-Read/Write + Freeze auf `main` (Merge PR #30).
+
+## ADV-001c3a – Engine-unabhängige Medienpflege (September 2026)
+
+Neue Werbemittel erhalten `kind=null`. Legacy-`kind` ist kein Adminfeld und
+bleibt bei Spot Classic unverändert. Katalogaktivität und technische
+Buchbarkeit für neue Kalkulationen sind getrennt. Zentrale Auswertung über
+`AdvertisingMediumLiveBookability` (gleicher Vertrag für Admin-Status,
+Wizard-Props und Live-Pfad im FreezeResolver/CatalogResolver). Wizard lässt
+für neue Positionen nur `is_bookable_for_new_positions=true` zu. Keine
+Methodenkarte; Methoden-Admin folgt in c3b/c3c; Positionsauswahl in c4.
+
+| Kriterium | Status |
+|---|---|
+| Create mit `kind=null`, `kind` prohibited | umgesetzt |
+| Null-kind Update/Category/Deakt./Reakt. | umgesetzt |
+| Legacy Compatibility nur bei gesetztem kind | umgesetzt |
+| Admin-Status Katalog vs. Buchbarkeit | umgesetzt |
+| Zentrale Live-Buchbarkeit + Wizard-Filter | umgesetzt |
+| Methoden-Admin / Defaults / Overrides | **c3b/c3c** |
+| Positions-Methodenwahl | **c4** |
 
 ## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
 
@@ -49,8 +69,8 @@ bleiben `inherit`. Keine neue Engine; Gen-3-Snapshots unverändert.
 | Dual-Read/Write Kalkulation + Dispo-Übernahme | umgesetzt |
 | `CalculationMethodFreezeResolver` + Registry-Anbindung | umgesetzt |
 | Historische Stabilität (unveränderte Kombination) | umgesetzt |
-| `advertising_media.kind` nullable + Null-Guards | umgesetzt |
-| Katalog-/Methoden-Admin | **Slice 3** |
+| `advertising_media.kind` nullable + Null-Guards (bis c3a) | umgesetzt / **c3a ersetzt Guards** |
+| Katalog-/Methoden-Admin | **c3a Medien; c3b/c3c Methoden** |
 | Positions-Methodenwahl / Selectability | **Slice 4** |
 | Legacy-Felder entfernen / Gen-4 | **nicht** |
 
@@ -289,9 +309,9 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c2
+## Bewusst offen nach ADV-001c3a
 
-- ADV-001c3: Katalog-/Methoden-Admin (Mode/Defaults/Zuordnungen)
+- ADV-001c3b/c3c: Methodenstammdaten, Kategorie-/Medium-Zuordnungen, Mode/Defaults
 - ADV-001c4: Positionsauswahl und Selectability
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden

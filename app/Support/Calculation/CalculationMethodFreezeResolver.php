@@ -3,13 +3,12 @@
 namespace App\Support\Calculation;
 
 use App\Enums\CalculationKind;
-use App\Enums\CalculationMethodMode;
 use App\Enums\EngineCapabilityStatus;
 use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
-use App\Models\CalculationMethod;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
+use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use ValueError;
@@ -30,6 +29,10 @@ class CalculationMethodFreezeResolver
         'algorithm_version' => 'v1',
     ];
 
+    public function __construct(
+        private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
+    ) {}
+
     /**
      * Descriptor für neue oder fachlich geänderte Kombinationen (Live-Pfad).
      */
@@ -37,72 +40,18 @@ class CalculationMethodFreezeResolver
         AdvertisingMedium $medium,
         ?string $requestedMethodKey,
     ): CalculationMethodFreezeDescriptor {
-        $kindRaw = $medium->getAttributes()['kind'] ?? null;
-        if ($kindRaw === null || trim((string) $kindRaw) === '') {
+        $evaluation = $this->liveBookability->evaluate($medium, $requestedMethodKey);
+        if (! $evaluation->isBookableForNewPositions) {
             throw ValidationException::withMessages([
-                'positions' => 'Das Werbemittel hat keine Berechnungsart und kann in diesem Umfang nicht neu kalkuliert werden.',
+                'positions' => (string) $evaluation->unbookableReason,
             ]);
         }
-
-        if ((string) $kindRaw !== CalculationKind::SpotClassic->value) {
-            throw ValidationException::withMessages([
-                'positions' => 'Nur Spot Classic ist in diesem Umfang zulässig.',
-            ]);
-        }
-
-        $medium->loadMissing(['category', 'defaultCalculationMethod', 'category.defaultCalculationMethod']);
-        $category = $medium->category;
-        if ($category === null || ! $category->is_active) {
-            throw ValidationException::withMessages([
-                'positions' => 'Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.',
-            ]);
-        }
-
-        $requested = $requestedMethodKey !== null ? trim($requestedMethodKey) : '';
-        $methodKey = $requested !== ''
-            ? $requested
-            : $this->resolveDefaultMethodKey($medium);
-
-        $this->assertLiveMethodAndAssignment($medium, $methodKey);
-
-        $assignmentProfile = $this->resolveActiveEngineProfileKey($medium, $methodKey);
-        if ($assignmentProfile === null || trim($assignmentProfile) === '') {
-            throw ValidationException::withMessages([
-                'positions' => 'Für dieses Werbemittel ist keine aktive Berechnungsmethoden-Zuordnung hinterlegt.',
-            ]);
-        }
-
-        try {
-            EngineProfileRegistry::assertKnownProfile($assignmentProfile);
-            EngineProfileRegistry::assertKnownMethodForProfile($assignmentProfile, $methodKey);
-        } catch (InvalidArgumentException) {
-            throw ValidationException::withMessages([
-                'positions' => 'Die gewählte Berechnungsmethode ist technisch unbekannt.',
-            ]);
-        }
-
-        $pairStatus = EngineProfileRegistry::pairStatus($assignmentProfile, $methodKey);
-        if ($pairStatus !== EngineCapabilityStatus::Released) {
-            $label = $this->methodLabel($methodKey);
-            throw ValidationException::withMessages([
-                'positions' => 'Kalkulationsart '.$label.' ist noch nicht freigegeben.',
-            ]);
-        }
-
-        $version = EngineProfileRegistry::currentReleasedVersion($assignmentProfile, $methodKey);
-        if ($version === null || trim($version) === '') {
-            throw ValidationException::withMessages([
-                'positions' => 'Für die gewählte Berechnungsmethode ist keine freigegebene Algorithmusversion hinterlegt.',
-            ]);
-        }
-
-        $name = $this->methodNameFromCatalog($methodKey);
 
         return new CalculationMethodFreezeDescriptor(
-            engineProfileKey: $assignmentProfile,
-            calculationMethodKey: $methodKey,
-            calculationMethodName: $name,
-            algorithmVersion: $version,
+            engineProfileKey: (string) $evaluation->engineProfileKey,
+            calculationMethodKey: (string) $evaluation->calculationMethodKey,
+            calculationMethodName: (string) $evaluation->calculationMethodName,
+            algorithmVersion: (string) $evaluation->algorithmVersion,
         );
     }
 
@@ -316,141 +265,6 @@ class CalculationMethodFreezeResolver
             throw ValidationException::withMessages([
                 'positions' => 'Die eingefrorene Algorithmusversion ist nicht ausführbar.',
             ]);
-        }
-    }
-
-    private function resolveDefaultMethodKey(AdvertisingMedium $medium): string
-    {
-        $medium->loadMissing(['defaultCalculationMethod', 'category.defaultCalculationMethod']);
-
-        if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
-            $key = $medium->defaultCalculationMethod?->key;
-            if ($key !== null && $key !== '') {
-                return $key;
-            }
-
-            throw ValidationException::withMessages([
-                'positions' => 'Für dieses Werbemittel ist keine Standard-Berechnungsmethode hinterlegt.',
-            ]);
-        }
-
-        $key = $medium->category?->defaultCalculationMethod?->key;
-        if ($key !== null && $key !== '') {
-            return $key;
-        }
-
-        throw ValidationException::withMessages([
-            'positions' => 'Für die Oberkategorie ist keine Standard-Berechnungsmethode hinterlegt.',
-        ]);
-    }
-
-    private function assertLiveMethodAndAssignment(AdvertisingMedium $medium, string $methodKey): void
-    {
-        $method = CalculationMethod::query()->where('key', $methodKey)->first();
-        if ($method === null || ! $method->is_active) {
-            throw ValidationException::withMessages([
-                'positions' => 'Die Berechnungsmethode ist unbekannt oder inaktiv.',
-            ]);
-        }
-
-        $profile = $this->resolveActiveEngineProfileKey($medium, $methodKey);
-        if ($profile === null || trim($profile) === '') {
-            throw ValidationException::withMessages([
-                'positions' => 'Die gewählte Berechnungsmethode ist für dieses Werbemittel nicht aktiv zugeordnet.',
-            ]);
-        }
-
-        // Defaultmethode muss zu einer aktiven zulässigen Zuordnung gehören.
-        $defaultKey = null;
-        if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
-            $defaultKey = $medium->defaultCalculationMethod?->key;
-        } else {
-            $defaultKey = $medium->category?->defaultCalculationMethod?->key;
-        }
-        if ($defaultKey !== null && $defaultKey !== '') {
-            $defaultProfile = $this->resolveActiveEngineProfileKey($medium, $defaultKey);
-            if ($defaultProfile === null || trim($defaultProfile) === '') {
-                throw ValidationException::withMessages([
-                    'positions' => 'Die Standard-Berechnungsmethode ist keiner aktiven Zuordnung zugeordnet.',
-                ]);
-            }
-        }
-    }
-
-    private function resolveActiveEngineProfileKey(AdvertisingMedium $medium, string $methodKey): ?string
-    {
-        $medium->loadMissing([
-            'calculationMethodAssignments.calculationMethod',
-            'category.calculationMethodAssignments.calculationMethod',
-        ]);
-
-        if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
-            foreach ($medium->calculationMethodAssignments as $assignment) {
-                if (! $assignment->is_active) {
-                    continue;
-                }
-                if ($assignment->calculationMethod?->key !== $methodKey) {
-                    continue;
-                }
-                if (! $assignment->calculationMethod->is_active) {
-                    continue;
-                }
-                $profile = $this->nullableString($assignment->engine_profile_key);
-                if ($profile === null) {
-                    continue;
-                }
-
-                return $profile;
-            }
-
-            return null;
-        }
-
-        $category = $medium->category;
-        if ($category === null) {
-            return null;
-        }
-
-        foreach ($category->calculationMethodAssignments as $assignment) {
-            if (! $assignment->is_active) {
-                continue;
-            }
-            if ($assignment->calculationMethod?->key !== $methodKey) {
-                continue;
-            }
-            if (! $assignment->calculationMethod->is_active) {
-                continue;
-            }
-            $profile = $this->nullableString($assignment->engine_profile_key);
-            if ($profile === null) {
-                continue;
-            }
-
-            return $profile;
-        }
-
-        return null;
-    }
-
-    private function methodNameFromCatalog(string $methodKey): string
-    {
-        $method = CalculationMethod::query()->where('key', $methodKey)->where('is_active', true)->first();
-        $name = $method !== null ? trim((string) $method->name) : '';
-        if ($name !== '') {
-            return $name;
-        }
-
-        throw ValidationException::withMessages([
-            'positions' => 'Der Methodenname der Berechnungsmethode konnte nicht ermittelt werden.',
-        ]);
-    }
-
-    private function methodLabel(string $methodKey): string
-    {
-        try {
-            return SpotCalculationMethod::from($methodKey)->label();
-        } catch (ValueError) {
-            return $methodKey;
         }
     }
 

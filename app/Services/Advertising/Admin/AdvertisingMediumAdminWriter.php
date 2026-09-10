@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 use ValueError;
 
 /**
- * ADV-001b / ADV-001: Admin-Lifecycle für Werbemittel.
+ * ADV-001b / ADV-001c3a: Admin-Lifecycle für Werbemittel (engine-unabhängig).
  */
 final class AdvertisingMediumAdminWriter
 {
@@ -35,12 +35,13 @@ final class AdvertisingMediumAdminWriter
     public function create(array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($payload, $actor): AdvertisingMedium {
+            $this->assertKindProhibited($payload);
+
             $code = trim((string) $payload['code']);
             $name = trim((string) $payload['name']);
             AdvertisingCatalogKeyValidator::assertValid($code, 'code');
             $this->assertName($name);
 
-            $kind = $this->parseKind($payload['kind'] ?? null);
             // Kategorie unter lockForUpdate prüfen – verhindert Race mit Deaktivierung.
             $category = $this->locks->lockCategory((int) ($payload['category_id'] ?? 0));
             if (! $category->is_active) {
@@ -48,7 +49,6 @@ final class AdvertisingMediumAdminWriter
                     'category_id' => 'Neue Werbemittel können nur aktiven Oberkategorien zugeordnet werden.',
                 ]);
             }
-            AdvertisingKindCategoryCompatibility::assertCompatible($kind, $category->key);
 
             $length = $this->normalizeLength($payload['default_length_seconds'] ?? 30);
             $sort = $this->normalizeSort($payload['sort'] ?? 0);
@@ -61,7 +61,8 @@ final class AdvertisingMediumAdminWriter
                 $medium->category_id = $category->id;
                 $medium->code = $code;
                 $medium->name = $name;
-                $medium->kind = $kind;
+                // ADV-001c3a: neue Medien sind engine-unabhängig (Legacy-kind bleibt null).
+                $medium->kind = null;
                 $medium->default_length_seconds = $length;
                 $medium->is_discountable = $isDiscountable;
                 $medium->is_ae_eligible = $isAeEligible;
@@ -94,36 +95,21 @@ final class AdvertisingMediumAdminWriter
         });
     }
 
-    private function assertKindPresentForMutation(AdvertisingMedium $medium): void
-    {
-        $kind = $medium->getAttributes()['kind'] ?? null;
-        if ($kind === null || $kind === '') {
-            throw ValidationException::withMessages([
-                'kind' => 'Dieses Werbemittel hat keine Berechnungsart und kann in diesem Umfang nicht geändert oder reaktiviert werden.',
-            ]);
-        }
-    }
-
     /**
      * @param  array<string, mixed>  $payload
      */
     public function update(AdvertisingMedium $medium, array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($medium, $payload, $actor): AdvertisingMedium {
+            $this->assertKindProhibited($payload);
+
             /** @var AdvertisingMedium $locked */
             $locked = AdvertisingMedium::query()->whereKey($medium->id)->lockForUpdate()->firstOrFail();
             $this->assertLock($locked, (int) $payload['lock_version']);
-            $this->assertKindPresentForMutation($locked);
 
             if (array_key_exists('code', $payload) && (string) $payload['code'] !== $locked->code) {
                 throw ValidationException::withMessages([
                     'code' => 'Der technische Code ist nach dem Anlegen unveränderlich (PO-ADV001b-2).',
-                ]);
-            }
-
-            if (array_key_exists('kind', $payload) && (string) $payload['kind'] !== (string) ($locked->getAttributes()['kind'] ?? '')) {
-                throw ValidationException::withMessages([
-                    'kind' => 'Die Berechnungsart kann über diese Aktion nicht geändert werden.',
                 ]);
             }
 
@@ -170,6 +156,7 @@ final class AdvertisingMediumAdminWriter
     public function changeCategory(AdvertisingMedium $medium, array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($medium, $payload, $actor): AdvertisingMedium {
+            $this->assertKindProhibited($payload);
             $targetCategoryId = (int) ($payload['category_id'] ?? 0);
 
             // Rows sperren → Zustand neu lesen → Preview neu → Fingerprint → mutieren
@@ -179,7 +166,6 @@ final class AdvertisingMediumAdminWriter
             );
             $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
-            $this->assertKindPresentForMutation($locked);
 
             /** @var AdvertisingCategory|null $lockedTarget */
             $lockedTarget = $lockedBundle['categories']->firstWhere('id', $targetCategoryId);
@@ -279,10 +265,11 @@ final class AdvertisingMediumAdminWriter
     public function reactivate(AdvertisingMedium $medium, array $payload, User $actor): AdvertisingMedium
     {
         return DB::transaction(function () use ($medium, $payload, $actor): AdvertisingMedium {
+            $this->assertKindProhibited($payload);
+
             $lockedBundle = $this->locks->lockMediumAndCategories((int) $medium->id);
             $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
-            $this->assertKindPresentForMutation($locked);
 
             if ($locked->is_active) {
                 throw ValidationException::withMessages([
@@ -302,7 +289,7 @@ final class AdvertisingMediumAdminWriter
                 ]);
             }
 
-            AdvertisingKindCategoryCompatibility::assertCompatible($locked->kind, $category->key);
+            $this->assertLegacyKindCompatibleIfPresent($locked, $category->key);
 
             $before = $this->auditPayload($locked);
             $locked->is_active = true;
@@ -328,6 +315,36 @@ final class AdvertisingMediumAdminWriter
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function assertKindProhibited(array $payload): void
+    {
+        if (array_key_exists('kind', $payload)) {
+            throw ValidationException::withMessages([
+                'kind' => 'Das Feld „kind“ darf über die Admin-Pflege nicht gesetzt oder geändert werden.',
+            ]);
+        }
+    }
+
+    private function assertLegacyKindCompatibleIfPresent(AdvertisingMedium $medium, string $categoryKey): void
+    {
+        $kindRaw = $medium->getAttributes()['kind'] ?? null;
+        if ($kindRaw === null || $kindRaw === '') {
+            return;
+        }
+
+        try {
+            $kind = CalculationKind::from((string) $kindRaw);
+        } catch (ValueError) {
+            throw ValidationException::withMessages([
+                'kind' => 'Unbekannte oder nicht unterstützte Legacy-Berechnungsart.',
+            ]);
+        }
+
+        AdvertisingKindCategoryCompatibility::assertCompatible($kind, $categoryKey);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function auditPayload(AdvertisingMedium $medium): array
@@ -348,17 +365,6 @@ final class AdvertisingMediumAdminWriter
             'is_active' => $medium->is_active,
             'lock_version' => $medium->lock_version,
         ];
-    }
-
-    private function parseKind(mixed $value): CalculationKind
-    {
-        try {
-            return CalculationKind::from((string) $value);
-        } catch (ValueError) {
-            throw ValidationException::withMessages([
-                'kind' => 'Unbekannte oder nicht unterstützte Berechnungsart.',
-            ]);
-        }
     }
 
     private function assertName(string $name): void

@@ -7,11 +7,14 @@ type MediaRow = {
     id: number;
     name: string;
     code: string;
-    kind: string;
+    kind: string | null;
     category_name: string | null;
     category_key: string | null;
     is_active: boolean;
     status_label: string;
+    is_bookable_for_new_positions: boolean;
+    unbookable_reason: string | null;
+    bookability_label: string;
     is_discountable: boolean;
     is_ae_eligible: boolean;
     default_length_seconds: number;
@@ -65,7 +68,7 @@ export default function MediaIndex({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Werbemittel"
-                    description="Technischer Code unveränderlich. Spot Classic nur in der Oberkategorie Spots."
+                    description="Technischer Code unveränderlich. Katalogaktivität und technische Buchbarkeit sind getrennt."
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" asChild>
@@ -151,13 +154,13 @@ export default function MediaIndex({
                                         Code
                                     </th>
                                     <th className="px-4 py-2 font-medium">
-                                        Art
-                                    </th>
-                                    <th className="px-4 py-2 font-medium">
                                         Oberkategorie
                                     </th>
                                     <th className="px-4 py-2 font-medium">
-                                        Status
+                                        Katalog
+                                    </th>
+                                    <th className="px-4 py-2 font-medium">
+                                        Neue Kalkulationen
                                     </th>
                                     <th className="px-4 py-2 font-medium">
                                         Rabatt/AE
@@ -183,9 +186,6 @@ export default function MediaIndex({
                                             {row.code}
                                         </td>
                                         <td className="px-4 py-2">
-                                            {row.kind}
-                                        </td>
-                                        <td className="px-4 py-2">
                                             {row.category_name}
                                         </td>
                                         <td className="px-4 py-2">
@@ -193,6 +193,17 @@ export default function MediaIndex({
                                                 data-test={`medium-status-${row.id}`}
                                             >
                                                 {row.status_label}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <span
+                                                data-test={`medium-bookability-${row.id}`}
+                                                title={
+                                                    row.unbookable_reason ??
+                                                    undefined
+                                                }
+                                            >
+                                                {row.bookability_label}
                                             </span>
                                         </td>
                                         <td className="px-4 py-2">

@@ -17,6 +17,7 @@ use App\Services\Advertising\Admin\CatalogImpactPreviewService;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
@@ -31,6 +32,30 @@ use Tests\TestCase;
 class CatalogLifecycleConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
+
+    protected function tearDown(): void
+    {
+        // ADV-001c3a: Create erzeugt kind=NULL. DatabaseMigrations ruft c2-down auf,
+        // das bei Null-kind bewusst fail-closed ist – vor Rollback neutralisieren.
+        // Worker werden in runParallelWorkers::finally gestoppt, bevor tearDown läuft.
+        // catch deckt nur Lock-Timeouts der Neutralisierung ab; parent::tearDown()
+        // liegt außerhalb und lässt fehlgeschlagene Migration-Rollbacks sichtbar scheitern.
+        // Mutation nur über MysqlTestDatabaseGuard (dispo_test) / DatabaseMigrations.
+        try {
+            if (Schema::hasTable('advertising_media')
+                && DB::connection()->getDriverName() === 'mysql'
+            ) {
+                DB::statement('SET SESSION innodb_lock_wait_timeout = 3');
+                DB::table('advertising_media')
+                    ->whereNull('kind')
+                    ->update(['kind' => 'spot_classic']);
+            }
+        } catch (\Throwable) {
+            // Neutralisierung fehlgeschlagen → c2-down scheitert explizit im parent::tearDown.
+        }
+
+        parent::tearDown();
+    }
 
     public function test_c_race_01_category_deactivate_versus_medium_create(): void
     {
@@ -65,7 +90,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'actor_id' => $admin->id,
                     'code' => $code,
                     'name' => 'Race Create',
-                    'kind' => CalculationKind::SpotClassic->value,
                     'category_id' => $spots->id,
                     'orchestration' => [
                         'wait_before' => ['holder_category_locked'],
@@ -101,7 +125,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'actor_id' => $admin->id,
                     'code' => $code,
                     'name' => 'Race Create Holder',
-                    'kind' => CalculationKind::SpotClassic->value,
                     'category_id' => $spots->id,
                     'orchestration' => [
                         'outer_transaction' => true,
@@ -385,7 +408,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         app(AdvertisingMediumAdminWriter::class)->create([
             'code' => 'seq_block_'.bin2hex(random_bytes(3)),
             'name' => 'Blocked',
-            'kind' => CalculationKind::SpotClassic->value,
             'category_id' => $spots->id,
         ], $admin);
     }
@@ -475,8 +497,15 @@ class CatalogLifecycleConcurrencyTest extends TestCase
             $processB->setTimeout(60);
             $processA->start();
             $processB->start();
-            $processA->wait();
-            $processB->wait();
+
+            try {
+                $processA->wait();
+                $processB->wait();
+            } catch (\Throwable $e) {
+                $processA->stop(0);
+                $processB->stop(0);
+                throw $e;
+            }
 
             $results = [];
             foreach (glob($runDir.'/worker-*.result') ?: [] as $resultFile) {
@@ -488,6 +517,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
 
             return $results;
         } finally {
+            if (isset($processA) && $processA->isRunning()) {
+                $processA->stop(0);
+            }
+            if (isset($processB) && $processB->isRunning()) {
+                $processB->stop(0);
+            }
             foreach (glob($runDir.'/*') ?: [] as $file) {
                 if (is_file($file)) {
                     unlink($file);

@@ -40,6 +40,7 @@ import {
     type DayGroupOption,
     type TimeRangeDraft,
 } from '@/lib/pricing-time';
+import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import {
     EmptyState,
     ErrorState,
@@ -159,6 +160,8 @@ type Catalog = {
         is_discountable: boolean;
         is_ae_eligible: boolean;
         is_active: boolean;
+        is_bookable_for_new_positions: boolean;
+        unbookable_reason: string | null;
     }[];
     rules: {
         id: number;
@@ -413,37 +416,42 @@ function catalogLabel(name: string, isActive: boolean): string {
 }
 
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
+    // ADV-001c3a bis c4: ausschließlich Spot Classic (kein Fallback auf andere buchbare Medien).
+    const preferredMedium =
+        catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
+        null;
+
+    if (!preferredMedium) {
+        return null;
+    }
+
     for (const inventory of catalog.inventories.filter(
         (item) => item.is_active,
     )) {
-        for (const medium of catalog.media.filter(
-            (item) => item.code === 'spot_classic' && item.is_active,
-        )) {
-            const rule = ruleFor(catalog, inventory.id, medium.id);
-            if (!rule || !rule.is_active) {
-                continue;
-            }
-
-            return {
-                client_key: newClientKey(),
-                inventory_id: inventory.id,
-                advertising_medium_id: medium.id,
-                spot_method: 'average',
-                length_seconds:
-                    rule.default_length_seconds ??
-                    medium.default_length_seconds,
-                total_spot_count: 0,
-                position_discount_percent: '0',
-                ae_percent: '0',
-                plan_rows: [],
-                time_ranges: [emptyTimeRange()],
-                position_discounts: [],
-                period_open: true,
-                flight_period_start: '',
-                flight_period_end: '',
-                custom_fields: {},
-            };
+        const rule = ruleFor(catalog, inventory.id, preferredMedium.id);
+        if (!rule || !rule.is_active) {
+            continue;
         }
+
+        return {
+            client_key: newClientKey(),
+            inventory_id: inventory.id,
+            advertising_medium_id: preferredMedium.id,
+            spot_method: 'average',
+            length_seconds:
+                rule.default_length_seconds ??
+                preferredMedium.default_length_seconds,
+            total_spot_count: 0,
+            position_discount_percent: '0',
+            ae_percent: '0',
+            plan_rows: [],
+            time_ranges: [emptyTimeRange()],
+            position_discounts: [],
+            period_open: true,
+            flight_period_start: '',
+            flight_period_end: '',
+            custom_fields: {},
+        };
     }
 
     return null;
@@ -638,8 +646,8 @@ export default function CalculationWizard({
     const [targetBudget, setTargetBudget] = useState(
         calculation?.target_budget_nn ?? '',
     );
-    const spotClassicMedium = catalog.media.find(
-        (item) => item.code === 'spot_classic' && item.is_active,
+    const spotClassicMedium = catalog.media.find((item) =>
+        isSelectableForNewWizardPositions(item),
     );
     const defaultSpotLength =
         catalog.rules.find(
@@ -1033,8 +1041,7 @@ export default function CalculationWizard({
 
         return catalog.media.filter(
             (medium) =>
-                medium.code === 'spot_classic' &&
-                medium.is_active &&
+                isSelectableForNewWizardPositions(medium) &&
                 mediumIds.has(medium.id),
         );
     }
@@ -1350,9 +1357,7 @@ export default function CalculationWizard({
     const summaryTotals = displayTotals ?? savedDisplayTotals ?? null;
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
-        catalog.media.some(
-            (item) => item.code === 'spot_classic' && item.is_active,
-        );
+        catalog.media.some((item) => isSelectableForNewWizardPositions(item));
     const catalogMissing =
         planningMode === 'manual' &&
         positions.length === 0 &&

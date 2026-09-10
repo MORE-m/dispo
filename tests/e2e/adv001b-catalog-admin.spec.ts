@@ -86,7 +86,8 @@ test.describe.serial('ADV-001b Katalog-Admin', () => {
         ).toHaveValue(`e2e_cat_${suffix}`);
 
         await page.goto('/administration/katalog/werbemittel/neu');
-        await expect(page.locator('[data-test="medium-kind-note"]')).toBeVisible();
+        await expect(page.locator('[data-test="medium-catalog-note"]')).toBeVisible();
+        await expect(page.locator('[data-test="medium-kind-select"]')).toHaveCount(0);
         await page
             .locator('[data-test="medium-name-input"]')
             .fill(`E2E Spot ${suffix}`);
@@ -101,6 +102,9 @@ test.describe.serial('ADV-001b Katalog-Admin', () => {
         await expect(
             page.locator('[data-test="medium-code-readonly"]'),
         ).toHaveValue(`e2e_spot_${suffix}`);
+        await expect(
+            page.locator('[data-test="medium-bookability-badge"]'),
+        ).toHaveText('Noch nicht technisch verfügbar');
     });
 
     test('Medium bearbeiten, Deaktivieren und Kategorie-Blocker', async ({
@@ -168,7 +172,7 @@ test.describe.serial('ADV-001b Katalog-Admin', () => {
             { timeout: 15_000 },
         );
 
-        // Kategoriewechsel auf inkompatible Kategorie → Blocker
+        // Null-kind: Wechsel auf Online Audio ist erlaubt
         const onlineOption = page
             .locator('[data-test="medium-target-category-select"] option')
             .filter({ hasText: /Online Audio/ });
@@ -181,6 +185,29 @@ test.describe.serial('ADV-001b Katalog-Admin', () => {
             .locator('[data-test="medium-category-preview-button"]')
             .click();
         await expect(
+            page.locator('[data-test="medium-category-preview"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="medium-category-confirm"]'),
+        ).toBeEnabled();
+
+        // Legacy spot_classic: inkompatible Kategorie blockiert
+        await page.goto('/administration/katalog/werbemittel');
+        await page.getByRole('link', { name: 'Spot Classic' }).first().click();
+        await expect(page).toHaveURL(/werbemittel\/\d+$/);
+        const legacyOnlineValue = await page
+            .locator('[data-test="medium-target-category-select"] option')
+            .filter({ hasText: /Online Audio/ })
+            .first()
+            .getAttribute('value');
+        expect(legacyOnlineValue).toBeTruthy();
+        await page
+            .locator('[data-test="medium-target-category-select"]')
+            .selectOption(legacyOnlineValue!);
+        await page
+            .locator('[data-test="medium-category-preview-button"]')
+            .click();
+        await expect(
             page.locator('[data-test="medium-category-blocker"]'),
         ).toBeVisible();
         await expect(
@@ -188,6 +215,7 @@ test.describe.serial('ADV-001b Katalog-Admin', () => {
         ).toBeDisabled();
 
         // 409 nach paralleler Änderung sichtbar in der UI
+        await page.goto(mediumUrl);
         const lockText = await page
             .locator('text=Sperrversion')
             .first()
