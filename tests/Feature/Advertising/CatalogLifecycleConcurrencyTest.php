@@ -17,6 +17,7 @@ use App\Services\Advertising\Admin\CatalogImpactPreviewService;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
@@ -31,6 +32,17 @@ use Tests\TestCase;
 class CatalogLifecycleConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
+
+    protected function tearDown(): void
+    {
+        // ADV-001c3a: Create erzeugt kind=NULL. DatabaseMigrations ruft c2-down auf,
+        // das bei Null-kind bewusst fail-closed ist – vor Rollback aufräumen.
+        if (Schema::hasTable('advertising_media')) {
+            DB::table('advertising_media')->whereNull('kind')->delete();
+        }
+
+        parent::tearDown();
+    }
 
     public function test_c_race_01_category_deactivate_versus_medium_create(): void
     {

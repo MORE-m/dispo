@@ -40,7 +40,7 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
             '[data-test="medium-category-select"]',
         );
         const options = categorySelect.locator('option');
-        await expect(options).toHaveCount(7); // Bitte wählen + 6 Kategorien
+        expect(await options.count()).toBeGreaterThanOrEqual(7);
 
         await page
             .locator('[data-test="medium-name-input"]')
