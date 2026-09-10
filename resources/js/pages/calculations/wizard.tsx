@@ -418,9 +418,8 @@ function catalogLabel(name: string, isActive: boolean): string {
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
     // ADV-001c3a bis c4: ausschließlich Spot Classic (kein Fallback auf andere buchbare Medien).
     const preferredMedium =
-        catalog.media.find((item) =>
-            isSelectableForNewWizardPositions(item),
-        ) ?? null;
+        catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
+        null;
 
     if (!preferredMedium) {
         return null;
@@ -2845,10 +2844,12 @@ export default function CalculationWizard({
                                                                                 {formatHour(
                                                                                     range.start_hour,
                                                                                 )}
+
                                                                                 –
                                                                                 {formatInclusiveEnd(
                                                                                     range.end_hour_exclusive,
                                                                                 )}
+
                                                                                 ,{' '}
                                                                                 {
                                                                                     range.spot_count

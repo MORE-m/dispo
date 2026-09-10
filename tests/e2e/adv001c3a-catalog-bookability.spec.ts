@@ -1,11 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-    expect,
-    test,
-    type Page,
-} from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 /**
  * ADV-001c3a isolierte Suite: Null-kind-Medien + Wizard-Buchbarkeit.
@@ -129,7 +125,9 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
         await page
             .locator('[data-test="medium-code-input"]')
             .fill(`e2e_oa_${suffix}`);
-        await categorySelect.selectOption({ label: 'Online Audio (online_audio)' });
+        await categorySelect.selectOption({
+            label: 'Online Audio (online_audio)',
+        });
         await page.locator('[data-test="medium-create-submit"]').click();
         await expect(page).toHaveURL(/werbemittel\/\d+$/, { timeout: 30_000 });
 
@@ -194,11 +192,15 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
         });
 
         catalog = await readWizardCatalog(page);
-        const nullMedium = catalog.media.find((item) => item.name === visibleName);
+        const nullMedium = catalog.media.find(
+            (item) => item.name === visibleName,
+        );
         expect(nullMedium, `Medium „${visibleName}“ im Payload`).toBeTruthy();
         expect(nullMedium!.is_active).toBe(true);
         expect(nullMedium!.is_bookable_for_new_positions).toBe(false);
-        expect(nullMedium!.unbookable_reason).toMatch(/Berechnungsmethode|technisch/i);
+        expect(nullMedium!.unbookable_reason).toMatch(
+            /Berechnungsmethode|technisch/i,
+        );
 
         const activeRule = catalog.rules.find(
             (rule) =>
@@ -206,7 +208,10 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
                 rule.advertising_medium_id === nullMedium!.id &&
                 rule.inventory_id === inventory!.id,
         );
-        expect(activeRule, 'Aktive InventoryMediumRule für Null-kind').toBeTruthy();
+        expect(
+            activeRule,
+            'Aktive InventoryMediumRule für Null-kind',
+        ).toBeTruthy();
 
         // Wizard-Auswahlstruktur bis c4: nur Spot Classic + Buchbarkeit + aktive Regel.
         const selectableForInventory = catalog.media.filter(
@@ -229,7 +234,9 @@ test.describe.serial('ADV-001c3a Katalog Null-kind und Wizard', () => {
         ).toBe(true);
 
         // Sichtbarer Name darf nicht als auswählbares Medium im UI auftauchen.
-        await expect(page.getByText(visibleName, { exact: true })).toHaveCount(0);
+        await expect(page.getByText(visibleName, { exact: true })).toHaveCount(
+            0,
+        );
 
         // Speichern als Admin (bereits eingeloggt) – Spot-Classic-Pfad bis Persistenz.
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
