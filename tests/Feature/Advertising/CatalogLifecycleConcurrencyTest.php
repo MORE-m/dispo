@@ -36,9 +36,17 @@ class CatalogLifecycleConcurrencyTest extends TestCase
     protected function tearDown(): void
     {
         // ADV-001c3a: Create erzeugt kind=NULL. DatabaseMigrations ruft c2-down auf,
-        // das bei Null-kind bewusst fail-closed ist – vor Rollback aufräumen.
-        if (Schema::hasTable('advertising_media')) {
-            DB::table('advertising_media')->whereNull('kind')->delete();
+        // das bei Null-kind bewusst fail-closed ist – vor Rollback neutralisieren.
+        // Kurzes Lock-Wait: verwaiste Worker-Locks dürfen Teardown nicht aufhängen.
+        try {
+            if (Schema::hasTable('advertising_media')) {
+                DB::statement('SET SESSION innodb_lock_wait_timeout = 3');
+                DB::table('advertising_media')
+                    ->whereNull('kind')
+                    ->update(['kind' => 'spot_classic']);
+            }
+        } catch (\Throwable) {
+            // Teardown darf Migration-Down nicht blockieren; Down scheitert ggf. explizit.
         }
 
         parent::tearDown();
@@ -484,8 +492,15 @@ class CatalogLifecycleConcurrencyTest extends TestCase
             $processB->setTimeout(60);
             $processA->start();
             $processB->start();
-            $processA->wait();
-            $processB->wait();
+
+            try {
+                $processA->wait();
+                $processB->wait();
+            } catch (\Throwable $e) {
+                $processA->stop(0);
+                $processB->stop(0);
+                throw $e;
+            }
 
             $results = [];
             foreach (glob($runDir.'/worker-*.result') ?: [] as $resultFile) {
@@ -497,6 +512,12 @@ class CatalogLifecycleConcurrencyTest extends TestCase
 
             return $results;
         } finally {
+            if (isset($processA) && $processA->isRunning()) {
+                $processA->stop(0);
+            }
+            if (isset($processB) && $processB->isRunning()) {
+                $processB->stop(0);
+            }
             foreach (glob($runDir.'/*') ?: [] as $file) {
                 if (is_file($file)) {
                     unlink($file);
