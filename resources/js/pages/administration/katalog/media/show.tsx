@@ -386,7 +386,9 @@ export default function MediaShow({
                 >
                     <div>
                         <span className="font-medium">Katalog: </span>
-                        <span data-test="medium-status-badge">{statusLabel}</span>
+                        <span data-test="medium-status-badge">
+                            {statusLabel}
+                        </span>
                     </div>
                     <div>
                         <span className="font-medium">

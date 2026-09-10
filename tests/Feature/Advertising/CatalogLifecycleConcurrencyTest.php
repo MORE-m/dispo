@@ -65,7 +65,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'actor_id' => $admin->id,
                     'code' => $code,
                     'name' => 'Race Create',
-                    'kind' => CalculationKind::SpotClassic->value,
                     'category_id' => $spots->id,
                     'orchestration' => [
                         'wait_before' => ['holder_category_locked'],
@@ -101,7 +100,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
                     'actor_id' => $admin->id,
                     'code' => $code,
                     'name' => 'Race Create Holder',
-                    'kind' => CalculationKind::SpotClassic->value,
                     'category_id' => $spots->id,
                     'orchestration' => [
                         'outer_transaction' => true,

@@ -9,7 +9,6 @@ declare(strict_types=1);
  * explizite vorbereitende Zeilenlocks und Dateibarrieren.
  */
 
-use App\Enums\CalculationKind;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Models\FieldSetAssignment;
@@ -118,7 +117,6 @@ try {
                 $medium = $writer->create([
                     'code' => (string) $payload['code'],
                     'name' => (string) ($payload['name'] ?? $payload['code']),
-                    'kind' => (string) ($payload['kind'] ?? CalculationKind::SpotClassic->value),
                     'category_id' => (int) $payload['category_id'],
                     'default_length_seconds' => (int) ($payload['default_length_seconds'] ?? 30),
                     'is_active' => true,
