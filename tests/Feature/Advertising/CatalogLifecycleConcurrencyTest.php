@@ -37,16 +37,21 @@ class CatalogLifecycleConcurrencyTest extends TestCase
     {
         // ADV-001c3a: Create erzeugt kind=NULL. DatabaseMigrations ruft c2-down auf,
         // das bei Null-kind bewusst fail-closed ist – vor Rollback neutralisieren.
-        // Kurzes Lock-Wait: verwaiste Worker-Locks dürfen Teardown nicht aufhängen.
+        // Worker werden in runParallelWorkers::finally gestoppt, bevor tearDown läuft.
+        // catch deckt nur Lock-Timeouts der Neutralisierung ab; parent::tearDown()
+        // liegt außerhalb und lässt fehlgeschlagene Migration-Rollbacks sichtbar scheitern.
+        // Mutation nur über MysqlTestDatabaseGuard (dispo_test) / DatabaseMigrations.
         try {
-            if (Schema::hasTable('advertising_media')) {
+            if (Schema::hasTable('advertising_media')
+                && DB::connection()->getDriverName() === 'mysql'
+            ) {
                 DB::statement('SET SESSION innodb_lock_wait_timeout = 3');
                 DB::table('advertising_media')
                     ->whereNull('kind')
                     ->update(['kind' => 'spot_classic']);
             }
         } catch (\Throwable) {
-            // Teardown darf Migration-Down nicht blockieren; Down scheitert ggf. explizit.
+            // Neutralisierung fehlgeschlagen → c2-down scheitert explizit im parent::tearDown.
         }
 
         parent::tearDown();

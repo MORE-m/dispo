@@ -7,8 +7,10 @@ use App\Enums\Role;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Models\User;
+use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -297,6 +299,57 @@ class CatalogAdminAdv001c3aTest extends TestCase
 
                     return $keys === $activeKeys;
                 }));
+    }
+
+    public function test_wizard_media_serialization_avoids_calculation_method_queries_per_medium(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Admin)->create();
+
+        AdvertisingMedium::factory()->count(3)->sequence(
+            ['code' => 'c3a_q_null_a'],
+            ['code' => 'c3a_q_null_b'],
+            ['code' => 'c3a_q_null_c'],
+        )->create([
+            'category_id' => $catalog['medium']->category_id,
+            'kind' => null,
+            'is_active' => true,
+        ]);
+
+        $bookability = app(AdvertisingMediumLiveBookability::class);
+        $media = AdvertisingMedium::query()
+            ->with([
+                'category.defaultCalculationMethod',
+                'category.calculationMethodAssignments.calculationMethod',
+                'defaultCalculationMethod',
+                'calculationMethodAssignments.calculationMethod',
+            ])
+            ->where('is_active', true)
+            ->get();
+
+        $this->assertGreaterThanOrEqual(4, $media->count());
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        foreach ($media as $medium) {
+            $bookability->payloadForMedium($medium);
+        }
+
+        $methodQueries = collect(DB::getQueryLog())
+            ->filter(function (array $query): bool {
+                $sql = strtolower((string) ($query['query'] ?? ''));
+
+                return str_contains($sql, 'from "calculation_methods"')
+                    || str_contains($sql, 'from `calculation_methods`');
+            })
+            ->values();
+
+        $this->assertCount(
+            0,
+            $methodQueries,
+            'Eager-geladene Medien dürfen keine CalculationMethod::query() pro Medium auslösen.',
+        );
     }
 
     private function spots(): AdvertisingCategory

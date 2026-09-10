@@ -40,6 +40,7 @@ import {
     type DayGroupOption,
     type TimeRangeDraft,
 } from '@/lib/pricing-time';
+import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import {
     EmptyState,
     ErrorState,
@@ -415,17 +416,11 @@ function catalogLabel(name: string, isActive: boolean): string {
 }
 
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
+    // ADV-001c3a bis c4: ausschließlich Spot Classic (kein Fallback auf andere buchbare Medien).
     const preferredMedium =
-        catalog.media.find(
-            (item) =>
-                item.is_bookable_for_new_positions &&
-                item.is_active &&
-                item.code === 'spot_classic',
-        ) ??
-        catalog.media.find(
-            (item) => item.is_bookable_for_new_positions && item.is_active,
-        ) ??
-        null;
+        catalog.media.find((item) =>
+            isSelectableForNewWizardPositions(item),
+        ) ?? null;
 
     if (!preferredMedium) {
         return null;
@@ -652,16 +647,9 @@ export default function CalculationWizard({
     const [targetBudget, setTargetBudget] = useState(
         calculation?.target_budget_nn ?? '',
     );
-    const spotClassicMedium =
-        catalog.media.find(
-            (item) =>
-                item.is_bookable_for_new_positions &&
-                item.is_active &&
-                item.code === 'spot_classic',
-        ) ??
-        catalog.media.find(
-            (item) => item.is_bookable_for_new_positions && item.is_active,
-        );
+    const spotClassicMedium = catalog.media.find((item) =>
+        isSelectableForNewWizardPositions(item),
+    );
     const defaultSpotLength =
         catalog.rules.find(
             (rule) =>
@@ -1054,8 +1042,7 @@ export default function CalculationWizard({
 
         return catalog.media.filter(
             (medium) =>
-                medium.is_bookable_for_new_positions &&
-                medium.is_active &&
+                isSelectableForNewWizardPositions(medium) &&
                 mediumIds.has(medium.id),
         );
     }
@@ -1371,9 +1358,7 @@ export default function CalculationWizard({
     const summaryTotals = displayTotals ?? savedDisplayTotals ?? null;
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
-        catalog.media.some(
-            (item) => item.is_bookable_for_new_positions && item.is_active,
-        );
+        catalog.media.some((item) => isSelectableForNewWizardPositions(item));
     const catalogMissing =
         planningMode === 'manual' &&
         positions.length === 0 &&

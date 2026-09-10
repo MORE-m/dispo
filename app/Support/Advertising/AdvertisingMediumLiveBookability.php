@@ -6,7 +6,9 @@ use App\Enums\CalculationKind;
 use App\Enums\CalculationMethodMode;
 use App\Enums\EngineCapabilityStatus;
 use App\Enums\SpotCalculationMethod;
+use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
+use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\CalculationMethod;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\EngineProfileRegistry;
@@ -19,6 +21,9 @@ use ValueError;
  * Einziger fachlicher Vertrag für Admin-Status, Wizard-Props und den Live-Pfad
  * in {@see CalculationMethodFreezeResolver}.
  * Inventarregeln und Preislisten bleiben kombinatorsiche Resolver-Prüfungen.
+ *
+ * Nutzt bereits eager-geladene Assignment-/Methoden-Relationen; keine
+ * zusätzliche CalculationMethod::query() pro Medium.
  */
 final class AdvertisingMediumLiveBookability
 {
@@ -67,7 +72,7 @@ final class AdvertisingMediumLiveBookability
             $methodKey = $defaultKey;
         }
 
-        $method = CalculationMethod::query()->where('key', $methodKey)->first();
+        $method = $this->resolveLoadedMethod($medium, $methodKey);
         if ($method === null || ! $method->is_active) {
             return $this->blocked('Die Berechnungsmethode ist unbekannt oder inaktiv.');
         }
@@ -148,6 +153,51 @@ final class AdvertisingMediumLiveBookability
         $key = $medium->category?->defaultCalculationMethod?->key;
 
         return ($key !== null && $key !== '') ? $key : null;
+    }
+
+    /**
+     * Methode aus bereits geladenen Relationen (keine CalculationMethod::query).
+     */
+    private function resolveLoadedMethod(AdvertisingMedium $medium, string $methodKey): ?CalculationMethod
+    {
+        foreach ($this->assignmentCandidates($medium) as $assignment) {
+            $method = $assignment->calculationMethod;
+            if ($method !== null && $method->key === $methodKey) {
+                return $method;
+            }
+        }
+
+        $defaults = [
+            $medium->defaultCalculationMethod,
+            $medium->category?->defaultCalculationMethod,
+        ];
+
+        foreach ($defaults as $method) {
+            if ($method !== null && $method->key === $methodKey) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return iterable<int, AdvertisingCategoryCalculationMethod|AdvertisingMediumCalculationMethod>
+     */
+    private function assignmentCandidates(AdvertisingMedium $medium): iterable
+    {
+        if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
+            yield from $medium->calculationMethodAssignments;
+
+            return;
+        }
+
+        $category = $medium->category;
+        if ($category === null) {
+            return;
+        }
+
+        yield from $category->calculationMethodAssignments;
     }
 
     private function resolveActiveEngineProfileKey(AdvertisingMedium $medium, string $methodKey): ?string

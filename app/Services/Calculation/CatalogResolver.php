@@ -11,7 +11,6 @@ use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
-use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use Illuminate\Support\Collection;
@@ -21,7 +20,6 @@ final class CatalogResolver
 {
     public function __construct(
         private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
-        private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
     ) {}
 
     /**
@@ -209,16 +207,6 @@ final class CatalogResolver
             ]);
         }
 
-        $bookability = $this->liveBookability->evaluate(
-            $medium,
-            isset($position['spot_method']) ? (string) $position['spot_method'] : null,
-        );
-        if (! $bookability->isBookableForNewPositions) {
-            throw ValidationException::withMessages([
-                'positions' => (string) $bookability->unbookableReason,
-            ]);
-        }
-
         $rule = InventoryMediumRule::query()
             ->where('inventory_id', $inventory->id)
             ->where('advertising_medium_id', $medium->id)
@@ -235,6 +223,7 @@ final class CatalogResolver
             ? (string) $position['spot_method']
             : null;
 
+        // Eine maßgebliche Live-Prüfung: FreezeResolver → AdvertisingMediumLiveBookability.
         $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
 
         $priceList = $this->activePriceList($inventory->id);
@@ -595,16 +584,6 @@ final class CatalogResolver
             ]);
         }
 
-        $bookability = $this->liveBookability->evaluate(
-            $medium,
-            SpotCalculationMethod::Average->value,
-        );
-        if (! $bookability->isBookableForNewPositions) {
-            throw ValidationException::withMessages([
-                'budget_wish_inventory_ids' => (string) $bookability->unbookableReason,
-            ]);
-        }
-
         $rule = InventoryMediumRule::query()
             ->where('inventory_id', $inventory->id)
             ->where('advertising_medium_id', $medium->id)
@@ -618,6 +597,7 @@ final class CatalogResolver
         }
 
         try {
+            // Eine maßgebliche Live-Prüfung (kein vorausgehender Doppel-Evaluate).
             $freeze = $this->freezeResolver->resolveForNewCombination(
                 $medium,
                 SpotCalculationMethod::Average->value,
