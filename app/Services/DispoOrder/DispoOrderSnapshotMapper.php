@@ -11,6 +11,7 @@ use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
+use App\Support\Calculation\CalculationMethodFreezeResolver;
 use Illuminate\Support\Collection;
 
 /**
@@ -20,6 +21,7 @@ final class DispoOrderSnapshotMapper
 {
     public function __construct(
         private readonly SpecialApprovalAssessor $assessor = new SpecialApprovalAssessor,
+        private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
     ) {}
 
     /**
@@ -76,6 +78,9 @@ final class DispoOrderSnapshotMapper
     {
         $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'discounts']);
 
+        // Dispoerzeugung ist Mutation: Descriptor muss ausführbar sein.
+        $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
+
         return [
             'calculation_position_id' => $position->id,
             'sort' => $sort,
@@ -85,8 +90,12 @@ final class DispoOrderSnapshotMapper
             'advertising_medium_id' => $position->advertising_medium_id,
             'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
             'advertising_medium_code' => $position->advertisingMedium->code ?? null,
-            'kind' => $position->kind->value,
-            'spot_method' => $position->spot_method->value,
+            'kind' => $freeze->legacyKind()->value,
+            'spot_method' => $freeze->legacySpotMethod()->value,
+            'engine_profile_key' => $freeze->engineProfileKey,
+            'calculation_method_key' => $freeze->calculationMethodKey,
+            'calculation_method_name' => $freeze->calculationMethodName,
+            'algorithm_version' => $freeze->algorithmVersion,
             'length_seconds' => $position->length_seconds,
             'total_spot_count' => $position->total_spot_count,
             'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,

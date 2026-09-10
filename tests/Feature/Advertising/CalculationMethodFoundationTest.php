@@ -52,10 +52,36 @@ class CalculationMethodFoundationTest extends TestCase
         }
     }
 
-    public function test_migration_creates_no_category_or_medium_method_assignments(): void
+    public function test_c2_backfills_spot_category_method_assignments_only(): void
     {
-        $this->assertSame(0, AdvertisingCategoryCalculationMethod::query()->count());
+        $spots = AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::SPOTS)
+            ->firstOrFail();
+
+        $assignments = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $spots->id)
+            ->with('calculationMethod')
+            ->get()
+            ->sortBy(fn ($row) => $row->calculationMethod?->sort)
+            ->values();
+
+        $this->assertCount(3, $assignments);
+        $this->assertSame(
+            ['average', 'calendar', 'fixed_price'],
+            $assignments->map(fn ($row) => $row->calculationMethod?->key)->all(),
+        );
+        foreach ($assignments as $assignment) {
+            $this->assertSame('spot_classic', $assignment->engine_profile_key);
+            $this->assertTrue($assignment->is_active);
+        }
+
+        $this->assertSame('average', $spots->defaultCalculationMethod?->key);
         $this->assertSame(0, AdvertisingMediumCalculationMethod::query()->count());
+
+        $otherCategoryAssignments = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', '!=', $spots->id)
+            ->count();
+        $this->assertSame(0, $otherCategoryAssignments);
     }
 
     public function test_existing_media_default_to_inherit_mode(): void
@@ -105,15 +131,16 @@ class CalculationMethodFoundationTest extends TestCase
         ]);
     }
 
-    public function test_default_calculation_method_fks_are_nullable(): void
+    public function test_default_calculation_method_fks_are_nullable_on_media(): void
     {
         $this->assertTrue(Schema::hasColumn('advertising_categories', 'default_calculation_method_id'));
         $this->assertTrue(Schema::hasColumn('advertising_media', 'default_calculation_method_id'));
 
+        // ADV-001c2 setzt Spot-Kategorie-Default auf average; Medium-Default bleibt nullable.
         $category = AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPOTS)
             ->firstOrFail();
-        $this->assertNull($category->default_calculation_method_id);
+        $this->assertSame('average', $category->defaultCalculationMethod?->key);
 
         $medium = AdvertisingMedium::factory()->create(['code' => 'spot_classic_default_null']);
         $this->assertNull($medium->default_calculation_method_id);
@@ -206,9 +233,7 @@ class CalculationMethodFoundationTest extends TestCase
 
     public function test_category_method_assignment_unique_and_allows_different_methods(): void
     {
-        $category = AdvertisingCategory::query()
-            ->where('key', CanonicalAdvertisingCategories::SPOTS)
-            ->firstOrFail();
+        $category = AdvertisingCategory::factory()->create(['key' => 'tmp_unique_methods_cat']);
         $average = CalculationMethod::query()->where('key', 'average')->firstOrFail();
         $calendar = CalculationMethod::query()->where('key', 'calendar')->firstOrFail();
 
@@ -333,14 +358,17 @@ class CalculationMethodFoundationTest extends TestCase
         $this->assertSame('spot_classic', $mediumAssignment->fresh()?->engine_profile_key);
     }
 
-    public function test_kind_column_remains_not_null(): void
+    public function test_kind_column_is_nullable_after_c2(): void
     {
         $this->assertTrue(Schema::hasColumn('advertising_media', 'kind'));
 
-        $medium = AdvertisingMedium::factory()->create(['code' => 'spot_classic_kind_nn']);
+        $kindColumn = collect(Schema::getColumns('advertising_media'))->firstWhere('name', 'kind');
+        $this->assertTrue((bool) ($kindColumn['nullable'] ?? false));
+
+        $medium = AdvertisingMedium::factory()->create(['code' => 'spot_classic_kind_nullable']);
         $this->assertNotNull($medium->getAttributes()['kind']);
 
-        $this->expectException(QueryException::class);
         DB::table('advertising_media')->where('id', $medium->id)->update(['kind' => null]);
+        $this->assertNull(DB::table('advertising_media')->where('id', $medium->id)->value('kind'));
     }
 }

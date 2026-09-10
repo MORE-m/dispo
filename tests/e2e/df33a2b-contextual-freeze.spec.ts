@@ -2,7 +2,8 @@ import { expect, test, type APIResponse, type Page } from '@playwright/test';
 
 /**
  * DF-3.3a2β isolierte Suite: Generation-3-Freeze mit mindestens zwei
- * Positionen und unterschiedlichen Kategorie-/Werbemittel-Schemas.
+ * Positionen und unterschiedlichen medium-spezifischen Effektiv-Schemas
+ * innerhalb der fachlich passenden Spot-Kategorie.
  * Läuft nur über playwright.df33a2b.config.ts (DB e2e-df33a2b.sqlite, Port 8005).
  */
 
@@ -209,14 +210,17 @@ test.describe('DF-3.3a2β contextual freeze', () => {
             catalog.media.find((m) => m.code === 'spot_classic') ??
             catalog.media[0];
         const mediumB =
-            catalog.media.find((m) => m.id !== mediumA.id) ?? catalog.media[1];
+            catalog.media.find((m) => m.code === 'spot_classic_b') ??
+            catalog.media.find((m) => m.id !== mediumA.id) ??
+            catalog.media[1];
         expect(mediumA.category_id).toBeTruthy();
         expect(mediumB.id).not.toBe(mediumA.id);
+        expect(mediumB.category_id).toBe(mediumA.category_id);
 
         await activateAssignment(page, {
             field_set_id: setIdA,
-            target_layer: 'advertising_category',
-            advertising_category_id: mediumA.category_id,
+            target_layer: 'advertising_medium',
+            advertising_medium_id: mediumA.id,
             applies_to_process: 'calculation',
         });
         await activateAssignment(page, {

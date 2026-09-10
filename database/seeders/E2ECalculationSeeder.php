@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CalculationKind;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
@@ -53,19 +54,21 @@ class E2ECalculationSeeder extends Seeder
         $spotsCategoryId = (int) AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPOTS)
             ->value('id');
-        $onlineCategoryId = (int) AdvertisingCategory::query()
-            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
-            ->value('id');
 
         $medium = AdvertisingMedium::factory()->create([
             'code' => 'spot_classic',
             'category_id' => $spotsCategoryId,
+            'kind' => CalculationKind::SpotClassic,
         ]);
-        // Zweites Werbemittel in anderer Oberkategorie für Gen-3-E2E (unterschiedliche Effektiv-Schemas).
+        // Zweites Spot-Werbemittel (gleiche fachlich passende Kategorie) für Gen-3-E2E:
+        // unterschiedliche Effektiv-Schemas über medium-spezifische Feldsets, ohne
+        // reale Nicht-Spot-Kategorien mit spot_classic/average zu verfälschen.
         $secondMedium = AdvertisingMedium::factory()->create([
-            'code' => 'online_audio_e2e',
-            'name' => 'Online Audio E2E',
-            'category_id' => $onlineCategoryId,
+            'code' => 'spot_classic_b',
+            'name' => 'Spot Classic B E2E',
+            'category_id' => $spotsCategoryId,
+            'kind' => CalculationKind::SpotClassic,
+            'sort' => 1,
         ]);
 
         /** @var array<string, Inventory> $inventories */

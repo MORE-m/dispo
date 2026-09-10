@@ -4,7 +4,6 @@ namespace App\Services\Calculation;
 
 use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
-use App\Enums\CalculationKind;
 use App\Enums\CalculationStatus;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
@@ -263,8 +262,8 @@ final class CalculationWriter
                 'advertising_medium_id' => $item['medium']->id,
                 'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
                 'price_list_id' => $item['priceList']->id,
-                'kind' => CalculationKind::SpotClassic,
-                'spot_method' => $item['spot_method'],
+                'kind' => $item['freeze']->legacyKind(),
+                'spot_method' => $item['freeze']->legacySpotMethod(),
                 'length_seconds' => (int) $item['length_seconds'],
                 'total_spot_count' => (int) $item['total_spot_count'],
                 'needs_spot_redistribution' => $item['needs_spot_redistribution'] && $item['time_ranges'] === [],
@@ -285,6 +284,11 @@ final class CalculationWriter
                 'nn_invest' => $result->nnInvest,
                 'sort' => $index,
             ]);
+            // ADV-001c2 Dual-Write: Freeze serverseitig, nicht aus Client-Payload.
+            $position->engine_profile_key = $item['freeze']->engineProfileKey;
+            $position->calculation_method_key = $item['freeze']->calculationMethodKey;
+            $position->calculation_method_name = $item['freeze']->calculationMethodName;
+            $position->algorithm_version = $item['freeze']->algorithmVersion;
             $position->calculation()->associate($calculation);
             $position->save();
             $seenIds[] = $position->id;

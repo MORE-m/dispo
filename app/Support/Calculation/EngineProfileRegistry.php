@@ -16,7 +16,7 @@ use InvalidArgumentException;
  * - current_released_version (explizit, nie aus Array-Reihenfolge)
  * - versions[version] => status
  *
- * In diesem Slice nicht an CatalogResolver / CalculationWriter angebunden.
+ * In diesem Slice an CatalogResolver / CalculationWriter / FreezeResolver angebunden.
  * Keine Handler-Auflösung.
  */
 final class EngineProfileRegistry

@@ -94,6 +94,16 @@ final class AdvertisingMediumAdminWriter
         });
     }
 
+    private function assertKindPresentForMutation(AdvertisingMedium $medium): void
+    {
+        $kind = $medium->getAttributes()['kind'] ?? null;
+        if ($kind === null || $kind === '') {
+            throw ValidationException::withMessages([
+                'kind' => 'Dieses Werbemittel hat keine Berechnungsart und kann in diesem Umfang nicht geändert oder reaktiviert werden.',
+            ]);
+        }
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -103,6 +113,7 @@ final class AdvertisingMediumAdminWriter
             /** @var AdvertisingMedium $locked */
             $locked = AdvertisingMedium::query()->whereKey($medium->id)->lockForUpdate()->firstOrFail();
             $this->assertLock($locked, (int) $payload['lock_version']);
+            $this->assertKindPresentForMutation($locked);
 
             if (array_key_exists('code', $payload) && (string) $payload['code'] !== $locked->code) {
                 throw ValidationException::withMessages([
@@ -110,7 +121,7 @@ final class AdvertisingMediumAdminWriter
                 ]);
             }
 
-            if (array_key_exists('kind', $payload) && (string) $payload['kind'] !== $locked->kind->value) {
+            if (array_key_exists('kind', $payload) && (string) $payload['kind'] !== (string) ($locked->getAttributes()['kind'] ?? '')) {
                 throw ValidationException::withMessages([
                     'kind' => 'Die Berechnungsart kann über diese Aktion nicht geändert werden.',
                 ]);
@@ -168,6 +179,7 @@ final class AdvertisingMediumAdminWriter
             );
             $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
+            $this->assertKindPresentForMutation($locked);
 
             /** @var AdvertisingCategory|null $lockedTarget */
             $lockedTarget = $lockedBundle['categories']->firstWhere('id', $targetCategoryId);
@@ -270,6 +282,7 @@ final class AdvertisingMediumAdminWriter
             $lockedBundle = $this->locks->lockMediumAndCategories((int) $medium->id);
             $locked = $lockedBundle['medium'];
             $this->assertLock($locked, (int) $payload['lock_version']);
+            $this->assertKindPresentForMutation($locked);
 
             if ($locked->is_active) {
                 throw ValidationException::withMessages([
@@ -325,7 +338,7 @@ final class AdvertisingMediumAdminWriter
             'id' => $medium->id,
             'code' => $medium->code,
             'name' => $medium->name,
-            'kind' => $medium->kind->value,
+            'kind' => $medium->kind?->value,
             'category_id' => $medium->category_id,
             'category_key' => $medium->category?->key,
             'default_length_seconds' => $medium->default_length_seconds,

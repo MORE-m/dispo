@@ -144,7 +144,8 @@ class AdvertisingMediumAdminController extends Controller
             ]);
         }
 
-        if ($request->exists('kind') && (string) $request->input('kind') !== $medium->kind->value) {
+        $currentKind = (string) ($medium->getAttributes()['kind'] ?? '');
+        if ($request->exists('kind') && (string) $request->input('kind') !== $currentKind) {
             throw ValidationException::withMessages([
                 'kind' => 'Die Berechnungsart kann über diese Aktion nicht geändert werden.',
             ]);
@@ -312,7 +313,7 @@ class AdvertisingMediumAdminController extends Controller
             'id' => $medium->id,
             'name' => $medium->name,
             'code' => $medium->code,
-            'kind' => $medium->kind->value,
+            'kind' => $medium->kind?->value,
             'category_id' => $medium->category_id,
             'category_name' => $medium->category?->name,
             'category_key' => $medium->category?->key,
@@ -344,7 +345,7 @@ class AdvertisingMediumAdminController extends Controller
             'id' => $medium->id,
             'name' => $medium->name,
             'code' => $medium->code,
-            'kind' => $medium->kind->value,
+            'kind' => $medium->kind?->value,
             'category_id' => $medium->category_id,
             'category_name' => $medium->category?->name,
             'category_key' => $medium->category?->key,

@@ -1,13 +1,13 @@
 # Fortschritt V1
 
-Stand: 9. September 2026 (ADV-001c1 Schema-Fundament – kein Abschluss von ADV-001 / DF-3)
+Stand: 10. September 2026 (ADV-001c2 Dual-Read/Write + Freeze – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b und ADV-001c1 auf Feature-Branch**
-(bzw. `main`). Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor). ADV-001
-Defaults und weitere CALC-KIND-Slices bleiben offen.
+DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1 und ADV-001c2 auf
+Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen (Optionen,
+Regel-Editor). ADV-001 Katalog-Methoden-Admin und Positionsauswahl bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -17,15 +17,42 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c1 Schema-Fundament (Katalog ↔ Berechnungsmethoden ↔ Engine-Profile).
-Nächste sinnvolle Schritte nach Merge: ADV-001c2 Backfill + Dual-Read/Write;
-danach Katalog-Methoden-Admin (c3), Positionsauswahl (c4); parallel Optionen /
+ADV-001c2 Dual-Read/Write + Positions-Freeze (Feature-Branch
+`feat/adv001c2-dual-read-write-freeze`). Nächste sinnvolle Schritte: ADV-001c3
+Katalog-Methoden-Admin; danach Positionsauswahl (c4); parallel Optionen /
 Regel-Editor; Inventar-/Preislisten-Admin.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c1 Schema-Fundament auf Branch `feat/adv001c1-calc-kind-foundation`
-(Basis `main` nach PR #28).
+ADV-001c2 Dual-Read/Write + Freeze auf Branch `feat/adv001c2-dual-read-write-freeze`
+(Basis `main` nach PR #29 / ADV-001c1).
+
+## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
+
+Vierteiliger Freeze-Vertrag an `calculation_positions` und
+`dispo_order_positions`: `engine_profile_key`, `calculation_method_key`,
+`calculation_method_name`, `algorithm_version` (alle vier gesetzt oder alle
+`NULL`; partiell = fail-closed). Dual-Write schreibt Legacy (`kind`,
+`spot_method`) und Freeze gemeinsam. Zentrale Auflösung über
+`CalculationMethodFreezeResolver`. Legacy-Fallback nur
+`spot_classic`/`average` → `spot_classic/average/Durchschnitt/v1`. Historische
+unveränderte Positionen nutzen den Freeze (nicht Live-Default/Registry/Kind).
+`advertising_media.kind` nullable; Mutation/Reaktivierung bei `kind=NULL` mit
+deutschem 422 blockiert. Spot-Kategorie erhält Zuordnungen average/calendar/
+fixed_price (`engine_profile_key=spot_classic`), Default `average`; Medien
+bleiben `inherit`. Keine neue Engine; Gen-3-Snapshots unverändert.
+
+| Kriterium | Status |
+|---|---|
+| Positions-Freeze-Spalten + Backfill Spot-Classic-Average | umgesetzt |
+| Spot-Kategorie-Methodenzuordnungen + Default average | umgesetzt |
+| Dual-Read/Write Kalkulation + Dispo-Übernahme | umgesetzt |
+| `CalculationMethodFreezeResolver` + Registry-Anbindung | umgesetzt |
+| Historische Stabilität (unveränderte Kombination) | umgesetzt |
+| `advertising_media.kind` nullable + Null-Guards | umgesetzt |
+| Katalog-/Methoden-Admin | **Slice 3** |
+| Positions-Methodenwahl / Selectability | **Slice 4** |
+| Legacy-Felder entfernen / Gen-4 | **nicht** |
 
 ## ADV-001c1 – CALC-KIND-FOUNDATION Schema (September 2026)
 
@@ -34,8 +61,7 @@ Modus `inherit`/`override` am Werbemittel (keine Vererbung über Zeilenanzahl).
 Default über nullable FK `default_calculation_method_id` (nicht `is_default`).
 `engine_profile_key` technisch geschützt/nullable. Code-Registry
 `EngineProfileRegistry` mit Dispatch-Vertrag
-`(engine_profile_key, calculation_method_key, algorithm_version)` – **noch nicht**
-an Runtime angebunden.
+`(engine_profile_key, calculation_method_key, algorithm_version)`.
 
 | Kriterium | Status |
 |---|---|
@@ -43,12 +69,10 @@ an Runtime angebunden.
 | Zuordnungstabellen Kat/Medium, Unique (Ziel, Methode) | umgesetzt |
 | `calculation_method_mode` + Default-FKs | umgesetzt |
 | `EngineProfileRegistry` (spot_classic/average/v1 released) | umgesetzt |
-| Runtime CatalogResolver/Writer/Engine | **unverändert** |
-| Dual-Read/Write, Positions-Freeze, `kind` nullable | **Slice 2** |
+| Runtime CatalogResolver/Writer Dual-R/W + Freeze | **c2** |
 | Katalog-/Methoden-Admin, Default-Mitgliedschaft Writer | **Slice 3** |
 | Positions-Methodenwahl / Selectability | **Slice 4** |
 | Systemfelder / Kern-Feldsets / ADV-002 | **unverändert / offen** |
-| Kategorie-/Medium-Methoden-Backfill | **nicht** in c1 |
 
 ## ADV-001b – Katalog-Admin (September 2026)
 
@@ -265,12 +289,12 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c1
+## Bewusst offen nach ADV-001c2
 
-- ADV-001c2: Backfill + Dual-Read/Write + `kind` nullable + Snapshot-Entkopplung
 - ADV-001c3: Katalog-/Methoden-Admin (Mode/Defaults/Zuordnungen)
 - ADV-001c4: Positionsauswahl und Selectability
-- ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden-Fundament
+- Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
+- ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
 - Optionen, Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)

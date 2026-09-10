@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $client_key
  * @property CalculationKind $kind
  * @property SpotCalculationMethod $spot_method
+ * @property string|null $engine_profile_key
+ * @property string|null $calculation_method_key
+ * @property string|null $calculation_method_name
+ * @property string|null $algorithm_version
  * @property int $total_spot_count
  * @property bool $needs_spot_redistribution
  * @property int $advertising_medium_id

@@ -141,6 +141,7 @@ class AdvertisingCategoryFoundationTest extends TestCase
     {
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_07_100000_create_advertising_categories_tables.php');
+        $this->tearDownDependentCatalogMethodSchemaForAdv001aDown();
         $migration->down();
 
         $this->assertFalse(Schema::hasTable('advertising_categories'));
@@ -179,6 +180,7 @@ class AdvertisingCategoryFoundationTest extends TestCase
     {
         /** @var object{up: callable, down: callable} $migration */
         $migration = require database_path('migrations/2026_09_07_100000_create_advertising_categories_tables.php');
+        $this->tearDownDependentCatalogMethodSchemaForAdv001aDown();
         $migration->down();
 
         $now = now();
@@ -221,6 +223,32 @@ class AdvertisingCategoryFoundationTest extends TestCase
             array_column(self::EXPECTED_CATEGORIES, 'key'),
             AdvertisingCategory::query()->orderBy('sort')->pluck('key')->all(),
         );
+    }
+
+    /**
+     * ADV-001c2 legt referenzierende Zuordnungszeilen an. Unter RefreshDatabase
+     * (SQLite-Transaktion) greift PRAGMA foreign_keys=OFF nicht – deshalb vor
+     * ADV-001a-down abhängige Zeilen leeren, sonst scheitert DROP categories.
+     */
+    private function tearDownDependentCatalogMethodSchemaForAdv001aDown(): void
+    {
+        if (Schema::hasTable('advertising_categories')
+            && Schema::hasColumn('advertising_categories', 'default_calculation_method_id')) {
+            DB::table('advertising_categories')->update(['default_calculation_method_id' => null]);
+        }
+
+        if (Schema::hasTable('advertising_media')
+            && Schema::hasColumn('advertising_media', 'default_calculation_method_id')) {
+            DB::table('advertising_media')->update(['default_calculation_method_id' => null]);
+        }
+
+        if (Schema::hasTable('advertising_category_calculation_methods')) {
+            DB::table('advertising_category_calculation_methods')->delete();
+        }
+
+        if (Schema::hasTable('advertising_medium_calculation_methods')) {
+            DB::table('advertising_medium_calculation_methods')->delete();
+        }
     }
 
     private function assertAdvertisingCategorySchemaComplete(): void

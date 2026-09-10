@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\DynamicField;
 
+use App\Enums\CalculationKind;
 use App\Enums\ConfigurationSnapshotSource;
 use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
@@ -252,13 +253,14 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
         $catalog = $this->createSpotClassicCatalog();
         $admin = User::factory()->role(Role::Admin)->create();
         $medium = $catalog['medium'];
-        $otherCategory = AdvertisingCategory::query()
-            ->where('id', '!=', $medium->category_id)
-            ->firstOrFail();
+        // Zweites Spot-Medium in derselben Spots-Kategorie: unterschiedliche Effektiv-Schemas
+        // über Kategorie- vs. Medium-Feldset, ohne reale Nicht-Spot-Kategorien zu verfälschen.
         $otherMedium = AdvertisingMedium::factory()->create([
-            'category_id' => $otherCategory->id,
+            'category_id' => $medium->category_id,
             'code' => 'df33a2b_http_other',
-            'name' => 'HTTP Other Medium',
+            'name' => 'HTTP Other Spot Medium',
+            'kind' => CalculationKind::SpotClassic,
+            'sort' => 1,
         ]);
         $catalog['hamburg']->mediumRules()->create([
             'advertising_medium_id' => $otherMedium->id,

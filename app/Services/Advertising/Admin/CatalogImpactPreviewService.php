@@ -180,7 +180,12 @@ final class CatalogImpactPreviewService
             ];
         }
 
-        if (! AdvertisingKindCategoryCompatibility::isCompatible($medium->kind, $target->key)) {
+        if ($medium->kind === null) {
+            $blocking[] = [
+                'code' => 'kind_missing',
+                'message' => 'Dieses Werbemittel hat keine Berechnungsart und kann in diesem Umfang nicht geändert werden.',
+            ];
+        } elseif (! AdvertisingKindCategoryCompatibility::isCompatible($medium->kind, $target->key)) {
             $blocking[] = [
                 'code' => 'kind_incompatible',
                 'message' => 'Berechnungsart und Ziel-Oberkategorie sind nicht kompatibel (PO-ADV001b-8).',
@@ -324,7 +329,7 @@ final class CatalogImpactPreviewService
             'id' => (int) $medium->id,
             'code' => $medium->code,
             'name' => $medium->name,
-            'kind' => $medium->kind->value,
+            'kind' => $medium->kind?->value,
             'category_id' => (int) $medium->category_id,
             'category_key' => $medium->category?->key,
             'category_name' => $medium->category?->name,
