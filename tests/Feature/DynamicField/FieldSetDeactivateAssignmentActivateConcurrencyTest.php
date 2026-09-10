@@ -6,6 +6,7 @@ use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\Role;
+use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\FieldSet;
 use App\Models\FieldSetAssignment;
 use App\Models\FieldSetVersion;
@@ -20,8 +21,11 @@ use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /**
- * DF-3.3-fs-HF1: echte parallele MySQL-Transaktionen
+ * DF-3.3-fs-HF1/HF2: echte parallele MySQL-Transaktionen
  * Assignment-Activate vs. Feldset-Deactivate.
+ *
+ * HF2: Verlierer darf ValidationException oder Fingerprint-409
+ * (FieldSetAssignmentConflictException) sein – timingabhängig, beide zulässig.
  *
  * Orchestrierung nur in tests/ – keine Test-Hooks unter app/.
  */
@@ -264,7 +268,38 @@ class FieldSetDeactivateAssignmentActivateConcurrencyTest extends TestCase
             str_starts_with($ok[0], 'OK:deactivate_fieldset') || str_starts_with($ok[0], 'OK:activate_assignment'),
             'Unerwarteter Winner: '.$ok[0],
         );
-        $this->assertStringContainsString(ValidationException::class, $errors[0]);
+        $this->assertValidRaceLoser($errors[0]);
+    }
+
+    /**
+     * DF-3.3fs-HF2: abhängig vom Race-Timing sind beide kontrollierten Verliererpfade zulässig.
+     */
+    private function assertValidRaceLoser(string $errorLine): void
+    {
+        $payload = substr($errorLine, strlen('ERROR:'));
+        $separator = strpos($payload, '|');
+        $this->assertNotFalse($separator, 'ERROR-Zeile ohne Klassen-/Nachrichten-Trenner: '.$errorLine);
+
+        $class = substr($payload, 0, $separator);
+        $message = substr($payload, $separator + 1);
+
+        if ($class === ValidationException::class) {
+            return;
+        }
+
+        if ($class === FieldSetAssignmentConflictException::class) {
+            $this->assertSame(
+                'Preview-Fingerprint veraltet',
+                $message,
+                'FieldSetAssignmentConflictException muss den Fingerprint-Konflikt melden: '.$errorLine,
+            );
+
+            return;
+        }
+
+        $this->fail(
+            'Verlierer muss ValidationException oder FieldSetAssignmentConflictException sein, got: '.$errorLine,
+        );
     }
 
     /**
