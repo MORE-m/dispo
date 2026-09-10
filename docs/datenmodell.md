@@ -105,9 +105,19 @@ Sortierung. Lifecycle `is_active` nur ohne aktive Zeilen in
 read-only (profil→methode, 0..n). Künftige Assignment-Aktivierungen müssen die
 Methode unter Lock auf aktiv prüfen. Keine Migration.
 
-**ADV-001 insgesamt noch offen:** c3b2 Kategorie-Desired-State/Default; c3c
-Medium-Overrides; c4 Positionsauswahl; weitere Defaults
-(Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
+**ADV-001c3b2 (Kategorie-Desired-State):** Atomare Preview/Apply-Pflege der
+Kategorie-Methodenzuordnungen und des Defaults. Fehlende Payload-Zeilen
+deaktivieren vorhandene Assignments (kein Hard Delete). `engine_profile_key`
+nie aus Admin; neu=`null`, bestehende Werte unverändert. Default nur bei
+global aktiver Methode, aktiver Desired-Zuordnung, non-null Profil,
+Registry `Released` + `current_released_version`. Bestandsschutz bisher
+buchbarer Inherit-Medien über LiveBookability-Simulation
+(`CategoryMethodCatalogSnapshot`). Lock: Kategorie → Methoden ASC →
+Kategorie-Assignments ASC. Identischer State = No-op ohne Mutation/Audit.
+Keine Migration.
+
+**ADV-001 insgesamt noch offen:** c3c Medium-Overrides; c4 Positionsauswahl;
+weitere Defaults (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert

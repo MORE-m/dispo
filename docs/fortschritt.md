@@ -1,14 +1,14 @@
 # Fortschritt V1
 
-Stand: 10. September 2026 (ADV-001c3b1 Methoden-Lifecycle – kein Abschluss von ADV-001 / DF-3)
+Stand: 10. September 2026 (ADV-001c3b2 Kategorie-Desired-State – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
 DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
-ADV-001c3a und ADV-001c3b1 auf Feature-Branch** (bzw. `main`). Gesamtziel DF-3 bleibt offen
-(Optionen, Regel-Editor). ADV-001 c3b2/c3c und Positionsauswahl
-(c4) bleiben offen.
+ADV-001c3a, ADV-001c3b1 und ADV-001c3b2 auf Feature-Branch** (bzw. `main`).
+Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor). ADV-001 c3c und
+Positionsauswahl (c4) bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -18,14 +18,36 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c3b1 Methodenstammdaten und sicherer Lifecycle (Feature-Branch
-`feat/adv001c3b1-calculation-method-lifecycle`). Nächste sinnvolle Schritte:
-ADV-001c3b2 Kategorie-Desired-State/Default; c3c Medium-Overrides; c4
-Positionsauswahl; parallel Optionen / Regel-Editor.
+ADV-001c3b2 Kategorie-Methodenzuordnungen und Default als Desired State
+(Feature-Branch `feat/adv001c3b2-category-calculation-methods-desired-state`).
+Nächste sinnvolle Schritte: c3c Medium-Overrides; c4 Positionsauswahl;
+parallel Optionen / Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c3a engine-unabhängige Medienpflege auf `main` (Merge PR #32).
+ADV-001c3b1 Methodenstammdaten und Lifecycle auf `main` (Merge PR #33).
+
+## ADV-001c3b2 – Kategorie-Desired-State / Default (September 2026)
+
+Atomare Verwaltung der Kategorie-Methodenzuordnungen und des Kategorie-Defaults
+als Desired State (Preview + Apply). Kein Hard Delete; fehlende Payload-Zeilen
+deaktivieren vorhandene Assignments. `engine_profile_key` nie aus Admin;
+neue Zeilen `null`, bestehende Werte unverändert. Strenger Default-Vertrag
+(Released + Profil + aktive Zuordnung). Bestandsschutz bisher buchbarer
+Inherit-Medien via `AdvertisingMediumLiveBookability`-Simulation
+(`CategoryMethodCatalogSnapshot`). Lock: Kategorie → Methoden ID ASC →
+Kategorie-Assignments ID ASC. Identischer State = No-op ohne Mutation/Audit.
+Keine Migration. c3c/c4 offen.
+
+| Kriterium | Status |
+|---|---|
+| Preview/Apply Desired State + Fingerprint/`lock_version` | umgesetzt |
+| Default-Vertrag Released/ausführbar | umgesetzt |
+| Bookability-Simulation + Inherit-Schutz | umgesetzt |
+| No-op ohne Versionssprung/Audit | umgesetzt |
+| Kategorie-Detail UI Methodenabschnitt | umgesetzt |
+| Medium-Overrides / Mode | **c3c** |
+| Positions-Methodenwahl | **c4** |
 
 ## ADV-001c3b1 – Methodenstammdaten und Lifecycle (September 2026)
 
@@ -34,7 +56,8 @@ kein Create/Delete. Metadaten: Name, Hilfetext, Sortierung. `is_active` nur übe
 Preview/Deaktivieren/Reaktivieren. Deaktivierung blockiert bei aktiven
 Kategorie- oder Mediumzuordnungen (kein Force, keine Kaskade). Registry-Paare
 read-only (0..n Profile je Methode). Keine `engine_profile_key`-Ableitung.
-Künftige Assignment-Aktivierung: Method-Lock + Aktivitätsprüfung. Keine Migration.
+Assignment-Aktivierung: Method-Lock + Aktivitätsprüfung
+(`CalculationMethodAssignmentActivationGuard`). Keine Migration.
 
 | Kriterium | Status |
 |---|---|
@@ -64,7 +87,7 @@ Methodenkarte; Methoden-Admin folgt in c3b/c3c; Positionsauswahl in c4.
 | Legacy Compatibility nur bei gesetztem kind | umgesetzt |
 | Admin-Status Katalog vs. Buchbarkeit | umgesetzt |
 | Zentrale Live-Buchbarkeit + Wizard-Filter | umgesetzt |
-| Methoden-Admin / Defaults / Overrides | **c3b1 Lifecycle; c3b2/c3c offen** |
+| Methoden-Admin / Defaults / Overrides | **c3b1/c3b2; c3c offen** |
 | Positions-Methodenwahl | **c4** |
 
 ## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
@@ -329,9 +352,8 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c3b1
+## Bewusst offen nach ADV-001c3b2
 
-- ADV-001c3b2: Kategorie-Desired-State und Kategorie-Default
 - ADV-001c3c: Medium-Overrides / Mode / Medium-Default
 - ADV-001c4: Positionsauswahl und Selectability
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase

@@ -16,6 +16,8 @@ use App\Models\CalculationMethod;
 use App\Models\FieldSetAssignment;
 use App\Models\User;
 use App\Services\Advertising\Admin\AdvertisingCategoryAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingCategoryCalculationMethodAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingCategoryCalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\AdvertisingMediumAdminWriter;
 use App\Services\Advertising\Admin\CalculationMethodAdminWriter;
 use App\Services\Advertising\Admin\CalculationMethodImpactPreviewService;
@@ -234,6 +236,61 @@ try {
                 ], $actor);
 
                 return 'OK:update_medium_metadata|'.$updated->id.'|'.$updated->lock_version;
+            })(),
+            'update_category_metadata' => (function () use ($app, $actor, $payload): string {
+                $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
+                $writer = $app->make(AdvertisingCategoryAdminWriter::class);
+                $updated = $writer->update($category, [
+                    'name' => (string) $payload['name'],
+                    'sort' => (int) ($payload['sort'] ?? $category->sort),
+                    'lock_version' => (int) ($payload['lock_version'] ?? $category->lock_version),
+                ], $actor);
+
+                return 'OK:update_category_metadata|'.$updated->id.'|'.$updated->lock_version;
+            })(),
+            'deactivate_medium' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $impact = $app->make(CatalogImpactPreviewService::class);
+                $preview = $impact->previewMediumDeactivate($medium->fresh());
+                $writer = $app->make(AdvertisingMediumAdminWriter::class);
+                $updated = $writer->deactivate($medium, [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
+                    'fingerprint' => (string) ($payload['fingerprint'] ?? $preview['fingerprint']),
+                ], $actor);
+
+                return 'OK:deactivate_medium|'.$updated->id.'|'.($updated->is_active ? '1' : '0').'|'.$updated->lock_version;
+            })(),
+            'preview_and_replace_category_methods' => (function () use ($app, $actor, $payload): string {
+                $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
+                $desired = [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $category->lock_version),
+                    'default_calculation_method_id' => $payload['default_calculation_method_id'] ?? null,
+                    'assignments' => $payload['assignments'],
+                ];
+                $impact = $app->make(AdvertisingCategoryCalculationMethodImpactPreviewService::class);
+                $preview = $impact->preview($category->fresh(), $desired);
+                $writer = $app->make(AdvertisingCategoryCalculationMethodAdminWriter::class);
+                $result = $writer->replace($category, array_merge($desired, [
+                    'fingerprint' => $preview['fingerprint'],
+                ]), $actor);
+                $updated = $result['category'];
+
+                return 'OK:preview_and_replace_category_methods|'.$updated->id.'|'
+                    .($result['has_changes'] ? '1' : '0').'|'.$updated->lock_version;
+            })(),
+            'replace_category_methods' => (function () use ($app, $actor, $payload): string {
+                $category = AdvertisingCategory::query()->findOrFail((int) $payload['category_id']);
+                $writer = $app->make(AdvertisingCategoryCalculationMethodAdminWriter::class);
+                $result = $writer->replace($category, [
+                    'lock_version' => (int) $payload['lock_version'],
+                    'fingerprint' => (string) $payload['fingerprint'],
+                    'default_calculation_method_id' => $payload['default_calculation_method_id'] ?? null,
+                    'assignments' => $payload['assignments'],
+                ], $actor);
+                $updated = $result['category'];
+
+                return 'OK:replace_category_methods|'.$updated->id.'|'
+                    .($result['has_changes'] ? '1' : '0').'|'.$updated->lock_version;
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),
         };

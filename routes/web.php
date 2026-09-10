@@ -151,6 +151,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.catalog.categories.deactivate');
         Route::post('administration/katalog/oberkategorien/{category}/reaktivieren', [AdvertisingCategoryAdminController::class, 'reactivate'])
             ->name('administration.catalog.categories.reactivate');
+        Route::post('administration/katalog/oberkategorien/{category}/berechnungsmethoden-vorschau', [AdvertisingCategoryAdminController::class, 'calculationMethodsPreview'])
+            ->name('administration.catalog.categories.calculation-methods-preview');
+        Route::put('administration/katalog/oberkategorien/{category}/berechnungsmethoden', [AdvertisingCategoryAdminController::class, 'calculationMethodsReplace'])
+            ->name('administration.catalog.categories.calculation-methods');
 
         Route::get('administration/katalog/werbemittel', [AdvertisingMediumAdminController::class, 'index'])
             ->name('administration.catalog.media.index');

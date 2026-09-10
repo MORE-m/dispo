@@ -1,5 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
@@ -14,6 +14,31 @@ type MediaRow = {
     status_label: string;
 };
 
+type RegistryPair = {
+    engine_profile_key: string;
+    pair_status: string;
+    current_released_version: string | null;
+};
+
+type MethodRow = {
+    calculation_method_id: number;
+    key: string;
+    name: string;
+    method_is_active: boolean;
+    method_status_label: string;
+    assigned: boolean;
+    is_active: boolean;
+    sort: number;
+    engine_profile_key: string | null;
+    assignment_lock_version: number | null;
+    registry_pairs: RegistryPair[];
+    technical_status: string;
+    technical_status_label: string;
+    default_eligible: boolean;
+    is_category_default: boolean;
+    method_show_url: string;
+};
+
 type Category = {
     id: number;
     key: string;
@@ -22,6 +47,7 @@ type Category = {
     is_active: boolean;
     status_label: string;
     lock_version: number;
+    default_calculation_method_id: number | null;
     media_active_count: number;
     media_inactive_count: number;
     assignments_active_count: number;
@@ -35,6 +61,8 @@ type Routes = {
     deactivatePreview: string;
     deactivate: string;
     reactivate: string;
+    calculationMethodsPreview: string;
+    calculationMethodsReplace: string;
 };
 
 type ImpactPreview = {
@@ -51,6 +79,30 @@ type ImpactPreview = {
     dispo_order_positions_count: number;
 };
 
+type MethodsPreview = {
+    fingerprint: string;
+    lock_version: number;
+    has_changes: boolean;
+    can_proceed: boolean;
+    blocking_reasons: Array<{ code: string; message: string }>;
+    protected_inherit_media: Array<{
+        id: number;
+        code: string;
+        name: string;
+        bookable_before: boolean;
+        bookable_after: boolean;
+        unbookable_reason_after: string | null;
+    }>;
+    override_media_count: number;
+    dependency_note: string;
+};
+
+type DraftRow = {
+    calculation_method_id: number;
+    is_active: boolean;
+    sort: number;
+};
+
 async function csrfHeaders(): Promise<Record<string, string>> {
     const token = document.cookie
         .split('; ')
@@ -65,9 +117,13 @@ async function csrfHeaders(): Promise<Record<string, string>> {
 
 export default function CategoryShow({
     category,
+    calculationMethods,
+    boundaryNote,
     routes,
 }: {
     category: Category;
+    calculationMethods: MethodRow[];
+    boundaryNote: string;
     routes: Routes;
 }) {
     const flash = usePage().props.flash;
@@ -76,12 +132,97 @@ export default function CategoryShow({
     const [lockVersion, setLockVersion] = useState(category.lock_version);
     const [isActive, setIsActive] = useState(category.is_active);
     const [statusLabel, setStatusLabel] = useState(category.status_label);
+    const [methods, setMethods] = useState(calculationMethods);
+    const [defaultMethodId, setDefaultMethodId] = useState<number | null>(
+        category.default_calculation_method_id,
+    );
+    const [drafts, setDrafts] = useState<Record<number, DraftRow>>(() => {
+        const map: Record<number, DraftRow> = {};
+        for (const row of calculationMethods) {
+            map[row.calculation_method_id] = {
+                calculation_method_id: row.calculation_method_id,
+                is_active: row.is_active,
+                sort: row.sort,
+            };
+        }
+        return map;
+    });
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(
         flash.success ? String(flash.success) : null,
     );
     const [preview, setPreview] = useState<ImpactPreview | null>(null);
+    const [methodsPreview, setMethodsPreview] = useState<MethodsPreview | null>(
+        null,
+    );
+    const methodsPreviewRef = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+        if (methodsPreview && methodsPreviewRef.current) {
+            methodsPreviewRef.current.focus();
+        }
+    }, [methodsPreview]);
+
+    const sortedMethods = useMemo(() => {
+        return [...methods].sort((a, b) => {
+            const draftA = drafts[a.calculation_method_id];
+            const draftB = drafts[b.calculation_method_id];
+            const sortA = draftA?.sort ?? a.sort;
+            const sortB = draftB?.sort ?? b.sort;
+            if (sortA !== sortB) {
+                return sortA - sortB;
+            }
+            return a.calculation_method_id - b.calculation_method_id;
+        });
+    }, [methods, drafts]);
+
+    const defaultOptions = useMemo(() => {
+        return sortedMethods.filter((row) => {
+            const draft = drafts[row.calculation_method_id];
+            if (!draft?.is_active || !row.method_is_active) {
+                return false;
+            }
+            return (
+                row.technical_status === 'released_executable' &&
+                Boolean(row.engine_profile_key)
+            );
+        });
+    }, [sortedMethods, drafts]);
+
+    function buildAssignmentsPayload(): DraftRow[] {
+        return Object.values(drafts)
+            .filter((row) => {
+                const original = methods.find(
+                    (m) =>
+                        m.calculation_method_id === row.calculation_method_id,
+                );
+                // Send active drafts and existing assigned rows (incl. explicit inactive).
+                return row.is_active || Boolean(original?.assigned);
+            })
+            .map((row) => ({
+                calculation_method_id: row.calculation_method_id,
+                is_active: row.is_active,
+                sort: row.sort,
+            }))
+            .sort((a, b) => a.calculation_method_id - b.calculation_method_id);
+    }
+
+    function updateDraft(
+        methodId: number,
+        patch: Partial<Pick<DraftRow, 'is_active' | 'sort'>>,
+    ) {
+        setDrafts((prev) => ({
+            ...prev,
+            [methodId]: {
+                calculation_method_id: methodId,
+                is_active:
+                    patch.is_active ?? prev[methodId]?.is_active ?? false,
+                sort: patch.sort ?? prev[methodId]?.sort ?? 0,
+            },
+        }));
+        setMethodsPreview(null);
+    }
 
     async function saveMetadata(event: React.FormEvent) {
         event.preventDefault();
@@ -221,6 +362,106 @@ export default function CategoryShow({
         }
     }
 
+    async function loadMethodsPreview() {
+        setBusy(true);
+        setError(null);
+        setSuccess(null);
+        setMethodsPreview(null);
+        try {
+            const response = await fetch(routes.calculationMethodsPreview, {
+                method: 'POST',
+                headers: await csrfHeaders(),
+                body: JSON.stringify({
+                    lock_version: lockVersion,
+                    default_calculation_method_id: defaultMethodId,
+                    assignments: buildAssignmentsPayload(),
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const msg =
+                    data.message ||
+                    data.errors?.assignments?.[0] ||
+                    data.errors?.default_calculation_method_id?.[0] ||
+                    data.errors?.calculation_method_id?.[0] ||
+                    'Methodenvorschau fehlgeschlagen.';
+                setError(msg);
+                return;
+            }
+            setMethodsPreview(data);
+            setLockVersion(data.lock_version ?? lockVersion);
+        } catch {
+            setError('Methodenvorschau fehlgeschlagen.');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function confirmMethodsApply() {
+        if (!methodsPreview) {
+            return;
+        }
+        if (!methodsPreview.has_changes) {
+            setMethodsPreview(null);
+            setSuccess('Keine Änderungen');
+            return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+            const response = await fetch(routes.calculationMethodsReplace, {
+                method: 'PUT',
+                headers: await csrfHeaders(),
+                body: JSON.stringify({
+                    lock_version: lockVersion,
+                    fingerprint: methodsPreview.fingerprint,
+                    default_calculation_method_id: defaultMethodId,
+                    assignments: buildAssignmentsPayload(),
+                }),
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.status === 409) {
+                setError(
+                    data.message ||
+                        'Vorschau oder Sperrversion veraltet. Bitte erneut laden.',
+                );
+                setMethodsPreview(null);
+                return;
+            }
+            if (!response.ok) {
+                const msg =
+                    data.message ||
+                    data.errors?.assignments?.[0] ||
+                    data.errors?.default_calculation_method_id?.[0] ||
+                    'Speichern der Berechnungsmethoden fehlgeschlagen.';
+                setError(msg);
+                return;
+            }
+            setLockVersion(data.lock_version);
+            setDefaultMethodId(
+                data.default_calculation_method_id ?? defaultMethodId,
+            );
+            if (Array.isArray(data.calculationMethods)) {
+                setMethods(data.calculationMethods);
+                const next: Record<number, DraftRow> = {};
+                for (const row of data.calculationMethods as MethodRow[]) {
+                    next[row.calculation_method_id] = {
+                        calculation_method_id: row.calculation_method_id,
+                        is_active: row.is_active,
+                        sort: row.sort,
+                    };
+                }
+                setDrafts(next);
+            }
+            setMethodsPreview(null);
+            setSuccess(data.message || 'Berechnungsmethoden gespeichert.');
+        } catch {
+            setError('Speichern der Berechnungsmethoden fehlgeschlagen.');
+        } finally {
+            setBusy(false);
+        }
+    }
+
     return (
         <>
             <Head title={category.name} />
@@ -276,7 +517,12 @@ export default function CategoryShow({
                         data-test="category-show-error"
                     />
                 ) : null}
-                {success ? <SuccessState message={success} /> : null}
+                {success ? (
+                    <SuccessState
+                        message={success}
+                        data-test="category-show-success"
+                    />
+                ) : null}
 
                 <form
                     className="grid max-w-xl gap-4 rounded-xl border p-4"
@@ -320,6 +566,257 @@ export default function CategoryShow({
                         Speichern
                     </Button>
                 </form>
+
+                <section
+                    className="space-y-4 rounded-xl border p-4"
+                    data-test="category-calculation-methods-section"
+                    aria-labelledby="category-calculation-methods-heading"
+                >
+                    <div>
+                        <h2
+                            id="category-calculation-methods-heading"
+                            className="text-base font-semibold"
+                        >
+                            Berechnungsmethoden
+                        </h2>
+                        <p
+                            className="text-muted-foreground mt-1 text-sm"
+                            data-test="category-methods-boundary-note"
+                        >
+                            {boundaryNote}
+                        </p>
+                    </div>
+
+                    <FormField
+                        label="Kategorie-Default"
+                        htmlFor="category-default-method"
+                    >
+                        <select
+                            id="category-default-method"
+                            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-xl rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                            value={defaultMethodId ?? ''}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setDefaultMethodId(
+                                    value === '' ? null : Number(value),
+                                );
+                                setMethodsPreview(null);
+                            }}
+                            data-test="category-default-method-select"
+                        >
+                            <option value="">Kein Default</option>
+                            {defaultOptions.map((row) => (
+                                <option
+                                    key={row.calculation_method_id}
+                                    value={row.calculation_method_id}
+                                    data-test={`category-default-option-${row.key}`}
+                                >
+                                    {row.name} ({row.key})
+                                </option>
+                            ))}
+                        </select>
+                    </FormField>
+
+                    <ul className="space-y-3" data-test="category-methods-list">
+                        {sortedMethods.map((row) => {
+                            const draft = drafts[row.calculation_method_id] ?? {
+                                calculation_method_id:
+                                    row.calculation_method_id,
+                                is_active: false,
+                                sort: row.sort,
+                            };
+                            return (
+                                <li
+                                    key={row.calculation_method_id}
+                                    className="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_auto]"
+                                    data-test={`category-method-row-${row.key}`}
+                                >
+                                    <div className="space-y-1 text-sm">
+                                        <div className="font-medium">
+                                            {row.name}{' '}
+                                            <span className="text-muted-foreground font-mono text-xs">
+                                                {row.key}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            Global:{' '}
+                                            <span
+                                                data-test={`category-method-global-${row.key}`}
+                                            >
+                                                {row.method_status_label}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            Technik:{' '}
+                                            <span
+                                                data-test={`category-method-tech-${row.key}`}
+                                            >
+                                                {row.technical_status_label}
+                                            </span>
+                                        </div>
+                                        {row.registry_pairs.length > 0 ? (
+                                            <div
+                                                className="text-muted-foreground"
+                                                data-test={`category-method-registry-${row.key}`}
+                                            >
+                                                Registry:{' '}
+                                                {row.registry_pairs
+                                                    .map(
+                                                        (pair) =>
+                                                            `${pair.engine_profile_key}:${pair.pair_status}${pair.current_released_version ? `/${pair.current_released_version}` : ''}`,
+                                                    )
+                                                    .join(', ')}
+                                            </div>
+                                        ) : (
+                                            <div className="text-muted-foreground">
+                                                Keine Registry-Paare
+                                            </div>
+                                        )}
+                                        {row.engine_profile_key ? (
+                                            <div className="font-mono text-xs">
+                                                Profil: {row.engine_profile_key}
+                                            </div>
+                                        ) : null}
+                                        <Link
+                                            href={row.method_show_url}
+                                            className="underline-offset-4 hover:underline"
+                                            data-test={`category-method-link-${row.key}`}
+                                        >
+                                            Methodendetail öffnen
+                                        </Link>
+                                    </div>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="flex items-center gap-2 text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={draft.is_active}
+                                                disabled={
+                                                    busy ||
+                                                    !row.method_is_active
+                                                }
+                                                onChange={(e) =>
+                                                    updateDraft(
+                                                        row.calculation_method_id,
+                                                        {
+                                                            is_active:
+                                                                e.target
+                                                                    .checked,
+                                                        },
+                                                    )
+                                                }
+                                                data-test={`category-method-active-${row.key}`}
+                                            />
+                                            Kategoriezuordnung aktiv
+                                        </label>
+                                        <FormField
+                                            label="Sortierung"
+                                            htmlFor={`method-sort-${row.key}`}
+                                        >
+                                            <Input
+                                                id={`method-sort-${row.key}`}
+                                                type="number"
+                                                min={0}
+                                                value={draft.sort}
+                                                onChange={(e) =>
+                                                    updateDraft(
+                                                        row.calculation_method_id,
+                                                        {
+                                                            sort: Number(
+                                                                e.target
+                                                                    .value || 0,
+                                                            ),
+                                                        },
+                                                    )
+                                                }
+                                                data-test={`category-method-sort-${row.key}`}
+                                            />
+                                        </FormField>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+
+                    <Button
+                        type="button"
+                        disabled={busy}
+                        onClick={loadMethodsPreview}
+                        data-test="category-methods-preview-button"
+                    >
+                        Vorschau und speichern…
+                    </Button>
+
+                    {methodsPreview ? (
+                        <div
+                            ref={methodsPreviewRef}
+                            tabIndex={-1}
+                            className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900 dark:bg-amber-950"
+                            data-test="category-methods-preview"
+                            role="dialog"
+                            aria-labelledby="category-methods-preview-title"
+                        >
+                            <h3
+                                id="category-methods-preview-title"
+                                className="font-semibold"
+                            >
+                                Methodenvorschau
+                            </h3>
+                            <p>{methodsPreview.dependency_note}</p>
+                            <p data-test="category-methods-preview-changes">
+                                {methodsPreview.has_changes
+                                    ? 'Es liegen Änderungen vor.'
+                                    : 'Keine Änderungen'}
+                            </p>
+                            {methodsPreview.override_media_count > 0 ? (
+                                <p data-test="category-methods-preview-overrides">
+                                    Override-Medien (unverändert):{' '}
+                                    {methodsPreview.override_media_count}
+                                </p>
+                            ) : null}
+                            {methodsPreview.blocking_reasons.map((reason) => (
+                                <p
+                                    key={reason.code + reason.message}
+                                    className="font-medium text-red-800 dark:text-red-200"
+                                    data-test="category-methods-preview-blocker"
+                                >
+                                    {reason.message}
+                                </p>
+                            ))}
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => setMethodsPreview(null)}
+                                    data-test="category-methods-preview-cancel"
+                                >
+                                    Abbrechen
+                                </Button>
+                                {methodsPreview.has_changes ? (
+                                    <Button
+                                        disabled={
+                                            busy || !methodsPreview.can_proceed
+                                        }
+                                        onClick={confirmMethodsApply}
+                                        data-test="category-methods-preview-confirm"
+                                    >
+                                        Desired State anwenden
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        disabled={busy}
+                                        onClick={() => {
+                                            setMethodsPreview(null);
+                                            setSuccess('Keine Änderungen');
+                                        }}
+                                        data-test="category-methods-preview-noop"
+                                    >
+                                        Schließen
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
+                </section>
 
                 {preview ? (
                     <div
