@@ -24,12 +24,16 @@ use ValueError;
  *
  * Nutzt bereits eager-geladene Assignment-/Methoden-Relationen; keine
  * zusätzliche CalculationMethod::query() pro Medium.
+ *
+ * ADV-001c3b2: optionaler {@see CategoryMethodCatalogSnapshot} für Inherit-
+ * Simulation ohne DB-Mutation (expliziter Evaluationskontext).
  */
 final class AdvertisingMediumLiveBookability
 {
     public function evaluate(
         AdvertisingMedium $medium,
         ?string $requestedMethodKey = null,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog = null,
     ): AdvertisingMediumLiveBookabilityResult {
         if (! $medium->is_active) {
             return $this->blocked('Das Werbemittel ist im Katalog deaktiviert.');
@@ -57,11 +61,17 @@ final class AdvertisingMediumLiveBookability
             return $this->blocked('Die Oberkategorie des Werbemittels ist unbekannt oder inaktiv.');
         }
 
+        if ($inheritCatalog !== null && $medium->calculation_method_mode === CalculationMethodMode::Override) {
+            throw new InvalidArgumentException(
+                'CategoryMethodCatalogSnapshot darf nur für inherit-Medien verwendet werden.',
+            );
+        }
+
         $requested = $requestedMethodKey !== null ? trim($requestedMethodKey) : '';
         if ($requested !== '') {
             $methodKey = $requested;
         } else {
-            $defaultKey = $this->resolveDefaultMethodKey($medium);
+            $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog);
             if ($defaultKey === null) {
                 if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
                     return $this->blocked('Für dieses Werbemittel ist keine Standard-Berechnungsmethode hinterlegt.');
@@ -72,19 +82,19 @@ final class AdvertisingMediumLiveBookability
             $methodKey = $defaultKey;
         }
 
-        $method = $this->resolveLoadedMethod($medium, $methodKey);
+        $method = $this->resolveLoadedMethod($medium, $methodKey, $inheritCatalog);
         if ($method === null || ! $method->is_active) {
             return $this->blocked('Die Berechnungsmethode ist unbekannt oder inaktiv.');
         }
 
-        $assignmentProfile = $this->resolveActiveEngineProfileKey($medium, $methodKey);
+        $assignmentProfile = $this->resolveActiveEngineProfileKey($medium, $methodKey, $inheritCatalog);
         if ($assignmentProfile === null) {
             return $this->blocked('Die gewählte Berechnungsmethode ist für dieses Werbemittel nicht aktiv zugeordnet.');
         }
 
-        $defaultKey = $this->resolveDefaultMethodKey($medium);
+        $defaultKey = $this->resolveDefaultMethodKey($medium, $inheritCatalog);
         if ($defaultKey !== null) {
-            $defaultProfile = $this->resolveActiveEngineProfileKey($medium, $defaultKey);
+            $defaultProfile = $this->resolveActiveEngineProfileKey($medium, $defaultKey, $inheritCatalog);
             if ($defaultProfile === null) {
                 return $this->blocked('Die Standard-Berechnungsmethode ist keiner aktiven Zuordnung zugeordnet.');
             }
@@ -140,12 +150,20 @@ final class AdvertisingMediumLiveBookability
         );
     }
 
-    private function resolveDefaultMethodKey(AdvertisingMedium $medium): ?string
-    {
+    private function resolveDefaultMethodKey(
+        AdvertisingMedium $medium,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog,
+    ): ?string {
         $medium->loadMissing(['defaultCalculationMethod', 'category.defaultCalculationMethod']);
 
         if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
             $key = $medium->defaultCalculationMethod?->key;
+
+            return ($key !== null && $key !== '') ? $key : null;
+        }
+
+        if ($inheritCatalog !== null) {
+            $key = $inheritCatalog->defaultCalculationMethod?->key;
 
             return ($key !== null && $key !== '') ? $key : null;
         }
@@ -156,14 +174,24 @@ final class AdvertisingMediumLiveBookability
     }
 
     /**
-     * Methode aus bereits geladenen Relationen (keine CalculationMethod::query).
+     * Methode aus bereits geladenen Relationen bzw. Snapshot (keine CalculationMethod::query).
      */
-    private function resolveLoadedMethod(AdvertisingMedium $medium, string $methodKey): ?CalculationMethod
-    {
-        foreach ($this->assignmentCandidates($medium) as $assignment) {
+    private function resolveLoadedMethod(
+        AdvertisingMedium $medium,
+        string $methodKey,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog,
+    ): ?CalculationMethod {
+        foreach ($this->assignmentCandidates($medium, $inheritCatalog) as $assignment) {
             $method = $assignment->calculationMethod;
             if ($method !== null && $method->key === $methodKey) {
                 return $method;
+            }
+        }
+
+        if ($inheritCatalog !== null && $medium->calculation_method_mode !== CalculationMethodMode::Override) {
+            $default = $inheritCatalog->defaultCalculationMethod;
+            if ($default !== null && $default->key === $methodKey) {
+                return $default;
             }
         }
 
@@ -184,10 +212,18 @@ final class AdvertisingMediumLiveBookability
     /**
      * @return iterable<int, AdvertisingCategoryCalculationMethod|AdvertisingMediumCalculationMethod>
      */
-    private function assignmentCandidates(AdvertisingMedium $medium): iterable
-    {
+    private function assignmentCandidates(
+        AdvertisingMedium $medium,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog,
+    ): iterable {
         if ($medium->calculation_method_mode === CalculationMethodMode::Override) {
             yield from $medium->calculationMethodAssignments;
+
+            return;
+        }
+
+        if ($inheritCatalog !== null) {
+            yield from $inheritCatalog->assignments;
 
             return;
         }
@@ -200,8 +236,11 @@ final class AdvertisingMediumLiveBookability
         yield from $category->calculationMethodAssignments;
     }
 
-    private function resolveActiveEngineProfileKey(AdvertisingMedium $medium, string $methodKey): ?string
-    {
+    private function resolveActiveEngineProfileKey(
+        AdvertisingMedium $medium,
+        string $methodKey,
+        ?CategoryMethodCatalogSnapshot $inheritCatalog,
+    ): ?string {
         $medium->loadMissing([
             'calculationMethodAssignments.calculationMethod',
             'category.calculationMethodAssignments.calculationMethod',
@@ -229,12 +268,15 @@ final class AdvertisingMediumLiveBookability
             return null;
         }
 
-        $category = $medium->category;
-        if ($category === null) {
+        $assignments = $inheritCatalog !== null
+            ? $inheritCatalog->assignments
+            : $medium->category?->calculationMethodAssignments;
+
+        if ($assignments === null) {
             return null;
         }
 
-        foreach ($category->calculationMethodAssignments as $assignment) {
+        foreach ($assignments as $assignment) {
             if (! $assignment->is_active) {
                 continue;
             }
