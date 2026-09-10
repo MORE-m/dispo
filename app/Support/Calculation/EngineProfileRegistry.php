@@ -67,6 +67,41 @@ final class EngineProfileRegistry
     }
 
     /**
+     * ADV-001c3b1: alle Registry-Paare für einen Methoden-Key (profil→methode).
+     *
+     * Deterministisch nach engine_profile_key ASC. Keine Heuristik „ein Status
+     * je Methode“ – mehrere Profile pro Methode sind strukturell möglich.
+     *
+     * @return list<array{
+     *     engine_profile_key: string,
+     *     pair_status: string,
+     *     current_released_version: string|null
+     * }>
+     */
+    public static function pairsForMethodKey(string $calculationMethodKey): array
+    {
+        $pairs = [];
+        foreach (self::catalog() as $profileKey => $methods) {
+            if (! isset($methods[$calculationMethodKey])) {
+                continue;
+            }
+            $pair = $methods[$calculationMethodKey];
+            $pairs[] = [
+                'engine_profile_key' => $profileKey,
+                'pair_status' => $pair['pair_status']->value,
+                'current_released_version' => $pair['current_released_version'],
+            ];
+        }
+
+        usort(
+            $pairs,
+            static fn (array $a, array $b): int => strcmp($a['engine_profile_key'], $b['engine_profile_key']),
+        );
+
+        return $pairs;
+    }
+
+    /**
      * Fachlicher Pair-Status für neue Vorgänge.
      */
     public static function pairStatus(string $engineProfileKey, string $calculationMethodKey): EngineCapabilityStatus

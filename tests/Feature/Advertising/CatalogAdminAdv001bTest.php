@@ -41,7 +41,7 @@ class CatalogAdminAdv001bTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('administration/katalog/index')
-                ->has('links', 2)
+                ->has('links', 3)
                 ->where('boundaryNote', fn (string $note): bool => str_contains($note, 'Dynamische Felder')));
 
         $this->actingAs($admin)

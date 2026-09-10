@@ -94,11 +94,19 @@ UI-Feld. Legacy-`kind` (Spot Classic) bleibt erhalten; Compatibility nur wenn
 gesetzt. Katalogaktivität ≠ technische Buchbarkeit. Zentrale Auswertung
 `AdvertisingMediumLiveBookability` für Admin, Wizard-Props und Live-Pfad.
 Wizard filtert neue Positionen auf `is_bookable_for_new_positions` (Inventar/
-Preisliste bleiben kombinatorisch). Kein Methoden-Admin, keine Overrides, keine
-Positions-Methodenwahl.
+Preisliste bleiben kombinatorisch). Keine Overrides, keine Positions-Methodenwahl.
 
-**ADV-001 insgesamt noch offen:** c3b/c3c Katalog-Methoden-Admin inkl.
-Default-Mitgliedschaft/Overrides; c4 Positionsauswahl; weitere Defaults
+**ADV-001c3b1 (Methodenstammdaten/-Lifecycle, umgesetzt):** Systemdefinierte
+`calculation_methods` mit unveränderlichen Keys; Admin pflegt Name, Hilfetext,
+Sortierung. Lifecycle `is_active` nur ohne aktive Zeilen in
+`advertising_category_calculation_methods` /
+`advertising_medium_calculation_methods` (kein Force, keine Kaskade).
+`engine_profile_key` wird im Admin weder gesetzt noch abgeleitet; Registry-Paare
+read-only (profil→methode, 0..n). Künftige Assignment-Aktivierungen müssen die
+Methode unter Lock auf aktiv prüfen. Keine Migration.
+
+**ADV-001 insgesamt noch offen:** c3b2 Kategorie-Desired-State/Default; c3c
+Medium-Overrides; c4 Positionsauswahl; weitere Defaults
 (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört

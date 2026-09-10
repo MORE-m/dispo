@@ -75,6 +75,24 @@ class EngineProfileRegistryTest extends TestCase
     }
 
     #[Test]
+    public function pairs_for_method_key_lists_zero_one_or_more_profiles_deterministically(): void
+    {
+        $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('tkp'));
+        $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('free_position'));
+
+        $average = EngineProfileRegistry::pairsForMethodKey('average');
+        $this->assertCount(1, $average);
+        $this->assertSame('spot_classic', $average[0]['engine_profile_key']);
+        $this->assertSame('released', $average[0]['pair_status']);
+        $this->assertSame('v1', $average[0]['current_released_version']);
+
+        $keys = array_column(EngineProfileRegistry::pairsForMethodKey('calendar'), 'engine_profile_key');
+        $sorted = $keys;
+        sort($sorted);
+        $this->assertSame($sorted, $keys);
+    }
+
+    #[Test]
     public function planned_pairs_have_no_current_version_and_no_invented_versions(): void
     {
         foreach (['calendar', 'fixed_price'] as $method) {
