@@ -383,7 +383,6 @@ class CatalogLifecycleConcurrencyTest extends TestCase
         app(AdvertisingMediumAdminWriter::class)->create([
             'code' => 'seq_block_'.bin2hex(random_bytes(3)),
             'name' => 'Blocked',
-            'kind' => CalculationKind::SpotClassic->value,
             'category_id' => $spots->id,
         ], $admin);
     }
