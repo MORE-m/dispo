@@ -20,7 +20,7 @@ final class FieldDefinitionOptionContract
 
     public const MAX_LABEL_LENGTH = 255;
 
-    /** Späterer Runtime-Limit (DF-3-REST-C); hier nur Vertragskonstanten. */
+    /** Runtime-Limit für Multi-Select-Werte (DF-3-REST-C1). */
     public const MAX_MULTI_SELECT_SELECTED = 50;
 
     /** Passend zu unsignedInteger in der Options-Migration. */

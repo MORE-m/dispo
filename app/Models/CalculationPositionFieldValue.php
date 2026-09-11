@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\ChoiceValueJsonCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,7 @@ use Illuminate\Support\Carbon;
  * @property bool|null $value_boolean
  * @property Carbon|null $value_period_start
  * @property Carbon|null $value_period_end
+ * @property string|list<string>|null $value_json
  */
 class CalculationPositionFieldValue extends Model
 {
@@ -26,6 +28,7 @@ class CalculationPositionFieldValue extends Model
         'value_boolean',
         'value_period_start',
         'value_period_end',
+        'value_json',
     ];
 
     /**
@@ -37,6 +40,7 @@ class CalculationPositionFieldValue extends Model
             'value_boolean' => 'boolean',
             'value_period_start' => 'date',
             'value_period_end' => 'date',
+            'value_json' => ChoiceValueJsonCast::class,
         ];
     }
 
