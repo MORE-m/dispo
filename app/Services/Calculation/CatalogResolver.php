@@ -13,6 +13,7 @@ use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
+use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -20,6 +21,7 @@ final class CatalogResolver
 {
     public function __construct(
         private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
+        private readonly CalculationPositionMethodKeyNormalizer $methodKeyNormalizer = new CalculationPositionMethodKeyNormalizer,
     ) {}
 
     /**
@@ -47,17 +49,51 @@ final class CatalogResolver
     {
         $inventoryId = (int) ($position['inventory_id'] ?? 0);
         $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+        $methodIntent = $this->methodKeyNormalizer->normalize($position);
 
         $inventoryChanged = $existing !== null && $inventoryId !== $existing->inventory_id;
         $mediumChanged = $existing !== null && $mediumId !== $existing->advertising_medium_id;
-        $combinationChanged = $inventoryChanged || $mediumChanged;
-        $useSnapshot = $existing !== null && ! $combinationChanged;
 
-        if ($useSnapshot) {
-            return $this->resolveSnapshotPosition($position, $existing, $inventoryId, $mediumId, $inventoryChanged, $mediumChanged);
+        if ($existing !== null && ! $mediumChanged) {
+            // Lesen des gespeicherten Keys: forExecution=false erlaubt unbekannte historische Versionen.
+            $storedFreeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: false);
+            $methodUnchanged = ! $methodIntent['present']
+                || $methodIntent['key'] === $storedFreeze->calculationMethodKey;
+
+            if ($methodUnchanged) {
+                if ($inventoryChanged) {
+                    return $this->resolveInventoryChangeKeepingFreeze(
+                        $position,
+                        $existing,
+                        $inventoryId,
+                        $mediumId,
+                        $inventoryChanged,
+                        $mediumChanged,
+                    );
+                }
+
+                return $this->resolveSnapshotPosition(
+                    $position,
+                    $existing,
+                    $inventoryId,
+                    $mediumId,
+                    $inventoryChanged,
+                    $mediumChanged,
+                );
+            }
         }
 
-        return $this->resolveActivePosition($position, $inventoryId, $mediumId, $inventoryChanged, $mediumChanged);
+        $requestedMethod = $methodIntent['present'] ? $methodIntent['key'] : null;
+
+        return $this->resolveActivePosition(
+            $position,
+            $inventoryId,
+            $mediumId,
+            $inventoryChanged,
+            $mediumChanged,
+            $requestedMethod,
+            rewriteExplicitMethodFailure: $existing !== null && $methodIntent['present'],
+        );
     }
 
     /**
@@ -89,10 +125,8 @@ final class CatalogResolver
         bool $inventoryChanged,
         bool $mediumChanged,
     ): array {
-        $incomingMethod = isset($position['spot_method']) ? (string) $position['spot_method'] : null;
-        $this->freezeResolver->assertMethodUnchangedOnExisting($existing, $incomingMethod);
-
         // Historischer Freeze ist maßgeblich – nicht Live-Kind, Aktivstatus oder Zuordnungen.
+        // Methodenwechsel bei gleichem Medium läuft über resolveActivePosition.
         $freeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: true);
 
         $inventory = Inventory::query()->find($inventoryId);
@@ -178,12 +212,134 @@ final class CatalogResolver
      *     medium_changed: bool
      * }
      */
+    /**
+     * ADV-001c4a: reiner Inventarwechsel bei unverändertem Medium/Methodenschlüssel.
+     * Freeze bytegenau erhalten; Inventar/Rule/Preisliste live prüfen.
+     *
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
+    private function resolveInventoryChangeKeepingFreeze(
+        array $position,
+        CalculationPosition $existing,
+        int $inventoryId,
+        int $mediumId,
+        bool $inventoryChanged,
+        bool $mediumChanged,
+    ): array {
+        $freeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: true);
+
+        $inventory = Inventory::query()
+            ->whereKey($inventoryId)
+            ->where('is_active', true)
+            ->first();
+
+        if ($inventory === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Sender oder Kombi ist unbekannt oder inaktiv.',
+            ]);
+        }
+
+        $medium = AdvertisingMedium::query()->find($mediumId);
+        if ($medium === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Das gespeicherte Werbemittel ist ungültig.',
+            ]);
+        }
+
+        $rule = InventoryMediumRule::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('advertising_medium_id', $medium->id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($rule === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Die Kombination Sender/Werbemittel ist nicht zulässig.',
+            ]);
+        }
+
+        $priceList = $this->activePriceList($inventory->id);
+        if ($priceList === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+            ]);
+        }
+
+        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+            $position,
+            $priceList,
+            $inventory->name,
+            $existing,
+            useSnapshot: false,
+        );
+
+        return [
+            'inventory' => $inventory,
+            'medium' => $medium,
+            'rule' => $rule,
+            'priceList' => $priceList,
+            'rows' => $rows,
+            'time_ranges' => $timeRanges,
+            'needs_spot_redistribution' => $needsRedistribution,
+            'total_spot_count' => $totalSpotCount,
+            'spot_method' => $freeze->legacySpotMethod(),
+            'freeze' => $freeze,
+            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
+            'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
+            'inventory_medium_rule_id' => $rule->id,
+            'inventory_changed' => $inventoryChanged,
+            'medium_changed' => $mediumChanged,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
     private function resolveActivePosition(
         array $position,
         int $inventoryId,
         int $mediumId,
         bool $inventoryChanged,
         bool $mediumChanged,
+        ?string $requestedMethod,
+        bool $rewriteExplicitMethodFailure = false,
     ): array {
         $inventory = Inventory::query()
             ->whereKey($inventoryId)
@@ -219,12 +375,22 @@ final class CatalogResolver
             ]);
         }
 
-        $requestedMethod = isset($position['spot_method'])
-            ? (string) $position['spot_method']
-            : null;
-
         // Eine maßgebliche Live-Prüfung: FreezeResolver → AdvertisingMediumLiveBookability.
-        $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
+        try {
+            $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
+        } catch (ValidationException $exception) {
+            if (
+                $rewriteExplicitMethodFailure
+                && $requestedMethod !== null
+                && trim($requestedMethod) !== ''
+            ) {
+                throw ValidationException::withMessages([
+                    'positions' => 'Die Berechnungsmethode ist für dieses Werbemittel nicht mehr verfügbar. Bitte Auswahl aktualisieren.',
+                ]);
+            }
+
+            throw $exception;
+        }
 
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {

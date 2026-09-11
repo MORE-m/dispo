@@ -127,7 +127,16 @@ nur Mitgliedschaft. Bestandsschutz über LiveBookability +
 Cat-/Med-Assignments ASC. Aktive gespeicherte Medium-Assignments blockieren
 c3b1-Deaktivierung auch bei inherit. Keine Migration.
 
-**ADV-001 insgesamt noch offen:** c4 Positionsauswahl; weitere Defaults
+**ADV-001c4a (Methodenoptions-/Freeze-Persistenz):** Serverseitiger
+`AdvertisingMediumCalculationMethodOptionsResolver` liefert auswählbare Methoden
+(Selectability = `AdvertisingMediumLiveBookability`). Request
+`calculation_method_key` presence-aware; `spot_method` Legacy-Alias mit
+Konflikt-422. Freeze bytegenau bei unverändertem Medium+Key inkl. reinem
+Inventarwechsel; Re-Freeze nur neu / Mediumwechsel / Methodenwechsel.
+Wizard-Props additiv (`calculation_method_options`, Freeze-Read); keine
+sichtbare Methoden-UX. Budget bleibt average. Keine Migration.
+
+**ADV-001 insgesamt noch offen:** c4b sichtbare Positions-Methodenwahl; weitere Defaults
 (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen; technische
 Profil-Provisionierung.
 

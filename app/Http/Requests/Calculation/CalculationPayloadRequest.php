@@ -19,6 +19,7 @@ use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\TimeRangeValidator;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
+use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -231,8 +232,8 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.inventory_id' => ['required', 'integer', 'exists:inventories,id'],
             'positions.*.advertising_medium_id' => ['required', 'integer', 'exists:advertising_media,id'],
             'positions.*.spot_method' => ['nullable', Rule::enum(SpotCalculationMethod::class)],
+            'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'string', 'max:64'],
             'positions.*.engine_profile_key' => ['prohibited'],
-            'positions.*.calculation_method_key' => ['prohibited'],
             'positions.*.calculation_method_name' => ['prohibited'],
             'positions.*.algorithm_version' => ['prohibited'],
             'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
@@ -292,6 +293,7 @@ class CalculationPayloadRequest extends FormRequest
 
             $this->validateDynamicPeriods($validator);
             $this->validateDynamicFieldKeys($validator);
+            $this->validatePositionMethodKeys($validator);
             // PO-32b-1: leere Custom-Pflichtfelder blockieren Calc Create/Update
             // nicht allein deshalb; Snapshot-Regeln/Typvalidierung bleiben aktiv.
 
@@ -398,6 +400,31 @@ class CalculationPayloadRequest extends FormRequest
                 }
             }
         });
+    }
+
+    /**
+     * ADV-001c4a: presence-aware calculation_method_key / spot_method-Normalisierung.
+     * Fehlend ≠ explizit null/leer; widersprüchliche Alias-Paare → 422.
+     */
+    private function validatePositionMethodKeys(Validator $validator): void
+    {
+        $normalizer = app(CalculationPositionMethodKeyNormalizer::class);
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            try {
+                $normalizer->normalize($position);
+            } catch (ValidationException $exception) {
+                foreach ($exception->errors() as $messages) {
+                    foreach ($messages as $message) {
+                        $validator->errors()->add("positions.{$index}.calculation_method_key", $message);
+                    }
+                }
+            }
+        }
     }
 
     private function validateDynamicFieldKeys(Validator $validator): void
