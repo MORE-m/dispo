@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\CatalogAdminConflictException;
+use App\Exceptions\FieldDefinitionConflictException;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -44,6 +45,10 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (CatalogAdminConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        });
+
+        $exceptions->render(function (FieldDefinitionConflictException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         });
     })->create();

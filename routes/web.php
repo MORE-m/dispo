@@ -81,6 +81,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.definitions.reactivate');
         Route::delete('administration/dynamische-felder/definitionen/{definition}', [FieldDefinitionAdminController::class, 'destroy'])
             ->name('administration.dynamic-fields.definitions.destroy');
+        Route::post('administration/dynamische-felder/definitionen/{definition}/optionen-vorschau', [FieldDefinitionAdminController::class, 'optionsPreview'])
+            ->name('administration.dynamic-fields.definitions.options.preview');
+        Route::put('administration/dynamische-felder/definitionen/{definition}/optionen', [FieldDefinitionAdminController::class, 'optionsReplace'])
+            ->name('administration.dynamic-fields.definitions.options.replace');
         Route::get('administration/dynamische-felder/feldsets', [FieldSetAdminController::class, 'index'])
             ->name('administration.dynamic-fields.field-sets.index');
         Route::get('administration/dynamische-felder/feldsets/neu', [FieldSetAdminController::class, 'create'])

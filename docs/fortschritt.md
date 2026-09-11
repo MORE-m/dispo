@@ -1,15 +1,18 @@
 # Fortschritt V1
 
-Stand: 11. September 2026 (DF-3-REST-A geprüft in PR #38 – kein Abschluss von ADV-001 / DF-3)
+Stand: 11. September 2026 (DF-3-REST-B Options-Admin-UI umgesetzt in PR #39 –
+kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
 DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
 ADV-001c3a, ADV-001c3b1, ADV-001c3b2, ADV-001c3c, ADV-001c4a, ADV-001c4b**
-auf `main`; **DF-3-REST-A (Options-Fundament)** in PR #38 vollständig geprüft
-(noch nicht auf `main`).
-Gesamtziel DF-3 bleibt offen (Options-Admin/Runtime, Regelmatrix, Regel-Editor).
+sowie **DF-3-REST-A (Options-Fundament)** über PR #38 auf `main`
+(`7daee909e76e1fe8e47f36155e58b4059496b09d`) und **DF-3-REST-B
+(Options-Admin-UI)** vollständig umgesetzt und in PR #39 geprüft.
+Gesamtziel DF-3 bleibt offen (Select-/Multi-Select-Runtime, Regelmatrix,
+Regel-Editor).
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
@@ -21,27 +24,42 @@ bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-DF-3-REST-A ist umgesetzt und in PR #38 vollständig geprüft.
-Nächster geplanter Slice: **DF-3-REST-B Options-Admin-UI** (noch nicht begonnen).
-Danach Select-/Multi-Select-Runtime, anschließend Regel-Fundament/Editor;
-parallel weitere ADV-001-Defaults.
+Nächster geplanter Slice: **Select-/Multi-Select-Runtime** (noch nicht begonnen).
+Danach Regel-Fundament/Editor; parallel weitere ADV-001-Defaults.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-REST-A Options-Fundament (PR #38, Feature-HEAD
-`f80ee5938c79cf11220a0f9b65584a7fa28d4c1e`): Optionsmodell, Desired-State,
-Gen3-Freeze und Integrity umgesetzt; keine Admin-/Runtime-UI; kein Abschluss
-von DF-3 insgesamt. Noch nicht auf `main` (Merge ausstehend).
-Davor auf `main`: ADV-001c4b Wizard-Methodenauswahl (Merge PR #37,
-`b91a0c90219570e4134d9b9b462f2dbd6d81d73b`).
+DF-3-REST-B Options-Admin-UI (umgesetzt in PR #39): Choice-Typen
+`select`/`multi_select` im Custom-Feld-Admin freigeschaltet; Auswahloptionen
+auf der Definitions-Detailseite über den REST-A-Writer mit Preview/Apply;
+isolierte Playwright-Suite Port 8013. Kein Runtime/`value_json`, kein
+Regel-Editor, kein Abschluss von DF-3 insgesamt.
+
+Davor auf `main`: DF-3-REST-A Options-Fundament (Merge PR #38,
+`7daee909e76e1fe8e47f36155e58b4059496b09d`).
+
+## DF-3-REST-B – Options-Admin-UI (September 2026)
+
+Admin-UI für versionierte Auswahloptionen eigener `select`/`multi_select`-
+Felddefinitionen. Desired-State Preview/Apply ausschließlich über
+`FieldDefinitionOptionsWriter` / `FieldDefinitionOptionContract`. Minimale
+read-only Preview-DTO-Erweiterung am Writer. Keine Migration. Keine Runtime.
+**Vollständig umgesetzt und in PR #39 geprüft.**
+
+| Kriterium | Status |
+|---|---|
+| Choice-Typen anlegen/ändern (vor Nutzung) | **umgesetzt (PR #39)** |
+| Options-Sektion auf Definitions-Detail | **umgesetzt (PR #39)** |
+| Preview/Apply + 409/422 DE + No-op | **umgesetzt (PR #39)** |
+| Select-/Multi-Select-Runtime (`value_json`) | **nicht** |
+| Regel-Editor / volle Regelmatrix | **nicht** |
 
 ## DF-3-REST-A – Options-Fundament (September 2026)
 
 Versioniertes Optionsmodell an `FieldDefinitionRevision`, Enum `select` /
 `multi_select`, atomarer Desired-State-Writer, additives Gen3-Freeze
-(`options_json`), Integrity fail-closed. Keine Admin-/Runtime-UI, kein
-`value_json`, kein Regel-Editor, kein Gen4. In PR #38 vollständig geprüft;
-Merge auf `main` ausstehend.
+(`options_json`), Integrity fail-closed. Keine Admin-/Runtime-UI in diesem
+Slice. **Auf `main` gemergt (PR #38).**
 
 | Kriterium | Status |
 |---|---|
@@ -49,8 +67,10 @@ Merge auf `main` ausstehend.
 | Relationale Optionszeilen pro Revision | **umgesetzt** |
 | Desired-State-Writer inkl. No-op / Deaktivierung statt Delete | **umgesetzt** |
 | Gen3 additives Options-Freeze + Fingerprint | **umgesetzt** |
-| Options-Admin-UI / Calc-Dispo-Runtime | **nicht** |
+| Options-Admin-UI | **umgesetzt in PR #39 (REST-B)** |
+| Calc-Dispo-Runtime | **nicht** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
+
 
 ## ADV-001c4b – Sichtbare Wizard-Methodenauswahl (September 2026)
 
@@ -339,8 +359,9 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- Options-Admin-UI, Select-/Multi-Select-Runtime, volle Regelmatrix, Regel-Editor
-  (DF-3-REST-A Fundament umgesetzt; Slice-Reihenfolge: Options-Admin → Select-Runtime → Regeln)
+- Select-/Multi-Select-Runtime, volle Regelmatrix, Regel-Editor
+  (DF-3-REST-A auf main; DF-3-REST-B Options-Admin umgesetzt in PR #39;
+  Slice-Reihenfolge weiter: Select-Runtime → Regeln)
 - ADV-001 Rest: Kategorie-Defaults
 - Inventar-/Preislisten-/Kombinations-Admin
 - ADV-001 Defaults parallel möglich
@@ -440,14 +461,15 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c4b / DF-3-REST-A
+## Bewusst offen nach ADV-001c4b / DF-3-REST-A / REST-B
 
 - ADV-001c4a/c4b: Methodenoptions-/Freeze + sichtbare Wizard-Auswahl (umgesetzt)
-- DF-3-REST-A: Options-Fundament (umgesetzt; Admin-UI/Runtime folgen)
+- DF-3-REST-A: Options-Fundament (auf `main`, PR #38)
+- DF-3-REST-B: Options-Admin-UI (umgesetzt in PR #39)
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
-- Options-Admin-UI, Select-/Multi-Select-Runtime, Regelmatrix, Regel-Editor
+- Select-/Multi-Select-Runtime, Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices

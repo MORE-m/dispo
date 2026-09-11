@@ -82,8 +82,9 @@ Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
 Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview, DF-3.3a2α Gen2-Freeze,
 DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI (alles auf `main`; β via
 PR #25, b via Feature-Branch `feat/df3-3b-assignment-admin-ui`).
-Offen: Options-Admin/Runtime, Regel-Editor; Inventar-/Preislisten-Admin.
-Options-Fundament (DF-3-REST-A) umgesetzt.
+Offen: Select-/Multi-Select-Runtime, Regel-Editor; Inventar-/Preislisten-Admin.
+Options-Fundament (DF-3-REST-A) auf `main` (PR #38). Options-Admin-UI
+(DF-3-REST-B) auf Feature-Branch umgesetzt (vor Merge).
 ADV-001c3b1 (Methodenstammdaten/-Lifecycle), ADV-001c3b2
 (Kategorie-Desired-State/Default), ADV-001c3c (Medium-Overrides/Mode/Default),
 ADV-001c4a (Methodenoptions-/Freeze-Persistenz) und ADV-001c4b (sichtbare

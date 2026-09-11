@@ -161,17 +161,137 @@ final class FieldDefinitionOptionsWriter
     }
 
     /**
+     * Read-only Preview des Desired State (dieselben Contract-Schritte wie replace).
+     *
      * @param  list<array<string, mixed>>  $options
+     * @return array{
+     *     fingerprint: string,
+     *     has_changes: bool,
+     *     options: list<array{key: string, label: string, sort: int, is_active: bool}>,
+     *     previous_options: list<array{key: string, label: string, sort: int, is_active: bool}>,
+     *     summary: array{
+     *         added: list<string>,
+     *         label_changed: list<string>,
+     *         sort_changed: list<string>,
+     *         deactivated: list<string>,
+     *         reactivated: list<string>,
+     *         unchanged: bool
+     *     }
+     * }
      */
-    public function previewFingerprint(FieldDefinition $definition, array $options): string
+    public function preview(FieldDefinition $definition, array $options): array
     {
+        if (! $definition->field_type->isChoice()) {
+            throw ValidationException::withMessages([
+                'definition' => 'Optionen können nur für select- und multi_select-Felder gepflegt werden.',
+            ]);
+        }
+
         $definition->loadMissing('currentRevision.options');
         $previous = $definition->currentRevision !== null
             ? FieldDefinitionOptionContract::fromRevisionOptions($definition->currentRevision->options)
             : [];
         $desired = FieldDefinitionOptionContract::normalizeDesiredPayload($options);
         $merged = FieldDefinitionOptionContract::mergeWithPrevious($desired, $previous);
+        $fingerprint = FieldDefinitionOptionContract::fingerprint($merged);
+        $hasChanges = ! FieldDefinitionOptionContract::equalsCanonical($previous, $merged);
 
-        return FieldDefinitionOptionContract::fingerprint($merged);
+        return [
+            'fingerprint' => $fingerprint,
+            'has_changes' => $hasChanges,
+            'options' => $merged,
+            'previous_options' => $previous,
+            'summary' => $this->buildChangeSummary($previous, $merged),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $options
+     */
+    public function previewFingerprint(FieldDefinition $definition, array $options): string
+    {
+        return $this->preview($definition, $options)['fingerprint'];
+    }
+
+    /**
+     * @param  list<array{key: string, label: string, sort: int, is_active: bool}>  $previous
+     * @param  list<array{key: string, label: string, sort: int, is_active: bool}>  $next
+     * @return array{
+     *     added: list<string>,
+     *     label_changed: list<string>,
+     *     sort_changed: list<string>,
+     *     deactivated: list<string>,
+     *     reactivated: list<string>,
+     *     unchanged: bool
+     * }
+     */
+    private function buildChangeSummary(array $previous, array $next): array
+    {
+        /** @var array<string, array{key: string, label: string, sort: int, is_active: bool}> $previousByKey */
+        $previousByKey = [];
+        foreach ($previous as $row) {
+            $previousByKey[$row['key']] = $row;
+        }
+
+        /** @var array<string, array{key: string, label: string, sort: int, is_active: bool}> $nextByKey */
+        $nextByKey = [];
+        foreach ($next as $row) {
+            $nextByKey[$row['key']] = $row;
+        }
+
+        $added = [];
+        $labelChanged = [];
+        $sortChanged = [];
+        $deactivated = [];
+        $reactivated = [];
+
+        foreach ($nextByKey as $key => $row) {
+            if (! isset($previousByKey[$key])) {
+                $added[] = $key;
+
+                continue;
+            }
+
+            $before = $previousByKey[$key];
+            if ($before['label'] !== $row['label']) {
+                $labelChanged[] = $key;
+            }
+            if ($before['sort'] !== $row['sort']) {
+                $sortChanged[] = $key;
+            }
+            if ($before['is_active'] === true && $row['is_active'] === false) {
+                $deactivated[] = $key;
+            }
+            if ($before['is_active'] === false && $row['is_active'] === true) {
+                $reactivated[] = $key;
+            }
+        }
+
+        foreach ($previousByKey as $key => $row) {
+            if (! isset($nextByKey[$key]) && $row['is_active'] === true) {
+                $deactivated[] = $key;
+            }
+        }
+
+        sort($added);
+        sort($labelChanged);
+        sort($sortChanged);
+        sort($deactivated);
+        sort($reactivated);
+
+        $unchanged = $added === []
+            && $labelChanged === []
+            && $sortChanged === []
+            && $deactivated === []
+            && $reactivated === [];
+
+        return [
+            'added' => $added,
+            'label_changed' => $labelChanged,
+            'sort_changed' => $sortChanged,
+            'deactivated' => $deactivated,
+            'reactivated' => $reactivated,
+            'unchanged' => $unchanged,
+        ];
     }
 }

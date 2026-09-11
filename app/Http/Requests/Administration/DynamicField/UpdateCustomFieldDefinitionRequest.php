@@ -23,7 +23,12 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
         return [
             'lock_version' => ['required', 'integer', 'min:1'],
             'label' => ['sometimes', 'string', 'max:255'],
-            'field_type' => ['sometimes', Rule::enum(FieldType::class)->only([FieldType::ShortText, FieldType::LongText])],
+            'field_type' => ['sometimes', Rule::enum(FieldType::class)->only([
+                FieldType::ShortText,
+                FieldType::LongText,
+                FieldType::Select,
+                FieldType::MultiSelect,
+            ])],
             'scope' => ['sometimes', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['sometimes', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],

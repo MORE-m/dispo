@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState, type FormEvent } from 'react';
+import FieldDefinitionOptionsEditor from '@/components/administration/field-definition-options-editor';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { JsonPostError, jsonDelete, jsonPost, jsonPut } from '@/lib/json-post';
+import type { OptionRow } from '@/lib/field-definition-options-draft';
 
 type Revision = {
     id: number;
@@ -32,6 +34,7 @@ type Membership = {
     sort: number;
     required_override: boolean | null;
     visible_override: boolean | null;
+    field_definition_revision_id?: number | null;
 };
 
 type Definition = {
@@ -49,7 +52,14 @@ type Definition = {
     current_revision: Revision | null;
     revisions: Revision[];
     memberships: Membership[];
+    options: OptionRow[];
+    options_fingerprint: string | null;
+    can_manage_options: boolean;
 };
+
+function isChoiceType(fieldType: string): boolean {
+    return fieldType === 'select' || fieldType === 'multi_select';
+}
 
 function maxLengthFromRevision(revision: Revision | null): string {
     const value = revision?.validation_json?.max_length;
@@ -57,11 +67,19 @@ function maxLengthFromRevision(revision: Revision | null): string {
 }
 
 export default function DefinitionShow({
-    definition,
+    definition: initialDefinition,
+    routes,
+    optionsBoundaryNote,
 }: {
     definition: Definition;
+    routes: {
+        optionsPreview: string;
+        optionsReplace: string;
+    } | null;
+    optionsBoundaryNote: string;
 }) {
     const flash = usePage().props.flash;
+    const [definition, setDefinition] = useState(initialDefinition);
     const current = definition.current_revision;
     const isCustom = !definition.is_system;
     const [error, setError] = useState<string | null>(null);
@@ -91,7 +109,14 @@ export default function DefinitionShow({
 
     function handleCaught(caught: unknown, fallback: string) {
         if (caught instanceof JsonPostError) {
-            setError(caught.message || fallback);
+            if (caught.isConflict) {
+                setError(
+                    caught.message ||
+                        'Die Daten wurden zwischenzeitlich geändert. Bitte die Seite neu laden.',
+                );
+            } else {
+                setError(caught.message || fallback);
+            }
             const mapped: Record<string, string> = {};
             for (const [key, messages] of Object.entries(caught.fieldErrors)) {
                 if (messages[0]) {
@@ -115,28 +140,31 @@ export default function DefinitionShow({
         setFieldErrors({});
 
         try {
+            const payload: Record<string, unknown> = {
+                lock_version: definition.lock_version,
+                label: structural.label,
+                field_type: structural.field_type,
+                applies_to: structural.applies_to,
+                help_text:
+                    structural.help_text.trim() === ''
+                        ? null
+                        : structural.help_text,
+                group_key:
+                    structural.group_key.trim() === ''
+                        ? null
+                        : structural.group_key,
+                sort_default: structural.sort_default,
+                reportable: structural.reportable,
+            };
+            if (!isChoiceType(structural.field_type)) {
+                payload.max_length =
+                    structural.max_length === ''
+                        ? null
+                        : Number(structural.max_length);
+            }
             await jsonPut<{ redirect: string }>(
                 `/administration/dynamische-felder/definitionen/${definition.id}`,
-                {
-                    lock_version: definition.lock_version,
-                    label: structural.label,
-                    field_type: structural.field_type,
-                    applies_to: structural.applies_to,
-                    help_text:
-                        structural.help_text.trim() === ''
-                            ? null
-                            : structural.help_text,
-                    group_key:
-                        structural.group_key.trim() === ''
-                            ? null
-                            : structural.group_key,
-                    sort_default: structural.sort_default,
-                    reportable: structural.reportable,
-                    max_length:
-                        structural.max_length === ''
-                            ? null
-                            : Number(structural.max_length),
-                },
+                payload,
             );
             router.reload();
         } catch (caught) {
@@ -157,26 +185,29 @@ export default function DefinitionShow({
         setFieldErrors({});
 
         try {
+            const payload: Record<string, unknown> = {
+                lock_version: definition.lock_version,
+                label: revision.label,
+                help_text:
+                    revision.help_text.trim() === ''
+                        ? null
+                        : revision.help_text,
+                group_key:
+                    revision.group_key.trim() === ''
+                        ? null
+                        : revision.group_key,
+                sort_default: revision.sort_default,
+                reportable: revision.reportable,
+            };
+            if (!isChoiceType(definition.field_type)) {
+                payload.max_length =
+                    revision.max_length === ''
+                        ? null
+                        : Number(revision.max_length);
+            }
             await jsonPost<{ redirect: string }>(
                 `/administration/dynamische-felder/definitionen/${definition.id}/revisionen`,
-                {
-                    lock_version: definition.lock_version,
-                    label: revision.label,
-                    help_text:
-                        revision.help_text.trim() === ''
-                            ? null
-                            : revision.help_text,
-                    group_key:
-                        revision.group_key.trim() === ''
-                            ? null
-                            : revision.group_key,
-                    sort_default: revision.sort_default,
-                    reportable: revision.reportable,
-                    max_length:
-                        revision.max_length === ''
-                            ? null
-                            : Number(revision.max_length),
-                },
+                payload,
             );
             router.reload();
         } catch (caught) {
@@ -253,8 +284,9 @@ export default function DefinitionShow({
                     </Badge>
                     <Badge
                         variant={definition.is_active ? 'secondary' : 'outline'}
+                        data-test="field-definition-active-badge"
                     >
-                        {definition.is_active ? 'aktiv' : 'inaktiv'}
+                        Feld {definition.is_active ? 'aktiv' : 'inaktiv'}
                     </Badge>
                     <span className="text-muted-foreground">
                         Sperrversion {definition.lock_version}
@@ -316,6 +348,10 @@ export default function DefinitionShow({
                                         short_text
                                     </option>
                                     <option value="long_text">long_text</option>
+                                    <option value="select">select</option>
+                                    <option value="multi_select">
+                                        multi_select
+                                    </option>
                                 </select>
                             </FormField>
                             <FormField
@@ -343,29 +379,32 @@ export default function DefinitionShow({
                                     <option value="both">Beide</option>
                                 </select>
                             </FormField>
-                            <FormField
-                                label="Maximallänge"
-                                htmlFor="structural-max-length"
-                                error={fieldErrors.max_length}
-                            >
-                                <Input
-                                    id="structural-max-length"
-                                    type="number"
-                                    min={1}
-                                    max={
-                                        structural.field_type === 'short_text'
-                                            ? 255
-                                            : 20000
-                                    }
-                                    value={structural.max_length}
-                                    onChange={(e) =>
-                                        setStructural({
-                                            ...structural,
-                                            max_length: e.target.value,
-                                        })
-                                    }
-                                />
-                            </FormField>
+                            {!isChoiceType(structural.field_type) ? (
+                                <FormField
+                                    label="Maximallänge"
+                                    htmlFor="structural-max-length"
+                                    error={fieldErrors.max_length}
+                                >
+                                    <Input
+                                        id="structural-max-length"
+                                        type="number"
+                                        min={1}
+                                        max={
+                                            structural.field_type ===
+                                            'short_text'
+                                                ? 255
+                                                : 20000
+                                        }
+                                        value={structural.max_length}
+                                        onChange={(e) =>
+                                            setStructural({
+                                                ...structural,
+                                                max_length: e.target.value,
+                                            })
+                                        }
+                                    />
+                                </FormField>
+                            ) : null}
                             <FormField
                                 label="Hilfetext"
                                 htmlFor="structural-help"
@@ -450,6 +489,25 @@ export default function DefinitionShow({
                     </section>
                 ) : null}
 
+                {definition.can_manage_options && routes ? (
+                    <FieldDefinitionOptionsEditor
+                        lockVersion={definition.lock_version}
+                        initialOptions={definition.options}
+                        boundaryNote={optionsBoundaryNote}
+                        routes={routes}
+                        onApplied={(result) => {
+                            setDefinition((prev) => ({
+                                ...prev,
+                                lock_version: result.lock_version,
+                                options: result.options,
+                                options_fingerprint: result.fingerprint,
+                                current_revision: result.current_revision,
+                                revisions: result.revisions,
+                            }));
+                        }}
+                    />
+                ) : null}
+
                 <section className="max-w-xl space-y-4 rounded-xl border p-4">
                     <h2 className="text-base font-semibold">Neue Revision</h2>
                     <p className="text-muted-foreground text-sm">
@@ -528,7 +586,7 @@ export default function DefinitionShow({
                                 required
                             />
                         </FormField>
-                        {isCustom ? (
+                        {isCustom && !isChoiceType(definition.field_type) ? (
                             <FormField
                                 label="Maximallänge"
                                 htmlFor="rev-max-length"
@@ -639,6 +697,9 @@ export default function DefinitionShow({
                                         <th className="px-4 py-2 font-medium">
                                             Sort
                                         </th>
+                                        <th className="px-4 py-2 font-medium">
+                                            Gepinnte Rev-ID
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -647,6 +708,7 @@ export default function DefinitionShow({
                                             <tr
                                                 key={membership.id}
                                                 className="border-t"
+                                                data-test={`field-definition-membership-${membership.id}`}
                                             >
                                                 <td className="px-4 py-2">
                                                     {membership.field_set_id ? (
@@ -670,6 +732,13 @@ export default function DefinitionShow({
                                                 </td>
                                                 <td className="px-4 py-2">
                                                     {membership.sort}
+                                                </td>
+                                                <td
+                                                    className="px-4 py-2 font-mono"
+                                                    data-test={`field-definition-membership-pin-${membership.id}`}
+                                                >
+                                                    {membership.field_definition_revision_id ??
+                                                        '–'}
                                                 </td>
                                             </tr>
                                         ),
