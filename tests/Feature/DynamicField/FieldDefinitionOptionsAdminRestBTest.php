@@ -6,6 +6,7 @@ use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\Role;
+use App\Exceptions\FieldDefinitionConflictException;
 use App\Models\AuditEvent;
 use App\Models\FieldDefinition;
 use App\Models\FieldDefinitionRevision;
@@ -573,6 +574,9 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
         );
 
         $definition->refresh();
+        $lockBeforeBlocked = (int) $definition->lock_version;
+        $typeBeforeBlocked = $definition->field_type;
+        $revisionBeforeBlocked = (int) $definition->current_revision_id;
         $this->actingAs($admin)
             ->putJson(route('administration.dynamic-fields.definitions.update', $definition), [
                 'lock_version' => $definition->lock_version,
@@ -582,6 +586,10 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['definition']);
+        $definition->refresh();
+        $this->assertSame($lockBeforeBlocked, (int) $definition->lock_version);
+        $this->assertSame($typeBeforeBlocked, $definition->field_type);
+        $this->assertSame($revisionBeforeBlocked, (int) $definition->current_revision_id);
     }
 
     public function test_text_contracts_remain_unchanged(): void
@@ -600,6 +608,265 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
             ['max_length' => 12],
             $definition->currentRevision?->validation_json,
         );
+    }
+
+    public function test_preview_fingerprint_and_has_changes_match_replace_for_multiple_states(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createSelectDefinition('preview_eq_replace');
+        $writer = app(FieldDefinitionOptionsWriter::class);
+
+        $states = [
+            [
+                ['key' => 'a', 'label' => 'A', 'sort' => 1, 'is_active' => true],
+            ],
+            [
+                ['key' => 'a', 'label' => 'A2', 'sort' => 5, 'is_active' => true],
+                ['key' => 'b', 'label' => 'B', 'sort' => 2, 'is_active' => false],
+            ],
+            [
+                ['key' => 'b', 'label' => 'B', 'sort' => 2, 'is_active' => true],
+            ],
+            [
+                ['key' => 'b', 'label' => 'B', 'sort' => 2, 'is_active' => true],
+            ],
+            [],
+        ];
+
+        foreach ($states as $index => $options) {
+            $definition->refresh();
+            $lock = (int) $definition->lock_version;
+            $revisionCountBefore = FieldDefinitionRevision::query()
+                ->where('field_definition_id', $definition->id)
+                ->count();
+            $optionRowsBefore = FieldDefinitionRevisionOption::query()->count();
+            $auditsBefore = AuditEvent::query()
+                ->where('action', 'field_definition.options_replaced')
+                ->count();
+
+            $preview = $writer->preview($definition, $options);
+            $definitionAfterPreview = $definition->fresh();
+            $this->assertSame($lock, (int) $definitionAfterPreview?->lock_version);
+            $this->assertSame(
+                $revisionCountBefore,
+                FieldDefinitionRevision::query()->where('field_definition_id', $definition->id)->count(),
+            );
+            $this->assertSame($optionRowsBefore, FieldDefinitionRevisionOption::query()->count());
+            $this->assertSame(
+                $auditsBefore,
+                AuditEvent::query()->where('action', 'field_definition.options_replaced')->count(),
+            );
+
+            $replace = $writer->replace($definition, [
+                'lock_version' => $lock,
+                'fingerprint' => $preview['fingerprint'],
+                'options' => $options,
+            ], $admin);
+
+            $this->assertSame(
+                $preview['fingerprint'],
+                $replace['fingerprint'],
+                "Fingerprint mismatch in state #{$index}",
+            );
+            $this->assertSame(
+                $preview['has_changes'],
+                $replace['has_changes'],
+                "has_changes mismatch in state #{$index}",
+            );
+            $this->assertSame($preview['options'], $replace['options']);
+        }
+    }
+
+    public function test_conflict_and_validation_do_not_mutate_and_conflict_json_is_message_only(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createSelectDefinition('no_mutate');
+        $writer = app(FieldDefinitionOptionsWriter::class);
+        $writer->replace($definition, [
+            'lock_version' => $definition->lock_version,
+            'options' => [
+                ['key' => 'keep', 'label' => 'Keep', 'sort' => 1, 'is_active' => true],
+            ],
+        ], $admin);
+        $definition->refresh();
+
+        $lock = (int) $definition->lock_version;
+        $revisionId = (int) $definition->current_revision_id;
+        $optionCount = FieldDefinitionRevisionOption::query()
+            ->where('field_definition_revision_id', $revisionId)
+            ->count();
+        $audits = AuditEvent::query()->where('action', 'field_definition.options_replaced')->count();
+
+        $conflict = $this->actingAs($admin)
+            ->putJson(route('administration.dynamic-fields.definitions.options.replace', $definition), [
+                'lock_version' => $lock + 1,
+                'fingerprint' => str_repeat('c', 64),
+                'options' => [
+                    ['key' => 'keep', 'label' => 'Changed', 'sort' => 1, 'is_active' => true],
+                ],
+            ]);
+        $conflict->assertStatus(409)
+            ->assertExactJson([
+                'message' => 'Die Felddefinition wurde parallel geändert. Bitte die Seite neu laden.',
+            ]);
+        $this->assertFalse($conflict->headers->contains('content-type', 'text/html'));
+
+        // HTML Accept: gleiche Exception-Übersetzung wie Katalog/Assignment (JSON message only).
+        $htmlConflict = $this->actingAs($admin)
+            ->call(
+                'PUT',
+                route('administration.dynamic-fields.definitions.options.replace', $definition),
+                [],
+                [],
+                [],
+                [
+                    'CONTENT_TYPE' => 'application/json',
+                    'HTTP_ACCEPT' => 'text/html',
+                ],
+                json_encode([
+                    'lock_version' => $lock + 1,
+                    'fingerprint' => str_repeat('c', 64),
+                    'options' => [
+                        ['key' => 'keep', 'label' => 'Changed', 'sort' => 1, 'is_active' => true],
+                    ],
+                ], JSON_THROW_ON_ERROR),
+            );
+        $htmlConflict->assertStatus(409);
+        $this->assertSame(
+            'Die Felddefinition wurde parallel geändert. Bitte die Seite neu laden.',
+            $htmlConflict->json('message'),
+        );
+        $this->assertArrayNotHasKey('trace', $htmlConflict->json() ?? []);
+        $this->assertArrayNotHasKey('exception', $htmlConflict->json() ?? []);
+
+        $this->actingAs($admin)
+            ->putJson(route('administration.dynamic-fields.definitions.options.replace', $definition), [
+                'lock_version' => $lock,
+                'fingerprint' => str_repeat('d', 64),
+                'options' => [
+                    ['key' => 'BAD', 'label' => 'Bad', 'sort' => 1, 'is_active' => true],
+                ],
+            ])
+            ->assertStatus(422);
+
+        $definition->refresh();
+        $this->assertSame($lock, (int) $definition->lock_version);
+        $this->assertSame($revisionId, (int) $definition->current_revision_id);
+        $this->assertSame(
+            $optionCount,
+            FieldDefinitionRevisionOption::query()
+                ->where('field_definition_revision_id', $revisionId)
+                ->count(),
+        );
+        $this->assertSame(
+            $audits,
+            AuditEvent::query()->where('action', 'field_definition.options_replaced')->count(),
+        );
+        $this->assertSame(
+            'Keep',
+            FieldDefinitionRevisionOption::query()
+                ->where('field_definition_revision_id', $revisionId)
+                ->where('key', 'keep')
+                ->value('label'),
+        );
+    }
+
+    public function test_choice_text_type_roundtrip_clears_max_length_and_keeps_historical_options(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = app(FieldDefinitionCustomWriter::class)->create([
+            'label' => 'Roundtrip',
+            'key' => 'roundtrip_restb',
+            'field_type' => FieldType::ShortText,
+            'scope' => FieldScope::Header,
+            'applies_to' => FieldAppliesTo::Both,
+            'max_length' => 77,
+        ], $admin);
+        $this->assertSame(['max_length' => 77], $definition->currentRevision?->validation_json);
+
+        $updated = app(FieldDefinitionCustomWriter::class)->updateBeforeUsed($definition, [
+            'lock_version' => $definition->lock_version,
+            'field_type' => FieldType::Select,
+            'label' => 'Roundtrip',
+        ], $admin);
+        $this->assertSame(FieldType::Select, $updated->field_type);
+        $this->assertNull($updated->currentRevision?->validation_json);
+
+        app(FieldDefinitionOptionsWriter::class)->replace($updated, [
+            'lock_version' => $updated->lock_version,
+            'options' => [
+                ['key' => 'hist', 'label' => 'Hist', 'sort' => 1, 'is_active' => true],
+            ],
+        ], $admin);
+        $updated->refresh();
+        $choiceRevisionId = (int) $updated->current_revision_id;
+        $this->assertSame(1, FieldDefinitionRevisionOption::query()
+            ->where('field_definition_revision_id', $choiceRevisionId)
+            ->count());
+
+        $backToText = app(FieldDefinitionCustomWriter::class)->updateBeforeUsed($updated, [
+            'lock_version' => $updated->lock_version,
+            'field_type' => FieldType::ShortText,
+            'label' => 'Roundtrip',
+            'max_length' => 50,
+        ], $admin);
+        $this->assertSame(FieldType::ShortText, $backToText->field_type);
+        $this->assertSame(['max_length' => 50], $backToText->currentRevision?->validation_json);
+        // Optionszeilen der (weiterhin aktuellen) Revision bleiben physisch erhalten.
+        $this->assertSame(1, FieldDefinitionRevisionOption::query()
+            ->where('field_definition_revision_id', $choiceRevisionId)
+            ->count());
+        $this->assertSame(
+            'Hist',
+            FieldDefinitionRevisionOption::query()
+                ->where('field_definition_revision_id', $choiceRevisionId)
+                ->where('key', 'hist')
+                ->value('label'),
+        );
+
+        $failedLock = (int) $backToText->lock_version;
+        $failedType = $backToText->field_type;
+        try {
+            app(FieldDefinitionCustomWriter::class)->updateBeforeUsed($backToText, [
+                'lock_version' => $failedLock + 1,
+                'field_type' => FieldType::MultiSelect,
+                'label' => 'Roundtrip',
+            ], $admin);
+            $this->fail('Stale lock muss Konfliktexception werfen.');
+        } catch (FieldDefinitionConflictException) {
+            // expected
+        }
+        $backToText->refresh();
+        $this->assertSame($failedLock, (int) $backToText->lock_version);
+        $this->assertSame($failedType, $backToText->field_type);
+    }
+
+    public function test_choice_definition_deactivate_reactivate_works(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = app(FieldDefinitionCustomWriter::class)->create([
+            'label' => 'Lifecycle Choice',
+            'key' => 'lifecycle_choice_restb',
+            'field_type' => FieldType::MultiSelect,
+            'scope' => FieldScope::Position,
+            'applies_to' => FieldAppliesTo::Both,
+        ], $admin);
+
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.definitions.deactivate', $definition), [
+                'lock_version' => $definition->lock_version,
+            ])
+            ->assertOk();
+        $definition->refresh();
+        $this->assertFalse($definition->is_active);
+
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.definitions.reactivate', $definition), [
+                'lock_version' => $definition->lock_version,
+            ])
+            ->assertOk();
+        $definition->refresh();
+        $this->assertTrue($definition->is_active);
     }
 
     private function createSelectDefinition(string $key): FieldDefinition
