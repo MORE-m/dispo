@@ -100,7 +100,6 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
                 'advertising_medium_id' => $catalog['medium']->id,
                 'spot_method' => 'average',
                 'engine_profile_key' => 'injected',
-                'calculation_method_key' => 'injected',
                 'calculation_method_name' => 'Injected',
                 'algorithm_version' => 'v9',
                 'length_seconds' => 30,
@@ -113,13 +112,12 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors([
                 'positions.0.engine_profile_key',
-                'positions.0.calculation_method_key',
                 'positions.0.calculation_method_name',
                 'positions.0.algorithm_version',
             ]);
     }
 
-    public function test_changing_spot_method_on_existing_position_is_rejected_in_german(): void
+    public function test_changing_spot_method_on_existing_position_to_planned_is_rejected_in_german(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -137,7 +135,7 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
             $this->fail('Erwartete ValidationException bei Methodenwechsel.');
         } catch (ValidationException $exception) {
             $this->assertSame(
-                ['Die Berechnungsmethode einer bestehenden Position kann in diesem Umfang nicht geändert werden.'],
+                ['Die Berechnungsmethode ist für dieses Werbemittel nicht mehr verfügbar. Bitte Auswahl aktualisieren.'],
                 $exception->errors()['positions'] ?? null,
             );
         }

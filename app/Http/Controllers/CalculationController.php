@@ -29,6 +29,7 @@ use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -47,6 +48,7 @@ class CalculationController extends Controller
         private readonly CalculationDynamicFieldWriter $dynamicFields,
         private readonly ConfigurationSnapshotFreezeService $freeze,
         private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
+        private readonly AdvertisingMediumCalculationMethodOptionsResolver $methodOptionsResolver = new AdvertisingMediumCalculationMethodOptionsResolver,
     ) {}
 
     public function index(Request $request): Response
@@ -355,6 +357,7 @@ class CalculationController extends Controller
         $media = $activeMedia->concat($historicalMedia)->values()->map(
             function (AdvertisingMedium $medium): array {
                 $bookability = $this->liveBookability->payloadForMedium($medium);
+                $methodOptions = $this->methodOptionsResolver->resolve($medium)->toPayload();
 
                 return [
                     'id' => $medium->id,
@@ -368,6 +371,7 @@ class CalculationController extends Controller
                     'is_active' => $medium->is_active,
                     'is_bookable_for_new_positions' => $bookability['is_bookable_for_new_positions'],
                     'unbookable_reason' => $bookability['unbookable_reason'],
+                    'calculation_method_options' => $methodOptions,
                 ];
             },
         )->values();
@@ -531,6 +535,8 @@ class CalculationController extends Controller
                         'schema_fingerprint' => $positionFieldSchema['schema_fingerprint'] ?? null,
                         'field_schema' => $positionFieldSchema,
                         'spot_method' => $position->spot_method->value,
+                        'calculation_method_key' => $position->calculation_method_key,
+                        'calculation_method_name' => $position->calculation_method_name,
                         'length_seconds' => $position->length_seconds,
                         'total_spot_count' => $position->total_spot_count,
                         'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,

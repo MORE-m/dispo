@@ -1,14 +1,14 @@
 # Fortschritt V1
 
-Stand: 10. September 2026 (ADV-001c3c Medium-Overrides Desired State – kein Abschluss von ADV-001 / DF-3)
+Stand: 11. September 2026 (ADV-001c4a Methodenoptions-/Freeze-Persistenz – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
 DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
-ADV-001c3a, ADV-001c3b1, ADV-001c3b2 und ADV-001c3c auf Feature-Branch**
+ADV-001c3a, ADV-001c3b1, ADV-001c3b2, ADV-001c3c und ADV-001c4a auf Feature-Branch**
 (bzw. `main`). Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor).
-ADV-001 Positionsauswahl (c4) bleibt offen.
+ADV-001 sichtbare Positions-Methodenwahl (**c4b**) bleibt offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -18,13 +18,31 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c3c Methodenvererbung / Medium-Overrides / Medium-Default als Desired
-State (Feature-Branch `feat/adv001c3c-medium-calculation-methods-desired-state`).
-Nächste sinnvolle Schritte: c4 Positionsauswahl; parallel Optionen / Regel-Editor.
+ADV-001c4a serverseitige Methodenoptionen + Freeze-Edit-Semantik (Feature-Branch
+`feat/adv001c4a-calculation-method-options-persistence`).
+Nächste sinnvolle Schritte: c4b Wizard-Methodenauswahl; parallel Optionen / Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c3b2 Kategorie-Desired-State auf `main` (Merge PR #34).
+ADV-001c3c Medium-Overrides Desired State auf `main` (Merge PR #35).
+
+## ADV-001c4a – Methodenoptions-Resolver und Freeze-Edit-Semantik (September 2026)
+
+Serverseitige Auflösung auswählbarer Berechnungsmethoden über
+`AdvertisingMediumCalculationMethodOptionsResolver` (Selectability ausschließlich
+über `AdvertisingMediumLiveBookability`). Request-Feld `calculation_method_key`
+presence-aware; `spot_method` als Legacy-Alias (Konflikt → 422). Freeze bytegenau
+bei unverändertem Medium+Key inkl. reinem Inventarwechsel; Re-Freeze nur bei neuer
+Position, Mediumwechsel oder tatsächlichem Methodenwechsel. Wizard-Props additiv
+mit `calculation_method_options` und Freeze-Read-Feldern; **keine** sichtbare
+Methoden-UX (c4b). Budget bleibt average/v1. Keine Migration.
+
+| Kriterium | Status |
+|---|---|
+| MethodOptionsResolver + Wizard-Props | umgesetzt |
+| Request-/Legacy-Alias + presence-aware Semantik | umgesetzt |
+| Freeze-Edit-Matrix inkl. Inventar-only | umgesetzt |
+| Sichtbare Wizard-Methodenauswahl | **c4b** |
 
 ## ADV-001c3c – Medium-Overrides / Mode / Medium-Default (September 2026)
 
@@ -39,7 +57,7 @@ inherit nur Mitgliedschaftspflicht. Bestandsschutz bisher buchbarer Medien via
 `AdvertisingMediumLiveBookability` mit `MediumMethodCatalogSnapshot`.
 Lock: Medium → Kategorie → Methoden ASC → Cat-Assignments ASC → Med-Assignments ASC.
 c3b1: aktive gespeicherte Medium-Assignments blockieren Methodendeaktivierung
-auch bei inherit. No-op ohne Mutation/Audit. Keine Migration. c4 offen.
+auch bei inherit. No-op ohne Mutation/Audit. Keine Migration. c4a umgesetzt; c4b offen.
 
 | Kriterium | Status |
 |---|---|
@@ -47,7 +65,7 @@ auch bei inherit. No-op ohne Mutation/Audit. Keine Migration. c4 offen.
 | inherit/override Semantik (gespeichert vs. wirksam) | umgesetzt |
 | Default-/Profilvertrag + Bookability-Schutz | umgesetzt |
 | Werbemittel-Detail Methodenabschnitt | umgesetzt |
-| Positions-Methodenwahl | **c4** |
+| Positions-Methodenwahl (Backend c4a / UX c4b) | **c4a umgesetzt; c4b offen** |
 
 ## ADV-001c3b2 – Kategorie-Desired-State / Default (September 2026)
 
@@ -59,7 +77,7 @@ neue Zeilen `null`, bestehende Werte unverändert. Strenger Default-Vertrag
 Inherit-Medien via `AdvertisingMediumLiveBookability`-Simulation
 (`CategoryMethodCatalogSnapshot`). Lock: Kategorie → Methoden ID ASC →
 Kategorie-Assignments ID ASC. Identischer State = No-op ohne Mutation/Audit.
-Keine Migration. c3c umgesetzt; c4 offen.
+Keine Migration. c3c/c4a umgesetzt; c4b offen.
 
 | Kriterium | Status |
 |---|---|
@@ -69,7 +87,7 @@ Keine Migration. c3c umgesetzt; c4 offen.
 | No-op ohne Versionssprung/Audit | umgesetzt |
 | Kategorie-Detail UI Methodenabschnitt | umgesetzt |
 | Medium-Overrides / Mode | **c3c** |
-| Positions-Methodenwahl | **c4** |
+| Positions-Methodenwahl (Backend c4a / UX c4b) | **c4a umgesetzt; c4b offen** |
 
 ## ADV-001c3b1 – Methodenstammdaten und Lifecycle (September 2026)
 
@@ -90,7 +108,7 @@ Assignment-Aktivierung: Method-Lock + Aktivitätsprüfung
 | Registry-Paare deterministisch read-only | umgesetzt |
 | Kategorie-Desired-State / Default | **c3b2** |
 | Medium-Overrides / Mode | **c3c** |
-| Positions-Methodenwahl | **c4** |
+| Positions-Methodenwahl (Backend c4a / UX c4b) | **c4a umgesetzt; c4b offen** |
 
 ## ADV-001c3a – Engine-unabhängige Medienpflege (September 2026)
 
@@ -110,7 +128,7 @@ Methodenkarte; Methoden-Admin folgt in c3b/c3c; Positionsauswahl in c4.
 | Admin-Status Katalog vs. Buchbarkeit | umgesetzt |
 | Zentrale Live-Buchbarkeit + Wizard-Filter | umgesetzt |
 | Methoden-Admin / Defaults / Overrides | **c3b1/c3b2/c3c** |
-| Positions-Methodenwahl | **c4** |
+| Positions-Methodenwahl (Backend c4a / UX c4b) | **c4a umgesetzt; c4b offen** |
 
 ## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
 
@@ -136,7 +154,7 @@ bleiben `inherit`. Keine neue Engine; Gen-3-Snapshots unverändert.
 | Historische Stabilität (unveränderte Kombination) | umgesetzt |
 | `advertising_media.kind` nullable + Null-Guards (bis c3a) | umgesetzt / **c3a ersetzt Guards** |
 | Katalog-/Methoden-Admin | **c3a Medien; c3b/c3c Methoden** |
-| Positions-Methodenwahl / Selectability | **Slice 4** |
+| Positions-Methodenwahl / Selectability | **c4a umgesetzt; c4b offen** |
 | Legacy-Felder entfernen / Gen-4 | **nicht** |
 
 ## ADV-001c1 – CALC-KIND-FOUNDATION Schema (September 2026)
@@ -156,7 +174,7 @@ Default über nullable FK `default_calculation_method_id` (nicht `is_default`).
 | `EngineProfileRegistry` (spot_classic/average/v1 released) | umgesetzt |
 | Runtime CatalogResolver/Writer Dual-R/W + Freeze | **c2** |
 | Katalog-/Methoden-Admin, Default-Mitgliedschaft Writer | **Slice 3** |
-| Positions-Methodenwahl / Selectability | **Slice 4** |
+| Positions-Methodenwahl / Selectability | **c4a umgesetzt; c4b offen** |
 | Systemfelder / Kern-Feldsets / ADV-002 | **unverändert / offen** |
 
 ## ADV-001b – Katalog-Admin (September 2026)
@@ -376,7 +394,8 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bewusst offen nach ADV-001c3c
 
-- ADV-001c4: Positionsauswahl und Selectability
+- ADV-001c4a: Methodenoptions-/Freeze-Persistenz (umgesetzt)
+- ADV-001c4b: sichtbare Positionsauswahl und Selectability-UX
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
