@@ -42,7 +42,13 @@ class ChoiceValueJsonMigrationTest extends TestCase
                 );
                 $this->assertNotNull($column);
                 $this->assertSame('YES', $column->is_nullable);
-                $this->assertSame('json', strtolower((string) $column->data_type));
+                // Laravel `json()` → MySQL `json`; unter MariaDB (XAMPP/CI-lokal)
+                // wie bei options_json typischerweise `longtext`.
+                $this->assertContains(
+                    strtolower((string) $column->data_type),
+                    ['json', 'longtext'],
+                    $table.' value_json DATA_TYPE',
+                );
             }
         }
     }
