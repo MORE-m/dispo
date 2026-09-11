@@ -367,8 +367,9 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
             ->assertOk();
 
         $definition->refresh();
+        $this->assertNotNull($definition->currentRevision);
         $options = FieldDefinitionOptionContract::fromRevisionOptions(
-            $definition->currentRevision?->options ?? [],
+            $definition->currentRevision->options,
         );
         $byKey = collect($options)->keyBy('key');
         $this->assertFalse($byKey['keep']['is_active']);
@@ -498,7 +499,8 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
             ->assertOk();
 
         $select->refresh();
-        $this->assertSame(3, (int) $select->currentRevision?->revision);
+        $this->assertNotNull($select->currentRevision);
+        $this->assertSame(3, (int) $select->currentRevision->revision);
         $this->assertSame(
             $optionCountBefore,
             FieldDefinitionRevisionOption::query()
@@ -506,7 +508,7 @@ class FieldDefinitionOptionsAdminRestBTest extends TestCase
                 ->count(),
         );
         $copied = FieldDefinitionOptionContract::fromRevisionOptions(
-            $select->currentRevision?->options ?? [],
+            $select->currentRevision->options,
         );
         $this->assertSame('A', $copied[0]['label']);
         $this->assertFalse($copied[1]['is_active']);
