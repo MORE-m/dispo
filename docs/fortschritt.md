@@ -1,8 +1,8 @@
 # Fortschritt V1
 
-Stand: 11. September 2026 (DF-3-REST-C1 Choice-Wertmodell serverseitig auf
-Feature-Branch `feat/df3-rest-c1-choice-value-persistence` – kein Abschluss von
-ADV-001 / DF-3; noch nicht auf `main`)
+Stand: 11. September 2026 (DF-3-REST-C1 Choice-Wertmodell serverseitig
+vollständig umgesetzt und geprüft – kein Abschluss von ADV-001 / DF-3;
+sichtbare Choice-UI weiterhin offen)
 
 ## Aktuelle Phase
 
@@ -14,10 +14,8 @@ sowie **DF-3-REST-A (Options-Fundament)** über PR #38 auf `main`
 (Options-Admin-UI)** über PR #39 auf `main`
 (`769d48554140cdd79d525b5cd4330db9699dd797`).
 **DF-3-REST-C1** (Choice-Wertmodell/`value_json`, serverseitige Persistenz) ist
-vollständig umgesetzt und geprüft auf Feature-Branch
-`feat/df3-rest-c1-choice-value-persistence` (noch ohne PR).
-Gesamtziel DF-3 bleibt offen (sichtbare Calc-/Dispo-Choice-UI = C2/C3,
-Regelmatrix, Regel-Editor).
+vollständig umgesetzt und geprüft. Noch keine sichtbare Calc-/Dispo-Choice-UI
+(C2/C3). Gesamtziel DF-3 bleibt offen (Regelmatrix, Regel-Editor).
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
@@ -35,11 +33,10 @@ in der Oberfläche). Parallel Regel-Fundament/Editor und weitere ADV-001-Default
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-REST-C1 Choice-Wertmodell und serverseitige Persistenz (Feature-Branch
-`feat/df3-rest-c1-choice-value-persistence`): additives `value_json` auf allen
-vier dynamischen Wertetabellen; `ChoiceFieldValueContract`; Calc-/Dispo-Writer
-Persistenz/Export/Copy/Completeness; Remapper; Schema-Props mit `options_json`;
-keine sichtbare Choice-UI. **Noch nicht auf `main`.**
+DF-3-REST-C1 Choice-Wertmodell und serverseitige Persistenz: additives
+`value_json` auf allen vier dynamischen Wertetabellen; `ChoiceFieldValueContract`;
+Calc-/Dispo-Writer Persistenz/Export/Copy/Completeness; Remapper; Schema-Props
+mit `options_json`; keine sichtbare Choice-UI.
 
 Davor auf `main`: DF-3-REST-B Options-Admin-UI (PR #39) und DF-3-REST-A
 (PR #38).
@@ -50,10 +47,10 @@ Serverseitige Select-/Multi-Select-Runtime ohne sichtbare UI.
 
 | Kriterium | Status |
 |---|---|
-| `value_json` an vier Wertetabellen (additiv, nullable) | **umgesetzt (Feature-Branch)** |
-| `ChoiceFieldValueContract` (Normalize, historisch inactive, XOR) | **umgesetzt (Feature-Branch)** |
-| Calc/Dispo Persistenz, Export, Copy, Completeness | **umgesetzt (Feature-Branch)** |
-| Schema-Props inkl. `options_json` | **umgesetzt (Feature-Branch)** |
+| `value_json` an vier Wertetabellen (additiv, nullable) | **umgesetzt** |
+| `ChoiceFieldValueContract` (Normalize, historisch inactive, XOR) | **umgesetzt** |
+| Calc/Dispo Persistenz, Export, Copy, Completeness | **umgesetzt** |
+| Schema-Props inkl. `options_json` | **umgesetzt** |
 | Sichtbare Calc-UI (C2) | **nicht** |
 | Sichtbare Dispo-UI / Playwright C2/C3 (C3) | **nicht** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
@@ -61,10 +58,10 @@ Serverseitige Select-/Multi-Select-Runtime ohne sichtbare UI.
 Leer-/XOR-Vertrag: Select leer = `null`; Multi leer = `[]`; Choice nur in
 `value_json`; skalare Kanäle bei Choice genullt (App-Layer; kein DB-CHECK wegen
 SQLite/MySQL-Symmetrie). Spaltentyp Laravel `json()` (MySQL `json`, MariaDB
-wie bestehende `options_json` oft `longtext`). Historisch inaktive Keys nur
-gegen DB-Vorzustand. Required: Calc-Draft wie Text ohne statisches required;
-Pflicht bei Dispo-Create und Dispo-Submit/Partial-Gates. Freeze/`options_json`
-einzige Optionsquelle.
+wie bestehende `options_json` oft `longtext` ohne JSON-Validierungs-CHECK).
+Historisch inaktive Keys nur gegen DB-Vorzustand. Required: Calc-Draft wie Text
+ohne statisches required; Pflicht bei Dispo-Create und Dispo-Submit/Partial-Gates.
+Freeze/`options_json` einzige Optionsquelle.
 
 ## DF-3-REST-B – Options-Admin-UI (September 2026)
 
@@ -79,7 +76,7 @@ read-only Preview-DTO-Erweiterung am Writer. Keine Migration. Keine Runtime.
 | Choice-Typen anlegen/ändern (vor Nutzung) | **umgesetzt (PR #39)** |
 | Options-Sektion auf Definitions-Detail | **umgesetzt (PR #39)** |
 | Preview/Apply + 409/422 DE + No-op | **umgesetzt (PR #39)** |
-| Select-/Multi-Select-Runtime (`value_json`) | **C1 Feature-Branch; UI = C2/C3 offen** |
+| Select-/Multi-Select-Runtime (`value_json`) | **C1 serverseitig umgesetzt; UI = C2/C3 offen** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 ## DF-3-REST-A – Options-Fundament (September 2026)
@@ -96,7 +93,7 @@ Slice. **Auf `main` gemergt (PR #38).**
 | Desired-State-Writer inkl. No-op / Deaktivierung statt Delete | **umgesetzt** |
 | Gen3 additives Options-Freeze + Fingerprint | **umgesetzt** |
 | Options-Admin-UI | **umgesetzt in PR #39 (REST-B)** |
-| Calc-Dispo-Runtime | **C1 serverseitig (Feature-Branch); UI offen** |
+| Calc-Dispo-Runtime | **C1 serverseitig umgesetzt; UI offen** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 
@@ -388,7 +385,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
 - Sichtbare Select-/Multi-Select-UI (C2/C3), volle Regelmatrix, Regel-Editor
-  (DF-3-REST-A/B auf main; C1 serverseitig auf Feature-Branch;
+  (DF-3-REST-A/B auf main; C1 serverseitig umgesetzt;
   Slice-Reihenfolge weiter: C2 → C3 → Regeln)
 - ADV-001 Rest: Kategorie-Defaults
 - Inventar-/Preislisten-/Kombinations-Admin
@@ -494,7 +491,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 - ADV-001c4a/c4b: Methodenoptions-/Freeze + sichtbare Wizard-Auswahl (umgesetzt)
 - DF-3-REST-A: Options-Fundament (auf `main`, PR #38)
 - DF-3-REST-B: Options-Admin-UI (auf `main`, PR #39)
-- DF-3-REST-C1: Choice-Wertmodell serverseitig (Feature-Branch, noch ohne PR)
+- DF-3-REST-C1: Choice-Wertmodell serverseitig umgesetzt (UI = C2/C3 offen)
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting

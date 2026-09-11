@@ -154,15 +154,26 @@ class UpdateDispoOrderDraftRequest extends FormRequest
             if ($def->field_type === FieldType::MultiSelect) {
                 if ($value === null) {
                     $filtered[$key] = null;
-                } elseif (is_array($value)) {
-                    $list = [];
+                } elseif (is_array($value) && array_is_list($value)) {
+                    $allStrings = true;
                     foreach ($value as $item) {
-                        if (is_string($item)) {
-                            $list[] = $item;
+                        if (! is_string($item)) {
+                            $allStrings = false;
+                            break;
                         }
                     }
-                    $filtered[$key] = $list;
+                    // Nur vollständige String-Listen übernehmen; sonst kein stilles Filtern.
+                    if ($allStrings) {
+                        /** @var list<string> $value */
+                        $filtered[$key] = $value;
+                    }
                 }
+
+                continue;
+            }
+
+            if ($def->field_type === FieldType::Select) {
+                $filtered[$key] = is_string($value) || $value === null ? $value : null;
 
                 continue;
             }

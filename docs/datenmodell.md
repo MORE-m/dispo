@@ -446,11 +446,11 @@ Umgesetzt in DF-3-REST-A (Fundament) und DF-3-REST-B (Options-Admin auf `main`):
 - additives Gen3-`options_json`-Freeze
 - Options-Admin-UI
 
-Umgesetzt in DF-3-REST-C1 (Feature-Branch `feat/df3-rest-c1-choice-value-persistence`,
-noch nicht auf `main`):
+Umgesetzt in DF-3-REST-C1:
 
 - additives `value_json` an den vier dynamischen Wertetabellen
-  (Laravel `json()`, unter MariaDB wie `options_json` typischerweise `longtext`)
+  (Laravel `json()`, unter MariaDB wie `options_json` typischerweise `longtext`
+  ohne JSON-Validierungs-CHECK)
 - `ChoiceFieldValueContract` (Select = JSON-String, Multi = JSON-Array,
   historisch inactive, Leer-/XOR-Vertrag)
 - serverseitige Calc-/Dispo-Persistenz, Copy, Completeness; Schema-Props mit

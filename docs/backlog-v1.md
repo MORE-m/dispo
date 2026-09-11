@@ -234,9 +234,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
 - **Offen:** Sichtbare Select-/Multi-Select-UI (C2/C3), volle Regelmatrix, Regel-Editor.
   Options-Fundament (DF-3-REST-A) und Options-Admin (DF-3-REST-B) auf `main`
-  (PR #38 / #39). Serverseitiges Choice-Wertmodell (DF-3-REST-C1) auf
-  Feature-Branch `feat/df3-rest-c1-choice-value-persistence` umgesetzt (noch
-  ohne PR; nicht als auf `main` bezeichnen).
+  (PR #38 / #39). Serverseitiges Choice-Wertmodell (DF-3-REST-C1) vollständig
+  umgesetzt und geprüft; sichtbare UI folgt in C2/C3.
 
 ### BL-P3-02 – Snapshot-Fundament
 

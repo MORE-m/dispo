@@ -11,6 +11,9 @@ use JsonException;
  * DF-3-REST-C1: JSON-Codec für Choice-Werte (Select = JSON-String, Multi = JSON-Array).
  * Kein Array-Zwang wie beim Eloquent-Cast `array`.
  *
+ * Der Cast kennt keinen FieldType und rät nicht: zulässig sind ausschließlich
+ * SQL-NULL, JSON-String (Select-Key) oder JSON-Array aus Strings (Multi).
+ *
  * @implements CastsAttributes<string|list<string>|null, string|list<string>|null>
  */
 final class ChoiceValueJsonCast implements CastsAttributes
@@ -21,19 +24,22 @@ final class ChoiceValueJsonCast implements CastsAttributes
             return null;
         }
 
-        if (! is_string($value)) {
-            return $value;
+        // Driver (MySQL/MariaDB) können JSON bereits als PHP-Wert liefern.
+        if (is_string($value)) {
+            try {
+                $decoded = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException $exception) {
+                throw new InvalidArgumentException(
+                    "Ungültiges JSON in {$key}.",
+                    0,
+                    $exception,
+                );
+            }
+
+            return self::assertDecodableChoicePayload($decoded, $key);
         }
 
-        try {
-            return json_decode($value, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new InvalidArgumentException(
-                "Ungültiges JSON in {$key}.",
-                0,
-                $exception,
-            );
-        }
+        return self::assertDecodableChoicePayload($value, $key);
     }
 
     public function set(Model $model, string $key, mixed $value, array $attributes): ?string
@@ -42,9 +48,11 @@ final class ChoiceValueJsonCast implements CastsAttributes
             return null;
         }
 
+        $payload = self::assertDecodableChoicePayload($value, $key);
+
         try {
             return json_encode(
-                $value,
+                $payload,
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
             );
         } catch (JsonException $exception) {
@@ -54,5 +62,38 @@ final class ChoiceValueJsonCast implements CastsAttributes
                 $exception,
             );
         }
+    }
+
+    /**
+     * @return string|list<string>
+     */
+    private static function assertDecodableChoicePayload(mixed $value, string $key): string|array
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (! is_array($value)) {
+            throw new InvalidArgumentException(
+                "{$key} muss null, ein JSON-String oder ein JSON-Array aus Strings sein.",
+            );
+        }
+
+        if (! array_is_list($value)) {
+            throw new InvalidArgumentException(
+                "{$key} darf kein assoziatives JSON-Objekt sein.",
+            );
+        }
+
+        foreach ($value as $item) {
+            if (! is_string($item)) {
+                throw new InvalidArgumentException(
+                    "{$key} darf nur String-Elemente im JSON-Array enthalten.",
+                );
+            }
+        }
+
+        /** @var list<string> $value */
+        return $value;
     }
 }

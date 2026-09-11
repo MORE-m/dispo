@@ -27,6 +27,14 @@ use Tests\TestCase;
 
 /**
  * DF-3-REST-C1: echte parallele Choice-Partial-Saves gegen dispo_test.
+ *
+ * Abgedeckt: parallele Calc-Select-Updates mit gleicher lock_version → genau
+ * ein Winner, ein 409, Winner in DB.
+ *
+ * Bewusst nicht in C1 (Lücken): parallele native Dispo-Saves, Dispo-Create
+ * während Calc-Änderung, Multi-Select-Concurrency, Inactive-Previous unter
+ * Parallelität, Options-Admin vs. Freeze (Freeze-Isolation indirekt über
+ * Runtime-Vertrag abgesichert).
  */
 class ChoiceValueConcurrencyTest extends TestCase
 {

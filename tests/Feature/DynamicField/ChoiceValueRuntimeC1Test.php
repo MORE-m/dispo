@@ -260,6 +260,76 @@ class ChoiceValueRuntimeC1Test extends TestCase
             ->assertSessionHasErrors('dynamic_field_values.'.$definition->key);
     }
 
+    public function test_historical_inactive_multi_keep_remove_and_readd_rejected(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->activateChoiceOnCore(
+            $admin,
+            FieldType::MultiSelect,
+            FieldScope::Header,
+            FieldAppliesTo::Both,
+            [
+                ['key' => 'opt_a', 'label' => 'A', 'sort' => 1],
+                ['key' => 'opt_b', 'label' => 'B', 'sort' => 2],
+            ],
+        );
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $catalog = $this->createSpotClassicCatalog();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'agency_name' => 'Agentur',
+            'campaign' => 'Kampagne',
+            'product_title' => 'Produkt',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => [
+                $definition->key => ['opt_b', 'opt_a'],
+            ],
+            'positions' => [$this->positionPayload($catalog)],
+        ]), $user);
+
+        SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->update([
+                'options_json' => json_encode([
+                    ['key' => 'opt_a', 'label' => 'A', 'sort' => 1, 'is_active' => true],
+                    ['key' => 'opt_b', 'label' => 'B', 'sort' => 2, 'is_active' => false],
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        $payload['dynamic_field_values'][$definition->key] = ['opt_b', 'opt_a'];
+        $writer->update($calculation->fresh(), $payload, $user);
+
+        $snapDef = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $row = CalculationFieldValue::query()
+            ->where('calculation_id', $calculation->id)
+            ->where('snapshot_field_definition_id', $snapDef->id)
+            ->firstOrFail();
+        $this->assertSame(['opt_a', 'opt_b'], $row->value_json);
+
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        $payload['dynamic_field_values'][$definition->key] = ['opt_a'];
+        $writer->update($calculation->fresh(), $payload, $user);
+        $row->refresh();
+        $this->assertSame(['opt_a'], $row->value_json);
+
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        $payload['dynamic_field_values'][$definition->key] = ['opt_a', 'opt_b'];
+        $this->actingAs($user)
+            ->put(route('calculations.update', $calculation->fresh()), $payload)
+            ->assertSessionHasErrors('dynamic_field_values.'.$definition->key);
+        $row->refresh();
+        $this->assertSame(['opt_a'], $row->value_json);
+    }
+
     public function test_dispo_create_copies_choice_and_completeness_gates(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();

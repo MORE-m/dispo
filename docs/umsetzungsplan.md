@@ -84,8 +84,8 @@ DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI (alles auf `main`; β vi
 PR #25, b via Feature-Branch `feat/df3-3b-assignment-admin-ui`).
 Offen: Sichtbare Select-/Multi-Select-UI (C2/C3), Regel-Editor; Inventar-/Preislisten-Admin.
 Options-Fundament (DF-3-REST-A) und Options-Admin (DF-3-REST-B) auf `main`
-(PR #38 / #39). Serverseitiges Choice-Wertmodell (DF-3-REST-C1) auf Feature-Branch
-`feat/df3-rest-c1-choice-value-persistence` umgesetzt (noch ohne PR).
+(PR #38 / #39). Serverseitiges Choice-Wertmodell (DF-3-REST-C1) vollständig
+umgesetzt und geprüft; sichtbare UI folgt in C2/C3.
 ADV-001c3b1 (Methodenstammdaten/-Lifecycle), ADV-001c3b2
 (Kategorie-Desired-State/Default), ADV-001c3c (Medium-Overrides/Mode/Default),
 ADV-001c4a (Methodenoptions-/Freeze-Persistenz) und ADV-001c4b (sichtbare

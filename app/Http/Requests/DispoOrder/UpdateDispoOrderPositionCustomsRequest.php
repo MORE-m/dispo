@@ -171,17 +171,26 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             foreach ($values as $key => $value) {
                 $key = (string) $key;
                 if (is_array($value)) {
-                    $list = [];
+                    if (! array_is_list($value)) {
+                        continue;
+                    }
+                    $allStrings = true;
                     foreach ($value as $item) {
-                        if (is_string($item)) {
-                            $list[] = $item;
+                        if (! is_string($item)) {
+                            $allStrings = false;
+                            break;
                         }
                     }
-                    $filtered[$key] = $list;
+                    if ($allStrings) {
+                        /** @var list<string> $value */
+                        $filtered[$key] = $value;
+                    }
 
                     continue;
                 }
-                $filtered[$key] = is_string($value) || $value === null ? $value : (string) $value;
+                if (is_string($value) || $value === null) {
+                    $filtered[$key] = $value;
+                }
             }
             $out[(int) $positionId] = $filtered;
         }
