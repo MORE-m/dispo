@@ -16,6 +16,7 @@ use App\Models\FieldSetVersionField;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\SnapshotFieldRuleEvaluator;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -561,7 +562,7 @@ final class FieldSetVersionAdminWriter
                 ]);
             }
 
-            $lockedDraft->load(['fields.revision.definition', 'rules']);
+            $lockedDraft->load(['fields.revision.options', 'fields.revision.definition', 'rules']);
 
             if ($lockedDraft->fields->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -581,6 +582,15 @@ final class FieldSetVersionAdminWriter
                     throw ValidationException::withMessages([
                         'fields' => "Feldschlüssel „{$definition->key}“ ist mehrfach vorhanden.",
                     ]);
+                }
+                if ($definition->field_type->isChoice()) {
+                    $revisionOptions = $membership->revision->options;
+                    $canonical = FieldDefinitionOptionContract::fromRevisionOptions($revisionOptions);
+                    if ($canonical === [] || ! FieldDefinitionOptionContract::hasActiveOption($canonical)) {
+                        throw ValidationException::withMessages([
+                            'fields' => "Auswahlfeld „{$definition->key}“ benötigt mindestens eine aktive Option in der gepinnten Revision.",
+                        ]);
+                    }
                 }
                 if (! $definition->is_system) {
                     if (! $definition->is_active) {

@@ -232,7 +232,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.3b erledigt (Feature-Branch `feat/df3-3b-assignment-admin-ui`):**
   Assignment-Admin-UI mit Herkunft/Konfliktvorschau; PO-33b-1 Read-only-Katalogwahl;
   PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
-- **Offen:** Optionen, volle Regelmatrix, Regel-Editor.
+- **Offen:** Options-Admin-UI, Select-/Multi-Select-Runtime, volle Regelmatrix, Regel-Editor.
+  Options-Fundament (DF-3-REST-A) umgesetzt.
 
 ### BL-P3-02 – Snapshot-Fundament
 

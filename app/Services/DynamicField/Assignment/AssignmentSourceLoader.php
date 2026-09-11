@@ -8,7 +8,9 @@ use App\Enums\FieldSetVersionStatus;
 use App\Models\FieldSet;
 use App\Models\FieldSetAssignment;
 use App\Models\FieldSetVersion;
+use App\Models\FieldSetVersionField;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -146,6 +148,7 @@ final class AssignmentSourceLoader
         /** @var list<FieldSetAssignment> $rows */
         $rows = FieldSetAssignment::query()
             ->with([
+                'fieldSet.activeVersion.fields.revision.options',
                 'fieldSet.activeVersion.fields.revision.definition',
                 'fieldSet.activeVersion.fields.definition',
                 'fieldSet.activeVersion.rules',
@@ -222,7 +225,7 @@ final class AssignmentSourceLoader
 
         /** @var FieldSetVersion $version */
         $version = FieldSetVersion::query()
-            ->with(['fields.revision.definition', 'fields.definition', 'rules'])
+            ->with(['fields.revision.options', 'fields.revision.definition', 'fields.definition', 'rules'])
             ->whereKey($fieldSet->active_version_id)
             ->firstOrFail();
 
@@ -265,9 +268,13 @@ final class AssignmentSourceLoader
         /** @var FieldSetVersion $version */
         $version = $fieldSet->activeVersion
             ?? FieldSetVersion::query()
-                ->with(['fields.revision.definition', 'fields.definition', 'rules'])
+                ->with(['fields.revision.options', 'fields.revision.definition', 'fields.definition', 'rules'])
                 ->whereKey($fieldSet->active_version_id)
                 ->firstOrFail();
+
+        if ($fieldSet->activeVersion !== null) {
+            $version->loadMissing(['fields.revision.options', 'fields.revision.definition', 'fields.definition', 'rules']);
+        }
 
         $source = $this->versionToSource(
             layer: FieldSetAssignmentMergeResolver::layerFromTarget($assignment->target_layer),
@@ -387,6 +394,25 @@ final class AssignmentSourceLoader
             if ($definition === null || $revision === null) {
                 throw new RuntimeException('Membership ohne Definition/Revision.');
             }
+
+            $revision->loadMissing('options');
+            $fieldType = $definition->field_type;
+            $options = $fieldType->isChoice()
+                ? FieldDefinitionOptionContract::fromRevisionOptions($revision->options)
+                : null;
+
+            if ($fieldType->isChoice() && ($options === null || $options === [])) {
+                throw new RuntimeException(
+                    "Auswahlfeld „{$definition->key}“ besitzt in Revision {$revision->id} keine Optionen.",
+                );
+            }
+
+            if ($fieldType->isChoice() && $options !== null && ! FieldDefinitionOptionContract::hasActiveOption($options)) {
+                throw new RuntimeException(
+                    "Auswahlfeld „{$definition->key}“ benötigt mindestens eine aktive Option für den Freeze.",
+                );
+            }
+
             $memberships[] = [
                 'field_definition_id' => $definition->id,
                 'field_definition_revision_id' => $revision->id,
@@ -402,8 +428,9 @@ final class AssignmentSourceLoader
                 'label' => $revision->label,
                 'help_text' => $revision->help_text,
                 'validation_json' => $revision->validation_json,
+                'options_json' => $options,
                 'reportable' => $revision->reportable,
-                'field_type' => $definition->field_type->value,
+                'field_type' => $fieldType->value,
             ];
         }
 
@@ -515,6 +542,7 @@ final class AssignmentSourceLoader
                 'visible_override' => $field['visible_override'],
                 'winning_merge_order' => $field['winning_merge_order'],
                 'winning_layer' => $field['winning_layer'],
+                'options_json' => $field['options_json'] ?? null,
             ];
         }
 
@@ -555,6 +583,7 @@ final class AssignmentSourceLoader
                 'sort' => $membership->sort,
                 'required_override' => $membership->required_override,
                 'visible_override' => $membership->visible_override,
+                'options_json' => $this->membershipOptionsFingerprint($membership),
             ];
         }
 
@@ -577,6 +606,26 @@ final class AssignmentSourceLoader
         }
 
         return $rows;
+    }
+
+    /**
+     * @return list<array{key: string, label: string, sort: int, is_active: bool}>|null
+     */
+    private function membershipOptionsFingerprint(FieldSetVersionField $membership): ?array
+    {
+        $revision = $membership->revision;
+        if ($revision === null) {
+            return null;
+        }
+
+        $definition = $revision->definition ?? $membership->definition;
+        if ($definition === null || ! $definition->field_type->isChoice()) {
+            return null;
+        }
+
+        $revision->loadMissing('options');
+
+        return FieldDefinitionOptionContract::fromRevisionOptions($revision->options);
     }
 
     private function processIsSubsetOfFieldSet(FieldAppliesTo $assignment, FieldAppliesTo $fieldSet): bool

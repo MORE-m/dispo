@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -52,5 +53,15 @@ class FieldDefinitionRevision extends Model
     public function definition(): BelongsTo
     {
         return $this->belongsTo(FieldDefinition::class, 'field_definition_id');
+    }
+
+    /**
+     * @return HasMany<FieldDefinitionRevisionOption, $this>
+     */
+    public function options(): HasMany
+    {
+        return $this->hasMany(FieldDefinitionRevisionOption::class)
+            ->orderBy('sort')
+            ->orderBy('key');
     }
 }

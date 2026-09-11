@@ -9,12 +9,14 @@ use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\ConfigurationSnapshotSource;
+use App\Models\ConfigurationSnapshotSourceField;
 use App\Models\ConfigurationSnapshotSourceRule;
 use App\Models\DispoOrderPosition;
 use App\Models\FieldSetAssignment;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\SnapshotFieldRule;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentMergeResolver;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -218,6 +220,7 @@ final class ConfigurationSnapshotIntegrity
 
             $fieldsBySource[$sourceId] = [];
             foreach ($source->fields as $field) {
+                $this->assertSourceFieldOptions($snapshot, $field);
                 $fieldsBySource[$sourceId][(int) $field->field_definition_id] = true;
             }
 
@@ -241,6 +244,7 @@ final class ConfigurationSnapshotIntegrity
         }
 
         foreach ($snapshot->fieldDefinitions as $definition) {
+            $this->assertDefinitionOptions($snapshot, $definition);
             $this->assertDefinitionProvenance($snapshot, $definition, $sourcesById, $fieldsBySource);
         }
 
@@ -317,6 +321,7 @@ final class ConfigurationSnapshotIntegrity
 
             $fieldsBySource[$sourceId] = [];
             foreach ($source->fields as $field) {
+                $this->assertSourceFieldOptions($snapshot, $field);
                 $fieldsBySource[$sourceId][(int) $field->field_definition_id] = true;
             }
 
@@ -340,6 +345,7 @@ final class ConfigurationSnapshotIntegrity
         }
 
         foreach ($snapshot->fieldDefinitions as $definition) {
+            $this->assertDefinitionOptions($snapshot, $definition);
             $this->assertDefinitionProvenance($snapshot, $definition, $sourcesById, $fieldsBySource);
         }
 
@@ -917,6 +923,36 @@ final class ConfigurationSnapshotIntegrity
 
         if ($sourceRule->source_field_rule_id === null) {
             $this->fail($snapshot, "Source-Rule {$sourceRule->id} ohne source_field_rule_id");
+        }
+    }
+
+    private function assertSourceFieldOptions(
+        ConfigurationSnapshot $snapshot,
+        ConfigurationSnapshotSourceField $field,
+    ): void {
+        try {
+            FieldDefinitionOptionContract::assertFrozenOptions(
+                is_array($field->options_json) ? $field->options_json : null,
+                $field->field_type,
+                (string) $field->field_key,
+            );
+        } catch (RuntimeException $exception) {
+            $this->fail($snapshot, $exception->getMessage());
+        }
+    }
+
+    private function assertDefinitionOptions(
+        ConfigurationSnapshot $snapshot,
+        SnapshotFieldDefinition $definition,
+    ): void {
+        try {
+            FieldDefinitionOptionContract::assertFrozenOptions(
+                is_array($definition->options_json) ? $definition->options_json : null,
+                $definition->field_type,
+                (string) $definition->key,
+            );
+        } catch (RuntimeException $exception) {
+            $this->fail($snapshot, $exception->getMessage());
         }
     }
 

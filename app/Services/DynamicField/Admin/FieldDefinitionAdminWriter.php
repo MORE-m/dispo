@@ -5,6 +5,7 @@ namespace App\Services\DynamicField\Admin;
 use App\Exceptions\FieldDefinitionConflictException;
 use App\Models\FieldDefinition;
 use App\Models\FieldDefinitionRevision;
+use App\Models\FieldDefinitionRevisionOption;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +78,19 @@ final class FieldDefinitionAdminWriter
             $revision->validation_json = $validationJson;
             $revision->created_at = now();
             $revision->save();
+
+            if ($previous !== null && $locked->field_type->isChoice()) {
+                $previous->loadMissing('options');
+                foreach ($previous->options as $previousOption) {
+                    $copy = new FieldDefinitionRevisionOption;
+                    $copy->field_definition_revision_id = $revision->id;
+                    $copy->key = $previousOption->key;
+                    $copy->label = $previousOption->label;
+                    $copy->sort = $previousOption->sort;
+                    $copy->is_active = $previousOption->is_active;
+                    $copy->save();
+                }
+            }
 
             $locked->current_revision_id = $revision->id;
             $locked->lock_version = $locked->lock_version + 1;

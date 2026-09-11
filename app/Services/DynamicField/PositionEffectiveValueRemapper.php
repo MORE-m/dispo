@@ -154,6 +154,7 @@ final class PositionEffectiveValueRemapper
             FieldType::Period => $row->value_period_start === null && $row->value_period_end === null,
             FieldType::ShortText => $this->isBlank($row->value_string),
             FieldType::LongText => $this->isBlank($row->value_text),
+            FieldType::Select, FieldType::MultiSelect => true,
         };
     }
 

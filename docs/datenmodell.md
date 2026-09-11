@@ -436,9 +436,15 @@ PR #25 / `100c79a`.
 
 ### Spätere Ausbaustufen
 
+Umgesetzt in DF-3-REST-A (Fundament, ohne Admin-/Runtime-UI):
+
+- `FieldDefinitionRevisionOption` / Auswahloptionen an Revisionen
+- Enum `select` / `multi_select`
+- additives Gen3-`options_json`-Freeze
+
 Konzeptuell vorgesehen, aber **nicht implementiert**:
 
-- `FieldOption` / Auswahloptionen,
+- Options-Admin-UI und Select-/Multi-Select-Runtime (`value_json`)
 - `SystemFieldSetting`,
 - Regel-Editor / volle Regelmatrix.
 
