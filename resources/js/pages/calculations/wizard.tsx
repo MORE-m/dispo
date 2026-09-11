@@ -2,6 +2,7 @@ import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { CalculationMethodSelector } from '@/components/calculation-method-selector';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
 import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
@@ -19,6 +20,7 @@ import {
 } from '@/components/discount-list-editor';
 import {
     FormField,
+    formSelectClass,
     formTextareaClass,
     formatPercent,
     money,
@@ -40,6 +42,17 @@ import {
     type DayGroupOption,
     type TimeRangeDraft,
 } from '@/lib/pricing-time';
+import {
+    calculationMethodPayloadFields,
+    hasSubmittableCalculationMethodKey,
+    initMethodStateForExistingPosition,
+    initMethodStateForNewPosition,
+    methodStateAfterMediumIdChange,
+    NO_CALCULATION_METHOD_MESSAGE,
+    restoreHistoricalCalculationMethod,
+    selectLiveCalculationMethod,
+    type CalculationMethodOptions,
+} from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import {
     EmptyState,
@@ -126,7 +139,11 @@ type PositionDraft = {
     schema_fingerprint?: string | null;
     /** DF-3.3a2β: Positions-Schema (Effektiv bzw. Live je Medium). */
     field_schema?: FieldSchema | null;
-    spot_method: string;
+    /** ADV-001c4b: fachlicher Methoden-Key (moderner Wizard-Payload). */
+    calculation_method_key: string | null;
+    calculation_method_name: string | null;
+    historical_calculation_method_key: string | null;
+    historical_calculation_method_name: string | null;
     length_seconds: number;
     total_spot_count: number;
     needs_spot_redistribution?: boolean;
@@ -162,6 +179,7 @@ type Catalog = {
         is_active: boolean;
         is_bookable_for_new_positions: boolean;
         unbookable_reason: string | null;
+        calculation_method_options?: CalculationMethodOptions | null;
     }[];
     rules: {
         id: number;
@@ -288,7 +306,9 @@ type SavedCalculation = {
         advertising_medium_id: number;
         schema_fingerprint?: string | null;
         field_schema?: FieldSchema | null;
-        spot_method: string;
+        spot_method?: string;
+        calculation_method_key?: string | null;
+        calculation_method_name?: string | null;
         length_seconds: number;
         total_spot_count: number;
         needs_spot_redistribution?: boolean;
@@ -415,8 +435,18 @@ function catalogLabel(name: string, isActive: boolean): string {
     return isActive ? name : `${name} (inaktiv – historisch)`;
 }
 
+function methodOptionsForMedium(
+    catalog: Catalog,
+    mediumId: number,
+): CalculationMethodOptions | null {
+    return (
+        catalog.media.find((item) => item.id === mediumId)
+            ?.calculation_method_options ?? null
+    );
+}
+
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
-    // ADV-001c3a bis c4: ausschließlich Spot Classic (kein Fallback auf andere buchbare Medien).
+    // ADV-001c4b: erstes aktives, buchbares Medium mit Inventarregel (kein Code-Hardcode).
     const preferredMedium =
         catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
         null;
@@ -433,11 +463,15 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             continue;
         }
 
+        const methodState = initMethodStateForNewPosition(
+            preferredMedium.calculation_method_options,
+        );
+
         return {
             client_key: newClientKey(),
             inventory_id: inventory.id,
             advertising_medium_id: preferredMedium.id,
-            spot_method: 'average',
+            ...methodState,
             length_seconds:
                 rule.default_length_seconds ??
                 preferredMedium.default_length_seconds,
@@ -687,56 +721,73 @@ export default function CalculationWizard({
     const [proposalError, setProposalError] = useState<string | null>(null);
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
-            return calculation.positions.map((position) => ({
-                id: position.id,
-                client_key: position.client_key ?? newClientKey(),
-                inventory_id: position.inventory_id,
-                advertising_medium_id: position.advertising_medium_id,
-                schema_fingerprint: position.schema_fingerprint ?? null,
-                field_schema: position.field_schema ?? null,
-                spot_method: position.spot_method ?? 'average',
-                length_seconds: position.length_seconds,
-                total_spot_count: position.total_spot_count,
-                needs_spot_redistribution: position.needs_spot_redistribution,
-                position_discount_percent: String(
-                    position.position_discount_percent,
-                ),
-                ae_percent: String(position.ae_percent),
-                plan_rows: position.plan_rows.map((row) => ({
-                    hour: row.hour,
-                    day_group: row.day_group,
-                    second_price: row.second_price,
-                })),
-                time_ranges: draftTimeRanges(position),
-                position_discounts: draftDiscounts(
-                    position.position_discounts,
-                    position.position_discount_percent,
-                ),
-                period_open: position.dynamic_field_values?.period_open ?? true,
-                flight_period_start:
-                    position.dynamic_field_values?.position_flight_period
-                        ?.start ?? '',
-                flight_period_end:
-                    position.dynamic_field_values?.position_flight_period
-                        ?.end ?? '',
-                custom_fields: Object.fromEntries(
-                    customPositionTextFieldsFromSchema(
-                        schemaFieldsForPosition(
-                            { field_schema: position.field_schema ?? null },
-                            fieldSchema,
-                            (fieldSchema.format_version ?? 0) >= 3,
-                        ),
-                    ).map((field) => {
-                        const raw = position.dynamic_field_values?.[field.key];
-                        return [
-                            field.key,
-                            typeof raw === 'string' || typeof raw === 'number'
-                                ? String(raw)
-                                : '',
-                        ];
-                    }),
-                ),
-            }));
+            return calculation.positions.map((position) => {
+                const methodState = initMethodStateForExistingPosition(
+                    methodOptionsForMedium(
+                        catalog,
+                        position.advertising_medium_id,
+                    ),
+                    position.calculation_method_key ??
+                        position.spot_method ??
+                        null,
+                    position.calculation_method_name ?? null,
+                );
+
+                return {
+                    id: position.id,
+                    client_key: position.client_key ?? newClientKey(),
+                    inventory_id: position.inventory_id,
+                    advertising_medium_id: position.advertising_medium_id,
+                    schema_fingerprint: position.schema_fingerprint ?? null,
+                    field_schema: position.field_schema ?? null,
+                    ...methodState,
+                    length_seconds: position.length_seconds,
+                    total_spot_count: position.total_spot_count,
+                    needs_spot_redistribution:
+                        position.needs_spot_redistribution,
+                    position_discount_percent: String(
+                        position.position_discount_percent,
+                    ),
+                    ae_percent: String(position.ae_percent),
+                    plan_rows: position.plan_rows.map((row) => ({
+                        hour: row.hour,
+                        day_group: row.day_group,
+                        second_price: row.second_price,
+                    })),
+                    time_ranges: draftTimeRanges(position),
+                    position_discounts: draftDiscounts(
+                        position.position_discounts,
+                        position.position_discount_percent,
+                    ),
+                    period_open:
+                        position.dynamic_field_values?.period_open ?? true,
+                    flight_period_start:
+                        position.dynamic_field_values?.position_flight_period
+                            ?.start ?? '',
+                    flight_period_end:
+                        position.dynamic_field_values?.position_flight_period
+                            ?.end ?? '',
+                    custom_fields: Object.fromEntries(
+                        customPositionTextFieldsFromSchema(
+                            schemaFieldsForPosition(
+                                { field_schema: position.field_schema ?? null },
+                                fieldSchema,
+                                (fieldSchema.format_version ?? 0) >= 3,
+                            ),
+                        ).map((field) => {
+                            const raw =
+                                position.dynamic_field_values?.[field.key];
+                            return [
+                                field.key,
+                                typeof raw === 'string' ||
+                                typeof raw === 'number'
+                                    ? String(raw)
+                                    : '',
+                            ];
+                        }),
+                    ),
+                };
+            });
         }
 
         if (calculation?.planning_mode === 'budget') {
@@ -906,6 +957,8 @@ export default function CalculationWizard({
                 ? []
                 : positions.map((position) => {
                       const ranges = payloadTimeRanges(position.time_ranges);
+                      const methodPayload =
+                          calculationMethodPayloadFields(position);
 
                       return {
                           id: position.id,
@@ -914,7 +967,7 @@ export default function CalculationWizard({
                           advertising_medium_id: position.advertising_medium_id,
                           schema_fingerprint:
                               position.schema_fingerprint ?? null,
-                          spot_method: position.spot_method,
+                          ...methodPayload,
                           length_seconds: position.length_seconds,
                           total_spot_count: totalSpotCount(
                               position.time_ranges,
@@ -1077,7 +1130,12 @@ export default function CalculationWizard({
                         media.find(
                             (candidate) =>
                                 candidate.id === item.advertising_medium_id,
-                        ) ?? media[0];
+                        ) ??
+                        media.find(
+                            (candidate) =>
+                                candidate.id === next.advertising_medium_id,
+                        ) ??
+                        media[0];
 
                     if (!medium) {
                         return item;
@@ -1088,11 +1146,26 @@ export default function CalculationWizard({
                         patch.inventory_id,
                         medium.id,
                     );
+                    const methodState = methodStateAfterMediumIdChange(
+                        item.advertising_medium_id,
+                        medium.id,
+                        {
+                            calculation_method_key: item.calculation_method_key,
+                            calculation_method_name:
+                                item.calculation_method_name,
+                            historical_calculation_method_key:
+                                item.historical_calculation_method_key,
+                            historical_calculation_method_name:
+                                item.historical_calculation_method_name,
+                        },
+                        medium.calculation_method_options,
+                    );
 
                     next = {
                         ...next,
                         inventory_id: patch.inventory_id,
                         advertising_medium_id: medium.id,
+                        ...methodState,
                         length_seconds:
                             rule?.default_length_seconds ??
                             medium.default_length_seconds,
@@ -1102,6 +1175,41 @@ export default function CalculationWizard({
                         time_ranges: [emptyTimeRange()],
                         position_discounts: [],
                         total_spot_count: 0,
+                    };
+                } else if (patch.advertising_medium_id !== undefined) {
+                    const medium = catalog.media.find(
+                        (candidate) =>
+                            candidate.id === patch.advertising_medium_id,
+                    );
+                    if (!medium) {
+                        return item;
+                    }
+
+                    const rule = ruleFor(catalog, next.inventory_id, medium.id);
+                    const methodState = methodStateAfterMediumIdChange(
+                        item.advertising_medium_id,
+                        medium.id,
+                        {
+                            calculation_method_key: item.calculation_method_key,
+                            calculation_method_name:
+                                item.calculation_method_name,
+                            historical_calculation_method_key:
+                                item.historical_calculation_method_key,
+                            historical_calculation_method_name:
+                                item.historical_calculation_method_name,
+                        },
+                        medium.calculation_method_options,
+                    );
+
+                    next = {
+                        ...next,
+                        advertising_medium_id: medium.id,
+                        ...methodState,
+                        length_seconds:
+                            rule?.default_length_seconds ??
+                            medium.default_length_seconds,
+                        schema_fingerprint: null,
+                        field_schema: null,
                     };
                 }
 
@@ -1121,6 +1229,16 @@ export default function CalculationWizard({
     }
 
     function save() {
+        const missingMethod = positions.find(
+            (position) => !hasSubmittableCalculationMethodKey(position),
+        );
+        if (missingMethod && !isBudgetSetup) {
+            setSaveError(
+                `Speichern nicht möglich: ${NO_CALCULATION_METHOD_MESSAGE}`,
+            );
+            return;
+        }
+
         setBusy(true);
         setSaveError(null);
         setSaveFieldErrors({});
@@ -1298,7 +1416,9 @@ export default function CalculationWizard({
                     client_key: existing?.client_key ?? newClientKey(),
                     inventory_id: item.inventory_id,
                     advertising_medium_id: mediumId,
-                    spot_method: 'average',
+                    ...initMethodStateForNewPosition(
+                        methodOptionsForMedium(catalog, mediumId),
+                    ),
                     length_seconds:
                         item.length_seconds ??
                         element?.spot_length_seconds ??
@@ -1907,13 +2027,87 @@ export default function CalculationWizard({
                                                         </div>
 
                                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            <FormField label="Kalkulationsart">
-                                                                <Input
-                                                                    readOnly
-                                                                    value="Durchschnitt"
-                                                                    disabled
-                                                                    className="bg-muted/50 text-muted-foreground"
-                                                                />
+                                                            <FormField
+                                                                label="Werbemittel"
+                                                                htmlFor={`medium-${index}`}
+                                                            >
+                                                                <select
+                                                                    id={`medium-${index}`}
+                                                                    data-test={`position-medium-${index}`}
+                                                                    className={
+                                                                        formSelectClass
+                                                                    }
+                                                                    value={
+                                                                        position.advertising_medium_id
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                advertising_medium_id:
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    ),
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    {(() => {
+                                                                        const allowed =
+                                                                            allowedMediaFor(
+                                                                                position.inventory_id,
+                                                                            );
+                                                                        const current =
+                                                                            catalog.media.find(
+                                                                                (
+                                                                                    medium,
+                                                                                ) =>
+                                                                                    medium.id ===
+                                                                                    position.advertising_medium_id,
+                                                                            );
+                                                                        const options =
+                                                                            current &&
+                                                                            !allowed.some(
+                                                                                (
+                                                                                    medium,
+                                                                                ) =>
+                                                                                    medium.id ===
+                                                                                    current.id,
+                                                                            )
+                                                                                ? [
+                                                                                      current,
+                                                                                      ...allowed,
+                                                                                  ]
+                                                                                : allowed;
+
+                                                                        return options.map(
+                                                                            (
+                                                                                medium,
+                                                                            ) => (
+                                                                                <option
+                                                                                    key={
+                                                                                        medium.id
+                                                                                    }
+                                                                                    value={
+                                                                                        medium.id
+                                                                                    }
+                                                                                >
+                                                                                    {catalogLabel(
+                                                                                        medium.name,
+                                                                                        medium.is_active,
+                                                                                    )}
+                                                                                </option>
+                                                                            ),
+                                                                        );
+                                                                    })()}
+                                                                </select>
                                                             </FormField>
                                                             <FormField
                                                                 label="Länge (Sekunden)"
@@ -1973,23 +2167,12 @@ export default function CalculationWizard({
                                                             >
                                                                 <Checkbox
                                                                     id={`period-open-${index}`}
+                                                                    data-test={`period-open-${index}`}
                                                                     checked={
                                                                         position.period_open
                                                                     }
                                                                     disabled={
                                                                         !canEdit
-                                                                    }
-                                                                    data-test={`period-open-${index}`}
-                                                                    aria-label={
-                                                                        positionFields.find(
-                                                                            (
-                                                                                field,
-                                                                            ) =>
-                                                                                field.key ===
-                                                                                'period_open',
-                                                                        )
-                                                                            ?.label ??
-                                                                        'Zeitraum offen'
                                                                     }
                                                                     onCheckedChange={(
                                                                         checked,
@@ -2005,6 +2188,78 @@ export default function CalculationWizard({
                                                                     }
                                                                 />
                                                             </FormField>
+                                                        </div>
+
+                                                        <CalculationMethodSelector
+                                                            positionIndex={
+                                                                index
+                                                            }
+                                                            options={methodOptionsForMedium(
+                                                                catalog,
+                                                                position.advertising_medium_id,
+                                                            )}
+                                                            state={{
+                                                                calculation_method_key:
+                                                                    position.calculation_method_key,
+                                                                calculation_method_name:
+                                                                    position.calculation_method_name,
+                                                                historical_calculation_method_key:
+                                                                    position.historical_calculation_method_key,
+                                                                historical_calculation_method_name:
+                                                                    position.historical_calculation_method_name,
+                                                            }}
+                                                            disabled={!canEdit}
+                                                            error={
+                                                                fieldErrors[
+                                                                    `positions.${index}.calculation_method_key`
+                                                                ]?.[0]
+                                                            }
+                                                            onSelectLiveKey={(
+                                                                key,
+                                                            ) => {
+                                                                const next =
+                                                                    selectLiveCalculationMethod(
+                                                                        {
+                                                                            calculation_method_key:
+                                                                                position.calculation_method_key,
+                                                                            calculation_method_name:
+                                                                                position.calculation_method_name,
+                                                                            historical_calculation_method_key:
+                                                                                position.historical_calculation_method_key,
+                                                                            historical_calculation_method_name:
+                                                                                position.historical_calculation_method_name,
+                                                                        },
+                                                                        methodOptionsForMedium(
+                                                                            catalog,
+                                                                            position.advertising_medium_id,
+                                                                        ),
+                                                                        key,
+                                                                    );
+                                                                updatePosition(
+                                                                    index,
+                                                                    next,
+                                                                );
+                                                            }}
+                                                            onRestoreHistorical={() =>
+                                                                updatePosition(
+                                                                    index,
+                                                                    restoreHistoricalCalculationMethod(
+                                                                        {
+                                                                            calculation_method_key:
+                                                                                position.calculation_method_key,
+                                                                            calculation_method_name:
+                                                                                position.calculation_method_name,
+                                                                            historical_calculation_method_key:
+                                                                                position.historical_calculation_method_key,
+                                                                            historical_calculation_method_name:
+                                                                                position.historical_calculation_method_name,
+                                                                        },
+                                                                    ),
+                                                                )
+                                                            }
+                                                        />
+
+                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                             {requiredPositionFieldKeysFromSnapshotRules(
                                                                 positionRules,
                                                                 {
@@ -2163,14 +2418,6 @@ export default function CalculationWizard({
                                                                 </div>
                                                             ) : null}
                                                         </div>
-
-                                                        <input
-                                                            type="hidden"
-                                                            value={
-                                                                position.advertising_medium_id
-                                                            }
-                                                            readOnly
-                                                        />
 
                                                         <PriceTimeRanges
                                                             positionIndex={
