@@ -242,9 +242,7 @@ export default function FieldDefinitionOptionsEditor({
             setDrafts(rowsFromServer(response.options));
             setPreview(null);
             setSuccess(
-                response.has_changes
-                    ? response.message
-                    : 'Keine Änderungen',
+                response.has_changes ? response.message : 'Keine Änderungen',
             );
             onApplied(response);
         } catch (caught) {
@@ -325,7 +323,9 @@ export default function FieldDefinitionOptionsEditor({
             ) : null}
 
             {fieldErrors.options ? (
-                <p className="text-destructive text-sm">{fieldErrors.options}</p>
+                <p className="text-destructive text-sm">
+                    {fieldErrors.options}
+                </p>
             ) : null}
             {fieldErrors.definition ? (
                 <p className="text-destructive text-sm">
@@ -393,11 +393,13 @@ export default function FieldDefinitionOptionsEditor({
                                         id={`option-label-${row.clientId}`}
                                         value={row.label}
                                         onChange={(e) =>
-                                            patchDraft(row.clientId, (current) =>
-                                                applyLabelChange(
-                                                    current,
-                                                    e.target.value,
-                                                ),
+                                            patchDraft(
+                                                row.clientId,
+                                                (current) =>
+                                                    applyLabelChange(
+                                                        current,
+                                                        e.target.value,
+                                                    ),
                                             )
                                         }
                                         data-test={`field-definition-option-label-${row.key || row.clientId}`}
@@ -424,11 +426,14 @@ export default function FieldDefinitionOptionsEditor({
                                                 : 'font-mono'
                                         }
                                         onChange={(e) =>
-                                            patchDraft(row.clientId, (current) => ({
-                                                ...current,
-                                                key: e.target.value,
-                                                keyTouched: true,
-                                            }))
+                                            patchDraft(
+                                                row.clientId,
+                                                (current) => ({
+                                                    ...current,
+                                                    key: e.target.value,
+                                                    keyTouched: true,
+                                                }),
+                                            )
                                         }
                                         data-test={`field-definition-option-key-${row.key || row.clientId}`}
                                     />
@@ -447,13 +452,17 @@ export default function FieldDefinitionOptionsEditor({
                                             const raw = e.target.value;
                                             const parsed =
                                                 parseStrictSortInput(raw);
-                                            patchDraft(row.clientId, (current) => ({
-                                                ...current,
-                                                sortInput: raw,
-                                                sort:
-                                                    parsed.value ?? current.sort,
-                                                sortError: parsed.error,
-                                            }));
+                                            patchDraft(
+                                                row.clientId,
+                                                (current) => ({
+                                                    ...current,
+                                                    sortInput: raw,
+                                                    sort:
+                                                        parsed.value ??
+                                                        current.sort,
+                                                    sortError: parsed.error,
+                                                }),
+                                            );
                                         }}
                                         data-test={`field-definition-option-sort-${row.key || row.clientId}`}
                                     />
@@ -467,10 +476,13 @@ export default function FieldDefinitionOptionsEditor({
                                         variant="outline"
                                         disabled={busy}
                                         onClick={() =>
-                                            patchDraft(row.clientId, (current) => ({
-                                                ...current,
-                                                is_active: false,
-                                            }))
+                                            patchDraft(
+                                                row.clientId,
+                                                (current) => ({
+                                                    ...current,
+                                                    is_active: false,
+                                                }),
+                                            )
                                         }
                                         data-test={`field-definition-option-deactivate-${row.key || row.clientId}`}
                                     >
@@ -482,10 +494,13 @@ export default function FieldDefinitionOptionsEditor({
                                         variant="outline"
                                         disabled={busy}
                                         onClick={() =>
-                                            patchDraft(row.clientId, (current) => ({
-                                                ...current,
-                                                is_active: true,
-                                            }))
+                                            patchDraft(
+                                                row.clientId,
+                                                (current) => ({
+                                                    ...current,
+                                                    is_active: true,
+                                                }),
+                                            )
                                         }
                                         data-test={`field-definition-option-reactivate-${row.key || row.clientId}`}
                                     >

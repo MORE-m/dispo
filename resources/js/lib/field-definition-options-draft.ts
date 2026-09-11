@@ -118,13 +118,16 @@ export function activeOptionCount(rows: Array<{ is_active: boolean }>): number {
     return rows.filter((row) => row.is_active).length;
 }
 
-export function hasZeroActiveWarning(rows: Array<{ is_active: boolean }>): boolean {
+export function hasZeroActiveWarning(
+    rows: Array<{ is_active: boolean }>,
+): boolean {
     return activeOptionCount(rows) === 0;
 }
 
-export function toPayloadOptions(
-    rows: DraftOptionRow[],
-): { options: OptionRow[]; errors: Record<string, string> } {
+export function toPayloadOptions(rows: DraftOptionRow[]): {
+    options: OptionRow[];
+    errors: Record<string, string>;
+} {
     const errors: Record<string, string> = {};
     const options: OptionRow[] = [];
 
@@ -137,7 +140,8 @@ export function toPayloadOptions(
             return;
         }
         if (row.label.trim() === '') {
-            errors[`${row.clientId}.label`] = 'Das Optionslabel darf nicht leer sein.';
+            errors[`${row.clientId}.label`] =
+                'Das Optionslabel darf nicht leer sein.';
         }
         if (row.label.trim().length > 255) {
             errors[`${row.clientId}.label`] =
@@ -159,7 +163,8 @@ export function toPayloadOptions(
     });
 
     if (rows.length > 100) {
-        errors.options = 'Es sind maximal 100 Optionen pro Felddefinition zulässig.';
+        errors.options =
+            'Es sind maximal 100 Optionen pro Felddefinition zulässig.';
     }
 
     return { options, errors };
@@ -225,7 +230,10 @@ export function buildLocalChangeSummary(
     };
 }
 
-export function applyLabelChange(row: DraftOptionRow, label: string): DraftOptionRow {
+export function applyLabelChange(
+    row: DraftOptionRow,
+    label: string,
+): DraftOptionRow {
     const next: DraftOptionRow = { ...row, label };
     if (!row.persisted && !row.keyTouched) {
         next.key = slugFromLabel(label);

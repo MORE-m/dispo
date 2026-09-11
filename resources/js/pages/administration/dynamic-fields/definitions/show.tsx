@@ -286,8 +286,7 @@ export default function DefinitionShow({
                         variant={definition.is_active ? 'secondary' : 'outline'}
                         data-test="field-definition-active-badge"
                     >
-                        Feld{' '}
-                        {definition.is_active ? 'aktiv' : 'inaktiv'}
+                        Feld {definition.is_active ? 'aktiv' : 'inaktiv'}
                     </Badge>
                     <span className="text-muted-foreground">
                         Sperrversion {definition.lock_version}
