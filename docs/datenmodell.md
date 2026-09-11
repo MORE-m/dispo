@@ -311,7 +311,10 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 | `calculation_position_field_values` | typisierte Positionswerte (`value_text` MEDIUMTEXT ab DF-3.2b) |
 | `calculations.configuration_snapshot_id` | FK auf den Config-Snapshot der Kalkulation |
 
-Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`, Textfelder), nicht als generisches JSON-Blob.
+Werte liegen typisiert in Spalten (`value_boolean`, `value_period_start`/`end`,
+Textfelder, ab DF-3-REST-C1 zusätzlich `value_json` für Choice), nicht als
+generisches untypisiertes JSON-Blob. Select speichert einen JSON-String-Key,
+Multi-Select ein JSON-Array kanonischer Keys; XOR im Application-Layer.
 
 ### DF-2 – Dispoauftrag (umgesetzt)
 
@@ -436,15 +439,25 @@ PR #25 / `100c79a`.
 
 ### Spätere Ausbaustufen
 
-Umgesetzt in DF-3-REST-A (Fundament, ohne Admin-/Runtime-UI):
+Umgesetzt in DF-3-REST-A (Fundament) und DF-3-REST-B (Options-Admin auf `main`):
 
 - `FieldDefinitionRevisionOption` / Auswahloptionen an Revisionen
 - Enum `select` / `multi_select`
 - additives Gen3-`options_json`-Freeze
+- Options-Admin-UI
+
+Umgesetzt in DF-3-REST-C1 (Feature-Branch `feat/df3-rest-c1-choice-value-persistence`,
+noch nicht auf `main`):
+
+- additives `value_json` an den vier dynamischen Wertetabellen
+- `ChoiceFieldValueContract` (Select = JSON-String, Multi = JSON-Array,
+  historisch inactive, Leer-/XOR-Vertrag)
+- serverseitige Calc-/Dispo-Persistenz, Copy, Completeness; Schema-Props mit
+  `options_json`
 
 Konzeptuell vorgesehen, aber **nicht implementiert**:
 
-- Options-Admin-UI und Select-/Multi-Select-Runtime (`value_json`)
+- sichtbare Select-/Multi-Select-UI (C2/C3)
 - `SystemFieldSetting`,
 - Regel-Editor / volle Regelmatrix.
 
