@@ -47,6 +47,9 @@ export default function DefinitionCreate({
         // eslint-disable-next-line react-hooks/exhaustive-deps -- preview only tracks label
     }, [form.data.label, keyTouched]);
 
+    const isChoice =
+        form.data.field_type === 'select' ||
+        form.data.field_type === 'multi_select';
     const maxHint =
         form.data.field_type === 'short_text'
             ? 'Standard 255, max. 255'
@@ -58,7 +61,7 @@ export default function DefinitionCreate({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Eigenes Feld anlegen"
-                    description="Textfeld (short_text / long_text) für Header oder Position."
+                    description="Eigenes Feld (Text oder Auswahl) für Header oder Position."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/administration/dynamische-felder/definitionen">
@@ -73,24 +76,36 @@ export default function DefinitionCreate({
                     data-test="custom-field-definition-create-form"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        form.transform((data) => ({
-                            ...data,
-                            key:
-                                data.key.trim() === '' ? null : data.key.trim(),
-                            help_text:
-                                data.help_text.trim() === ''
-                                    ? null
-                                    : data.help_text,
-                            group_key:
-                                data.group_key.trim() === ''
-                                    ? null
-                                    : data.group_key,
-                            max_length:
-                                data.max_length === '' ||
-                                data.max_length === null
-                                    ? null
-                                    : Number(data.max_length),
-                        }));
+                        form.transform((data) => {
+                            const choice =
+                                data.field_type === 'select' ||
+                                data.field_type === 'multi_select';
+                            const payload: Record<string, unknown> = {
+                                ...data,
+                                key:
+                                    data.key.trim() === ''
+                                        ? null
+                                        : data.key.trim(),
+                                help_text:
+                                    data.help_text.trim() === ''
+                                        ? null
+                                        : data.help_text,
+                                group_key:
+                                    data.group_key.trim() === ''
+                                        ? null
+                                        : data.group_key,
+                            };
+                            if (choice) {
+                                delete payload.max_length;
+                            } else {
+                                payload.max_length =
+                                    data.max_length === '' ||
+                                    data.max_length === null
+                                        ? null
+                                        : Number(data.max_length);
+                            }
+                            return payload;
+                        });
                         form.post(
                             '/administration/dynamische-felder/definitionen',
                         );
@@ -140,9 +155,12 @@ export default function DefinitionCreate({
                             onChange={(e) =>
                                 form.setData('field_type', e.target.value)
                             }
+                            data-test="custom-field-type-select"
                         >
                             <option value="short_text">short_text</option>
                             <option value="long_text">long_text</option>
+                            <option value="select">select</option>
+                            <option value="multi_select">multi_select</option>
                         </select>
                     </FormField>
 
@@ -184,32 +202,34 @@ export default function DefinitionCreate({
                         </select>
                     </FormField>
 
-                    <FormField
-                        label="Maximallänge"
-                        htmlFor="max_length"
-                        error={form.errors.max_length}
-                        hint={maxHint}
-                    >
-                        <Input
-                            id="max_length"
-                            type="number"
-                            min={1}
-                            max={
-                                form.data.field_type === 'short_text'
-                                    ? 255
-                                    : 20000
-                            }
-                            value={form.data.max_length}
-                            onChange={(e) =>
-                                form.setData(
-                                    'max_length',
-                                    e.target.value === ''
-                                        ? ''
-                                        : Number(e.target.value),
-                                )
-                            }
-                        />
-                    </FormField>
+                    {!isChoice ? (
+                        <FormField
+                            label="Maximallänge"
+                            htmlFor="max_length"
+                            error={form.errors.max_length}
+                            hint={maxHint}
+                        >
+                            <Input
+                                id="max_length"
+                                type="number"
+                                min={1}
+                                max={
+                                    form.data.field_type === 'short_text'
+                                        ? 255
+                                        : 20000
+                                }
+                                value={form.data.max_length}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'max_length',
+                                        e.target.value === ''
+                                            ? ''
+                                            : Number(e.target.value),
+                                    )
+                                }
+                            />
+                        </FormField>
+                    ) : null}
 
                     <FormField
                         label="Hilfetext"
