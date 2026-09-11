@@ -31,7 +31,6 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             'lock_version' => ['required', 'integer', 'min:1'],
             'position_dynamic_field_values' => ['required', 'array'],
             'position_dynamic_field_values.*' => ['array'],
-            'position_dynamic_field_values.*.*' => ['nullable', 'string'],
         ];
     }
 
@@ -92,9 +91,47 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
                     }
 
                     $def = $editableByKey[$key];
+                    $errorKey = "position_dynamic_field_values.{$positionId}.{$key}";
+
+                    if ($def->field_type === FieldType::MultiSelect) {
+                        if ($raw === null) {
+                            continue;
+                        }
+                        if (! is_array($raw)) {
+                            $validator->errors()->add(
+                                $errorKey,
+                                $def->label.' muss eine Liste sein.',
+                            );
+
+                            continue;
+                        }
+                        foreach ($raw as $item) {
+                            if (! is_string($item)) {
+                                $validator->errors()->add(
+                                    $errorKey,
+                                    $def->label.' darf nur Textwerte enthalten.',
+                                );
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
+
+                    if ($def->field_type === FieldType::Select) {
+                        if ($raw !== null && ! is_string($raw)) {
+                            $validator->errors()->add(
+                                $errorKey,
+                                $def->label.' muss Text sein.',
+                            );
+                        }
+
+                        continue;
+                    }
+
                     if ($raw !== null && ! is_string($raw)) {
                         $validator->errors()->add(
-                            "position_dynamic_field_values.{$positionId}.{$key}",
+                            $errorKey,
                             $def->label.' muss Text sein.',
                         );
 
@@ -104,7 +141,7 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
                     $max = $this->maxLengthForDefinition($def);
                     if (is_string($raw) && mb_strlen($raw) > $max) {
                         $validator->errors()->add(
-                            "position_dynamic_field_values.{$positionId}.{$key}",
+                            $errorKey,
                             $def->label." darf höchstens {$max} Zeichen haben.",
                         );
                     }
@@ -119,7 +156,7 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
     }
 
     /**
-     * @return array<int, array<string, string|null>>
+     * @return array<int, array<string, string|list<string>|null>>
      */
     public function positionDynamicFieldValues(): array
     {
@@ -132,7 +169,19 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             }
             $filtered = [];
             foreach ($values as $key => $value) {
-                $filtered[(string) $key] = is_string($value) || $value === null ? $value : (string) $value;
+                $key = (string) $key;
+                if (is_array($value)) {
+                    $list = [];
+                    foreach ($value as $item) {
+                        if (is_string($item)) {
+                            $list[] = $item;
+                        }
+                    }
+                    $filtered[$key] = $list;
+
+                    continue;
+                }
+                $filtered[$key] = is_string($value) || $value === null ? $value : (string) $value;
             }
             $out[(int) $positionId] = $filtered;
         }
@@ -184,7 +233,12 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
         if (! $def->visible) {
             return false;
         }
-        if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+        if (! in_array($def->field_type, [
+            FieldType::ShortText,
+            FieldType::LongText,
+            FieldType::Select,
+            FieldType::MultiSelect,
+        ], true)) {
             return false;
         }
 

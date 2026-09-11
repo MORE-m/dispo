@@ -6,6 +6,7 @@ use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
+use App\Enums\FieldType;
 use App\Enums\PlanningMode;
 use App\Http\Requests\Calculation\BudgetProposalPayloadRequest;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
@@ -31,6 +32,7 @@ use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -637,6 +639,7 @@ class CalculationController extends Controller
                 'visible' => (bool) $def->visible,
                 'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
                 'validation_json' => $def->validation_json,
+                'options_json' => $this->optionsJsonForSchemaProp($def->field_type, $def->options_json),
             ])->values()->all(),
             'rules' => $snapshot->rules->map(fn ($rule): array => [
                 'condition' => $rule->condition_json,
@@ -702,6 +705,7 @@ class CalculationController extends Controller
                 'visible' => (bool) $def->visible,
                 'max_length' => $this->maxLengthFromValidation($def->validation_json, (string) $def->field_type->value),
                 'validation_json' => $def->validation_json,
+                'options_json' => $this->optionsJsonForSchemaProp($def->field_type, $def->options_json),
             ])->values()->all(),
             'rules' => $effective->rules->map(fn ($rule): array => [
                 'condition' => $rule->condition_json,
@@ -729,23 +733,31 @@ class CalculationController extends Controller
     private function liveFieldSchemaProp(array $resolved): array
     {
         return [
-            'fields' => array_map(fn (array $field): array => [
-                'key' => (string) $field['field_key'],
-                'field_type' => (string) $field['field_type'],
-                'label' => (string) $field['label'],
-                'help_text' => $field['help_text'] ?? null,
-                'scope' => (string) $field['field_scope'],
-                'applies_to' => (string) $field['applies_to'],
-                'sort' => (int) $field['sort'],
-                'is_system' => (bool) $field['definition_is_system'],
-                'required' => (bool) $field['effective_required'],
-                'visible' => (bool) $field['effective_visible'],
-                'max_length' => $this->maxLengthFromValidation(
-                    $field['validation_json'] ?? null,
-                    (string) $field['field_type'],
-                ),
-                'validation_json' => $field['validation_json'] ?? null,
-            ], $resolved['fields']),
+            'fields' => array_map(function (array $field): array {
+                $fieldType = (string) $field['field_type'];
+
+                return [
+                    'key' => (string) $field['field_key'],
+                    'field_type' => $fieldType,
+                    'label' => (string) $field['label'],
+                    'help_text' => $field['help_text'] ?? null,
+                    'scope' => (string) $field['field_scope'],
+                    'applies_to' => (string) $field['applies_to'],
+                    'sort' => (int) $field['sort'],
+                    'is_system' => (bool) $field['definition_is_system'],
+                    'required' => (bool) $field['effective_required'],
+                    'visible' => (bool) $field['effective_visible'],
+                    'max_length' => $this->maxLengthFromValidation(
+                        $field['validation_json'] ?? null,
+                        $fieldType,
+                    ),
+                    'validation_json' => $field['validation_json'] ?? null,
+                    'options_json' => $this->optionsJsonForSchemaProp(
+                        FieldType::tryFrom($fieldType),
+                        $field['options_json'] ?? null,
+                    ),
+                ];
+            }, $resolved['fields']),
             'rules' => array_map(fn (array $rule): array => [
                 'condition' => $rule['condition_json'],
                 'action' => $rule['action_json'],
@@ -766,6 +778,22 @@ class CalculationController extends Controller
         }
 
         return $fieldType === 'short_text' ? 255 : 20000;
+    }
+
+    /**
+     * @return list<array{key: string, label: string, sort: int, is_active: bool}>|null
+     */
+    private function optionsJsonForSchemaProp(?FieldType $fieldType, mixed $optionsJson): ?array
+    {
+        if ($fieldType === null || ! $fieldType->isChoice()) {
+            return null;
+        }
+
+        if (! is_array($optionsJson)) {
+            return null;
+        }
+
+        return FieldDefinitionOptionContract::canonicalize($optionsJson);
     }
 
     /**

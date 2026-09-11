@@ -206,7 +206,8 @@ final class SnapshotFieldRuleEvaluator
             FieldType::Boolean => $this->asBool($value) === null,
             FieldType::Period => $this->periodIsEmpty(is_array($value) ? $value : []),
             FieldType::ShortText, FieldType::LongText => trim((string) $value) === '',
-            FieldType::Select, FieldType::MultiSelect => $value === '' || $value === [],
+            FieldType::Select => $value === '',
+            FieldType::MultiSelect => $value === [] || $value === '',
         };
     }
 

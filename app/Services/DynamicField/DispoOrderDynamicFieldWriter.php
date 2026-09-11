@@ -18,6 +18,7 @@ use App\Models\FieldDefinition;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Support\DynamicField\ChoiceFieldValueContract;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -386,9 +387,10 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $snapshot = $this->requireSnapshot($locked);
+            $locked->loadMissing('fieldValues.snapshotFieldDefinition');
             $before = $this->textValuesForAudit($locked, $snapshot);
 
-            $normalized = $this->normalizeTextInput($snapshot, $input);
+            $normalized = $this->normalizeTextInput($snapshot, $input, $locked);
             $changed = false;
 
             foreach ($normalized as $key => $newValue) {
@@ -396,7 +398,24 @@ final class DispoOrderDynamicFieldWriter
                 if ($oldValue === $newValue) {
                     continue;
                 }
-                $this->upsertHeaderTextValue($locked, $snapshot, $key, $newValue);
+                $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+                if ($def !== null && $def->field_type->isChoice()) {
+                    $this->upsertHeaderChoiceValue(
+                        $locked,
+                        $snapshot,
+                        $key,
+                        is_string($newValue) || is_array($newValue) || $newValue === null
+                            ? $newValue
+                            : null,
+                    );
+                } else {
+                    $this->upsertHeaderTextValue(
+                        $locked,
+                        $snapshot,
+                        $key,
+                        $newValue === null ? null : (string) $newValue,
+                    );
+                }
                 $changed = true;
             }
 
@@ -500,6 +519,42 @@ final class DispoOrderDynamicFieldWriter
                         continue;
                     }
                     $raw = $values[$key];
+
+                    if ($def->field_type->isChoice()) {
+                        $previous = $this->readPositionValue($position, $def);
+                        try {
+                            $value = ChoiceFieldValueContract::normalizeIncoming(
+                                $def->field_type,
+                                is_array($def->options_json) ? $def->options_json : null,
+                                $raw,
+                                $previous,
+                                "position_dynamic_field_values.{$positionId}.{$key}",
+                                $def->label,
+                            );
+                        } catch (ValidationException $exception) {
+                            foreach ($exception->errors() as $errorKey => $messages) {
+                                $errors[$errorKey] = $messages[0] ?? ($def->label.' ist ungültig.');
+                            }
+
+                            continue;
+                        }
+                        if ($def->required && $def->visible
+                            && ChoiceFieldValueContract::isEmpty($def->field_type, $value)) {
+                            $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                                $def->label.' ist erforderlich.';
+
+                            continue;
+                        }
+                        $old = $previous;
+                        if ($old === $value) {
+                            continue;
+                        }
+                        $this->upsertPositionChoiceValue($position, $positionSnapshot, $key, $value);
+                        $changed = true;
+
+                        continue;
+                    }
+
                     if ($raw !== null && ! is_string($raw) && ! is_numeric($raw)) {
                         $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
                             $def->label.' muss Text sein.';
@@ -686,7 +741,7 @@ final class DispoOrderDynamicFieldWriter
             if (! $def->required || ! $def->visible) {
                 continue;
             }
-            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
             if ($this->isCalcOriginKey($snapshot, $def->key)) {
@@ -694,7 +749,7 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $raw = $this->readHeaderValue($order, $def);
-            if ($raw === null || $raw === '') {
+            if ($this->isRequiredCustomEmpty($def, $raw)) {
                 $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
             }
         }
@@ -704,7 +759,7 @@ final class DispoOrderDynamicFieldWriter
                 if (! $def->required || ! $def->visible) {
                     continue;
                 }
-                if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                     continue;
                 }
                 if ($this->isCalcOriginKey($positionSnapshot, $def->key)) {
@@ -712,7 +767,7 @@ final class DispoOrderDynamicFieldWriter
                 }
 
                 $raw = $this->readPositionValue($position, $def);
-                if ($raw === null || $raw === '') {
+                if ($this->isRequiredCustomEmpty($def, $raw)) {
                     $errors["position_dynamic_field_values.{$position->id}.{$def->key}"] =
                         $def->label.' ist erforderlich.';
                 }
@@ -777,8 +832,19 @@ final class DispoOrderDynamicFieldWriter
                 'calc_origin' => $this->isCalcOriginKey($owner, $def->key),
                 'max_length' => $this->maxLengthForDefinition($def),
                 'validation_json' => $def->validation_json,
+                'options_json' => ChoiceFieldValueContract::optionsForSchemaProp(
+                    is_array($def->options_json) ? $def->options_json : null,
+                    $def->field_type,
+                ),
             ];
         }, $entries);
+
+        $customSchemaTypes = [
+            FieldType::ShortText->value,
+            FieldType::LongText->value,
+            FieldType::Select->value,
+            FieldType::MultiSelect->value,
+        ];
 
         $editableCustom = array_values(array_filter(
             $fields,
@@ -786,7 +852,7 @@ final class DispoOrderDynamicFieldWriter
                 && $field['editable'] === true
                 && $field['visible'] === true
                 && $field['scope'] === FieldScope::Header->value
-                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+                && in_array($field['field_type'], $customSchemaTypes, true),
         ));
         $calcOriginCustom = array_values(array_filter(
             $fields,
@@ -794,7 +860,7 @@ final class DispoOrderDynamicFieldWriter
                 && $field['calc_origin'] === true
                 && $field['visible'] === true
                 && $field['scope'] === FieldScope::Header->value
-                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+                && in_array($field['field_type'], $customSchemaTypes, true),
         ));
         $editableCustomPosition = array_values(array_filter(
             $fields,
@@ -802,7 +868,7 @@ final class DispoOrderDynamicFieldWriter
                 && $field['editable'] === true
                 && $field['visible'] === true
                 && $field['scope'] === FieldScope::Position->value
-                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+                && in_array($field['field_type'], $customSchemaTypes, true),
         ));
         $calcOriginCustomPosition = array_values(array_filter(
             $fields,
@@ -810,7 +876,7 @@ final class DispoOrderDynamicFieldWriter
                 && $field['calc_origin'] === true
                 && $field['visible'] === true
                 && $field['scope'] === FieldScope::Position->value
-                && in_array($field['field_type'], [FieldType::ShortText->value, FieldType::LongText->value], true),
+                && in_array($field['field_type'], $customSchemaTypes, true),
         ));
 
         return [
@@ -985,8 +1051,34 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $predDef = $predSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
-            if ($predDef === null
-                || ! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if ($predDef === null || $predDef->field_type !== $newDef->field_type) {
+                continue;
+            }
+
+            if ($newDef->field_type->isChoice()) {
+                $predRow = $predecessor->fieldValues
+                    ->firstWhere('snapshot_field_definition_id', $predDef->id);
+                if ($predRow === null) {
+                    continue;
+                }
+                $stored = ChoiceFieldValueContract::readStored($predDef, $predRow);
+                if (ChoiceFieldValueContract::isEmpty($newDef->field_type, $stored)) {
+                    continue;
+                }
+                $normalized = ChoiceFieldValueContract::normalizeIncoming(
+                    $newDef->field_type,
+                    is_array($newDef->options_json) ? $newDef->options_json : null,
+                    $stored,
+                    $stored,
+                    "dynamic_field_values.{$newDef->key}",
+                    $newDef->label,
+                );
+                $this->upsertHeaderChoiceValue($order, $snapshot, $newDef->key, $normalized);
+
+                continue;
+            }
+
+            if (! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                 continue;
             }
 
@@ -1024,8 +1116,39 @@ final class DispoOrderDynamicFieldWriter
                 }
 
                 $predDef = $predPositionSnapshot->fieldDefinitions->firstWhere('key', $newDef->key);
-                if ($predDef === null
-                    || ! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                if ($predDef === null || $predDef->field_type !== $newDef->field_type) {
+                    continue;
+                }
+
+                if ($newDef->field_type->isChoice()) {
+                    $predValue = $predPosition->fieldValues
+                        ->firstWhere('snapshot_field_definition_id', $predDef->id);
+                    if ($predValue === null) {
+                        continue;
+                    }
+                    $stored = ChoiceFieldValueContract::readStored($predDef, $predValue);
+                    if (ChoiceFieldValueContract::isEmpty($newDef->field_type, $stored)) {
+                        continue;
+                    }
+                    $normalized = ChoiceFieldValueContract::normalizeIncoming(
+                        $newDef->field_type,
+                        is_array($newDef->options_json) ? $newDef->options_json : null,
+                        $stored,
+                        $stored,
+                        "position_dynamic_field_values.{$dispoPosition->id}.{$newDef->key}",
+                        $newDef->label,
+                    );
+                    $this->upsertPositionChoiceValue(
+                        $dispoPosition,
+                        $positionSnapshot,
+                        $newDef->key,
+                        $normalized,
+                    );
+
+                    continue;
+                }
+
+                if (! in_array($predDef->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
                     continue;
                 }
 
@@ -1056,7 +1179,7 @@ final class DispoOrderDynamicFieldWriter
             if ($def->key === 'campaign_period') {
                 continue;
             }
-            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
             if (! $this->isCalcOriginKey($snapshot, $def->key, $calcSnapshot)) {
@@ -1064,6 +1187,21 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $raw = $headerFromCalc[$def->key] ?? null;
+
+            if ($def->field_type->isChoice()) {
+                $normalized = ChoiceFieldValueContract::normalizeIncoming(
+                    $def->field_type,
+                    is_array($def->options_json) ? $def->options_json : null,
+                    $raw,
+                    $raw,
+                    "dynamic_field_values.{$def->key}",
+                    $def->label,
+                );
+                $this->upsertHeaderChoiceValue($order, $snapshot, $def->key, $normalized);
+
+                continue;
+            }
+
             $value = null;
             if (is_string($raw)) {
                 $trimmed = trim($raw);
@@ -1076,10 +1214,13 @@ final class DispoOrderDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array<string, string|null>
+     * @return array<string, mixed>
      */
-    private function normalizeTextInput(ConfigurationSnapshot $snapshot, array $input): array
-    {
+    private function normalizeTextInput(
+        ConfigurationSnapshot $snapshot,
+        array $input,
+        DispoOrder $order,
+    ): array {
         $editableKeys = [];
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
             if ($this->isNativeEditableHeaderText($snapshot, $def)) {
@@ -1106,6 +1247,36 @@ final class DispoOrderDynamicFieldWriter
                 continue;
             }
             $raw = $input[$key];
+
+            if ($def->field_type->isChoice()) {
+                $previous = $this->readHeaderValue($order, $def);
+                try {
+                    $value = ChoiceFieldValueContract::normalizeIncoming(
+                        $def->field_type,
+                        is_array($def->options_json) ? $def->options_json : null,
+                        $raw,
+                        $previous,
+                        "dynamic_field_values.{$key}",
+                        $def->label,
+                    );
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $errorKey => $messages) {
+                        $errors[$errorKey] = $messages[0] ?? ($def->label.' ist ungültig.');
+                    }
+
+                    continue;
+                }
+                if ($def->required && $def->visible
+                    && ChoiceFieldValueContract::isEmpty($def->field_type, $value)) {
+                    $errors["dynamic_field_values.{$key}"] = $def->label.' ist erforderlich.';
+
+                    continue;
+                }
+                $normalized[$key] = $value;
+
+                continue;
+            }
+
             if ($raw !== null && ! is_string($raw)) {
                 $errors["dynamic_field_values.{$key}"] = $def->label.' muss Text sein.';
 
@@ -1147,6 +1318,7 @@ final class DispoOrderDynamicFieldWriter
             'dispo_order_id' => $order->id,
             'snapshot_field_definition_id' => $def->id,
         ]);
+        ChoiceFieldValueContract::clearChoiceChannel($row);
         $row->value_string = $def->field_type === FieldType::ShortText ? $value : null;
         $row->value_text = $def->field_type === FieldType::LongText ? $value : null;
         $row->value_period_start = null;
@@ -1154,18 +1326,48 @@ final class DispoOrderDynamicFieldWriter
         $row->save();
     }
 
+    /**
+     * @param  string|list<string>|null  $value
+     */
+    private function upsertHeaderChoiceValue(
+        DispoOrder $order,
+        ConfigurationSnapshot $snapshot,
+        string $key,
+        string|array|null $value,
+    ): void {
+        $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+        if ($def === null) {
+            throw new RuntimeException("Snapshot-Definition {$key} fehlt.");
+        }
+
+        $row = DispoOrderFieldValue::query()->firstOrNew([
+            'dispo_order_id' => $order->id,
+            'snapshot_field_definition_id' => $def->id,
+        ]);
+        ChoiceFieldValueContract::writeStored($def, $row, $value);
+        $row->save();
+    }
+
+    /**
+     * Native bearbeitbare Header-Customs: Short/Long-Text sowie Select/MultiSelect
+     * (nicht calc-origin).
+     */
     private function isNativeEditableHeaderText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
     {
         if ($def->scope !== FieldScope::Header) {
             return false;
         }
-        if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+        if (! $this->isTextOrChoiceFieldType($def->field_type)) {
             return false;
         }
 
         return ! $this->isCalcOriginKey($snapshot, $def->key);
     }
 
+    /**
+     * Native bearbeitbare Positions-Customs: Short/Long-Text sowie Select/MultiSelect
+     * (sichtbar, nicht calc-origin).
+     */
     private function isNativeEditablePositionText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
     {
         if ($def->scope !== FieldScope::Position) {
@@ -1174,11 +1376,30 @@ final class DispoOrderDynamicFieldWriter
         if (! $def->visible) {
             return false;
         }
-        if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+        if (! $this->isTextOrChoiceFieldType($def->field_type)) {
             return false;
         }
 
         return ! $this->isCalcOriginKey($snapshot, $def->key);
+    }
+
+    private function isTextOrChoiceFieldType(FieldType $fieldType): bool
+    {
+        return in_array($fieldType, [
+            FieldType::ShortText,
+            FieldType::LongText,
+            FieldType::Select,
+            FieldType::MultiSelect,
+        ], true);
+    }
+
+    private function isRequiredCustomEmpty(SnapshotFieldDefinition $def, mixed $raw): bool
+    {
+        if ($def->field_type->isChoice()) {
+            return ChoiceFieldValueContract::isEmpty($def->field_type, $raw);
+        }
+
+        return $raw === null || $raw === '';
     }
 
     /**
@@ -1205,12 +1426,12 @@ final class DispoOrderDynamicFieldWriter
             if (! $def->required || ! $def->visible) {
                 continue;
             }
-            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
 
             $raw = $headerValues[$def->key] ?? null;
-            if ($raw === null || $raw === '') {
+            if ($this->isRequiredCustomEmpty($def, $raw)) {
                 $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
             }
         }
@@ -1226,7 +1447,7 @@ final class DispoOrderDynamicFieldWriter
                 ->where('scope', FieldScope::Position)
                 ->filter(fn (SnapshotFieldDefinition $def): bool => $def->required
                     && $def->visible
-                    && in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true));
+                    && $this->isTextOrChoiceFieldType($def->field_type));
 
             if ($requiredDefs->isEmpty()) {
                 continue;
@@ -1235,7 +1456,7 @@ final class DispoOrderDynamicFieldWriter
             $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
             foreach ($requiredDefs as $def) {
                 $raw = $values[$def->key] ?? null;
-                if ($raw === null || $raw === '') {
+                if ($this->isRequiredCustomEmpty($def, $raw)) {
                     $errors["positions.{$index}.dynamic_field_values.{$def->key}"] =
                         $def->label.' ist erforderlich.';
                 }
@@ -1330,6 +1551,8 @@ final class DispoOrderDynamicFieldWriter
             'dispo_order_id' => $order->id,
             'snapshot_field_definition_id' => $def->id,
         ]);
+        ChoiceFieldValueContract::clearChoiceChannel($row);
+        $row->value_string = null;
         $row->value_text = null;
         $row->value_period_start = $start !== null ? Carbon::parse((string) $start)->toDateString() : null;
         $row->value_period_end = $end !== null ? Carbon::parse((string) $end)->toDateString() : null;
@@ -1364,6 +1587,20 @@ final class DispoOrderDynamicFieldWriter
             throw new RuntimeException("Snapshot-Definition {$key} fehlt.");
         }
 
+        if ($def->field_type->isChoice()) {
+            $normalized = ChoiceFieldValueContract::normalizeIncoming(
+                $def->field_type,
+                is_array($def->options_json) ? $def->options_json : null,
+                $raw,
+                $raw,
+                "dynamic_field_values.{$key}",
+                $def->label,
+            );
+            $this->upsertPositionChoiceValue($position, $snapshot, $key, $normalized);
+
+            return;
+        }
+
         if ($def->field_type === FieldType::Boolean || $key === 'period_open') {
             if ($key === 'period_open' && ! is_bool($raw)) {
                 throw ValidationException::withMessages([
@@ -1379,6 +1616,7 @@ final class DispoOrderDynamicFieldWriter
                 'dispo_order_position_id' => $position->id,
                 'snapshot_field_definition_id' => $def->id,
             ]);
+            ChoiceFieldValueContract::clearChoiceChannel($row);
             $row->value_boolean = is_bool($raw) ? $raw : null;
             $row->value_string = null;
             $row->value_text = null;
@@ -1428,6 +1666,7 @@ final class DispoOrderDynamicFieldWriter
             'dispo_order_position_id' => $position->id,
             'snapshot_field_definition_id' => $def->id,
         ]);
+        ChoiceFieldValueContract::clearChoiceChannel($row);
         $row->value_boolean = null;
         $row->value_string = null;
         $row->value_text = null;
@@ -1451,11 +1690,34 @@ final class DispoOrderDynamicFieldWriter
             'dispo_order_position_id' => $position->id,
             'snapshot_field_definition_id' => $def->id,
         ]);
+        ChoiceFieldValueContract::clearChoiceChannel($row);
         $row->value_string = $def->field_type === FieldType::ShortText ? $value : null;
         $row->value_text = $def->field_type === FieldType::LongText ? $value : null;
         $row->value_boolean = null;
         $row->value_period_start = null;
         $row->value_period_end = null;
+        $row->save();
+    }
+
+    /**
+     * @param  string|list<string>|null  $value
+     */
+    private function upsertPositionChoiceValue(
+        DispoOrderPosition $position,
+        ConfigurationSnapshot $snapshot,
+        string $key,
+        string|array|null $value,
+    ): void {
+        $def = $snapshot->fieldDefinitions->firstWhere('key', $key);
+        if ($def === null) {
+            throw new RuntimeException("Snapshot-Definition {$key} fehlt.");
+        }
+
+        $row = DispoOrderPositionFieldValue::query()->firstOrNew([
+            'dispo_order_position_id' => $position->id,
+            'snapshot_field_definition_id' => $def->id,
+        ]);
+        ChoiceFieldValueContract::writeStored($def, $row, $value);
         $row->save();
     }
 
@@ -1516,8 +1778,17 @@ final class DispoOrderDynamicFieldWriter
     {
         $row = $order->fieldValues->firstWhere('snapshot_field_definition_id', $def->id);
         if ($row === null) {
-            return null;
+            return $def->field_type->isChoice()
+                ? ChoiceFieldValueContract::emptyValue($def->field_type)
+                : null;
         }
+
+        if ($def->field_type->isChoice()) {
+            return ChoiceFieldValueContract::readStored($def, $row);
+        }
+
+        ChoiceFieldValueContract::assertChoiceChannelExclusive($def, $row);
+
         if ($def->field_type === FieldType::Period) {
             if ($row->value_period_start === null && $row->value_period_end === null) {
                 return null;
@@ -1544,8 +1815,16 @@ final class DispoOrderDynamicFieldWriter
     {
         $row = $position->fieldValues->firstWhere('snapshot_field_definition_id', $def->id);
         if ($row === null) {
-            return null;
+            return $def->field_type->isChoice()
+                ? ChoiceFieldValueContract::emptyValue($def->field_type)
+                : null;
         }
+
+        if ($def->field_type->isChoice()) {
+            return ChoiceFieldValueContract::readStored($def, $row);
+        }
+
+        ChoiceFieldValueContract::assertChoiceChannelExclusive($def, $row);
 
         return match ($def->field_type) {
             FieldType::Boolean => $row->value_boolean,
@@ -1558,7 +1837,7 @@ final class DispoOrderDynamicFieldWriter
             FieldType::ShortText => $row->value_string,
             FieldType::LongText => $row->value_text,
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
-                'select/multi_select-Export ist in DF-3-REST-A noch nicht freigegeben.',
+                'Unerreichbarer Choice-Zweig in readPositionValue.',
             ),
         };
     }
@@ -1685,14 +1964,14 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, mixed>
      */
     private function textValuesForAudit(DispoOrder $order, ConfigurationSnapshot $snapshot): array
     {
         $order->loadMissing('fieldValues.snapshotFieldDefinition');
         $out = [];
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
-            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
             if (! $this->isNativeEditableHeaderText($snapshot, $def)
@@ -1730,7 +2009,7 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @return array<int, array<string, string|null>>
+     * @return array<int, array<string, mixed>>
      */
     private function positionCustomValuesForAudit(DispoOrder $order, ConfigurationSnapshot $snapshot): array
     {
@@ -1740,7 +2019,7 @@ final class DispoOrderDynamicFieldWriter
             $positionSnapshot = $this->positionSnapshot($snapshot, $position);
             $values = [];
             foreach ($this->positionDefinitions($snapshot, $position) as $def) {
-                if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+                if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                     continue;
                 }
                 if (! $this->isNativeEditablePositionText($positionSnapshot, $def)
@@ -1748,7 +2027,11 @@ final class DispoOrderDynamicFieldWriter
                     continue;
                 }
                 $raw = $this->readPositionValue($position, $def);
-                $values[$def->key] = is_string($raw) || $raw === null ? $raw : (string) $raw;
+                if ($def->field_type->isChoice()) {
+                    $values[$def->key] = $raw;
+                } else {
+                    $values[$def->key] = is_string($raw) || $raw === null ? $raw : (string) $raw;
+                }
             }
             $out[(int) $position->id] = $values;
         }
