@@ -1,11 +1,11 @@
 /**
- * ADV-001c3a: Wizard-Auswahl für neue Positionen bis ADV-001c4.
+ * ADV-001c4b: Wizard-Auswahl für neue Positionen.
  *
- * Buchbarkeit allein reicht nicht – nur Spot Classic ist freigegeben.
- * Inventarregeln prüfen den Aufrufer zusätzlich.
+ * Buchbarkeit kommt aus den Backend-Props (is_active +
+ * is_bookable_for_new_positions). Inventarregeln prüft der Aufrufer zusätzlich.
+ * Kein Code-/Kind-/Engine-Hardcode im Frontend.
  */
 export type WizardSelectableMedium = {
-    code: string;
     is_active: boolean;
     is_bookable_for_new_positions: boolean;
 };
@@ -13,9 +13,5 @@ export type WizardSelectableMedium = {
 export function isSelectableForNewWizardPositions(
     medium: WizardSelectableMedium,
 ): boolean {
-    return (
-        medium.is_bookable_for_new_positions &&
-        medium.is_active &&
-        medium.code === 'spot_classic'
-    );
+    return medium.is_bookable_for_new_positions && medium.is_active;
 }

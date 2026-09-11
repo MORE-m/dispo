@@ -133,10 +133,16 @@ c3b1-Deaktivierung auch bei inherit. Keine Migration.
 `calculation_method_key` presence-aware; `spot_method` Legacy-Alias mit
 Konflikt-422. Freeze bytegenau bei unverändertem Medium+Key inkl. reinem
 Inventarwechsel; Re-Freeze nur neu / Mediumwechsel / Methodenwechsel.
-Wizard-Props additiv (`calculation_method_options`, Freeze-Read); keine
-sichtbare Methoden-UX. Budget bleibt average. Keine Migration.
+Wizard-Props additiv (`calculation_method_options`, Freeze-Read); sichtbare
+Methoden-UX in **ADV-001c4b**. Budget bleibt average. Keine Migration.
 
-**ADV-001 insgesamt noch offen:** c4b sichtbare Positions-Methodenwahl; weitere Defaults
+**ADV-001c4b (sichtbare Wizard-Methodenauswahl):** Wizard nutzt c4a-Props für
+0-/1-/n-Optionen und historische Freeze-Anzeige. Medienfilter ohne
+Spot-Classic-Code-Hardcode. Moderner Payload nur `calculation_method_key`;
+`spot_method` bleibt serverseitiger Legacy-Alias. Keine Migration; keine neue
+Engine; `calendar`/`fixed_price` weiter planned; Budget ohne Methodenauswahl.
+
+**ADV-001 insgesamt noch offen:** weitere Defaults
 (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen; technische
 Profil-Provisionierung.
 
