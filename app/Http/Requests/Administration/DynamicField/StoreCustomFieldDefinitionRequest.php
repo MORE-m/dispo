@@ -23,7 +23,12 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
         return [
             'label' => ['required', 'string', 'max:255'],
             'key' => ['nullable', 'string', 'max:64'],
-            'field_type' => ['required', Rule::enum(FieldType::class)->only([FieldType::ShortText, FieldType::LongText])],
+            'field_type' => ['required', Rule::enum(FieldType::class)->only([
+                FieldType::ShortText,
+                FieldType::LongText,
+                FieldType::Select,
+                FieldType::MultiSelect,
+            ])],
             'scope' => ['required', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['required', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],

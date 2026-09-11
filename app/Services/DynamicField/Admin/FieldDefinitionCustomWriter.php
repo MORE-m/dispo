@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * DF-3.2b: Custom Header-/Position-Textfelder anlegen, ändern, deaktivieren, löschen.
+ * DF-3.2b / DF-3-REST-B: Custom Header-/Position-Felder (Text + Auswahl) anlegen,
+ * ändern, deaktivieren, löschen.
  */
 final class FieldDefinitionCustomWriter
 {
@@ -50,8 +51,12 @@ final class FieldDefinitionCustomWriter
         $fieldType = $this->normalizeFieldType($payload['field_type']);
         $scope = $this->normalizeScope($payload['scope']);
         $appliesTo = $this->normalizeAppliesTo($payload['applies_to']);
-        $this->assertCustomTextType($fieldType);
-        $maxLength = $this->resolveMaxLength($fieldType, $payload['max_length'] ?? null);
+        $this->assertAllowedCustomType($fieldType);
+        $validationJson = $this->resolveValidationJson(
+            $fieldType,
+            array_key_exists('max_length', $payload),
+            $payload['max_length'] ?? null,
+        );
         $keyCandidate = $payload['key'] ?? null;
         $explicitKey = is_string($keyCandidate) && trim($keyCandidate) !== ''
             ? trim($keyCandidate)
@@ -63,7 +68,7 @@ final class FieldDefinitionCustomWriter
             $key = $this->slugger->uniqueSlugFromLabel($payload['label']);
         }
 
-        return DB::transaction(function () use ($payload, $actor, $fieldType, $scope, $appliesTo, $maxLength, $key): FieldDefinition {
+        return DB::transaction(function () use ($payload, $actor, $fieldType, $scope, $appliesTo, $validationJson, $key): FieldDefinition {
             $definition = new FieldDefinition;
             $definition->key = $key;
             $definition->field_type = $fieldType;
@@ -83,7 +88,7 @@ final class FieldDefinitionCustomWriter
             $revision->group_key = $payload['group_key'] ?? null;
             $revision->sort_default = (int) ($payload['sort_default'] ?? 100);
             $revision->reportable = (bool) ($payload['reportable'] ?? false);
-            $revision->validation_json = ['max_length' => $maxLength];
+            $revision->validation_json = $validationJson;
             $revision->created_at = now();
             $revision->save();
 
@@ -103,7 +108,7 @@ final class FieldDefinitionCustomWriter
                     'lock_version' => $definition->lock_version,
                     'revision_id' => $revision->id,
                     'label' => $revision->label,
-                    'max_length' => $maxLength,
+                    'max_length' => is_array($validationJson) ? $validationJson['max_length'] : null,
                 ],
             );
 
@@ -167,7 +172,7 @@ final class FieldDefinitionCustomWriter
 
             if (isset($payload['field_type'])) {
                 $fieldType = $this->normalizeFieldType($payload['field_type']);
-                $this->assertCustomTextType($fieldType);
+                $this->assertAllowedCustomType($fieldType);
                 $locked->field_type = $fieldType;
             }
             if (isset($payload['scope'])) {
@@ -178,12 +183,15 @@ final class FieldDefinitionCustomWriter
             }
 
             $fieldType = $locked->field_type;
-            $maxLength = array_key_exists('max_length', $payload)
-                ? $this->resolveMaxLength($fieldType, $payload['max_length'])
-                : $this->resolveMaxLength(
-                    $fieldType,
-                    is_array($previous->validation_json) ? ($previous->validation_json['max_length'] ?? null) : null,
-                );
+            $previousMaxLength = is_array($previous->validation_json)
+                ? ($previous->validation_json['max_length'] ?? null)
+                : null;
+            $maxLengthPresent = array_key_exists('max_length', $payload);
+            $validationJson = $this->resolveValidationJson(
+                $fieldType,
+                $maxLengthPresent,
+                $maxLengthPresent ? ($payload['max_length'] ?? null) : $previousMaxLength,
+            );
 
             if (isset($payload['label'])) {
                 $previous->label = $payload['label'];
@@ -200,7 +208,7 @@ final class FieldDefinitionCustomWriter
             if (isset($payload['reportable'])) {
                 $previous->reportable = (bool) $payload['reportable'];
             }
-            $previous->validation_json = ['max_length' => $maxLength];
+            $previous->validation_json = $validationJson;
             $previous->save();
 
             $locked->lock_version = $locked->lock_version + 1;
@@ -245,9 +253,31 @@ final class FieldDefinitionCustomWriter
     {
         $this->assertCustom($definition);
 
+        $fieldType = $definition->field_type;
+        if ($fieldType->isChoice()) {
+            if (array_key_exists('max_length', $payload) && $payload['max_length'] !== null) {
+                throw ValidationException::withMessages([
+                    'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
+                ]);
+            }
+
+            return $this->revisions->createRevision(
+                $definition,
+                [
+                    'label' => $payload['label'],
+                    'help_text' => $payload['help_text'] ?? null,
+                    'group_key' => $payload['group_key'] ?? null,
+                    'sort_default' => (int) $payload['sort_default'],
+                    'reportable' => (bool) $payload['reportable'],
+                ],
+                $actor,
+                (int) $payload['lock_version'],
+            );
+        }
+
         $maxLength = null;
         if (array_key_exists('max_length', $payload)) {
-            $maxLength = $this->resolveMaxLength($definition->field_type, $payload['max_length']);
+            $maxLength = $this->resolveMaxLength($fieldType, $payload['max_length']);
         }
 
         return $this->revisions->createRevision(
@@ -404,11 +434,16 @@ final class FieldDefinitionCustomWriter
         }
     }
 
-    private function assertCustomTextType(FieldType $fieldType): void
+    private function assertAllowedCustomType(FieldType $fieldType): void
     {
-        if (! in_array($fieldType, [FieldType::ShortText, FieldType::LongText], true)) {
+        if (! in_array($fieldType, [
+            FieldType::ShortText,
+            FieldType::LongText,
+            FieldType::Select,
+            FieldType::MultiSelect,
+        ], true)) {
             throw ValidationException::withMessages([
-                'field_type' => 'In DF-3.2b sind nur short_text und long_text zulässig.',
+                'field_type' => 'Zulässig sind short_text, long_text, select und multi_select.',
             ]);
         }
     }
@@ -435,8 +470,32 @@ final class FieldDefinitionCustomWriter
         return $value instanceof FieldAppliesTo ? $value : FieldAppliesTo::from((string) $value);
     }
 
+    /**
+     * @return array{max_length: int}|null
+     */
+    private function resolveValidationJson(FieldType $fieldType, bool $maxLengthPresent, mixed $raw): ?array
+    {
+        if ($fieldType->isChoice()) {
+            if ($maxLengthPresent && $raw !== null && $raw !== '') {
+                throw ValidationException::withMessages([
+                    'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
+                ]);
+            }
+
+            return null;
+        }
+
+        return ['max_length' => $this->resolveMaxLength($fieldType, $raw)];
+    }
+
     private function resolveMaxLength(FieldType $fieldType, mixed $raw): int
     {
+        if ($fieldType->isChoice()) {
+            throw ValidationException::withMessages([
+                'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
+            ]);
+        }
+
         $default = $fieldType === FieldType::ShortText ? 255 : 20000;
         $maxAllowed = $default;
         $value = $raw === null || $raw === '' ? $default : (int) $raw;
