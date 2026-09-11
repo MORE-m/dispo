@@ -51,8 +51,15 @@ class FieldDefinitionOptionsFreezeTest extends TestCase
             ['key' => 'opt_b', 'label' => 'Beta', 'sort' => 20, 'is_active' => false],
         ]);
 
-        $this->assertSame($expected, $sourceField->options_json);
-        $this->assertSame($expected, $effective->options_json);
+        // MySQL-JSON kann Objekt-Key-Reihenfolge umschreiben; Vertrag über Canonical vergleichen.
+        $this->assertSame(
+            $expected,
+            FieldDefinitionOptionContract::canonicalize($sourceField->options_json ?? []),
+        );
+        $this->assertSame(
+            $expected,
+            FieldDefinitionOptionContract::canonicalize($effective->options_json ?? []),
+        );
 
         app(ConfigurationSnapshotIntegrity::class)->assertReadable($snapshot);
     }
