@@ -259,6 +259,112 @@ class FieldDefinitionOptionsFoundationTest extends TestCase
         );
     }
 
+    public function test_writer_accepts_strict_sort_bounds_and_boolean_is_active(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createSelectDefinition('choice_sort_bounds');
+        $writer = app(FieldDefinitionOptionsWriter::class);
+
+        $result = $writer->replace($definition, [
+            'lock_version' => $definition->lock_version,
+            'options' => [
+                ['key' => 'min', 'label' => 'Min', 'sort' => 0, 'is_active' => true],
+                ['key' => 'mid', 'label' => 'Mid', 'sort' => 1, 'is_active' => false],
+                [
+                    'key' => 'max',
+                    'label' => 'Max',
+                    'sort' => FieldDefinitionOptionContract::MAX_SORT,
+                ],
+            ],
+        ], $admin);
+
+        $this->assertTrue($result['has_changes']);
+        $this->assertDatabaseHas('field_definition_revision_options', [
+            'field_definition_revision_id' => $definition->fresh()->current_revision_id,
+            'key' => 'min',
+            'sort' => 0,
+            'is_active' => 1,
+        ]);
+        $this->assertDatabaseHas('field_definition_revision_options', [
+            'field_definition_revision_id' => $definition->fresh()->current_revision_id,
+            'key' => 'mid',
+            'sort' => 1,
+            'is_active' => 0,
+        ]);
+        $this->assertDatabaseHas('field_definition_revision_options', [
+            'field_definition_revision_id' => $definition->fresh()->current_revision_id,
+            'key' => 'max',
+            'sort' => FieldDefinitionOptionContract::MAX_SORT,
+            'is_active' => 1,
+        ]);
+    }
+
+    public function test_writer_rejects_invalid_sort_with_german_422_without_query_exception(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createSelectDefinition('choice_sort_invalid');
+        $writer = app(FieldDefinitionOptionsWriter::class);
+        $invalidSorts = [
+            -1,
+            1.5,
+            '1',
+            '1.5',
+            '1e3',
+            null,
+            true,
+            FieldDefinitionOptionContract::MAX_SORT + 1,
+        ];
+
+        foreach ($invalidSorts as $sort) {
+            try {
+                $writer->replace($definition->fresh(), [
+                    'lock_version' => $definition->fresh()->lock_version,
+                    'options' => [
+                        ['key' => 'a', 'label' => 'A', 'sort' => $sort],
+                    ],
+                ], $admin);
+                $this->fail('Ungültiges sort muss 422 erzeugen: '.var_export($sort, true));
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('options.0.sort', $exception->errors());
+            }
+        }
+
+        $this->assertDatabaseCount('field_definition_revision_options', 0);
+    }
+
+    public function test_writer_rejects_invalid_is_active_with_german_422(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createSelectDefinition('choice_active_invalid');
+        $writer = app(FieldDefinitionOptionsWriter::class);
+        $invalid = [1, 0, 'true', 'false', 'yes', 'no', null, []];
+
+        foreach ($invalid as $isActive) {
+            try {
+                $writer->replace($definition->fresh(), [
+                    'lock_version' => $definition->fresh()->lock_version,
+                    'options' => [
+                        [
+                            'key' => 'a',
+                            'label' => 'A',
+                            'sort' => 1,
+                            'is_active' => $isActive,
+                        ],
+                    ],
+                ], $admin);
+                $this->fail('Ungültiges is_active muss 422 erzeugen: '.var_export($isActive, true));
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('options.0.is_active', $exception->errors());
+                $this->assertSame(
+                    'is_active muss true oder false sein.',
+                    $exception->errors()['options.0.is_active'][0],
+                );
+            }
+        }
+
+        $this->assertDatabaseCount('field_definition_revision_options', 0);
+    }
+
     private function createSelectDefinition(string $key): FieldDefinition
     {
         $definition = new FieldDefinition;

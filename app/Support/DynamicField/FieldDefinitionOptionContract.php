@@ -23,6 +23,11 @@ final class FieldDefinitionOptionContract
     /** Späterer Runtime-Limit (DF-3-REST-C); hier nur Vertragskonstanten. */
     public const MAX_MULTI_SELECT_SELECTED = 50;
 
+    /** Passend zu unsignedInteger in der Options-Migration. */
+    public const MIN_SORT = 0;
+
+    public const MAX_SORT = 4_294_967_295;
+
     /**
      * @param  list<array{key: string, label: string, sort: int, is_active: bool}>  $options
      * @return list<array{key: string, label: string, sort: int, is_active: bool}>
@@ -131,30 +136,63 @@ final class FieldDefinitionOptionContract
                 ]);
             }
 
-            if (! array_key_exists('sort', $raw) || ! is_numeric($raw['sort'])) {
+            if (! array_key_exists('sort', $raw)) {
                 throw ValidationException::withMessages([
-                    "options.{$index}.sort" => 'Die Optionssortierung muss eine ganze Zahl sein.',
+                    "options.{$index}.sort" => 'Die Optionssortierung muss als ganze Zahl angegeben werden.',
                 ]);
             }
 
-            $isActive = array_key_exists('is_active', $raw)
-                ? filter_var($raw['is_active'], FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE)
-                : true;
-            if ($isActive === null) {
-                throw ValidationException::withMessages([
-                    "options.{$index}.is_active" => 'is_active muss ein Wahrheitswert sein.',
-                ]);
+            $sort = self::normalizeStrictUnsignedSort($raw['sort'], $index);
+
+            $isActive = true;
+            if (array_key_exists('is_active', $raw)) {
+                $isActive = self::normalizeStrictBoolean($raw['is_active'], $index);
             }
 
             $normalized[] = [
                 'key' => $key,
                 'label' => $label,
-                'sort' => (int) $raw['sort'],
+                'sort' => $sort,
                 'is_active' => $isActive,
             ];
         }
 
         return self::canonicalize($normalized);
+    }
+
+    /**
+     * Sort muss ein echter Integer im unsignedInteger-Bereich sein.
+     * Keine Floats, Strings, Exponentialschreibweise oder Coercion.
+     */
+    public static function normalizeStrictUnsignedSort(mixed $value, int $index): int
+    {
+        if (! is_int($value)) {
+            throw ValidationException::withMessages([
+                "options.{$index}.sort" => 'Die Optionssortierung muss ein ganzer Zahlenwert (Integer) sein.',
+            ]);
+        }
+
+        if ($value < self::MIN_SORT || $value > self::MAX_SORT) {
+            throw ValidationException::withMessages([
+                "options.{$index}.sort" => 'Die Optionssortierung muss zwischen 0 und 4294967295 liegen.',
+            ]);
+        }
+
+        return $value;
+    }
+
+    /**
+     * is_active muss, wenn gesetzt, ein echter Boolean sein (keine Coercion).
+     */
+    public static function normalizeStrictBoolean(mixed $value, int $index): bool
+    {
+        if (! is_bool($value)) {
+            throw ValidationException::withMessages([
+                "options.{$index}.is_active" => 'is_active muss true oder false sein.',
+            ]);
+        }
+
+        return $value;
     }
 
     /**
@@ -272,9 +310,14 @@ final class FieldDefinitionOptionContract
                 );
             }
 
-            if (! array_key_exists('sort', $raw) || ! is_numeric($raw['sort'])) {
+            if (! array_key_exists('sort', $raw) || ! is_int($raw['sort'])) {
                 throw new \RuntimeException(
                     "Auswahlfeld „{$fieldKey}“: ungültige Sortierung für „{$key}“.",
+                );
+            }
+            if ($raw['sort'] < self::MIN_SORT || $raw['sort'] > self::MAX_SORT) {
+                throw new \RuntimeException(
+                    "Auswahlfeld „{$fieldKey}“: Sortierung außerhalb des zulässigen Bereichs für „{$key}“.",
                 );
             }
 
@@ -291,7 +334,7 @@ final class FieldDefinitionOptionContract
             $normalized[] = [
                 'key' => $key,
                 'label' => $label,
-                'sort' => (int) $raw['sort'],
+                'sort' => $raw['sort'],
                 'is_active' => $raw['is_active'],
             ];
         }

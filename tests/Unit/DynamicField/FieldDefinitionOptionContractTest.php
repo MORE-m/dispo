@@ -69,6 +69,84 @@ class FieldDefinitionOptionContractTest extends TestCase
         }
     }
 
+    public function test_normalize_desired_payload_accepts_strict_integer_sort_bounds(): void
+    {
+        foreach ([0, 1, FieldDefinitionOptionContract::MAX_SORT] as $sort) {
+            $normalized = FieldDefinitionOptionContract::normalizeDesiredPayload([
+                ['key' => 'alpha', 'label' => 'A', 'sort' => $sort],
+            ]);
+            $this->assertSame($sort, $normalized[0]['sort']);
+            $this->assertTrue($normalized[0]['is_active']);
+        }
+    }
+
+    public function test_normalize_desired_payload_rejects_non_strict_integer_sort(): void
+    {
+        $invalidSorts = [
+            -1,
+            1.5,
+            '1',
+            '1.5',
+            '1e3',
+            null,
+            true,
+            FieldDefinitionOptionContract::MAX_SORT + 1,
+        ];
+
+        foreach ($invalidSorts as $sort) {
+            try {
+                FieldDefinitionOptionContract::normalizeDesiredPayload([
+                    ['key' => 'alpha', 'label' => 'A', 'sort' => $sort],
+                ]);
+                $this->fail('Ungültiges sort muss 422 erzeugen: '.var_export($sort, true));
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('options.0.sort', $exception->errors());
+                $message = $exception->errors()['options.0.sort'][0];
+                $this->assertIsString($message);
+                $this->assertNotSame('', $message);
+            }
+        }
+    }
+
+    public function test_normalize_desired_payload_accepts_explicit_boolean_is_active(): void
+    {
+        foreach ([true, false] as $isActive) {
+            $normalized = FieldDefinitionOptionContract::normalizeDesiredPayload([
+                ['key' => 'alpha', 'label' => 'A', 'sort' => 1, 'is_active' => $isActive],
+            ]);
+            $this->assertSame($isActive, $normalized[0]['is_active']);
+        }
+    }
+
+    public function test_normalize_desired_payload_defaults_missing_is_active_to_true(): void
+    {
+        $normalized = FieldDefinitionOptionContract::normalizeDesiredPayload([
+            ['key' => 'alpha', 'label' => 'A', 'sort' => 1],
+        ]);
+
+        $this->assertTrue($normalized[0]['is_active']);
+    }
+
+    public function test_normalize_desired_payload_rejects_non_strict_boolean_is_active(): void
+    {
+        $invalid = [1, 0, 'true', 'false', 'yes', 'no', null, []];
+
+        foreach ($invalid as $isActive) {
+            try {
+                FieldDefinitionOptionContract::normalizeDesiredPayload([
+                    ['key' => 'alpha', 'label' => 'A', 'sort' => 1, 'is_active' => $isActive],
+                ]);
+                $this->fail('Ungültiges is_active muss 422 erzeugen: '.var_export($isActive, true));
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('options.0.is_active', $exception->errors());
+                $this->assertSame(
+                    'is_active muss true oder false sein.',
+                    $exception->errors()['options.0.is_active'][0],
+                );
+            }
+        }
+    }
+
     public function test_merge_deactivates_missing_previous_options(): void
     {
         $merged = FieldDefinitionOptionContract::mergeWithPrevious(
