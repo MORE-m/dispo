@@ -1,6 +1,6 @@
 # Fortschritt V1
 
-Stand: 11. September 2026 (DF-3-REST-B Options-Admin-UI auf Feature-Branch –
+Stand: 11. September 2026 (DF-3-REST-B Options-Admin-UI umgesetzt in PR #39 –
 kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
@@ -9,10 +9,8 @@ Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
 DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
 ADV-001c3a, ADV-001c3b1, ADV-001c3b2, ADV-001c3c, ADV-001c4a, ADV-001c4b**
 sowie **DF-3-REST-A (Options-Fundament)** über PR #38 auf `main`
-(`7daee909e76e1fe8e47f36155e58b4059496b09d`).
-**DF-3-REST-B (Options-Admin-UI)** ist auf Feature-Branch
-`feat/df3-rest-b-options-admin-ui` umgesetzt, vor Merge **nicht** als auf `main`
-bezeichnen.
+(`7daee909e76e1fe8e47f36155e58b4059496b09d`) und **DF-3-REST-B
+(Options-Admin-UI)** vollständig umgesetzt und in PR #39 geprüft.
 Gesamtziel DF-3 bleibt offen (Select-/Multi-Select-Runtime, Regelmatrix,
 Regel-Editor).
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
@@ -26,17 +24,16 @@ bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-DF-3-REST-B Options-Admin-UI ist auf Feature-Branch umgesetzt (vor Merge).
 Nächster geplanter Slice: **Select-/Multi-Select-Runtime** (noch nicht begonnen).
 Danach Regel-Fundament/Editor; parallel weitere ADV-001-Defaults.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-REST-B Options-Admin-UI (Feature-Branch `feat/df3-rest-b-options-admin-ui`):
-Choice-Typen im Custom-Feld-Admin freigeschaltet; Optionsverwaltung auf der
-Definitions-Detailseite mit Preview/Apply über REST-A-Writer; isolierte
-Playwright-Suite Port 8013. Kein Runtime/`value_json`, kein Regel-Editor,
-kein Abschluss von DF-3 insgesamt. Vor Merge nicht als auf `main` bezeichnen.
+DF-3-REST-B Options-Admin-UI (umgesetzt in PR #39): Choice-Typen
+`select`/`multi_select` im Custom-Feld-Admin freigeschaltet; Auswahloptionen
+auf der Definitions-Detailseite über den REST-A-Writer mit Preview/Apply;
+isolierte Playwright-Suite Port 8013. Kein Runtime/`value_json`, kein
+Regel-Editor, kein Abschluss von DF-3 insgesamt.
 
 Davor auf `main`: DF-3-REST-A Options-Fundament (Merge PR #38,
 `7daee909e76e1fe8e47f36155e58b4059496b09d`).
@@ -47,12 +44,13 @@ Admin-UI für versionierte Auswahloptionen eigener `select`/`multi_select`-
 Felddefinitionen. Desired-State Preview/Apply ausschließlich über
 `FieldDefinitionOptionsWriter` / `FieldDefinitionOptionContract`. Minimale
 read-only Preview-DTO-Erweiterung am Writer. Keine Migration. Keine Runtime.
+**Vollständig umgesetzt und in PR #39 geprüft.**
 
 | Kriterium | Status |
 |---|---|
-| Choice-Typen anlegen/ändern (vor Nutzung) | **umgesetzt (Feature-Branch)** |
-| Options-Sektion auf Definitions-Detail | **umgesetzt (Feature-Branch)** |
-| Preview/Apply + 409/422 DE + No-op | **umgesetzt (Feature-Branch)** |
+| Choice-Typen anlegen/ändern (vor Nutzung) | **umgesetzt (PR #39)** |
+| Options-Sektion auf Definitions-Detail | **umgesetzt (PR #39)** |
+| Preview/Apply + 409/422 DE + No-op | **umgesetzt (PR #39)** |
 | Select-/Multi-Select-Runtime (`value_json`) | **nicht** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
@@ -69,7 +67,7 @@ Slice. **Auf `main` gemergt (PR #38).**
 | Relationale Optionszeilen pro Revision | **umgesetzt** |
 | Desired-State-Writer inkl. No-op / Deaktivierung statt Delete | **umgesetzt** |
 | Gen3 additives Options-Freeze + Fingerprint | **umgesetzt** |
-| Options-Admin-UI | **umgesetzt auf Feature-Branch (REST-B)** |
+| Options-Admin-UI | **umgesetzt in PR #39 (REST-B)** |
 | Calc-Dispo-Runtime | **nicht** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
@@ -362,7 +360,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
 - Select-/Multi-Select-Runtime, volle Regelmatrix, Regel-Editor
-  (DF-3-REST-A auf main; DF-3-REST-B Options-Admin auf Feature-Branch;
+  (DF-3-REST-A auf main; DF-3-REST-B Options-Admin umgesetzt in PR #39;
   Slice-Reihenfolge weiter: Select-Runtime → Regeln)
 - ADV-001 Rest: Kategorie-Defaults
 - Inventar-/Preislisten-/Kombinations-Admin
@@ -467,7 +465,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 - ADV-001c4a/c4b: Methodenoptions-/Freeze + sichtbare Wizard-Auswahl (umgesetzt)
 - DF-3-REST-A: Options-Fundament (auf `main`, PR #38)
-- DF-3-REST-B: Options-Admin-UI (Feature-Branch; vor Merge nicht als auf main)
+- DF-3-REST-B: Options-Admin-UI (umgesetzt in PR #39)
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
