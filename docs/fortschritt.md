@@ -60,9 +60,11 @@ Serverseitige Select-/Multi-Select-Runtime ohne sichtbare UI.
 
 Leer-/XOR-Vertrag: Select leer = `null`; Multi leer = `[]`; Choice nur in
 `value_json`; skalare Kanäle bei Choice genullt (App-Layer; kein DB-CHECK wegen
-SQLite/MySQL-Symmetrie). Historisch inaktive Keys nur gegen DB-Vorzustand.
-Required: Calc-Draft wie Text ohne statisches required; Pflicht bei Dispo-Create
-und Dispo-Submit/Partial-Gates. Freeze/`options_json` einzige Optionsquelle.
+SQLite/MySQL-Symmetrie). Spaltentyp Laravel `json()` (MySQL `json`, MariaDB
+wie bestehende `options_json` oft `longtext`). Historisch inaktive Keys nur
+gegen DB-Vorzustand. Required: Calc-Draft wie Text ohne statisches required;
+Pflicht bei Dispo-Create und Dispo-Submit/Partial-Gates. Freeze/`options_json`
+einzige Optionsquelle.
 
 ## DF-3-REST-B – Options-Admin-UI (September 2026)
 

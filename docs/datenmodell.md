@@ -450,6 +450,7 @@ Umgesetzt in DF-3-REST-C1 (Feature-Branch `feat/df3-rest-c1-choice-value-persist
 noch nicht auf `main`):
 
 - additives `value_json` an den vier dynamischen Wertetabellen
+  (Laravel `json()`, unter MariaDB wie `options_json` typischerweise `longtext`)
 - `ChoiceFieldValueContract` (Select = JSON-String, Multi = JSON-Array,
   historisch inactive, Leer-/XOR-Vertrag)
 - serverseitige Calc-/Dispo-Persistenz, Copy, Completeness; Schema-Props mit
