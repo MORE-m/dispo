@@ -16,6 +16,7 @@ use App\Models\FieldSetVersionField;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\SnapshotFieldRuleEvaluator;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -584,9 +585,10 @@ final class FieldSetVersionAdminWriter
                 }
                 if ($definition->field_type->isChoice()) {
                     $revisionOptions = $membership->revision->options;
-                    if ($revisionOptions->isEmpty()) {
+                    $canonical = FieldDefinitionOptionContract::fromRevisionOptions($revisionOptions);
+                    if ($canonical === [] || ! FieldDefinitionOptionContract::hasActiveOption($canonical)) {
                         throw ValidationException::withMessages([
-                            'fields' => "Auswahlfeld „{$definition->key}“ benötigt mindestens eine Option in der gepinnten Revision.",
+                            'fields' => "Auswahlfeld „{$definition->key}“ benötigt mindestens eine aktive Option in der gepinnten Revision.",
                         ]);
                     }
                 }

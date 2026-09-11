@@ -17,14 +17,16 @@ return new class extends Migration
         if (! Schema::hasTable('field_definition_revision_options')) {
             Schema::create('field_definition_revision_options', function (Blueprint $table) {
                 $table->id();
-                $table->foreignId('field_definition_revision_id')
-                    ->constrained('field_definition_revisions')
-                    ->restrictOnDelete();
+                $table->unsignedBigInteger('field_definition_revision_id');
                 $table->string('key', 64);
                 $table->string('label', 255);
                 $table->unsignedInteger('sort')->default(0);
                 $table->boolean('is_active')->default(true);
 
+                $table->foreign('field_definition_revision_id', 'field_def_rev_opt_rev_fk')
+                    ->references('id')
+                    ->on('field_definition_revisions')
+                    ->restrictOnDelete();
                 $table->unique(
                     ['field_definition_revision_id', 'key'],
                     'field_def_rev_opt_key_unique',

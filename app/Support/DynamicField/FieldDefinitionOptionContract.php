@@ -243,6 +243,7 @@ final class FieldDefinitionOptionContract
         $seen = [];
         /** @var list<array{key: string, label: string, sort: int, is_active: bool}> $normalized */
         $normalized = [];
+        $hasActive = false;
 
         foreach ($options as $index => $raw) {
             if (! is_array($raw)) {
@@ -283,6 +284,10 @@ final class FieldDefinitionOptionContract
                 );
             }
 
+            if ($raw['is_active'] === true) {
+                $hasActive = true;
+            }
+
             $normalized[] = [
                 'key' => $key,
                 'label' => $label,
@@ -291,7 +296,27 @@ final class FieldDefinitionOptionContract
             ];
         }
 
+        if (! $hasActive) {
+            throw new \RuntimeException(
+                "Auswahlfeld „{$fieldKey}“ benötigt mindestens eine aktive Option.",
+            );
+        }
+
         return self::canonicalize($normalized);
+    }
+
+    /**
+     * @param  list<array{key: string, label: string, sort: int, is_active: bool}>  $options
+     */
+    public static function hasActiveOption(array $options): bool
+    {
+        foreach ($options as $row) {
+            if ($row['is_active'] === true) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

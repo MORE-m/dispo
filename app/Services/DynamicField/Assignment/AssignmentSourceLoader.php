@@ -407,6 +407,12 @@ final class AssignmentSourceLoader
                 );
             }
 
+            if ($fieldType->isChoice() && $options !== null && ! FieldDefinitionOptionContract::hasActiveOption($options)) {
+                throw new RuntimeException(
+                    "Auswahlfeld „{$definition->key}“ benötigt mindestens eine aktive Option für den Freeze.",
+                );
+            }
+
             $memberships[] = [
                 'field_definition_id' => $definition->id,
                 'field_definition_revision_id' => $revision->id,
