@@ -34,6 +34,7 @@ async function csrfJson(
                     .find((row) => row.startsWith('XSRF-TOKEN='))
                     ?.slice(11) ?? '',
             );
+            const upper = method.toUpperCase();
             const response = await fetch(url, {
                 method,
                 credentials: 'same-origin',
@@ -43,7 +44,9 @@ async function csrfJson(
                     'X-XSRF-TOKEN': token,
                     'X-Requested-With': 'XMLHttpRequest',
                 },
-                body: JSON.stringify(body),
+                ...(upper === 'GET' || upper === 'HEAD'
+                    ? {}
+                    : { body: JSON.stringify(body) }),
             });
             const text = await response.text();
             let data: unknown = null;
