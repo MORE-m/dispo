@@ -369,13 +369,13 @@ final class CalculationDynamicFieldWriter
     }
 
     /**
-     * @param  Collection<int, CalculationFieldValue|CalculationPositionFieldValue>  $rows
+     * @param  iterable<int, CalculationFieldValue|CalculationPositionFieldValue>  $rows
      * @return array<string, string|list<string>|null>
      */
     private function storedChoiceValuesByKey(
         ConfigurationSnapshot $snapshot,
         FieldScope $scope,
-        $rows,
+        iterable $rows,
     ): array {
         $byDefinitionId = [];
         foreach ($rows as $row) {
@@ -583,9 +583,7 @@ final class CalculationDynamicFieldWriter
             ChoiceFieldValueContract::writeStored(
                 $def,
                 $row,
-                is_string($value) || is_array($value) || $value === null
-                    ? $value
-                    : null,
+                ChoiceFieldValueContract::assertNormalizedStoredValue($def->field_type, $value),
             );
 
             return;

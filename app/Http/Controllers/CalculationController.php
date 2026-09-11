@@ -32,7 +32,7 @@ use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
-use App\Support\DynamicField\FieldDefinitionOptionContract;
+use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -793,7 +793,7 @@ class CalculationController extends Controller
             return null;
         }
 
-        return FieldDefinitionOptionContract::canonicalize($optionsJson);
+        return ChoiceFieldValueContract::optionsForSchemaProp($optionsJson, $fieldType);
     }
 
     /**

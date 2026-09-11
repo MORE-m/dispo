@@ -41,11 +41,27 @@ final class ChoiceFieldValueContract
         $options = self::requireFrozenOptions($optionsJson, $fieldType, $errorKey, $label);
         $previous = self::normalizePrevious($fieldType, $previousStored, $options, $errorKey, $label);
 
-        return match ($fieldType) {
-            FieldType::Select => self::normalizeSelect($incoming, $previous, $options, $errorKey, $label),
-            FieldType::MultiSelect => self::normalizeMultiSelect($incoming, $previous, $options, $errorKey, $label),
-            default => throw new RuntimeException('Unerwarteter Choice-Typ.'),
-        };
+        if ($fieldType === FieldType::Select) {
+            return self::normalizeSelect(
+                $incoming,
+                is_string($previous) || $previous === null ? $previous : null,
+                $options,
+                $errorKey,
+                $label,
+            );
+        }
+
+        if ($fieldType === FieldType::MultiSelect) {
+            return self::normalizeMultiSelect(
+                $incoming,
+                is_array($previous) ? $previous : [],
+                $options,
+                $errorKey,
+                $label,
+            );
+        }
+
+        throw new RuntimeException('Unerwarteter Choice-Typ.');
     }
 
     /**
@@ -302,13 +318,15 @@ final class ChoiceFieldValueContract
         foreach ($keys as $key) {
             $unique[$key] = true;
         }
+        /** @var list<string> $list */
         $list = array_keys($unique);
         sort($list, SORT_STRING);
 
-        return array_values($list);
+        return $list;
     }
 
     /**
+     * @param  array<mixed>|null  $optionsJson
      * @return list<array{key: string, label: string, sort: int, is_active: bool}>|null
      */
     public static function optionsForSchemaProp(?array $optionsJson, FieldType $fieldType): ?array
@@ -323,18 +341,42 @@ final class ChoiceFieldValueContract
 
         try {
             return FieldDefinitionOptionContract::assertFrozenOptions(
-                $optionsJson,
+                array_values($optionsJson),
                 $fieldType,
                 'schema',
             );
         } catch (RuntimeException) {
-            return FieldDefinitionOptionContract::canonicalize(
-                array_values(array_filter(
-                    $optionsJson,
-                    static fn (mixed $row): bool => is_array($row),
-                )),
-            );
+            return null;
         }
+    }
+
+    /**
+     * @return string|list<string>|null
+     */
+    public static function assertNormalizedStoredValue(FieldType $fieldType, mixed $value): string|array|null
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if ($fieldType === FieldType::Select) {
+            if (! is_string($value)) {
+                throw new RuntimeException('Select-Wert muss string|null sein.');
+            }
+
+            return $value;
+        }
+
+        if ($fieldType === FieldType::MultiSelect) {
+            if (! self::isListOfStrings($value)) {
+                throw new RuntimeException('Multi-Select-Wert muss list<string> sein.');
+            }
+
+            /** @var list<string> $value */
+            return self::canonicalizeKeys($value);
+        }
+
+        throw new RuntimeException('assertNormalizedStoredValue nur für Choice-Typen.');
     }
 
     /**

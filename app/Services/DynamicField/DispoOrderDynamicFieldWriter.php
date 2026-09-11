@@ -404,9 +404,7 @@ final class DispoOrderDynamicFieldWriter
                         $locked,
                         $snapshot,
                         $key,
-                        is_string($newValue) || is_array($newValue) || $newValue === null
-                            ? $newValue
-                            : null,
+                        ChoiceFieldValueContract::assertNormalizedStoredValue($def->field_type, $newValue),
                     );
                 } else {
                     $this->upsertHeaderTextValue(
