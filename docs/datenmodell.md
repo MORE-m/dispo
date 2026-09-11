@@ -116,8 +116,20 @@ buchbarer Inherit-Medien über LiveBookability-Simulation
 Kategorie-Assignments ASC. Identischer State = No-op ohne Mutation/Audit.
 Keine Migration.
 
-**ADV-001 insgesamt noch offen:** c3c Medium-Overrides; c4 Positionsauswahl;
-weitere Defaults (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen.
+**ADV-001c3c (Medium-Overrides Desired State):** Atomare Preview/Apply-Pflege
+von `calculation_method_mode` (inherit/override), gespeicherten
+Medium-Assignments und Medium-Default. inherit: nur Kategorie wirksam;
+gespeicherte Overrides bleiben erhalten und unwirksam. override: nur Medium
+wirksam, kein Kategorie-Fallback. Kein Hard Delete; `engine_profile_key` nie
+aus Admin. Override-Default Released+Profil; gespeicherter Default bei inherit
+nur Mitgliedschaft. Bestandsschutz über LiveBookability +
+`MediumMethodCatalogSnapshot`. Lock: Medium → Kategorie → Methoden ASC →
+Cat-/Med-Assignments ASC. Aktive gespeicherte Medium-Assignments blockieren
+c3b1-Deaktivierung auch bei inherit. Keine Migration.
+
+**ADV-001 insgesamt noch offen:** c4 Positionsauswahl; weitere Defaults
+(Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen; technische
+Profil-Provisionierung.
 
 Soll weiterhin: `AdvertisingCategory` liefert Defaults. `AdvertisingMedium` gehört
 genau einer Kategorie und ergänzt eigene Regeln. Deaktivierung verhindert

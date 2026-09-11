@@ -1,14 +1,14 @@
 # Fortschritt V1
 
-Stand: 10. September 2026 (ADV-001c3b2 Kategorie-Desired-State – kein Abschluss von ADV-001 / DF-3)
+Stand: 10. September 2026 (ADV-001c3c Medium-Overrides Desired State – kein Abschluss von ADV-001 / DF-3)
 
 ## Aktuelle Phase
 
 Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
 DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
-ADV-001c3a, ADV-001c3b1 und ADV-001c3b2 auf Feature-Branch** (bzw. `main`).
-Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor). ADV-001 c3c und
-Positionsauswahl (c4) bleiben offen.
+ADV-001c3a, ADV-001c3b1, ADV-001c3b2 und ADV-001c3c auf Feature-Branch**
+(bzw. `main`). Gesamtziel DF-3 bleibt offen (Optionen, Regel-Editor).
+ADV-001 Positionsauswahl (c4) bleibt offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -18,14 +18,36 @@ Inventar- und Preislisten-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-ADV-001c3b2 Kategorie-Methodenzuordnungen und Default als Desired State
-(Feature-Branch `feat/adv001c3b2-category-calculation-methods-desired-state`).
-Nächste sinnvolle Schritte: c3c Medium-Overrides; c4 Positionsauswahl;
-parallel Optionen / Regel-Editor.
+ADV-001c3c Methodenvererbung / Medium-Overrides / Medium-Default als Desired
+State (Feature-Branch `feat/adv001c3c-medium-calculation-methods-desired-state`).
+Nächste sinnvolle Schritte: c4 Positionsauswahl; parallel Optionen / Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-ADV-001c3b1 Methodenstammdaten und Lifecycle auf `main` (Merge PR #33).
+ADV-001c3b2 Kategorie-Desired-State auf `main` (Merge PR #34).
+
+## ADV-001c3c – Medium-Overrides / Mode / Medium-Default (September 2026)
+
+Atomare Verwaltung von `calculation_method_mode` (inherit/override), gespeicherten
+Medium-Methodenzuordnungen und Medium-Default als Desired State (Preview + Apply).
+Bei inherit bleibt nur die Kategorie wirksam; gespeicherte Overrides bleiben
+erhalten und unwirksam. Bei override kein Fallback auf die Kategorie.
+Kein Hard Delete; fehlende Payload-Zeilen deaktivieren Assignments.
+`engine_profile_key` nie aus Admin; neu `null`, bestehende unverändert.
+Override-Default nur Released+Profil+aktive Zuordnung; gespeicherter Default bei
+inherit nur Mitgliedschaftspflicht. Bestandsschutz bisher buchbarer Medien via
+`AdvertisingMediumLiveBookability` mit `MediumMethodCatalogSnapshot`.
+Lock: Medium → Kategorie → Methoden ASC → Cat-Assignments ASC → Med-Assignments ASC.
+c3b1: aktive gespeicherte Medium-Assignments blockieren Methodendeaktivierung
+auch bei inherit. No-op ohne Mutation/Audit. Keine Migration. c4 offen.
+
+| Kriterium | Status |
+|---|---|
+| Preview/Apply Desired State + Mode + Fingerprint/`lock_version` | umgesetzt |
+| inherit/override Semantik (gespeichert vs. wirksam) | umgesetzt |
+| Default-/Profilvertrag + Bookability-Schutz | umgesetzt |
+| Werbemittel-Detail Methodenabschnitt | umgesetzt |
+| Positions-Methodenwahl | **c4** |
 
 ## ADV-001c3b2 – Kategorie-Desired-State / Default (September 2026)
 
@@ -37,7 +59,7 @@ neue Zeilen `null`, bestehende Werte unverändert. Strenger Default-Vertrag
 Inherit-Medien via `AdvertisingMediumLiveBookability`-Simulation
 (`CategoryMethodCatalogSnapshot`). Lock: Kategorie → Methoden ID ASC →
 Kategorie-Assignments ID ASC. Identischer State = No-op ohne Mutation/Audit.
-Keine Migration. c3c/c4 offen.
+Keine Migration. c3c umgesetzt; c4 offen.
 
 | Kriterium | Status |
 |---|---|
@@ -87,7 +109,7 @@ Methodenkarte; Methoden-Admin folgt in c3b/c3c; Positionsauswahl in c4.
 | Legacy Compatibility nur bei gesetztem kind | umgesetzt |
 | Admin-Status Katalog vs. Buchbarkeit | umgesetzt |
 | Zentrale Live-Buchbarkeit + Wizard-Filter | umgesetzt |
-| Methoden-Admin / Defaults / Overrides | **c3b1/c3b2; c3c offen** |
+| Methoden-Admin / Defaults / Overrides | **c3b1/c3b2/c3c** |
 | Positions-Methodenwahl | **c4** |
 
 ## ADV-001c2 – Dual-Read/Write + Positions-Freeze (September 2026)
@@ -352,9 +374,8 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c3b2
+## Bewusst offen nach ADV-001c3c
 
-- ADV-001c3c: Medium-Overrides / Mode / Medium-Default
 - ADV-001c4: Positionsauswahl und Selectability
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
@@ -363,6 +384,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 - übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices
+- technische Profil-Provisionierung für Medium-Overrides
 
 ## Echte Blocker
 

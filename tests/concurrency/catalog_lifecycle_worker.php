@@ -19,6 +19,8 @@ use App\Services\Advertising\Admin\AdvertisingCategoryAdminWriter;
 use App\Services\Advertising\Admin\AdvertisingCategoryCalculationMethodAdminWriter;
 use App\Services\Advertising\Admin\AdvertisingCategoryCalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\AdvertisingMediumAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingMediumCalculationMethodAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingMediumCalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\CalculationMethodAdminWriter;
 use App\Services\Advertising\Admin\CalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\CatalogImpactPreviewService;
@@ -290,6 +292,45 @@ try {
                 $updated = $result['category'];
 
                 return 'OK:replace_category_methods|'.$updated->id.'|'
+                    .($result['has_changes'] ? '1' : '0').'|'.$updated->lock_version;
+            })(),
+            'replace_medium_methods' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $writer = $app->make(AdvertisingMediumCalculationMethodAdminWriter::class);
+                $result = $writer->replace($medium, [
+                    'lock_version' => (int) $payload['lock_version'],
+                    'fingerprint' => (string) $payload['fingerprint'],
+                    'calculation_method_mode' => (string) $payload['calculation_method_mode'],
+                    'default_calculation_method_id' => $payload['default_calculation_method_id'] ?? null,
+                    'assignments' => $payload['assignments'],
+                ], $actor);
+                $updated = $result['medium'];
+
+                return 'OK:replace_medium_methods|'.$updated->id.'|'
+                    .($result['has_changes'] ? '1' : '0').'|'.$updated->lock_version;
+            })(),
+            'preview_and_replace_medium_methods' => (function () use ($app, $actor, $payload): string {
+                $medium = AdvertisingMedium::query()->findOrFail((int) $payload['medium_id']);
+                $desired = [
+                    'lock_version' => (int) ($payload['lock_version'] ?? $medium->lock_version),
+                    'calculation_method_mode' => (string) $payload['calculation_method_mode'],
+                    'default_calculation_method_id' => $payload['default_calculation_method_id'] ?? null,
+                    'assignments' => $payload['assignments'],
+                ];
+                $impact = $app->make(AdvertisingMediumCalculationMethodImpactPreviewService::class);
+                $preview = $impact->preview($medium->fresh([
+                    'category.defaultCalculationMethod',
+                    'category.calculationMethodAssignments.calculationMethod',
+                    'defaultCalculationMethod',
+                    'calculationMethodAssignments.calculationMethod',
+                ]), $desired);
+                $writer = $app->make(AdvertisingMediumCalculationMethodAdminWriter::class);
+                $result = $writer->replace($medium, array_merge($desired, [
+                    'fingerprint' => $preview['fingerprint'],
+                ]), $actor);
+                $updated = $result['medium'];
+
+                return 'OK:preview_and_replace_medium_methods|'.$updated->id.'|'
                     .($result['has_changes'] ? '1' : '0').'|'.$updated->lock_version;
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),

@@ -2,23 +2,32 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Enums\EngineCapabilityStatus;
 use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Http\Controllers\Controller;
 use App\Models\AdvertisingCategory;
+use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
+use App\Models\AdvertisingMediumCalculationMethod;
+use App\Models\CalculationMethod;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
 use App\Models\FieldSetAssignment;
 use App\Models\InventoryMediumRule;
 use App\Services\Advertising\Admin\AdvertisingMediumAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingMediumCalculationMethodAdminWriter;
+use App\Services\Advertising\Admin\AdvertisingMediumCalculationMethodImpactPreviewService;
 use App\Services\Advertising\Admin\CatalogImpactPreviewService;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
+use App\Support\Calculation\EngineProfileRegistry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
 
 /**
  * ADV-001b / ADV-001c3a: Admin-UI Werbemittel (engine-unabhängig).
@@ -134,6 +143,11 @@ class AdvertisingMediumAdminController extends Controller
 
         return Inertia::render('administration/katalog/media/show', [
             'medium' => $this->serializeDetail($medium, $writer),
+            'calculationMethods' => $this->serializeMediumCalculationMethods($medium),
+            'categoryCalculationMethods' => $this->serializeCategoryReferenceMethods($medium),
+            'methodsBoundaryNote' => 'Desired State für Vererbungsmodus, gespeicherte Medium-Overrides und Medium-Default. '
+                .'Wirksame Konfiguration und gespeicherte Override-Daten sind getrennt. '
+                .'engine_profile_key wird nicht aus dem Admin gesetzt. Preview vor Apply; kein Force.',
             'formOptions' => $this->formOptions(),
             'catalogNote' => 'Katalogaktivität und technische Buchbarkeit für neue Kalkulationen sind getrennt. Legacy-kind ist kein Adminfeld.',
             'routes' => [
@@ -144,7 +158,59 @@ class AdvertisingMediumAdminController extends Controller
                 'reactivate' => route('administration.catalog.media.reactivate', $medium),
                 'categoryChangePreview' => route('administration.catalog.media.category-change-preview', $medium),
                 'categoryChange' => route('administration.catalog.media.category-change', $medium),
+                'calculationMethodsPreview' => route('administration.catalog.media.calculation-methods-preview', $medium),
+                'calculationMethodsReplace' => route('administration.catalog.media.calculation-methods', $medium),
+                'categoryShow' => $medium->category !== null
+                    ? route('administration.catalog.categories.show', $medium->category)
+                    : null,
             ],
+        ]);
+    }
+
+    public function calculationMethodsPreview(
+        Request $request,
+        AdvertisingMedium $medium,
+        AdvertisingMediumCalculationMethodImpactPreviewService $impact,
+    ): JsonResponse {
+        $this->authorize('access-administration');
+
+        if ($request->exists('fingerprint')) {
+            throw ValidationException::withMessages([
+                'fingerprint' => 'Die Vorschau erwartet keinen Fingerprint.',
+            ]);
+        }
+
+        $payload = $this->validatedCalculationMethodsPayload($request, requireFingerprint: false);
+
+        return response()->json($impact->preview($medium, $payload));
+    }
+
+    public function calculationMethodsReplace(
+        Request $request,
+        AdvertisingMedium $medium,
+        AdvertisingMediumCalculationMethodAdminWriter $writer,
+        AdvertisingMediumAdminWriter $mediumWriter,
+    ): JsonResponse {
+        $this->authorize('access-administration');
+
+        $payload = $this->validatedCalculationMethodsPayload($request, requireFingerprint: true);
+        $result = $writer->replace($medium, $payload, $request->user());
+        $updated = $result['medium']->load([
+            'category.defaultCalculationMethod',
+            'category.calculationMethodAssignments.calculationMethod',
+            'defaultCalculationMethod',
+            'calculationMethodAssignments.calculationMethod',
+        ]);
+
+        return response()->json([
+            'message' => $result['message'],
+            'has_changes' => $result['has_changes'],
+            'lock_version' => $updated->lock_version,
+            'calculation_method_mode' => $updated->calculation_method_mode->value,
+            'default_calculation_method_id' => $updated->default_calculation_method_id,
+            'medium' => $this->serializeDetail($updated, $mediumWriter),
+            'calculationMethods' => $this->serializeMediumCalculationMethods($updated),
+            'categoryCalculationMethods' => $this->serializeCategoryReferenceMethods($updated),
         ]);
     }
 
@@ -393,6 +459,14 @@ class AdvertisingMediumAdminController extends Controller
             'category_name' => $medium->category?->name,
             'category_key' => $medium->category?->key,
             'category_is_active' => (bool) $medium->category?->is_active,
+            'calculation_method_mode' => $medium->calculation_method_mode->value,
+            'default_calculation_method_id' => $medium->default_calculation_method_id !== null
+                ? (int) $medium->default_calculation_method_id
+                : null,
+            'category_default_calculation_method_id' => $medium->category?->default_calculation_method_id !== null
+                ? (int) $medium->category->default_calculation_method_id
+                : null,
+            'effective_source' => $this->liveBookability->configurationSource($medium),
             'default_length_seconds' => $medium->default_length_seconds,
             'is_discountable' => $medium->is_discountable,
             'is_ae_eligible' => $medium->is_ae_eligible,
@@ -426,5 +500,279 @@ class AdvertisingMediumAdminController extends Controller
                 ->where('is_active', false)
                 ->count(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function validatedCalculationMethodsPayload(Request $request, bool $requireFingerprint): array
+    {
+        foreach (AdvertisingMediumCalculationMethodImpactPreviewService::PROHIBITED_TOP_LEVEL as $prohibited) {
+            if ($request->exists($prohibited)) {
+                throw ValidationException::withMessages([
+                    $prohibited => 'Das Feld „'.$prohibited.'“ darf über die Methodenkonfiguration nicht gesetzt werden.',
+                ]);
+            }
+        }
+
+        $assignmentsInput = $request->input('assignments');
+        if (is_array($assignmentsInput)) {
+            foreach ($assignmentsInput as $index => $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                foreach (array_keys($row) as $key) {
+                    if (! in_array((string) $key, AdvertisingMediumCalculationMethodImpactPreviewService::ALLOWED_ASSIGNMENT_KEYS, true)) {
+                        throw ValidationException::withMessages([
+                            "assignments.{$index}.{$key}" => 'Das Feld „'.$key.'“ darf in Methodenzuordnungen nicht gesetzt werden.',
+                        ]);
+                    }
+                }
+            }
+        }
+
+        $rules = [
+            'lock_version' => ['required', 'integer', 'min:1'],
+            'calculation_method_mode' => ['required', 'string', 'in:inherit,override'],
+            'default_calculation_method_id' => ['nullable', 'integer', 'exists:calculation_methods,id'],
+            'assignments' => ['present', 'array'],
+            'assignments.*.calculation_method_id' => ['required', 'integer', 'exists:calculation_methods,id'],
+            'assignments.*.is_active' => ['required', 'boolean'],
+            'assignments.*.sort' => ['required', 'integer', 'min:0'],
+        ];
+        if ($requireFingerprint) {
+            $rules['fingerprint'] = ['required', 'string', 'size:64', 'regex:/^[a-f0-9]{64}$/'];
+        }
+
+        $validated = $request->validate($rules);
+
+        $assignments = [];
+        foreach (array_values($validated['assignments']) as $row) {
+            $assignments[] = [
+                'calculation_method_id' => (int) $row['calculation_method_id'],
+                'is_active' => filter_var($row['is_active'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? (bool) $row['is_active'],
+                'sort' => (int) $row['sort'],
+            ];
+        }
+
+        $payload = [
+            'lock_version' => (int) $validated['lock_version'],
+            'calculation_method_mode' => (string) $validated['calculation_method_mode'],
+            'default_calculation_method_id' => $validated['default_calculation_method_id'] ?? null,
+            'assignments' => $assignments,
+        ];
+        if ($requireFingerprint) {
+            $payload['fingerprint'] = (string) $validated['fingerprint'];
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function serializeMediumCalculationMethods(AdvertisingMedium $medium): array
+    {
+        $medium->loadMissing(['calculationMethodAssignments', 'defaultCalculationMethod']);
+
+        /** @var Collection<int, AdvertisingMediumCalculationMethod> $byMethod */
+        $byMethod = $medium->calculationMethodAssignments
+            ->keyBy(static fn (AdvertisingMediumCalculationMethod $row): int => (int) $row->calculation_method_id);
+
+        $methods = CalculationMethod::query()
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get();
+
+        $rows = $methods->map(function (CalculationMethod $method) use ($byMethod, $medium): array {
+            /** @var AdvertisingMediumCalculationMethod|null $assignment */
+            $assignment = $byMethod->get((int) $method->id);
+            $pairs = EngineProfileRegistry::pairsForMethodKey((string) $method->key);
+            $profile = $assignment?->engine_profile_key;
+            $technicalStatus = $this->technicalStatus($method, $assignment, $pairs);
+            $defaultEligible = $this->isOverrideDefaultEligible($method, $assignment);
+            $operative = $medium->calculation_method_mode->value === 'override';
+
+            return [
+                'calculation_method_id' => (int) $method->id,
+                'key' => (string) $method->key,
+                'name' => (string) $method->name,
+                'method_is_active' => (bool) $method->is_active,
+                'method_status_label' => $method->is_active ? 'Aktiv' : 'Inaktiv',
+                'assigned' => $assignment !== null,
+                'is_active' => $assignment !== null ? (bool) $assignment->is_active : false,
+                'sort' => $assignment !== null ? (int) $assignment->sort : (int) $method->sort,
+                'engine_profile_key' => $profile,
+                'assignment_lock_version' => $assignment !== null ? (int) $assignment->lock_version : null,
+                'registry_pairs' => $pairs,
+                'technical_status' => $technicalStatus,
+                'technical_status_label' => $this->technicalStatusLabel($technicalStatus),
+                'default_eligible' => $defaultEligible,
+                'is_medium_default' => $medium->default_calculation_method_id !== null
+                    && (int) $medium->default_calculation_method_id === (int) $method->id,
+                'is_operative' => $operative && $assignment !== null && (bool) $assignment->is_active,
+                'stored_inactive_note' => (! $operative && $assignment !== null)
+                    ? 'gespeichert, aktuell nicht wirksam'
+                    : null,
+                'method_show_url' => route('administration.catalog.methods.show', $method),
+            ];
+        })->all();
+
+        usort($rows, static function (array $a, array $b): int {
+            $bySort = $a['sort'] <=> $b['sort'];
+            if ($bySort !== 0) {
+                return $bySort;
+            }
+
+            return $a['calculation_method_id'] <=> $b['calculation_method_id'];
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function serializeCategoryReferenceMethods(AdvertisingMedium $medium): array
+    {
+        $category = $medium->category;
+        if ($category === null) {
+            return [];
+        }
+
+        $category->loadMissing(['calculationMethodAssignments', 'defaultCalculationMethod']);
+
+        /** @var Collection<int, AdvertisingCategoryCalculationMethod> $byMethod */
+        $byMethod = $category->calculationMethodAssignments
+            ->keyBy(static fn (AdvertisingCategoryCalculationMethod $row): int => (int) $row->calculation_method_id);
+
+        $methods = CalculationMethod::query()
+            ->orderBy('sort')
+            ->orderBy('id')
+            ->get();
+
+        $rows = $methods->map(function (CalculationMethod $method) use ($byMethod, $category, $medium): array {
+            /** @var AdvertisingCategoryCalculationMethod|null $assignment */
+            $assignment = $byMethod->get((int) $method->id);
+            $pairs = EngineProfileRegistry::pairsForMethodKey((string) $method->key);
+            $profile = $assignment?->engine_profile_key;
+            $technicalStatus = $this->technicalStatus($method, $assignment, $pairs);
+            $operative = $medium->calculation_method_mode->value === 'inherit';
+
+            return [
+                'calculation_method_id' => (int) $method->id,
+                'key' => (string) $method->key,
+                'name' => (string) $method->name,
+                'method_is_active' => (bool) $method->is_active,
+                'assigned' => $assignment !== null,
+                'is_active' => $assignment !== null ? (bool) $assignment->is_active : false,
+                'sort' => $assignment !== null ? (int) $assignment->sort : (int) $method->sort,
+                'engine_profile_key' => $profile,
+                'registry_pairs' => $pairs,
+                'technical_status' => $technicalStatus,
+                'technical_status_label' => $this->technicalStatusLabel($technicalStatus),
+                'is_category_default' => $category->default_calculation_method_id !== null
+                    && (int) $category->default_calculation_method_id === (int) $method->id,
+                'is_operative' => $operative && $assignment !== null && (bool) $assignment->is_active,
+                'method_show_url' => route('administration.catalog.methods.show', $method),
+            ];
+        })->filter(static fn (array $row): bool => $row['assigned'])->values()->all();
+
+        usort($rows, static function (array $a, array $b): int {
+            $bySort = $a['sort'] <=> $b['sort'];
+            if ($bySort !== 0) {
+                return $bySort;
+            }
+
+            return $a['calculation_method_id'] <=> $b['calculation_method_id'];
+        });
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<array{engine_profile_key: string, pair_status: string, current_released_version: string|null}>  $pairs
+     */
+    private function technicalStatus(
+        CalculationMethod $method,
+        AdvertisingCategoryCalculationMethod|AdvertisingMediumCalculationMethod|null $assignment,
+        array $pairs,
+    ): string {
+        if (! $method->is_active) {
+            return 'method_inactive';
+        }
+
+        $profile = $assignment?->engine_profile_key;
+        if ($profile === null || trim((string) $profile) === '') {
+            if ($pairs === []) {
+                return 'no_profile';
+            }
+
+            $hasReleased = false;
+            $hasPlanned = false;
+            foreach ($pairs as $pair) {
+                if ($pair['pair_status'] === EngineCapabilityStatus::Released->value) {
+                    $hasReleased = true;
+                }
+                if ($pair['pair_status'] === EngineCapabilityStatus::Planned->value) {
+                    $hasPlanned = true;
+                }
+            }
+
+            return $hasReleased ? 'released_executable' : ($hasPlanned ? 'planned' : 'no_profile');
+        }
+
+        try {
+            EngineProfileRegistry::assertKnownProfile((string) $profile);
+            EngineProfileRegistry::assertKnownMethodForProfile((string) $profile, (string) $method->key);
+        } catch (InvalidArgumentException) {
+            return 'invalid_profile';
+        }
+
+        $status = EngineProfileRegistry::pairStatus((string) $profile, (string) $method->key);
+        $version = EngineProfileRegistry::currentReleasedVersion((string) $profile, (string) $method->key);
+        if ($status === EngineCapabilityStatus::Released && $version !== null && trim($version) !== '') {
+            return 'released_executable';
+        }
+        if ($status === EngineCapabilityStatus::Planned) {
+            return 'planned';
+        }
+
+        return 'invalid_profile';
+    }
+
+    private function technicalStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'released_executable' => 'Freigegeben und ausführbar',
+            'planned' => 'Geplant',
+            'no_profile' => 'Keinem technischen Profil zugeordnet',
+            'invalid_profile' => 'Technisch ungültiges Profil',
+            'method_inactive' => 'Methode global inaktiv',
+            default => $status,
+        };
+    }
+
+    private function isOverrideDefaultEligible(
+        CalculationMethod $method,
+        ?AdvertisingMediumCalculationMethod $assignment,
+    ): bool {
+        if (! $method->is_active || $assignment === null || ! $assignment->is_active) {
+            return false;
+        }
+        $profile = $assignment->engine_profile_key;
+        if ($profile === null || trim((string) $profile) === '') {
+            return false;
+        }
+        try {
+            EngineProfileRegistry::assertKnownProfile((string) $profile);
+            EngineProfileRegistry::assertKnownMethodForProfile((string) $profile, (string) $method->key);
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+        $status = EngineProfileRegistry::pairStatus((string) $profile, (string) $method->key);
+        $version = EngineProfileRegistry::currentReleasedVersion((string) $profile, (string) $method->key);
+
+        return $status === EngineCapabilityStatus::Released && $version !== null && trim($version) !== '';
     }
 }
