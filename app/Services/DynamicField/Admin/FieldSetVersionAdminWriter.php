@@ -561,7 +561,7 @@ final class FieldSetVersionAdminWriter
                 ]);
             }
 
-            $lockedDraft->load(['fields.revision.definition', 'rules']);
+            $lockedDraft->load(['fields.revision.options', 'fields.revision.definition', 'rules']);
 
             if ($lockedDraft->fields->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -581,6 +581,14 @@ final class FieldSetVersionAdminWriter
                     throw ValidationException::withMessages([
                         'fields' => "Feldschlüssel „{$definition->key}“ ist mehrfach vorhanden.",
                     ]);
+                }
+                if ($definition->field_type->isChoice()) {
+                    $revisionOptions = $membership->revision->options;
+                    if ($revisionOptions->isEmpty()) {
+                        throw ValidationException::withMessages([
+                            'fields' => "Auswahlfeld „{$definition->key}“ benötigt mindestens eine Option in der gepinnten Revision.",
+                        ]);
+                    }
                 }
                 if (! $definition->is_system) {
                     if (! $definition->is_active) {

@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool|null $required_override
  * @property bool|null $visible_override
  * @property array<string, mixed>|null $validation_json
+ * @property list<array{key: string, label: string, sort: int, is_active: bool}>|null $options_json
  * @property bool $reportable
  * @property bool $definition_is_system
  * @property bool $definition_is_active
@@ -49,6 +50,7 @@ class ConfigurationSnapshotSourceField extends Model
         'required_override',
         'visible_override',
         'validation_json',
+        'options_json',
         'reportable',
         'definition_is_system',
         'definition_is_active',
@@ -66,6 +68,7 @@ class ConfigurationSnapshotSourceField extends Model
             'required_override' => 'boolean',
             'visible_override' => 'boolean',
             'validation_json' => 'array',
+            'options_json' => 'array',
             'reportable' => 'boolean',
             'definition_is_system' => 'boolean',
             'definition_is_active' => 'boolean',

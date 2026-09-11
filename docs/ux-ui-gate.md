@@ -171,6 +171,17 @@ Diese Entscheidung gibt **ausschließlich** die Assignment-Verwaltung im Bereich
 „Dynamische Felder“ frei. Sie öffnet weder den allgemeinen Katalog-Admin noch
 andere UX-GATE-D-Module.
 
+**Product-Owner-Teilfreigabe (September 2026, PO-DF3-REST-1):** Innerhalb der
+bereits freigegebenen Administration dynamischer Felder zusätzlich bestätigt:
+
+- Options-Admin (Auswahlfelder / Optionspflege) und späterer Regel-Editor
+  gehören zur Dyn-Feld-Teilfreigabe
+- keine zusätzliche UX-GATE-D-Freigabe erforderlich
+
+DF-3-REST-A (Options-Fundament) enthält bewusst noch keine neue Admin- oder
+Runtime-UI. Inventar-Admin, Preislisten-Admin, Kombinationstabellen-Admin und
+übrige blockierte UX-GATE-D-Module bleiben gesperrt.
+
 **Product-Owner-Teilfreigabe (September 2026, PO-ADV001b-1):** Zusätzlich
 freigegeben:
 

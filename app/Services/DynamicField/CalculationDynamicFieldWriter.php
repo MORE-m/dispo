@@ -298,6 +298,11 @@ final class CalculationDynamicFieldWriter
                 FieldType::Boolean => $this->normalizeBoolean($raw, $def->key === 'period_open'),
                 FieldType::Period => $this->normalizePeriod($raw),
                 FieldType::ShortText, FieldType::LongText => $this->normalizeText($raw, $def, $errorPrefix, $errors),
+                FieldType::Select, FieldType::MultiSelect => $this->rejectUnsupportedChoiceType(
+                    $def,
+                    $errorPrefix,
+                    $errors,
+                ),
             };
         }
 
@@ -489,6 +494,9 @@ final class CalculationDynamicFieldWriter
             FieldType::Period => $this->fillPeriod($row, is_array($value) ? $value : null),
             FieldType::ShortText => $row->value_string = $value === null ? null : (string) $value,
             FieldType::LongText => $row->value_text = $value === null ? null : (string) $value,
+            FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
+                'select/multi_select-Persistenz ist in DF-3-REST-A noch nicht freigegeben.',
+            ),
         };
     }
 
@@ -515,6 +523,7 @@ final class CalculationDynamicFieldWriter
             FieldType::Boolean => $def->key === 'period_open' ? true : null,
             FieldType::Period => null,
             FieldType::ShortText, FieldType::LongText => null,
+            FieldType::Select, FieldType::MultiSelect => null,
         };
     }
 
@@ -532,6 +541,22 @@ final class CalculationDynamicFieldWriter
                 ],
             FieldType::ShortText => $value->value_string,
             FieldType::LongText => $value->value_text,
+            FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
+                'select/multi_select-Export ist in DF-3-REST-A noch nicht freigegeben.',
+            ),
         };
+    }
+
+    /**
+     * @param  array<string, string>  $errors
+     */
+    private function rejectUnsupportedChoiceType(
+        SnapshotFieldDefinition $def,
+        string $errorPrefix,
+        array &$errors,
+    ): null {
+        $errors["{$errorPrefix}.{$def->key}"] = 'Auswahlfelder werden in diesem Schritt noch nicht unterstützt.';
+
+        return null;
     }
 }

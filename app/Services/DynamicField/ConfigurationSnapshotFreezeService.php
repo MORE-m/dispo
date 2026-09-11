@@ -934,6 +934,7 @@ final class ConfigurationSnapshotFreezeService
                     'label' => (string) $field->label,
                     'help_text' => $field->help_text,
                     'validation_json' => $field->validation_json,
+                    'options_json' => $field->options_json,
                     'reportable' => (bool) $field->reportable,
                     'field_type' => $field->field_type->value,
                 ];
@@ -1726,6 +1727,7 @@ final class ConfigurationSnapshotFreezeService
                 'required_override' => $membership['required_override'] ?? null,
                 'visible_override' => $membership['visible_override'] ?? null,
                 'validation_json' => $membership['validation_json'] ?? null,
+                'options_json' => $membership['options_json'] ?? null,
                 'reportable' => (bool) ($membership['reportable'] ?? true),
                 'definition_is_system' => (bool) ($membership['definition_is_system'] ?? false),
                 'definition_is_active' => (bool) ($membership['definition_is_active'] ?? true),
@@ -1806,6 +1808,7 @@ final class ConfigurationSnapshotFreezeService
                 'required_override' => (bool) $definition->required,
                 'visible_override' => (bool) $definition->visible,
                 'validation_json' => $definition->validation_json,
+                'options_json' => $definition->options_json,
                 'reportable' => (bool) $definition->reportable,
                 'definition_is_system' => false,
                 'definition_is_active' => true,
@@ -1853,6 +1856,7 @@ final class ConfigurationSnapshotFreezeService
         $definition->required = (bool) $field['effective_required'];
         $definition->visible = (bool) $field['effective_visible'];
         $definition->validation_json = $frozen['validation_json'] ?? ($field['validation_json'] ?? null);
+        $definition->options_json = $frozen['options_json'] ?? ($field['options_json'] ?? null);
         $definition->provenance_definition_source_id = $definitionSourceId;
         $definition->provenance_revision_source_id = $revisionSourceId;
         $definition->provenance_required_source_id = $this->requireSourceId(
@@ -1895,6 +1899,7 @@ final class ConfigurationSnapshotFreezeService
         $definition->required = (bool) $source->required;
         $definition->visible = (bool) $source->visible;
         $definition->validation_json = $source->validation_json;
+        $definition->options_json = $source->options_json;
         $definition->provenance_definition_source_id = $calcOriginSourceId;
         $definition->provenance_revision_source_id = $calcOriginSourceId;
         $definition->provenance_required_source_id = $calcOriginSourceId;

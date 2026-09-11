@@ -1557,6 +1557,9 @@ final class DispoOrderDynamicFieldWriter
                 ],
             FieldType::ShortText => $row->value_string,
             FieldType::LongText => $row->value_text,
+            FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
+                'select/multi_select-Export ist in DF-3-REST-A noch nicht freigegeben.',
+            ),
         };
     }
 

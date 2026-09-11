@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $required
  * @property bool $visible
  * @property array<string, mixed>|null $validation_json
+ * @property list<array{key: string, label: string, sort: int, is_active: bool}>|null $options_json
  * @property int|null $provenance_definition_source_id
  * @property int|null $provenance_revision_source_id
  * @property int|null $provenance_required_source_id
@@ -52,6 +53,7 @@ class SnapshotFieldDefinition extends Model
         'required',
         'visible',
         'validation_json',
+        'options_json',
         'provenance_definition_source_id',
         'provenance_revision_source_id',
         'provenance_required_source_id',
@@ -83,6 +85,7 @@ class SnapshotFieldDefinition extends Model
             'required' => 'boolean',
             'visible' => 'boolean',
             'validation_json' => 'array',
+            'options_json' => 'array',
         ];
     }
 

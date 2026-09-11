@@ -396,6 +396,7 @@ final class FieldSetAssignmentMergeResolver
                 'label' => (string) $membership['label'],
                 'help_text' => $membership['help_text'] ?? null,
                 'validation_json' => $membership['validation_json'] ?? null,
+                'options_json' => $membership['options_json'] ?? null,
                 'reportable' => array_key_exists('reportable', $membership)
                     ? (bool) $membership['reportable']
                     : true,
