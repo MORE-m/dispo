@@ -2,6 +2,8 @@
 
 namespace App\Services\DynamicField;
 
+use App\Support\DynamicField\FieldRuleContract;
+
 /**
  * Kanonischer Dedupe-Key für eingefrorene Feldregeln (Freeze und Integrity).
  */
@@ -13,9 +15,6 @@ final class SnapshotFieldRuleDedupeKey
      */
     public static function from(array $condition, array $action): string
     {
-        return hash('sha256', json_encode([
-            'condition' => $condition,
-            'action' => $action,
-        ], JSON_THROW_ON_ERROR));
+        return FieldRuleContract::dedupePayload($condition, $action);
     }
 }

@@ -6,6 +6,7 @@ use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldSetAssignmentTargetLayer;
 use App\Models\SnapshotFieldDefinition;
+use App\Support\DynamicField\FieldRuleContract;
 
 /**
  * DF-3.3a1 / DYN-002 – deterministischer Merge von Primary-Core + Assignments.
@@ -149,29 +150,35 @@ final class FieldSetAssignmentMergeResolver
 
         $rulesOut = [];
         foreach ($rulesByFingerprint as $rule) {
-            $conditionKey = (string) ($rule['condition_json']['field_key'] ?? '');
-            $actionKey = (string) ($rule['action_json']['field_key'] ?? '');
+            $conditionJson = is_array($rule['condition_json'] ?? null) ? $rule['condition_json'] : [];
+            $actionJson = is_array($rule['action_json'] ?? null) ? $rule['action_json'] : [];
+            $conditionKeys = FieldRuleContract::conditionFieldKeys($conditionJson);
+            $actionKey = (string) ($actionJson['field_key'] ?? '');
 
             // Regeln, die nur Out-of-Scope-Felder referenzieren (z. B. Position
             // bei Header-Preview), werden übersprungen – kein Konflikt.
-            $conditionInScope = $conditionKey === '' || isset($effectiveKeys[$conditionKey]);
+            $conditionInScope = $conditionKeys === []
+                || collect($conditionKeys)->every(fn (string $key): bool => isset($effectiveKeys[$key]));
             $actionInScope = $actionKey === '' || isset($effectiveKeys[$actionKey]);
             if (! $conditionInScope || ! $actionInScope) {
-                $conditionKnown = $conditionKey === '' || isset($keysSeenInSources[$conditionKey]);
+                $conditionKnown = $conditionKeys === []
+                    || collect($conditionKeys)->every(fn (string $key): bool => isset($keysSeenInSources[$key]));
                 $actionKnown = $actionKey === '' || isset($keysSeenInSources[$actionKey]);
                 if ($conditionKnown && $actionKnown) {
                     continue;
                 }
             }
 
-            if ($conditionKey !== '' && ! isset($effectiveKeys[$conditionKey]) && ! isset($keysSeenInSources[$conditionKey])) {
-                $conflicts[] = [
-                    'code' => 'rule_unknown_condition_field',
-                    'message' => "Regel referenziert unbekanntes Bedingungsfeld „{$conditionKey}“.",
-                    'details' => ['field_rule_id' => $rule['field_rule_id']],
-                ];
+            foreach ($conditionKeys as $conditionKey) {
+                if (! isset($effectiveKeys[$conditionKey]) && ! isset($keysSeenInSources[$conditionKey])) {
+                    $conflicts[] = [
+                        'code' => 'rule_unknown_condition_field',
+                        'message' => "Regel referenziert unbekanntes Bedingungsfeld „{$conditionKey}“.",
+                        'details' => ['field_rule_id' => $rule['field_rule_id']],
+                    ];
 
-                continue;
+                    continue 2;
+                }
             }
             if ($actionKey !== '' && ! isset($effectiveKeys[$actionKey]) && ! isset($keysSeenInSources[$actionKey])) {
                 $conflicts[] = [
@@ -188,27 +195,36 @@ final class FieldSetAssignmentMergeResolver
             $rulesOut[] = $rule;
         }
 
-        /** @var array<string, list<string>> $actionSignaturesByTarget */
-        $actionSignaturesByTarget = [];
+        /** @var array<string, list<string>> $setVisibleByTarget */
+        $setVisibleByTarget = [];
         foreach ($rulesOut as $rule) {
-            $actionKey = (string) ($rule['action_json']['field_key'] ?? '');
+            $actionJson = is_array($rule['action_json'] ?? null) ? $rule['action_json'] : [];
+            $actionKey = (string) ($actionJson['field_key'] ?? '');
             if ($actionKey === '') {
                 continue;
             }
-            $actionSignaturesByTarget[$actionKey][] = hash(
-                'sha256',
-                json_encode($rule['action_json'], JSON_THROW_ON_ERROR),
-            );
-        }
-        foreach ($actionSignaturesByTarget as $targetKey => $signatures) {
-            if (count(array_unique($signatures)) > 1) {
+            $actionOp = (string) ($actionJson['op'] ?? '');
+            $signature = hash('sha256', json_encode($actionJson, JSON_THROW_ON_ERROR));
+            if ($actionOp === FieldRuleContract::ACTION_SET_VISIBLE) {
+                $setVisibleByTarget[$actionKey][] = $signature;
+            } elseif ($actionOp !== FieldRuleContract::ACTION_REQUIRE_FIELD) {
                 $conflicts[] = [
-                    'code' => 'rule_conflicting_actions',
-                    'message' => "Widersprüchliche Regelaktionen auf Feld „{$targetKey}“.",
+                    'code' => 'rule_unknown_action',
+                    'message' => "Unbekannte Regelaktion auf Feld „{$actionKey}“.",
+                    'details' => ['field_key' => $actionKey],
+                ];
+            }
+        }
+        foreach ($setVisibleByTarget as $targetKey => $signatures) {
+            if (count($signatures) > 1) {
+                $conflicts[] = [
+                    'code' => 'rule_conflicting_set_visible',
+                    'message' => "Mehrere Sichtbarkeitsregeln auf Feld „{$targetKey}“ sind in V1 nicht erlaubt.",
                     'details' => ['field_key' => $targetKey],
                 ];
             }
         }
+        // Mehrere require_field auf dasselbe Ziel sind zulässig (OR); keine Konfliktmeldung.
 
         $fieldsOut = array_values(array_filter(
             $fieldsByDefinitionId,

@@ -18,6 +18,7 @@ use App\Models\SnapshotFieldRule;
 use App\Services\DynamicField\Assignment\AssignmentConfigurationLockCoordinator;
 use App\Services\DynamicField\Assignment\AssignmentSourceLoader;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentMergeResolver;
+use App\Support\DynamicField\FieldRuleDefinitionContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
@@ -205,8 +206,9 @@ final class ConfigurationSnapshotFreezeService
             $fresh = $this->reload($snapshot);
             $fresh->assertReadable();
             $this->ruleEvaluator->assertRulesCompatibleWithDefinitions(
-                $fresh->fieldDefinitions->keyBy('key')->all(),
+                FieldRuleDefinitionContext::fromSnapshot($fresh),
                 $fresh->rules,
+                requireActiveOptionKeys: false,
             );
 
             return $fresh;
@@ -1113,8 +1115,9 @@ final class ConfigurationSnapshotFreezeService
         // Vor der Bindung an eine Position gibt es noch keinen Eigentümer.
         $this->integrity->assertReadableInternal($fresh);
         $this->ruleEvaluator->assertRulesCompatibleWithDefinitions(
-            $fresh->fieldDefinitions->keyBy('key')->all(),
+            FieldRuleDefinitionContext::fromSnapshot($fresh),
             $fresh->rules,
+            requireActiveOptionKeys: false,
         );
 
         return $fresh;

@@ -500,15 +500,8 @@ final class FieldSetVersionAdminWriter
                 $membership->save();
             }
 
-            $lockedDraft->load(['fields.revision.definition', 'rules']);
-            $defsByKey = [];
-            foreach ($lockedDraft->fields as $membership) {
-                $definition = $membership->revision?->definition;
-                if ($definition === null) {
-                    throw new RuntimeException('Membership ohne gültige Definition.');
-                }
-                $defsByKey[$definition->key] = $definition;
-            }
+            $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
+            $defsByKey = $this->ruleDefinitionsFromMemberships($lockedDraft->fields);
             $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
 
             $locked->lock_version = $locked->lock_version + 1;
@@ -609,9 +602,12 @@ final class FieldSetVersionAdminWriter
                         'fields' => 'Systemdefinitionen dürfen freien Feldsets nicht zugeordnet werden.',
                     ]);
                 }
-                $defsByKey[$definition->key] = $definition;
+                $defsByKey[$definition->key] = true;
             }
-            $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
+            $this->rules->assertRulesCompatibleWithDefinitions(
+                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
+                $lockedDraft->rules,
+            );
 
             $previousActiveId = $locked->active_version_id;
             if ($previousActiveId !== null) {
@@ -778,16 +774,11 @@ final class FieldSetVersionAdminWriter
                 : null;
             $membership->save();
 
-            $lockedDraft->load(['fields.revision.definition', 'rules']);
-            $defsByKey = [];
-            foreach ($lockedDraft->fields as $row) {
-                $def = $row->revision?->definition;
-                if ($def === null) {
-                    throw new RuntimeException('Membership ohne gültige Definition.');
-                }
-                $defsByKey[$def->key] = $def;
-            }
-            $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
+            $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
+            $this->rules->assertRulesCompatibleWithDefinitions(
+                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
+                $lockedDraft->rules,
+            );
 
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
@@ -873,16 +864,11 @@ final class FieldSetVersionAdminWriter
 
             $lockedMembership->delete();
 
-            $lockedDraft->load(['fields.revision.definition', 'rules']);
-            $defsByKey = [];
-            foreach ($lockedDraft->fields as $row) {
-                $def = $row->revision?->definition;
-                if ($def === null) {
-                    throw new RuntimeException('Membership ohne gültige Definition.');
-                }
-                $defsByKey[$def->key] = $def;
-            }
-            $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
+            $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
+            $this->rules->assertRulesCompatibleWithDefinitions(
+                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
+                $lockedDraft->rules,
+            );
 
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
@@ -995,6 +981,34 @@ final class FieldSetVersionAdminWriter
                 FieldSetVersionStatus::Archived,
             ])
             ->exists();
+    }
+
+    /**
+     * @param  iterable<int, FieldSetVersionField>  $memberships
+     * @return array<string, object>
+     */
+    private function ruleDefinitionsFromMemberships(iterable $memberships): array
+    {
+        $defsByKey = [];
+        foreach ($memberships as $membership) {
+            $revision = $membership->revision;
+            $definition = $revision?->definition;
+            if ($definition === null) {
+                throw new RuntimeException('Membership ohne gültige Definition.');
+            }
+            $options = null;
+            if ($definition->field_type->isChoice()) {
+                $options = FieldDefinitionOptionContract::fromRevisionOptions($revision->options);
+            }
+            $defsByKey[$definition->key] = (object) [
+                'key' => $definition->key,
+                'field_type' => $definition->field_type,
+                'scope' => $definition->scope,
+                'options_json' => $options,
+            ];
+        }
+
+        return $defsByKey;
     }
 
     private function normalizeAppliesTo(FieldAppliesTo|string $value): FieldAppliesTo

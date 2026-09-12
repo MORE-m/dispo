@@ -282,20 +282,51 @@ erzeugen eine neue Entwurfsversion; die aktive Version wird nicht in-place geän
 
 ## Regelmodell
 
-V1 unterstützt Bedingungen:
+V1 (DF-3-RULE-A, `FieldRuleContract`) unterstützt **atomare** Conditions und
+**flache** Gruppen – keine Verschachtelung:
 
-- Feld X hat Wert Y,
-- Feld X ist oder ist nicht leer,
-- Feld X ist größer/kleiner als Y,
-- Kombination mehrerer Bedingungen mit UND/ODER.
+- `field_equals` (boolean, select, short_text, long_text; nicht Multi, nicht Period-Struktur)
+- `field_empty` / `field_not_empty` (alle Enum-Typen)
+- `field_contains` (nur multi_select, genau ein Options-Key)
+- `all` / `any` mit 2–8 atomaren Kindern
 
 Aktionen:
 
-- Feld wird sichtbar/unsichtbar,
-- Feld wird Pflicht/optional,
-- konfigurierter Hinweis oder Validierungsfehler wird ausgelöst.
+- `set_visible` mit `value: true|false` (höchstens eine pro Zielfeld; keine Selbstreferenz)
+- `require_field` (mehrere = OR)
 
-Regeln referenzieren stabile Feld- und Options-IDs, niemals nur Anzeigenamen.
+Cross-Scope: Header→Header (einmal, auch ohne Positionen); Header→Position;
+Position→Position (gleiche Position); Position→Header **verboten**.
+Calc-Origin ist eine eingefrorene Provenance-Eigenschaft (`action_target_readonly`
+über Snapshot-Sources mit `target_identity=calc_origin` bzw. Gen1 über
+`source_configuration_snapshot_id`), keine Keyliste. Condition-Quelle ist
+erlaubt; Action-Ziele (`set_visible` / `require_field`) sind verboten.
+Einzige Kompatibilitätsausnahme ohne Migration: die **exakte** DF-1-Seed-Regel
+`field_equals(period_open, false)` → `require_field(position_flight_period)`.
+Native Calculation-Felder sind keine Calc-Origin-Ziele und bleiben frei
+regelbar. Custom-Calc-Origin-Felder sind genauso geschützt wie Systemfelder.
+
+Effektive Ableitung (Contract-Ebene): Integrity → Conditions auf Rohwerte →
+Visible (Basis ⊕ `set_visible`) → Required (Basis ∨ `require_field`, nur wenn
+sichtbar) → Werte unsichtbarer Felder bleiben (DYN-005, Contract). Regeln
+mutieren keine Werte.
+
+**RULE-A liefert** den Vertrag und Effective-State-APIs. **RULE-B** verdrahtet
+dynamische Sichtbarkeit vollständig in produktive Writer-/UI-Pfade. Bis dahin
+prüft `SnapshotFieldRuleEvaluator::validate()` nur regelbasiertes Required;
+statisches Snapshot-`required` bleibt in bestehenden Writer-/Completeness-
+Pfaden. DYN-005 für dynamisch ausgeblendete, **statisch** required Felder ist
+damit noch nicht auf jedem Save-Pfad verdrahtet. Partial-Save bleibt
+unverändert.
+
+**DYN-004 (Präzisierung):** Integrity bei fachlicher Speicherung; volle
+Required-Prüfung bei Create/Submit/Status. Draft-Partial-Save blockiert
+unberührte Pflichtfelder nicht (Writer-Vertrag; UI-Parity in RULE-B).
+
+Admin-Regel-Editor (RULE-C) und produktive Calc-/Dispo-UI-Verdrahtung (RULE-B)
+sind noch offen. Zahl-/Datumsvergleiche und nested Logic sind außerhalb V1.
+
+Regeln referenzieren stabile Feld- und Options-Keys, niemals nur Anzeigenamen.
 
 ### Sichtbarkeit und Pflicht
 

@@ -1,24 +1,14 @@
 # Fortschritt V1
 
-Stand: 12. September 2026 (DF-3-REST-C3 Dispo Choice-UI umgesetzt – kein
-Abschluss von ADV-001 / DF-3; Regelmatrix und Regel-Editor offen)
+Stand: 12. September 2026 (DF-3-RULE-A Regelvertrag/Evaluatoren umgesetzt –
+DF-3 weiter offen: RULE-B Runtime-UI, RULE-C Editor; ADV-002 außerhalb)
 
 ## Aktuelle Phase
 
-Phase 2/3 parallel: **DF-1, DF-2, DF-3.1, DF-3.2a, DF-3.2b, ADV-001a, DF-3.3-fs,
-DF-3.3a1, DF-3.3a2α, DF-3.3a2β, DF-3.3b, ADV-001b, ADV-001c1, ADV-001c2,
-ADV-001c3a, ADV-001c3b1, ADV-001c3b2, ADV-001c3c, ADV-001c4a, ADV-001c4b**
-sowie **DF-3-REST-A (Options-Fundament)** über PR #38 auf `main`
-(`7daee909e76e1fe8e47f36155e58b4059496b09d`), **DF-3-REST-B
-(Options-Admin-UI)** über PR #39 auf `main`
-(`769d48554140cdd79d525b5cd4330db9699dd797`) und **DF-3-REST-C1
-(Choice-Wertmodell)** über PR #40 auf `main`
-(`60c1abe0b7e009fef3ace47f2e157627e9aa4419`).
-**DF-3-REST-C2** (sichtbare Select-/Multi-Select-UI im Kalkulationswizard) und
-**DF-3-REST-C3** (sichtbare Dispo-Choice-UI inkl. positionsbezogener Schema-Props
-und Calc-Origin-Darstellung) sind umgesetzt. Gesamtziel DF-3 bleibt offen
-(Regelmatrix, Regel-Editor).
+Phase 2/3 parallel: **DF-1 … ADV-001c4b** sowie **DF-3-REST-A–C3** und
+**DF-3-RULE-A** (V1-Regelvertrag). Gesamtziel DF-3 bleibt offen bis RULE-B/C.
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
+`SystemFieldSetting` / ADV-002 liegt außerhalb des DF-3-Regelabschlusses.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
@@ -29,23 +19,43 @@ bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster geplanter Slice: Regel-Fundament / Regel-Editor sowie weitere
-ADV-001-Defaults. DF-3 bleibt unvollständig, solange Regelmatrix und
-Regel-Editor fehlen.
+Nächster Slice: **DF-3-RULE-B** Runtime Visible/Required in Calc-/Dispo-UI.
+Danach RULE-C Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-REST-C3 sichtbare Dispo-Choice-UI: positionsbezogene
-`position_field_schemas` je Effektiv-Snapshot, Native Select/Multi mit
-C2-Komponenten (Freeze-`options_json`, touched-only, Inactive, Limit 50),
-Calc-Origin read-only unter „Aus Kalkulation übernommen“, 409-Lock-Hinweis.
-Vitest, Featuretests, Concurrency, REST-C Playwright Port 8014. Keine
-Migration, keine C1-/C2-Vertragsänderung.
+DF-3-RULE-A: zentraler V1-Regelvertrag (`FieldRuleContract`), Evaluator mit
+Header-Pass, flaches all/any, `set_visible`/`require_field`, Preview/Activate/
+Freeze/Merge fail-closed, TS-Parity-Library. Keine produktive UI, kein Editor.
 
-Davor: DF-3-REST-C2 Calc Choice-UI; auf `main` C1 (PR #40), REST-B (#39),
-REST-A (#38), C2 (PR #44).
+## DF-3-RULE-A – Regelvertrag / Evaluatoren (September 2026)
+
+| Teil | Status |
+|------|--------|
+| `FieldRuleContract` Allowlist + flaches all/any + Typmatrix | **umgesetzt** |
+| Cross-Scope (Header↔Position), Position→Header block | **umgesetzt** |
+| `set_visible` / `require_field` + DYN-005 | **umgesetzt** |
+| Calc-Origin via Provenance (`action_target_readonly`); exakte Seed-Ausnahme | **umgesetzt** |
+| Selbstreferenz-`set_visible` block; `require_field` Selbstreferenz erlaubt | **umgesetzt** |
+| Dedupe-Kanon (Seed-Hash stabil) | **umgesetzt** |
+| Integrity + Preview/Activate/Freeze/Merge fail-closed am Contract | **umgesetzt** |
+| TS-Parity fail-closed + Legacy-Seed-Adapter | **umgesetzt** |
+| Calc-/Dispo-UI-Verdrahtung inkl. DYN-005 für statisch required (RULE-B) | **nicht** |
+| Regel-Editor (RULE-C) | **nicht** |
+| SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
+
+**RULE-A-/RULE-B-Grenze:** RULE-A liefert Vertrag und Effective-State. `validate()`
+prüft nur regelbasiertes Required; statisches Required bleibt in Writern.
+DYN-005 für dynamisch ausgeblendete, statisch required Felder folgt in RULE-B.
+Partial-Save unverändert.
+
+**RULE-B-Vormerkung:** Schema-Props dürfen Regelziele mit Basis-`visible=false`
+nicht vor Client-Auswertung entfernen; Conditions brauchen Definitionen und
+Rohwerte; erst der effektive Zustand steuert Rendering; Werte bleiben erhalten.
+RULE-A ändert C2/C3-Schema-Buckets nicht.
 
 ## DF-3-REST-C3 – Dispo Choice-UI (September 2026)
+
 
 Sichtbare Select-/Multi-Select-Felder im Dispoauftrag (Header und Positionen)
 gegen eingefrorenes `options_json`, inkl. Calc-Origin-Provenance. Positions-

@@ -22,6 +22,7 @@ use App\Services\DynamicField\ConfigurationSnapshotCloneService;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use App\Services\DynamicField\SnapshotFieldRuleDedupeKey;
+use App\Support\DynamicField\FieldRuleContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -188,8 +189,11 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
             ->where('configuration_snapshot_id', $snapshot->id)
             ->firstOrFail();
 
-        $tamperedAction = array_merge($rule->action_json, ['tampered' => true]);
-        $rule->action_json = $tamperedAction;
+        // Semantik ändern (nicht unbekannte Keys anhängen) – Kanonisierung
+        // behält nur op/field_key/value; unbekannte Attribute werden verworfen.
+        $tamperedCondition = $rule->condition_json;
+        $tamperedCondition['value'] = true;
+        $rule->condition_json = $tamperedCondition;
         $rule->save();
         $rule->refresh();
         $rule->dedupe_key = SnapshotFieldRuleDedupeKey::from($rule->condition_json, $rule->action_json);
@@ -248,6 +252,115 @@ class ConfigurationSnapshotDf33a2aIntegrityTaxonomyTest extends TestCase
             ->with(['fieldDefinitions', 'rules', 'sources.fields', 'sources.rules'])
             ->findOrFail($order->configuration_snapshot_id);
         $dispoSnapshot->assertReadable();
+
+        $seedKey = FieldRuleContract::SEED_RULE_DEDUPE_SHA256;
+        $positionSnapshotIds = $order->positions()
+            ->whereNotNull('effective_configuration_snapshot_id')
+            ->pluck('effective_configuration_snapshot_id');
+        $seedExists = SnapshotFieldRule::query()
+            ->whereIn('configuration_snapshot_id', $positionSnapshotIds->push($dispoSnapshot->id)->all())
+            ->where('dedupe_key', $seedKey)
+            ->exists();
+        $this->assertTrue(
+            $seedExists,
+            'DF-1-Seed-Regel muss in Dispo-Basis oder Positions-Effektiv lesbar bleiben.',
+        );
+    }
+
+    public function test_extra_condition_property_with_recomputed_dedupe_is_rejected(): void
+    {
+        $snapshot = $this->freshV2CalcSnapshot();
+        $rule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->firstOrFail();
+
+        $tampered = $rule->condition_json;
+        $tampered['extra'] = 'x';
+        $rule->condition_json = $tampered;
+        $rule->dedupe_key = SnapshotFieldRuleDedupeKey::from($rule->condition_json, $rule->action_json);
+        $rule->save();
+
+        DB::table('configuration_snapshot_source_rules')
+            ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
+            ->where('source_field_rule_id', $rule->source_field_rule_id)
+            ->update([
+                'condition_json' => json_encode($rule->condition_json, JSON_THROW_ON_ERROR),
+                'dedupe_key' => $rule->dedupe_key,
+            ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/unzulässiges Attribut|unerwartetes Attribut|Bedingung/');
+        $snapshot->fresh(['fieldDefinitions', 'rules', 'sources.rules', 'sources'])->assertReadable();
+    }
+
+    public function test_extra_action_property_with_recomputed_dedupe_is_rejected(): void
+    {
+        $snapshot = $this->freshV2CalcSnapshot();
+        $rule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->firstOrFail();
+
+        $tampered = $rule->action_json;
+        $tampered['extra'] = true;
+        $rule->action_json = $tampered;
+        $rule->dedupe_key = SnapshotFieldRuleDedupeKey::from($rule->condition_json, $rule->action_json);
+        $rule->save();
+
+        DB::table('configuration_snapshot_source_rules')
+            ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
+            ->where('source_field_rule_id', $rule->source_field_rule_id)
+            ->update([
+                'action_json' => json_encode($rule->action_json, JSON_THROW_ON_ERROR),
+                'dedupe_key' => $rule->dedupe_key,
+            ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/unzulässiges Attribut|unerwartetes Attribut|Aktion/');
+        $snapshot->fresh(['fieldDefinitions', 'rules', 'sources.rules', 'sources'])->assertReadable();
+    }
+
+    public function test_nested_group_rule_with_recomputed_dedupe_is_rejected(): void
+    {
+        $snapshot = $this->freshV2CalcSnapshot();
+        $rule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->firstOrFail();
+
+        $nested = [
+            'op' => 'all',
+            'conditions' => [
+                ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => false],
+                [
+                    'op' => 'any',
+                    'conditions' => [
+                        ['op' => 'field_empty', 'field_key' => 'period_open'],
+                        ['op' => 'field_not_empty', 'field_key' => 'period_open'],
+                    ],
+                ],
+            ],
+        ];
+        $action = ['op' => 'require_field', 'field_key' => 'position_flight_period'];
+        $rawDedupe = hash('sha256', json_encode([
+            'condition' => $nested,
+            'action' => $action,
+        ], JSON_THROW_ON_ERROR));
+        $rule->condition_json = $nested;
+        $rule->action_json = $action;
+        $rule->dedupe_key = $rawDedupe;
+        $rule->save();
+
+        DB::table('configuration_snapshot_source_rules')
+            ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
+            ->where('source_field_rule_id', $rule->source_field_rule_id)
+            ->update([
+                'condition_json' => json_encode($nested, JSON_THROW_ON_ERROR),
+                'action_json' => json_encode($action, JSON_THROW_ON_ERROR),
+                'dedupe_key' => $rawDedupe,
+            ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessageMatches('/Verschachtelte/');
+        $snapshot->fresh(['fieldDefinitions', 'rules', 'sources.rules', 'sources'])->assertReadable();
     }
 
     public function test_generation_one_remains_readable_without_source_graph(): void

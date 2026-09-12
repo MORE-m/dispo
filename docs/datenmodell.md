@@ -464,9 +464,13 @@ Umgesetzt in DF-3-REST-C2 (Calc-UI) und C3 (Dispo-UI):
 
 Weiter offen für den DF-3-Abschluss:
 
-- volle Regelmatrix und Regel-Editor
+- Runtime Visible/Required in Calc-/Dispo-UI (DF-3-RULE-B)
+- Regel-Editor (DF-3-RULE-C)
 - Gen4 / weitere Regeloperatoren nach Bedarf
-- `SystemFieldSetting`
+
+Außerhalb DF-3:
+
+- `SystemFieldSetting` / ADV-002
 
 **ADV-001b Katalog-Admin** für Oberkategorien und Werbemittel ist umgesetzt
 (Lifecycle, Impact-Preview, kein Hard Delete).
