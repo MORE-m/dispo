@@ -14,7 +14,6 @@ declare module '@inertiajs/core' {
             navigation: import('./auth').NavigationItem[];
             flash: { success: string | null; error: string | null };
             sidebarOpen: boolean | null;
-            e2eServer: boolean;
             [key: string]: unknown;
         };
     }

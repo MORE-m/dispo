@@ -188,6 +188,27 @@ export async function e2eSetOptionActive(
     expect(result.status).toBe(200);
 }
 
+export async function e2eSetFieldVisible(
+    page: Page,
+    calculationId: number,
+    fieldKey: string,
+    visible: boolean,
+    positionId?: number,
+) {
+    const result = await csrfJson(
+        page,
+        'POST',
+        '/e2e/snapshot-field-visible',
+        {
+            calculation_id: calculationId,
+            field_key: fieldKey,
+            visible,
+            ...(positionId != null ? { position_id: positionId } : {}),
+        },
+    );
+    expect(result.status).toBe(200);
+}
+
 export async function e2eChoiceValue(
     page: Page,
     calculationId: number,

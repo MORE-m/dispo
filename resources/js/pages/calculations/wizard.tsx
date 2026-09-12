@@ -690,24 +690,10 @@ export default function CalculationWizard({
         () => customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
-    const e2eServer = Boolean(usePage().props.e2eServer);
-    const [e2eVisibleOverrides, setE2eVisibleOverrides] = useState<
-        Record<string, boolean>
-    >({});
     const [schemaRetryToken, setSchemaRetryToken] = useState(0);
-    const headerChoiceFieldsForRender = useMemo(() => {
-        return customHeaderChoiceFields.map((field) =>
-            Object.prototype.hasOwnProperty.call(e2eVisibleOverrides, field.key)
-                ? {
-                      ...field,
-                      visible: e2eVisibleOverrides[field.key] !== false,
-                  }
-                : field,
-        );
-    }, [customHeaderChoiceFields, e2eVisibleOverrides]);
     const visibleHeaderChoiceFields = useMemo(
-        () => visibleChoiceFields(headerChoiceFieldsForRender),
-        [headerChoiceFieldsForRender],
+        () => visibleChoiceFields(customHeaderChoiceFields),
+        [customHeaderChoiceFields],
     );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
@@ -2142,7 +2128,7 @@ export default function CalculationWizard({
                                                 />
                                                 <SchemaChoiceFields
                                                     fields={
-                                                        headerChoiceFieldsForRender
+                                                        customHeaderChoiceFields
                                                     }
                                                     values={
                                                         customHeaderChoiceValues
@@ -2174,61 +2160,6 @@ export default function CalculationWizard({
                                                         );
                                                     }}
                                                 />
-                                                {e2eServer ? (
-                                                    <div
-                                                        className="space-y-2 rounded-md border border-dashed p-3 text-xs"
-                                                        data-test="e2e-choice-visible-controls"
-                                                    >
-                                                        <p className="font-medium">
-                                                            E2E Sichtbarkeit
-                                                        </p>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {customHeaderChoiceFields.map(
-                                                                (field) => (
-                                                                    <button
-                                                                        key={
-                                                                            field.key
-                                                                        }
-                                                                        type="button"
-                                                                        className="rounded border px-2 py-1"
-                                                                        data-test={`e2e-toggle-visible-${field.key}`}
-                                                                        onClick={() =>
-                                                                            setE2eVisibleOverrides(
-                                                                                (
-                                                                                    current,
-                                                                                ) => {
-                                                                                    const currentlyVisible =
-                                                                                        Object.prototype.hasOwnProperty.call(
-                                                                                            current,
-                                                                                            field.key,
-                                                                                        )
-                                                                                            ? current[
-                                                                                                  field
-                                                                                                      .key
-                                                                                              ] !==
-                                                                                              false
-                                                                                            : field.visible !==
-                                                                                              false;
-
-                                                                                    return {
-                                                                                        ...current,
-                                                                                        [field.key]:
-                                                                                            !currentlyVisible,
-                                                                                    };
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Toggle{' '}
-                                                                        {
-                                                                            field.key
-                                                                        }
-                                                                    </button>
-                                                                ),
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ) : null}
                                             </div>
                                         ) : null}
                                         <FormField
@@ -2299,19 +2230,6 @@ export default function CalculationWizard({
                                         const positionChoiceFields =
                                             customPositionChoiceFieldsFromSchema(
                                                 positionFields,
-                                            ).map((field) =>
-                                                Object.prototype.hasOwnProperty.call(
-                                                    e2eVisibleOverrides,
-                                                    field.key,
-                                                )
-                                                    ? {
-                                                          ...field,
-                                                          visible:
-                                                              e2eVisibleOverrides[
-                                                                  field.key
-                                                              ] !== false,
-                                                      }
-                                                    : field,
                                             );
                                         const visiblePositionChoiceFields =
                                             visibleChoiceFields(

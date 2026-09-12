@@ -5,6 +5,7 @@ import {
     calculationIdFromUrl,
     createChoiceDefinition,
     e2eChoiceValue,
+    e2eSetFieldVisible,
     e2eSetOptionActive,
     fillMinimalCalcSpots,
     login,
@@ -566,7 +567,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
         ).toEqual(['tag_b']);
     });
 
-    test('13 visible toggle keeps value and does not auto-touch', async ({
+    test('13 visible via snapshot keeps value and does not auto-touch', async ({
         page,
     }) => {
         test.setTimeout(240_000);
@@ -590,45 +591,43 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
         await saveCalculationDraft(page);
         const calcId = calculationIdFromUrl(page.url());
 
+        // Echter Snapshot-Pfad: visible=false serverseitig, dann Feldschema neu laden.
+        await e2eSetFieldVisible(page, calcId, headerSelectKey, false);
+        await page.reload();
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
         await expect(
-            page.locator(`[data-test="e2e-choice-visible-controls"]`),
-        ).toBeVisible();
-        await page
-            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
-            .click();
-        await expect(
             page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toHaveCount(0);
+        await expect(
+            page.locator(`[data-test="e2e-choice-visible-controls"]`),
         ).toHaveCount(0);
 
         await page
             .locator(`[data-test="calc-custom-${textKey}"]`)
             .fill('nach-hide');
+        const hideSaveRequestPromise = page.waitForRequest(
+            (request) =>
+                request.url().includes(`/kalkulationen/${calcId}`) &&
+                ['PUT', 'POST'].includes(request.method()),
+        );
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern' }).click();
+        const hideSaveRequest = await hideSaveRequestPromise;
+        const hidePayload = hideSaveRequest.postData() ?? '';
+        expect(hidePayload).not.toContain(`"${headerSelectKey}"`);
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
         ).toBe('beta');
 
+        await e2eSetFieldVisible(page, calcId, headerSelectKey, true);
         await page.reload();
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
         await expect(
             page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
         ).toContainText('Beta');
-        await page
-            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
-            .click();
-        await expect(
-            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
-        ).toHaveCount(0);
-        await page
-            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
-            .click();
-        await expect(
-            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
-        ).toContainText('Beta');
 
+        // Bewusst ändern und speichern; Hide/Show über Snapshot darf den Wert nicht verlieren.
         await page
             .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
             .click();
@@ -637,24 +636,35 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
                 `[data-test="calc-choice-${headerSelectKey}-option-gamma"]`,
             )
             .click();
-        await page
-            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
-            .click();
-        await expect(
-            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
-        ).toHaveCount(0);
-        await page
-            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
-            .click();
-        await expect(
-            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
-        ).toContainText('Gamma');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern' }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
         ).toBe('gamma');
+
+        await e2eSetFieldVisible(page, calcId, headerSelectKey, false);
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toHaveCount(0);
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('nach-gamma-hide');
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBe('gamma');
+
+        await e2eSetFieldVisible(page, calcId, headerSelectKey, true);
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Gamma');
     });
 
     test('14 server 422 maps to position choice field without persist', async ({

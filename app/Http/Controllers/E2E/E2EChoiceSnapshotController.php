@@ -12,7 +12,7 @@ use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
- * Nur aktiv wenn E2E_SERVER=1. Keine Produktionsroute.
+ * Nur aktiv wenn APP_ENV=testing und E2E_SERVER=1. Keine Produktionsroute.
  */
 class E2EChoiceSnapshotController
 {
@@ -203,7 +203,7 @@ class E2EChoiceSnapshotController
 
     private function assertE2E(): void
     {
-        if (! config('app.e2e_server')) {
+        if (! app()->environment('testing') || ! config('app.e2e_server')) {
             abort(404);
         }
     }

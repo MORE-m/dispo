@@ -203,7 +203,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
 });
 
-if (config('app.e2e_server')) {
+// Isolierte Playwright-Server: nur testing + E2E_SERVER=1. Nie Produktion/Route-Cache.
+if (app()->environment('testing') && config('app.e2e_server')) {
     Route::middleware(['auth'])->prefix('e2e')->group(function () {
         Route::post('snapshot-choice-option-active', [E2EChoiceSnapshotController::class, 'setOptionActive'])
             ->name('e2e.snapshot-choice-option-active');
