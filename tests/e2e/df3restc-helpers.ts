@@ -123,3 +123,117 @@ export async function saveCalculationDraft(page: Page) {
     await page.getByRole('button', { name: 'Speichern' }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
 }
+
+export async function csrfJson(
+    page: Page,
+    method: string,
+    url: string,
+    body?: unknown,
+) {
+    return page.evaluate(
+        async ({ method, url, body }) => {
+            const token = decodeURIComponent(
+                document.cookie
+                    .split('; ')
+                    .find((row) => row.startsWith('XSRF-TOKEN='))
+                    ?.slice(11) ?? '',
+            );
+            const upper = method.toUpperCase();
+            const response = await fetch(url, {
+                method,
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': token,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                ...(upper === 'GET' || upper === 'HEAD'
+                    ? {}
+                    : { body: JSON.stringify(body ?? {}) }),
+            });
+            const text = await response.text();
+            let data: unknown = null;
+            try {
+                data = text ? JSON.parse(text) : null;
+            } catch {
+                data = text;
+            }
+            return { status: response.status, data };
+        },
+        { method, url, body },
+    );
+}
+
+export async function e2eSetOptionActive(
+    page: Page,
+    calculationId: number,
+    fieldKey: string,
+    optionKey: string,
+    isActive: boolean,
+    positionId?: number,
+) {
+    const result = await csrfJson(
+        page,
+        'POST',
+        '/e2e/snapshot-choice-option-active',
+        {
+            calculation_id: calculationId,
+            field_key: fieldKey,
+            option_key: optionKey,
+            is_active: isActive,
+            ...(positionId != null ? { position_id: positionId } : {}),
+        },
+    );
+    expect(result.status).toBe(200);
+}
+
+export async function e2eChoiceValue(
+    page: Page,
+    calculationId: number,
+    fieldKey: string,
+    positionId?: number,
+) {
+    const query = new URLSearchParams({
+        calculation_id: String(calculationId),
+        field_key: fieldKey,
+        ...(positionId != null ? { position_id: String(positionId) } : {}),
+    });
+    const result = await csrfJson(
+        page,
+        'GET',
+        `/e2e/calculation-choice-value?${query.toString()}`,
+    );
+    expect(result.status).toBe(200);
+    return result.data as { value_json: unknown; exists: boolean };
+}
+
+export async function e2eCalculationPositions(
+    page: Page,
+    calculationId: number,
+) {
+    const query = new URLSearchParams({
+        calculation_id: String(calculationId),
+    });
+    const result = await csrfJson(
+        page,
+        'GET',
+        `/e2e/calculation-positions?${query.toString()}`,
+    );
+    expect(result.status).toBe(200);
+    return (
+        result.data as {
+            positions: Array<{
+                id: number;
+                client_key: string;
+                effective_configuration_snapshot_id: number | null;
+            }>;
+        }
+    ).positions;
+}
+
+export function calculationIdFromUrl(url: string): number {
+    const match = url.match(/kalkulationen\/(\d+)/);
+    expect(match?.[1]).toBeTruthy();
+    return Number(match![1]);
+}

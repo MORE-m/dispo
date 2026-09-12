@@ -2,7 +2,10 @@ import { expect, test } from '@playwright/test';
 import {
     activateCurrentDraft,
     addCustomFieldToDraft,
+    calculationIdFromUrl,
     createChoiceDefinition,
+    e2eChoiceValue,
+    e2eSetOptionActive,
     fillMinimalCalcSpots,
     login,
     openOrCreateDraft,
@@ -347,5 +350,454 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
                 `[data-test="calc-choice-${headerSelectKey}-content"]`,
             ),
         ).toBeVisible();
+    });
+
+    test('11 historically inactive header select keeps freeze value', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+        await login(page, 'sales@example.com');
+        await page.goto('/kalkulationen/neu');
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toBeVisible({ timeout: 20_000 });
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-alpha"]`,
+            )
+            .click();
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('vor inactive');
+        await fillMinimalCalcSpots(page);
+        await saveCalculationDraft(page);
+        const inactiveCalcUrl = page.url();
+        const calcId = calculationIdFromUrl(inactiveCalcUrl);
+
+        await e2eSetOptionActive(page, calcId, headerSelectKey, 'alpha', false);
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        const trigger = page.locator(
+            `[data-test="calc-choice-${headerSelectKey}"]`,
+        );
+        await expect(trigger).toContainText('Alpha', { timeout: 20_000 });
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerSelectKey}-inactive-hint"]`,
+            ),
+        ).toBeVisible();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerSelectKey}-inactive-hint"]`,
+            ),
+        ).toContainText(/inaktiv|nicht erneut auswählbar/i);
+
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(trigger).toContainText('Alpha');
+
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('andere fachliche aenderung');
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Alpha');
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBe('alpha');
+
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-alpha"]`,
+            ),
+        ).toBeVisible();
+        await expect(
+            page
+                .locator(
+                    `[data-test="calc-choice-${headerSelectKey}-option-alpha"] [data-test="calc-choice-${headerSelectKey}-inactive-badge"]`,
+                )
+                .first(),
+        ).toContainText(/Nicht mehr auswählbar|Inaktiv/i);
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-beta"]`,
+            )
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Beta');
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-alpha"]`,
+            ),
+        ).toHaveCount(0);
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}-clear"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Keine Auswahl');
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBeNull();
+        calcUrl = inactiveCalcUrl;
+    });
+
+    test('12 historically inactive header multi keeps selection until removed', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+        await login(page, 'sales@example.com');
+        await page.goto('/kalkulationen/neu');
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerMultiKey}"]`),
+        ).toBeVisible({ timeout: 20_000 });
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            )
+            .click();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_b"]`,
+            )
+            .click();
+        await fillMinimalCalcSpots(page);
+        await saveCalculationDraft(page);
+        const calcId = calculationIdFromUrl(page.url());
+
+        await e2eSetOptionActive(page, calcId, headerMultiKey, 'tag_a', false);
+        await e2eSetOptionActive(page, calcId, headerMultiKey, 'tag_c', false);
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            ),
+        ).toBeChecked({ timeout: 20_000 });
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-inactive-badge-tag_a"]`,
+            ),
+        ).toContainText(/Nicht mehr auswählbar|Inaktiv/i);
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_c"]`,
+            ),
+        ).toBeDisabled();
+
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerMultiKey}-search"]`,
+            )
+            .fill('Tag A');
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            ),
+        ).toBeChecked();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerMultiKey}-search"]`,
+            )
+            .fill('');
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            ),
+        ).toBeChecked();
+
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            )
+            .click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            ),
+        ).toBeDisabled();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_b"]`,
+            ),
+        ).toBeChecked();
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-count"]`,
+            ),
+        ).toContainText('1 ausgewählt');
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_b"]`,
+            ),
+        ).toBeChecked();
+        await expect(
+            page.locator(
+                `[data-test="calc-choice-${headerMultiKey}-check-tag_a"]`,
+            ),
+        ).toBeDisabled();
+        expect(
+            (await e2eChoiceValue(page, calcId, headerMultiKey)).value_json,
+        ).toEqual(['tag_b']);
+    });
+
+    test('13 visible toggle keeps value and does not auto-touch', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+        await login(page, 'sales@example.com');
+        await page.goto('/kalkulationen/neu');
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toBeVisible({ timeout: 20_000 });
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-beta"]`,
+            )
+            .click();
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('sichtbar-baseline');
+        await fillMinimalCalcSpots(page);
+        await saveCalculationDraft(page);
+        const calcId = calculationIdFromUrl(page.url());
+
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="e2e-choice-visible-controls"]`),
+        ).toBeVisible();
+        await page
+            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toHaveCount(0);
+
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('nach-hide');
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBe('beta');
+
+        await page.reload();
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Beta');
+        await page
+            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toHaveCount(0);
+        await page
+            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Beta');
+
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-gamma"]`,
+            )
+            .click();
+        await page
+            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toHaveCount(0);
+        await page
+            .locator(`[data-test="e2e-toggle-visible-${headerSelectKey}"]`)
+            .click();
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toContainText('Gamma');
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBe('gamma');
+    });
+
+    test('14 server 422 maps to position choice field without persist', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+        await login(page, 'sales@example.com');
+        await page.goto('/kalkulationen/neu');
+        await expect(
+            page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
+        ).toBeVisible({ timeout: 20_000 });
+        await page
+            .locator(`[data-test="calc-choice-${headerSelectKey}"]`)
+            .click();
+        await page
+            .locator(
+                `[data-test="calc-choice-${headerSelectKey}-option-beta"]`,
+            )
+            .click();
+        await page
+            .locator(`[data-test="calc-custom-${textKey}"]`)
+            .fill('422-baseline');
+        await fillMinimalCalcSpots(page);
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        let posSelect = page
+            .locator(
+                `[data-test*="calc-pos-choice-"][data-test$="-${posSelectKey}"]`,
+            )
+            .first();
+        await expect(posSelect).toBeVisible({ timeout: 20_000 });
+        await posSelect.click();
+        await page
+            .locator(`[data-test$="-${posSelectKey}-option-pos_beta"]`)
+            .first()
+            .click();
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await saveCalculationDraft(page);
+        const calcId = calculationIdFromUrl(page.url());
+        const editUrl = page.url();
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        posSelect = page
+            .locator(
+                `[data-test*="calc-pos-choice-"][data-test$="-${posSelectKey}"]`,
+            )
+            .first();
+        await expect(posSelect).toContainText('Pos Beta', { timeout: 20_000 });
+        // Fachliche Touch-Änderung, damit ein echter Save ausgelöst wird.
+        await posSelect.click();
+        await page
+            .locator(`[data-test$="-${posSelectKey}-option-pos_alpha"]`)
+            .first()
+            .click();
+
+        await page.evaluate(
+            ({ calcId, fieldKey }) => {
+                // Prototype-Patch für kontrollierte E2E-Query-Injection; this bleibt am XHR.
+                // oxlint-disable-next-line typescript/unbound-method
+                const originalOpen = XMLHttpRequest.prototype.open;
+                XMLHttpRequest.prototype.open = function (
+                    method: string,
+                    url: string | URL,
+                    async?: boolean,
+                    username?: string | null,
+                    password?: string | null,
+                ) {
+                    let nextUrl = url;
+                    if (
+                        typeof url === 'string' &&
+                        url.includes(`/kalkulationen/${calcId}`)
+                    ) {
+                        const parsed = new URL(url, window.location.origin);
+                        parsed.searchParams.set('e2e_invalid_choice', fieldKey);
+                        parsed.searchParams.set(
+                            'e2e_invalid_prefix',
+                            'positions.0.dynamic_field_values',
+                        );
+                        nextUrl = parsed.toString();
+                    }
+                    return originalOpen.call(
+                        this,
+                        method,
+                        nextUrl,
+                        async as boolean,
+                        username,
+                        password,
+                    );
+                };
+            },
+            { calcId, fieldKey: posSelectKey },
+        );
+
+        const saveResponsePromise = page.waitForResponse(
+            (response) =>
+                response.url().includes(`/kalkulationen/${calcId}`) &&
+                response.url().includes('e2e_invalid_choice=') &&
+                ['PUT', 'POST'].includes(response.request().method()) &&
+                response.status() !== 0,
+        );
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.getByRole('button', { name: 'Speichern' }).click();
+        const saveResponse = await saveResponsePromise;
+        // Inertia/Laravel: Validierung kann als 422-JSON oder 303-Back mit Errors kommen.
+        expect([422, 303]).toContain(saveResponse.status());
+        await expect(page).toHaveURL(editUrl);
+        await expect(
+            page.locator('[data-test="preview-error"]'),
+        ).toContainText(/nicht mehr auswählbar|Speichern nicht möglich/i, {
+            timeout: 15_000,
+        });
+        await expect(
+            page.getByText(/Exception|Stack trace|SQLSTATE/i),
+        ).toHaveCount(0);
+        await expect(page.getByText(/erfolgreich gespeichert/i)).toHaveCount(0);
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page
+                .locator(
+                    `[data-test*="calc-pos-choice-"][data-test$="-${posSelectKey}"]`,
+                )
+                .first(),
+        ).toHaveAttribute('aria-invalid', 'true');
+        await expect(
+            page.getByText(/nicht mehr auswählbar/i).first(),
+        ).toBeVisible({ timeout: 15_000 });
+
+        expect(
+            (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
+        ).toBe('beta');
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page
+                .locator(
+                    `[data-test*="calc-pos-choice-"][data-test$="-${posSelectKey}"]`,
+                )
+                .first(),
+        ).toContainText('Pos Beta', { timeout: 20_000 });
+        await page.getByRole('button', { name: '1. Grunddaten' }).click();
+        await expect(
+            page.locator(`[data-test="calc-custom-${textKey}"]`),
+        ).toHaveValue('422-baseline');
     });
 });

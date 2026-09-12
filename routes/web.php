@@ -11,6 +11,7 @@ use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
+use App\Http\Controllers\E2E\E2EChoiceSnapshotController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OverviewController;
 use App\Http\Controllers\UnavailableModuleController;
@@ -201,5 +202,18 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('admin', AdministrationAccessController::class)->name('admin.access');
 });
+
+if (config('app.e2e_server')) {
+    Route::middleware(['auth'])->prefix('e2e')->group(function () {
+        Route::post('snapshot-choice-option-active', [E2EChoiceSnapshotController::class, 'setOptionActive'])
+            ->name('e2e.snapshot-choice-option-active');
+        Route::post('snapshot-field-visible', [E2EChoiceSnapshotController::class, 'setFieldVisible'])
+            ->name('e2e.snapshot-field-visible');
+        Route::get('calculation-choice-value', [E2EChoiceSnapshotController::class, 'choiceValue'])
+            ->name('e2e.calculation-choice-value');
+        Route::get('calculation-positions', [E2EChoiceSnapshotController::class, 'positions'])
+            ->name('e2e.calculation-positions');
+    });
+}
 
 require __DIR__.'/settings.php';
