@@ -1,7 +1,7 @@
 import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationMethodSelector } from '@/components/calculation-method-selector';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
@@ -108,6 +108,13 @@ import {
 } from '@/lib/validation-errors';
 import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
+import {
+    nextSchemaFetchGeneration,
+    positionNeedsFieldSchema,
+    schemaLoadBlockMessage,
+    shouldApplyPositionSchemaResponse,
+    type PositionSchemaFetchTarget,
+} from '@/lib/position-field-schema';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -683,9 +690,24 @@ export default function CalculationWizard({
         () => customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
+    const e2eServer = Boolean(usePage().props.e2eServer);
+    const [e2eVisibleOverrides, setE2eVisibleOverrides] = useState<
+        Record<string, boolean>
+    >({});
+    const [schemaRetryToken, setSchemaRetryToken] = useState(0);
+    const headerChoiceFieldsForRender = useMemo(() => {
+        return customHeaderChoiceFields.map((field) =>
+            Object.prototype.hasOwnProperty.call(e2eVisibleOverrides, field.key)
+                ? {
+                      ...field,
+                      visible: e2eVisibleOverrides[field.key] !== false,
+                  }
+                : field,
+        );
+    }, [customHeaderChoiceFields, e2eVisibleOverrides]);
     const visibleHeaderChoiceFields = useMemo(
-        () => visibleChoiceFields(customHeaderChoiceFields),
-        [customHeaderChoiceFields],
+        () => visibleChoiceFields(headerChoiceFieldsForRender),
+        [headerChoiceFieldsForRender],
     );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
@@ -902,16 +924,30 @@ export default function CalculationWizard({
         return first ? [first] : [];
     });
 
-    // DF-3.3a2β: Positions-Fingerprints und -Schemas nachladen (Create oder Mediumwechsel).
+    // DF-3.3a2β / C2: Positions-Fingerprints und -Schemas nachladen.
+    // Generation pro client_key verhindert Out-of-order-Überschreiben.
+    const schemaFetchPendingRef = useRef<
+        Map<string, PositionSchemaFetchTarget>
+    >(new Map());
+    const [schemaLoadingClientKeys, setSchemaLoadingClientKeys] = useState<
+        Record<string, true>
+    >({});
+    const [schemaLoadError, setSchemaLoadError] = useState<string | null>(null);
+    const positionsNeedingSchemaKey = useMemo(
+        () =>
+            positions
+                .filter(positionNeedsFieldSchema)
+                .map(
+                    (position) =>
+                        `${position.client_key}:${position.advertising_medium_id}`,
+                )
+                .sort()
+                .join('|'),
+        [positions],
+    );
+
     useEffect(() => {
-        const missing = positions.filter(
-            (position) =>
-                position.advertising_medium_id > 0 &&
-                (position.schema_fingerprint === null ||
-                    position.schema_fingerprint === undefined ||
-                    position.schema_fingerprint === '' ||
-                    position.field_schema == null),
-        );
+        const missing = positions.filter(positionNeedsFieldSchema);
 
         if (missing.length === 0) {
             return;
@@ -922,10 +958,31 @@ export default function CalculationWizard({
         void (async () => {
             const updates = new Map<
                 string,
-                { fingerprint: string; fieldSchema: FieldSchema }
+                {
+                    fingerprint: string;
+                    fieldSchema: FieldSchema;
+                    target: PositionSchemaFetchTarget;
+                }
             >();
+            let loadError: string | null = null;
 
             for (const position of missing) {
+                const generation = nextSchemaFetchGeneration(
+                    schemaFetchPendingRef.current.get(position.client_key)
+                        ?.generation,
+                );
+                const target: PositionSchemaFetchTarget = {
+                    clientKey: position.client_key,
+                    advertisingMediumId: position.advertising_medium_id,
+                    generation,
+                };
+                schemaFetchPendingRef.current.set(position.client_key, target);
+                setSchemaLoadingClientKeys((current) => ({
+                    ...current,
+                    [position.client_key]: true,
+                }));
+                setSchemaLoadError(null);
+
                 try {
                     const response = await jsonPost<{
                         fieldSchema?: FieldSchema;
@@ -937,25 +994,69 @@ export default function CalculationWizard({
                     });
                     const nextSchema = response.fieldSchema;
                     const fingerprint = nextSchema?.schema_fingerprint ?? null;
-                    if (fingerprint && nextSchema) {
-                        updates.set(position.client_key, {
-                            fingerprint,
-                            fieldSchema: nextSchema,
-                        });
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (
+                        !shouldApplyPositionSchemaResponse(pending, target) ||
+                        !fingerprint ||
+                        !nextSchema
+                    ) {
+                        continue;
                     }
+                    updates.set(position.client_key, {
+                        fingerprint,
+                        fieldSchema: nextSchema,
+                        target,
+                    });
                 } catch {
-                    // Nachladen fehlgeschlagen: Speichern bleibt fail-closed.
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (shouldApplyPositionSchemaResponse(pending, target)) {
+                        loadError =
+                            'Positions-Feldschema konnte nicht geladen werden. Speichern ist ohne Fingerprint nicht möglich.';
+                    }
+                } finally {
+                    setSchemaLoadingClientKeys((current) => {
+                        const next = { ...current };
+                        delete next[position.client_key];
+
+                        return next;
+                    });
                 }
             }
 
-            if (cancelled || updates.size === 0) {
+            if (cancelled) {
                 return;
             }
 
+            if (loadError) {
+                setSchemaLoadError(loadError);
+            }
+
+            if (updates.size === 0) {
+                return;
+            }
+
+            setSchemaLoadError(null);
             setPositions((current) =>
                 current.map((position) => {
                     const next = updates.get(position.client_key);
                     if (!next) {
+                        return position;
+                    }
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (
+                        !shouldApplyPositionSchemaResponse(
+                            pending,
+                            next.target,
+                        ) ||
+                        position.advertising_medium_id !==
+                            next.target.advertisingMediumId
+                    ) {
                         return position;
                     }
 
@@ -1027,7 +1128,10 @@ export default function CalculationWizard({
         return () => {
             cancelled = true;
         };
-    }, [calculation?.id, positions]);
+        // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
+        // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
+    }, [calculation?.id, positionsNeedingSchemaKey, schemaRetryToken]);
 
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
@@ -1247,7 +1351,11 @@ export default function CalculationWizard({
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
     });
-    const error = previewError ?? saveError ?? proposalError;
+    const error = previewError ?? saveError ?? proposalError ?? schemaLoadError;
+    const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
+    const schemaFingerprintMissing =
+        !isBudgetSetup && positions.some(positionNeedsFieldSchema);
+    const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
     const pageValidationErrors = mapValidationErrors(
         (usePage().props.errors ?? {}) as Record<string, string | string[]>,
     );
@@ -1414,19 +1522,17 @@ export default function CalculationWizard({
             return;
         }
 
-        if (
-            !isBudgetSetup &&
-            positions.some(
-                (position) =>
-                    position.advertising_medium_id > 0 &&
-                    (position.schema_fingerprint === null ||
-                        position.schema_fingerprint === undefined ||
-                        position.schema_fingerprint === '' ||
-                        position.field_schema == null),
-            )
-        ) {
+        if (!isBudgetSetup && positions.some(positionNeedsFieldSchema)) {
+            const stillLoading =
+                Object.keys(schemaLoadingClientKeys).length > 0;
+            if (!stillLoading) {
+                setSchemaRetryToken((token) => token + 1);
+            }
             setSaveError(
-                'Speichern nicht möglich: Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.',
+                `Speichern nicht möglich: ${
+                    schemaLoadBlockMessage(stillLoading, schemaLoadError) ??
+                    'Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.'
+                }`,
             );
             return;
         }
@@ -2036,7 +2142,7 @@ export default function CalculationWizard({
                                                 />
                                                 <SchemaChoiceFields
                                                     fields={
-                                                        customHeaderChoiceFields
+                                                        headerChoiceFieldsForRender
                                                     }
                                                     values={
                                                         customHeaderChoiceValues
@@ -2068,6 +2174,61 @@ export default function CalculationWizard({
                                                         );
                                                     }}
                                                 />
+                                                {e2eServer ? (
+                                                    <div
+                                                        className="space-y-2 rounded-md border border-dashed p-3 text-xs"
+                                                        data-test="e2e-choice-visible-controls"
+                                                    >
+                                                        <p className="font-medium">
+                                                            E2E Sichtbarkeit
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {customHeaderChoiceFields.map(
+                                                                (field) => (
+                                                                    <button
+                                                                        key={
+                                                                            field.key
+                                                                        }
+                                                                        type="button"
+                                                                        className="rounded border px-2 py-1"
+                                                                        data-test={`e2e-toggle-visible-${field.key}`}
+                                                                        onClick={() =>
+                                                                            setE2eVisibleOverrides(
+                                                                                (
+                                                                                    current,
+                                                                                ) => {
+                                                                                    const currentlyVisible =
+                                                                                        Object.prototype.hasOwnProperty.call(
+                                                                                            current,
+                                                                                            field.key,
+                                                                                        )
+                                                                                            ? current[
+                                                                                                  field
+                                                                                                      .key
+                                                                                              ] !==
+                                                                                              false
+                                                                                            : field.visible !==
+                                                                                              false;
+
+                                                                                    return {
+                                                                                        ...current,
+                                                                                        [field.key]:
+                                                                                            !currentlyVisible,
+                                                                                    };
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Toggle{' '}
+                                                                        {
+                                                                            field.key
+                                                                        }
+                                                                    </button>
+                                                                ),
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         ) : null}
                                         <FormField
@@ -2138,6 +2299,19 @@ export default function CalculationWizard({
                                         const positionChoiceFields =
                                             customPositionChoiceFieldsFromSchema(
                                                 positionFields,
+                                            ).map((field) =>
+                                                Object.prototype.hasOwnProperty.call(
+                                                    e2eVisibleOverrides,
+                                                    field.key,
+                                                )
+                                                    ? {
+                                                          ...field,
+                                                          visible:
+                                                              e2eVisibleOverrides[
+                                                                  field.key
+                                                              ] !== false,
+                                                      }
+                                                    : field,
                                             );
                                         const visiblePositionChoiceFields =
                                             visibleChoiceFields(
@@ -3497,6 +3671,19 @@ export default function CalculationWizard({
                     </aside>
 
                     <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
+                        {schemaSaveBlocked ? (
+                            <p
+                                className="text-muted-foreground w-full text-sm"
+                                data-test="wizard-schema-loading"
+                                role="status"
+                            >
+                                {schemaLoadBlockMessage(
+                                    schemaStillLoading,
+                                    schemaLoadError,
+                                ) ??
+                                    'Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.'}
+                            </p>
+                        ) : null}
                         {step > 0 ? (
                             <Button
                                 type="button"
@@ -3528,6 +3715,7 @@ export default function CalculationWizard({
                                 onClick={save}
                                 disabled={
                                     busy ||
+                                    schemaStillLoading ||
                                     (planningMode === 'budget' &&
                                         positions.length === 0 &&
                                         !isBudgetSetup)

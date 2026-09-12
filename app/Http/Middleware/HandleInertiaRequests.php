@@ -58,6 +58,8 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => $request->hasCookie('sidebar_state')
                 ? $request->cookie('sidebar_state') === 'true'
                 : null,
+            // Nur für isolierte Playwright-Server (E2E_SERVER=1); nie in Produktion.
+            'e2eServer' => (bool) config('app.e2e_server'),
         ];
     }
 }
