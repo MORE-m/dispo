@@ -120,10 +120,8 @@ class ChoiceValueJsonMigrationTest extends TestCase
         $header->save();
         $header->refresh();
         $this->assertSame('opt_a', $header->value_json);
-        $this->assertSame(
-            '"opt_a"',
-            DB::table('calculation_field_values')->where('id', $header->id)->value('value_json'),
-        );
+        $rawSelect = DB::table('calculation_field_values')->where('id', $header->id)->value('value_json');
+        $this->assertSame('opt_a', json_decode((string) $rawSelect, true, 512, JSON_THROW_ON_ERROR));
 
         $pos = CalculationPositionFieldValue::query()->findOrFail($rows['calculation_position_field_values']);
         $pos->value_string = null;
@@ -131,9 +129,11 @@ class ChoiceValueJsonMigrationTest extends TestCase
         $pos->save();
         $pos->refresh();
         $this->assertSame(['opt_b', 'opt_a'], $pos->value_json);
+        // MySQL native JSON kann beim Lesen Spaces nach Kommas einfügen; fachlich zählt Decode.
+        $rawMulti = DB::table('calculation_position_field_values')->where('id', $pos->id)->value('value_json');
         $this->assertSame(
-            '["opt_b","opt_a"]',
-            DB::table('calculation_position_field_values')->where('id', $pos->id)->value('value_json'),
+            ['opt_b', 'opt_a'],
+            json_decode((string) $rawMulti, true, 512, JSON_THROW_ON_ERROR),
         );
 
         $dispoHeader = DispoOrderFieldValue::query()->findOrFail($rows['dispo_order_field_values']);
@@ -142,6 +142,8 @@ class ChoiceValueJsonMigrationTest extends TestCase
         $dispoHeader->save();
         $dispoHeader->refresh();
         $this->assertSame([], $dispoHeader->value_json);
+        $rawEmpty = DB::table('dispo_order_field_values')->where('id', $dispoHeader->id)->value('value_json');
+        $this->assertSame([], json_decode((string) $rawEmpty, true, 512, JSON_THROW_ON_ERROR));
 
         $dispoPos = DispoOrderPositionFieldValue::query()->findOrFail($rows['dispo_order_position_field_values']);
         $dispoPos->value_string = null;
@@ -149,6 +151,8 @@ class ChoiceValueJsonMigrationTest extends TestCase
         $dispoPos->save();
         $dispoPos->refresh();
         $this->assertSame('opt_z', $dispoPos->value_json);
+        $rawDispoSelect = DB::table('dispo_order_position_field_values')->where('id', $dispoPos->id)->value('value_json');
+        $this->assertSame('opt_z', json_decode((string) $rawDispoSelect, true, 512, JSON_THROW_ON_ERROR));
     }
 
     public function test_migration_down_and_up_are_symmetric(): void
