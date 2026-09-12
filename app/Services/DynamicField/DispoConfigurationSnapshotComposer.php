@@ -13,6 +13,7 @@ use App\Models\FieldSetVersion;
 use App\Models\FieldSetVersionField;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\SnapshotFieldRule;
+use App\Support\DynamicField\FieldRuleDefinitionContext;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -199,6 +200,8 @@ final class DispoConfigurationSnapshotComposer
             })->values();
 
             $defsForRuleCheck = [];
+            /** @var array<string, true> $calcReadonly */
+            $calcReadonly = [];
             foreach ($toMaterialize as $item) {
                 if ($item['source'] === 'calc') {
                     $calc = $item['calc'];
@@ -206,6 +209,7 @@ final class DispoConfigurationSnapshotComposer
                         throw new RuntimeException('Calc-Snapshot-Definition fehlt beim Materialisieren.');
                     }
                     $defsForRuleCheck[$calc->key] = $calc;
+                    $calcReadonly[$calc->key] = true;
                 } else {
                     $nativeMembership = $item['membership'];
                     if ($nativeMembership === null) {
@@ -214,7 +218,13 @@ final class DispoConfigurationSnapshotComposer
                     $defsForRuleCheck[$nativeMembership->revision->definition->key] = $nativeMembership->revision->definition;
                 }
             }
-            $this->rules->assertRulesCompatibleWithDefinitions($defsForRuleCheck, $relevantRules);
+            $this->rules->assertRulesCompatibleWithDefinitions(
+                FieldRuleDefinitionContext::withReadonlyKeys(
+                    $defsForRuleCheck,
+                    $calcReadonly,
+                ),
+                $relevantRules,
+            );
 
             $snapshot = new ConfigurationSnapshot;
             $snapshot->field_set_id = $set->id;

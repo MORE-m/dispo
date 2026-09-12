@@ -251,7 +251,13 @@ class FieldSetAssignmentMergeResolverTest extends TestCase
             'field_rule_id' => 3,
             'sort' => 1,
             'condition_json' => ['op' => 'field_equals', 'field_key' => 'a', 'value' => true],
-            'action_json' => ['op' => 'require_field', 'field_key' => 'b', 'extra' => 1],
+            'action_json' => ['op' => 'set_visible', 'field_key' => 'b', 'value' => false],
+        ];
+        $visibleRule = [
+            'field_rule_id' => 4,
+            'sort' => 2,
+            'condition_json' => ['op' => 'field_equals', 'field_key' => 'a', 'value' => false],
+            'action_json' => ['op' => 'set_visible', 'field_key' => 'b', 'value' => true],
         ];
         $conflict = $this->resolver->resolve([
             'process' => FieldAppliesTo::Calculation,
@@ -260,12 +266,12 @@ class FieldSetAssignmentMergeResolverTest extends TestCase
                 $this->source('primary_core', null, null, 1, [
                     $this->membership(1, 1, 'a', FieldScope::Position, sort: 1),
                     $this->membership(2, 2, 'b', FieldScope::Position, sort: 2),
-                ], isCore: true, rules: [$ruleA]),
+                ], isCore: true, rules: [$visibleRule]),
                 $this->source('global', 1, 1, 2, [], rules: [$conflictRule]),
             ],
         ]);
         $this->assertTrue($conflict['has_blocking_conflicts']);
-        $this->assertContains('rule_conflicting_actions', array_column($conflict['conflicts'], 'code'));
+        $this->assertContains('rule_conflicting_set_visible', array_column($conflict['conflicts'], 'code'));
     }
 
     public function test_field_sort_tuple_is_stable(): void

@@ -17,6 +17,8 @@ use App\Models\SnapshotFieldDefinition;
 use App\Models\SnapshotFieldRule;
 use App\Services\DynamicField\Assignment\FieldSetAssignmentMergeResolver;
 use App\Support\DynamicField\FieldDefinitionOptionContract;
+use App\Support\DynamicField\FieldRuleContract;
+use App\Support\DynamicField\FieldRuleDefinitionContext;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
@@ -150,6 +152,8 @@ final class ConfigurationSnapshotIntegrity
         }
 
         if ($version === ConfigurationSnapshot::FORMAT_VERSION_LEGACY) {
+            $this->assertFieldRulesContract($snapshot);
+
             return;
         }
 
@@ -174,6 +178,8 @@ final class ConfigurationSnapshotIntegrity
             'fieldDefinitions',
             'rules',
         ]);
+
+        $this->assertFieldRulesContract($snapshot);
 
         $sources = $snapshot->sources;
         if ($sources->isEmpty()) {
@@ -268,6 +274,8 @@ final class ConfigurationSnapshotIntegrity
             'fieldDefinitions',
             'rules',
         ]);
+
+        $this->assertFieldRulesContract($snapshot);
 
         $sources = $snapshot->sources;
         if ($sources->isEmpty()) {
@@ -903,6 +911,53 @@ final class ConfigurationSnapshotIntegrity
                 "{$label} {$source->id} darf keine Kategorie-/Werbemittel-Zielreferenzen tragen",
             );
         }
+    }
+
+    /**
+     * V1-Regelvertrag vor Dedupe/Provenance: Snapshot- und Source-Regeln fail-closed.
+     */
+    private function assertFieldRulesContract(ConfigurationSnapshot $snapshot): void
+    {
+        $snapshot->loadMissing(['fieldDefinitions', 'rules', 'sources.rules', 'sources.fields', 'sources']);
+
+        try {
+            $defs = FieldRuleDefinitionContext::fromSnapshot($snapshot);
+            FieldRuleContract::assertRuleset(
+                $defs,
+                $snapshot->rules,
+                requireActiveOptionKeys: false,
+            );
+
+            foreach ($snapshot->sources as $source) {
+                FieldRuleContract::assertRuleset(
+                    $this->definitionsFromSource($source),
+                    $source->rules,
+                    requireActiveOptionKeys: false,
+                );
+            }
+        } catch (RuntimeException $exception) {
+            $this->fail($snapshot, $exception->getMessage());
+        }
+    }
+
+    /**
+     * @return array<string, object>
+     */
+    private function definitionsFromSource(ConfigurationSnapshotSource $source): array
+    {
+        $readonly = $source->target_identity === ConfigurationSnapshotSource::TARGET_IDENTITY_CALC_ORIGIN;
+        $raw = [];
+        foreach ($source->fields as $field) {
+            $raw[(string) $field->field_key] = (object) [
+                'key' => (string) $field->field_key,
+                'field_type' => $field->field_type,
+                'scope' => $field->scope,
+                'options_json' => $field->options_json,
+                'action_target_readonly' => $readonly,
+            ];
+        }
+
+        return FieldRuleContract::normalizeDefinitions($raw);
     }
 
     private function assertSourceRuleSelfConsistent(
