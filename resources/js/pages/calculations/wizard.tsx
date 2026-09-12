@@ -1,7 +1,7 @@
 import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationMethodSelector } from '@/components/calculation-method-selector';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
@@ -27,10 +27,23 @@ import {
     moneyDeduction,
 } from '@/components/form-field';
 import {
+    SchemaChoiceFields,
+    customHeaderChoiceFieldsFromSchema,
+    customPositionChoiceFieldsFromSchema,
+    visibleChoiceFields,
+} from '@/components/dynamic-fields/schema-choice-fields';
+import {
     SchemaTextFields,
     customHeaderTextFieldsFromSchema,
     customPositionTextFieldsFromSchema,
 } from '@/components/dynamic-fields/schema-text-fields';
+import {
+    choiceValuesForPayload,
+    initChoiceEntriesMap,
+    initChoiceValuesMap,
+    type ChoiceFieldEntry,
+    type ChoiceValue,
+} from '@/lib/choice-field-values';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
     emptyTimeRange,
@@ -95,6 +108,13 @@ import {
 } from '@/lib/validation-errors';
 import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
+import {
+    nextSchemaFetchGeneration,
+    positionNeedsFieldSchema,
+    schemaLoadBlockMessage,
+    shouldApplyPositionSchemaResponse,
+    type PositionSchemaFetchTarget,
+} from '@/lib/position-field-schema';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -121,6 +141,12 @@ type FieldSchema = {
         visible?: boolean;
         max_length?: number | null;
         validation_json?: { max_length?: number } | null;
+        options_json?: Array<{
+            key: string;
+            label: string;
+            sort: number;
+            is_active: boolean;
+        }> | null;
     }>;
     rules: Array<{
         condition: { op?: string; field_key?: string; value?: unknown };
@@ -156,6 +182,13 @@ type PositionDraft = {
     flight_period_start: string;
     flight_period_end: string;
     custom_fields: Record<string, string>;
+    /** DF-3-REST-C2: Select = string|null, Multi = string[]. */
+    custom_choice_fields: Record<string, ChoiceValue>;
+    custom_choice_touched: Record<string, true>;
+    custom_choice_meta: Record<
+        string,
+        Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+    >;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -485,6 +518,9 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             flight_period_start: '',
             flight_period_end: '',
             custom_fields: {},
+            custom_choice_fields: {},
+            custom_choice_touched: {},
+            custom_choice_meta: {},
         };
     }
 
@@ -650,6 +686,15 @@ export default function CalculationWizard({
         () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
+    const customHeaderChoiceFields = useMemo(
+        () => customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+        [fieldSchema.fields],
+    );
+    const [schemaRetryToken, setSchemaRetryToken] = useState(0);
+    const visibleHeaderChoiceFields = useMemo(
+        () => visibleChoiceFields(customHeaderChoiceFields),
+        [customHeaderChoiceFields],
+    );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
     const [customHeaderValues, setCustomHeaderValues] = useState<
@@ -667,6 +712,35 @@ export default function CalculationWizard({
                     : '';
         }
         return initial;
+    });
+    const [customHeaderChoiceValues, setCustomHeaderChoiceValues] = useState<
+        Record<string, ChoiceValue>
+    >(() =>
+        initChoiceValuesMap(
+            customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+            calculation?.dynamic_field_values ?? {},
+        ),
+    );
+    const [customHeaderChoiceTouched, setCustomHeaderChoiceTouched] = useState<
+        Record<string, true>
+    >({});
+    const [customHeaderChoiceMeta, setCustomHeaderChoiceMeta] = useState(() => {
+        const entries = initChoiceEntriesMap(
+            customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+            calculation?.dynamic_field_values ?? {},
+        );
+        const meta: Record<
+            string,
+            Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+        > = {};
+        for (const [key, entry] of Object.entries(entries)) {
+            meta[key] = {
+                initPayloadSafe: entry.initPayloadSafe,
+                issue: entry.issue,
+            };
+        }
+
+        return meta;
     });
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
@@ -786,6 +860,44 @@ export default function CalculationWizard({
                             ];
                         }),
                     ),
+                    custom_choice_fields: initChoiceValuesMap(
+                        customPositionChoiceFieldsFromSchema(
+                            schemaFieldsForPosition(
+                                { field_schema: position.field_schema ?? null },
+                                fieldSchema,
+                                (fieldSchema.format_version ?? 0) >= 3,
+                            ),
+                        ),
+                        position.dynamic_field_values ?? {},
+                    ),
+                    custom_choice_touched: {},
+                    custom_choice_meta: (() => {
+                        const entries = initChoiceEntriesMap(
+                            customPositionChoiceFieldsFromSchema(
+                                schemaFieldsForPosition(
+                                    {
+                                        field_schema:
+                                            position.field_schema ?? null,
+                                    },
+                                    fieldSchema,
+                                    (fieldSchema.format_version ?? 0) >= 3,
+                                ),
+                            ),
+                            position.dynamic_field_values ?? {},
+                        );
+                        const meta: Record<
+                            string,
+                            Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+                        > = {};
+                        for (const [key, entry] of Object.entries(entries)) {
+                            meta[key] = {
+                                initPayloadSafe: entry.initPayloadSafe,
+                                issue: entry.issue,
+                            };
+                        }
+
+                        return meta;
+                    })(),
                 };
             });
         }
@@ -798,16 +910,30 @@ export default function CalculationWizard({
         return first ? [first] : [];
     });
 
-    // DF-3.3a2β: Positions-Fingerprints und -Schemas nachladen (Create oder Mediumwechsel).
+    // DF-3.3a2β / C2: Positions-Fingerprints und -Schemas nachladen.
+    // Generation pro client_key verhindert Out-of-order-Überschreiben.
+    const schemaFetchPendingRef = useRef<
+        Map<string, PositionSchemaFetchTarget>
+    >(new Map());
+    const [schemaLoadingClientKeys, setSchemaLoadingClientKeys] = useState<
+        Record<string, true>
+    >({});
+    const [schemaLoadError, setSchemaLoadError] = useState<string | null>(null);
+    const positionsNeedingSchemaKey = useMemo(
+        () =>
+            positions
+                .filter(positionNeedsFieldSchema)
+                .map(
+                    (position) =>
+                        `${position.client_key}:${position.advertising_medium_id}`,
+                )
+                .sort()
+                .join('|'),
+        [positions],
+    );
+
     useEffect(() => {
-        const missing = positions.filter(
-            (position) =>
-                position.advertising_medium_id > 0 &&
-                (position.schema_fingerprint === null ||
-                    position.schema_fingerprint === undefined ||
-                    position.schema_fingerprint === '' ||
-                    position.field_schema == null),
-        );
+        const missing = positions.filter(positionNeedsFieldSchema);
 
         if (missing.length === 0) {
             return;
@@ -818,10 +944,31 @@ export default function CalculationWizard({
         void (async () => {
             const updates = new Map<
                 string,
-                { fingerprint: string; fieldSchema: FieldSchema }
+                {
+                    fingerprint: string;
+                    fieldSchema: FieldSchema;
+                    target: PositionSchemaFetchTarget;
+                }
             >();
+            let loadError: string | null = null;
 
             for (const position of missing) {
+                const generation = nextSchemaFetchGeneration(
+                    schemaFetchPendingRef.current.get(position.client_key)
+                        ?.generation,
+                );
+                const target: PositionSchemaFetchTarget = {
+                    clientKey: position.client_key,
+                    advertisingMediumId: position.advertising_medium_id,
+                    generation,
+                };
+                schemaFetchPendingRef.current.set(position.client_key, target);
+                setSchemaLoadingClientKeys((current) => ({
+                    ...current,
+                    [position.client_key]: true,
+                }));
+                setSchemaLoadError(null);
+
                 try {
                     const response = await jsonPost<{
                         fieldSchema?: FieldSchema;
@@ -833,25 +980,69 @@ export default function CalculationWizard({
                     });
                     const nextSchema = response.fieldSchema;
                     const fingerprint = nextSchema?.schema_fingerprint ?? null;
-                    if (fingerprint && nextSchema) {
-                        updates.set(position.client_key, {
-                            fingerprint,
-                            fieldSchema: nextSchema,
-                        });
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (
+                        !shouldApplyPositionSchemaResponse(pending, target) ||
+                        !fingerprint ||
+                        !nextSchema
+                    ) {
+                        continue;
                     }
+                    updates.set(position.client_key, {
+                        fingerprint,
+                        fieldSchema: nextSchema,
+                        target,
+                    });
                 } catch {
-                    // Nachladen fehlgeschlagen: Speichern bleibt fail-closed.
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (shouldApplyPositionSchemaResponse(pending, target)) {
+                        loadError =
+                            'Positions-Feldschema konnte nicht geladen werden. Speichern ist ohne Fingerprint nicht möglich.';
+                    }
+                } finally {
+                    setSchemaLoadingClientKeys((current) => {
+                        const next = { ...current };
+                        delete next[position.client_key];
+
+                        return next;
+                    });
                 }
             }
 
-            if (cancelled || updates.size === 0) {
+            if (cancelled) {
                 return;
             }
 
+            if (loadError) {
+                setSchemaLoadError(loadError);
+            }
+
+            if (updates.size === 0) {
+                return;
+            }
+
+            setSchemaLoadError(null);
             setPositions((current) =>
                 current.map((position) => {
                     const next = updates.get(position.client_key);
                     if (!next) {
+                        return position;
+                    }
+                    const pending = schemaFetchPendingRef.current.get(
+                        position.client_key,
+                    );
+                    if (
+                        !shouldApplyPositionSchemaResponse(
+                            pending,
+                            next.target,
+                        ) ||
+                        position.advertising_medium_id !==
+                            next.target.advertisingMediumId
+                    ) {
                         return position;
                     }
 
@@ -864,12 +1055,57 @@ export default function CalculationWizard({
                             position.custom_fields[field.key] ?? '',
                         ]),
                     );
+                    const nextChoiceFields =
+                        customPositionChoiceFieldsFromSchema(
+                            next.fieldSchema.fields,
+                        );
+                    const nextEntries = initChoiceEntriesMap(
+                        nextChoiceFields,
+                        {},
+                    );
+                    const custom_choice_fields: Record<string, ChoiceValue> =
+                        {};
+                    const custom_choice_meta: Record<
+                        string,
+                        Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+                    > = {};
+                    for (const field of nextChoiceFields) {
+                        if (
+                            Object.prototype.hasOwnProperty.call(
+                                position.custom_choice_fields,
+                                field.key,
+                            )
+                        ) {
+                            custom_choice_fields[field.key] =
+                                position.custom_choice_fields[field.key];
+                            custom_choice_meta[field.key] = position
+                                .custom_choice_meta[field.key] ?? {
+                                initPayloadSafe: true,
+                                issue: null,
+                            };
+                        } else {
+                            custom_choice_fields[field.key] =
+                                nextEntries[field.key]?.value ??
+                                (field.field_type === 'multi_select'
+                                    ? []
+                                    : null);
+                            custom_choice_meta[field.key] = {
+                                initPayloadSafe:
+                                    nextEntries[field.key]?.initPayloadSafe ??
+                                    true,
+                                issue: nextEntries[field.key]?.issue ?? null,
+                            };
+                        }
+                    }
 
                     return {
                         ...position,
                         schema_fingerprint: next.fingerprint,
                         field_schema: next.fieldSchema,
                         custom_fields,
+                        custom_choice_fields,
+                        custom_choice_touched: position.custom_choice_touched,
+                        custom_choice_meta,
                     };
                 }),
             );
@@ -878,7 +1114,10 @@ export default function CalculationWizard({
         return () => {
             cancelled = true;
         };
-    }, [calculation?.id, positions]);
+        // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
+        // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
+    }, [calculation?.id, positionsNeedingSchemaKey, schemaRetryToken]);
 
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
@@ -926,6 +1165,12 @@ export default function CalculationWizard({
                         customHeaderValues[field.key] ?? '',
                     ]),
                 ),
+                ...choiceValuesForPayload(
+                    customHeaderChoiceFields,
+                    customHeaderChoiceValues,
+                    new Set(Object.keys(customHeaderChoiceTouched)),
+                    customHeaderChoiceMeta,
+                ).payload,
             },
             order_discount_percent: '0',
             order_discounts: payloadDiscounts(orderDiscounts),
@@ -1006,6 +1251,22 @@ export default function CalculationWizard({
                                       position.custom_fields[field.key] ?? '',
                                   ]),
                               ),
+                              ...choiceValuesForPayload(
+                                  customPositionChoiceFieldsFromSchema(
+                                      schemaFieldsForPosition(
+                                          position,
+                                          fieldSchema,
+                                          existingGen3,
+                                      ),
+                                  ),
+                                  position.custom_choice_fields,
+                                  new Set(
+                                      Object.keys(
+                                          position.custom_choice_touched,
+                                      ),
+                                  ),
+                                  position.custom_choice_meta,
+                              ).payload,
                           },
                           plan_rows: ranges.flatMap((range) =>
                               Array.from(
@@ -1033,8 +1294,12 @@ export default function CalculationWizard({
             campaignPeriodStart,
             campaignPeriodEnd,
             customHeaderFields,
+            customHeaderChoiceFields,
             existingGen3,
             customHeaderValues,
+            customHeaderChoiceValues,
+            customHeaderChoiceTouched,
+            customHeaderChoiceMeta,
             fieldSchema,
             orderDiscounts,
             aeEnabled,
@@ -1072,7 +1337,11 @@ export default function CalculationWizard({
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
     });
-    const error = previewError ?? saveError ?? proposalError;
+    const error = previewError ?? saveError ?? proposalError ?? schemaLoadError;
+    const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
+    const schemaFingerprintMissing =
+        !isBudgetSetup && positions.some(positionNeedsFieldSchema);
+    const schemaSaveBlocked = schemaStillLoading || schemaFingerprintMissing;
     const pageValidationErrors = mapValidationErrors(
         (usePage().props.errors ?? {}) as Record<string, string | string[]>,
     );
@@ -1237,6 +1506,53 @@ export default function CalculationWizard({
                 `Speichern nicht möglich: ${NO_CALCULATION_METHOD_MESSAGE}`,
             );
             return;
+        }
+
+        if (!isBudgetSetup && positions.some(positionNeedsFieldSchema)) {
+            const stillLoading =
+                Object.keys(schemaLoadingClientKeys).length > 0;
+            if (!stillLoading) {
+                setSchemaRetryToken((token) => token + 1);
+            }
+            setSaveError(
+                `Speichern nicht möglich: ${
+                    schemaLoadBlockMessage(stillLoading, schemaLoadError) ??
+                    'Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.'
+                }`,
+            );
+            return;
+        }
+
+        const headerChoiceBlock = choiceValuesForPayload(
+            customHeaderChoiceFields,
+            customHeaderChoiceValues,
+            new Set(Object.keys(customHeaderChoiceTouched)),
+            customHeaderChoiceMeta,
+        ).blockReason;
+        if (headerChoiceBlock) {
+            setSaveError(`Speichern nicht möglich: ${headerChoiceBlock}`);
+            return;
+        }
+
+        for (const [index, position] of positions.entries()) {
+            const positionBlock = choiceValuesForPayload(
+                customPositionChoiceFieldsFromSchema(
+                    schemaFieldsForPosition(
+                        position,
+                        fieldSchema,
+                        existingGen3,
+                    ),
+                ),
+                position.custom_choice_fields,
+                new Set(Object.keys(position.custom_choice_touched)),
+                position.custom_choice_meta,
+            ).blockReason;
+            if (positionBlock) {
+                setSaveError(
+                    `Speichern nicht möglich (Position ${index + 1}): ${positionBlock}`,
+                );
+                return;
+            }
         }
 
         setBusy(true);
@@ -1445,6 +1761,10 @@ export default function CalculationWizard({
                     flight_period_start: existing?.flight_period_start ?? '',
                     flight_period_end: existing?.flight_period_end ?? '',
                     custom_fields: existing?.custom_fields ?? {},
+                    custom_choice_fields: existing?.custom_choice_fields ?? {},
+                    custom_choice_touched:
+                        existing?.custom_choice_touched ?? {},
+                    custom_choice_meta: existing?.custom_choice_meta ?? {},
                 };
             }),
         );
@@ -1782,7 +2102,8 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         </FormField>
-                                        {customHeaderFields.length > 0 ? (
+                                        {customHeaderFields.length > 0 ||
+                                        visibleHeaderChoiceFields.length > 0 ? (
                                             <div
                                                 className="space-y-3 sm:col-span-2"
                                                 data-test="calculation-custom-header-fields"
@@ -1804,6 +2125,40 @@ export default function CalculationWizard({
                                                             }),
                                                         )
                                                     }
+                                                />
+                                                <SchemaChoiceFields
+                                                    fields={
+                                                        customHeaderChoiceFields
+                                                    }
+                                                    values={
+                                                        customHeaderChoiceValues
+                                                    }
+                                                    errors={fieldErrors}
+                                                    disabled={!canEdit}
+                                                    idPrefix="calc-choice"
+                                                    onChange={(key, value) => {
+                                                        setCustomHeaderChoiceValues(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: value,
+                                                            }),
+                                                        );
+                                                        setCustomHeaderChoiceTouched(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: true,
+                                                            }),
+                                                        );
+                                                        setCustomHeaderChoiceMeta(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: {
+                                                                    initPayloadSafe: true,
+                                                                    issue: null,
+                                                                },
+                                                            }),
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         ) : null}
@@ -1871,6 +2226,14 @@ export default function CalculationWizard({
                                         const positionCustomFields =
                                             customPositionTextFieldsFromSchema(
                                                 positionFields,
+                                            );
+                                        const positionChoiceFields =
+                                            customPositionChoiceFieldsFromSchema(
+                                                positionFields,
+                                            );
+                                        const visiblePositionChoiceFields =
+                                            visibleChoiceFields(
+                                                positionChoiceFields,
                                             );
 
                                         return (
@@ -2355,7 +2718,9 @@ export default function CalculationWizard({
                                                                 </FormField>
                                                             ) : null}
                                                             {positionCustomFields.length >
-                                                            0 ? (
+                                                                0 ||
+                                                            visiblePositionChoiceFields.length >
+                                                                0 ? (
                                                                 <div
                                                                     className="space-y-3 sm:col-span-2"
                                                                     data-test={`calculation-custom-position-fields-${position.client_key}`}
@@ -2392,6 +2757,52 @@ export default function CalculationWizard({
                                                                                         {
                                                                                             ...position.custom_fields,
                                                                                             [key]: value,
+                                                                                        },
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <SchemaChoiceFields
+                                                                        fields={
+                                                                            positionChoiceFields
+                                                                        }
+                                                                        values={
+                                                                            position.custom_choice_fields
+                                                                        }
+                                                                        errors={
+                                                                            fieldErrors
+                                                                        }
+                                                                        errorKeyPrefixes={[
+                                                                            `positions.${index}.dynamic_field_values`,
+                                                                        ]}
+                                                                        disabled={
+                                                                            !canEdit
+                                                                        }
+                                                                        idPrefix={`calc-pos-choice-${position.client_key}`}
+                                                                        onChange={(
+                                                                            key,
+                                                                            value,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    custom_choice_fields:
+                                                                                        {
+                                                                                            ...position.custom_choice_fields,
+                                                                                            [key]: value,
+                                                                                        },
+                                                                                    custom_choice_touched:
+                                                                                        {
+                                                                                            ...position.custom_choice_touched,
+                                                                                            [key]: true,
+                                                                                        },
+                                                                                    custom_choice_meta:
+                                                                                        {
+                                                                                            ...position.custom_choice_meta,
+                                                                                            [key]: {
+                                                                                                initPayloadSafe: true,
+                                                                                                issue: null,
+                                                                                            },
                                                                                         },
                                                                                 },
                                                                             )
@@ -3178,6 +3589,19 @@ export default function CalculationWizard({
                     </aside>
 
                     <div className="border-border order-3 flex flex-wrap gap-3 border-t pt-6 lg:col-start-1 lg:row-start-2">
+                        {schemaSaveBlocked ? (
+                            <p
+                                className="text-muted-foreground w-full text-sm"
+                                data-test="wizard-schema-loading"
+                                role="status"
+                            >
+                                {schemaLoadBlockMessage(
+                                    schemaStillLoading,
+                                    schemaLoadError,
+                                ) ??
+                                    'Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.'}
+                            </p>
+                        ) : null}
                         {step > 0 ? (
                             <Button
                                 type="button"
@@ -3209,6 +3633,7 @@ export default function CalculationWizard({
                                 onClick={save}
                                 disabled={
                                     busy ||
+                                    schemaStillLoading ||
                                     (planningMode === 'budget' &&
                                         positions.length === 0 &&
                                         !isBudgetSetup)

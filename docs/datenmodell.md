@@ -458,9 +458,12 @@ Umgesetzt in DF-3-REST-C1:
 
 Konzeptuell vorgesehen, aber **nicht implementiert**:
 
-- sichtbare Select-/Multi-Select-UI (C2/C3)
+- sichtbare Dispo Select-/Multi-Select-UI (C3)
 - `SystemFieldSetting`,
 - Regel-Editor / volle Regelmatrix.
+
+Calc Select-/Multi-Select-UI (C2) ist umgesetzt (Freeze-`options_json`, Header/
+Positionen, Partial Save gemäß C1).
 
 **ADV-001b Katalog-Admin** für Oberkategorien und Werbemittel ist umgesetzt
 (Lifecycle, Impact-Preview, kein Hard Delete).

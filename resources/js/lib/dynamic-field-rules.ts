@@ -58,6 +58,22 @@ function conditionMatches(
         return asBool(actual) === expected;
     }
 
+    // Multi-Select: leeres Array ist „leer“, gefülltes Array matcht nur
+    // identische Listen (Reihenfolge egal) bzw. nie einen Skalar-Expected.
+    if (Array.isArray(actual)) {
+        if (Array.isArray(expected)) {
+            if (actual.length !== expected.length) {
+                return false;
+            }
+            const left = [...actual].map(String).sort();
+            const right = [...expected].map(String).sort();
+
+            return left.every((item, index) => item === right[index]);
+        }
+
+        return false;
+    }
+
     return actual === expected;
 }
 
