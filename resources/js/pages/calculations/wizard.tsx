@@ -27,10 +27,21 @@ import {
     moneyDeduction,
 } from '@/components/form-field';
 import {
+    SchemaChoiceFields,
+    customHeaderChoiceFieldsFromSchema,
+    customPositionChoiceFieldsFromSchema,
+    visibleChoiceFields,
+} from '@/components/dynamic-fields/schema-choice-fields';
+import {
     SchemaTextFields,
     customHeaderTextFieldsFromSchema,
     customPositionTextFieldsFromSchema,
 } from '@/components/dynamic-fields/schema-text-fields';
+import {
+    choiceValuesForPayload,
+    initChoiceValuesMap,
+    type ChoiceValue,
+} from '@/lib/choice-field-values';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
 import {
     emptyTimeRange,
@@ -121,6 +132,12 @@ type FieldSchema = {
         visible?: boolean;
         max_length?: number | null;
         validation_json?: { max_length?: number } | null;
+        options_json?: Array<{
+            key: string;
+            label: string;
+            sort: number;
+            is_active: boolean;
+        }> | null;
     }>;
     rules: Array<{
         condition: { op?: string; field_key?: string; value?: unknown };
@@ -156,6 +173,8 @@ type PositionDraft = {
     flight_period_start: string;
     flight_period_end: string;
     custom_fields: Record<string, string>;
+    /** DF-3-REST-C2: Select = string|null, Multi = string[]. */
+    custom_choice_fields: Record<string, ChoiceValue>;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -485,6 +504,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             flight_period_start: '',
             flight_period_end: '',
             custom_fields: {},
+            custom_choice_fields: {},
         };
     }
 
@@ -650,6 +670,14 @@ export default function CalculationWizard({
         () => customHeaderTextFieldsFromSchema(fieldSchema.fields),
         [fieldSchema.fields],
     );
+    const customHeaderChoiceFields = useMemo(
+        () => customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+        [fieldSchema.fields],
+    );
+    const visibleHeaderChoiceFields = useMemo(
+        () => visibleChoiceFields(customHeaderChoiceFields),
+        [customHeaderChoiceFields],
+    );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
     const [customHeaderValues, setCustomHeaderValues] = useState<
@@ -668,6 +696,14 @@ export default function CalculationWizard({
         }
         return initial;
     });
+    const [customHeaderChoiceValues, setCustomHeaderChoiceValues] = useState<
+        Record<string, ChoiceValue>
+    >(() =>
+        initChoiceValuesMap(
+            customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+            calculation?.dynamic_field_values ?? {},
+        ),
+    );
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -786,6 +822,16 @@ export default function CalculationWizard({
                             ];
                         }),
                     ),
+                    custom_choice_fields: initChoiceValuesMap(
+                        customPositionChoiceFieldsFromSchema(
+                            schemaFieldsForPosition(
+                                { field_schema: position.field_schema ?? null },
+                                fieldSchema,
+                                (fieldSchema.format_version ?? 0) >= 3,
+                            ),
+                        ),
+                        position.dynamic_field_values ?? {},
+                    ),
                 };
             });
         }
@@ -864,12 +910,31 @@ export default function CalculationWizard({
                             position.custom_fields[field.key] ?? '',
                         ]),
                     );
+                    const nextChoiceFields =
+                        customPositionChoiceFieldsFromSchema(
+                            next.fieldSchema.fields,
+                        );
+                    const custom_choice_fields: Record<string, ChoiceValue> = {
+                        ...initChoiceValuesMap(nextChoiceFields, {}),
+                    };
+                    for (const field of nextChoiceFields) {
+                        if (
+                            Object.prototype.hasOwnProperty.call(
+                                position.custom_choice_fields,
+                                field.key,
+                            )
+                        ) {
+                            custom_choice_fields[field.key] =
+                                position.custom_choice_fields[field.key];
+                        }
+                    }
 
                     return {
                         ...position,
                         schema_fingerprint: next.fingerprint,
                         field_schema: next.fieldSchema,
                         custom_fields,
+                        custom_choice_fields,
                     };
                 }),
             );
@@ -925,6 +990,10 @@ export default function CalculationWizard({
                         field.key,
                         customHeaderValues[field.key] ?? '',
                     ]),
+                ),
+                ...choiceValuesForPayload(
+                    customHeaderChoiceFields,
+                    customHeaderChoiceValues,
                 ),
             },
             order_discount_percent: '0',
@@ -1006,6 +1075,16 @@ export default function CalculationWizard({
                                       position.custom_fields[field.key] ?? '',
                                   ]),
                               ),
+                              ...choiceValuesForPayload(
+                                  customPositionChoiceFieldsFromSchema(
+                                      schemaFieldsForPosition(
+                                          position,
+                                          fieldSchema,
+                                          existingGen3,
+                                      ),
+                                  ),
+                                  position.custom_choice_fields,
+                              ),
                           },
                           plan_rows: ranges.flatMap((range) =>
                               Array.from(
@@ -1033,8 +1112,10 @@ export default function CalculationWizard({
             campaignPeriodStart,
             campaignPeriodEnd,
             customHeaderFields,
+            customHeaderChoiceFields,
             existingGen3,
             customHeaderValues,
+            customHeaderChoiceValues,
             fieldSchema,
             orderDiscounts,
             aeEnabled,
@@ -1445,6 +1526,7 @@ export default function CalculationWizard({
                     flight_period_start: existing?.flight_period_start ?? '',
                     flight_period_end: existing?.flight_period_end ?? '',
                     custom_fields: existing?.custom_fields ?? {},
+                    custom_choice_fields: existing?.custom_choice_fields ?? {},
                 };
             }),
         );
@@ -1782,7 +1864,8 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         </FormField>
-                                        {customHeaderFields.length > 0 ? (
+                                        {customHeaderFields.length > 0 ||
+                                        visibleHeaderChoiceFields.length > 0 ? (
                                             <div
                                                 className="space-y-3 sm:col-span-2"
                                                 data-test="calculation-custom-header-fields"
@@ -1798,6 +1881,25 @@ export default function CalculationWizard({
                                                     idPrefix="calc-custom"
                                                     onChange={(key, value) =>
                                                         setCustomHeaderValues(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: value,
+                                                            }),
+                                                        )
+                                                    }
+                                                />
+                                                <SchemaChoiceFields
+                                                    fields={
+                                                        customHeaderChoiceFields
+                                                    }
+                                                    values={
+                                                        customHeaderChoiceValues
+                                                    }
+                                                    errors={fieldErrors}
+                                                    disabled={!canEdit}
+                                                    idPrefix="calc-choice"
+                                                    onChange={(key, value) =>
+                                                        setCustomHeaderChoiceValues(
                                                             (current) => ({
                                                                 ...current,
                                                                 [key]: value,
@@ -1871,6 +1973,14 @@ export default function CalculationWizard({
                                         const positionCustomFields =
                                             customPositionTextFieldsFromSchema(
                                                 positionFields,
+                                            );
+                                        const positionChoiceFields =
+                                            customPositionChoiceFieldsFromSchema(
+                                                positionFields,
+                                            );
+                                        const visiblePositionChoiceFields =
+                                            visibleChoiceFields(
+                                                positionChoiceFields,
                                             );
 
                                         return (
@@ -2355,7 +2465,9 @@ export default function CalculationWizard({
                                                                 </FormField>
                                                             ) : null}
                                                             {positionCustomFields.length >
-                                                            0 ? (
+                                                                0 ||
+                                                            visiblePositionChoiceFields.length >
+                                                                0 ? (
                                                                 <div
                                                                     className="space-y-3 sm:col-span-2"
                                                                     data-test={`calculation-custom-position-fields-${position.client_key}`}
@@ -2391,6 +2503,39 @@ export default function CalculationWizard({
                                                                                     custom_fields:
                                                                                         {
                                                                                             ...position.custom_fields,
+                                                                                            [key]: value,
+                                                                                        },
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <SchemaChoiceFields
+                                                                        fields={
+                                                                            positionChoiceFields
+                                                                        }
+                                                                        values={
+                                                                            position.custom_choice_fields
+                                                                        }
+                                                                        errors={
+                                                                            fieldErrors
+                                                                        }
+                                                                        errorKeyPrefixes={[
+                                                                            `positions.${index}.dynamic_field_values`,
+                                                                        ]}
+                                                                        disabled={
+                                                                            !canEdit
+                                                                        }
+                                                                        idPrefix={`calc-pos-choice-${position.client_key}`}
+                                                                        onChange={(
+                                                                            key,
+                                                                            value,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    custom_choice_fields:
+                                                                                        {
+                                                                                            ...position.custom_choice_fields,
                                                                                             [key]: value,
                                                                                         },
                                                                                 },

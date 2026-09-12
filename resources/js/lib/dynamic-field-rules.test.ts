@@ -49,4 +49,44 @@ describe('dynamic-field-rules', () => {
             ),
         ).toEqual([]);
     });
+
+    it('treats empty multi-select arrays as non-matching for scalar equals', () => {
+        const rule: SnapshotFieldRule = {
+            condition: {
+                op: 'field_equals',
+                field_key: 'tags',
+                value: 'opt_a',
+            },
+            action: { op: 'require_field', field_key: 'other' },
+        };
+
+        expect(
+            requiredPositionFieldKeysFromSnapshotRules([rule], { tags: [] }),
+        ).toEqual([]);
+        expect(
+            requiredPositionFieldKeysFromSnapshotRules([rule], {
+                tags: ['opt_a'],
+            }),
+        ).toEqual([]);
+    });
+
+    it('matches multi-select arrays set-wise when expected is an array', () => {
+        const rule: SnapshotFieldRule = {
+            condition: {
+                op: 'field_equals',
+                field_key: 'tags',
+                value: ['opt_b', 'opt_a'],
+            },
+            action: { op: 'require_field', field_key: 'other' },
+        };
+
+        expect(
+            requiredPositionFieldKeysFromSnapshotRules([rule], {
+                tags: ['opt_a', 'opt_b'],
+            }),
+        ).toEqual(['other']);
+        expect(
+            requiredPositionFieldKeysFromSnapshotRules([rule], { tags: [] }),
+        ).toEqual([]);
+    });
 });
