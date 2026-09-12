@@ -232,10 +232,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **DF-3.3b erledigt (Feature-Branch `feat/df3-3b-assignment-admin-ui`):**
   Assignment-Admin-UI mit Herkunft/Konfliktvorschau; PO-33b-1 Read-only-Katalogwahl;
   PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
-- **Offen:** Dispo Select-/Multi-Select-UI (C3), volle Regelmatrix, Regel-Editor.
-  Options-Fundament (DF-3-REST-A), Options-Admin (DF-3-REST-B) und Choice-Wertmodell
-  (DF-3-REST-C1) auf `main` (PR #38 / #39 / #40). Calc Choice-UI (DF-3-REST-C2)
-  vollständig umgesetzt und geprüft; Dispo-UI folgt in C3.
+- **Offen:** volle Regelmatrix, Regel-Editor.
+  Options-Fundament/Admin und Choice-Wertmodell (DF-3-REST-A/B/C1) auf `main`
+  (PR #38 / #39 / #40). Calc Choice-UI (DF-3-REST-C2) und Dispo Choice-UI
+  (DF-3-REST-C3) umgesetzt; DF-3 bleibt ohne Regelmatrix/Regel-Editor unvollständig.
 
 ### BL-P3-02 – Snapshot-Fundament
 

@@ -789,53 +789,51 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @return array{fields: list<array<string, mixed>>, rules: list<array<string, mixed>>}
+     * @return array{
+     *     fields: list<array<string, mixed>>,
+     *     rules: list<array<string, mixed>>,
+     *     editable_custom_header_fields: list<array<string, mixed>>,
+     *     calc_origin_custom_header_fields: list<array<string, mixed>>,
+     *     editable_custom_position_fields: list<array<string, mixed>>,
+     *     calc_origin_custom_position_fields: list<array<string, mixed>>,
+     *     position_field_schemas: array<int, array{
+     *         editable_custom_fields: list<array<string, mixed>>,
+     *         calc_origin_custom_fields: list<array<string, mixed>>
+     *     }>
+     * }
      */
     public function fieldSchemaProp(DispoOrder $order): array
     {
         $snapshot = $order->configurationSnapshot;
         $snapshot->assertReadable();
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
+        $order->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
 
         $entries = $this->schemaDefinitions($order, $snapshot);
 
+        $definitionIds = array_values(array_unique(array_map(
+            static fn (array $entry): int => (int) $entry['def']->field_definition_id,
+            $entries,
+        )));
+        foreach ($order->positions as $position) {
+            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+                $definitionIds[] = (int) $def->field_definition_id;
+            }
+        }
+        $definitionIds = array_values(array_unique($definitionIds));
+
         $systemByDefinitionId = FieldDefinition::query()
-            ->whereIn('id', array_values(array_unique(array_map(
-                static fn (array $entry): int => (int) $entry['def']->field_definition_id,
-                $entries,
-            ))))
+            ->whereIn('id', $definitionIds)
             ->pluck('is_system', 'id');
 
-        $fields = array_map(function (array $entry) use ($systemByDefinitionId): array {
-            /** @var SnapshotFieldDefinition $def */
-            $def = $entry['def'];
-            /** @var ConfigurationSnapshot $owner */
-            $owner = $entry['snapshot'];
-
-            return [
-                'key' => $def->key,
-                'label' => $def->label,
-                'help_text' => $def->help_text,
-                'field_type' => $def->field_type->value,
-                'scope' => $def->scope->value,
-                'sort' => $def->sort,
-                'group_key' => $def->group_key,
-                'applies_to' => $def->applies_to->value,
-                'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
-                'required' => (bool) $def->required,
-                'visible' => (bool) $def->visible,
-                'editable' => $def->scope === FieldScope::Header
-                    ? $this->isNativeEditableHeaderText($owner, $def)
-                    : $this->isNativeEditablePositionText($owner, $def),
-                'calc_origin' => $this->isCalcOriginKey($owner, $def->key),
-                'max_length' => $this->maxLengthForDefinition($def),
-                'validation_json' => $def->validation_json,
-                'options_json' => ChoiceFieldValueContract::optionsForSchemaProp(
-                    is_array($def->options_json) ? $def->options_json : null,
-                    $def->field_type,
-                ),
-            ];
-        }, $entries);
+        $fields = array_map(
+            fn (array $entry): array => $this->mapSchemaFieldProp(
+                $entry['def'],
+                $entry['snapshot'],
+                $systemByDefinitionId,
+            ),
+            $entries,
+        );
 
         $customSchemaTypes = [
             FieldType::ShortText->value,
@@ -844,38 +842,65 @@ final class DispoOrderDynamicFieldWriter
             FieldType::MultiSelect->value,
         ];
 
-        $editableCustom = array_values(array_filter(
+        $editableCustom = $this->filterCustomSchemaFields(
             $fields,
-            fn (array $field): bool => ! $field['is_system']
-                && $field['editable'] === true
-                && $field['visible'] === true
-                && $field['scope'] === FieldScope::Header->value
-                && in_array($field['field_type'], $customSchemaTypes, true),
-        ));
-        $calcOriginCustom = array_values(array_filter(
+            FieldScope::Header,
+            editable: true,
+            calcOrigin: false,
+            customSchemaTypes: $customSchemaTypes,
+        );
+        $calcOriginCustom = $this->filterCustomSchemaFields(
             $fields,
-            fn (array $field): bool => ! $field['is_system']
-                && $field['calc_origin'] === true
-                && $field['visible'] === true
-                && $field['scope'] === FieldScope::Header->value
-                && in_array($field['field_type'], $customSchemaTypes, true),
-        ));
-        $editableCustomPosition = array_values(array_filter(
+            FieldScope::Header,
+            editable: false,
+            calcOrigin: true,
+            customSchemaTypes: $customSchemaTypes,
+        );
+        $editableCustomPosition = $this->filterCustomSchemaFields(
             $fields,
-            fn (array $field): bool => ! $field['is_system']
-                && $field['editable'] === true
-                && $field['visible'] === true
-                && $field['scope'] === FieldScope::Position->value
-                && in_array($field['field_type'], $customSchemaTypes, true),
-        ));
-        $calcOriginCustomPosition = array_values(array_filter(
+            FieldScope::Position,
+            editable: true,
+            calcOrigin: false,
+            customSchemaTypes: $customSchemaTypes,
+        );
+        $calcOriginCustomPosition = $this->filterCustomSchemaFields(
             $fields,
-            fn (array $field): bool => ! $field['is_system']
-                && $field['calc_origin'] === true
-                && $field['visible'] === true
-                && $field['scope'] === FieldScope::Position->value
-                && in_array($field['field_type'], $customSchemaTypes, true),
-        ));
+            FieldScope::Position,
+            editable: false,
+            calcOrigin: true,
+            customSchemaTypes: $customSchemaTypes,
+        );
+
+        /** @var array<int, array{editable_custom_fields: list<array<string, mixed>>, calc_origin_custom_fields: list<array<string, mixed>>}> $positionFieldSchemas */
+        $positionFieldSchemas = [];
+        foreach ($order->positions as $position) {
+            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            $positionFields = [];
+            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+                $positionFields[] = $this->mapSchemaFieldProp(
+                    $def,
+                    $positionSnapshot,
+                    $systemByDefinitionId,
+                );
+            }
+
+            $positionFieldSchemas[(int) $position->id] = [
+                'editable_custom_fields' => $this->filterCustomSchemaFields(
+                    $positionFields,
+                    FieldScope::Position,
+                    editable: true,
+                    calcOrigin: false,
+                    customSchemaTypes: $customSchemaTypes,
+                ),
+                'calc_origin_custom_fields' => $this->filterCustomSchemaFields(
+                    $positionFields,
+                    FieldScope::Position,
+                    editable: false,
+                    calcOrigin: true,
+                    customSchemaTypes: $customSchemaTypes,
+                ),
+            ];
+        }
 
         return [
             'fields' => $fields,
@@ -884,7 +909,87 @@ final class DispoOrderDynamicFieldWriter
             'calc_origin_custom_header_fields' => $calcOriginCustom,
             'editable_custom_position_fields' => $editableCustomPosition,
             'calc_origin_custom_position_fields' => $calcOriginCustomPosition,
+            'position_field_schemas' => $positionFieldSchemas,
         ];
+    }
+
+    /**
+     * @param  Collection<int|string, mixed>  $systemByDefinitionId
+     * @return array<string, mixed>
+     */
+    private function mapSchemaFieldProp(
+        SnapshotFieldDefinition $def,
+        ConfigurationSnapshot $owner,
+        $systemByDefinitionId,
+    ): array {
+        return [
+            'key' => $def->key,
+            'label' => $def->label,
+            'help_text' => $def->help_text,
+            'field_type' => $def->field_type->value,
+            'scope' => $def->scope->value,
+            'sort' => $def->sort,
+            'group_key' => $def->group_key,
+            'applies_to' => $def->applies_to->value,
+            'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
+            'required' => (bool) $def->required,
+            'visible' => (bool) $def->visible,
+            'editable' => $def->scope === FieldScope::Header
+                ? $this->isNativeEditableHeaderText($owner, $def)
+                : $this->isNativeEditablePositionText($owner, $def),
+            'calc_origin' => $this->isCalcOriginKey($owner, $def->key),
+            'max_length' => $this->maxLengthForDefinition($def),
+            'validation_json' => $def->validation_json,
+            'options_json' => ChoiceFieldValueContract::optionsForSchemaProp(
+                is_array($def->options_json) ? $def->options_json : null,
+                $def->field_type,
+            ),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $fields
+     * @param  list<string>  $customSchemaTypes
+     * @return list<array<string, mixed>>
+     */
+    private function filterCustomSchemaFields(
+        array $fields,
+        FieldScope $scope,
+        bool $editable,
+        bool $calcOrigin,
+        array $customSchemaTypes,
+    ): array {
+        return array_values(array_filter(
+            $fields,
+            function (array $field) use ($scope, $editable, $calcOrigin, $customSchemaTypes): bool {
+                if (($field['is_system'] ?? false) === true) {
+                    return false;
+                }
+                if (($field['visible'] ?? false) !== true) {
+                    return false;
+                }
+                if (($field['scope'] ?? null) !== $scope->value) {
+                    return false;
+                }
+                if (! in_array($field['field_type'] ?? null, $customSchemaTypes, true)) {
+                    return false;
+                }
+                if ($editable && ($field['editable'] ?? false) !== true) {
+                    return false;
+                }
+                if ($calcOrigin && ($field['calc_origin'] ?? false) !== true) {
+                    return false;
+                }
+                if (! $editable && ! $calcOrigin) {
+                    return false;
+                }
+                if ($editable && ($field['calc_origin'] ?? false) === true) {
+                    return false;
+                }
+
+                return true;
+            },
+        ));
     }
 
     /**

@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
+import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
+import { SchemaChoiceFields } from '@/components/dynamic-fields/schema-choice-fields';
+import { SchemaChoiceReadonlyFields } from '@/components/dynamic-fields/schema-choice-readonly';
 import {
     SchemaTextFields,
     type SchemaTextField,
@@ -20,6 +23,16 @@ import { SpecialApprovalReasonsList } from '@/components/special-approval-reason
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import {
+    choiceFieldsFromCustomBucket,
+    choiceValuesForPayload,
+    initChoiceEntriesMap,
+    textFieldsFromCustomBucket,
+    textReadOnlyCapturedDisplay,
+    type ChoiceFieldEntry,
+    type ChoiceValue,
+    type SchemaChoiceField,
+} from '@/lib/choice-field-values';
 import { formatDateOnly, formatDateTime } from '@/lib/date-time';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import type {
@@ -41,8 +54,15 @@ type SchemaField = {
     is_system?: boolean;
     editable?: boolean;
     calc_origin?: boolean;
+    options_json?: unknown;
+    visible?: boolean;
     max_length?: number | null;
     required?: boolean;
+};
+
+type PositionFieldSchemaBucket = {
+    editable_custom_fields?: SchemaField[];
+    calc_origin_custom_fields?: SchemaField[];
 };
 
 type FieldSchema = {
@@ -56,6 +76,7 @@ type FieldSchema = {
     calc_origin_custom_header_fields?: SchemaField[];
     editable_custom_position_fields?: SchemaField[];
     calc_origin_custom_position_fields?: SchemaField[];
+    position_field_schemas?: Record<number | string, PositionFieldSchemaBucket>;
 };
 
 type OrderPosition = {
@@ -155,6 +176,18 @@ type OrderDetail = {
     positions: OrderPosition[];
 };
 
+type ChoiceMeta = Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>;
+
+type PositionFieldView = {
+    editableText: SchemaTextField[];
+    editableChoice: SchemaChoiceField[];
+    calcOriginText: SchemaTextField[];
+    calcOriginChoice: SchemaChoiceField[];
+};
+
+const LOCK_CONFLICT_FALLBACK =
+    'Der Dispoauftrag wurde zwischenzeitlich geändert. Bitte die Seite neu laden.';
+
 export default function DispoOrderShow({
     order,
     fieldSchema = { fields: [], rules: [] },
@@ -193,8 +226,9 @@ export default function DispoOrderShow({
             ? headerValues.disposition_notes
             : '',
     );
-    const editableCustomFields = useMemo((): SchemaTextField[] => {
-        const source =
+
+    const editableHeaderSource = useMemo((): SchemaField[] => {
+        return (
             fieldSchema.editable_custom_header_fields ??
             fieldSchema.fields.filter(
                 (field) =>
@@ -203,20 +237,23 @@ export default function DispoOrderShow({
                     field.scope === 'header' &&
                     (field.field_type === 'short_text' ||
                         field.field_type === 'long_text'),
-            );
-
-        return source.map((field) => ({
-            key: field.key,
-            label: field.label,
-            help_text: field.help_text,
-            field_type: field.field_type,
-            sort: field.sort,
-            max_length: field.max_length ?? undefined,
-            required: field.required === true,
-        }));
+            )
+        );
     }, [fieldSchema]);
-    const calcOriginCustomFields = useMemo((): SchemaTextField[] => {
-        const source =
+
+    const editableCustomTextFields = useMemo(
+        (): SchemaTextField[] =>
+            textFieldsFromCustomBucket(editableHeaderSource),
+        [editableHeaderSource],
+    );
+    const editableCustomChoiceFields = useMemo(
+        (): SchemaChoiceField[] =>
+            choiceFieldsFromCustomBucket(editableHeaderSource),
+        [editableHeaderSource],
+    );
+
+    const calcOriginHeaderSource = useMemo((): SchemaField[] => {
+        return (
             fieldSchema.calc_origin_custom_header_fields ??
             fieldSchema.fields.filter(
                 (field) =>
@@ -225,65 +262,63 @@ export default function DispoOrderShow({
                     field.scope === 'header' &&
                     (field.field_type === 'short_text' ||
                         field.field_type === 'long_text'),
-            );
-
-        return source.map((field) => ({
-            key: field.key,
-            label: field.label,
-            help_text: field.help_text,
-            field_type: field.field_type,
-            sort: field.sort,
-            max_length: field.max_length ?? undefined,
-        }));
+            )
+        );
     }, [fieldSchema]);
-    const editablePositionCustomFields = useMemo((): SchemaTextField[] => {
-        const source =
-            fieldSchema.editable_custom_position_fields ??
-            fieldSchema.fields.filter(
-                (field) =>
-                    field.is_system !== true &&
-                    field.editable === true &&
-                    field.scope === 'position' &&
-                    (field.field_type === 'short_text' ||
-                        field.field_type === 'long_text'),
-            );
 
-        return source.map((field) => ({
-            key: field.key,
-            label: field.label,
-            help_text: field.help_text,
-            field_type: field.field_type,
-            sort: field.sort,
-            max_length: field.max_length ?? undefined,
-            required: field.required === true,
-        }));
-    }, [fieldSchema]);
-    const calcOriginPositionCustomFields = useMemo((): SchemaTextField[] => {
-        const source =
-            fieldSchema.calc_origin_custom_position_fields ??
-            fieldSchema.fields.filter(
-                (field) =>
-                    field.is_system !== true &&
-                    field.calc_origin === true &&
-                    field.scope === 'position' &&
-                    (field.field_type === 'short_text' ||
-                        field.field_type === 'long_text'),
-            );
+    const calcOriginCustomTextFields = useMemo(
+        (): SchemaTextField[] =>
+            textFieldsFromCustomBucket(calcOriginHeaderSource),
+        [calcOriginHeaderSource],
+    );
+    const calcOriginCustomChoiceFields = useMemo(
+        (): SchemaChoiceField[] =>
+            choiceFieldsFromCustomBucket(calcOriginHeaderSource),
+        [calcOriginHeaderSource],
+    );
 
-        return source.map((field) => ({
-            key: field.key,
-            label: field.label,
-            help_text: field.help_text,
-            field_type: field.field_type,
-            sort: field.sort,
-            max_length: field.max_length ?? undefined,
-        }));
-    }, [fieldSchema]);
+    const positionFieldViews = useMemo((): Record<
+        number,
+        PositionFieldView
+    > => {
+        const map: Record<number, PositionFieldView> = {};
+        for (const position of order.positions) {
+            const bucket = positionFieldBucket(fieldSchema, position.id);
+            map[position.id] = {
+                editableText: textFieldsFromCustomBucket(
+                    bucket.editable_custom_fields,
+                ),
+                editableChoice: choiceFieldsFromCustomBucket(
+                    bucket.editable_custom_fields,
+                ),
+                calcOriginText: textFieldsFromCustomBucket(
+                    bucket.calc_origin_custom_fields,
+                ),
+                calcOriginChoice: choiceFieldsFromCustomBucket(
+                    bucket.calc_origin_custom_fields,
+                ),
+            };
+        }
+        return map;
+    }, [fieldSchema, order.positions]);
+
+    const anyPositionHasEditableCustoms = useMemo(
+        () =>
+            order.positions.some((position) => {
+                const view = positionFieldViews[position.id];
+                return (
+                    (view?.editableText.length ?? 0) > 0 ||
+                    (view?.editableChoice.length ?? 0) > 0
+                );
+            }),
+        [order.positions, positionFieldViews],
+    );
+
     const [customHeaderValues, setCustomHeaderValues] = useState<
         Record<string, string>
     >(() => {
         const initial: Record<string, string> = {};
-        for (const field of editableCustomFields) {
+        for (const field of editableCustomTextFields) {
             const raw = headerValues[field.key];
             initial[field.key] =
                 typeof raw === 'string' || typeof raw === 'number'
@@ -292,14 +327,54 @@ export default function DispoOrderShow({
         }
         return initial;
     });
+
+    const [customHeaderChoiceValues, setCustomHeaderChoiceValues] = useState<
+        Record<string, ChoiceValue>
+    >(() => {
+        const entries = initChoiceEntriesMap(
+            editableCustomChoiceFields,
+            headerValues,
+        );
+        const initial: Record<string, ChoiceValue> = {};
+        for (const [key, entry] of Object.entries(entries)) {
+            initial[key] = entry.value;
+        }
+        return initial;
+    });
+    const [customHeaderChoiceTouched, setCustomHeaderChoiceTouched] = useState<
+        Record<string, true>
+    >({});
+    const [customHeaderChoiceMeta, setCustomHeaderChoiceMeta] = useState<
+        Record<string, ChoiceMeta>
+    >(() => {
+        const entries = initChoiceEntriesMap(
+            editableCustomChoiceFields,
+            headerValues,
+        );
+        const meta: Record<string, ChoiceMeta> = {};
+        for (const [key, entry] of Object.entries(entries)) {
+            meta[key] = {
+                initPayloadSafe: entry.initPayloadSafe,
+                issue: entry.issue,
+            };
+        }
+        return meta;
+    });
+
     const [positionCustomValues, setPositionCustomValues] = useState<
         Record<number, Record<string, string>>
     >(() => {
         const initial: Record<number, Record<string, string>> = {};
         for (const position of order.positions) {
             const stored = position.dynamic_field_values ?? {};
+            const textFields =
+                positionFieldViews[position.id]?.editableText ??
+                textFieldsFromCustomBucket(
+                    positionFieldBucket(fieldSchema, position.id)
+                        .editable_custom_fields,
+                );
             const row: Record<string, string> = {};
-            for (const field of editablePositionCustomFields) {
+            for (const field of textFields) {
                 const raw = stored[field.key];
                 row[field.key] =
                     typeof raw === 'string' || typeof raw === 'number'
@@ -310,6 +385,60 @@ export default function DispoOrderShow({
         }
         return initial;
     });
+
+    const [positionChoiceValues, setPositionChoiceValues] = useState<
+        Record<number, Record<string, ChoiceValue>>
+    >(() => {
+        const initial: Record<number, Record<string, ChoiceValue>> = {};
+        for (const position of order.positions) {
+            const choiceFields =
+                positionFieldViews[position.id]?.editableChoice ??
+                choiceFieldsFromCustomBucket(
+                    positionFieldBucket(fieldSchema, position.id)
+                        .editable_custom_fields,
+                );
+            const entries = initChoiceEntriesMap(
+                choiceFields,
+                position.dynamic_field_values ?? {},
+            );
+            const row: Record<string, ChoiceValue> = {};
+            for (const [key, entry] of Object.entries(entries)) {
+                row[key] = entry.value;
+            }
+            initial[position.id] = row;
+        }
+        return initial;
+    });
+    const [positionChoiceTouched, setPositionChoiceTouched] = useState<
+        Record<number, Record<string, true>>
+    >({});
+    const [positionChoiceMeta, setPositionChoiceMeta] = useState<
+        Record<number, Record<string, ChoiceMeta>>
+    >(() => {
+        const initial: Record<number, Record<string, ChoiceMeta>> = {};
+        for (const position of order.positions) {
+            const choiceFields =
+                positionFieldViews[position.id]?.editableChoice ??
+                choiceFieldsFromCustomBucket(
+                    positionFieldBucket(fieldSchema, position.id)
+                        .editable_custom_fields,
+                );
+            const entries = initChoiceEntriesMap(
+                choiceFields,
+                position.dynamic_field_values ?? {},
+            );
+            const meta: Record<string, ChoiceMeta> = {};
+            for (const [key, entry] of Object.entries(entries)) {
+                meta[key] = {
+                    initPayloadSafe: entry.initPayloadSafe,
+                    issue: entry.issue,
+                };
+            }
+            initial[position.id] = meta;
+        }
+        return initial;
+    });
+
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
     const [savingPositionCustoms, setSavingPositionCustoms] = useState(false);
@@ -356,6 +485,19 @@ export default function DispoOrderShow({
         headerCaptured.campaign_period === true,
     );
 
+    function applyLockConflict(response: HttpExceptionResponse): boolean {
+        if (response.status !== 409) {
+            return false;
+        }
+
+        setFieldErrors({
+            lock_version:
+                conflictMessage(response.data) ?? LOCK_CONFLICT_FALLBACK,
+        });
+
+        return true;
+    }
+
     function saveSystemNotes() {
         if (savingNotes) {
             return;
@@ -374,6 +516,14 @@ export default function DispoOrderShow({
             },
             {
                 preserveScroll: true,
+                onHttpException: (response: HttpExceptionResponse) => {
+                    if (!applyLockConflict(response)) {
+                        return;
+                    }
+                    setSavingNotes(false);
+
+                    return false;
+                },
                 onError: (errors) => {
                     setFieldErrors(errors);
                 },
@@ -389,21 +539,51 @@ export default function DispoOrderShow({
             return;
         }
 
+        const choiceResult = choiceValuesForPayload(
+            editableCustomChoiceFields,
+            customHeaderChoiceValues,
+            new Set(Object.keys(customHeaderChoiceTouched)),
+            customHeaderChoiceMeta,
+        );
+        if (choiceResult.blockReason) {
+            setFieldErrors({
+                dynamic_field_values: choiceResult.blockReason,
+            });
+            return;
+        }
+
+        const dynamicFieldValues: Record<string, string | null | string[]> = {
+            ...Object.fromEntries(
+                editableCustomTextFields.map((field) => [
+                    field.key,
+                    customHeaderValues[field.key] ?? '',
+                ]),
+            ),
+            ...choiceResult.payload,
+        };
+
+        if (Object.keys(dynamicFieldValues).length === 0) {
+            return;
+        }
+
         setSavingNotes(true);
         setFieldErrors({});
         router.patch(
             `/dispoauftraege/${order.id}`,
             {
                 lock_version: order.lock_version,
-                dynamic_field_values: Object.fromEntries(
-                    editableCustomFields.map((field) => [
-                        field.key,
-                        customHeaderValues[field.key] ?? '',
-                    ]),
-                ),
+                dynamic_field_values: dynamicFieldValues,
             },
             {
                 preserveScroll: true,
+                onHttpException: (response: HttpExceptionResponse) => {
+                    if (!applyLockConflict(response)) {
+                        return;
+                    }
+                    setSavingNotes(false);
+
+                    return false;
+                },
                 onError: (errors) => {
                     setFieldErrors(errors);
                 },
@@ -419,17 +599,54 @@ export default function DispoOrderShow({
             return;
         }
 
+        const payload: Record<
+            string,
+            Record<string, string | null | string[]>
+        > = {};
+
+        for (const position of order.positions) {
+            const view = positionFieldViews[position.id];
+            const textFields = view?.editableText ?? [];
+            const choiceFields = view?.editableChoice ?? [];
+
+            if (textFields.length === 0 && choiceFields.length === 0) {
+                continue;
+            }
+
+            const choiceResult = choiceValuesForPayload(
+                choiceFields,
+                positionChoiceValues[position.id] ?? {},
+                new Set(Object.keys(positionChoiceTouched[position.id] ?? {})),
+                positionChoiceMeta[position.id] ?? {},
+            );
+            if (choiceResult.blockReason) {
+                setFieldErrors({
+                    [`position_dynamic_field_values.${position.id}`]:
+                        choiceResult.blockReason,
+                });
+                return;
+            }
+
+            const row: Record<string, string | null | string[]> = {};
+            for (const field of textFields) {
+                row[field.key] =
+                    positionCustomValues[position.id]?.[field.key] ?? '';
+            }
+            Object.assign(row, choiceResult.payload);
+
+            if (Object.keys(row).length === 0) {
+                continue;
+            }
+
+            payload[String(position.id)] = row;
+        }
+
+        if (Object.keys(payload).length === 0) {
+            return;
+        }
+
         setSavingPositionCustoms(true);
         setFieldErrors({});
-        const payload: Record<string, Record<string, string>> = {};
-        for (const position of order.positions) {
-            payload[String(position.id)] = Object.fromEntries(
-                editablePositionCustomFields.map((field) => [
-                    field.key,
-                    positionCustomValues[position.id]?.[field.key] ?? '',
-                ]),
-            );
-        }
         router.patch(
             `/dispoauftraege/${order.id}/positions-angaben`,
             {
@@ -438,6 +655,14 @@ export default function DispoOrderShow({
             },
             {
                 preserveScroll: true,
+                onHttpException: (response: HttpExceptionResponse) => {
+                    if (!applyLockConflict(response)) {
+                        return;
+                    }
+                    setSavingPositionCustoms(false);
+
+                    return false;
+                },
                 onError: (errors) => {
                     setFieldErrors(errors);
                 },
@@ -465,6 +690,13 @@ export default function DispoOrderShow({
             },
         );
     }
+
+    const showHeaderCustomCard =
+        editableCustomTextFields.length > 0 ||
+        editableCustomChoiceFields.length > 0;
+    const showHeaderCalcOrigin =
+        calcOriginCustomTextFields.length > 0 ||
+        calcOriginCustomChoiceFields.length > 0;
 
     return (
         <>
@@ -639,41 +871,43 @@ export default function DispoOrderShow({
                                 helpText={campaignPeriodHelp}
                             />
                         </div>
-                        {calcOriginCustomFields.length > 0 ? (
+                        {showHeaderCalcOrigin ? (
                             <div
-                                className="space-y-3 border-t pt-3"
+                                className="space-y-3 border-t pt-3 sm:col-span-2"
                                 data-test="dispo-order-calc-origin-custom-fields"
                             >
                                 <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-                                    Aus Kalkulation
+                                    Aus Kalkulation übernommen
                                 </p>
-                                <SchemaTextFields
-                                    fields={calcOriginCustomFields}
-                                    values={Object.fromEntries(
-                                        calcOriginCustomFields.map((field) => {
-                                            const raw = headerValues[field.key];
-                                            const captured =
-                                                headerCaptured[field.key] ===
-                                                true;
-                                            if (!captured) {
-                                                return [
+                                {calcOriginCustomTextFields.length > 0 ? (
+                                    <SchemaTextFields
+                                        fields={calcOriginCustomTextFields}
+                                        values={Object.fromEntries(
+                                            calcOriginCustomTextFields.map(
+                                                (field) => [
                                                     field.key,
-                                                    'Nicht erfasst',
-                                                ];
-                                            }
-                                            return [
-                                                field.key,
-                                                typeof raw === 'string' ||
-                                                typeof raw === 'number'
-                                                    ? String(raw)
-                                                    : '',
-                                            ];
-                                        }),
-                                    )}
-                                    readOnly
-                                    idPrefix="dispo-calc-origin"
-                                    onChange={() => undefined}
-                                />
+                                                    textReadOnlyCapturedDisplay(
+                                                        headerValues[field.key],
+                                                        headerCaptured[
+                                                            field.key
+                                                        ] === true,
+                                                    ),
+                                                ],
+                                            ),
+                                        )}
+                                        readOnly
+                                        idPrefix="dispo-calc-origin"
+                                        onChange={() => undefined}
+                                    />
+                                ) : null}
+                                {calcOriginCustomChoiceFields.length > 0 ? (
+                                    <SchemaChoiceReadonlyFields
+                                        fields={calcOriginCustomChoiceFields}
+                                        values={headerValues}
+                                        captured={headerCaptured}
+                                        idPrefix="dispo-calc-origin-choice"
+                                    />
+                                ) : null}
                             </div>
                         ) : null}
                     </CardContent>
@@ -832,8 +1066,7 @@ export default function DispoOrderShow({
                     </CardContent>
                 </Card>
 
-                {editableCustomFields.length > 0 ||
-                Object.keys(customHeaderValues).length > 0 ? (
+                {showHeaderCustomCard ? (
                     <Card
                         className="border-border/70 rounded-xl shadow-xs"
                         data-test="dispo-order-custom-header-card"
@@ -846,21 +1079,68 @@ export default function DispoOrderShow({
                         <CardContent className="space-y-4 px-5 py-4">
                             {canUpdate ? (
                                 <>
-                                    <SchemaTextFields
-                                        fields={editableCustomFields}
-                                        values={customHeaderValues}
-                                        errors={fieldErrors}
-                                        disabled={savingNotes}
-                                        idPrefix="dispo-custom"
-                                        onChange={(key, value) =>
-                                            setCustomHeaderValues(
-                                                (current) => ({
-                                                    ...current,
-                                                    [key]: value,
-                                                }),
-                                            )
-                                        }
-                                    />
+                                    {editableCustomTextFields.length > 0 ? (
+                                        <SchemaTextFields
+                                            fields={editableCustomTextFields}
+                                            values={customHeaderValues}
+                                            errors={fieldErrors}
+                                            disabled={savingNotes}
+                                            idPrefix="dispo-custom"
+                                            onChange={(key, value) =>
+                                                setCustomHeaderValues(
+                                                    (current) => ({
+                                                        ...current,
+                                                        [key]: value,
+                                                    }),
+                                                )
+                                            }
+                                        />
+                                    ) : null}
+                                    {editableCustomChoiceFields.length > 0 ? (
+                                        <div data-test="dispo-order-custom-header-choice-fields">
+                                            <SchemaChoiceFields
+                                                fields={
+                                                    editableCustomChoiceFields
+                                                }
+                                                values={
+                                                    customHeaderChoiceValues
+                                                }
+                                                errors={fieldErrors}
+                                                disabled={savingNotes}
+                                                idPrefix="dispo-custom-choice"
+                                                onChange={(key, value) => {
+                                                    setCustomHeaderChoiceValues(
+                                                        (current) => ({
+                                                            ...current,
+                                                            [key]: value,
+                                                        }),
+                                                    );
+                                                    setCustomHeaderChoiceTouched(
+                                                        (current) => ({
+                                                            ...current,
+                                                            [key]: true,
+                                                        }),
+                                                    );
+                                                    setCustomHeaderChoiceMeta(
+                                                        (current) => ({
+                                                            ...current,
+                                                            [key]: {
+                                                                initPayloadSafe: true,
+                                                                issue: null,
+                                                            },
+                                                        }),
+                                                    );
+                                                }}
+                                            />
+                                        </div>
+                                    ) : null}
+                                    {fieldErrors.dynamic_field_values ||
+                                    fieldErrors.lock_version ? (
+                                        <p className="text-destructive text-xs">
+                                            {fieldErrors.dynamic_field_values ??
+                                                fieldErrors.lock_version}
+                                        </p>
+                                    ) : null}
                                     <Button
                                         type="button"
                                         disabled={savingNotes}
@@ -873,24 +1153,50 @@ export default function DispoOrderShow({
                                     </Button>
                                 </>
                             ) : (
-                                <SchemaTextFields
-                                    fields={editableCustomFields}
-                                    values={Object.fromEntries(
-                                        editableCustomFields.map((field) => {
-                                            const raw = headerValues[field.key];
-                                            return [
-                                                field.key,
-                                                typeof raw === 'string' ||
-                                                typeof raw === 'number'
-                                                    ? String(raw)
-                                                    : '',
-                                            ];
-                                        }),
-                                    )}
-                                    readOnly
-                                    idPrefix="dispo-custom-ro"
-                                    onChange={() => undefined}
-                                />
+                                <>
+                                    {editableCustomTextFields.length > 0 ? (
+                                        <SchemaTextFields
+                                            fields={editableCustomTextFields}
+                                            values={Object.fromEntries(
+                                                editableCustomTextFields.map(
+                                                    (field) => {
+                                                        const raw =
+                                                            headerValues[
+                                                                field.key
+                                                            ];
+                                                        return [
+                                                            field.key,
+                                                            typeof raw ===
+                                                                'string' ||
+                                                            typeof raw ===
+                                                                'number'
+                                                                ? String(raw)
+                                                                : '',
+                                                        ];
+                                                    },
+                                                ),
+                                            )}
+                                            readOnly
+                                            idPrefix="dispo-custom-ro"
+                                            onChange={() => undefined}
+                                        />
+                                    ) : null}
+                                    {editableCustomChoiceFields.length > 0 ? (
+                                        <div data-test="dispo-order-custom-header-choice-fields-ro">
+                                            <SchemaChoiceReadonlyFields
+                                                fields={
+                                                    editableCustomChoiceFields
+                                                }
+                                                values={headerValues}
+                                                captured={nativeChoiceCapturedMap(
+                                                    editableCustomChoiceFields,
+                                                    headerCaptured,
+                                                )}
+                                                idPrefix="dispo-custom-choice-ro"
+                                            />
+                                        </div>
+                                    ) : null}
+                                </>
                             )}
                         </CardContent>
                     </Card>
@@ -982,6 +1288,18 @@ export default function DispoOrderShow({
                                 positionValues.position_flight_period,
                                 flightCaptured,
                             );
+                            const view = positionFieldViews[position.id] ?? {
+                                editableText: [],
+                                editableChoice: [],
+                                calcOriginText: [],
+                                calcOriginChoice: [],
+                            };
+                            const showCalcOrigin =
+                                view.calcOriginText.length > 0 ||
+                                view.calcOriginChoice.length > 0;
+                            const showNative =
+                                view.editableText.length > 0 ||
+                                view.editableChoice.length > 0;
 
                             return (
                                 <section
@@ -1024,57 +1342,53 @@ export default function DispoOrderShow({
                                             </p>
                                         ) : null}
                                     </div>
-                                    {calcOriginPositionCustomFields.length >
-                                    0 ? (
+                                    {showCalcOrigin ? (
                                         <div
                                             className="mt-4 space-y-3"
                                             data-test={`dispo-order-calc-origin-position-fields-${position.id}`}
                                         >
                                             <p className="text-sm font-medium">
-                                                Aus Kalkulation
+                                                Aus Kalkulation übernommen
                                             </p>
-                                            <SchemaTextFields
-                                                fields={
-                                                    calcOriginPositionCustomFields
-                                                }
-                                                values={Object.fromEntries(
-                                                    calcOriginPositionCustomFields.map(
-                                                        (field) => {
-                                                            const raw =
-                                                                positionValues[
-                                                                    field.key
-                                                                ];
-                                                            const captured =
-                                                                positionCaptured[
-                                                                    field.key
-                                                                ] === true;
-                                                            if (!captured) {
-                                                                return [
-                                                                    field.key,
-                                                                    '',
-                                                                ];
-                                                            }
-                                                            return [
+                                            {view.calcOriginText.length > 0 ? (
+                                                <SchemaTextFields
+                                                    fields={view.calcOriginText}
+                                                    values={Object.fromEntries(
+                                                        view.calcOriginText.map(
+                                                            (field) => [
                                                                 field.key,
-                                                                typeof raw ===
-                                                                    'string' ||
-                                                                typeof raw ===
-                                                                    'number'
-                                                                    ? String(
-                                                                          raw,
-                                                                      )
-                                                                    : '',
-                                                            ];
-                                                        },
-                                                    ),
-                                                )}
-                                                readOnly
-                                                idPrefix={`dispo-pos-calc-${position.id}`}
-                                                onChange={() => undefined}
-                                            />
+                                                                textReadOnlyCapturedDisplay(
+                                                                    positionValues[
+                                                                        field
+                                                                            .key
+                                                                    ],
+                                                                    positionCaptured[
+                                                                        field
+                                                                            .key
+                                                                    ] === true,
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    )}
+                                                    readOnly
+                                                    idPrefix={`dispo-pos-calc-${position.id}`}
+                                                    onChange={() => undefined}
+                                                />
+                                            ) : null}
+                                            {view.calcOriginChoice.length >
+                                            0 ? (
+                                                <SchemaChoiceReadonlyFields
+                                                    fields={
+                                                        view.calcOriginChoice
+                                                    }
+                                                    values={positionValues}
+                                                    captured={positionCaptured}
+                                                    idPrefix={`dispo-pos-calc-choice-${position.id}`}
+                                                />
+                                            ) : null}
                                         </div>
                                     ) : null}
-                                    {editablePositionCustomFields.length > 0 ? (
+                                    {showNative ? (
                                         <div
                                             className="mt-4 space-y-3"
                                             data-test={`dispo-order-native-position-fields-${position.id}`}
@@ -1083,52 +1397,171 @@ export default function DispoOrderShow({
                                                 Weitere Angaben
                                             </p>
                                             {canUpdate ? (
-                                                <SchemaTextFields
-                                                    fields={
-                                                        editablePositionCustomFields
-                                                    }
-                                                    values={
-                                                        positionCustomValues[
-                                                            position.id
-                                                        ] ?? {}
-                                                    }
-                                                    errors={fieldErrors}
-                                                    errorKeyPrefixes={[
-                                                        `position_dynamic_field_values.${position.id}`,
-                                                    ]}
-                                                    disabled={
-                                                        savingPositionCustoms
-                                                    }
-                                                    idPrefix={`dispo-pos-custom-${position.id}`}
-                                                    onChange={(key, value) =>
-                                                        setPositionCustomValues(
-                                                            (current) => ({
-                                                                ...current,
-                                                                [position.id]: {
-                                                                    ...current[
+                                                <>
+                                                    {view.editableText.length >
+                                                    0 ? (
+                                                        <SchemaTextFields
+                                                            fields={
+                                                                view.editableText
+                                                            }
+                                                            values={
+                                                                positionCustomValues[
+                                                                    position.id
+                                                                ] ?? {}
+                                                            }
+                                                            errors={fieldErrors}
+                                                            errorKeyPrefixes={[
+                                                                `position_dynamic_field_values.${position.id}`,
+                                                            ]}
+                                                            disabled={
+                                                                savingPositionCustoms
+                                                            }
+                                                            idPrefix={`dispo-pos-custom-${position.id}`}
+                                                            onChange={(
+                                                                key,
+                                                                value,
+                                                            ) =>
+                                                                setPositionCustomValues(
+                                                                    (
+                                                                        current,
+                                                                    ) => ({
+                                                                        ...current,
+                                                                        [position.id]:
+                                                                            {
+                                                                                ...current[
+                                                                                    position
+                                                                                        .id
+                                                                                ],
+                                                                                [key]: value,
+                                                                            },
+                                                                    }),
+                                                                )
+                                                            }
+                                                        />
+                                                    ) : null}
+                                                    {view.editableChoice
+                                                        .length > 0 ? (
+                                                        <div
+                                                            data-test={`dispo-order-native-position-choice-fields-${position.id}`}
+                                                        >
+                                                            <SchemaChoiceFields
+                                                                fields={
+                                                                    view.editableChoice
+                                                                }
+                                                                values={
+                                                                    positionChoiceValues[
                                                                         position
                                                                             .id
-                                                                    ],
-                                                                    [key]: value,
-                                                                },
-                                                            }),
-                                                        )
-                                                    }
-                                                />
+                                                                    ] ?? {}
+                                                                }
+                                                                errors={
+                                                                    fieldErrors
+                                                                }
+                                                                errorKeyPrefixes={[
+                                                                    `position_dynamic_field_values.${position.id}`,
+                                                                ]}
+                                                                disabled={
+                                                                    savingPositionCustoms
+                                                                }
+                                                                idPrefix={`dispo-pos-custom-choice-${position.id}`}
+                                                                onChange={(
+                                                                    key,
+                                                                    value,
+                                                                ) => {
+                                                                    setPositionChoiceValues(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [position.id]:
+                                                                                {
+                                                                                    ...current[
+                                                                                        position
+                                                                                            .id
+                                                                                    ],
+                                                                                    [key]: value,
+                                                                                },
+                                                                        }),
+                                                                    );
+                                                                    setPositionChoiceTouched(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [position.id]:
+                                                                                {
+                                                                                    ...current[
+                                                                                        position
+                                                                                            .id
+                                                                                    ],
+                                                                                    [key]: true,
+                                                                                },
+                                                                        }),
+                                                                    );
+                                                                    setPositionChoiceMeta(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [position.id]:
+                                                                                {
+                                                                                    ...current[
+                                                                                        position
+                                                                                            .id
+                                                                                    ],
+                                                                                    [key]: {
+                                                                                        initPayloadSafe: true,
+                                                                                        issue: null,
+                                                                                    },
+                                                                                },
+                                                                        }),
+                                                                    );
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : null}
+                                                </>
                                             ) : (
-                                                <SchemaTextFields
-                                                    fields={
-                                                        editablePositionCustomFields
-                                                    }
-                                                    values={
-                                                        positionCustomValues[
-                                                            position.id
-                                                        ] ?? {}
-                                                    }
-                                                    readOnly
-                                                    idPrefix={`dispo-pos-custom-${position.id}`}
-                                                    onChange={() => undefined}
-                                                />
+                                                <>
+                                                    {view.editableText.length >
+                                                    0 ? (
+                                                        <SchemaTextFields
+                                                            fields={
+                                                                view.editableText
+                                                            }
+                                                            values={
+                                                                positionCustomValues[
+                                                                    position.id
+                                                                ] ?? {}
+                                                            }
+                                                            readOnly
+                                                            idPrefix={`dispo-pos-custom-${position.id}`}
+                                                            onChange={() =>
+                                                                undefined
+                                                            }
+                                                        />
+                                                    ) : null}
+                                                    {view.editableChoice
+                                                        .length > 0 ? (
+                                                        <div
+                                                            data-test={`dispo-order-native-position-choice-fields-ro-${position.id}`}
+                                                        >
+                                                            <SchemaChoiceReadonlyFields
+                                                                fields={
+                                                                    view.editableChoice
+                                                                }
+                                                                values={
+                                                                    positionValues
+                                                                }
+                                                                captured={nativeChoiceCapturedMap(
+                                                                    view.editableChoice,
+                                                                    positionCaptured,
+                                                                )}
+                                                                idPrefix={`dispo-pos-custom-choice-ro-${position.id}`}
+                                                            />
+                                                        </div>
+                                                    ) : null}
+                                                </>
                                             )}
                                         </div>
                                     ) : null}
@@ -1177,24 +1610,83 @@ export default function DispoOrderShow({
                                 </section>
                             );
                         })}
-                        {canUpdate &&
-                        editablePositionCustomFields.length > 0 ? (
-                            <Button
-                                type="button"
-                                disabled={savingPositionCustoms}
-                                data-test="dispo-order-save-position-customs"
-                                onClick={savePositionCustoms}
-                            >
-                                {savingPositionCustoms
-                                    ? 'Wird gespeichert…'
-                                    : 'Positionsangaben speichern'}
-                            </Button>
+                        {canUpdate && anyPositionHasEditableCustoms ? (
+                            <>
+                                {fieldErrors.lock_version ? (
+                                    <p className="text-destructive text-xs">
+                                        {fieldErrors.lock_version}
+                                    </p>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    disabled={savingPositionCustoms}
+                                    data-test="dispo-order-save-position-customs"
+                                    onClick={savePositionCustoms}
+                                >
+                                    {savingPositionCustoms
+                                        ? 'Wird gespeichert…'
+                                        : 'Positionsangaben speichern'}
+                                </Button>
+                            </>
                         ) : null}
                     </CardContent>
                 </Card>
             </div>
         </>
     );
+}
+
+function positionFieldBucket(
+    fieldSchema: FieldSchema,
+    positionId: number,
+): {
+    editable_custom_fields: SchemaField[];
+    calc_origin_custom_fields: SchemaField[];
+} {
+    const schemas = fieldSchema.position_field_schemas;
+    if (!schemas) {
+        return {
+            editable_custom_fields: [],
+            calc_origin_custom_fields: [],
+        };
+    }
+
+    const bucket = schemas[positionId] ?? schemas[String(positionId)];
+
+    return {
+        editable_custom_fields: bucket?.editable_custom_fields ?? [],
+        calc_origin_custom_fields: bucket?.calc_origin_custom_fields ?? [],
+    };
+}
+
+function nativeChoiceCapturedMap(
+    fields: SchemaChoiceField[],
+    captured: Record<string, boolean>,
+): Record<string, boolean> {
+    const result: Record<string, boolean> = {};
+    for (const field of fields) {
+        result[field.key] = captured[field.key] === true;
+    }
+
+    return result;
+}
+
+function conflictMessage(
+    data: string | Record<string, unknown>,
+): string | null {
+    let payload: unknown = data;
+
+    if (typeof payload === 'string') {
+        try {
+            payload = JSON.parse(payload);
+        } catch {
+            return null;
+        }
+    }
+
+    const message = (payload as { message?: unknown } | null)?.message;
+
+    return typeof message === 'string' && message !== '' ? message : null;
 }
 
 function fieldLabel(

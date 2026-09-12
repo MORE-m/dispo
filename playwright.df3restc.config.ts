@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * DF-3-REST-C isolierte E2E-Suite (Calc Choice-UI C2).
+ * DF-3-REST-C isolierte E2E-Suite (Choice-UI C2/C3).
  * Eigene SQLite-DB, Port 8014 — nicht in der Hauptsuite.
  */
 const e2eDb = path.resolve(

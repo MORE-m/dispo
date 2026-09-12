@@ -12,7 +12,10 @@ export async function login(page: Page, email: string) {
     );
 }
 
-export async function openOrCreateDraft(page: Page, fieldSetPathSegment: string) {
+export async function openOrCreateDraft(
+    page: Page,
+    fieldSetPathSegment: string,
+) {
     await page.goto(`/administration/dynamische-felder/feldsets`);
     await page
         .getByRole('link', { name: fieldSetPathSegment, exact: true })
@@ -28,9 +31,11 @@ export async function openOrCreateDraft(page: Page, fieldSetPathSegment: string)
     } else {
         await createDraft.click();
     }
-    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeVisible({
-        timeout: 15_000,
-    });
+    await expect(page.locator('[data-test="fieldset-draft-save"]')).toBeVisible(
+        {
+            timeout: 15_000,
+        },
+    );
 }
 
 export async function activateCurrentDraft(page: Page) {
@@ -77,11 +82,12 @@ export async function createChoiceDefinition(
     fieldType: 'select' | 'multi_select',
     scope: 'header' | 'position',
     options: Array<{ key: string; label: string }>,
+    appliesTo: 'calculation' | 'dispo_order' | 'both' = 'calculation',
 ) {
     await page.goto('/administration/dynamische-felder/definitionen/neu');
     await page.locator('#label').fill(label);
     await page.locator('#key').fill(key);
-    await page.locator('#applies_to').selectOption('calculation');
+    await page.locator('#applies_to').selectOption(appliesTo);
     await page.locator('#scope').selectOption(scope);
     await page
         .locator('[data-test="custom-field-type-select"]')
@@ -90,7 +96,9 @@ export async function createChoiceDefinition(
     await expect(page).toHaveURL(/definitionen\/\d+$/, { timeout: 15_000 });
 
     for (let i = 0; i < options.length; i++) {
-        await page.locator('[data-test="field-definition-options-add"]').click();
+        await page
+            .locator('[data-test="field-definition-options-add"]')
+            .click();
     }
     const labelInputs = page.locator(
         '[data-test^="field-definition-option-label-"]',
@@ -195,17 +203,12 @@ export async function e2eSetFieldVisible(
     visible: boolean,
     positionId?: number,
 ) {
-    const result = await csrfJson(
-        page,
-        'POST',
-        '/e2e/snapshot-field-visible',
-        {
-            calculation_id: calculationId,
-            field_key: fieldKey,
-            visible,
-            ...(positionId != null ? { position_id: positionId } : {}),
-        },
-    );
+    const result = await csrfJson(page, 'POST', '/e2e/snapshot-field-visible', {
+        calculation_id: calculationId,
+        field_key: fieldKey,
+        visible,
+        ...(positionId != null ? { position_id: positionId } : {}),
+    });
     expect(result.status).toBe(200);
 }
 
@@ -257,4 +260,144 @@ export function calculationIdFromUrl(url: string): number {
     const match = url.match(/kalkulationen\/(\d+)/);
     expect(match?.[1]).toBeTruthy();
     return Number(match![1]);
+}
+
+export function dispoOrderIdFromUrl(url: string): number {
+    const match = url.match(/dispoauftraege\/(\d+)/);
+    expect(match?.[1]).toBeTruthy();
+    return Number(match![1]);
+}
+
+export async function createDispoFromCurrentCalc(page: Page) {
+    await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+    await expect(
+        page.locator('[data-test="dispo-order-create-open"]'),
+    ).toBeVisible({ timeout: 20_000 });
+    await page.locator('[data-test="dispo-order-create-open"]').click();
+    await expect(
+        page.locator('[data-test="dispo-order-create-dialog"]'),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.locator('[data-test="dispo-order-submit"]').click();
+    await expect(page).toHaveURL(/dispoauftraege\/\d+/, { timeout: 30_000 });
+}
+
+export async function e2eDispoSetOptionActive(
+    page: Page,
+    dispoOrderId: number,
+    fieldKey: string,
+    optionKey: string,
+    isActive: boolean,
+    dispoOrderPositionId?: number,
+) {
+    const result = await csrfJson(
+        page,
+        'POST',
+        '/e2e/snapshot-choice-option-active',
+        {
+            dispo_order_id: dispoOrderId,
+            field_key: fieldKey,
+            option_key: optionKey,
+            is_active: isActive,
+            ...(dispoOrderPositionId != null
+                ? { dispo_order_position_id: dispoOrderPositionId }
+                : {}),
+        },
+    );
+    expect(result.status).toBe(200);
+}
+
+export async function e2eDispoChoiceValue(
+    page: Page,
+    dispoOrderId: number,
+    fieldKey: string,
+    dispoOrderPositionId?: number,
+) {
+    const query = new URLSearchParams({
+        dispo_order_id: String(dispoOrderId),
+        field_key: fieldKey,
+        ...(dispoOrderPositionId != null
+            ? { dispo_order_position_id: String(dispoOrderPositionId) }
+            : {}),
+    });
+    const result = await csrfJson(
+        page,
+        'GET',
+        `/e2e/dispo-choice-value?${query.toString()}`,
+    );
+    expect(result.status).toBe(200);
+    return result.data as { value_json: unknown; exists: boolean };
+}
+
+export async function e2eDispoPositions(page: Page, dispoOrderId: number) {
+    const result = await csrfJson(
+        page,
+        'GET',
+        `/e2e/dispo-positions?dispo_order_id=${dispoOrderId}`,
+    );
+    expect(result.status).toBe(200);
+    const data = result.data as {
+        lock_version?: number;
+        positions: Array<{
+            id: number;
+            calculation_position_id: number | null;
+            effective_configuration_snapshot_id: number | null;
+        }>;
+    };
+
+    return data;
+}
+
+export async function e2eDispoReplaceChoiceOptions(
+    page: Page,
+    dispoOrderId: number,
+    dispoOrderPositionId: number,
+    fieldKey: string,
+    options: Array<{
+        key: string;
+        label: string;
+        sort: number;
+        is_active: boolean;
+    }>,
+) {
+    const result = await csrfJson(
+        page,
+        'POST',
+        '/e2e/dispo-snapshot-choice-options',
+        {
+            dispo_order_id: dispoOrderId,
+            dispo_order_position_id: dispoOrderPositionId,
+            field_key: fieldKey,
+            options,
+        },
+    );
+    expect(result.status).toBe(200);
+}
+
+export async function e2eDispoSetFieldVisible(
+    page: Page,
+    dispoOrderId: number,
+    fieldKey: string,
+    visible: boolean,
+    dispoOrderPositionId?: number,
+) {
+    const result = await csrfJson(page, 'POST', '/e2e/snapshot-field-visible', {
+        dispo_order_id: dispoOrderId,
+        field_key: fieldKey,
+        visible,
+        ...(dispoOrderPositionId != null
+            ? { dispo_order_position_id: dispoOrderPositionId }
+            : {}),
+    });
+    expect(result.status).toBe(200);
+}
+
+export async function fillTwoCalcSpots(page: Page) {
+    await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+    await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
+    await expect(page.getByText('Werbeelement 2')).toBeVisible({
+        timeout: 15_000,
+    });
+    await page.locator('[data-test="range-spots-0-0"]').fill('10');
+    await page.locator('[data-test="range-spots-1-0"]').fill('5');
+    await page.getByRole('button', { name: '3. Konditionen' }).click();
 }

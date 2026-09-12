@@ -491,3 +491,225 @@ export function optionByKey(
 
     return options.find((option) => option.key === key);
 }
+
+export function isTextFieldType(
+    value: string,
+): value is 'short_text' | 'long_text' {
+    return value === 'short_text' || value === 'long_text';
+}
+
+/**
+ * Text-Customs aus einem bereits gefilterten Custom-Bucket (Header oder Position).
+ */
+export function textFieldsFromCustomBucket(fields: SchemaSourceField[]): Array<{
+    key: string;
+    label: string;
+    help_text?: string | null;
+    field_type: string;
+    sort?: number;
+    max_length?: number | null;
+    required?: boolean;
+}> {
+    return fields
+        .filter((field) => isTextFieldType(field.field_type))
+        .map((field) => ({
+            key: field.key,
+            label: field.label,
+            help_text: field.help_text,
+            field_type: field.field_type,
+            sort: field.sort,
+            max_length:
+                typeof (field as { max_length?: unknown }).max_length ===
+                'number'
+                    ? ((field as { max_length?: number }).max_length ?? null)
+                    : null,
+            required: field.required === true,
+        }));
+}
+
+/**
+ * Choice-Customs aus einem bereits gefilterten Custom-Bucket.
+ */
+export function choiceFieldsFromCustomBucket(
+    fields: SchemaSourceField[],
+): SchemaChoiceField[] {
+    return fields
+        .filter((field) => isChoiceFieldType(field.field_type))
+        .map((field) => {
+            const parsed = parseOptionsJson(field.options_json);
+            const fieldType = field.field_type as ChoiceFieldType;
+
+            return {
+                key: field.key,
+                label: field.label,
+                help_text: field.help_text,
+                field_type: fieldType,
+                sort: field.sort,
+                required: field.required === true,
+                visible: field.visible !== false,
+                options_json: parsed.options,
+            } satisfies SchemaChoiceField;
+        });
+}
+
+/**
+ * Multi-Anzeige: Reihenfolge nach Freeze-options_json.sort, Tie-Breaker Key.
+ * Speicherung bleibt C1-kanonisch (lexikographisch nach Key).
+ */
+export function sortMultiKeysForDisplay(
+    keys: readonly string[],
+    options: ChoiceOption[] | null,
+): string[] {
+    const unique = [...new Set(keys.filter((key) => key !== ''))];
+    if (!options || options.length === 0) {
+        return [...unique].sort((a, b) => a.localeCompare(b));
+    }
+
+    const byKey = new Map(options.map((option) => [option.key, option]));
+
+    return unique.sort((a, b) => {
+        const left = byKey.get(a);
+        const right = byKey.get(b);
+        const leftSort = left?.sort ?? Number.MAX_SAFE_INTEGER;
+        const rightSort = right?.sort ?? Number.MAX_SAFE_INTEGER;
+        if (leftSort !== rightSort) {
+            return leftSort - rightSort;
+        }
+
+        return a.localeCompare(b);
+    });
+}
+
+export type ChoiceReadOnlyDisplay =
+    | { kind: 'uncaptured'; text: 'Nicht erfasst' }
+    | { kind: 'empty'; text: '–' }
+    | {
+          kind: 'select';
+          label: string;
+          inactive: boolean;
+      }
+    | {
+          kind: 'multi';
+          items: Array<{ key: string; label: string; inactive: boolean }>;
+      }
+    | { kind: 'integrity'; message: string };
+
+/**
+ * Calc-Origin-/Read-only-Darstellung für Choice (keine Controls).
+ */
+export function choiceReadOnlyDisplay(
+    field: SchemaChoiceField,
+    raw: unknown,
+    captured: boolean,
+): ChoiceReadOnlyDisplay {
+    if (!captured) {
+        return { kind: 'uncaptured', text: 'Nicht erfasst' };
+    }
+
+    const optionsIssue = parseOptionsJson(field.options_json).issue;
+    if (optionsIssue !== null) {
+        return {
+            kind: 'integrity',
+            message: choiceSchemaIssueMessage(optionsIssue),
+        };
+    }
+    if (field.options_json === null) {
+        return {
+            kind: 'integrity',
+            message: choiceSchemaIssueMessage('missing_options'),
+        };
+    }
+
+    if (field.field_type === 'select') {
+        if (raw === null || raw === undefined || raw === '') {
+            return { kind: 'empty', text: '–' };
+        }
+        if (typeof raw !== 'string') {
+            return {
+                kind: 'integrity',
+                message: choiceSchemaIssueMessage('invalid_value_type'),
+            };
+        }
+        const option = optionByKey(field.options_json, raw);
+        if (!option) {
+            return {
+                kind: 'integrity',
+                message: choiceSchemaIssueMessage('unknown_stored_key'),
+            };
+        }
+
+        return {
+            kind: 'select',
+            label: option.label,
+            inactive: !option.is_active,
+        };
+    }
+
+    if (raw === null || raw === undefined) {
+        return { kind: 'empty', text: '–' };
+    }
+    if (!Array.isArray(raw) || !raw.every((item) => typeof item === 'string')) {
+        return {
+            kind: 'integrity',
+            message: choiceSchemaIssueMessage('invalid_value_type'),
+        };
+    }
+    if (raw.length === 0) {
+        return { kind: 'empty', text: '–' };
+    }
+    if (raw.length !== new Set(raw).size) {
+        return {
+            kind: 'integrity',
+            message: choiceSchemaIssueMessage('invalid_value_type'),
+        };
+    }
+    if (raw.length > MULTI_SELECT_MAX) {
+        return {
+            kind: 'integrity',
+            message: choiceSchemaIssueMessage('multi_over_limit'),
+        };
+    }
+
+    const ordered = sortMultiKeysForDisplay(raw, field.options_json);
+    const items: Array<{ key: string; label: string; inactive: boolean }> = [];
+
+    for (const key of ordered) {
+        const option = optionByKey(field.options_json, key);
+        if (!option) {
+            return {
+                kind: 'integrity',
+                message: choiceSchemaIssueMessage('unknown_stored_key'),
+            };
+        }
+        items.push({
+            key,
+            label: option.label,
+            inactive: !option.is_active,
+        });
+    }
+
+    return { kind: 'multi', items };
+}
+
+/**
+ * Text-Calc-Origin: captured=false → „Nicht erfasst“, sonst Leerwert „–“.
+ */
+export function textReadOnlyCapturedDisplay(
+    raw: unknown,
+    captured: boolean,
+): string {
+    if (!captured) {
+        return 'Nicht erfasst';
+    }
+
+    if (raw === null || raw === undefined) {
+        return '–';
+    }
+    if (typeof raw === 'string' || typeof raw === 'number') {
+        const text = String(raw).trim();
+
+        return text === '' ? '–' : String(raw);
+    }
+
+    return '–';
+}

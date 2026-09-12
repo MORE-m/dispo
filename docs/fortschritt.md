@@ -1,7 +1,7 @@
 # Fortschritt V1
 
-Stand: 12. September 2026 (DF-3-REST-C2 Calc Choice-UI vollständig umgesetzt
-und geprüft – kein Abschluss von ADV-001 / DF-3; Dispo-Choice-UI C3 offen)
+Stand: 12. September 2026 (DF-3-REST-C3 Dispo Choice-UI umgesetzt – kein
+Abschluss von ADV-001 / DF-3; Regelmatrix und Regel-Editor offen)
 
 ## Aktuelle Phase
 
@@ -14,9 +14,10 @@ sowie **DF-3-REST-A (Options-Fundament)** über PR #38 auf `main`
 (`769d48554140cdd79d525b5cd4330db9699dd797`) und **DF-3-REST-C1
 (Choice-Wertmodell)** über PR #40 auf `main`
 (`60c1abe0b7e009fef3ace47f2e157627e9aa4419`).
-**DF-3-REST-C2** (sichtbare Select-/Multi-Select-UI im Kalkulationswizard) ist
-vollständig umgesetzt und geprüft. Dispo-Choice-UI (**C3**) ist noch nicht
-begonnen. Gesamtziel DF-3 bleibt offen (Regelmatrix, Regel-Editor).
+**DF-3-REST-C2** (sichtbare Select-/Multi-Select-UI im Kalkulationswizard) und
+**DF-3-REST-C3** (sichtbare Dispo-Choice-UI inkl. positionsbezogener Schema-Props
+und Calc-Origin-Darstellung) sind umgesetzt. Gesamtziel DF-3 bleibt offen
+(Regelmatrix, Regel-Editor).
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
@@ -28,26 +29,42 @@ bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster geplanter Slice: **DF-3-REST-C3** (sichtbare Dispo-Choice-UI,
-Calc→Dispo-Übernahme/Provenance in der Oberfläche). Parallel Regel-Fundament/
-Editor und weitere ADV-001-Defaults.
+Nächster geplanter Slice: Regel-Fundament / Regel-Editor sowie weitere
+ADV-001-Defaults. DF-3 bleibt unvollständig, solange Regelmatrix und
+Regel-Editor fehlen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-REST-C2 sichtbare Select-/Multi-Select-UI im Kalkulationswizard: zentrale
-`schema-choice-fields`-Komponenten (Radix Select, Checkbox-Liste mit lokaler
-Suche ab 10 Optionen, Inactive-Kennzeichnung, Limit 50), Wizard-State/Partial-
-Save gemäß C1-Vertrag (Select `string|null`, Multi kanonisches `string[]`),
-Vitest, Featuretests Props/Payload, isolierte Playwright-Suite Port 8014.
-Keine Dispo-UI, keine C1-Vertragsänderung.
+DF-3-REST-C3 sichtbare Dispo-Choice-UI: positionsbezogene
+`position_field_schemas` je Effektiv-Snapshot, Native Select/Multi mit
+C2-Komponenten (Freeze-`options_json`, touched-only, Inactive, Limit 50),
+Calc-Origin read-only unter „Aus Kalkulation übernommen“, 409-Lock-Hinweis.
+Vitest, Featuretests, Concurrency, REST-C Playwright Port 8014. Keine
+Migration, keine C1-/C2-Vertragsänderung.
 
-Davor auf `main`: DF-3-REST-C1 (PR #40), REST-B (PR #39), REST-A (PR #38).
+Davor: DF-3-REST-C2 Calc Choice-UI; auf `main` C1 (PR #40), REST-B (#39),
+REST-A (#38), C2 (PR #44).
+
+## DF-3-REST-C3 – Dispo Choice-UI (September 2026)
+
+Sichtbare Select-/Multi-Select-Felder im Dispoauftrag (Header und Positionen)
+gegen eingefrorenes `options_json`, inkl. Calc-Origin-Provenance. Positions-
+Schema je Dispoposition (kein First-wins über Effektiv-Snapshots).
+
+| Teil | Status |
+|------|--------|
+| `position_field_schemas` je Position | **umgesetzt** |
+| Native Select/Multi Header+Position | **umgesetzt** |
+| Touched-only Partial-Save | **umgesetzt** |
+| Calc-Origin read-only + Provenance | **umgesetzt** |
+| REST-C E2E Port 8014 erweitert | **umgesetzt** |
+| Regelmatrix / Regel-Editor | **nicht** |
 
 ## DF-3-REST-C2 – Calc Choice-UI (September 2026)
 
 Sichtbare Select-/Multi-Select-Felder im Kalkulationswizard (Header und
 Positionen) ausschließlich gegen Freeze-`options_json` und gespeicherte
-C1-Werte. Keine Live-Options, keine Dispo-UI.
+C1-Werte. Keine Live-Options.
 
 | Kriterium | Status |
 |---|---|
@@ -59,7 +76,7 @@ C1-Werte. Keine Live-Options, keine Dispo-UI.
 | Vitest + Featuretests Props/Payload | **umgesetzt** |
 | Playwright isoliert Port 8014 (`playwright.df3restc.config.ts`) | **umgesetzt** |
 | CI: isolierte REST-B- und REST-C-Suites in `tests.yml` | **umgesetzt** |
-| Dispo-Choice-UI (C3) | **nicht** |
+| Dispo-Choice-UI (C3) | **umgesetzt (C3)** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 ## DF-3-REST-C1 – Choice-Wertmodell / Persistenz (September 2026)
@@ -73,7 +90,7 @@ Serverseitige Select-/Multi-Select-Runtime. **Auf `main` gemergt (PR #40).**
 | Calc/Dispo Persistenz, Export, Copy, Completeness | **umgesetzt** |
 | Schema-Props inkl. `options_json` | **umgesetzt** |
 | Sichtbare Calc-UI (C2) | **umgesetzt (C2)** |
-| Sichtbare Dispo-UI (C3) | **nicht** |
+| Sichtbare Dispo-UI (C3) | **umgesetzt (C3)** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 Leer-/XOR-Vertrag: Select leer = `null`; Multi leer = `[]`; Choice nur in
@@ -99,7 +116,7 @@ read-only Preview-DTO-Erweiterung am Writer. Keine Migration. Keine Runtime.
 | Choice-Typen anlegen/ändern (vor Nutzung) | **umgesetzt (PR #39)** |
 | Options-Sektion auf Definitions-Detail | **umgesetzt (PR #39)** |
 | Preview/Apply + 409/422 DE + No-op | **umgesetzt (PR #39)** |
-| Select-/Multi-Select-Runtime (`value_json`) | **C1 auf main (PR #40); Calc-UI = C2 umgesetzt; Dispo-UI = C3 offen** |
+| Select-/Multi-Select-Runtime (`value_json`) | **C1–C3 umgesetzt (Calc- und Dispo-UI)** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 ## DF-3-REST-A – Options-Fundament (September 2026)
@@ -116,7 +133,7 @@ Slice. **Auf `main` gemergt (PR #38).**
 | Desired-State-Writer inkl. No-op / Deaktivierung statt Delete | **umgesetzt** |
 | Gen3 additives Options-Freeze + Fingerprint | **umgesetzt** |
 | Options-Admin-UI | **umgesetzt in PR #39 (REST-B)** |
-| Calc-Dispo-Runtime | **C1 auf main (PR #40); Calc-UI C2 umgesetzt; Dispo-UI C3 offen** |
+| Calc-Dispo-Runtime | **C1–C3 umgesetzt (Calc- und Dispo-Choice-UI)** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 
 
@@ -407,9 +424,8 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- Dispo Select-/Multi-Select-UI (C3), volle Regelmatrix, Regel-Editor
-  (DF-3-REST-A/B/C1 auf main; C2 Calc-UI umgesetzt und geprüft;
-  Slice-Reihenfolge weiter: C3 → Regeln)
+- Volle Regelmatrix, Regel-Editor
+  (DF-3-REST-A/B/C1–C3 Choice-Fundament und Choice-UI umgesetzt)
 - ADV-001 Rest: Kategorie-Defaults
 - Inventar-/Preislisten-/Kombinations-Admin
 - ADV-001 Defaults parallel möglich
@@ -509,18 +525,18 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c4b / DF-3-REST-A / REST-B / C1 / C2
+## Bewusst offen nach ADV-001c4b / DF-3-REST-A / REST-B / C1 / C2 / C3
 
 - ADV-001c4a/c4b: Methodenoptions-/Freeze + sichtbare Wizard-Auswahl (umgesetzt)
 - DF-3-REST-A: Options-Fundament (auf `main`, PR #38)
 - DF-3-REST-B: Options-Admin-UI (auf `main`, PR #39)
 - DF-3-REST-C1: Choice-Wertmodell (auf `main`, PR #40)
-- DF-3-REST-C2: Calc Choice-UI vollständig umgesetzt und geprüft
-- DF-3-REST-C3: Dispo-Choice-UI noch nicht begonnen
+- DF-3-REST-C2: Calc Choice-UI (auf `main`, PR #44)
+- DF-3-REST-C3: Dispo Choice-UI umgesetzt (positionsbezogene Schema-Props)
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
-- Sichtbare Dispo-Choice-UI (C3), Regelmatrix, Regel-Editor
+- Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices
