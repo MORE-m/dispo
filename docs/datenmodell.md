@@ -299,7 +299,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 
 | Tabelle | Rolle |
 |---|---|
-| `field_definitions` | stabile Feldidentität (`key`, Typ, Scope, `current_revision_id`) |
+| `field_definitions` | stabile Feldidentität (`key`, Typ, Scope, `current_revision_id`); Scope liegt nur hier (kein Override in `field_set_version_fields`); bei unbenutzten Custom-Feldern strukturell zwischen `header`/`position` änderbar, danach fest (neue Definition nötig); historische Snapshots unverändert |
 | `field_definition_revisions` | unveränderliche Revisionszeilen (Label, Hilfe, Reportflag) |
 | `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version`; DF-3.3-fs: `is_system`, `applies_to`, `is_assignable` (Cores: system + nicht assignierbar; freie Sets: Draft→Activate, Deakt./Reakt.) |
 | `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |

@@ -144,7 +144,7 @@ final class FieldDefinitionCustomWriter
 
             if ($this->isUsed($locked)) {
                 throw ValidationException::withMessages([
-                    'definition' => 'Diese Definition wird bereits verwendet. Bitte eine neue Revision anlegen.',
+                    'definition' => 'Diese Felddefinition wird bereits verwendet. Feldtyp, Bereich und Geltung können nicht mehr geändert werden. Lege dafür eine neue Felddefinition an.',
                 ]);
             }
 

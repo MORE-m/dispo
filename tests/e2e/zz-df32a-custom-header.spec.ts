@@ -128,6 +128,49 @@ async function addCustomFieldToDraft(
     }
 }
 
+test('DF-3.2a Admin: unbenutztes Custom-Feld Scope Kopfbereich → Position', async ({
+    page,
+}) => {
+    test.setTimeout(90_000);
+
+    const stamp = Date.now();
+    const label = `E2E Scope Edit ${stamp}`;
+    const key = `e2e_scope_edit_${stamp}`;
+
+    await login(page, 'admin@example.com');
+
+    await page.goto('/administration/dynamische-felder/definitionen/neu');
+    await page.locator('#label').fill(label);
+    await page.locator('#key').fill(key);
+    await page.locator('[data-test="custom-field-scope-select"]').selectOption(
+        'header',
+    );
+    await page.locator('#applies_to').selectOption('both');
+    await page.locator('[data-test="custom-field-definition-submit"]').click();
+    await expect(page).toHaveURL(/definitionen\/\d+/, { timeout: 15_000 });
+
+    const scopeSelect = page.locator('[data-test="structural-scope-select"]');
+    await expect(scopeSelect).toBeVisible({ timeout: 15_000 });
+    await expect(scopeSelect).toHaveValue('header');
+    await scopeSelect.selectOption('position');
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/definitionen/') &&
+                response.request().method() === 'PUT' &&
+                response.ok(),
+        ),
+        page.getByRole('button', { name: 'Speichern' }).click(),
+    ]);
+    await page.reload();
+    await expect(
+        page.locator('[data-test="structural-scope-select"]'),
+    ).toHaveValue('position', { timeout: 15_000 });
+    await expect(page.getByText(/Scope position/i)).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('SQLSTATE');
+    await expect(page.locator('body')).not.toContainText('Stack trace');
+});
+
 test('DF-3.2a Custom-Header: Admin → Calc Pflicht → Dispo Capture read-only', async ({
     page,
 }) => {
