@@ -197,42 +197,6 @@ export function emptyChoiceValue(fieldType: ChoiceFieldType): ChoiceValue {
     return fieldType === 'multi_select' ? [] : null;
 }
 
-/**
- * Gespeicherten Serverwert typstreng initialisieren (keine Coercion aus falschen Typen).
- */
-export function initChoiceValueFromStored(
-    fieldType: ChoiceFieldType,
-    raw: unknown,
-): { value: ChoiceValue; issue: ChoiceSchemaIssue | null } {
-    if (fieldType === 'select') {
-        if (raw === null || raw === undefined || raw === '') {
-            return { value: null, issue: null };
-        }
-        if (typeof raw !== 'string') {
-            return { value: null, issue: 'invalid_value_type' };
-        }
-
-        return { value: raw, issue: null };
-    }
-
-    if (raw === null || raw === undefined) {
-        return { value: [], issue: null };
-    }
-    if (!Array.isArray(raw)) {
-        return { value: [], issue: 'invalid_value_type' };
-    }
-    if (!raw.every((item) => typeof item === 'string')) {
-        return { value: [], issue: 'invalid_value_type' };
-    }
-
-    const canonical = canonicalizeMultiKeys(raw);
-    if (canonical.length > MULTI_SELECT_MAX) {
-        return { value: canonical, issue: 'multi_over_limit' };
-    }
-
-    return { value: canonical, issue: null };
-}
-
 export function diagnoseChoiceField(
     field: SchemaChoiceField,
     value: ChoiceValue,
@@ -268,6 +232,9 @@ export function diagnoseChoiceField(
     if (!value.every((item) => typeof item === 'string')) {
         return 'invalid_value_type';
     }
+    if (value.length !== new Set(value).size) {
+        return 'invalid_value_type';
+    }
     if (value.length > MULTI_SELECT_MAX) {
         return 'multi_over_limit';
     }
@@ -276,6 +243,194 @@ export function diagnoseChoiceField(
     }
 
     return null;
+}
+
+/**
+ * Gespeicherten Serverwert typstreng initialisieren (keine Coercion aus falschen Typen).
+ * Bei Typfehlern: leerer Anzeigewert + initPayloadSafe=false (niemals als Clear senden).
+ */
+export function initChoiceValueFromStored(
+    fieldType: ChoiceFieldType,
+    raw: unknown,
+): {
+    value: ChoiceValue;
+    issue: ChoiceSchemaIssue | null;
+    initPayloadSafe: boolean;
+} {
+    if (fieldType === 'select') {
+        if (raw === null || raw === undefined || raw === '') {
+            return { value: null, issue: null, initPayloadSafe: true };
+        }
+        if (typeof raw !== 'string') {
+            return {
+                value: null,
+                issue: 'invalid_value_type',
+                initPayloadSafe: false,
+            };
+        }
+
+        return { value: raw, issue: null, initPayloadSafe: true };
+    }
+
+    if (raw === null || raw === undefined) {
+        return { value: [], issue: null, initPayloadSafe: true };
+    }
+    if (!Array.isArray(raw)) {
+        return {
+            value: [],
+            issue: 'invalid_value_type',
+            initPayloadSafe: false,
+        };
+    }
+    if (!raw.every((item) => typeof item === 'string')) {
+        return {
+            value: [],
+            issue: 'invalid_value_type',
+            initPayloadSafe: false,
+        };
+    }
+
+    const asStrings = raw as string[];
+    if (asStrings.length !== new Set(asStrings).size) {
+        // Beschädigte Serverdaten: keine stille Deduplizierung.
+        return {
+            value: [...asStrings],
+            issue: 'invalid_value_type',
+            initPayloadSafe: false,
+        };
+    }
+
+    const canonical = canonicalizeMultiKeys(asStrings);
+    if (canonical.length > MULTI_SELECT_MAX) {
+        return {
+            value: canonical,
+            issue: 'multi_over_limit',
+            initPayloadSafe: false,
+        };
+    }
+
+    return { value: canonical, issue: null, initPayloadSafe: true };
+}
+
+export type ChoiceFieldEntry = {
+    value: ChoiceValue;
+    issue: ChoiceSchemaIssue | null;
+    /** false: Key darf unberührt nicht im Payload erscheinen (Datenverlust-Schutz). */
+    initPayloadSafe: boolean;
+};
+
+/**
+ * Init-Map für alle Choice-Felder eines Schemas (sichtbar und unsichtbar).
+ */
+export function initChoiceEntriesMap(
+    fields: SchemaChoiceField[],
+    stored: Record<string, unknown> | null | undefined,
+): Record<string, ChoiceFieldEntry> {
+    const initial: Record<string, ChoiceFieldEntry> = {};
+
+    for (const field of fields) {
+        const raw = stored?.[field.key];
+        const initialized = initChoiceValueFromStored(field.field_type, raw);
+        const schemaIssue =
+            initialized.issue ?? diagnoseChoiceField(field, initialized.value);
+        const unsafeInit =
+            initialized.initPayloadSafe === false ||
+            schemaIssue === 'missing_options' ||
+            schemaIssue === 'invalid_options' ||
+            schemaIssue === 'duplicate_option_keys' ||
+            schemaIssue === 'invalid_value_type' ||
+            schemaIssue === 'unknown_stored_key' ||
+            schemaIssue === 'multi_over_limit';
+
+        initial[field.key] = {
+            value: initialized.value,
+            issue: schemaIssue,
+            initPayloadSafe: !unsafeInit,
+        };
+    }
+
+    return initial;
+}
+
+/**
+ * Abwärtskompatibel: nur Werte (ohne Meta).
+ */
+export function initChoiceValuesMap(
+    fields: SchemaChoiceField[],
+    stored: Record<string, unknown> | null | undefined,
+): Record<string, ChoiceValue> {
+    const entries = initChoiceEntriesMap(fields, stored);
+    const initial: Record<string, ChoiceValue> = {};
+    for (const [key, entry] of Object.entries(entries)) {
+        initial[key] = entry.value;
+    }
+
+    return initial;
+}
+
+/**
+ * C1-Partial-Save: unberührte Keys weglassen (Keep).
+ * Nur touched Keys senden; Integrity ohne gültige Nutzerkorrektur blockiert Save.
+ */
+export function choiceValuesForPayload(
+    fields: SchemaChoiceField[],
+    values: Record<string, ChoiceValue>,
+    touchedKeys: ReadonlySet<string>,
+    initMeta: Record<
+        string,
+        Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+    > = {},
+): {
+    payload: Record<string, string | null | string[]>;
+    blockReason: string | null;
+} {
+    const payload: Record<string, string | null | string[]> = {};
+    let blockReason: string | null = null;
+
+    for (const field of fields) {
+        if (!touchedKeys.has(field.key)) {
+            continue;
+        }
+
+        const current = values[field.key];
+        const meta = initMeta[field.key];
+        const issue = diagnoseChoiceField(
+            field,
+            current ?? emptyChoiceValue(field.field_type),
+        );
+
+        if (
+            issue === 'missing_options' ||
+            issue === 'invalid_options' ||
+            issue === 'duplicate_option_keys' ||
+            issue === 'invalid_value_type' ||
+            issue === 'unknown_stored_key' ||
+            issue === 'multi_over_limit'
+        ) {
+            blockReason =
+                blockReason ??
+                `${field.label}: ${choiceSchemaIssueMessage(issue)}`;
+            continue;
+        }
+
+        if (meta && meta.initPayloadSafe === false && issue !== null) {
+            blockReason =
+                blockReason ??
+                `${field.label}: ${choiceSchemaIssueMessage(meta.issue ?? issue)}`;
+            continue;
+        }
+
+        if (field.field_type === 'select') {
+            payload[field.key] =
+                typeof current === 'string' && current !== '' ? current : null;
+        } else {
+            payload[field.key] = Array.isArray(current)
+                ? canonicalizeMultiKeys(current)
+                : [];
+        }
+    }
+
+    return { payload, blockReason };
 }
 
 export function choiceSchemaIssueMessage(issue: ChoiceSchemaIssue): string {
@@ -335,48 +490,4 @@ export function optionByKey(
     }
 
     return options.find((option) => option.key === key);
-}
-
-/**
- * Init-Map für alle Choice-Felder eines Schemas (sichtbar und unsichtbar).
- */
-export function initChoiceValuesMap(
-    fields: SchemaChoiceField[],
-    stored: Record<string, unknown> | null | undefined,
-): Record<string, ChoiceValue> {
-    const initial: Record<string, ChoiceValue> = {};
-
-    for (const field of fields) {
-        const raw = stored?.[field.key];
-        initial[field.key] = initChoiceValueFromStored(
-            field.field_type,
-            raw,
-        ).value;
-    }
-
-    return initial;
-}
-
-/**
- * Payload-Einträge nur für Choice-Keys (explizit null / []).
- */
-export function choiceValuesForPayload(
-    fields: SchemaChoiceField[],
-    values: Record<string, ChoiceValue>,
-): Record<string, string | null | string[]> {
-    const payload: Record<string, string | null | string[]> = {};
-
-    for (const field of fields) {
-        const current = values[field.key];
-        if (field.field_type === 'select') {
-            payload[field.key] =
-                typeof current === 'string' && current !== '' ? current : null;
-        } else {
-            payload[field.key] = Array.isArray(current)
-                ? canonicalizeMultiKeys(current)
-                : [];
-        }
-    }
-
-    return payload;
 }

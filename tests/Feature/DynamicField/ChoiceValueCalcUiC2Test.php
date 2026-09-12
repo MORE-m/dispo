@@ -307,6 +307,66 @@ class ChoiceValueCalcUiC2Test extends TestCase
         $this->assertSame(['opt_a'], $multiRow->value_json);
     }
 
+    public function test_c2_untouched_choice_keys_omitted_keep_historical_inactive(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->activateChoiceOnCore(
+            $admin,
+            FieldType::Select,
+            FieldScope::Header,
+            FieldAppliesTo::Calculation,
+            [
+                ['key' => 'opt_a', 'label' => 'A', 'sort' => 1],
+                ['key' => 'opt_old', 'label' => 'Alt', 'sort' => 2],
+            ],
+            calc: true,
+            dispo: false,
+        );
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $catalog = $this->createSpotClassicCatalog();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'agency_name' => 'Agentur',
+            'campaign' => 'Kampagne',
+            'product_title' => 'Produkt',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => [
+                $definition->key => 'opt_old',
+            ],
+            'positions' => [$this->positionPayload($catalog)],
+        ]), $user);
+
+        SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->update([
+                'options_json' => json_encode([
+                    ['key' => 'opt_a', 'label' => 'A', 'sort' => 1, 'is_active' => true],
+                    ['key' => 'opt_old', 'label' => 'Alt', 'sort' => 2, 'is_active' => false],
+                ], JSON_THROW_ON_ERROR),
+            ]);
+
+        // C2-UI: unberührtes Choice-Feld → Key fehlt im Payload (Keep).
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        unset($payload['dynamic_field_values'][$definition->key]);
+        $payload['customer_name'] = 'Nur Stammdaten';
+        $writer->update($calculation->fresh(), $payload, $user);
+
+        $snapDef = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $row = CalculationFieldValue::query()
+            ->where('calculation_id', $calculation->id)
+            ->where('snapshot_field_definition_id', $snapDef->id)
+            ->firstOrFail();
+        $this->assertSame('opt_old', $row->value_json);
+    }
+
     public function test_invalid_choice_payload_maps_422_to_field_key(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();

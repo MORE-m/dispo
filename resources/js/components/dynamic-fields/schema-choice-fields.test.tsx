@@ -1,7 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SchemaChoiceFields } from '@/components/dynamic-fields/schema-choice-fields';
-import type { SchemaChoiceField } from '@/lib/choice-field-values';
+import {
+    CHOICE_SEARCH_MIN_OPTIONS,
+    SELECT_CLEAR_VALUE,
+    type SchemaChoiceField,
+} from '@/lib/choice-field-values';
 
 afterEach(() => {
     cleanup();
@@ -148,24 +152,40 @@ describe('SchemaChoiceFields', () => {
         expect(screen.queryByTestId('calc-choice-hidden_select')).toBeNull();
     });
 
-    it('shows integrity notice for missing options without auto-clearing', () => {
-        const broken: SchemaChoiceField = {
-            ...selectField,
-            options_json: null,
-        };
+    it('shows inactive selected multi as removable and unselected inactive disabled', () => {
         const onChange = vi.fn();
-        render(
+        const { rerender } = render(
             <SchemaChoiceFields
-                fields={[broken]}
-                values={{ hdr_select: 'opt_a' }}
+                fields={[multiField]}
+                values={{ hdr_multi: ['opt_old'] }}
                 onChange={onChange}
                 idPrefix="calc-choice"
             />,
         );
 
         expect(
-            screen.getByTestId('calc-choice-hdr_select-integrity'),
+            screen.getByTestId('calc-choice-hdr_multi-inactive-badge-opt_old'),
         ).toBeTruthy();
-        expect(onChange).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByTestId('calc-choice-hdr_multi-check-opt_old'));
+        expect(onChange).toHaveBeenCalledWith('hdr_multi', []);
+
+        rerender(
+            <SchemaChoiceFields
+                fields={[multiField]}
+                values={{ hdr_multi: [] }}
+                onChange={onChange}
+                idPrefix="calc-choice"
+            />,
+        );
+        expect(
+            screen
+                .getByTestId('calc-choice-hdr_multi-check-opt_old')
+                .getAttribute('disabled'),
+        ).not.toBeNull();
+    });
+
+    it('exposes search threshold constant at 10 options', () => {
+        expect(CHOICE_SEARCH_MIN_OPTIONS).toBe(10);
+        expect(SELECT_CLEAR_VALUE.startsWith('__dispo_choice_')).toBe(true);
     });
 });

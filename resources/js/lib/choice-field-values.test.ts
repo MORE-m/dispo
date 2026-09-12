@@ -63,21 +63,33 @@ describe('choice-field-values select', () => {
         expect(initChoiceValueFromStored('select', 'opt_a')).toEqual({
             value: 'opt_a',
             issue: null,
+            initPayloadSafe: true,
         });
         expect(initChoiceValueFromStored('select', null)).toEqual({
             value: null,
             issue: null,
+            initPayloadSafe: true,
         });
         expect(initChoiceValueFromStored('select', ['opt_a']).issue).toBe(
             'invalid_value_type',
         );
+        expect(
+            initChoiceValueFromStored('select', ['opt_a']).initPayloadSafe,
+        ).toBe(false);
     });
 
-    it('marks required without blocking empty draft payload', () => {
+    it('marks required without blocking empty draft payload when touched', () => {
         expect(selectField.required).toBe(true);
         expect(
-            choiceValuesForPayload([selectField], { hdr_select: null }),
-        ).toEqual({ hdr_select: null });
+            choiceValuesForPayload(
+                [selectField],
+                { hdr_select: null },
+                new Set(['hdr_select']),
+            ),
+        ).toEqual({
+            payload: { hdr_select: null },
+            blockReason: null,
+        });
     });
 });
 
@@ -110,24 +122,71 @@ describe('choice-field-values multi', () => {
         expect(initChoiceValueFromStored('multi_select', keys).issue).toBe(
             'multi_over_limit',
         );
+        expect(
+            initChoiceValueFromStored('multi_select', keys).initPayloadSafe,
+        ).toBe(false);
     });
 
-    it('sends explicit empty array and omits nothing when field listed', () => {
+    it('sends explicit empty array only when touched; omits untouched keys', () => {
         expect(
-            choiceValuesForPayload([multiField], { hdr_multi: [] }),
-        ).toEqual({ hdr_multi: [] });
+            choiceValuesForPayload(
+                [multiField],
+                { hdr_multi: [] },
+                new Set(['hdr_multi']),
+            ),
+        ).toEqual({
+            payload: { hdr_multi: [] },
+            blockReason: null,
+        });
         expect(
-            choiceValuesForPayload([multiField], {
-                hdr_multi: ['opt_b', 'opt_a'],
-            }),
-        ).toEqual({ hdr_multi: ['opt_a', 'opt_b'] });
-        expect(choiceValuesForPayload([], { hdr_multi: [] })).toEqual({});
+            choiceValuesForPayload(
+                [multiField],
+                { hdr_multi: ['opt_b', 'opt_a'] },
+                new Set(),
+            ),
+        ).toEqual({ payload: {}, blockReason: null });
+        expect(
+            choiceValuesForPayload(
+                [multiField],
+                {
+                    hdr_multi: ['opt_b', 'opt_a'],
+                },
+                new Set(['hdr_multi']),
+            ),
+        ).toEqual({
+            payload: { hdr_multi: ['opt_a', 'opt_b'] },
+            blockReason: null,
+        });
     });
 
-    it('rejects wrong stored types for multi', () => {
-        expect(initChoiceValueFromStored('multi_select', 'opt_a').issue).toBe(
-            'invalid_value_type',
+    it('rejects wrong stored types for multi without treating as clear', () => {
+        const init = initChoiceValueFromStored('multi_select', 'opt_a');
+        expect(init.issue).toBe('invalid_value_type');
+        expect(init.initPayloadSafe).toBe(false);
+    });
+
+    it('does not silently dedupe damaged multi server rows', () => {
+        const init = initChoiceValueFromStored('multi_select', [
+            'opt_a',
+            'opt_a',
+        ]);
+        expect(init.issue).toBe('invalid_value_type');
+        expect(init.initPayloadSafe).toBe(false);
+        expect(init.value).toEqual(['opt_a', 'opt_a']);
+    });
+
+    it('blocks touched integrity values instead of sending null/[]', () => {
+        const broken: SchemaChoiceField = {
+            ...selectField,
+            options_json: null,
+        };
+        const result = choiceValuesForPayload(
+            [broken],
+            { hdr_select: null },
+            new Set(['hdr_select']),
         );
+        expect(result.payload).toEqual({});
+        expect(result.blockReason).toMatch(/fehlen eingefrorene Optionen/i);
     });
 
     it('filters local search by label and key without mutating options', () => {

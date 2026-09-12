@@ -39,7 +39,9 @@ import {
 } from '@/components/dynamic-fields/schema-text-fields';
 import {
     choiceValuesForPayload,
+    initChoiceEntriesMap,
     initChoiceValuesMap,
+    type ChoiceFieldEntry,
     type ChoiceValue,
 } from '@/lib/choice-field-values';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
@@ -175,6 +177,11 @@ type PositionDraft = {
     custom_fields: Record<string, string>;
     /** DF-3-REST-C2: Select = string|null, Multi = string[]. */
     custom_choice_fields: Record<string, ChoiceValue>;
+    custom_choice_touched: Record<string, true>;
+    custom_choice_meta: Record<
+        string,
+        Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+    >;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -505,6 +512,8 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             flight_period_end: '',
             custom_fields: {},
             custom_choice_fields: {},
+            custom_choice_touched: {},
+            custom_choice_meta: {},
         };
     }
 
@@ -704,6 +713,27 @@ export default function CalculationWizard({
             calculation?.dynamic_field_values ?? {},
         ),
     );
+    const [customHeaderChoiceTouched, setCustomHeaderChoiceTouched] = useState<
+        Record<string, true>
+    >({});
+    const [customHeaderChoiceMeta, setCustomHeaderChoiceMeta] = useState(() => {
+        const entries = initChoiceEntriesMap(
+            customHeaderChoiceFieldsFromSchema(fieldSchema.fields),
+            calculation?.dynamic_field_values ?? {},
+        );
+        const meta: Record<
+            string,
+            Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+        > = {};
+        for (const [key, entry] of Object.entries(entries)) {
+            meta[key] = {
+                initPayloadSafe: entry.initPayloadSafe,
+                issue: entry.issue,
+            };
+        }
+
+        return meta;
+    });
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -832,6 +862,34 @@ export default function CalculationWizard({
                         ),
                         position.dynamic_field_values ?? {},
                     ),
+                    custom_choice_touched: {},
+                    custom_choice_meta: (() => {
+                        const entries = initChoiceEntriesMap(
+                            customPositionChoiceFieldsFromSchema(
+                                schemaFieldsForPosition(
+                                    {
+                                        field_schema:
+                                            position.field_schema ?? null,
+                                    },
+                                    fieldSchema,
+                                    (fieldSchema.format_version ?? 0) >= 3,
+                                ),
+                            ),
+                            position.dynamic_field_values ?? {},
+                        );
+                        const meta: Record<
+                            string,
+                            Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+                        > = {};
+                        for (const [key, entry] of Object.entries(entries)) {
+                            meta[key] = {
+                                initPayloadSafe: entry.initPayloadSafe,
+                                issue: entry.issue,
+                            };
+                        }
+
+                        return meta;
+                    })(),
                 };
             });
         }
@@ -914,9 +972,16 @@ export default function CalculationWizard({
                         customPositionChoiceFieldsFromSchema(
                             next.fieldSchema.fields,
                         );
-                    const custom_choice_fields: Record<string, ChoiceValue> = {
-                        ...initChoiceValuesMap(nextChoiceFields, {}),
-                    };
+                    const nextEntries = initChoiceEntriesMap(
+                        nextChoiceFields,
+                        {},
+                    );
+                    const custom_choice_fields: Record<string, ChoiceValue> =
+                        {};
+                    const custom_choice_meta: Record<
+                        string,
+                        Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
+                    > = {};
                     for (const field of nextChoiceFields) {
                         if (
                             Object.prototype.hasOwnProperty.call(
@@ -926,6 +991,23 @@ export default function CalculationWizard({
                         ) {
                             custom_choice_fields[field.key] =
                                 position.custom_choice_fields[field.key];
+                            custom_choice_meta[field.key] = position
+                                .custom_choice_meta[field.key] ?? {
+                                initPayloadSafe: true,
+                                issue: null,
+                            };
+                        } else {
+                            custom_choice_fields[field.key] =
+                                nextEntries[field.key]?.value ??
+                                (field.field_type === 'multi_select'
+                                    ? []
+                                    : null);
+                            custom_choice_meta[field.key] = {
+                                initPayloadSafe:
+                                    nextEntries[field.key]?.initPayloadSafe ??
+                                    true,
+                                issue: nextEntries[field.key]?.issue ?? null,
+                            };
                         }
                     }
 
@@ -935,6 +1017,8 @@ export default function CalculationWizard({
                         field_schema: next.fieldSchema,
                         custom_fields,
                         custom_choice_fields,
+                        custom_choice_touched: position.custom_choice_touched,
+                        custom_choice_meta,
                     };
                 }),
             );
@@ -994,7 +1078,9 @@ export default function CalculationWizard({
                 ...choiceValuesForPayload(
                     customHeaderChoiceFields,
                     customHeaderChoiceValues,
-                ),
+                    new Set(Object.keys(customHeaderChoiceTouched)),
+                    customHeaderChoiceMeta,
+                ).payload,
             },
             order_discount_percent: '0',
             order_discounts: payloadDiscounts(orderDiscounts),
@@ -1084,7 +1170,13 @@ export default function CalculationWizard({
                                       ),
                                   ),
                                   position.custom_choice_fields,
-                              ),
+                                  new Set(
+                                      Object.keys(
+                                          position.custom_choice_touched,
+                                      ),
+                                  ),
+                                  position.custom_choice_meta,
+                              ).payload,
                           },
                           plan_rows: ranges.flatMap((range) =>
                               Array.from(
@@ -1116,6 +1208,8 @@ export default function CalculationWizard({
             existingGen3,
             customHeaderValues,
             customHeaderChoiceValues,
+            customHeaderChoiceTouched,
+            customHeaderChoiceMeta,
             fieldSchema,
             orderDiscounts,
             aeEnabled,
@@ -1318,6 +1412,55 @@ export default function CalculationWizard({
                 `Speichern nicht möglich: ${NO_CALCULATION_METHOD_MESSAGE}`,
             );
             return;
+        }
+
+        if (
+            !isBudgetSetup &&
+            positions.some(
+                (position) =>
+                    position.advertising_medium_id > 0 &&
+                    (position.schema_fingerprint === null ||
+                        position.schema_fingerprint === undefined ||
+                        position.schema_fingerprint === '' ||
+                        position.field_schema == null),
+            )
+        ) {
+            setSaveError(
+                'Speichern nicht möglich: Positions-Feldschema wird noch geladen. Bitte kurz warten und erneut speichern.',
+            );
+            return;
+        }
+
+        const headerChoiceBlock = choiceValuesForPayload(
+            customHeaderChoiceFields,
+            customHeaderChoiceValues,
+            new Set(Object.keys(customHeaderChoiceTouched)),
+            customHeaderChoiceMeta,
+        ).blockReason;
+        if (headerChoiceBlock) {
+            setSaveError(`Speichern nicht möglich: ${headerChoiceBlock}`);
+            return;
+        }
+
+        for (const [index, position] of positions.entries()) {
+            const positionBlock = choiceValuesForPayload(
+                customPositionChoiceFieldsFromSchema(
+                    schemaFieldsForPosition(
+                        position,
+                        fieldSchema,
+                        existingGen3,
+                    ),
+                ),
+                position.custom_choice_fields,
+                new Set(Object.keys(position.custom_choice_touched)),
+                position.custom_choice_meta,
+            ).blockReason;
+            if (positionBlock) {
+                setSaveError(
+                    `Speichern nicht möglich (Position ${index + 1}): ${positionBlock}`,
+                );
+                return;
+            }
         }
 
         setBusy(true);
@@ -1527,6 +1670,9 @@ export default function CalculationWizard({
                     flight_period_end: existing?.flight_period_end ?? '',
                     custom_fields: existing?.custom_fields ?? {},
                     custom_choice_fields: existing?.custom_choice_fields ?? {},
+                    custom_choice_touched:
+                        existing?.custom_choice_touched ?? {},
+                    custom_choice_meta: existing?.custom_choice_meta ?? {},
                 };
             }),
         );
@@ -1898,14 +2044,29 @@ export default function CalculationWizard({
                                                     errors={fieldErrors}
                                                     disabled={!canEdit}
                                                     idPrefix="calc-choice"
-                                                    onChange={(key, value) =>
+                                                    onChange={(key, value) => {
                                                         setCustomHeaderChoiceValues(
                                                             (current) => ({
                                                                 ...current,
                                                                 [key]: value,
                                                             }),
-                                                        )
-                                                    }
+                                                        );
+                                                        setCustomHeaderChoiceTouched(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: true,
+                                                            }),
+                                                        );
+                                                        setCustomHeaderChoiceMeta(
+                                                            (current) => ({
+                                                                ...current,
+                                                                [key]: {
+                                                                    initPayloadSafe: true,
+                                                                    issue: null,
+                                                                },
+                                                            }),
+                                                        );
+                                                    }}
                                                 />
                                             </div>
                                         ) : null}
@@ -2537,6 +2698,19 @@ export default function CalculationWizard({
                                                                                         {
                                                                                             ...position.custom_choice_fields,
                                                                                             [key]: value,
+                                                                                        },
+                                                                                    custom_choice_touched:
+                                                                                        {
+                                                                                            ...position.custom_choice_touched,
+                                                                                            [key]: true,
+                                                                                        },
+                                                                                    custom_choice_meta:
+                                                                                        {
+                                                                                            ...position.custom_choice_meta,
+                                                                                            [key]: {
+                                                                                                initPayloadSafe: true,
+                                                                                                issue: null,
+                                                                                            },
                                                                                         },
                                                                                 },
                                                                             )
