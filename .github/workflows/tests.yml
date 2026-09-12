@@ -115,6 +115,12 @@ jobs:
       - name: Browser ADV-001c4b isolated tests
         run: npx playwright test -c playwright.adv001c4b.config.ts
 
+      - name: Browser DF-3-REST-B isolated tests
+        run: npx playwright test -c playwright.df3restb.config.ts
+
+      - name: Browser DF-3-REST-C isolated tests
+        run: npx playwright test -c playwright.df3restc.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

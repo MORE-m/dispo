@@ -58,6 +58,7 @@ C1-Werte. Keine Live-Options, keine Dispo-UI.
 | Partial Save: fehlender Key = Keep; `null`/`[]` = bewusst leer | **umgesetzt** |
 | Vitest + Featuretests Props/Payload | **umgesetzt** |
 | Playwright isoliert Port 8014 (`playwright.df3restc.config.ts`) | **umgesetzt** |
+| CI: isolierte REST-B- und REST-C-Suites in `tests.yml` | **umgesetzt** |
 | Dispo-Choice-UI (C3) | **nicht** |
 | Regel-Editor / volle Regelmatrix | **nicht** |
 

@@ -122,9 +122,18 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await waitForCalculationPreview(page);
 
     await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
-    await page.locator('[data-test="position-inventory-1"]').selectOption({
-        label: 'ROCK ANTENNE Hamburg',
-    });
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/kalkulationen/feldschema') &&
+                response.request().method() === 'POST' &&
+                response.ok(),
+            { timeout: 15_000 },
+        ),
+        page.locator('[data-test="position-inventory-1"]').selectOption({
+            label: 'ROCK ANTENNE Hamburg',
+        }),
+    ]);
     await page.locator('[data-test="range-start-1-0"]').selectOption('10');
     await page.locator('[data-test="range-end-1-0"]').selectOption('11');
     await page.locator('[data-test="range-spots-1-0"]').fill('5');
