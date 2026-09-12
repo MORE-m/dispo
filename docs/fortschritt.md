@@ -61,7 +61,9 @@ SQLite/MySQL-Symmetrie). Spaltentyp Laravel `json()` (MySQL `json`, MariaDB
 wie bestehende `options_json` oft `longtext` ohne JSON-Validierungs-CHECK).
 Historisch inaktive Keys nur gegen DB-Vorzustand. Required: Calc-Draft wie Text
 ohne statisches required; Pflicht bei Dispo-Create und Dispo-Submit/Partial-Gates.
-Freeze/`options_json` einzige Optionsquelle.
+Freeze/`options_json` einzige Optionsquelle. Dispo-Create sperrt die
+Kalkulationszeile vor Value-Copy und serialisiert damit gegen parallele
+Calc-Updates (kein gemischter Calc-Zustand im neu erstellten Auftrag).
 
 ## DF-3-REST-B – Options-Admin-UI (September 2026)
 

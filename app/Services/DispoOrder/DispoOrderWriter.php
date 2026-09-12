@@ -146,6 +146,13 @@ final class DispoOrderWriter
         User $user,
         ?DispoOrder $revises = null,
     ): DispoOrderWriterResult {
+        // DF-3-REST-C1: Calc-Zeile zuerst sperren, damit Dispo-Create und
+        // CalculationWriter::update sich serialisieren (kein gemischter Zustand).
+        $calculation = Calculation::query()
+            ->whereKey($calculation->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
         $calculation->loadMissing([
             'advisor',
             'orderDiscounts',

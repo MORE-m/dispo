@@ -555,6 +555,106 @@ class ChoiceValueRuntimeC1Test extends TestCase
         $this->assertSame('opt_a', $row->value_json);
     }
 
+    public function test_freeze_isolation_ignores_live_options_admin_changes(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->activateChoiceOnCore(
+            $admin,
+            FieldType::Select,
+            FieldScope::Header,
+            FieldAppliesTo::Both,
+            [
+                ['key' => 'opt_a', 'label' => 'Label Alt', 'sort' => 1],
+            ],
+        );
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $catalog = $this->createSpotClassicCatalog();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde',
+            'agency_name' => 'Agentur',
+            'campaign' => 'Kampagne',
+            'product_title' => 'Produkt',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => [
+                $definition->key => 'opt_a',
+            ],
+            'positions' => [$this->positionPayload($catalog)],
+        ]), $user);
+
+        $frozen = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $this->assertSame('Label Alt', $frozen->options_json[0]['label'] ?? null);
+        $this->assertTrue((bool) ($frozen->options_json[0]['is_active'] ?? false));
+
+        app(FieldDefinitionOptionsWriter::class)->replace($definition->fresh(), [
+            'lock_version' => $definition->fresh()->lock_version,
+            'options' => [
+                ['key' => 'opt_a', 'label' => 'Label Neu', 'sort' => 1, 'is_active' => false],
+                ['key' => 'opt_b', 'label' => 'Neu B', 'sort' => 2],
+            ],
+        ], $admin);
+        $definition->refresh();
+
+        // Bestehende Calc behält Freeze der alten Revision (Pin unverändert).
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        $payload['dynamic_field_values'][$definition->key] = 'opt_a';
+        $writer->update($calculation->fresh(), $payload, $user);
+
+        $frozenAfter = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $calculation->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $this->assertSame('Label Alt', $frozenAfter->options_json[0]['label'] ?? null);
+        $this->assertTrue((bool) ($frozenAfter->options_json[0]['is_active'] ?? false));
+        $this->assertCount(1, $frozenAfter->options_json);
+
+        $payload = $this->updatePayload($writer, $calculation->fresh());
+        $payload['dynamic_field_values'][$definition->key] = 'opt_b';
+        $this->actingAs($user)
+            ->put(route('calculations.update', $calculation->fresh()), $payload)
+            ->assertSessionHasErrors('dynamic_field_values.'.$definition->key);
+
+        // Neuer Snapshot: Pins auf aktuelle Options-Revision umstecken.
+        $setWriter = app(FieldSetVersionAdminWriter::class);
+        foreach ([AdminFieldSetCatalog::CALCULATION_CORE, AdminFieldSetCatalog::DISPO_ORDER_CORE] as $setKey) {
+            $fieldSet = FieldSet::query()->where('key', $setKey)->firstOrFail();
+            $source = FieldSetVersion::query()->whereKey($fieldSet->active_version_id)->firstOrFail();
+            $draft = $setWriter->createDraftFromVersion($fieldSet, $source, $admin, $fieldSet->lock_version);
+            $fieldSet->refresh();
+            $setWriter->pinCurrentRevisionsOnDraft($fieldSet, $draft, $admin, $fieldSet->lock_version);
+            $fieldSet->refresh();
+            $setWriter->activateDraft($fieldSet, $draft, $admin, $fieldSet->lock_version);
+        }
+        app(ConfigurationSnapshotMaterializer::class)
+            ->materializeFromActiveSet(AdminFieldSetCatalog::CALCULATION_CORE);
+
+        $freshCalc = $writer->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde 2',
+            'agency_name' => 'Agentur',
+            'campaign' => 'Kampagne 2',
+            'product_title' => 'Produkt',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'dynamic_field_values' => [],
+            'positions' => [$this->positionPayload($catalog)],
+        ]), $user);
+        $newFreeze = SnapshotFieldDefinition::query()
+            ->where('configuration_snapshot_id', $freshCalc->configuration_snapshot_id)
+            ->where('key', $definition->key)
+            ->firstOrFail();
+        $keys = array_column($newFreeze->options_json ?? [], 'key');
+        $this->assertSame(['opt_a', 'opt_b'], $keys);
+        $this->assertFalse((bool) ($newFreeze->options_json[0]['is_active'] ?? true));
+        $this->assertSame('Label Neu', $newFreeze->options_json[0]['label'] ?? null);
+    }
+
     public function test_invisible_required_choice_does_not_block_dispo_create(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();

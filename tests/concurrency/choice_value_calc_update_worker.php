@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 /**
  * DF-3-REST-C1: parallele Calc-Updates mit Choice-Werten (lock_version).
+ *
+ * choice_value darf ein Select-Key oder ein JSON-Array (Multi) sein.
  */
 
 use App\Enums\Role;
@@ -18,10 +20,11 @@ $workerId = (int) ($argv[2] ?? -1);
 $calculationId = (int) ($argv[3] ?? 0);
 $lockVersion = (int) ($argv[4] ?? 0);
 $fieldKey = (string) ($argv[5] ?? '');
-$choiceValue = (string) ($argv[6] ?? '');
+$rawValue = (string) ($argv[6] ?? '');
+$readyCount = (int) ($argv[7] ?? 2);
 
-if ($runDir === '' || $workerId < 0 || $calculationId <= 0 || $lockVersion <= 0 || $fieldKey === '' || $choiceValue === '') {
-    fwrite(STDERR, "Usage: choice_value_calc_update_worker.php <run_dir> <worker_id> <calculation_id> <lock_version> <field_key> <choice_value>\n");
+if ($runDir === '' || $workerId < 0 || $calculationId <= 0 || $lockVersion <= 0 || $fieldKey === '' || $rawValue === '') {
+    fwrite(STDERR, "Usage: choice_value_calc_update_worker.php <run_dir> <worker_id> <calculation_id> <lock_version> <field_key> <choice_value_or_json_array> [ready_count]\n");
     exit(1);
 }
 
@@ -39,7 +42,7 @@ $resultFile = $runDir.'/worker-'.$workerId.'.result';
 file_put_contents($readyFile, '1');
 
 $deadline = microtime(true) + 30.0;
-while (count(glob($runDir.'/worker-*.ready')) < 2) {
+while (count(glob($runDir.'/worker-*.ready')) < $readyCount) {
     if (microtime(true) > $deadline) {
         fwrite(STDERR, "Barrier timeout for worker {$workerId}\n");
         exit(2);
@@ -48,6 +51,9 @@ while (count(glob($runDir.'/worker-*.ready')) < 2) {
 }
 
 try {
+    $decoded = json_decode($rawValue, true);
+    $choiceValue = is_array($decoded) ? $decoded : $rawValue;
+
     $user = User::query()->where('role', Role::Sales->value)->firstOrFail();
     $writer = $app->make(CalculationWriter::class);
     $calculation = Calculation::query()->with([
@@ -64,11 +70,15 @@ try {
     $payload['dynamic_field_values'][$fieldKey] = $choiceValue;
 
     $writer->update($calculation, $payload, $user);
-    file_put_contents($resultFile, 'ok:'.$choiceValue);
+    $encoded = is_array($choiceValue)
+        ? json_encode($choiceValue, JSON_THROW_ON_ERROR)
+        : (string) $choiceValue;
+    file_put_contents($resultFile, 'ok:'.$encoded);
     exit(0);
 } catch (ValidationException $exception) {
-    $messages = $exception->errors()['lock_version'] ?? [];
-    file_put_contents($resultFile, 'conflict:'.implode('|', $messages));
+    $messages = $exception->errors()['lock_version'] ?? array_values($exception->errors())[0] ?? [];
+    $prefix = isset($exception->errors()['lock_version']) ? 'conflict:' : 'validation:';
+    file_put_contents($resultFile, $prefix.implode('|', is_array($messages) ? $messages : [(string) $messages]));
     exit(0);
 } catch (Throwable $exception) {
     fwrite(STDERR, $exception->getMessage()."\n");
