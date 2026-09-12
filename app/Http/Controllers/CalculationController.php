@@ -115,7 +115,6 @@ class CalculationController extends Controller
     public function update(CalculationPayloadRequest $request, Calculation $calculation): RedirectResponse
     {
         $this->authorize('update', $calculation);
-        $this->assertE2EForcedChoiceInvalid($request);
 
         /** @var User $user */
         $user = $request->user();
@@ -819,31 +818,5 @@ class CalculationController extends Controller
             'rejection_reason' => $context['rejection_reason'],
             'return_url' => $context['return_url'],
         ];
-    }
-
-    /**
-     * Nur E2E_SERVER: erzwingt eine Feld-422 ohne Freeze-/Fingerprint-Mutation.
-     */
-    private function assertE2EForcedChoiceInvalid(Request $request): void
-    {
-        if (! config('app.e2e_server')) {
-            return;
-        }
-
-        $fieldKey = $request->header('X-E2E-Invalid-Choice-Field')
-            ?? $request->query('e2e_invalid_choice');
-        if (! is_string($fieldKey) || $fieldKey === '') {
-            return;
-        }
-
-        $prefix = $request->header('X-E2E-Invalid-Choice-Prefix')
-            ?? $request->query('e2e_invalid_prefix', 'dynamic_field_values');
-        if (! is_string($prefix) || $prefix === '') {
-            $prefix = 'dynamic_field_values';
-        }
-
-        throw ValidationException::withMessages([
-            "{$prefix}.{$fieldKey}" => 'Die Option ist nicht mehr auswählbar.',
-        ]);
     }
 }

@@ -703,67 +703,62 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             )
             .first();
         await expect(posSelect).toContainText('Pos Beta', { timeout: 20_000 });
-        // Fachliche Touch-Änderung, damit ein echter Save ausgelöst wird.
+        // Touch: gültige Alternativoption, Payload wird nur im Test-XHR manipuliert.
         await posSelect.click();
         await page
             .locator(`[data-test$="-${posSelectKey}-option-pos_alpha"]`)
             .first()
             .click();
 
-        await page.evaluate(
-            ({ calcId, fieldKey }) => {
-                // Prototype-Patch für kontrollierte E2E-Query-Injection; this bleibt am XHR.
-                // oxlint-disable-next-line typescript/unbound-method
-                const originalOpen = XMLHttpRequest.prototype.open;
-                XMLHttpRequest.prototype.open = function (
-                    method: string,
-                    url: string | URL,
-                    async?: boolean,
-                    username?: string | null,
-                    password?: string | null,
-                ) {
-                    let nextUrl = url;
-                    if (
-                        typeof url === 'string' &&
-                        url.includes(`/kalkulationen/${calcId}`)
-                    ) {
-                        const parsed = new URL(url, window.location.origin);
-                        parsed.searchParams.set('e2e_invalid_choice', fieldKey);
-                        parsed.searchParams.set(
-                            'e2e_invalid_prefix',
-                            'positions.0.dynamic_field_values',
-                        );
-                        nextUrl = parsed.toString();
+        // Ausschließlich Testcode: Body-Injection eines unbekannten Keys (gleiche Länge),
+        // damit der echte Choice-Vertrag serverseitig ablehnt — kein produktiver Testschalter.
+        await page.evaluate((fieldKey) => {
+            // oxlint-disable-next-line typescript/unbound-method
+            const originalSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.send = function (
+                body?: Document | XMLHttpRequestBodyInit | null,
+            ) {
+                if (typeof body === 'string' && body.includes(`"${fieldKey}"`)) {
+                    const positionsIdx = body.indexOf('"positions"');
+                    if (positionsIdx >= 0) {
+                        const head = body.slice(0, positionsIdx);
+                        let tail = body.slice(positionsIdx);
+                        for (const from of [
+                            `"${fieldKey}":"pos_alpha"`,
+                            `"${fieldKey}":"pos_beta"`,
+                        ]) {
+                            if (tail.includes(from)) {
+                                // gleiche Länge wie pos_alpha/pos_beta → Content-Length bleibt stimmig
+                                tail = tail.replace(
+                                    from,
+                                    `"${fieldKey}":"ghost_xxx"`,
+                                );
+                                break;
+                            }
+                        }
+                        body = head + tail;
                     }
-                    return originalOpen.call(
-                        this,
-                        method,
-                        nextUrl,
-                        async as boolean,
-                        username,
-                        password,
-                    );
-                };
-            },
-            { calcId, fieldKey: posSelectKey },
-        );
+                }
+                return originalSend.call(this, body);
+            };
+        }, posSelectKey);
 
         const saveResponsePromise = page.waitForResponse(
             (response) =>
                 response.url().includes(`/kalkulationen/${calcId}`) &&
-                response.url().includes('e2e_invalid_choice=') &&
+                !response.url().includes('e2e_invalid') &&
                 ['PUT', 'POST'].includes(response.request().method()) &&
                 response.status() !== 0,
         );
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern' }).click();
         const saveResponse = await saveResponsePromise;
-        // Inertia/Laravel: Validierung kann als 422-JSON oder 303-Back mit Errors kommen.
-        expect([422, 303]).toContain(saveResponse.status());
+        // Inertia-PUT: ValidationException → Redirect zurück, Middleware setzt 303.
+        expect(saveResponse.status()).toBe(303);
         await expect(page).toHaveURL(editUrl);
         await expect(
             page.locator('[data-test="preview-error"]'),
-        ).toContainText(/nicht mehr auswählbar|Speichern nicht möglich/i, {
+        ).toContainText(/unbekannten Optionsschlüssel|nicht mehr auswählbar|Speichern nicht möglich/i, {
             timeout: 15_000,
         });
         await expect(
@@ -779,7 +774,11 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
                 .first(),
         ).toHaveAttribute('aria-invalid', 'true');
         await expect(
-            page.getByText(/nicht mehr auswählbar/i).first(),
+            page
+                .getByText(
+                    /unbekannten Optionsschlüssel|nicht mehr auswählbar/i,
+                )
+                .first(),
         ).toBeVisible({ timeout: 15_000 });
 
         expect(
