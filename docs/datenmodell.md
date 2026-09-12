@@ -456,14 +456,17 @@ Umgesetzt in DF-3-REST-C1:
 - serverseitige Calc-/Dispo-Persistenz, Copy, Completeness; Schema-Props mit
   `options_json`
 
-Konzeptuell vorgesehen, aber **nicht implementiert**:
+Umgesetzt in DF-3-REST-C2 (Calc-UI) und C3 (Dispo-UI):
 
-- sichtbare Dispo Select-/Multi-Select-UI (C3)
-- `SystemFieldSetting`,
-- Regel-Editor / volle Regelmatrix.
+- sichtbare Select-/Multi-Select gegen Freeze-`options_json`
+- Dispo: `position_field_schemas` je Effektiv-Snapshot; Calc-Origin read-only
+  unter „Aus Kalkulation übernommen“; touched-only Partial-Save
 
-Calc Select-/Multi-Select-UI (C2) ist umgesetzt (Freeze-`options_json`, Header/
-Positionen, Partial Save gemäß C1).
+Weiter offen für den DF-3-Abschluss:
+
+- volle Regelmatrix und Regel-Editor
+- Gen4 / weitere Regeloperatoren nach Bedarf
+- `SystemFieldSetting`
 
 **ADV-001b Katalog-Admin** für Oberkategorien und Werbemittel ist umgesetzt
 (Lifecycle, Impact-Preview, kein Hard Delete).

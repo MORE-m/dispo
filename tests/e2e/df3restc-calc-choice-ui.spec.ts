@@ -16,7 +16,7 @@ import {
 /**
  * DF-3-REST-C2 isolierte Calc-Choice-UI-Suite.
  * Nur über playwright.df3restc.config.ts (Port 8014, eigene SQLite).
- * Keine C3-Dispo-Choice-UI.
+ * C3 in df3restc-dispo-choice-ui.spec.ts
  */
 
 test.describe.configure({ mode: 'serial' });

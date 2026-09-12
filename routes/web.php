@@ -212,6 +212,12 @@ if (app()->environment('testing') && config('app.e2e_server')) {
             ->name('e2e.snapshot-field-visible');
         Route::get('calculation-choice-value', [E2EChoiceSnapshotController::class, 'choiceValue'])
             ->name('e2e.calculation-choice-value');
+        Route::get('dispo-choice-value', [E2EChoiceSnapshotController::class, 'dispoChoiceValue'])
+            ->name('e2e.dispo-choice-value');
+        Route::get('dispo-positions', [E2EChoiceSnapshotController::class, 'dispoPositions'])
+            ->name('e2e.dispo-positions');
+        Route::post('dispo-snapshot-choice-options', [E2EChoiceSnapshotController::class, 'replaceDispoChoiceOptions'])
+            ->name('e2e.dispo-snapshot-choice-options');
         Route::get('calculation-positions', [E2EChoiceSnapshotController::class, 'positions'])
             ->name('e2e.calculation-positions');
     });
