@@ -68,9 +68,12 @@ Erster technischer Teilslice von DF-3 – **kein Abschluss von DF-3**.
 Zweiter Teilslice von DF-3 auf Feature-Branch
 `feat/df3-2a-custom-header-text-fields` – **DF-3 bleibt unvollständig**.
 
-- Custom-Definitionen: nur `short_text` / `long_text`, Scope fest `header`,
-  `applies_to` calculation|dispo_order|both; Key aus Label (vor Save
-  editierbar), danach unveränderlich.
+- Custom-Definitionen: `short_text` / `long_text` (sowie Choice ab REST-B),
+  Scope `header` als stabile Eigenschaft von `field_definitions` (bei
+  unbenutzten Custom-Feldern strukturell änderbar auf `position`; nach
+  Verwendung feste Identität – Scope-Wechsel erfordert neue Felddefinition;
+  kein Membership-Override), `applies_to` calculation|dispo_order|both; Key aus
+  Label (vor Save editierbar), danach unveränderlich.
 - `max_length` in `validation_json`: short_text max. 255, long_text max. 20000;
   Speicher Calc/Dispo Header-Text als MEDIUMTEXT bzw. erweiterte String-Spalte.
 - Admin: Index System vs. Eigene Felder; Anlegen; Show mit struktureller
@@ -187,8 +190,12 @@ Teilslice nach ADV-001a – **kein** Abschluss von DF-3. Freie Feldsets haben
 Dritter Teilslice von DF-3 auf Feature-Branch
 `feat/df3-2b-custom-position-text-fields` – **DF-3 bleibt unvollständig**.
 
-- Custom-Definitionen: nur `short_text` / `long_text`, Scope fest `position`,
-  `applies_to` calculation|dispo_order|both (both wie DF-3.2a, PO-32b-4).
+- Custom-Definitionen: `short_text` / `long_text` (sowie Choice ab REST-B),
+  Scope `position` als stabile Eigenschaft von `field_definitions` (bei
+  unbenutzten Custom-Feldern strukturell änderbar auf `header`; nach
+  Verwendung feste Identität – Scope-Wechsel erfordert neue Felddefinition;
+  kein Membership-Override), `applies_to` calculation|dispo_order|both (both wie
+  DF-3.2a, PO-32b-4).
 - Identity: Calc-Sync über Positions-`id`/`client_key`; Dispo-Zuordnung über
   `calculation_position_id`.
 - Provenance Calc-Origin: Quell-Snapshot (`source_configuration_snapshot_id` +

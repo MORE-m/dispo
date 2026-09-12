@@ -456,7 +456,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 | Kriterium | Status |
 |---|---|
-| Custom-Definitionen `short_text` / `long_text`, Scope fest `position` | umgesetzt |
+| Custom-Definitionen `short_text` / `long_text`, Scope `position` (stabil; vor Nutzung editierbar) | umgesetzt |
 | `applies_to` calculation / dispo_order / both (wie DF-3.2a) | umgesetzt |
 | Pflicht-Vollständigkeit nur bei Dispo-Create/Revision aus Calc (PO-32b-1) | umgesetzt |
 | Identity Calc: `id`/`client_key`; Dispo-Position: `calculation_position_id` | umgesetzt |
@@ -469,10 +469,10 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 | Kriterium | Status |
 |---|---|
-| Custom-Definitionen `short_text` / `long_text`, Scope fest `header` | umgesetzt |
+| Custom-Definitionen `short_text` / `long_text`, Scope `header` (stabil; vor Nutzung editierbar) | umgesetzt |
 | `applies_to` calculation / dispo_order / both; Key aus Label (editierbar vor Save) | umgesetzt |
 | `max_length` bis 255 bzw. 20000 (`MEDIUMTEXT` / Dispo-String) | umgesetzt |
-| Admin: Index System vs. Eigene, Anlegen, Show (strukturell/Revision/Lifecycle) | umgesetzt |
+| Admin: Index System vs. Eigene, Anlegen, Show (strukturell inkl. Bereich/Revision/Lifecycle) | umgesetzt |
 | Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt (Position in DF-3.2b) |
 | Runtime: Wizard „Weitere Angaben“, Dispo editierbar + Calc-origin read-only | umgesetzt |
 | DF-3.2b Position-Custom-Felder | **umgesetzt** (auf `main`) |

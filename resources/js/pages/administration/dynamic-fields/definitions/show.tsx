@@ -89,6 +89,7 @@ export default function DefinitionShow({
     const [structural, setStructural] = useState({
         label: current?.label ?? '',
         field_type: definition.field_type,
+        scope: definition.scope,
         applies_to: definition.applies_to,
         help_text: current?.help_text ?? '',
         group_key: current?.group_key ?? '',
@@ -144,6 +145,7 @@ export default function DefinitionShow({
                 lock_version: definition.lock_version,
                 label: structural.label,
                 field_type: structural.field_type,
+                scope: structural.scope,
                 applies_to: structural.applies_to,
                 help_text:
                     structural.help_text.trim() === ''
@@ -300,15 +302,41 @@ export default function DefinitionShow({
                     ) : null}
                 </div>
 
+                {isCustom && definition.is_used ? (
+                    <section
+                        className="max-w-2xl space-y-2 rounded-xl border p-4"
+                        data-test="field-definition-structural-lock-hint"
+                    >
+                        <h2 className="text-base font-semibold">
+                            Strukturell gesperrt
+                        </h2>
+                        <p className="text-muted-foreground text-sm">
+                            Feldtyp, Bereich und Geltung sind nach der ersten
+                            Verwendung fest. Neue Revisionen ändern nur
+                            Darstellung und Validierungsmetadaten.
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                            Für einen Wechsel zwischen Kopfbereich und Position
+                            ist eine neue Felddefinition anzulegen. Befindet
+                            sich das Feld ausschließlich in einem noch nicht
+                            aktivierten Feldset-Entwurf, kann es dort zuerst
+                            entfernt werden; danach darf es wieder strukturell
+                            bearbeitbar werden, sofern keine andere Verwendung
+                            existiert. Historische Snapshots und vorhandene
+                            Werte bleiben dadurch geschützt.
+                        </p>
+                    </section>
+                ) : null}
+
                 {isCustom && !definition.is_used ? (
                     <section className="max-w-xl space-y-4 rounded-xl border p-4">
                         <h2 className="text-base font-semibold">
                             Strukturelle Bearbeitung
                         </h2>
                         <p className="text-muted-foreground text-sm">
-                            Solange das Feld unbenutzt ist, können Typ, Geltung
-                            und Metadaten geändert werden. Der Schlüssel bleibt
-                            fest.
+                            Solange das Feld unbenutzt ist, können Feldtyp,
+                            Bereich, Geltung und Metadaten geändert werden. Der
+                            Feldschlüssel bleibt unveränderlich.
                         </p>
                         <form className="space-y-4" onSubmit={saveStructural}>
                             <FormField
@@ -352,6 +380,27 @@ export default function DefinitionShow({
                                     <option value="multi_select">
                                         multi_select
                                     </option>
+                                </select>
+                            </FormField>
+                            <FormField
+                                label="Bereich"
+                                htmlFor="structural-scope"
+                                error={fieldErrors.scope}
+                            >
+                                <select
+                                    id="structural-scope"
+                                    className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                                    value={structural.scope}
+                                    onChange={(e) =>
+                                        setStructural({
+                                            ...structural,
+                                            scope: e.target.value,
+                                        })
+                                    }
+                                    data-test="structural-scope-select"
+                                >
+                                    <option value="header">Kopfbereich</option>
+                                    <option value="position">Position</option>
                                 </select>
                             </FormField>
                             <FormField
@@ -511,9 +560,10 @@ export default function DefinitionShow({
                 <section className="max-w-xl space-y-4 rounded-xl border p-4">
                     <h2 className="text-base font-semibold">Neue Revision</h2>
                     <p className="text-muted-foreground text-sm">
-                        Schlüssel und Feldtyp bleiben unveränderlich. Neue
-                        Revisionen gelten erst nach Pin in einem Entwurf und
-                        dessen Aktivierung für neue Vorgänge.
+                        Schlüssel, Feldtyp, Bereich und Geltung bleiben
+                        unveränderlich. Neue Revisionen ändern nur Darstellung
+                        und Validierungsmetadaten und gelten erst nach Pin in
+                        einem Entwurf und dessen Aktivierung für neue Vorgänge.
                     </p>
                     <form className="space-y-4" onSubmit={saveRevision}>
                         <FormField
