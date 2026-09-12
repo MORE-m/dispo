@@ -31,7 +31,20 @@ class UpdateDispoOrderDraftRequest extends FormRequest
             'dynamic_field_values' => ['required', 'array'],
         ];
 
-        foreach ($this->editableHeaderTextDefinitions() as $def) {
+        foreach ($this->editableHeaderDefinitions() as $def) {
+            if ($def->field_type === FieldType::MultiSelect) {
+                $rules["dynamic_field_values.{$def->key}"] = ['nullable', 'array'];
+                $rules["dynamic_field_values.{$def->key}.*"] = ['string'];
+
+                continue;
+            }
+
+            if ($def->field_type === FieldType::Select) {
+                $rules["dynamic_field_values.{$def->key}"] = ['nullable', 'string'];
+
+                continue;
+            }
+
             $max = $this->maxLengthForDefinition($def);
             $rules["dynamic_field_values.{$def->key}"] = ['nullable', 'string', "max:{$max}"];
         }
@@ -45,7 +58,10 @@ class UpdateDispoOrderDraftRequest extends FormRequest
     public function messages(): array
     {
         $messages = [];
-        foreach ($this->editableHeaderTextDefinitions() as $def) {
+        foreach ($this->editableHeaderDefinitions() as $def) {
+            if ($def->field_type->isChoice()) {
+                continue;
+            }
             $max = $this->maxLengthForDefinition($def);
             $messages["dynamic_field_values.{$def->key}.max"] =
                 $def->label." darf höchstens {$max} Zeichen haben.";
@@ -63,7 +79,7 @@ class UpdateDispoOrderDraftRequest extends FormRequest
             }
 
             $allowed = [];
-            foreach ($this->editableHeaderTextDefinitions() as $def) {
+            foreach ($this->editableHeaderDefinitions() as $def) {
                 $allowed[$def->key] = true;
             }
 
@@ -88,7 +104,7 @@ class UpdateDispoOrderDraftRequest extends FormRequest
                 );
             }
 
-            foreach ($this->editableHeaderTextDefinitions() as $def) {
+            foreach ($this->editableHeaderDefinitions() as $def) {
                 if (! array_key_exists($def->key, $values)) {
                     continue;
                 }
@@ -96,7 +112,10 @@ class UpdateDispoOrderDraftRequest extends FormRequest
                     continue;
                 }
                 $raw = $values[$def->key];
-                if ($raw === null || $raw === '') {
+                $isEmpty = $def->field_type === FieldType::MultiSelect
+                    ? ($raw === [] || $raw === null)
+                    : ($raw === null || $raw === '');
+                if ($isEmpty) {
                     $validator->errors()->add(
                         "dynamic_field_values.{$def->key}",
                         $def->label.' ist erforderlich.',
@@ -112,23 +131,54 @@ class UpdateDispoOrderDraftRequest extends FormRequest
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, string|list<string>|null>
      */
     public function dynamicFieldValues(): array
     {
         /** @var array<string, mixed> $values */
         $values = $this->input('dynamic_field_values', []);
-        $allowed = [];
-        foreach ($this->editableHeaderTextDefinitions() as $def) {
-            $allowed[$def->key] = true;
+        $defsByKey = [];
+        foreach ($this->editableHeaderDefinitions() as $def) {
+            $defsByKey[$def->key] = $def;
         }
 
-        /** @var array<string, string|null> $filtered */
+        /** @var array<string, string|list<string>|null> $filtered */
         $filtered = [];
         foreach ($values as $key => $value) {
-            if (isset($allowed[(string) $key])) {
-                $filtered[(string) $key] = is_string($value) || $value === null ? $value : (string) $value;
+            $key = (string) $key;
+            $def = $defsByKey[$key] ?? null;
+            if ($def === null) {
+                continue;
             }
+
+            if ($def->field_type === FieldType::MultiSelect) {
+                if ($value === null) {
+                    $filtered[$key] = null;
+                } elseif (is_array($value) && array_is_list($value)) {
+                    $allStrings = true;
+                    foreach ($value as $item) {
+                        if (! is_string($item)) {
+                            $allStrings = false;
+                            break;
+                        }
+                    }
+                    // Nur vollständige String-Listen übernehmen; sonst kein stilles Filtern.
+                    if ($allStrings) {
+                        /** @var list<string> $value */
+                        $filtered[$key] = $value;
+                    }
+                }
+
+                continue;
+            }
+
+            if ($def->field_type === FieldType::Select) {
+                $filtered[$key] = is_string($value) || $value === null ? $value : null;
+
+                continue;
+            }
+
+            $filtered[$key] = is_string($value) || $value === null ? $value : (string) $value;
         }
 
         return $filtered;
@@ -148,7 +198,7 @@ class UpdateDispoOrderDraftRequest extends FormRequest
     /**
      * @return list<SnapshotFieldDefinition>
      */
-    private function editableHeaderTextDefinitions(): array
+    private function editableHeaderDefinitions(): array
     {
         $order = $this->dispoOrder();
         $snapshot = $order?->configurationSnapshot;
@@ -161,7 +211,12 @@ class UpdateDispoOrderDraftRequest extends FormRequest
         $calcKeys = $this->calcOriginKeys($snapshot);
         $editable = [];
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
-            if (! in_array($def->field_type, [FieldType::ShortText, FieldType::LongText], true)) {
+            if (! in_array($def->field_type, [
+                FieldType::ShortText,
+                FieldType::LongText,
+                FieldType::Select,
+                FieldType::MultiSelect,
+            ], true)) {
                 continue;
             }
             if (isset($calcKeys[$def->key])) {

@@ -9,6 +9,7 @@ use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
 use App\Models\SnapshotFieldDefinition;
+use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -124,6 +125,15 @@ final class PositionEffectiveValueRemapper
                 }
             }
 
+            if ($hasValue && $next->field_type->isChoice()) {
+                $violation = $this->choiceRemapViolation($previous, $next, $row);
+                if ($violation !== null) {
+                    $errors[$errorKey] = $violation;
+
+                    continue;
+                }
+            }
+
             // Unsichtbare Felder behalten ihren Wert; Sichtbarkeit ist kein Matchkriterium.
             $updates[] = [$row, (int) $next->id];
         }
@@ -149,6 +159,13 @@ final class PositionEffectiveValueRemapper
         SnapshotFieldDefinition $definition,
         CalculationPositionFieldValue|DispoOrderPositionFieldValue $row,
     ): bool {
+        if ($definition->field_type->isChoice()) {
+            return ChoiceFieldValueContract::isEmpty(
+                $definition->field_type,
+                ChoiceFieldValueContract::readStored($definition, $row),
+            );
+        }
+
         return match ($definition->field_type) {
             FieldType::Boolean => $row->value_boolean === null,
             FieldType::Period => $row->value_period_start === null && $row->value_period_end === null,
@@ -190,5 +207,46 @@ final class PositionEffectiveValueRemapper
 
         return "„{$definition->label}“ überschreitet im neuen Werbemittelkontext die zulässige Länge von "
             .((int) $maxLength).' Zeichen.';
+    }
+
+    private function choiceRemapViolation(
+        SnapshotFieldDefinition $previous,
+        SnapshotFieldDefinition $next,
+        CalculationPositionFieldValue|DispoOrderPositionFieldValue $row,
+    ): ?string {
+        try {
+            $stored = ChoiceFieldValueContract::readStored($previous, $row);
+            $options = ChoiceFieldValueContract::requireFrozenOptions(
+                is_array($next->options_json) ? $next->options_json : null,
+                $next->field_type,
+                $next->key,
+                $next->label,
+            );
+            $byKey = ChoiceFieldValueContract::optionsByKey($options);
+
+            if ($next->field_type === FieldType::Select) {
+                if ($stored === null || $stored === '') {
+                    return null;
+                }
+                if (! is_string($stored) || ! isset($byKey[$stored])) {
+                    return "„{$previous->label}“ kann im neuen Werbemittelkontext nicht übernommen werden.";
+                }
+
+                return null;
+            }
+
+            if (! is_array($stored)) {
+                return "„{$previous->label}“ kann im neuen Werbemittelkontext nicht übernommen werden.";
+            }
+            foreach ($stored as $key) {
+                if (! isset($byKey[$key])) {
+                    return "„{$previous->label}“ kann im neuen Werbemittelkontext nicht übernommen werden.";
+                }
+            }
+
+            return null;
+        } catch (ValidationException|RuntimeException) {
+            return "„{$previous->label}“ kann im neuen Werbemittelkontext nicht übernommen werden.";
+        }
     }
 }

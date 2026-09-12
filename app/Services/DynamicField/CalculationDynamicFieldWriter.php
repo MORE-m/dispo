@@ -10,6 +10,7 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionFieldValue;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
+use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -42,6 +43,8 @@ final class CalculationDynamicFieldWriter
 
         $snapshot->assertReadable();
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
+        $calculation->loadMissing(['fieldValues.snapshotFieldDefinition', 'positions']);
+
         $headerInput = is_array($payload['dynamic_field_values'] ?? null)
             ? $payload['dynamic_field_values']
             : [];
@@ -52,22 +55,29 @@ final class CalculationDynamicFieldWriter
             $headerInput,
             'dynamic_field_values',
         );
-        $headerValues = $this->normalizeScopeValues(
+
+        $previousHeader = $this->storedChoiceValuesByKey(
+            $snapshot,
+            FieldScope::Header,
+            $calculation->fieldValues,
+        );
+        [$headerValues, $headerChoiceDirty] = $this->normalizeScopeValues(
             $snapshot,
             FieldScope::Header,
             $headerInput,
             'dynamic_field_values',
+            $previousHeader,
         );
 
         // Die Position muss vor der Normalisierung feststehen: ab Generation 3
         // bestimmt ihr Effektiv-Snapshot die erlaubten Keys und Regeln.
-        $calculation->loadMissing('positions');
         $byId = $calculation->positions->keyBy('id');
         $byClient = $calculation->positions->keyBy('client_key');
 
         $positionContexts = [];
         foreach (array_values($payload['positions'] ?? []) as $index => $positionPayload) {
             $position = $this->matchPosition($byId, $byClient, $positionPayload, $index);
+            $position->loadMissing('fieldValues.snapshotFieldDefinition');
             $scopeSnapshot = $this->positionScopeSnapshot($position, $snapshot);
 
             $input = is_array($positionPayload['dynamic_field_values'] ?? null)
@@ -78,20 +88,38 @@ final class CalculationDynamicFieldWriter
             }
             $prefix = "positions.{$index}.dynamic_field_values";
             $this->rejectUnknownKeys($scopeSnapshot, FieldScope::Position, $input, $prefix);
+            $previousPosition = $this->storedChoiceValuesByKey(
+                $scopeSnapshot,
+                FieldScope::Position,
+                $position->fieldValues,
+            );
+            [$values, $choiceDirty] = $this->normalizeScopeValues(
+                $scopeSnapshot,
+                FieldScope::Position,
+                $input,
+                $prefix,
+                $previousPosition,
+            );
             $positionContexts[] = [
                 'index' => $index,
                 'position' => $position,
                 'snapshot' => $scopeSnapshot,
-                'values' => $this->normalizeScopeValues($scopeSnapshot, FieldScope::Position, $input, $prefix),
+                'values' => $values,
+                'choice_dirty' => $choiceDirty,
             ];
         }
 
         $this->validateRules($snapshot, $headerValues, $positionContexts);
 
-        $this->persistHeaderValues($calculation, $snapshot, $headerValues);
+        $this->persistHeaderValues($calculation, $snapshot, $headerValues, $headerChoiceDirty);
 
         foreach ($positionContexts as $context) {
-            $this->persistPositionValues($context['position'], $context['snapshot'], $context['values']);
+            $this->persistPositionValues(
+                $context['position'],
+                $context['snapshot'],
+                $context['values'],
+                $context['choice_dirty'],
+            );
         }
     }
 
@@ -271,18 +299,49 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
+     * @param  array<string, string|list<string>|null>  $previousChoice
+     * @return array{0: array<string, mixed>, 1: array<string, true>}
      */
     private function normalizeScopeValues(
         ConfigurationSnapshot $snapshot,
         FieldScope $scope,
         array $input,
         string $errorPrefix,
+        array $previousChoice = [],
     ): array {
         $normalized = [];
+        $choiceDirty = [];
         $errors = [];
 
         foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
+            if ($def->field_type->isChoice()) {
+                if (! array_key_exists($def->key, $input)) {
+                    $normalized[$def->key] = array_key_exists($def->key, $previousChoice)
+                        ? $previousChoice[$def->key]
+                        : ChoiceFieldValueContract::emptyValue($def->field_type);
+
+                    continue;
+                }
+
+                try {
+                    $normalized[$def->key] = ChoiceFieldValueContract::normalizeIncoming(
+                        $def->field_type,
+                        is_array($def->options_json) ? $def->options_json : null,
+                        $input[$def->key],
+                        $previousChoice[$def->key] ?? null,
+                        "{$errorPrefix}.{$def->key}",
+                        $def->label,
+                    );
+                    $choiceDirty[$def->key] = true;
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        $errors[$key] = $messages[0] ?? ($def->label.' ist ungültig.');
+                    }
+                }
+
+                continue;
+            }
+
             $raw = $input[$def->key] ?? null;
 
             if ($def->field_type === FieldType::Period) {
@@ -298,11 +357,7 @@ final class CalculationDynamicFieldWriter
                 FieldType::Boolean => $this->normalizeBoolean($raw, $def->key === 'period_open'),
                 FieldType::Period => $this->normalizePeriod($raw),
                 FieldType::ShortText, FieldType::LongText => $this->normalizeText($raw, $def, $errorPrefix, $errors),
-                FieldType::Select, FieldType::MultiSelect => $this->rejectUnsupportedChoiceType(
-                    $def,
-                    $errorPrefix,
-                    $errors,
-                ),
+                FieldType::Select, FieldType::MultiSelect => null,
             };
         }
 
@@ -310,7 +365,38 @@ final class CalculationDynamicFieldWriter
             throw ValidationException::withMessages($errors);
         }
 
-        return $normalized;
+        return [$normalized, $choiceDirty];
+    }
+
+    /**
+     * @param  iterable<int, CalculationFieldValue|CalculationPositionFieldValue>  $rows
+     * @return array<string, string|list<string>|null>
+     */
+    private function storedChoiceValuesByKey(
+        ConfigurationSnapshot $snapshot,
+        FieldScope $scope,
+        iterable $rows,
+    ): array {
+        $byDefinitionId = [];
+        foreach ($rows as $row) {
+            $byDefinitionId[(int) $row->snapshot_field_definition_id] = $row;
+        }
+
+        $out = [];
+        foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
+            if (! $def->field_type->isChoice()) {
+                continue;
+            }
+            $row = $byDefinitionId[(int) $def->id] ?? null;
+            if ($row === null) {
+                $out[$def->key] = ChoiceFieldValueContract::emptyValue($def->field_type);
+
+                continue;
+            }
+            $out[$def->key] = ChoiceFieldValueContract::readStored($def, $row);
+        }
+
+        return $out;
     }
 
     /**
@@ -444,13 +530,18 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $values
+     * @param  array<string, true>  $choiceDirty
      */
     private function persistHeaderValues(
         Calculation $calculation,
         ConfigurationSnapshot $snapshot,
         array $values,
+        array $choiceDirty = [],
     ): void {
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
+            if ($def->field_type->isChoice() && ! isset($choiceDirty[$def->key])) {
+                continue;
+            }
             $row = CalculationFieldValue::query()->firstOrNew([
                 'calculation_id' => $calculation->id,
                 'snapshot_field_definition_id' => $def->id,
@@ -462,13 +553,18 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $values
+     * @param  array<string, true>  $choiceDirty
      */
     private function persistPositionValues(
         CalculationPosition $position,
         ConfigurationSnapshot $snapshot,
         array $values,
+        array $choiceDirty = [],
     ): void {
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
+            if ($def->field_type->isChoice() && ! isset($choiceDirty[$def->key])) {
+                continue;
+            }
             $row = CalculationPositionFieldValue::query()->firstOrNew([
                 'calculation_position_id' => $position->id,
                 'snapshot_field_definition_id' => $def->id,
@@ -483,6 +579,17 @@ final class CalculationDynamicFieldWriter
         SnapshotFieldDefinition $def,
         mixed $value,
     ): void {
+        if ($def->field_type->isChoice()) {
+            ChoiceFieldValueContract::writeStored(
+                $def,
+                $row,
+                ChoiceFieldValueContract::assertNormalizedStoredValue($def->field_type, $value),
+            );
+
+            return;
+        }
+
+        ChoiceFieldValueContract::clearChoiceChannel($row);
         $row->value_string = null;
         $row->value_text = null;
         $row->value_boolean = null;
@@ -495,7 +602,7 @@ final class CalculationDynamicFieldWriter
             FieldType::ShortText => $row->value_string = $value === null ? null : (string) $value,
             FieldType::LongText => $row->value_text = $value === null ? null : (string) $value,
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
-                'select/multi_select-Persistenz ist in DF-3-REST-A noch nicht freigegeben.',
+                'Unerreichbarer Choice-Zweig in fillRow.',
             ),
         };
     }
@@ -523,7 +630,7 @@ final class CalculationDynamicFieldWriter
             FieldType::Boolean => $def->key === 'period_open' ? true : null,
             FieldType::Period => null,
             FieldType::ShortText, FieldType::LongText => null,
-            FieldType::Select, FieldType::MultiSelect => null,
+            FieldType::Select, FieldType::MultiSelect => ChoiceFieldValueContract::emptyValue($def->field_type),
         };
     }
 
@@ -531,6 +638,12 @@ final class CalculationDynamicFieldWriter
         SnapshotFieldDefinition $def,
         CalculationFieldValue|CalculationPositionFieldValue $value,
     ): mixed {
+        if ($def->field_type->isChoice()) {
+            return ChoiceFieldValueContract::readStored($def, $value);
+        }
+
+        ChoiceFieldValueContract::assertChoiceChannelExclusive($def, $value);
+
         return match ($def->field_type) {
             FieldType::Boolean => $value->value_boolean,
             FieldType::Period => ($value->value_period_start === null && $value->value_period_end === null)
@@ -542,21 +655,8 @@ final class CalculationDynamicFieldWriter
             FieldType::ShortText => $value->value_string,
             FieldType::LongText => $value->value_text,
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
-                'select/multi_select-Export ist in DF-3-REST-A noch nicht freigegeben.',
+                'Unerreichbarer Choice-Zweig in exportValue.',
             ),
         };
-    }
-
-    /**
-     * @param  array<string, string>  $errors
-     */
-    private function rejectUnsupportedChoiceType(
-        SnapshotFieldDefinition $def,
-        string $errorPrefix,
-        array &$errors,
-    ): null {
-        $errors["{$errorPrefix}.{$def->key}"] = 'Auswahlfelder werden in diesem Schritt noch nicht unterstützt.';
-
-        return null;
     }
 }
