@@ -276,7 +276,10 @@ export default function FieldSetRulesEditor({
                         </select>
                     </label>
                     {condition.conditions.map((child, childIndex) => (
-                        <div key={childIndex} className="space-y-2 border-t pt-3">
+                        <div
+                            key={childIndex}
+                            className="space-y-2 border-t pt-3"
+                        >
                             {renderAtomicEditor(
                                 child,
                                 (nextChild) => {
@@ -539,10 +542,10 @@ export default function FieldSetRulesEditor({
                             }
                         }}
                     >
-                        <option value="require_field">Als Pflicht setzen</option>
-                        <option value="set_visible">
-                            Sichtbarkeit setzen
+                        <option value="require_field">
+                            Als Pflicht setzen
                         </option>
+                        <option value="set_visible">Sichtbarkeit setzen</option>
                     </select>
                 </label>
                 <label className="block space-y-1 text-sm">
@@ -695,7 +698,9 @@ export default function FieldSetRulesEditor({
                                             ) : null}
                                             {preview?.matched?.[index] ===
                                             true ? (
-                                                <Badge>Beispiel trifft zu</Badge>
+                                                <Badge>
+                                                    Beispiel trifft zu
+                                                </Badge>
                                             ) : null}
                                             {preview?.matched?.[index] ===
                                             false ? (

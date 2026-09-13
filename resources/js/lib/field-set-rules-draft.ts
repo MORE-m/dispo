@@ -103,7 +103,12 @@ export function moveDraftRule(
     direction: -1 | 1,
 ): DraftRule[] {
     const target = index + direction;
-    if (index < 0 || target < 0 || index >= rules.length || target >= rules.length) {
+    if (
+        index < 0 ||
+        target < 0 ||
+        index >= rules.length ||
+        target >= rules.length
+    ) {
         return rules;
     }
     if (rules[index]?.is_system_seed || rules[target]?.is_system_seed) {
@@ -133,10 +138,7 @@ export function allowedConditionOps(fieldType: string): string[] {
     return ['field_empty', 'field_not_empty'];
 }
 
-export function fieldLabel(
-    catalog: FieldCatalogEntry[],
-    key: string,
-): string {
+export function fieldLabel(catalog: FieldCatalogEntry[], key: string): string {
     const entry = catalog.find((row) => row.key === key);
 
     return entry ? `${entry.label} (${entry.key})` : key;
