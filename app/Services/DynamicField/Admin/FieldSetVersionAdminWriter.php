@@ -24,7 +24,8 @@ use RuntimeException;
 /**
  * DF-3.1 / DF-3.3-fs / DYN-003 / VER-005 / VER-006 / ADM-001:
  * Create freier Feldsets, Draft, Activate, Copy-as-template, Deakt./Reakt.
- * Regeln werden nur kopiert, nie mutiert.
+ * Regelmutation erfolgt ausschließlich über FieldSetVersionRulesWriter (RULE-C).
+ * Draft-Copy kopiert Regeln; Activate prüft System-Seed fail-closed.
  */
 final class FieldSetVersionAdminWriter
 {
@@ -32,6 +33,7 @@ final class FieldSetVersionAdminWriter
         private readonly AuditLogger $audit,
         private readonly SnapshotFieldRuleEvaluator $rules,
         private readonly FieldSetKeySlugger $slugger,
+        private readonly FieldSetVersionRulesWriter $rulesWriter,
     ) {}
 
     public function assertAdminFieldSet(FieldSet $fieldSet): void
@@ -608,6 +610,7 @@ final class FieldSetVersionAdminWriter
                 $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
                 $lockedDraft->rules,
             );
+            $this->rulesWriter->assertSystemCoreRulesForActivation($locked, $lockedDraft->rules);
 
             $previousActiveId = $locked->active_version_id;
             if ($previousActiveId !== null) {

@@ -1,5 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+import FieldSetRulesEditor from '@/components/administration/field-set-rules-editor';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import PageHeader from '@/components/heading-page';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { JsonPostError, jsonDelete, jsonPost, jsonPut } from '@/lib/json-post';
+import type { FieldCatalogEntry } from '@/lib/field-set-rules-draft';
 
 type AvailableRevision = {
     id: number;
@@ -52,6 +54,8 @@ type RuleRow = {
     sort: number;
     condition: Record<string, unknown>;
     action: Record<string, unknown>;
+    dedupe_key?: string;
+    is_system_seed?: boolean;
 };
 
 type Props = {
@@ -70,17 +74,24 @@ type Props = {
         editable: boolean;
         fields: Membership[];
         rules: RuleRow[];
+        field_catalog: FieldCatalogEntry[];
     };
     availableCustomDefinitions?: AvailableCustomDefinition[];
+    rulesRoutes: {
+        preview: string;
+        replace: string;
+    };
 };
 
 export default function FieldSetVersionEdit({
     fieldSet,
     version,
     availableCustomDefinitions = [],
+    rulesRoutes,
 }: Props) {
     const flash = usePage().props.flash;
     const [fields, setFields] = useState(version.fields);
+    const [lockVersion, setLockVersion] = useState(fieldSet.lock_version);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
@@ -131,7 +142,7 @@ export default function FieldSetVersionEdit({
             const result = await jsonPut<{ redirect: string }>(
                 `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}`,
                 {
-                    lock_version: fieldSet.lock_version,
+                    lock_version: lockVersion,
                     fields: membershipPayload(),
                 },
             );
@@ -155,7 +166,7 @@ export default function FieldSetVersionEdit({
         try {
             const result = await jsonPost<{ redirect: string }>(
                 `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}/aktuelle-revisionen`,
-                { lock_version: fieldSet.lock_version },
+                { lock_version: lockVersion },
             );
             router.visit(result.redirect, { preserveScroll: true });
         } catch (caught) {
@@ -178,7 +189,7 @@ export default function FieldSetVersionEdit({
             const result = await jsonPost<{ redirect: string }>(
                 `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}/felder`,
                 {
-                    lock_version: fieldSet.lock_version,
+                    lock_version: lockVersion,
                     field_definition_id: selectedDefinitionId,
                     field_definition_revision_id: selectedRevisionId,
                     sort: addSort,
@@ -212,7 +223,7 @@ export default function FieldSetVersionEdit({
         try {
             const result = await jsonDelete<{ redirect: string }>(
                 `/administration/dynamische-felder/feldsets/${fieldSet.id}/versionen/${version.id}/felder/${membership.id}`,
-                { lock_version: fieldSet.lock_version },
+                { lock_version: lockVersion },
             );
             router.visit(result.redirect, { preserveScroll: true });
         } catch (caught) {
@@ -226,7 +237,7 @@ export default function FieldSetVersionEdit({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title={`${fieldSet.name} · Version ${version.version}`}
-                    description={`Status: ${version.status}. Regeln sind nur lesbar. Custom-Felder mit Scope header oder position können hinzugefügt werden.`}
+                    description={`Status: ${version.status}. Regeln können im Entwurf bearbeitet werden. Custom-Felder mit Scope header oder position können hinzugefügt werden.`}
                     actions={
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" asChild>
@@ -540,28 +551,14 @@ export default function FieldSetVersionEdit({
                     </div>
                 </section>
 
-                <section className="space-y-3">
-                    <h2 className="text-base font-semibold">
-                        Regeln (nur Lesen)
-                    </h2>
-                    {version.rules.length === 0 ? (
-                        <p className="text-muted-foreground text-sm">
-                            Keine Regeln in dieser Version.
-                        </p>
-                    ) : (
-                        <ul className="space-y-2 rounded-xl border p-4 text-sm">
-                            {version.rules.map((rule) => (
-                                <li key={rule.id}>
-                                    #{rule.sort}:{' '}
-                                    <code className="text-xs">
-                                        {JSON.stringify(rule.condition)} →{' '}
-                                        {JSON.stringify(rule.action)}
-                                    </code>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
+                <FieldSetRulesEditor
+                    editable={version.editable}
+                    lockVersion={lockVersion}
+                    fieldCatalog={version.field_catalog ?? []}
+                    initialRules={version.rules}
+                    routes={rulesRoutes}
+                    onLockVersionChange={setLockVersion}
+                />
             </div>
 
             <Dialog open={addOpen} onOpenChange={setAddOpen}>

@@ -12,8 +12,10 @@ use App\Http\Requests\Administration\DynamicField\AddFieldSetMembershipRequest;
 use App\Http\Requests\Administration\DynamicField\CreateFieldSetDraftRequest;
 use App\Http\Requests\Administration\DynamicField\DeactivateFieldSetRequest;
 use App\Http\Requests\Administration\DynamicField\PinCurrentRevisionsRequest;
+use App\Http\Requests\Administration\DynamicField\PreviewFieldSetVersionRulesRequest;
 use App\Http\Requests\Administration\DynamicField\ReactivateFieldSetRequest;
 use App\Http\Requests\Administration\DynamicField\RemoveFieldSetMembershipRequest;
+use App\Http\Requests\Administration\DynamicField\ReplaceFieldSetVersionRulesRequest;
 use App\Http\Requests\Administration\DynamicField\StoreFreeFieldSetRequest;
 use App\Http\Requests\Administration\DynamicField\UpdateFieldSetDraftRequest;
 use App\Http\Requests\Administration\DynamicField\UpdateFieldSetMetadataRequest;
@@ -26,6 +28,9 @@ use App\Models\FieldSetVersionField;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldSetVersionAdminWriter;
 use App\Services\DynamicField\Admin\FieldSetVersionPreviewService;
+use App\Services\DynamicField\Admin\FieldSetVersionRulesWriter;
+use App\Support\DynamicField\FieldDefinitionOptionContract;
+use App\Support\DynamicField\FieldRuleContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -39,6 +44,7 @@ class FieldSetAdminController extends Controller
     public function __construct(
         private readonly FieldSetVersionAdminWriter $writer,
         private readonly FieldSetVersionPreviewService $preview,
+        private readonly FieldSetVersionRulesWriter $rulesWriter,
     ) {}
 
     public function home(): Response
@@ -295,7 +301,7 @@ class FieldSetAdminController extends Controller
         abort_unless((int) $version->field_set_id === (int) $fieldSet->id, 404);
 
         $fieldSet->refresh();
-        $version->load(['fields.revision.definition', 'fields.definition', 'rules']);
+        $version->load(['fields.revision.definition', 'fields.revision.options', 'fields.definition', 'rules']);
 
         $definitionIds = $version->fields->pluck('field_definition_id')->unique()->all();
         /** @var array<int, list<array{id: int, revision: int, label: string}>> $revisionsByDefinition */
@@ -395,14 +401,105 @@ class FieldSetAdminController extends Controller
                         'available_revisions' => $revisionsByDefinition[$membership->field_definition_id] ?? [],
                     ];
                 }),
-                'rules' => $version->rules->map(fn ($rule): array => [
-                    'id' => $rule->id,
-                    'sort' => $rule->sort,
-                    'condition' => $rule->condition_json,
-                    'action' => $rule->action_json,
-                ]),
+                'rules' => $version->rules->map(function ($rule) use ($fieldSet): array {
+                    /** @var array<string, mixed> $condition */
+                    $condition = $rule->condition_json;
+                    /** @var array<string, mixed> $action */
+                    $action = $rule->action_json;
+                    $dedupe = FieldRuleContract::dedupePayload($condition, $action);
+
+                    return [
+                        'id' => $rule->id,
+                        'sort' => $rule->sort,
+                        'condition' => $condition,
+                        'action' => $action,
+                        'dedupe_key' => $dedupe,
+                        'is_system_seed' => $fieldSet->key === AdminFieldSetCatalog::CALCULATION_CORE
+                            && $dedupe === FieldRuleContract::SEED_RULE_DEDUPE_SHA256,
+                    ];
+                }),
+                'field_catalog' => $version->fields->map(function (FieldSetVersionField $membership): array {
+                    $definition = $membership->definition ?? $membership->revision->definition;
+                    $revision = $membership->revision;
+                    $options = [];
+                    if ($definition->field_type->isChoice()) {
+                        foreach (FieldDefinitionOptionContract::fromRevisionOptions($revision->options) as $option) {
+                            $options[] = $option;
+                        }
+                    }
+
+                    return [
+                        'key' => $definition->key,
+                        'label' => $revision->label,
+                        'field_type' => $definition->field_type->value,
+                        'scope' => $definition->scope->value,
+                        'is_system' => (bool) $definition->is_system,
+                        'options' => $options,
+                    ];
+                })->values()->all(),
             ],
             'availableCustomDefinitions' => $availableCustomDefinitions,
+            'rulesRoutes' => [
+                'preview' => route(
+                    'administration.dynamic-fields.field-sets.versions.rules.preview',
+                    [$fieldSet, $version],
+                ),
+                'replace' => route(
+                    'administration.dynamic-fields.field-sets.versions.rules.replace',
+                    [$fieldSet, $version],
+                ),
+            ],
+        ]);
+    }
+
+    public function rulesPreview(
+        PreviewFieldSetVersionRulesRequest $request,
+        FieldSet $fieldSet,
+        FieldSetVersion $version,
+    ): JsonResponse {
+        $this->authorize('access-administration');
+        $this->writer->assertAdminFieldSet($fieldSet);
+        abort_unless((int) $version->field_set_id === (int) $fieldSet->id, 404);
+
+        $payload = $request->payload();
+        $preview = $this->rulesWriter->preview(
+            $fieldSet,
+            $version,
+            $payload['rules'],
+            $payload['lock_version'],
+            $payload['example_header'],
+            $payload['example_position'],
+        );
+
+        return response()->json($preview);
+    }
+
+    public function rulesReplace(
+        ReplaceFieldSetVersionRulesRequest $request,
+        FieldSet $fieldSet,
+        FieldSetVersion $version,
+    ): JsonResponse {
+        $this->authorize('access-administration');
+        $this->writer->assertAdminFieldSet($fieldSet);
+        abort_unless((int) $version->field_set_id === (int) $fieldSet->id, 404);
+
+        $result = $this->rulesWriter->replace(
+            $fieldSet,
+            $version,
+            $request->payload(),
+            $request->user(),
+        );
+
+        $message = $result['has_changes']
+            ? 'Regeln übernommen.'
+            : 'Keine Änderungen';
+
+        return response()->json([
+            'message' => $message,
+            'has_changes' => $result['has_changes'],
+            'lock_version' => $result['lock_version'],
+            'fingerprint' => $result['fingerprint'],
+            'rules' => $result['rules'],
         ]);
     }
 

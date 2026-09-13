@@ -80,18 +80,11 @@ Relevante Anforderungen: `DYN-*`, `VER-*`, `ADM-001`, `ADM-002`.
 
 Ist (Teil): DF-1/DF-2 Runtime, DF-3.1–3.2b Admin/Custom-Text, DF-3.3-fs freie
 Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview, DF-3.3a2α Gen2-Freeze,
-DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI (alles auf `main`; β via
-PR #25, b via Feature-Branch `feat/df3-3b-assignment-admin-ui`).
-Offen: Regel-Editor; Inventar-/Preislisten-Admin.
-Options-Fundament (DF-3-REST-A), Options-Admin (DF-3-REST-B) und Choice-Wertmodell
-(DF-3-REST-C1) auf `main` (PR #38 / #39 / #40). Calc Choice-UI (DF-3-REST-C2)
-und Dispo Choice-UI (DF-3-REST-C3) sowie Regelvertrag/Evaluatoren (DF-3-RULE-A)
-und Runtime Visible/Required (DF-3-RULE-B) umgesetzt; DF-3 bleibt ohne RULE-C
-(Regel-Editor) unvollständig.
-ADV-001c3b1 (Methodenstammdaten/-Lifecycle), ADV-001c3b2
-(Kategorie-Desired-State/Default), ADV-001c3c (Medium-Overrides/Mode/Default),
-ADV-001c4a (Methodenoptions-/Freeze-Persistenz) und ADV-001c4b (sichtbare
-Wizard-Methodenauswahl) sind umgesetzt.
+DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI; Options-Fundament bis
+Choice-UI (DF-3-REST-A–C3); Regelvertrag/Evaluatoren (RULE-A), Runtime
+Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
+abgeschlossen**. Offen außerhalb: Inventar-/Preislisten-Admin; ADV-002.
+ADV-001c3b1–c4b (Methoden) sind umgesetzt.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

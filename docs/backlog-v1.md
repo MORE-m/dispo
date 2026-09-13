@@ -200,42 +200,19 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-01 – Felddefinitionen, Feldsets, Regeln
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 Runtime + DF-3.1 Admin + DF-3.2a/b Custom-Text + DF-3.3-fs freie Feldsets + DF-3.3a1 Assignments/Preview + DF-3.3a2α globale Runtime + DF-3.3a2β Kat/Medium + VER-003 + DF-3.3b Assignment-UI)
+- **Status:** erledigt (DF-1 … DF-3-RULE-C; Dyn-Feld-Pfad inkl. Optionen und Regel-Editor)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
+- **Geplante Folge:** ADV-001a → … → Optionen / Regel-Editor – **erledigt**; danach Inventar-/Preislisten-Admin / ADV-002
+- **Offen außerhalb DF-3:** ADV-002, Inventar-/Preislisten-Admin.
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
-- **Geplante Folge:** ADV-001a → DF-3.3-fs → DF-3.3a1 (Assignments/Resolver/Preview)
-  → DF-3.3a2α (VER-002-Freeze + globale Runtime) → DF-3.3a2β (Kat/Medium +
-  VER-003) → **DF-3.3b** (Admin-UI) → **ADV-001b** (Katalog-Admin) → Optionen / Regel-Editor
-- **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen
+- **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen, Regel-Editor
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
-- **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung
-- **DF-1 erledigt:** geschützte Systemfelder + Feldset `system_calculation_core`;
-  Snapshot-Regel `field_equals`/`require_field` für `period_open` →
-  `position_flight_period`; Writer-/Wizard-Anbindung (`DYN-001`, `DYN-004`,
-  `DYN-006`).
-- **DF-3.1 erledigt:** Admin-UI für Systemfeld-Revisionen und Kern-Feldset
-  Draft/Activate/statische Vorschau; Regeln nur lesbar; Audit (`ADM-001`,
-  `ADM-002` Teil).
-- **DF-3.2a/b erledigt:** Custom Header-/Position-Textfelder auf `main`.
-- **DF-3.3-fs erledigt (`main`):** frei anlegbare versionierte Feldsets
-  inkl. `is_system`/`applies_to`/`is_assignable`, Deakt./Reakt., ohne Runtime-
-  Wirkung (`DYN-002`/`DYN-003` Teil). **HF1:** Deaktivierung bei aktiven
-  Assignments blockiert (keine Kaskade; Runtime fail-closed).
-- **DF-3.3a1 erledigt (`main`):** `field_set_assignments`, deterministischer
-  Resolver, Kontext-Preview/Activate-Fingerprint; Runtime folgt a2.
-- **DF-3.3a2α erledigt (`main`, PR #24 / `8edcbd7`):**
-  aktive **globale** Assignments wirken produktiv auf Kalkulation und Dispoauftrag
-  (Kopf- und Positionsfelder).
-- **DF-3.3a2β erledigt (`main`, PR #25 / `100c79a`):**
-  Generation 3, Kategorie-/Werbemittel-Runtime, VER-003 Positions-Effektivs,
-  historischer Kontext, Unique-Ownership.
-- **DF-3.3b erledigt (Feature-Branch `feat/df3-3b-assignment-admin-ui`):**
-  Assignment-Admin-UI mit Herkunft/Konfliktvorschau; PO-33b-1 Read-only-Katalogwahl;
-  PO-33b-2 Dyn-Feld-Teilfreigabe. **DF-3 nicht abgeschlossen.**
-- **Offen:** volle Regelmatrix, Regel-Editor.
-  Options-Fundament/Admin und Choice-Wertmodell (DF-3-REST-A/B/C1) auf `main`
-  (PR #38 / #39 / #40). Calc Choice-UI (DF-3-REST-C2) und Dispo Choice-UI
-  (DF-3-REST-C3) umgesetzt; DF-3 bleibt ohne Regelmatrix/Regel-Editor unvollständig.
+- **Tests:** Pest Regelmatrix positiv/negativ, Versionsaktivierung, RULE-C Preview/Apply
+- **DF-1 … DF-3.3b / REST / RULE-A/B:** siehe `fortschritt.md`
+- **DF-3-RULE-C erledigt:** Desired-State Regel-Editor; Seed-Schutz; Audit; E2E Port 8015.
+  **DF-3 Dyn-Feld-Pfad abgeschlossen** (ADV-002 außerhalb).
+- **Historische Folge (erledigt):** ADV-001a → DF-3.3-fs → a1 → a2α/β → 3b → ADV-001b
+  → Optionen → RULE-A/B/C
 
 ### BL-P3-02 – Snapshot-Fundament
 

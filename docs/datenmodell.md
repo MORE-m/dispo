@@ -303,7 +303,7 @@ Relationale Tabellen für geschützte Systemfelder und Kalkulationswerte:
 | `field_definition_revisions` | unveränderliche Revisionszeilen (Label, Hilfe, Reportflag) |
 | `field_sets` / `field_set_versions` | versionierbare Feldsets; Aktivzeiger `active_version_id`; DF-3.1: `lock_version`; DF-3.3-fs: `is_system`, `applies_to`, `is_assignable` (Cores: system + nicht assignierbar; freie Sets: Draft→Activate, Deakt./Reakt.) |
 | `field_set_version_fields` | Membership mit `field_definition_id` **und** gepinnter `field_definition_revision_id`; Unique `(field_set_version_id, field_definition_id)` |
-| `field_rules` | Regeln der Feldset-Version (`field_equals` / `require_field` in DF-1) |
+| `field_rules` | Regeln der Feldset-Version (V1-Contract RULE-A; Edit über RULE-C Desired-State) |
 | `configuration_snapshots` | unveränderlicher Config-Snapshot je Kalkulation (bzw. Legacy-Backfill); ab DF-3.3a2α zusätzlich `format_version` (NOT NULL) und `schema_fingerprint` |
 | `snapshot_field_definitions` | snapshot-stabile Felddarstellung und Validierungsbasis; ab DF-3.3a2α mit Property-Provenance |
 | `snapshot_field_rules` | kopierte Regeln des Snapshots |
@@ -465,8 +465,9 @@ Umgesetzt in DF-3-REST-C2 (Calc-UI) und C3 (Dispo-UI):
 Weiter offen für den DF-3-Abschluss:
 
 - Runtime Visible/Required in Calc-/Dispo-UI (DF-3-RULE-B) – **umgesetzt**
-- Regel-Editor (DF-3-RULE-C) – offen
+- Regel-Editor (DF-3-RULE-C) – **umgesetzt**
 - Gen4 / weitere Regeloperatoren nach Bedarf
+- ADV-002 / SystemFieldSetting – außerhalb DF-3
 
 Außerhalb DF-3:
 
