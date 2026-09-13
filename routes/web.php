@@ -9,6 +9,7 @@ use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\Administration\InventoryAdminController;
+use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
@@ -161,6 +162,29 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.inventories.reactivate-preview');
         Route::post('administration/inventare/{inventory}/reaktivieren', [InventoryAdminController::class, 'reactivate'])
             ->name('administration.inventories.reactivate');
+
+        Route::get('administration/preislisten', [PriceListAdminController::class, 'index'])
+            ->name('administration.price-lists.index');
+        Route::get('administration/preislisten/neu', [PriceListAdminController::class, 'create'])
+            ->name('administration.price-lists.create');
+        Route::post('administration/preislisten', [PriceListAdminController::class, 'store'])
+            ->name('administration.price-lists.store');
+        Route::get('administration/preislisten/{priceList}', [PriceListAdminController::class, 'show'])
+            ->name('administration.price-lists.show');
+        Route::put('administration/preislisten/{priceList}', [PriceListAdminController::class, 'update'])
+            ->name('administration.price-lists.update');
+        Route::post('administration/preislisten/{priceList}/pruefen', [PriceListAdminController::class, 'inspect'])
+            ->name('administration.price-lists.inspect');
+        Route::post('administration/preislisten/{priceList}/aktivierungs-vorschau', [PriceListAdminController::class, 'activatePreview'])
+            ->name('administration.price-lists.activate-preview');
+        Route::post('administration/preislisten/{priceList}/aktivieren', [PriceListAdminController::class, 'activate'])
+            ->name('administration.price-lists.activate');
+        Route::post('administration/preislisten/{priceList}/archivierungs-vorschau', [PriceListAdminController::class, 'archivePreview'])
+            ->name('administration.price-lists.archive-preview');
+        Route::post('administration/preislisten/{priceList}/archivieren', [PriceListAdminController::class, 'archive'])
+            ->name('administration.price-lists.archive');
+        Route::delete('administration/preislisten/{priceList}', [PriceListAdminController::class, 'destroy'])
+            ->name('administration.price-lists.destroy');
 
         // ADV-001b Katalog-Admin (PO-ADV001b-1 UX-GATE-D Teilfreigabe)
         Route::get('administration/katalog', CatalogHubController::class)

@@ -41,7 +41,7 @@ class InventoryAdminLifecycleTest extends TestCase
                     fn (array $m): bool => $m['key'] === 'inventories' && $m['available'] === true,
                 ))
                 ->where('modules', fn ($modules): bool => collect($modules)->contains(
-                    fn (array $m): bool => $m['key'] === 'price-lists' && $m['available'] === false,
+                    fn (array $m): bool => $m['key'] === 'price-lists' && $m['available'] === true,
                 )));
 
         $this->actingAs($admin)

@@ -10,6 +10,7 @@ use App\Models\InventoryMediumRule;
 use App\Models\Organization;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
+use App\Support\PriceList\PriceListCalendar;
 
 trait CreatesSpotClassicCatalog
 {
@@ -40,9 +41,11 @@ trait CreatesSpotClassicCatalog
                 'advertising_medium_id' => $medium->id,
             ]);
 
+            $year = PriceListCalendar::currentYear();
             $list = PriceList::factory()->create([
                 'inventory_id' => $inventory->id,
                 'status' => PriceListStatus::Active,
+                'year' => $year,
                 'version' => '2026-'.$inventory->code,
                 'valid_from' => now()->toDateString(),
             ]);

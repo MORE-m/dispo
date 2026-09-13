@@ -34,6 +34,7 @@ class CalculationReviewNacharbeitTest extends TestCase
         $newList = PriceList::factory()->create([
             'inventory_id' => $catalog['hamburg']->id,
             'status' => PriceListStatus::Active,
+            'year' => (int) now('Europe/Berlin')->year,
             'version' => '2026-RH-v2',
         ]);
         PriceListItem::factory()->create([
@@ -85,6 +86,7 @@ class CalculationReviewNacharbeitTest extends TestCase
         PriceList::factory()->create([
             'inventory_id' => $catalog['hamburg']->id,
             'status' => PriceListStatus::Active,
+            'year' => (int) now('Europe/Berlin')->subYear()->year,
             'version' => '2026-RH-alt',
             'valid_from' => now()->subYear()->toDateString(),
         ]);

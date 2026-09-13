@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property int $id
+ * @property int $price_list_id
  * @property DayGroup $day_group
  * @property int $hour
  * @property string $second_price

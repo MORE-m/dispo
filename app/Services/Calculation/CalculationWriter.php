@@ -39,6 +39,7 @@ final class CalculationWriter
         private readonly ConfigurationSnapshotFreezeService $snapshots,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
         private readonly ConfigurationSnapshotIntegrity $integrity,
+        private readonly BudgetProposalFingerprint $budgetFingerprints,
     ) {}
 
     /**
@@ -148,62 +149,72 @@ final class CalculationWriter
 
     public function applyBudgetProposal(Calculation $calculation, BudgetProposal $proposal, User $user): Calculation
     {
-        return DB::transaction(function () use ($calculation, $proposal, $user): Calculation {
-            $lockedCalculation = Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
-            $lockedProposal = BudgetProposal::query()->whereKey($proposal->id)->lockForUpdate()->firstOrFail();
+        try {
+            return DB::transaction(function () use ($calculation, $proposal, $user): Calculation {
+                $lockedCalculation = Calculation::query()->whereKey($calculation->id)->lockForUpdate()->firstOrFail();
+                $lockedProposal = BudgetProposal::query()->whereKey($proposal->id)->lockForUpdate()->firstOrFail();
 
-            abort_unless($lockedProposal->calculation_id === $lockedCalculation->id, 404);
-            abort_if($lockedProposal->applied_at !== null, 422, 'Der Vorschlag wurde bereits übernommen.');
+                abort_unless($lockedProposal->calculation_id === $lockedCalculation->id, 404);
+                abort_if($lockedProposal->applied_at !== null, 422, 'Der Vorschlag wurde bereits übernommen.');
 
-            if ($lockedProposal->lock_version !== null && $lockedProposal->lock_version !== $lockedCalculation->lock_version) {
-                throw ValidationException::withMessages([
-                    'lock_version' => 'Der Vorschlag basiert auf einer älteren Version der Kalkulation. Bitte neuen Vorschlag erzeugen.',
-                ]);
+                if ($lockedProposal->lock_version !== null && $lockedProposal->lock_version !== $lockedCalculation->lock_version) {
+                    throw ValidationException::withMessages([
+                        'lock_version' => 'Der Vorschlag basiert auf einer älteren Version der Kalkulation. Bitte neuen Vorschlag erzeugen.',
+                    ]);
+                }
+
+                if ($lockedProposal->status === BudgetProposalStatus::Stale) {
+                    throw ValidationException::withMessages([
+                        'proposal' => 'Der Vorschlag ist veraltet. Bitte neu berechnen, bevor Sie übernehmen.',
+                    ]);
+                }
+
+                $this->assertBudgetProposalFingerprintCurrent($lockedProposal);
+
+                $before = $this->calculationSnapshot($this->reloadCalculation($lockedCalculation));
+
+                $payload = $this->payloadFromCalculation($lockedCalculation);
+                $payload['planning_mode'] = $lockedCalculation->planning_mode->value;
+                $payload['order_discount_percent'] = (string) $lockedCalculation->order_discount_percent;
+                $payload['target_budget_nn'] = (string) $lockedProposal->target_budget_nn;
+                $payload['budget_strategy'] = $lockedProposal->strategy->value;
+                $payload['lock_version'] = $lockedCalculation->lock_version;
+
+                if ($lockedProposal->strategy === BudgetStrategy::EqualSpotCount) {
+                    $payload['positions'] = $this->mergeProposalHourlyDistribution(
+                        $payload['positions'],
+                        $lockedProposal->payloadArray(),
+                    );
+                } else {
+                    $proposalPayload = $lockedProposal->payloadArray();
+                    $payload['positions'] = $this->mergeProposalTotals(
+                        $payload['positions'],
+                        $proposalPayload['positions'] ?? [],
+                    );
+                }
+
+                $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false, derivePositionFingerprints: true);
+                $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
+                $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Applied;
+                $lockedCalculation->save();
+
+                $lockedProposal->applied_at = now();
+                $lockedProposal->applied_by = $user->id;
+                $lockedProposal->status = BudgetProposalStatus::Applied;
+                $lockedProposal->save();
+
+                $fresh = $this->reloadCalculation($lockedCalculation);
+                $this->audit->record($fresh, 'budget.applied', $user, $before, $this->calculationSnapshot($fresh));
+
+                return $fresh;
+            });
+        } catch (ValidationException $exception) {
+            if (array_key_exists('proposal', $exception->errors())) {
+                $this->markBudgetProposalStale($proposal, $calculation);
             }
 
-            if ($lockedProposal->status === BudgetProposalStatus::Stale) {
-                throw ValidationException::withMessages([
-                    'proposal' => 'Der Vorschlag ist veraltet. Bitte neu berechnen, bevor Sie übernehmen.',
-                ]);
-            }
-
-            $before = $this->calculationSnapshot($this->reloadCalculation($lockedCalculation));
-
-            $payload = $this->payloadFromCalculation($lockedCalculation);
-            $payload['planning_mode'] = $lockedCalculation->planning_mode->value;
-            $payload['order_discount_percent'] = (string) $lockedCalculation->order_discount_percent;
-            $payload['target_budget_nn'] = (string) $lockedProposal->target_budget_nn;
-            $payload['budget_strategy'] = $lockedProposal->strategy->value;
-            $payload['lock_version'] = $lockedCalculation->lock_version;
-
-            if ($lockedProposal->strategy === BudgetStrategy::EqualSpotCount) {
-                $payload['positions'] = $this->mergeProposalHourlyDistribution(
-                    $payload['positions'],
-                    $lockedProposal->payloadArray(),
-                );
-            } else {
-                $proposalPayload = $lockedProposal->payloadArray();
-                $payload['positions'] = $this->mergeProposalTotals(
-                    $payload['positions'],
-                    $proposalPayload['positions'] ?? [],
-                );
-            }
-
-            $this->fillAndPersist($lockedCalculation, $payload, $user, isCreate: false, derivePositionFingerprints: true);
-            $lockedCalculation->lock_version = $lockedCalculation->lock_version + 1;
-            $lockedCalculation->budget_proposal_status = BudgetProposalStatus::Applied;
-            $lockedCalculation->save();
-
-            $lockedProposal->applied_at = now();
-            $lockedProposal->applied_by = $user->id;
-            $lockedProposal->status = BudgetProposalStatus::Applied;
-            $lockedProposal->save();
-
-            $fresh = $this->reloadCalculation($lockedCalculation);
-            $this->audit->record($fresh, 'budget.applied', $user, $before, $this->calculationSnapshot($fresh));
-
-            return $fresh;
-        });
+            throw $exception;
+        }
     }
 
     /**
@@ -1532,5 +1543,42 @@ final class CalculationWriter
 
         $position->inventory_name = $previousInventoryName;
         $position->inventory_code = $previousInventoryCode;
+    }
+
+    private function assertBudgetProposalFingerprintCurrent(BudgetProposal $proposal): void
+    {
+        $payload = $proposal->payloadArray();
+        $input = [
+            'target_budget_nn' => (string) $proposal->target_budget_nn,
+            'budget_elements' => is_array($payload['budget_elements'] ?? null) ? $payload['budget_elements'] : [],
+            'order_discounts' => is_array($payload['order_discounts'] ?? null) ? $payload['order_discounts'] : [],
+            'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
+        ];
+
+        if ($this->budgetFingerprints->isStale(
+            ['input_fingerprint' => (string) ($proposal->input_fingerprint ?? '')],
+            $input,
+        )) {
+            throw ValidationException::withMessages([
+                'proposal' => 'Der Vorschlag ist veraltet. Bitte neu berechnen, bevor Sie übernehmen.',
+            ]);
+        }
+    }
+
+    private function markBudgetProposalStale(BudgetProposal $proposal, Calculation $calculation): void
+    {
+        $proposal->refresh();
+        if ($proposal->applied_at !== null) {
+            return;
+        }
+
+        $proposal->status = BudgetProposalStatus::Stale;
+        $proposal->save();
+
+        $calculation->refresh();
+        if ($calculation->budget_proposal_status === BudgetProposalStatus::Current) {
+            $calculation->budget_proposal_status = BudgetProposalStatus::Stale;
+            $calculation->save();
+        }
     }
 }

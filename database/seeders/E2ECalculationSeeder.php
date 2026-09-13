@@ -97,6 +97,7 @@ class E2ECalculationSeeder extends Seeder
             $list = PriceList::factory()->create([
                 'inventory_id' => $inventory->id,
                 'status' => PriceListStatus::Active,
+                'year' => (int) now('Europe/Berlin')->year,
                 'version' => 'e2e-'.$code,
                 'valid_from' => now()->toDateString(),
             ]);

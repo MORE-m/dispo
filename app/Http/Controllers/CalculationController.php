@@ -25,6 +25,7 @@ use App\Models\InventoryMediumRule;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Calculation\BudgetProposalFingerprint;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
@@ -48,6 +49,7 @@ class CalculationController extends Controller
     public function __construct(
         private readonly CalculationWriter $writer,
         private readonly BudgetSpotProposalService $spotProposals,
+        private readonly BudgetProposalFingerprint $budgetFingerprints,
         private readonly AuditLogger $audit,
         private readonly DispoOrderRevisionContext $dispoOrderRevisionContext,
         private readonly CalculationDynamicFieldWriter $dynamicFields,
@@ -306,11 +308,29 @@ class CalculationController extends Controller
                 ->first();
 
             if ($latest !== null) {
+                $latestPayload = $latest->payloadArray();
+                $latestStatus = $this->budgetFingerprints->statusFromProposal(
+                    [
+                        'status' => $latest->status->value,
+                        'input_fingerprint' => $latest->input_fingerprint,
+                    ],
+                    [
+                        'target_budget_nn' => (string) $latest->target_budget_nn,
+                        'budget_elements' => is_array($latestPayload['budget_elements'] ?? null)
+                            ? $latestPayload['budget_elements']
+                            : [],
+                        'order_discounts' => is_array($latestPayload['order_discounts'] ?? null)
+                            ? $latestPayload['order_discounts']
+                            : [],
+                        'ae_enabled' => (bool) ($latestPayload['ae_enabled'] ?? false),
+                    ],
+                    $calculation,
+                );
                 $latestBudgetProposal = [
                     'id' => $latest->id,
                     'input_fingerprint' => $latest->input_fingerprint,
-                    'status' => $latest->status->value,
-                    'payload' => $latest->payloadArray(),
+                    'status' => $latestStatus->value,
+                    'payload' => $latestPayload,
                 ];
             }
         }

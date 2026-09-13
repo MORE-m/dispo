@@ -36,9 +36,14 @@ final class BudgetProposalFingerprint
         array $elements,
         array $catalogs,
     ): array {
-        $priceListVersions = [];
+        $priceListIdentity = [];
         foreach ($catalogs as $inventoryId => $catalog) {
-            $priceListVersions[$inventoryId] = $catalog['priceList']->version;
+            $list = $catalog['priceList'];
+            $priceListIdentity[$inventoryId] = [
+                'price_list_id' => (int) ($list->id ?? 0),
+                'year' => (int) ($list->year ?? 0),
+                'version' => (string) ($list->version ?? ''),
+            ];
         }
 
         $elementFingerprint = [];
@@ -58,7 +63,7 @@ final class BudgetProposalFingerprint
             'budget_elements' => $elementFingerprint,
             'order_discounts' => $payload['order_discounts'] ?? [],
             'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
-            'price_list_versions' => $priceListVersions,
+            'price_list_identity' => $priceListIdentity,
         ];
     }
 
@@ -85,7 +90,11 @@ final class BudgetProposalFingerprint
                     try {
                         $catalogs[$inventoryId] = $resolver->resolveInventoryForBudget($inventoryId, $mediumId);
                     } catch (\Throwable) {
-                        $catalogs[$inventoryId] = ['priceList' => (object) ['version' => 'unknown']];
+                        $catalogs[$inventoryId] = ['priceList' => (object) [
+                            'id' => 0,
+                            'year' => 0,
+                            'version' => 'unknown',
+                        ]];
                     }
                 }
             }
