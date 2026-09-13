@@ -165,6 +165,8 @@ type PositionDraft = {
     id?: number;
     client_key: string;
     inventory_id: number;
+    inventory_name?: string | null;
+    inventory_code?: string | null;
     advertising_medium_id: number;
     /** DF-3.3a2β: Fingerprint des positionsbezogenen Effektiv-Schemas. */
     schema_fingerprint?: string | null;
@@ -341,6 +343,8 @@ type SavedCalculation = {
         id: number;
         client_key: string | null;
         inventory_id: number;
+        inventory_name?: string | null;
+        inventory_code?: string | null;
         advertising_medium_id: number;
         schema_fingerprint?: string | null;
         field_schema?: FieldSchema | null;
@@ -473,6 +477,28 @@ function catalogLabel(name: string, isActive: boolean): string {
     return isActive ? name : `${name} (inaktiv – historisch)`;
 }
 
+function positionInventoryName(
+    position: { inventory_id: number; inventory_name?: string | null },
+    catalog: Catalog,
+): string {
+    const frozen = (position.inventory_name ?? '').trim();
+    if (frozen !== '') {
+        const live = catalog.inventories.find(
+            (item) => item.id === position.inventory_id,
+        );
+        return catalogLabel(frozen, live?.is_active ?? true);
+    }
+
+    const inventory = catalog.inventories.find(
+        (item) => item.id === position.inventory_id,
+    );
+
+    return catalogLabel(
+        inventory?.name ?? 'Sender',
+        inventory?.is_active ?? true,
+    );
+}
+
 function methodOptionsForMedium(
     catalog: Catalog,
     mediumId: number,
@@ -508,6 +534,8 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
         return {
             client_key: newClientKey(),
             inventory_id: inventory.id,
+            inventory_name: inventory.name,
+            inventory_code: inventory.code,
             advertising_medium_id: preferredMedium.id,
             ...methodState,
             length_seconds:
@@ -876,6 +904,8 @@ export default function CalculationWizard({
                     id: position.id,
                     client_key: position.client_key ?? newClientKey(),
                     inventory_id: position.inventory_id,
+                    inventory_name: position.inventory_name ?? null,
+                    inventory_code: position.inventory_code ?? null,
                     advertising_medium_id: position.advertising_medium_id,
                     schema_fingerprint: position.schema_fingerprint ?? null,
                     field_schema: position.field_schema ?? null,
@@ -1495,9 +1525,15 @@ export default function CalculationWizard({
                         medium.calculation_method_options,
                     );
 
+                    const selectedInventory = catalog.inventories.find(
+                        (candidate) => candidate.id === patch.inventory_id,
+                    );
+
                     next = {
                         ...next,
                         inventory_id: patch.inventory_id,
+                        inventory_name: selectedInventory?.name ?? null,
+                        inventory_code: selectedInventory?.code ?? null,
                         advertising_medium_id: medium.id,
                         ...methodState,
                         length_seconds:
@@ -1839,6 +1875,18 @@ export default function CalculationWizard({
                     id: existing?.id,
                     client_key: existing?.client_key ?? newClientKey(),
                     inventory_id: item.inventory_id,
+                    inventory_name:
+                        catalog.inventories.find(
+                            (candidate) => candidate.id === item.inventory_id,
+                        )?.name ??
+                        existing?.inventory_name ??
+                        null,
+                    inventory_code:
+                        catalog.inventories.find(
+                            (candidate) => candidate.id === item.inventory_id,
+                        )?.code ??
+                        existing?.inventory_code ??
+                        null,
                     advertising_medium_id: mediumId,
                     ...initMethodStateForNewPosition(
                         methodOptionsForMedium(catalog, mediumId),
@@ -3243,17 +3291,19 @@ export default function CalculationWizard({
                                                         className={`${wizardCardTitleClass} flex items-center gap-2`}
                                                     >
                                                         <LogoSlot
-                                                            name={
-                                                                inventory?.name ??
-                                                                'Sender'
-                                                            }
+                                                            name={positionInventoryName(
+                                                                position,
+                                                                catalog,
+                                                            )}
                                                             logoPath={
                                                                 inventory?.logo_path
                                                             }
                                                         />
                                                         Rabatte für{' '}
-                                                        {inventory?.name ??
-                                                            'dieses Werbeelement'}
+                                                        {positionInventoryName(
+                                                            position,
+                                                            catalog,
+                                                        )}
                                                     </CardTitle>
                                                 </CardHeader>
                                                 <CardContent
@@ -3281,7 +3331,7 @@ export default function CalculationWizard({
                                                         </span>
                                                     </p>
                                                     <DiscountListEditor
-                                                        title={`Rabatte für ${inventory?.name ?? 'dieses Werbeelement'}`}
+                                                        title={`Rabatte für ${positionInventoryName(position, catalog)}`}
                                                         description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
                                                         discounts={
                                                             position.position_discounts
@@ -3700,12 +3750,6 @@ export default function CalculationWizard({
                                                                 .positions[
                                                                 index
                                                             ];
-                                                        const inventory =
-                                                            catalog.inventories.find(
-                                                                (item) =>
-                                                                    item.id ===
-                                                                    position.inventory_id,
-                                                            );
 
                                                         return (
                                                             <section
@@ -3715,8 +3759,10 @@ export default function CalculationWizard({
                                                                 className="rounded-lg border p-4"
                                                             >
                                                                 <p className="font-medium">
-                                                                    {inventory?.name ??
-                                                                        'Sender'}
+                                                                    {positionInventoryName(
+                                                                        position,
+                                                                        catalog,
+                                                                    )}
                                                                 </p>
                                                                 <p className="text-muted-foreground mt-1">
                                                                     {

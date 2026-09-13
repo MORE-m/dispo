@@ -12,6 +12,7 @@ use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
+use App\Support\Inventory\InventoryIdentity;
 use Illuminate\Support\Collection;
 
 /**
@@ -85,8 +86,8 @@ final class DispoOrderSnapshotMapper
             'calculation_position_id' => $position->id,
             'sort' => $sort,
             'inventory_id' => $position->inventory_id,
-            'inventory_name' => $position->inventory->name ?? 'Unbekannt',
-            'inventory_code' => $position->inventory->code ?? null,
+            'inventory_name' => InventoryIdentity::displayName($position),
+            'inventory_code' => InventoryIdentity::displayCode($position),
             'advertising_medium_id' => $position->advertising_medium_id,
             'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
             'advertising_medium_code' => $position->advertisingMedium->code ?? null,

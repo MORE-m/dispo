@@ -22,6 +22,7 @@ class InventoryFactory extends Factory
             'is_active' => true,
             'sort' => 0,
             'logo_path' => null,
+            'lock_version' => 1,
         ];
     }
 }

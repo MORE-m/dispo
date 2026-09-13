@@ -33,6 +33,7 @@ use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\DynamicField\ChoiceFieldValueContract;
+use App\Support\Inventory\InventoryIdentity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -450,8 +451,9 @@ class CalculationController extends Controller
                 'nn_invest' => (string) $calculation->nn_invest,
                 'target_budget_nn' => $calculation->target_budget_nn === null ? null : (string) $calculation->target_budget_nn,
                 'requires_special_approval' => $calculation->requires_special_approval,
-                'positions' => $calculation->positions->map(fn ($position): array => [
-                    'inventory_name' => $position->inventory->name ?? '',
+                'positions' => $calculation->positions->map(fn (CalculationPosition $position): array => [
+                    'inventory_name' => InventoryIdentity::displayName($position),
+                    'inventory_code' => InventoryIdentity::displayCode($position),
                     'spot_method' => $position->spot_method->value,
                     'price_list_version' => $position->price_list_version,
                     'length_seconds' => $position->length_seconds,
@@ -460,7 +462,7 @@ class CalculationController extends Controller
                     'nn_invest' => (string) $position->nn_invest,
                     'position_discount_percent' => (string) $position->position_discount_percent,
                     'ae_percent' => (string) $position->ae_percent,
-                    'plan_rows' => $position->planRows->map(fn ($row): array => [
+                    'plan_rows' => $position->planRows->map(fn (SpotClassicPlanRow $row): array => [
                         'hour' => $row->hour,
                         'day_group' => $row->day_group->value,
                         'second_price' => (string) $row->second_price,
@@ -535,6 +537,8 @@ class CalculationController extends Controller
                         'id' => $position->id,
                         'client_key' => $position->client_key,
                         'inventory_id' => $position->inventory_id,
+                        'inventory_name' => InventoryIdentity::displayName($position),
+                        'inventory_code' => InventoryIdentity::displayCode($position),
                         'advertising_medium_id' => $position->advertising_medium_id,
                         'schema_fingerprint' => $positionFieldSchema['schema_fingerprint'] ?? null,
                         'field_schema' => $positionFieldSchema,

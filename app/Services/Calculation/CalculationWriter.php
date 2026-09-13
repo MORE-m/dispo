@@ -15,6 +15,7 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
+use App\Models\Inventory;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -254,6 +255,9 @@ final class CalculationWriter
 
             $clientKey = $this->resolveClientKey($existing);
             $previousMediumId = $existing === null ? null : (int) $existing->advertising_medium_id;
+            $previousInventoryId = $existing === null ? null : (int) $existing->inventory_id;
+            $previousInventoryName = $existing === null ? '' : trim((string) ($existing->inventory_name ?? ''));
+            $previousInventoryCode = $existing === null ? '' : trim((string) ($existing->inventory_code ?? ''));
 
             $position = $existing ?? new CalculationPosition;
             $position->fill([
@@ -284,6 +288,13 @@ final class CalculationWriter
                 'nn_invest' => $result->nnInvest,
                 'sort' => $index,
             ]);
+            $this->stampInventoryIdentity(
+                $position,
+                $item['inventory'],
+                $previousInventoryId,
+                $previousInventoryName,
+                $previousInventoryCode,
+            );
             // ADV-001c2 Dual-Write: Freeze serverseitig, nicht aus Client-Payload.
             $position->engine_profile_key = $item['freeze']->engineProfileKey;
             $position->calculation_method_key = $item['freeze']->calculationMethodKey;
@@ -1494,5 +1505,32 @@ final class CalculationWriter
         }
 
         return $kept;
+    }
+
+    /**
+     * BL-P2-01a: Inventarname/-code historisch einfrieren.
+     * Gleicher inventory_id: gespeicherten Freeze behalten.
+     * Neuanlage, Inventarwechsel oder fehlender Freeze: aktuellen Katalogstand stempeln.
+     */
+    private function stampInventoryIdentity(
+        CalculationPosition $position,
+        Inventory $inventory,
+        ?int $previousInventoryId,
+        string $previousInventoryName,
+        string $previousInventoryCode,
+    ): void {
+        $inventoryChanged = $previousInventoryId === null
+            || $previousInventoryId !== (int) $inventory->id;
+        $missing = $previousInventoryName === '' || $previousInventoryCode === '';
+
+        if ($inventoryChanged || $missing) {
+            $position->inventory_name = $inventory->name;
+            $position->inventory_code = $inventory->code;
+
+            return;
+        }
+
+        $position->inventory_name = $previousInventoryName;
+        $position->inventory_code = $previousInventoryCode;
     }
 }

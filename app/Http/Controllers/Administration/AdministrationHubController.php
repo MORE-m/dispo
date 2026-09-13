@@ -8,7 +8,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b); Inventare/Preislisten gesperrt.
+ * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b) + Inventar-Admin (BL-P2-01a).
  */
 class AdministrationHubController extends Controller
 {
@@ -28,9 +28,9 @@ class AdministrationHubController extends Controller
                 [
                     'key' => 'inventories',
                     'title' => 'Inventare / Kombis',
-                    'description' => 'Noch nicht freigegeben (UX-GATE-D).',
-                    'href' => null,
-                    'available' => false,
+                    'description' => 'Inventare anlegen, bearbeiten und aktivieren. Kombi-Mitgliedschaften folgen später.',
+                    'href' => '/administration/inventare',
+                    'available' => true,
                 ],
                 [
                     'key' => 'catalog',

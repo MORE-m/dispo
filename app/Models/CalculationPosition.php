@@ -21,6 +21,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $algorithm_version
  * @property int $total_spot_count
  * @property bool $needs_spot_redistribution
+ * @property int $inventory_id
+ * @property string|null $inventory_name
+ * @property string|null $inventory_code
  * @property int $advertising_medium_id
  * @property string|null $advertising_medium_name
  * @property string|null $advertising_medium_code
@@ -43,6 +46,8 @@ class CalculationPosition extends Model
         'calculation_id',
         'client_key',
         'inventory_id',
+        'inventory_name',
+        'inventory_code',
         'advertising_medium_id',
         'advertising_medium_name',
         'advertising_medium_code',

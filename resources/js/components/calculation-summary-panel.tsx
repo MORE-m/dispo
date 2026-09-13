@@ -68,6 +68,7 @@ export function CalculationSummaryPanel({
     aeEnabled?: boolean;
     positions: {
         inventory_id: number;
+        inventory_name?: string | null;
         total_spot_count: number;
         length_seconds: number;
     }[];
@@ -107,6 +108,11 @@ export function CalculationSummaryPanel({
                                 );
                                 const total =
                                     totals?.positions?.[index] ?? null;
+                                const displayName =
+                                    (position.inventory_name ?? '').trim() ||
+                                    (total?.inventory_name ?? '').trim() ||
+                                    inventory?.name ||
+                                    'Sender';
                                 const ranges = total?.time_ranges ?? [];
                                 const discounts =
                                     total?.position_discounts ?? [];
@@ -123,16 +129,13 @@ export function CalculationSummaryPanel({
                                     >
                                         <div className="flex items-start gap-3">
                                             <LogoSlot
-                                                name={
-                                                    inventory?.name ?? 'Sender'
-                                                }
+                                                name={displayName}
                                                 logoPath={inventory?.logo_path}
                                                 className="size-8 shrink-0"
                                             />
                                             <div className="min-w-0 flex-1">
                                                 <p className="truncate text-sm font-medium">
-                                                    {inventory?.name ??
-                                                        'Sender'}
+                                                    {displayName}
                                                 </p>
                                                 {position.total_spot_count >
                                                 0 ? (

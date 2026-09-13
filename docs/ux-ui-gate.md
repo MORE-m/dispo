@@ -1,8 +1,9 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 3. September 2026
+- **Stand:** 13. September 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
-  UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe)
+  UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
+  + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 
@@ -18,7 +19,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -189,8 +190,38 @@ freigegeben:
 - Anlegen, Bearbeiten, Deaktivieren/Reaktivieren, Sortierung, fachliche Zuordnung
 - Auswirkungsvorschau für kritische Änderungen
 
-Nicht freigegeben bleiben Inventar-Admin, Preislisten-Admin, Kombinationstabellen-
-Admin, SystemFieldSettings und weitere Kalkulationsarten.
+**Product-Owner-Teilfreigabe (13. September 2026, UX-GATE-D / BL-P2-01a):**
+Für `BL-P2-01 – Administration Inventare und Kombis` sind innerhalb von
+UX-GATE-D **ausschließlich** folgende Bestandteile freigegeben:
+
+- Administration-Hub und Navigation zum Inventarmodul
+- Inventarliste
+- Inventar-Detailansicht
+- Inventar anlegen
+- Inventar-Metadaten bearbeiten
+- Aktivieren und Deaktivieren
+- Sortierung
+- Impact Preview
+- Optimistic Locking und Konfliktzustände
+- Auditierung
+- Leer-, Validierungs-, Fehler- und Read-only-Zustände
+- im späteren Slice `BL-P2-01b`: Pflege der Kombi-Mitgliedschaften einschließlich
+  historisch stabiler Übernahme der enthaltenen Sender in den Dispoauftrag
+
+Ausdrücklich **nicht** freigegeben bleiben:
+
+- Preislisten-Admin
+- Kombinationstabellen-Admin
+- Standardangebote
+- operative Bearbeitung durch die Disposition
+- Material, Uploads, Kommentare, Rückfragen, Reports
+- übrige UX-GATE-D-Module
+- sonstige Kalkulationsarten
+- allgemeine Organisationsverwaltung oder Mehrmandantenfähigkeit
+
+`BL-P2-01a` (Inventar-Admin-Lifecycle) ist der umgesetzte Teil. `BL-P2-01b`
+(Kombi-Mitgliedschaften) bleibt offen. `BL-P2-01` ist damit **nicht** vollständig
+abgeschlossen.
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
@@ -199,8 +230,9 @@ Admin, SystemFieldSettings und weitere Kalkulationsarten.
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der übrigen Initialkataloge (Inventare, Preislisten,
-  Kombinationstabelle, …) – Oberkategorien/Werbemittel freigegeben (ADV-001b)
+- Administration der übrigen Initialkataloge (Preislisten, Kombinationstabelle,
+  Kombi-Mitgliedschaften) – Oberkategorien/Werbemittel (ADV-001b) und
+  Inventar-Admin-Lifecycle (BL-P2-01a) sind teilfreigegeben
 - Auswertungen und abschließende Fachoberflächen
 - Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
 
@@ -216,7 +248,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b); operative Disposition sowie Inventar-/Preislisten-Admin weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b) + Inventar-Admin-Lifecycle (BL-P2-01a); operative Disposition, Preislisten-Admin und Kombi-Mitgliedschaften weiterhin gesperrt |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

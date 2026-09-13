@@ -163,12 +163,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-01 – Organisation und Inventare
 
 - **Phase:** 2
-- **Status:** offen
+- **Status:** teilweise (`BL-P2-01a` Inventar-Admin-Lifecycle umgesetzt; `BL-P2-01b` Kombi-Mitgliedschaften offen)
 - **Anforderungen:** `ORG-001` bis `ORG-003`
 - **Abhängigkeiten:** BL-P1-02
 - **Ergebnis:** eine Organisation, Inventare inkl. Kombi-Mitgliedschaft, Admin-Pflege
 - **Akzeptanz:** Deaktivierung verhindert Neuanlage, historische IDs bleiben
 - **Tests:** Pest CRUD, Aktivstatus, Kombi-Beziehung
+- **BL-P2-01a erledigt:** Inventar-Admin Liste/Detail/Create/Edit/Lifecycle,
+  Impact-Preview, Locking, Audit, historischer Namens-/Code-Freeze an
+  Kalkulationspositionen. Keine Memberships, kein Preislisten-Admin, kein
+  Auto-Import der 14 Startinventare.
+- **BL-P2-01b offen:** Pflege der Kombi-Mitgliedschaften inklusive historisch
+  stabiler Übernahme der enthaltenen Sender in den Dispoauftrag.
 
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 

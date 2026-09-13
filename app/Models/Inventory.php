@@ -10,8 +10,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property int $id
+ * @property int $organization_id
  * @property string $name
  * @property string $code
+ * @property InventoryType $type
+ * @property bool $is_active
+ * @property int $sort
+ * @property string|null $logo_path
+ * @property int $lock_version
  */
 class Inventory extends Model
 {
@@ -36,6 +43,7 @@ class Inventory extends Model
         return [
             'type' => InventoryType::class,
             'is_active' => 'boolean',
+            'lock_version' => 'integer',
         ];
     }
 
@@ -61,5 +69,21 @@ class Inventory extends Model
     public function priceLists(): HasMany
     {
         return $this->hasMany(PriceList::class);
+    }
+
+    /**
+     * @return HasMany<CalculationPosition, $this>
+     */
+    public function calculationPositions(): HasMany
+    {
+        return $this->hasMany(CalculationPosition::class);
+    }
+
+    /**
+     * @return HasMany<DispoOrderPosition, $this>
+     */
+    public function dispoOrderPositions(): HasMany
+    {
+        return $this->hasMany(DispoOrderPosition::class);
     }
 }

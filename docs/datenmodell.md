@@ -42,10 +42,22 @@ sauber abgegrenzt bleiben.
 
 ### Inventar und Kombi-Mitgliedschaft
 
-`Inventory` enthält stabile ID, Name, Kurzcode, Typ, Aktivstatus und Sortierung.
-Kombi-Mitgliedschaften werden als Beziehung mit Gültigkeit/Version geführt.
-Kombis besitzen eigene Preise; Mitgliedschaften dienen Anzeige und Disposition,
-nicht der Preisberechnung (`ORG-002`).
+`Inventory` enthält stabile ID, Name, Kurzcode, Typ (`sender`|`kombi`),
+Aktivstatus und Sortierung. `lock_version` steuert den administrativen Lifecycle
+(BL-P2-01a). Kombi-Mitgliedschaften werden als Beziehung mit Gültigkeit/Version
+geführt (**BL-P2-01b, noch nicht umgesetzt**). Kombis besitzen eigene Preise;
+Mitgliedschaften dienen Anzeige und Disposition, nicht der Preisberechnung
+(`ORG-002`).
+
+**BL-P2-01a (umgesetzt):** Admin-Lifecycle für Inventare (Liste, Anlegen,
+Metadaten, Aktivieren/Deaktivieren, Impact-Preview, Optimistic Locking, Audit).
+Kein Hard Delete. Code und Typ nach dem ersten Speichern unveränderlich.
+Organisation serverseitig als Singleton, ohne Organisations-UI.
+An `calculation_positions` additive Freeze-Spalten `inventory_name` und
+`inventory_code` (Backfill aus dem referenzierten Inventar). Historische
+Kalkulationsanzeigen nutzen den Freeze, nicht den Live-Namen. Dispo-Snapshots
+bestehender Aufträge werden nicht mutiert; neue Dispo-Positionen übernehmen den
+Calc-Freeze. Kein Auto-Import der 14 Startinventare.
 
 ### Oberkategorie und Werbemittel
 

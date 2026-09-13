@@ -1,30 +1,41 @@
 # Fortschritt V1
 
-Stand: 13. September 2026 (DF-3-RULE-C Regel-Editor umgesetzt – **DF-3
-Dyn-Feld-Pfad abgeschlossen**; ADV-002 außerhalb)
+Stand: 13. September 2026 (BL-P2-01a Inventar-Admin-Lifecycle umgesetzt –
+**BL-P2-01b Kombi-Mitgliedschaften offen**; DF-3 Dyn-Feld-Pfad abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 2/3: **DF-1 … DF-3-RULE-C** auf `main`-Pfad abgeschlossen (Feature-Branch
-bis Merge). ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
-`SystemFieldSetting` / ADV-002 liegt außerhalb des DF-3-Regelabschlusses.
-
-Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
-`main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
-Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin inkl. Assignments
-(PO-33b-2), Options-/Regel-Editor (PO-DF3-REST-1) und **Katalog-Admin
-Oberkategorien/Werbemittel (PO-ADV001b-1)**. Inventar- und Preislisten-Admin
-bleiben gesperrt.
+Phase 2: **BL-P2-01a** Inventar-Admin-Lifecycle auf dem Feature-Branch.
+UX-GATE-D enthält Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin,
+Katalog Oberkategorien/Werbemittel (PO-ADV001b-1) und **Inventar-Admin-Lifecycle
+(BL-P2-01a)**. Preislisten-Admin und Kombi-Mitgliedschaften bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster fachlicher Fokus außerhalb DF-3: ADV-001-Rest / Inventar-Preislisten
-oder UX-GATE-D-Rest – kein RULE-D.
+Nächster fachlicher Fokus: `BL-P2-01b` Kombi-Mitgliedschaften (nach eigener
+Freigabe) oder Preislisten-Admin / ADV-001-Rest.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-RULE-C Review-Fixes (PR #49): Vorschau mit Membership-Basiswerten,
-Calc-Origin im Admin-Regelkontext, editierbare Beispielwerte, erweiterte E2E.
+BL-P2-01a Inventar-Admin-Lifecycle: Hub, Liste/Detail/Create/Edit, Aktivieren/
+Deaktivieren, Impact-Preview, Optimistic Locking, Audit, historische
+`inventory_name`/`inventory_code`-Freeze an Kalkulationspositionen.
+
+## BL-P2-01a – Inventory Admin Lifecycle (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe Inventar-Admin-Lifecycle | **freigegeben / umgesetzt** |
+| Hub-Karte Inventare / Kombis | **umgesetzt** |
+| Liste, Detail, Anlegen, Metadaten, Sortierung | **umgesetzt** |
+| Aktivieren/Deaktivieren ohne Hard Delete | **umgesetzt** |
+| Impact-Preview (Calc/Dispo/Preislisten/Regeln) | **umgesetzt** |
+| `lock_version` + HTTP 409 | **umgesetzt** |
+| Audit `inventory.created/updated/deactivated/reactivated` | **umgesetzt** |
+| Historischer Freeze `calculation_positions.inventory_name/code` | **umgesetzt** |
+| E2E isoliert: `playwright.blp201a.config.ts` (Port 8016); Hauptsuite `testIgnore` | **umgesetzt** |
+| Kombi-Mitgliedschaften (`BL-P2-01b`) | **offen** |
+| Preislisten-Admin / Kombinationstabellen / 14-Inventar-Seeder | **nicht in diesem Slice** |
 
 ## DF-3-RULE-C – Administrativer Regel-Editor (September 2026)
 
@@ -570,7 +581,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
-- übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
+- übrige UX-GATE-D-Adminmodule (Preislisten, Kombinationstabelle, Kombi-Mitgliedschaften)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices
 - technische Profil-Provisionierung für Medium-Overrides
@@ -580,6 +591,6 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin und Katalog Kat/Medien teilfreigegeben; Inventare/Preislisten gesperrt) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien und Inventar-Admin-Lifecycle teilfreigegeben; Preislisten/Kombimitgliedschaften gesperrt) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |
