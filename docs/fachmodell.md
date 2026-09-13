@@ -34,7 +34,7 @@ Anforderungskatalogs.
 |---|---|
 | Organisation | more Marketing als einzige Organisation in V1 |
 | Inventar | Buchbare Einheit: Einzelsender, Kombi, digitales oder Event-Inventar |
-| Kombi | Eigenständiges Inventar mit eigener Preisliste und Beziehungen zu enthaltenen Sendern |
+| Kombi | Eigenständiges Inventar (`type=kombi`) mit eigener Preisliste, eigenen Werbemittelregeln und eigenen Kalkulations-/Dispopositionen; keine gepflegte Sender-Mitgliedschaft in V1 |
 | Oberkategorie | Übergeordnete Regelquelle für Kalkulationsarten, Felder und Preisverhalten |
 | Werbemittel | Konkrete buchbare Leistung innerhalb einer Oberkategorie |
 | Kombination | Zulässige Verbindung aus Inventar und Werbemittel mit Buchungskennzeichen, Zuständigkeit, Hinweisen und Regeln |
@@ -101,7 +101,8 @@ Ein Dispoauftrag enthält Kopfdaten, eine Auswahl von Positionen, zentrale Uploa
 Kommentare, Freigaben und Statushistorie. Er entsteht nur aus einer Kundenkalkulation
 (`DSP-007`) und synchronisiert sich niemals automatisch mit der Ursprungskalkulation
 (`DSP-003`). Die tatsächliche Spotlänge jeder übernommenen Spot-Classic-Position
-ist im Snapshot ausgewiesen.
+ist im Snapshot ausgewiesen. Eine Kombi erscheint als eigenständige
+Inventarposition und wird nicht in enthaltene Sender aufgefächert (`ORG-002`).
 
 ### Administration
 

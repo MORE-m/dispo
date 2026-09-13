@@ -207,7 +207,7 @@ Das System bildet genau eine Organisation ab. Sender, Kombis und digitale/eventb
 
 **ORG-001** Jedes Inventar besitzt eine stabile technische ID, Anzeigenamen, Kurzcode, Typ, Aktivstatus und Sortierreihenfolge.
 
-**ORG-002** Kombis sind eigenständige buchbare Inventare mit eigenen Preisen. Ihre enthaltenen Sender werden als Beziehung gepflegt und im Dispoauftrag angezeigt.
+**ORG-002** Kombis sind eigenständige buchbare Inventare und werden in Kalkulation, Preislisten, Werbemittelregeln und Disposition als eigenständige Inventare behandelt. Sie besitzen eigene Preise und eigene fachliche Konfiguration. Eine technische oder operative Pflege enthaltener Sender ist in V1 nicht erforderlich.
 
 **ORG-003** Admin kann Inventare in V1 einzeln anlegen, ändern, aktivieren und deaktivieren. Historische Snapshots bleiben unverändert.
 
@@ -283,7 +283,7 @@ Mögliche Werte für 'Einplanung durch': Disposition, OAP, PDM-Digital / Niklas 
 
 # 7. Preislisten und Preisversionen
 
-**PRI-001** Jedes Inventar besitzt eigenständige Preislisten. Eine Kombi wird nicht aus Preisen ihrer enthaltenen Sender berechnet.
+**PRI-001** Jedes Inventar besitzt eigenständige Preislisten. Eine Kombi wird nicht aus Preisen einzelner Sender berechnet.
 
 **PRI-002** Preislisten werden jahresbezogen versioniert. Die aktuelle Jahrespreisliste ist vorausgewählt; Vertrieb darf eine andere aktive Preisliste wählen.
 
@@ -694,7 +694,7 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 | **Bereich**    | **Inhalte**                                                                                                                                         |
 |----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
 | Kopfdaten      | Kunde, Rechnungsempfänger, Meridian-Nr., Agentur, Kontakte, Kampagne, Mediaberater, Prüf-/Payfaktorfelder, Rechnungs- und Dispohinweise             |
-| Positionen     | Inventar, enthaltene Sender bei Kombi, Werbemittel, Kategorie, Buchungskennzeichen, Einplanung durch, Zeitraum, tatsächliche Spotlänge, Invest, dynamische Felder, Hinweise |
+| Positionen     | Inventar (Kombi als eigenständige Position, ohne Auflösung in Sender), Werbemittel, Kategorie, Buchungskennzeichen, Einplanung durch, Zeitraum, tatsächliche Spotlänge, Invest, dynamische Felder, Hinweise |
 | Uploads        | Zentrale Uploadliste einschließlich Dateien aus dynamischen Datei-Feldern                                                                           |
 | Abrechnung     | Mediabrutto, Rabatte, AE, N/N, Payfaktoren, Rechnung per Ende                                                                                       |
 | Zusammenarbeit | Kommentare, Rückfragen/Antworten, Status-, Freigabe- und Änderungshistorie                                                                          |
@@ -897,7 +897,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 
 | **Modul**              | **Funktionen**                                                                    |
 |------------------------|-----------------------------------------------------------------------------------|
-| Inventare/Kombis       | Einzelanlage/-bearbeitung, enthaltene Sender, Aktivstatus, Sortierung             |
+| Inventare/Kombis       | Einzelanlage/-bearbeitung, Typ (`sender`/`kombi`), Aktivstatus, Sortierung        |
 | Werbemittel/Kategorien | Stammdaten, Zuordnung, Kalkulationsarten, Default-Eigenschaften                   |
 | Kombinationstabelle    | Vollständige Einzelbearbeitung, Buchungskennzeichen, Einplanung, Hinweise, Filter |
 | Preislisten            | Excel-Import, Vorschau, Fehlerprüfung, Aktivierung, Einzeländerung, Versionen     |
@@ -941,7 +941,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 
 **REP-006** Excel- und CSV-Exporte: Listen und Auswertungen. Exportiert werden nur die gemäß Rolle sichtbaren Daten.
 
-**REP-007** Der Dispo-PDF-Export zeigt enthaltene Sender einer Kombi, konkrete Spotverteilung, Targetings/Plattformverteilung, Zusatzpreiszeilen, Hinweise, Freigaben und investitionsrelevante Summen.
+**REP-007** Der Dispo-PDF-Export zeigt das gebuchte Inventar, konkrete Spotverteilung, Targetings/Plattformverteilung, Zusatzpreiszeilen, Hinweise, Freigaben und investitionsrelevante Summen. Eine Kombi erscheint als eigenständige Inventarposition und wird nicht in einzelne Sender aufgefächert.
 
 # 22. Historie, Benachrichtigungen und Nachvollziehbarkeit
 
@@ -970,7 +970,7 @@ E-Mail und In-App-Benachrichtigungen werden ausgelöst bei: Freigabe angefordert
 | **Objekt**                                    | **Kardinalität** | **Zweck**                                                       |
 |-----------------------------------------------|------------------|-----------------------------------------------------------------|
 | Organisation                                  | 1                | Mandantenrahmen; V1 genau eine Organisation                     |
-| Inventar / Kombi-Mitgliedschaft               | n                | Sender/Kombi/digital/event; enthaltene Sender                   |
+| Inventar                                      | n                | Sender (`type=sender`) und Kombi (`type=kombi`) als eigenständige Inventare |
 | Oberkategorie / Werbemittel                   | n                | Produktkatalog und Default-Regeln                               |
 | Inventar-Werbemittel-Regel                    | n:m              | Whitelist, Buchungskennzeichen, Einplanung, Hinweis, Aufschlag  |
 | Preisliste / Preiszeile / Version             | n                | Jahr, Gültigkeit, Tagesgruppe, Stunde, Sekunden-/Fix-/TKP-Preis |

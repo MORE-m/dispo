@@ -92,3 +92,9 @@ V1 ist fachlich abnahmefähig, wenn:
 - PDF-/Excel-/CSV-Exporte anhand freigegebener Muster geprüft sind,
 - Wiederherstellung und Berechtigungsmatrix getestet wurden.
 
+V1 prüft **nicht**, dass eine Kombi in enthaltene Sender aufgelöst wird.
+Eine Kombi erscheint in Kalkulation, Dispoauftrag und Dispo-PDF als
+eigenständiges Inventar (`ORG-002`, `REP-007`, PO-BL-P2-01-KOMBI).
+Typfilter `sender`/`kombi`, eigenständige Preislisten je Inventar und
+historische Inventar-ID-/Namensstabilität bleiben Abnahmekriterien.
+

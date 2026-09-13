@@ -1,25 +1,28 @@
 # Fortschritt V1
 
-Stand: 13. September 2026 (BL-P2-01a Inventar-Admin-Lifecycle umgesetzt –
-**BL-P2-01b Kombi-Mitgliedschaften offen**; DF-3 Dyn-Feld-Pfad abgeschlossen)
+Stand: 13. September 2026 (`BL-P2-01` Organisation und Inventare abgeschlossen –
+Inventar-Admin umgesetzt, Kombi-Mitgliedschaften entfallen durch PO-BL-P2-01-KOMBI;
+DF-3 Dyn-Feld-Pfad abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 2: **BL-P2-01a** Inventar-Admin-Lifecycle auf dem Feature-Branch.
-UX-GATE-D enthält Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin,
-Katalog Oberkategorien/Werbemittel (PO-ADV001b-1) und **Inventar-Admin-Lifecycle
-(BL-P2-01a)**. Preislisten-Admin und Kombi-Mitgliedschaften bleiben gesperrt.
+Phase 2: **`BL-P2-01` erledigt** (auf `main`). UX-GATE-D enthält Teilfreigaben für
+Dispo/Vier-Augen, Dynamische-Felder-Admin, Katalog Oberkategorien/Werbemittel
+(PO-ADV001b-1) und **Inventar-Admin-Lifecycle (BL-P2-01a)**. Preislisten-Admin
+und Kombinationstabellen-Admin bleiben gesperrt. Kombi-Mitgliedschaften sind
+kein V1-Lieferumfang.
 
 ## Aktuelle Aufgabe
 
-Nächster fachlicher Fokus: `BL-P2-01b` Kombi-Mitgliedschaften (nach eigener
-Freigabe) oder Preislisten-Admin / ADV-001-Rest.
+Nächster fachlicher Fokus: `BL-P4-01` Preislisten-Admin / Excel-Import
+(UX-GATE-D dafür noch nicht teilfreigegeben) bzw. ADV-001-Rest.
+`BL-P2-02` Kombinationstabellen-Admin bleibt offen. Keine Membership-
+Implementierung, kein `BL-P2-01b`.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-BL-P2-01a Inventar-Admin-Lifecycle: Hub, Liste/Detail/Create/Edit, Aktivieren/
-Deaktivieren, Impact-Preview, Optimistic Locking, Audit, historische
-`inventory_name`/`inventory_code`-Freeze an Kalkulationspositionen.
+BL-P2-01 Inventare: Admin-Lifecycle plus PO-Vertragsbereinigung
+(Kombis als eigenständige Inventare ohne Sender-Mitgliedschaften; nur `/docs`).
 
 ## BL-P2-01a – Inventory Admin Lifecycle (September 2026)
 
@@ -34,7 +37,8 @@ Deaktivieren, Impact-Preview, Optimistic Locking, Audit, historische
 | Audit `inventory.created/updated/deactivated/reactivated` | **umgesetzt** |
 | Historischer Freeze `calculation_positions.inventory_name/code` | **umgesetzt** |
 | E2E isoliert: `playwright.blp201a.config.ts` (Port 8016); Hauptsuite `testIgnore` | **umgesetzt** |
-| Kombi-Mitgliedschaften (`BL-P2-01b`) | **offen** |
+| Kombi-Mitgliedschaften (`BL-P2-01b`) | **entfallen** (PO-BL-P2-01-KOMBI; kein V1-Slice) |
+| `BL-P2-01` insgesamt | **erledigt** |
 | Preislisten-Admin / Kombinationstabellen / 14-Inventar-Seeder | **nicht in diesem Slice** |
 
 ## DF-3-RULE-C – Administrativer Regel-Editor (September 2026)
@@ -581,7 +585,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
-- übrige UX-GATE-D-Adminmodule (Preislisten, Kombinationstabelle, Kombi-Mitgliedschaften)
+- übrige UX-GATE-D-Adminmodule (Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices
 - technische Profil-Provisionierung für Medium-Overrides
@@ -591,6 +595,6 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien und Inventar-Admin-Lifecycle teilfreigegeben; Preislisten/Kombimitgliedschaften gesperrt) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien und Inventar-Admin-Lifecycle teilfreigegeben; Preislisten/Kombinationstabelle gesperrt; Kombi-Mitgliedschaften entfallen) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |

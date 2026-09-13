@@ -80,10 +80,10 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe); Rest blockiert
+- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
-- **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006)
+- **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
 
 ### BL-P1-A – App-Shell und gemeinsame Grundlage (UX-GATE-A)
 
@@ -163,18 +163,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-01 – Organisation und Inventare
 
 - **Phase:** 2
-- **Status:** teilweise (`BL-P2-01a` Inventar-Admin-Lifecycle umgesetzt; `BL-P2-01b` Kombi-Mitgliedschaften offen)
+- **Status:** erledigt (`BL-P2-01a` Inventar-Admin-Lifecycle; Kombi-Mitgliedschaften entfallen durch PO-BL-P2-01-KOMBI)
 - **Anforderungen:** `ORG-001` bis `ORG-003`
 - **Abhängigkeiten:** BL-P1-02
-- **Ergebnis:** eine Organisation, Inventare inkl. Kombi-Mitgliedschaft, Admin-Pflege
-- **Akzeptanz:** Deaktivierung verhindert Neuanlage, historische IDs bleiben
-- **Tests:** Pest CRUD, Aktivstatus, Kombi-Beziehung
+- **Ergebnis:** eine Organisation; Inventare der Typen `sender` und `kombi` als eigenständige Buchungsobjekte; Admin-Pflege
+- **Akzeptanz:** Deaktivierung verhindert Neuanlage, historische IDs bleiben; Kombis ohne Sender-Membership
+- **Tests:** Pest CRUD, Aktivstatus, Typfilter `sender`/`kombi`; keine Membership-Beziehung
 - **BL-P2-01a erledigt:** Inventar-Admin Liste/Detail/Create/Edit/Lifecycle,
   Impact-Preview, Locking, Audit, historischer Namens-/Code-Freeze an
-  Kalkulationspositionen. Keine Memberships, kein Preislisten-Admin, kein
-  Auto-Import der 14 Startinventare.
-- **BL-P2-01b offen:** Pflege der Kombi-Mitgliedschaften inklusive historisch
-  stabiler Übernahme der enthaltenen Sender in den Dispoauftrag.
+  Kalkulationspositionen. Kein Preislisten-Admin, kein Auto-Import der
+  14 Startinventare.
+- **BL-P2-01b entfällt:** Keine Pflege enthaltener Sender, keine
+  Membership-Tabelle, kein Membership-Snapshot in Kalkulation oder Dispo.
 
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
@@ -208,8 +208,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Phase:** 3
 - **Status:** erledigt (DF-1 … DF-3-RULE-C; Dyn-Feld-Pfad inkl. Optionen und Regel-Editor)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
-- **Geplante Folge:** ADV-001a → … → Optionen / Regel-Editor – **erledigt**; danach Inventar-/Preislisten-Admin / ADV-002
-- **Offen außerhalb DF-3:** ADV-002, Inventar-/Preislisten-Admin.
+- **Geplante Folge:** ADV-001a → … → Optionen / Regel-Editor – **erledigt**; Inventar-Admin erledigt; danach Preislisten-Admin / ADV-002
+- **Offen außerhalb DF-3:** ADV-002, Preislisten-Admin.
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen, Regel-Editor
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
