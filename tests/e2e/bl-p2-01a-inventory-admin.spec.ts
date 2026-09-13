@@ -162,6 +162,31 @@ test.describe.serial('BL-P2-01a Inventar-Admin', () => {
         await expect(
             page.locator('[data-test="calculation-summary"]'),
         ).not.toContainText('Radio Hamburg E2E umbenannt');
+
+        await page.goto('/kalkulationen/neu');
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        const wizardLabels = await page
+            .locator('[data-test="position-inventory-0"] option')
+            .allTextContents();
+        expect(wizardLabels).toContain('Radio Hamburg E2E umbenannt');
+        expect(wizardLabels).toContain('ROCK ANTENNE Hamburg');
+        expect(wizardLabels).not.toContain('Radio Hamburg');
+
+        await page.goto('/kalkulationen/neu');
+        await page
+            .getByRole('radio', { name: /Mit Budget planen/i })
+            .click({ force: true });
+        await page.getByLabel('Zielbudget N/N').fill('500');
+        await page.getByRole('button', { name: 'Weiter' }).click();
+        await expect(
+            page.locator('[data-test="budget-elements-step"]'),
+        ).toBeVisible();
+        const budgetLabels = await page
+            .locator('#budget-element-inventory-0 option')
+            .allTextContents();
+        expect(budgetLabels).toContain('Radio Hamburg E2E umbenannt');
+        expect(budgetLabels).toContain('ROCK ANTENNE Hamburg');
+        expect(budgetLabels).not.toContain('Radio Hamburg');
     });
 
     test('Nicht-Admin erhält 403', async ({ page }) => {

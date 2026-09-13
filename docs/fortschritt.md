@@ -33,6 +33,7 @@ Deaktivieren, Impact-Preview, Optimistic Locking, Audit, historische
 | `lock_version` + HTTP 409 | **umgesetzt** |
 | Audit `inventory.created/updated/deactivated/reactivated` | **umgesetzt** |
 | Historischer Freeze `calculation_positions.inventory_name/code` | **umgesetzt** |
+| E2E isoliert: `playwright.blp201a.config.ts` (Port 8016); Hauptsuite `testIgnore` | **umgesetzt** |
 | Kombi-Mitgliedschaften (`BL-P2-01b`) | **offen** |
 | Preislisten-Admin / Kombinationstabellen / 14-Inventar-Seeder | **nicht in diesem Slice** |
 

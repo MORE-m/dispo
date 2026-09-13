@@ -383,6 +383,61 @@ class InventoryAdminLifecycleTest extends TestCase
             ->assertSessionHasErrors('positions');
     }
 
+    public function test_rename_keeps_historical_freeze_but_new_positions_use_live_catalog(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $historical = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ], $sales);
+
+        $this->actingAs($admin)
+            ->putJson(route('administration.inventories.update', $catalog['hamburg']), [
+                'name' => 'Radio Hamburg Neu',
+                'sort' => 1,
+                'lock_version' => $catalog['hamburg']->fresh()->lock_version,
+            ])
+            ->assertOk();
+
+        $historicalPosition = $historical->positions()->firstOrFail();
+        $historicalPosition->refresh();
+        $this->assertSame('Radio Hamburg', $historicalPosition->inventory_name);
+        $this->assertSame('RH', $historicalPosition->inventory_code);
+
+        $this->actingAs($sales)
+            ->get(route('calculations.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('calculations/wizard')
+                ->where('catalog.inventories', function ($inventories): bool {
+                    $rows = collect($inventories);
+
+                    return $rows->contains(fn (array $row): bool => $row['name'] === 'Radio Hamburg Neu'
+                        && $row['code'] === 'RH'
+                        && $row['is_active'] === true)
+                        && $rows->contains(fn (array $row): bool => $row['name'] === 'ROCK ANTENNE Hamburg'
+                            && $row['is_active'] === true)
+                        && ! $rows->contains(fn (array $row): bool => $row['name'] === 'Radio Hamburg');
+                }));
+
+        $fresh = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+            ['inventory_id' => $catalog['rock']->id],
+        ], $sales);
+        $fresh->load('positions');
+
+        $hamburg = $fresh->positions->firstWhere('inventory_id', $catalog['hamburg']->id);
+        $rock = $fresh->positions->firstWhere('inventory_id', $catalog['rock']->id);
+        $this->assertNotNull($hamburg);
+        $this->assertNotNull($rock);
+        $this->assertSame('Radio Hamburg Neu', $hamburg->inventory_name);
+        $this->assertSame('RH', $hamburg->inventory_code);
+        $this->assertSame('ROCK ANTENNE Hamburg', $rock->inventory_name);
+        $this->assertSame('RAH', $rock->inventory_code);
+        $this->assertSame('Radio Hamburg', $historicalPosition->fresh()->inventory_name);
+    }
+
     public function test_backfill_fills_missing_inventory_identity_from_live_row(): void
     {
         $catalog = $this->createSpotClassicCatalog();
