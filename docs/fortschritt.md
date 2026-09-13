@@ -1,12 +1,12 @@
 # Fortschritt V1
 
-Stand: 12. September 2026 (DF-3-RULE-A Regelvertrag/Evaluatoren umgesetzt –
-DF-3 weiter offen: RULE-B Runtime-UI, RULE-C Editor; ADV-002 außerhalb)
+Stand: 13. September 2026 (DF-3-RULE-B Runtime Visible/Required umgesetzt –
+DF-3 weiter offen: RULE-C Regel-Editor; ADV-002 außerhalb)
 
 ## Aktuelle Phase
 
-Phase 2/3 parallel: **DF-1 … ADV-001c4b** sowie **DF-3-REST-A–C3** und
-**DF-3-RULE-A** (V1-Regelvertrag). Gesamtziel DF-3 bleibt offen bis RULE-B/C.
+Phase 2/3 parallel: **DF-1 … ADV-001c4b**, **DF-3-REST-A–C3**, **DF-3-RULE-A**
+und **DF-3-RULE-B** (Runtime-UI). Gesamtziel DF-3 bleibt offen bis RULE-C.
 ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
 `SystemFieldSetting` / ADV-002 liegt außerhalb des DF-3-Regelabschlusses.
 
@@ -19,14 +19,30 @@ bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster Slice: **DF-3-RULE-B** Runtime Visible/Required in Calc-/Dispo-UI.
-Danach RULE-C Regel-Editor.
+Nächster Slice: **DF-3-RULE-C** Regel-Editor.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-RULE-A: zentraler V1-Regelvertrag (`FieldRuleContract`), Evaluator mit
-Header-Pass, flaches all/any, `set_visible`/`require_field`, Preview/Activate/
-Freeze/Merge fail-closed, TS-Parity-Library. Keine produktive UI, kein Editor.
+DF-3-RULE-B: produktive Runtime Visible/Required in Calc-/Dispo-UI auf Basis
+RULE-A, Keep-on-missing inkl. Calc-Text, DYN-005 in Writer-Pfaden,
+kontexttreue Schema-Props, gemeinsame Client-Auswertung.
+
+## DF-3-RULE-B – Runtime Visible/Required (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Gemeinsame Client-Auswertung (`snapshot-field-runtime.ts`) | **umgesetzt** |
+| Calc-/Dispo-UI Effective Visible/Required | **umgesetzt** |
+| Keep-on-missing (Calc Text/Period/Boolean + Choice) | **umgesetzt** |
+| DYN-005 Writer/Submit/Create/Partial-Choice | **umgesetzt** |
+| Schema-Props inkl. basis `visible=false`, `action_target_readonly` | **umgesetzt** |
+| Kontexttreue Positions-Rules (kein Merge für Runtime) | **umgesetzt** |
+| Regel-Editor (RULE-C) | **nicht** |
+| SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
+
+**PO-Festlegungen:** Pending-Wert bei Unsichtbarwerden persistieren (Option A);
+fehlender Payload-Key = Keep; Calc-Draft ohne neue statische Required-Sperre;
+Dispo-Partial ohne neue rule-required-Sperre; volle Pflicht nur Create/Copy/Sync/Submit.
 
 ## DF-3-RULE-A – Regelvertrag / Evaluatoren (September 2026)
 
@@ -34,25 +50,19 @@ Freeze/Merge fail-closed, TS-Parity-Library. Keine produktive UI, kein Editor.
 |------|--------|
 | `FieldRuleContract` Allowlist + flaches all/any + Typmatrix | **umgesetzt** |
 | Cross-Scope (Header↔Position), Position→Header block | **umgesetzt** |
-| `set_visible` / `require_field` + DYN-005 | **umgesetzt** |
+| `set_visible` / `require_field` + DYN-005 Contract | **umgesetzt** |
 | Calc-Origin via Provenance (`action_target_readonly`); exakte Seed-Ausnahme | **umgesetzt** |
 | Selbstreferenz-`set_visible` block; `require_field` Selbstreferenz erlaubt | **umgesetzt** |
 | Dedupe-Kanon (Seed-Hash stabil) | **umgesetzt** |
 | Integrity + Preview/Activate/Freeze/Merge fail-closed am Contract | **umgesetzt** |
 | TS-Parity fail-closed + Legacy-Seed-Adapter | **umgesetzt** |
-| Calc-/Dispo-UI-Verdrahtung inkl. DYN-005 für statisch required (RULE-B) | **nicht** |
+| Calc-/Dispo-UI-Verdrahtung inkl. DYN-005 für statisch required (RULE-B) | **umgesetzt (RULE-B)** |
 | Regel-Editor (RULE-C) | **nicht** |
 | SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
 
 **RULE-A-/RULE-B-Grenze:** RULE-A liefert Vertrag und Effective-State. `validate()`
-prüft nur regelbasiertes Required; statisches Required bleibt in Writern.
-DYN-005 für dynamisch ausgeblendete, statisch required Felder folgt in RULE-B.
-Partial-Save unverändert.
-
-**RULE-B-Vormerkung:** Schema-Props dürfen Regelziele mit Basis-`visible=false`
-nicht vor Client-Auswertung entfernen; Conditions brauchen Definitionen und
-Rohwerte; erst der effektive Zustand steuert Rendering; Werte bleiben erhalten.
-RULE-A ändert C2/C3-Schema-Buckets nicht.
+prüft nur regelbasiertes Required; statisches Required bleibt in Writern mit
+Effective Visible (RULE-B/DYN-005). Partial-Save unverändert außer DYN-005.
 
 ## DF-3-REST-C3 – Dispo Choice-UI (September 2026)
 

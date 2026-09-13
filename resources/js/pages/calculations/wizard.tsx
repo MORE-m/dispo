@@ -30,7 +30,6 @@ import {
     SchemaChoiceFields,
     customHeaderChoiceFieldsFromSchema,
     customPositionChoiceFieldsFromSchema,
-    visibleChoiceFields,
 } from '@/components/dynamic-fields/schema-choice-fields';
 import {
     SchemaTextFields,
@@ -106,7 +105,12 @@ import {
     firstValidationMessage,
     mapValidationErrors,
 } from '@/lib/validation-errors';
-import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
+import {
+    applyEffectiveRequired,
+    evaluateSnapshotFieldRuntime,
+    filterByEffectiveVisible,
+} from '@/lib/snapshot-field-runtime';
+import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
     nextSchemaFetchGeneration,
@@ -154,6 +158,7 @@ type FieldSchema = {
     }>;
     schema_fingerprint?: string | null;
     format_version?: number;
+    rules_integrity_error?: string | null;
 };
 
 type PositionDraft = {
@@ -691,10 +696,6 @@ export default function CalculationWizard({
         [fieldSchema.fields],
     );
     const [schemaRetryToken, setSchemaRetryToken] = useState(0);
-    const visibleHeaderChoiceFields = useMemo(
-        () => visibleChoiceFields(customHeaderChoiceFields),
-        [customHeaderChoiceFields],
-    );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
     const [customHeaderValues, setCustomHeaderValues] = useState<
@@ -742,6 +743,70 @@ export default function CalculationWizard({
 
         return meta;
     });
+    const headerValuesForRules = useMemo(() => {
+        const values: Record<string, unknown> = {
+            campaign_period:
+                campaignPeriodStart || campaignPeriodEnd
+                    ? {
+                          start: campaignPeriodStart || null,
+                          end: campaignPeriodEnd || null,
+                      }
+                    : null,
+        };
+        for (const [key, value] of Object.entries(customHeaderValues)) {
+            values[key] = value.trim() === '' ? null : value;
+        }
+        for (const [key, value] of Object.entries(customHeaderChoiceValues)) {
+            values[key] = value;
+        }
+
+        return values;
+    }, [
+        campaignPeriodStart,
+        campaignPeriodEnd,
+        customHeaderValues,
+        customHeaderChoiceValues,
+    ]);
+    const headerRuntime = useMemo(
+        () =>
+            evaluateSnapshotFieldRuntime({
+                fields: fieldSchema.fields.filter(
+                    (field) =>
+                        field.scope === 'header' || field.scope === undefined,
+                ),
+                // Vollständiger Def-Katalog: Header-Pass inkl. Positionsregeln (DF-1-Seed).
+                definitionFields: fieldSchema.fields,
+                rules: fieldSchema.rules as SnapshotFieldRule[],
+                scope: 'header',
+                headerValues: headerValuesForRules,
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
+            }),
+        [
+            fieldSchema.fields,
+            fieldSchema.rules,
+            fieldSchema.rules_integrity_error,
+            headerValuesForRules,
+        ],
+    );
+    const visibleHeaderTextFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(customHeaderFields, headerRuntime),
+                headerRuntime,
+            ),
+        [customHeaderFields, headerRuntime],
+    );
+    const visibleHeaderChoiceFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(
+                    customHeaderChoiceFields,
+                    headerRuntime,
+                ),
+                headerRuntime,
+            ),
+        [customHeaderChoiceFields, headerRuntime],
+    );
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -1498,6 +1563,49 @@ export default function CalculationWizard({
     }
 
     function save() {
+        if (headerRuntime.integrityError) {
+            setSaveError(
+                `Speichern nicht möglich: ${headerRuntime.integrityError}`,
+            );
+            return;
+        }
+
+        for (const position of positions) {
+            const positionFields = schemaFieldsForPosition(
+                position,
+                fieldSchema,
+                existingGen3,
+            );
+            const positionRules = schemaRulesForPosition(
+                position,
+                fieldSchema,
+                existingGen3,
+            );
+            const positionRuntime = evaluateSnapshotFieldRuntime({
+                fields: positionFields,
+                rules: positionRules as SnapshotFieldRule[],
+                scope: 'position',
+                headerValues: headerValuesForRules,
+                positionValues: {
+                    period_open: position.period_open,
+                    ...position.custom_fields,
+                    ...position.custom_choice_fields,
+                },
+                conditionFields: fieldSchema.fields.filter(
+                    (field) =>
+                        field.scope === 'header' || field.scope === undefined,
+                ),
+                additionalRules: fieldSchema.rules as SnapshotFieldRule[],
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
+            });
+            if (positionRuntime.integrityError) {
+                setSaveError(
+                    `Speichern nicht möglich: ${positionRuntime.integrityError}`,
+                );
+                return;
+            }
+        }
+
         const missingMethod = positions.find(
             (position) => !hasSubmittableCalculationMethodKey(position),
         );
@@ -2058,51 +2166,84 @@ export default function CalculationWizard({
                                                 disabled={!canEdit}
                                             />
                                         </FormField>
-                                        <FormField
-                                            label={
-                                                fieldSchema.fields.find(
-                                                    (field) =>
-                                                        field.key ===
+                                        {headerRuntime.integrityError ? (
+                                            <p
+                                                className="text-destructive text-sm sm:col-span-2"
+                                                data-test="calculation-rules-integrity"
+                                                role="alert"
+                                            >
+                                                {headerRuntime.integrityError}
+                                            </p>
+                                        ) : null}
+                                        {headerRuntime.isFieldVisible(
+                                            'campaign_period',
+                                        ) ? (
+                                            <FormField
+                                                label={
+                                                    (fieldSchema.fields.find(
+                                                        (field) =>
+                                                            field.key ===
+                                                            'campaign_period',
+                                                    )?.label ??
+                                                        'Kampagnenzeitraum') +
+                                                    (headerRuntime.isFieldRequired(
                                                         'campaign_period',
-                                                )?.label ?? 'Kampagnenzeitraum'
-                                            }
-                                            htmlFor="campaign-period-start"
-                                            hint={
-                                                fieldSchema.fields.find(
-                                                    (field) =>
-                                                        field.key ===
-                                                        'campaign_period',
-                                                )?.help_text ?? undefined
-                                            }
-                                        >
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    id="campaign-period-start"
-                                                    type="date"
-                                                    value={campaignPeriodStart}
-                                                    onChange={(event) =>
-                                                        setCampaignPeriodStart(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                    data-test="campaign-period-start"
-                                                />
-                                                <Input
-                                                    id="campaign-period-end"
-                                                    type="date"
-                                                    value={campaignPeriodEnd}
-                                                    onChange={(event) =>
-                                                        setCampaignPeriodEnd(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                    data-test="campaign-period-end"
-                                                />
-                                            </div>
-                                        </FormField>
-                                        {customHeaderFields.length > 0 ||
+                                                    )
+                                                        ? ' *'
+                                                        : '')
+                                                }
+                                                htmlFor="campaign-period-start"
+                                                hint={
+                                                    fieldSchema.fields.find(
+                                                        (field) =>
+                                                            field.key ===
+                                                            'campaign_period',
+                                                    )?.help_text ?? undefined
+                                                }
+                                            >
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <Input
+                                                        id="campaign-period-start"
+                                                        type="date"
+                                                        value={
+                                                            campaignPeriodStart
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCampaignPeriodStart(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            headerRuntime.integrityError !==
+                                                                null
+                                                        }
+                                                        data-test="campaign-period-start"
+                                                    />
+                                                    <Input
+                                                        id="campaign-period-end"
+                                                        type="date"
+                                                        value={
+                                                            campaignPeriodEnd
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCampaignPeriodEnd(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            headerRuntime.integrityError !==
+                                                                null
+                                                        }
+                                                        data-test="campaign-period-end"
+                                                    />
+                                                </div>
+                                            </FormField>
+                                        ) : null}
+                                        {visibleHeaderTextFields.length > 0 ||
                                         visibleHeaderChoiceFields.length > 0 ? (
                                             <div
                                                 className="space-y-3 sm:col-span-2"
@@ -2112,10 +2253,16 @@ export default function CalculationWizard({
                                                     Weitere Angaben
                                                 </h3>
                                                 <SchemaTextFields
-                                                    fields={customHeaderFields}
+                                                    fields={
+                                                        visibleHeaderTextFields
+                                                    }
                                                     values={customHeaderValues}
                                                     errors={fieldErrors}
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        headerRuntime.integrityError !==
+                                                            null
+                                                    }
                                                     idPrefix="calc-custom"
                                                     onChange={(key, value) =>
                                                         setCustomHeaderValues(
@@ -2128,13 +2275,17 @@ export default function CalculationWizard({
                                                 />
                                                 <SchemaChoiceFields
                                                     fields={
-                                                        customHeaderChoiceFields
+                                                        visibleHeaderChoiceFields
                                                     }
                                                     values={
                                                         customHeaderChoiceValues
                                                     }
                                                     errors={fieldErrors}
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        headerRuntime.integrityError !==
+                                                            null
+                                                    }
                                                     idPrefix="calc-choice"
                                                     onChange={(key, value) => {
                                                         setCustomHeaderChoiceValues(
@@ -2231,10 +2382,77 @@ export default function CalculationWizard({
                                             customPositionChoiceFieldsFromSchema(
                                                 positionFields,
                                             );
-                                        const visiblePositionChoiceFields =
-                                            visibleChoiceFields(
-                                                positionChoiceFields,
+                                        const positionValuesForRules: Record<
+                                            string,
+                                            unknown
+                                        > = {
+                                            period_open: position.period_open,
+                                            position_flight_period:
+                                                position.flight_period_start ||
+                                                position.flight_period_end
+                                                    ? {
+                                                          start:
+                                                              position.flight_period_start ||
+                                                              null,
+                                                          end:
+                                                              position.flight_period_end ||
+                                                              null,
+                                                      }
+                                                    : null,
+                                            ...Object.fromEntries(
+                                                Object.entries(
+                                                    position.custom_fields,
+                                                ).map(([key, value]) => [
+                                                    key,
+                                                    value.trim() === ''
+                                                        ? null
+                                                        : value,
+                                                ]),
+                                            ),
+                                            ...position.custom_choice_fields,
+                                        };
+                                        const positionRuntime =
+                                            evaluateSnapshotFieldRuntime({
+                                                fields: positionFields,
+                                                rules: positionRules as SnapshotFieldRule[],
+                                                scope: 'position',
+                                                headerValues:
+                                                    headerValuesForRules,
+                                                positionValues:
+                                                    positionValuesForRules,
+                                                conditionFields:
+                                                    fieldSchema.fields.filter(
+                                                        (field) =>
+                                                            field.scope ===
+                                                                'header' ||
+                                                            field.scope ===
+                                                                undefined,
+                                                    ),
+                                                additionalRules:
+                                                    fieldSchema.rules as SnapshotFieldRule[],
+                                                serverIntegrityError:
+                                                    fieldSchema.rules_integrity_error ??
+                                                    null,
+                                            });
+                                        const visiblePositionTextFields =
+                                            applyEffectiveRequired(
+                                                filterByEffectiveVisible(
+                                                    positionCustomFields,
+                                                    positionRuntime,
+                                                ),
+                                                positionRuntime,
                                             );
+                                        const visiblePositionChoiceFields =
+                                            applyEffectiveRequired(
+                                                filterByEffectiveVisible(
+                                                    positionChoiceFields,
+                                                    positionRuntime,
+                                                ),
+                                                positionRuntime,
+                                            );
+                                        const rulesIntegrityError =
+                                            headerRuntime.integrityError ??
+                                            positionRuntime.integrityError;
 
                                         return (
                                             <section
@@ -2504,53 +2722,65 @@ export default function CalculationWizard({
                                                                     }
                                                                 />
                                                             </FormField>
-                                                            <FormField
-                                                                label={
-                                                                    positionFields.find(
-                                                                        (
-                                                                            field,
-                                                                        ) =>
-                                                                            field.key ===
-                                                                            'period_open',
-                                                                    )?.label ??
-                                                                    'Zeitraum offen'
-                                                                }
-                                                                htmlFor={`period-open-${index}`}
-                                                                hint={
-                                                                    positionFields.find(
-                                                                        (
-                                                                            field,
-                                                                        ) =>
-                                                                            field.key ===
-                                                                            'period_open',
-                                                                    )
-                                                                        ?.help_text ??
-                                                                    undefined
-                                                                }
-                                                            >
-                                                                <Checkbox
-                                                                    id={`period-open-${index}`}
-                                                                    data-test={`period-open-${index}`}
-                                                                    checked={
-                                                                        position.period_open
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                period_open:
-                                                                                    checked ===
-                                                                                    true,
-                                                                            },
+                                                            {positionRuntime.isFieldVisible(
+                                                                'period_open',
+                                                            ) ? (
+                                                                <FormField
+                                                                    label={
+                                                                        (positionFields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
                                                                         )
+                                                                            ?.label ??
+                                                                            'Zeitraum offen') +
+                                                                        (positionRuntime.isFieldRequired(
+                                                                            'period_open',
+                                                                        )
+                                                                            ? ' *'
+                                                                            : '')
                                                                     }
-                                                                />
-                                                            </FormField>
+                                                                    htmlFor={`period-open-${index}`}
+                                                                    hint={
+                                                                        positionFields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
+                                                                        )
+                                                                            ?.help_text ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    <Checkbox
+                                                                        id={`period-open-${index}`}
+                                                                        data-test={`period-open-${index}`}
+                                                                        checked={
+                                                                            position.period_open
+                                                                        }
+                                                                        disabled={
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
+                                                                        }
+                                                                        onCheckedChange={(
+                                                                            checked,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    period_open:
+                                                                                        checked ===
+                                                                                        true,
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </FormField>
+                                                            ) : null}
                                                         </div>
 
                                                         <CalculationMethodSelector
@@ -2623,26 +2853,23 @@ export default function CalculationWizard({
                                                         />
 
                                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            {requiredPositionFieldKeysFromSnapshotRules(
-                                                                positionRules,
-                                                                {
-                                                                    period_open:
-                                                                        position.period_open,
-                                                                    position_flight_period:
-                                                                        position.flight_period_start ||
-                                                                        position.flight_period_end
-                                                                            ? {
-                                                                                  start: position.flight_period_start,
-                                                                                  end: position.flight_period_end,
-                                                                              }
-                                                                            : null,
-                                                                },
-                                                            ).includes(
+                                                            {rulesIntegrityError ? (
+                                                                <p
+                                                                    className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
+                                                                    data-test={`calculation-rules-integrity-${position.client_key}`}
+                                                                    role="alert"
+                                                                >
+                                                                    {
+                                                                        rulesIntegrityError
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                            {positionRuntime.isFieldVisible(
                                                                 'position_flight_period',
                                                             ) ? (
                                                                 <FormField
                                                                     label={
-                                                                        positionFields.find(
+                                                                        (positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -2650,7 +2877,12 @@ export default function CalculationWizard({
                                                                                 'position_flight_period',
                                                                         )
                                                                             ?.label ??
-                                                                        'Flugzeitraum'
+                                                                            'Flugzeitraum') +
+                                                                        (positionRuntime.isFieldRequired(
+                                                                            'position_flight_period',
+                                                                        )
+                                                                            ? ' *'
+                                                                            : '')
                                                                     }
                                                                     htmlFor={`flight-start-${index}`}
                                                                     hint={
@@ -2673,7 +2905,9 @@ export default function CalculationWizard({
                                                                                 position.flight_period_start
                                                                             }
                                                                             disabled={
-                                                                                !canEdit
+                                                                                !canEdit ||
+                                                                                rulesIntegrityError !==
+                                                                                    null
                                                                             }
                                                                             data-test={`flight-period-start-${index}`}
                                                                             onChange={(
@@ -2697,7 +2931,9 @@ export default function CalculationWizard({
                                                                                 position.flight_period_end
                                                                             }
                                                                             disabled={
-                                                                                !canEdit
+                                                                                !canEdit ||
+                                                                                rulesIntegrityError !==
+                                                                                    null
                                                                             }
                                                                             data-test={`flight-period-end-${index}`}
                                                                             onChange={(
@@ -2717,7 +2953,7 @@ export default function CalculationWizard({
                                                                     </div>
                                                                 </FormField>
                                                             ) : null}
-                                                            {positionCustomFields.length >
+                                                            {visiblePositionTextFields.length >
                                                                 0 ||
                                                             visiblePositionChoiceFields.length >
                                                                 0 ? (
@@ -2731,7 +2967,7 @@ export default function CalculationWizard({
                                                                     </h3>
                                                                     <SchemaTextFields
                                                                         fields={
-                                                                            positionCustomFields
+                                                                            visiblePositionTextFields
                                                                         }
                                                                         values={
                                                                             position.custom_fields
@@ -2743,7 +2979,9 @@ export default function CalculationWizard({
                                                                             `positions.${index}.dynamic_field_values`,
                                                                         ]}
                                                                         disabled={
-                                                                            !canEdit
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
                                                                         }
                                                                         idPrefix={`calc-pos-custom-${position.client_key}`}
                                                                         onChange={(
@@ -2764,7 +3002,7 @@ export default function CalculationWizard({
                                                                     />
                                                                     <SchemaChoiceFields
                                                                         fields={
-                                                                            positionChoiceFields
+                                                                            visiblePositionChoiceFields
                                                                         }
                                                                         values={
                                                                             position.custom_choice_fields
@@ -2776,7 +3014,9 @@ export default function CalculationWizard({
                                                                             `positions.${index}.dynamic_field_values`,
                                                                         ]}
                                                                         disabled={
-                                                                            !canEdit
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
                                                                         }
                                                                         idPrefix={`calc-pos-choice-${position.client_key}`}
                                                                         onChange={(
@@ -3634,6 +3874,7 @@ export default function CalculationWizard({
                                 disabled={
                                     busy ||
                                     schemaStillLoading ||
+                                    headerRuntime.integrityError !== null ||
                                     (planningMode === 'budget' &&
                                         positions.length === 0 &&
                                         !isBudgetSetup)

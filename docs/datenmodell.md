@@ -464,8 +464,8 @@ Umgesetzt in DF-3-REST-C2 (Calc-UI) und C3 (Dispo-UI):
 
 Weiter offen für den DF-3-Abschluss:
 
-- Runtime Visible/Required in Calc-/Dispo-UI (DF-3-RULE-B)
-- Regel-Editor (DF-3-RULE-C)
+- Runtime Visible/Required in Calc-/Dispo-UI (DF-3-RULE-B) – **umgesetzt**
+- Regel-Editor (DF-3-RULE-C) – offen
 - Gen4 / weitere Regeloperatoren nach Bedarf
 
 Außerhalb DF-3:

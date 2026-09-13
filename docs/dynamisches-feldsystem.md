@@ -319,19 +319,21 @@ sichtbar) → Werte unsichtbarer Felder bleiben (DYN-005, Contract). Regeln
 mutieren keine Werte.
 
 **RULE-A liefert** den Vertrag und Effective-State-APIs. **RULE-B** verdrahtet
-dynamische Sichtbarkeit vollständig in produktive Writer-/UI-Pfade. Bis dahin
-prüft `SnapshotFieldRuleEvaluator::validate()` nur regelbasiertes Required;
-statisches Snapshot-`required` bleibt in bestehenden Writer-/Completeness-
-Pfaden. DYN-005 für dynamisch ausgeblendete, **statisch** required Felder ist
-damit noch nicht auf jedem Save-Pfad verdrahtet. Partial-Save bleibt
-unverändert.
+dynamische Sichtbarkeit und Required in produktive Writer-/UI-Pfade:
 
-**DYN-004 (Präzisierung):** Integrity bei fachlicher Speicherung; volle
-Required-Prüfung bei Create/Submit/Status. Draft-Partial-Save blockiert
-unberührte Pflichtfelder nicht (Writer-Vertrag; UI-Parity in RULE-B).
+- gemeinsame Client-Auswertung (`resources/js/lib/snapshot-field-runtime.ts`)
+  auf `dynamic-field-rules.ts`; Controls bleiben regel-frei
+- Schema-Props liefern Basis-`visible`/`required` inkl. `visible=false`;
+  Effective steuert Rendering; Positionsregeln kontexttreu je Effektiv-Snapshot
+- Keep-on-missing: fehlender Payload-Key = unverändert (Calc Text inkl.);
+  expliziter Leerwert = Clear; Pending-Wert trotz Unsichtbarwerden persistieren
+- DYN-005: `effectiveVisible=false` ⇒ kein Pflichtfehler in Partial/Submit/Create
+- `SnapshotFieldRuleEvaluator::validate()` prüft weiterhin nur regelbasiertes
+  Required (`basisRequired: []`); statisches Required bleibt Writer-Sache mit
+  Effective Visible
 
-Admin-Regel-Editor (RULE-C) und produktive Calc-/Dispo-UI-Verdrahtung (RULE-B)
-sind noch offen. Zahl-/Datumsvergleiche und nested Logic sind außerhalb V1.
+Admin-Regel-Editor (RULE-C) bleibt offen. Zahl-/Datumsvergleiche und nested
+Logic sind außerhalb V1.
 
 Regeln referenzieren stabile Feld- und Options-Keys, niemals nur Anzeigenamen.
 

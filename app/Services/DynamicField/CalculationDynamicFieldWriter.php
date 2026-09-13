@@ -13,8 +13,10 @@ use App\Models\SnapshotFieldDefinition;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Persistiert typisierte Dyn-Werte gegen Snapshot-Definitionen.
@@ -56,12 +58,12 @@ final class CalculationDynamicFieldWriter
             'dynamic_field_values',
         );
 
-        $previousHeader = $this->storedChoiceValuesByKey(
+        $previousHeader = $this->storedValuesByKey(
             $snapshot,
             FieldScope::Header,
             $calculation->fieldValues,
         );
-        [$headerValues, $headerChoiceDirty] = $this->normalizeScopeValues(
+        [$headerValues, $headerDirty] = $this->normalizeScopeValues(
             $snapshot,
             FieldScope::Header,
             $headerInput,
@@ -83,17 +85,14 @@ final class CalculationDynamicFieldWriter
             $input = is_array($positionPayload['dynamic_field_values'] ?? null)
                 ? $positionPayload['dynamic_field_values']
                 : [];
-            if (! array_key_exists('period_open', $input)) {
-                $input['period_open'] = true;
-            }
             $prefix = "positions.{$index}.dynamic_field_values";
             $this->rejectUnknownKeys($scopeSnapshot, FieldScope::Position, $input, $prefix);
-            $previousPosition = $this->storedChoiceValuesByKey(
+            $previousPosition = $this->storedValuesByKey(
                 $scopeSnapshot,
                 FieldScope::Position,
                 $position->fieldValues,
             );
-            [$values, $choiceDirty] = $this->normalizeScopeValues(
+            [$values, $dirty] = $this->normalizeScopeValues(
                 $scopeSnapshot,
                 FieldScope::Position,
                 $input,
@@ -105,20 +104,20 @@ final class CalculationDynamicFieldWriter
                 'position' => $position,
                 'snapshot' => $scopeSnapshot,
                 'values' => $values,
-                'choice_dirty' => $choiceDirty,
+                'dirty' => $dirty,
             ];
         }
 
         $this->validateRules($snapshot, $headerValues, $positionContexts);
 
-        $this->persistHeaderValues($calculation, $snapshot, $headerValues, $headerChoiceDirty);
+        $this->persistHeaderValues($calculation, $snapshot, $headerValues, $headerDirty);
 
         foreach ($positionContexts as $context) {
             $this->persistPositionValues(
                 $context['position'],
                 $context['snapshot'],
                 $context['values'],
-                $context['choice_dirty'],
+                $context['dirty'],
             );
         }
     }
@@ -144,7 +143,19 @@ final class CalculationDynamicFieldWriter
             );
         }
 
-        $effective->assertReadable();
+        try {
+            $effective->assertReadable();
+        } catch (Throwable $exception) {
+            // RULE-B: Show/Payload darf Integrity soft-failen; Mutation bleibt fail-closed.
+            Log::warning('Calculation position scope snapshot integrity failed', [
+                'position_id' => $position->id,
+                'snapshot_id' => $effective->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            $effective->loadMissing(['fieldDefinitions', 'rules']);
+
+            return $effective;
+        }
         $effective->loadMissing(['fieldDefinitions', 'rules']);
 
         return $effective;
@@ -298,8 +309,12 @@ final class CalculationDynamicFieldWriter
     }
 
     /**
+     * DF-3-RULE-B: fehlender Payload-Key = Keep (DB-Overlay); expliziter Leerwert = Clear.
+     * Nur angefasste Keys werden persistiert. period_open defaultet nur bei wirklich
+     * neuen Positionen ohne gespeicherten Wert auf true.
+     *
      * @param  array<string, mixed>  $input
-     * @param  array<string, string|list<string>|null>  $previousChoice
+     * @param  array<string, mixed>  $previousValues
      * @return array{0: array<string, mixed>, 1: array<string, true>}
      */
     private function normalizeScopeValues(
@@ -307,17 +322,17 @@ final class CalculationDynamicFieldWriter
         FieldScope $scope,
         array $input,
         string $errorPrefix,
-        array $previousChoice = [],
+        array $previousValues = [],
     ): array {
         $normalized = [];
-        $choiceDirty = [];
+        $dirty = [];
         $errors = [];
 
         foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
             if ($def->field_type->isChoice()) {
                 if (! array_key_exists($def->key, $input)) {
-                    $normalized[$def->key] = array_key_exists($def->key, $previousChoice)
-                        ? $previousChoice[$def->key]
+                    $normalized[$def->key] = array_key_exists($def->key, $previousValues)
+                        ? $previousValues[$def->key]
                         : ChoiceFieldValueContract::emptyValue($def->field_type);
 
                     continue;
@@ -328,11 +343,11 @@ final class CalculationDynamicFieldWriter
                         $def->field_type,
                         is_array($def->options_json) ? $def->options_json : null,
                         $input[$def->key],
-                        $previousChoice[$def->key] ?? null,
+                        $previousValues[$def->key] ?? null,
                         "{$errorPrefix}.{$def->key}",
                         $def->label,
                     );
-                    $choiceDirty[$def->key] = true;
+                    $dirty[$def->key] = true;
                 } catch (ValidationException $exception) {
                     foreach ($exception->errors() as $key => $messages) {
                         $errors[$key] = $messages[0] ?? ($def->label.' ist ungültig.');
@@ -342,7 +357,27 @@ final class CalculationDynamicFieldWriter
                 continue;
             }
 
-            $raw = $input[$def->key] ?? null;
+            if (! array_key_exists($def->key, $input)) {
+                // Keep-on-missing: vorhandener DB-Wert bleibt unverändert (nicht dirty).
+                if (array_key_exists($def->key, $previousValues)) {
+                    $normalized[$def->key] = $previousValues[$def->key];
+
+                    continue;
+                }
+
+                // Kein gespeicherter Wert: Default einmalig materialisieren (period_open=true,
+                // sonst leer), damit Folge-Updates und Dispo-Copy Zeilen vorfinden.
+                if ($def->key === 'period_open') {
+                    $normalized[$def->key] = true;
+                } else {
+                    $normalized[$def->key] = $this->emptyValue($def);
+                }
+                $dirty[$def->key] = true;
+
+                continue;
+            }
+
+            $raw = $input[$def->key];
 
             if ($def->field_type === FieldType::Period) {
                 $periodError = $this->periodRawError($raw);
@@ -359,20 +394,21 @@ final class CalculationDynamicFieldWriter
                 FieldType::ShortText, FieldType::LongText => $this->normalizeText($raw, $def, $errorPrefix, $errors),
                 FieldType::Select, FieldType::MultiSelect => null,
             };
+            $dirty[$def->key] = true;
         }
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
 
-        return [$normalized, $choiceDirty];
+        return [$normalized, $dirty];
     }
 
     /**
      * @param  iterable<int, CalculationFieldValue|CalculationPositionFieldValue>  $rows
-     * @return array<string, string|list<string>|null>
+     * @return array<string, mixed>
      */
-    private function storedChoiceValuesByKey(
+    private function storedValuesByKey(
         ConfigurationSnapshot $snapshot,
         FieldScope $scope,
         iterable $rows,
@@ -384,19 +420,36 @@ final class CalculationDynamicFieldWriter
 
         $out = [];
         foreach ($snapshot->fieldDefinitions->where('scope', $scope) as $def) {
-            if (! $def->field_type->isChoice()) {
-                continue;
-            }
             $row = $byDefinitionId[(int) $def->id] ?? null;
             if ($row === null) {
-                $out[$def->key] = ChoiceFieldValueContract::emptyValue($def->field_type);
-
                 continue;
             }
-            $out[$def->key] = ChoiceFieldValueContract::readStored($def, $row);
+            $out[$def->key] = $this->exportValue($def, $row);
         }
 
         return $out;
+    }
+
+    /**
+     * DYN-005 für Dispo-Create-Gates gegen Calc-Snapshots: Basis-required nur wenn effektiv sichtbar.
+     *
+     * @param  array<string, mixed>  $headerValues
+     * @param  array<string, mixed>  $positionValues
+     */
+    public function isEffectivelyVisible(
+        ConfigurationSnapshot $baseSnapshot,
+        SnapshotFieldDefinition $def,
+        array $headerValues,
+        array $positionValues = [],
+        ?ConfigurationSnapshot $positionScopeSnapshot = null,
+    ): bool {
+        return $this->rules->isEffectivelyVisible(
+            $baseSnapshot,
+            $def,
+            $headerValues,
+            $positionValues,
+            $positionScopeSnapshot,
+        );
     }
 
     /**
@@ -468,7 +521,7 @@ final class CalculationDynamicFieldWriter
         try {
             $startDate = Carbon::parse((string) $start)->startOfDay();
             $endDate = Carbon::parse((string) $end)->startOfDay();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'Zeitraum enthält ungültige Datumsangaben.';
         }
 
@@ -530,16 +583,16 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $values
-     * @param  array<string, true>  $choiceDirty
+     * @param  array<string, true>  $dirty
      */
     private function persistHeaderValues(
         Calculation $calculation,
         ConfigurationSnapshot $snapshot,
         array $values,
-        array $choiceDirty = [],
+        array $dirty = [],
     ): void {
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
-            if ($def->field_type->isChoice() && ! isset($choiceDirty[$def->key])) {
+            if (! isset($dirty[$def->key])) {
                 continue;
             }
             $row = CalculationFieldValue::query()->firstOrNew([
@@ -553,16 +606,16 @@ final class CalculationDynamicFieldWriter
 
     /**
      * @param  array<string, mixed>  $values
-     * @param  array<string, true>  $choiceDirty
+     * @param  array<string, true>  $dirty
      */
     private function persistPositionValues(
         CalculationPosition $position,
         ConfigurationSnapshot $snapshot,
         array $values,
-        array $choiceDirty = [],
+        array $dirty = [],
     ): void {
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
-            if ($def->field_type->isChoice() && ! isset($choiceDirty[$def->key])) {
+            if (! isset($dirty[$def->key])) {
                 continue;
             }
             $row = CalculationPositionFieldValue::query()->firstOrNew([

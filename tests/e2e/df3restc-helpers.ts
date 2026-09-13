@@ -401,3 +401,62 @@ export async function fillTwoCalcSpots(page: Page) {
     await page.locator('[data-test="range-spots-1-0"]').fill('5');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
 }
+
+export async function e2eUpsertSnapshotRule(
+    page: Page,
+    target: { calculationId?: number; dispoOrderId?: number },
+    condition: Record<string, unknown>,
+    action: Record<string, unknown>,
+    sort = 100,
+) {
+    const result = await csrfJson(page, 'POST', '/e2e/snapshot-field-rule', {
+        ...(target.calculationId != null
+            ? { calculation_id: target.calculationId }
+            : {}),
+        ...(target.dispoOrderId != null
+            ? { dispo_order_id: target.dispoOrderId }
+            : {}),
+        condition,
+        action,
+        sort,
+    });
+    expect(result.status).toBe(200);
+}
+
+export async function e2eCorruptSnapshotRules(
+    page: Page,
+    target: { calculationId?: number; dispoOrderId?: number },
+) {
+    const result = await csrfJson(page, 'POST', '/e2e/snapshot-rules-corrupt', {
+        ...(target.calculationId != null
+            ? { calculation_id: target.calculationId }
+            : {}),
+        ...(target.dispoOrderId != null
+            ? { dispo_order_id: target.dispoOrderId }
+            : {}),
+    });
+    expect(result.status).toBe(200);
+}
+
+export async function e2eTextValue(
+    page: Page,
+    target: { calculationId?: number; dispoOrderId?: number },
+    fieldKey: string,
+) {
+    const query = new URLSearchParams({
+        field_key: fieldKey,
+        ...(target.calculationId != null
+            ? { calculation_id: String(target.calculationId) }
+            : {}),
+        ...(target.dispoOrderId != null
+            ? { dispo_order_id: String(target.dispoOrderId) }
+            : {}),
+    });
+    const result = await csrfJson(
+        page,
+        'GET',
+        `/e2e/dynamic-field-text-value?${query.toString()}`,
+    );
+    expect(result.status).toBe(200);
+    return result.data as { exists: boolean; value: string | null };
+}

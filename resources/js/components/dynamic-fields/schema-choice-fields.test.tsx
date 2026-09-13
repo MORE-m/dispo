@@ -133,15 +133,15 @@ describe('SchemaChoiceFields', () => {
         );
     });
 
-    it('hides invisible fields while parent can keep state', () => {
+    it('renders all fields passed by parent (RULE-B: Effective-Filter liegt außerhalb)', () => {
         const hidden: SchemaChoiceField = {
             ...selectField,
             key: 'hidden_select',
             visible: false,
         };
-        render(
+        const { rerender } = render(
             <SchemaChoiceFields
-                fields={[selectField, hidden]}
+                fields={[selectField]}
                 values={{ hdr_select: null, hidden_select: 'opt_a' }}
                 onChange={() => undefined}
                 idPrefix="calc-choice"
@@ -150,6 +150,16 @@ describe('SchemaChoiceFields', () => {
 
         expect(screen.getByTestId('calc-choice-hdr_select')).toBeTruthy();
         expect(screen.queryByTestId('calc-choice-hidden_select')).toBeNull();
+
+        rerender(
+            <SchemaChoiceFields
+                fields={[selectField, hidden]}
+                values={{ hdr_select: null, hidden_select: 'opt_a' }}
+                onChange={() => undefined}
+                idPrefix="calc-choice"
+            />,
+        );
+        expect(screen.getByTestId('calc-choice-hidden_select')).toBeTruthy();
     });
 
     it('shows inactive selected multi as removable and unselected inactive disabled', () => {
