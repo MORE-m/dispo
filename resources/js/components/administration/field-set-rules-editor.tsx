@@ -468,7 +468,11 @@ export default function FieldSetRulesEditor({
                             <select
                                 className="border-input bg-background w-full rounded-md border px-3 py-2"
                                 disabled={disabled}
-                                value={String(condition.value ?? '')}
+                                value={
+                                    typeof condition.value === 'string'
+                                        ? condition.value
+                                        : ''
+                                }
                                 onChange={(event) =>
                                     onChange(
                                         updateAtomic(
@@ -493,7 +497,11 @@ export default function FieldSetRulesEditor({
                         ) : (
                             <Input
                                 disabled={disabled}
-                                value={String(condition.value ?? '')}
+                                value={
+                                    typeof condition.value === 'string'
+                                        ? condition.value
+                                        : ''
+                                }
                                 onChange={(event) =>
                                     onChange(
                                         updateAtomic(
