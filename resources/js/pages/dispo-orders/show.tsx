@@ -454,7 +454,7 @@ export default function DispoOrderShow({
 
     const headerValuesForRules = useMemo(() => {
         const values: Record<string, unknown> = {
-            ...(order.dynamic_field_values ?? {}),
+            ...order.dynamic_field_values,
             billing_special_features:
                 billingSpecialFeatures.trim() === ''
                     ? null
@@ -517,10 +517,7 @@ export default function DispoOrderShow({
     );
     const visibleCalcOriginHeaderTextFields = useMemo(
         () =>
-            filterByEffectiveVisible(
-                calcOriginCustomTextFields,
-                headerRuntime,
-            ),
+            filterByEffectiveVisible(calcOriginCustomTextFields, headerRuntime),
         [calcOriginCustomTextFields, headerRuntime],
     );
     const visibleCalcOriginHeaderChoiceFields = useMemo(
@@ -610,12 +607,7 @@ export default function DispoOrderShow({
         }
 
         return map;
-    }, [
-        order.positions,
-        positionFieldViews,
-        positionRuntimes,
-        headerRuntime,
-    ]);
+    }, [order.positions, positionFieldViews, positionRuntimes, headerRuntime]);
 
     const rulesIntegrityError = useMemo(() => {
         if (headerRuntime.integrityError) {
@@ -1094,9 +1086,12 @@ export default function DispoOrderShow({
                                 <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                                     Aus Kalkulation übernommen
                                 </p>
-                                {visibleCalcOriginHeaderTextFields.length > 0 ? (
+                                {visibleCalcOriginHeaderTextFields.length >
+                                0 ? (
                                     <SchemaTextFields
-                                        fields={visibleCalcOriginHeaderTextFields}
+                                        fields={
+                                            visibleCalcOriginHeaderTextFields
+                                        }
                                         values={Object.fromEntries(
                                             visibleCalcOriginHeaderTextFields.map(
                                                 (field) => [
@@ -1115,9 +1110,12 @@ export default function DispoOrderShow({
                                         onChange={() => undefined}
                                     />
                                 ) : null}
-                                {visibleCalcOriginHeaderChoiceFields.length > 0 ? (
+                                {visibleCalcOriginHeaderChoiceFields.length >
+                                0 ? (
                                     <SchemaChoiceReadonlyFields
-                                        fields={visibleCalcOriginHeaderChoiceFields}
+                                        fields={
+                                            visibleCalcOriginHeaderChoiceFields
+                                        }
                                         values={headerValues}
                                         captured={headerCaptured}
                                         idPrefix="dispo-calc-origin-choice"
@@ -1294,9 +1292,12 @@ export default function DispoOrderShow({
                         <CardContent className="space-y-4 px-5 py-4">
                             {canUpdate ? (
                                 <>
-                                    {visibleEditableHeaderTextFields.length > 0 ? (
+                                    {visibleEditableHeaderTextFields.length >
+                                    0 ? (
                                         <SchemaTextFields
-                                            fields={visibleEditableHeaderTextFields}
+                                            fields={
+                                                visibleEditableHeaderTextFields
+                                            }
                                             values={customHeaderValues}
                                             errors={fieldErrors}
                                             disabled={savingNotes}
@@ -1311,7 +1312,8 @@ export default function DispoOrderShow({
                                             }
                                         />
                                     ) : null}
-                                    {visibleEditableHeaderChoiceFields.length > 0 ? (
+                                    {visibleEditableHeaderChoiceFields.length >
+                                    0 ? (
                                         <div data-test="dispo-order-custom-header-choice-fields">
                                             <SchemaChoiceFields
                                                 fields={
@@ -1369,9 +1371,12 @@ export default function DispoOrderShow({
                                 </>
                             ) : (
                                 <>
-                                    {visibleEditableHeaderTextFields.length > 0 ? (
+                                    {visibleEditableHeaderTextFields.length >
+                                    0 ? (
                                         <SchemaTextFields
-                                            fields={visibleEditableHeaderTextFields}
+                                            fields={
+                                                visibleEditableHeaderTextFields
+                                            }
                                             values={Object.fromEntries(
                                                 visibleEditableHeaderTextFields.map(
                                                     (field) => {
@@ -1396,7 +1401,8 @@ export default function DispoOrderShow({
                                             onChange={() => undefined}
                                         />
                                     ) : null}
-                                    {visibleEditableHeaderChoiceFields.length > 0 ? (
+                                    {visibleEditableHeaderChoiceFields.length >
+                                    0 ? (
                                         <div data-test="dispo-order-custom-header-choice-fields-ro">
                                             <SchemaChoiceReadonlyFields
                                                 fields={
@@ -1503,7 +1509,9 @@ export default function DispoOrderShow({
                                 positionValues.position_flight_period,
                                 flightCaptured,
                             );
-                            const view = visiblePositionFieldViews[position.id] ?? {
+                            const view = visiblePositionFieldViews[
+                                position.id
+                            ] ?? {
                                 editableText: [],
                                 editableChoice: [],
                                 calcOriginText: [],

@@ -165,14 +165,12 @@ export function evaluateSnapshotFieldRuntime(args: {
     definitionFields?: RuntimeSchemaField[];
 }): SnapshotFieldRuntimeResult {
     const positionValues = args.positionValues ?? {};
-    const catalogFields =
-        args.definitionFields ??
-        [...(args.conditionFields ?? []), ...args.fields];
+    const catalogFields = args.definitionFields ?? [
+        ...(args.conditionFields ?? []),
+        ...args.fields,
+    ];
     const defsByKey = buildDefsByKey(catalogFields, args.scope);
-    const rules = dedupeRules([
-        ...(args.additionalRules ?? []),
-        ...args.rules,
-    ]);
+    const rules = dedupeRules([...(args.additionalRules ?? []), ...args.rules]);
 
     const empty: SnapshotFieldRuntimeResult = {
         defsByKey,
@@ -180,7 +178,7 @@ export function evaluateSnapshotFieldRuntime(args: {
         effectiveRequired: {},
         integrityError: null,
         isFieldVisible: (key) =>
-            (basisMap(args.fields, args.scope, 'visible')[key] ?? false),
+            basisMap(args.fields, args.scope, 'visible')[key] ?? false,
         isFieldRequired: () => false,
     };
 
@@ -230,7 +228,10 @@ export function evaluateSnapshotFieldRuntime(args: {
 
 export function filterByEffectiveVisible<T extends { key: string }>(
     fields: T[],
-    runtime: Pick<SnapshotFieldRuntimeResult, 'isFieldVisible' | 'integrityError'>,
+    runtime: Pick<
+        SnapshotFieldRuntimeResult,
+        'isFieldVisible' | 'integrityError'
+    >,
 ): T[] {
     if (runtime.integrityError) {
         return [];

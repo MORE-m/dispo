@@ -2688,53 +2688,54 @@ export default function CalculationWizard({
                                                             {positionRuntime.isFieldVisible(
                                                                 'period_open',
                                                             ) ? (
-                                                            <FormField
-                                                                label={
-                                                                    positionFields.find(
-                                                                        (
-                                                                            field,
-                                                                        ) =>
-                                                                            field.key ===
-                                                                            'period_open',
-                                                                    )?.label ??
-                                                                    'Zeitraum offen'
-                                                                }
-                                                                htmlFor={`period-open-${index}`}
-                                                                hint={
-                                                                    positionFields.find(
-                                                                        (
-                                                                            field,
-                                                                        ) =>
-                                                                            field.key ===
-                                                                            'period_open',
-                                                                    )
-                                                                        ?.help_text ??
-                                                                    undefined
-                                                                }
-                                                            >
-                                                                <Checkbox
-                                                                    id={`period-open-${index}`}
-                                                                    data-test={`period-open-${index}`}
-                                                                    checked={
-                                                                        position.period_open
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onCheckedChange={(
-                                                                        checked,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                period_open:
-                                                                                    checked ===
-                                                                                    true,
-                                                                            },
+                                                                <FormField
+                                                                    label={
+                                                                        positionFields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
                                                                         )
+                                                                            ?.label ??
+                                                                        'Zeitraum offen'
                                                                     }
-                                                                />
-                                                            </FormField>
+                                                                    htmlFor={`period-open-${index}`}
+                                                                    hint={
+                                                                        positionFields.find(
+                                                                            (
+                                                                                field,
+                                                                            ) =>
+                                                                                field.key ===
+                                                                                'period_open',
+                                                                        )
+                                                                            ?.help_text ??
+                                                                        undefined
+                                                                    }
+                                                                >
+                                                                    <Checkbox
+                                                                        id={`period-open-${index}`}
+                                                                        data-test={`period-open-${index}`}
+                                                                        checked={
+                                                                            position.period_open
+                                                                        }
+                                                                        disabled={
+                                                                            !canEdit
+                                                                        }
+                                                                        onCheckedChange={(
+                                                                            checked,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    period_open:
+                                                                                        checked ===
+                                                                                        true,
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </FormField>
                                                             ) : null}
                                                         </div>
 
