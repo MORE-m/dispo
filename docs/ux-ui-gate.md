@@ -205,8 +205,10 @@ UX-GATE-D **ausschließlich** folgende Bestandteile freigegeben:
 - Optimistic Locking und Konfliktzustände
 - Auditierung
 - Leer-, Validierungs-, Fehler- und Read-only-Zustände
-- im späteren Slice `BL-P2-01b`: Pflege der Kombi-Mitgliedschaften einschließlich
-  historisch stabiler Übernahme der enthaltenen Sender in den Dispoauftrag
+
+Kombi-Mitgliedschaften (`BL-P2-01b`) gehören **nicht** zum Lieferumfang: laut
+PO-BL-P2-01-KOMBI sind Kombis eigenständige Inventare ohne gepflegte Sender-
+Mitgliedschaften. Der Typfilter `Typ: Alle / Sender / Kombi` bleibt korrekt.
 
 Ausdrücklich **nicht** freigegeben bleiben:
 
@@ -219,9 +221,9 @@ Ausdrücklich **nicht** freigegeben bleiben:
 - sonstige Kalkulationsarten
 - allgemeine Organisationsverwaltung oder Mehrmandantenfähigkeit
 
-`BL-P2-01a` (Inventar-Admin-Lifecycle) ist der umgesetzte Teil. `BL-P2-01b`
-(Kombi-Mitgliedschaften) bleibt offen. `BL-P2-01` ist damit **nicht** vollständig
-abgeschlossen.
+`BL-P2-01a` (Inventar-Admin-Lifecycle) ist umgesetzt. `BL-P2-01b`
+(Kombi-Mitgliedschaften) **entfällt** durch PO-BL-P2-01-KOMBI. `BL-P2-01` ist
+damit **vollständig** abgeschlossen.
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
@@ -230,9 +232,10 @@ abgeschlossen.
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der übrigen Initialkataloge (Preislisten, Kombinationstabelle,
-  Kombi-Mitgliedschaften) – Oberkategorien/Werbemittel (ADV-001b) und
-  Inventar-Admin-Lifecycle (BL-P2-01a) sind teilfreigegeben
+- Administration der übrigen Initialkataloge (Preislisten, Kombinationstabelle)
+  – Oberkategorien/Werbemittel (ADV-001b) und Inventar-Admin-Lifecycle
+  (BL-P2-01a) sind teilfreigegeben; Kombi-Mitgliedschaften entfallen
+  (PO-BL-P2-01-KOMBI)
 - Auswertungen und abschließende Fachoberflächen
 - Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
 
@@ -248,7 +251,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b) + Inventar-Admin-Lifecycle (BL-P2-01a); operative Disposition, Preislisten-Admin und Kombi-Mitgliedschaften weiterhin gesperrt |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b) + Inventar-Admin-Lifecycle (BL-P2-01a); operative Disposition und Preislisten-Admin weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

@@ -28,7 +28,7 @@ Festlegungen:
 - HAMBURG ZWEI ist in der MORE Hamburg-Kombi durch 80er 90er OLDIE ANTENNE Hamburg ersetzt.
 - `radio ffn` aus der Referenz entspricht `ffn Hamburg Plus`.
 - `BOLLERWAGEN` aus der Referenz entspricht `RADIO BOLLERWAGEN DAB+ Hamburg`.
-- Kombis besitzen eigene Preislisten; enthaltene Sender werden zusätzlich gepflegt.
+- Kombis besitzen eigene Preislisten, Werbemittelregeln und Positionen; sie werden nicht aus Sendern abgeleitet. Die 14 Inventare bleiben unverändert; Kombis behalten `type=kombi`.
 
 ## Oberkategorien
 

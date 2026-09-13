@@ -11,7 +11,6 @@ der Technologieentscheidung präzisiert.
 ```mermaid
 erDiagram
     ORGANIZATION ||--o{ INVENTORY : owns
-    INVENTORY }o--o{ INVENTORY : contains
     CATEGORY ||--o{ ADVERTISING_MEDIUM : groups
     INVENTORY ||--o{ INVENTORY_MEDIUM_RULE : allows
     ADVERTISING_MEDIUM ||--o{ INVENTORY_MEDIUM_RULE : configures
@@ -40,16 +39,19 @@ V1 enthält genau eine Organisation. Die Organisations-ID bleibt trotzdem an
 mandantenrelevanten Tabellen vorgesehen, damit Datenzugriff und spätere Erweiterung
 sauber abgegrenzt bleiben.
 
-### Inventar und Kombi-Mitgliedschaft
+### Inventar
 
 `Inventory` enthält stabile ID, Name, Kurzcode, Typ (`sender`|`kombi`),
 Aktivstatus und Sortierung. `lock_version` steuert den administrativen Lifecycle
-(BL-P2-01a). Kombi-Mitgliedschaften werden als Beziehung mit Gültigkeit/Version
-geführt (**BL-P2-01b, noch nicht umgesetzt**). Kombis besitzen eigene Preise;
-Mitgliedschaften dienen Anzeige und Disposition, nicht der Preisberechnung
-(`ORG-002`).
+(BL-P2-01a). Sender und Kombis sind beides Inventare; die Unterscheidung erfolgt
+ausschließlich über `inventories.type`. Beide hängen eigenständig an Preislisten,
+Werbemittelregeln, Kalkulations- und Dispopositionen (`ORG-002`,
+PO-BL-P2-01-KOMBI). Es gibt in V1 keine Membership-Beziehung
+(`inventory_memberships`, Gültigkeit, Versionierung oder Snapshot enthaltener
+Sender), keine Preis-/Regelvererbung und keine Expansion einer Kombi in
+einzelne Senderpositionen.
 
-**BL-P2-01a (umgesetzt):** Admin-Lifecycle für Inventare (Liste, Anlegen,
+**BL-P2-01 (erledigt):** Admin-Lifecycle für Inventare (Liste, Anlegen,
 Metadaten, Aktivieren/Deaktivieren, Impact-Preview, Optimistic Locking, Audit).
 Kein Hard Delete. Code und Typ nach dem ersten Speichern unveränderlich.
 Organisation serverseitig als Singleton, ohne Organisations-UI.
@@ -267,6 +269,9 @@ Unterobjekte werden typbezogen normalisiert:
 `DispoOrder` referenziert die Ursprungs-**Kundenkalkulation** nur zur Navigation.
 Sein Inhalt stammt aus eigenen `DispoPositionSnapshot`-Datensätzen und wird nicht
 synchronisiert. Die tatsächliche Spotlänge ist Teil des Positionssnapshots.
+Eine Kombi erscheint als genau das gebuchte Inventar (eigene ID, Name, Code);
+enthaltene Sender werden nicht aufgelöst, angezeigt oder in den Snapshot
+geschrieben (`ORG-002`, PO-BL-P2-01-KOMBI).
 Ein Dispoauftrag ohne Kundenkalkulation bzw. direkt aus einem Standardangebot
 ist unzulässig.
 
