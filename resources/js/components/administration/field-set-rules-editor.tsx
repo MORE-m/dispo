@@ -660,8 +660,11 @@ export default function FieldSetRulesEditor({
         entry: FieldCatalogEntry,
         scope: 'header' | 'position',
     ) {
-        const value = exampleValues[scope][entry.key] ?? defaultExampleValue(entry);
-        const activeOptions = entry.options.filter((option) => option.is_active);
+        const value =
+            exampleValues[scope][entry.key] ?? defaultExampleValue(entry);
+        const activeOptions = entry.options.filter(
+            (option) => option.is_active,
+        );
         const inputId = `example-${scope}-${entry.key}`;
 
         if (entry.field_type === 'boolean') {
@@ -706,7 +709,11 @@ export default function FieldSetRulesEditor({
                         data-test={`fieldset-example-${scope}-${entry.key}`}
                         value={typeof value === 'string' ? value : ''}
                         onChange={(event) =>
-                            updateExampleValue(scope, entry.key, event.target.value)
+                            updateExampleValue(
+                                scope,
+                                entry.key,
+                                event.target.value,
+                            )
                         }
                     >
                         {activeOptions.map((option) => (
@@ -721,7 +728,9 @@ export default function FieldSetRulesEditor({
 
         if (entry.field_type === 'multi_select') {
             const selected = Array.isArray(value)
-                ? value.filter((item): item is string => typeof item === 'string')
+                ? value.filter(
+                      (item): item is string => typeof item === 'string',
+                  )
                 : [];
             return (
                 <fieldset
@@ -748,7 +757,11 @@ export default function FieldSetRulesEditor({
                                             : selected.filter(
                                                   (item) => item !== option.key,
                                               );
-                                        updateExampleValue(scope, entry.key, next);
+                                        updateExampleValue(
+                                            scope,
+                                            entry.key,
+                                            next,
+                                        );
                                     }}
                                 />
                                 {option.label}
@@ -913,7 +926,10 @@ export default function FieldSetRulesEditor({
                     </p>
                 </div>
                 <div className="grid gap-6 lg:grid-cols-2">
-                    <div className="space-y-3" data-test="fieldset-example-header">
+                    <div
+                        className="space-y-3"
+                        data-test="fieldset-example-header"
+                    >
                         <h4 className="text-sm font-medium">Header</h4>
                         {headerFields.length === 0 ? (
                             <p className="text-muted-foreground text-sm">
