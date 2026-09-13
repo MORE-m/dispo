@@ -332,8 +332,9 @@ dynamische Sichtbarkeit und Required in produktive Writer-/UI-Pfade:
   Required (`basisRequired: []`); statisches Required bleibt Writer-Sache mit
   Effective Visible
 
-Admin-Regel-Editor (RULE-C) bleibt offen. Zahl-/Datumsvergleiche und nested
-Logic sind außerhalb V1.
+Admin-Regel-Editor (RULE-C): Desired-State Preview/Apply auf Draft-
+`field_rules`, Seed-Schutz für `system_calculation_core`, keine Migration.
+Zahl-/Datumsvergleiche und nested Logic bleiben außerhalb V1.
 
 Regeln referenzieren stabile Feld- und Options-Keys, niemals nur Anzeigenamen.
 

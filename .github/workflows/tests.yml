@@ -121,6 +121,9 @@ jobs:
       - name: Browser DF-3-REST-C isolated tests
         run: npx playwright test -c playwright.df3restc.config.ts
 
+      - name: Browser DF-3-RULE-C isolated tests
+        run: npx playwright test -c playwright.df3rulec.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

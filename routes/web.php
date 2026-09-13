@@ -114,6 +114,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.field-sets.versions.pin-current');
         Route::get('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/vorschau', [FieldSetAdminController::class, 'preview'])
             ->name('administration.dynamic-fields.field-sets.versions.preview');
+        Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/regeln-vorschau', [FieldSetAdminController::class, 'rulesPreview'])
+            ->name('administration.dynamic-fields.field-sets.versions.rules.preview');
+        Route::put('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/regeln', [FieldSetAdminController::class, 'rulesReplace'])
+            ->name('administration.dynamic-fields.field-sets.versions.rules.replace');
         Route::post('administration/dynamische-felder/feldsets/{fieldSet}/versionen/{version}/aktivieren', [FieldSetAdminController::class, 'activate'])
             ->name('administration.dynamic-fields.field-sets.versions.activate');
 

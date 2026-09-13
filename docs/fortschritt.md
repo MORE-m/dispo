@@ -1,31 +1,52 @@
 # Fortschritt V1
 
-Stand: 13. September 2026 (DF-3-RULE-B Runtime Visible/Required umgesetzt –
-DF-3 weiter offen: RULE-C Regel-Editor; ADV-002 außerhalb)
+Stand: 13. September 2026 (DF-3-RULE-C Regel-Editor umgesetzt – **DF-3
+Dyn-Feld-Pfad abgeschlossen**; ADV-002 außerhalb)
 
 ## Aktuelle Phase
 
-Phase 2/3 parallel: **DF-1 … ADV-001c4b**, **DF-3-REST-A–C3**, **DF-3-RULE-A**
-und **DF-3-RULE-B** (Runtime-UI). Gesamtziel DF-3 bleibt offen bis RULE-C.
-ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
+Phase 2/3: **DF-1 … DF-3-RULE-C** auf `main`-Pfad abgeschlossen (Feature-Branch
+bis Merge). ADV-001 weitere Defaults und Legacy-Entfernung bleiben offen.
 `SystemFieldSetting` / ADV-002 liegt außerhalb des DF-3-Regelabschlusses.
 
 Phase 8 (Dispoauftrag) bleibt mit Vier-Augen-Freigabe und Nummernableitung auf
 `main`; UX-GATE-D ist weiterhin nicht vollständig abgeschlossen, enthält aber
 Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin inkl. Assignments
-(PO-33b-2), Options-/Regel-Editor-Rahmen (PO-DF3-REST-1) und **Katalog-Admin
+(PO-33b-2), Options-/Regel-Editor (PO-DF3-REST-1) und **Katalog-Admin
 Oberkategorien/Werbemittel (PO-ADV001b-1)**. Inventar- und Preislisten-Admin
 bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster Slice: **DF-3-RULE-C** Regel-Editor.
+Nächster fachlicher Fokus außerhalb DF-3: ADV-001-Rest / Inventar-Preislisten
+oder UX-GATE-D-Rest – kein RULE-D.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-RULE-B: produktive Runtime Visible/Required in Calc-/Dispo-UI auf Basis
-RULE-A, Keep-on-missing inkl. Calc-Text, DYN-005 in Writer-Pfaden,
-kontexttreue Schema-Props, gemeinsame Client-Auswertung.
+DF-3-RULE-C Review-Fixes (PR #49): Vorschau mit Membership-Basiswerten,
+Calc-Origin im Admin-Regelkontext, editierbare Beispielwerte, erweiterte E2E.
+
+## DF-3-RULE-C – Administrativer Regel-Editor (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Desired-State Preview/Apply auf Draft-`field_rules` | **umgesetzt** |
+| `FieldSet.lock_version` + atomarer Replace + No-op | **umgesetzt** |
+| RULE-A-V1-Vertrag unverändert (keine neuen Ops) | **umgesetzt** |
+| System-Seed-Schutz `system_calculation_core` (content-basiert) | **umgesetzt** |
+| Sort serverseitig; UI Nach oben/unten; lokales Duplizieren | **umgesetzt** |
+| Admin-UI auf Feldset-Versionsseite | **umgesetzt** |
+| Audit `field_set.rules_replaced` | **umgesetzt** |
+| Keine Migration; Snapshots unverändert | **umgesetzt** |
+| Preview-Basis aus Membership-`visible`/`required_override` | **umgesetzt** |
+| Calc-Origin `action_target_readonly` im Admin-Kernkontext | **umgesetzt** |
+| Editierbare Header-/Positions-Beispielwerte in der UI | **umgesetzt** |
+| Freier-Draft-E2E inkl. CRUD/Duplikat/Read-only Active | **umgesetzt** |
+| SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
+
+**PO-Festlegungen:** Desired-State; Seed nur in `system_calculation_core` via
+`SEED_RULE_DEDUPE_SHA256`; leere Regeln nur freie Sets; require+unsichtbar
+erlaubt mit Warnung; eine Beispielposition in Preview.
 
 ## DF-3-RULE-B – Runtime Visible/Required (September 2026)
 
@@ -37,7 +58,7 @@ kontexttreue Schema-Props, gemeinsame Client-Auswertung.
 | DYN-005 Writer/Submit/Create/Partial-Choice | **umgesetzt** |
 | Schema-Props inkl. basis `visible=false`, `action_target_readonly` | **umgesetzt** |
 | Kontexttreue Positions-Rules (kein Merge für Runtime) | **umgesetzt** |
-| Regel-Editor (RULE-C) | **nicht** |
+| Regel-Editor (RULE-C) | **umgesetzt** |
 | SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
 
 **PO-Festlegungen:** Pending-Wert bei Unsichtbarwerden persistieren (Option A);
@@ -57,7 +78,7 @@ Dispo-Partial ohne neue rule-required-Sperre; volle Pflicht nur Create/Copy/Sync
 | Integrity + Preview/Activate/Freeze/Merge fail-closed am Contract | **umgesetzt** |
 | TS-Parity fail-closed + Legacy-Seed-Adapter | **umgesetzt** |
 | Calc-/Dispo-UI-Verdrahtung inkl. DYN-005 für statisch required (RULE-B) | **umgesetzt (RULE-B)** |
-| Regel-Editor (RULE-C) | **nicht** |
+| Regel-Editor (RULE-C) | **umgesetzt** |
 | SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
 
 **RULE-A-/RULE-B-Grenze:** RULE-A liefert Vertrag und Effective-State. `validate()`
@@ -78,7 +99,7 @@ Schema je Dispoposition (kein First-wins über Effektiv-Snapshots).
 | Touched-only Partial-Save | **umgesetzt** |
 | Calc-Origin read-only + Provenance | **umgesetzt** |
 | REST-C E2E Port 8014 erweitert | **umgesetzt** |
-| Regelmatrix / Regel-Editor | **nicht** |
+| Regelmatrix / Regel-Editor | **umgesetzt (RULE-C)** |
 
 ## DF-3-REST-C2 – Calc Choice-UI (September 2026)
 
@@ -97,7 +118,7 @@ C1-Werte. Keine Live-Options.
 | Playwright isoliert Port 8014 (`playwright.df3restc.config.ts`) | **umgesetzt** |
 | CI: isolierte REST-B- und REST-C-Suites in `tests.yml` | **umgesetzt** |
 | Dispo-Choice-UI (C3) | **umgesetzt (C3)** |
-| Regel-Editor / volle Regelmatrix | **nicht** |
+| Regel-Editor / volle Regelmatrix | **umgesetzt (RULE-C)** |
 
 ## DF-3-REST-C1 – Choice-Wertmodell / Persistenz (September 2026)
 
@@ -111,7 +132,7 @@ Serverseitige Select-/Multi-Select-Runtime. **Auf `main` gemergt (PR #40).**
 | Schema-Props inkl. `options_json` | **umgesetzt** |
 | Sichtbare Calc-UI (C2) | **umgesetzt (C2)** |
 | Sichtbare Dispo-UI (C3) | **umgesetzt (C3)** |
-| Regel-Editor / volle Regelmatrix | **nicht** |
+| Regel-Editor / volle Regelmatrix | **umgesetzt (RULE-C)** |
 
 Leer-/XOR-Vertrag: Select leer = `null`; Multi leer = `[]`; Choice nur in
 `value_json`; skalare Kanäle bei Choice genullt (App-Layer; kein DB-CHECK wegen
@@ -137,7 +158,7 @@ read-only Preview-DTO-Erweiterung am Writer. Keine Migration. Keine Runtime.
 | Options-Sektion auf Definitions-Detail | **umgesetzt (PR #39)** |
 | Preview/Apply + 409/422 DE + No-op | **umgesetzt (PR #39)** |
 | Select-/Multi-Select-Runtime (`value_json`) | **C1–C3 umgesetzt (Calc- und Dispo-UI)** |
-| Regel-Editor / volle Regelmatrix | **nicht** |
+| Regel-Editor / volle Regelmatrix | **umgesetzt (RULE-C)** |
 
 ## DF-3-REST-A – Options-Fundament (September 2026)
 
@@ -154,7 +175,7 @@ Slice. **Auf `main` gemergt (PR #38).**
 | Gen3 additives Options-Freeze + Fingerprint | **umgesetzt** |
 | Options-Admin-UI | **umgesetzt in PR #39 (REST-B)** |
 | Calc-Dispo-Runtime | **C1–C3 umgesetzt (Calc- und Dispo-Choice-UI)** |
-| Regel-Editor / volle Regelmatrix | **nicht** |
+| Regel-Editor / volle Regelmatrix | **umgesetzt (RULE-C)** |
 
 
 ## ADV-001c4b – Sichtbare Wizard-Methodenauswahl (September 2026)
@@ -349,7 +370,7 @@ Inertia-Admin unter UX-GATE-D Teilfreigabe (PO-ADV001b-1). **Kein** Hard Delete.
 | Audit Alt/Neu via `AuditLogger` | umgesetzt |
 | E2E isoliert: `playwright.adv001b.config.ts` (Port 8007) | umgesetzt |
 | Inventar-/Preislisten-Admin | **weiterhin gesperrt** |
-| Optionen / Regel-Editor / ADV-002 | **nicht** |
+| Optionen / Regel-Editor / ADV-002 | Optionen+Regeln umgesetzt; ADV-002 **nicht** |
 
 ## DF-3.3b – Assignment-Admin-UI (September 2026)
 
@@ -366,7 +387,7 @@ Inertia-Admin unter Dyn-Feld-Teilfreigabe (PO-33b-2). **Kein** Abschluss von DF-
 | E2E isoliert: `playwright.df33b.config.ts` (Port 8006) | umgesetzt |
 | Snapshot-/Runtime-Verträge | **unverändert** |
 | Katalog-Admin Oberkategorien/Werbemittel | **umgesetzt** (ADV-001b) |
-| Optionen / Regel-Editor | **nicht** |
+| Optionen / Regel-Editor | **umgesetzt** (REST-B / RULE-C) |
 
 ## DF-3.3a2β – Contextual Freeze / VER-003 (September 2026, `main`)
 
@@ -444,11 +465,9 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 
 ## Bestätigte Folgeplanung (noch nicht implementiert)
 
-- Volle Regelmatrix, Regel-Editor
-  (DF-3-REST-A/B/C1–C3 Choice-Fundament und Choice-UI umgesetzt)
 - ADV-001 Rest: Kategorie-Defaults
 - Inventar-/Preislisten-/Kombinations-Admin
-- ADV-001 Defaults parallel möglich
+- ADV-002 / SystemFieldSetting
 
 ## ADV-001a – Oberkategorie-Datenbasis (September 2026)
 
@@ -473,7 +492,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Provenance Calc-Origin über Source-Snapshot (kein neues Flag) | umgesetzt |
 | Atomarer Partial-Save nativer Positions-Customs (PO-32b-2) | umgesetzt |
 | E2E isoliert: `playwright.df32b.config.ts` (eigene DB/Port) | umgesetzt |
-| Assignments / Optionen / Regel-Editor | Assignments in DF-3.3b; Optionen/Regeln offen |
+| Assignments / Optionen / Regel-Editor | Assignments DF-3.3b; Optionen REST-B; Regeln RULE-C |
 
 ## DF-3.2a – Custom Header-Textfelder (September 2026)
 
@@ -486,7 +505,7 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Feldset-Draft: Custom-Membership hinzufügen/entfernen; Position abgelehnt | umgesetzt (Position in DF-3.2b) |
 | Runtime: Wizard „Weitere Angaben“, Dispo editierbar + Calc-origin read-only | umgesetzt |
 | DF-3.2b Position-Custom-Felder | **umgesetzt** (auf `main`) |
-| Assignments / Optionen / Regel-Editor | Assignments in DF-3.3b; Optionen/Regeln offen |
+| Assignments / Optionen / Regel-Editor | Assignments DF-3.3b; Optionen REST-B; Regeln RULE-C |
 
 ## DF-3.1 – Admin Systemfelder / Kern-Feldsets (September 2026)
 
@@ -545,18 +564,12 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | Snapshot-Regel `period_open=false → require position_flight_period` | umgesetzt |
 | Admin-Feld-UI / Custom Fields / Dispo-Werte | **nicht** in DF-1 (DF-2+) |
 
-## Bewusst offen nach ADV-001c4b / DF-3-REST-A / REST-B / C1 / C2 / C3
+## Bewusst offen nach DF-3-RULE-C
 
-- ADV-001c4a/c4b: Methodenoptions-/Freeze + sichtbare Wizard-Auswahl (umgesetzt)
-- DF-3-REST-A: Options-Fundament (auf `main`, PR #38)
-- DF-3-REST-B: Options-Admin-UI (auf `main`, PR #39)
-- DF-3-REST-C1: Choice-Wertmodell (auf `main`, PR #40)
-- DF-3-REST-C2: Calc Choice-UI (auf `main`, PR #44)
-- DF-3-REST-C3: Dispo Choice-UI umgesetzt (positionsbezogene Schema-Props)
+- DF-3 Dyn-Feld-Pfad (REST-A–C3, RULE-A–C) **abgeschlossen**
 - Legacy-Felder (`kind`/`spot_method`) entfernen nach Dual-Write-Phase
 - ADV-001 Rest: Kategorie-Defaults (Feldsets, Rabatt/AE/Preisdefaults) jenseits Methoden
 - ADV-002 / SystemFieldSetting
-- Regelmatrix, Regel-Editor
 - übrige UX-GATE-D-Adminmodule (Inventare, Preislisten, Kombinationstabelle)
 - operative Disposition, Material, Kommentare, Status ab `In Bearbeitung`
 - weitere Engines (SWF, OA, Social, Events, Barter) als eigene Fachslices
