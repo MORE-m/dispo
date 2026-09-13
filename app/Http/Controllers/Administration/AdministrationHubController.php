@@ -28,7 +28,7 @@ class AdministrationHubController extends Controller
                 [
                     'key' => 'inventories',
                     'title' => 'Inventare / Kombis',
-                    'description' => 'Inventare anlegen, bearbeiten und aktivieren. Kombi-Mitgliedschaften folgen später.',
+                    'description' => 'Inventare und Kombis anlegen, bearbeiten und aktivieren.',
                     'href' => '/administration/inventare',
                     'available' => true,
                 ],
