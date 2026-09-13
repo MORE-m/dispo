@@ -239,7 +239,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **DF-3.3a2β (`main`, PR #25):** `VER-003` Positions-Effektiv-Snapshots,
   Kategorie-/Werbemittelquellen im Quellengraph, historischer Kontext.
   **DF-3.3b:** Assignment-Admin-UI (keine Schemaänderung).
-  **Offen:** Optionen, Regel-Editor.
+  **DF-3-REST / RULE-A–C:** Optionen und Regel-Editor erledigt; Dyn-Feld-Pfad abgeschlossen.
 
 ## Phase 4 – Preislisten und Spotkalkulation
 
