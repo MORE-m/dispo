@@ -263,11 +263,13 @@ class E2EChoiceSnapshotController
             ->where('configuration_snapshot_source_id', $source->id)
             ->where('dedupe_key', $dedupe)
             ->first();
-        $sourceFieldRuleId = (int) (
-            $existingRule?->source_field_rule_id
-            ?? $existingSourceRule?->source_field_rule_id
-            ?? $this->allocateE2ESourceFieldRuleId($snapshot)
-        );
+        if ($existingRule !== null) {
+            $sourceFieldRuleId = (int) $existingRule->source_field_rule_id;
+        } elseif ($existingSourceRule !== null) {
+            $sourceFieldRuleId = (int) $existingSourceRule->source_field_rule_id;
+        } else {
+            $sourceFieldRuleId = $this->allocateE2ESourceFieldRuleId($snapshot);
+        }
 
         $sourceRule = ConfigurationSnapshotSourceRule::query()->updateOrCreate(
             [
