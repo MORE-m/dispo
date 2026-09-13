@@ -6,7 +6,9 @@ use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\Role;
+use App\Models\AuditEvent;
 use App\Models\Calculation;
+use App\Models\DispoOrder;
 use App\Models\FieldDefinition;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
@@ -207,6 +209,242 @@ class RuleBRuntimeVisibleRequiredTest extends TestCase
         );
 
         $this->assertFalse($visible);
+    }
+
+    public function test_corrupt_ruleset_blocks_header_system_partial_save_without_mutation(): void
+    {
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calculation->positions()->pluck('id')->all(),
+                $user,
+            )
+            ->order;
+
+        $this->corruptDispoSnapshotRules($order);
+        $lockBefore = (int) $order->lock_version;
+        $auditsBefore = AuditEvent::query()
+            ->where('action', 'dispo_order.updated')
+            ->count();
+
+        $response = $this->actingAs($user)->from(route('dispo-orders.show', $order))->patch(route('dispo-orders.update', $order), [
+            'lock_version' => $order->lock_version,
+            'dynamic_field_values' => [
+                'billing_special_features' => 'darf-nicht',
+                'disposition_notes' => 'darf-nicht',
+            ],
+        ]);
+
+        $response->assertRedirect(route('dispo-orders.show', $order));
+        $response->assertSessionHasErrors('dynamic_field_values');
+        $this->assertStringContainsString(
+            'ungültig',
+            (string) session('errors')->first('dynamic_field_values'),
+        );
+
+        $order->refresh();
+        $this->assertSame($lockBefore, (int) $order->lock_version);
+        $this->assertSame(
+            $auditsBefore,
+            AuditEvent::query()->where('action', 'dispo_order.updated')->count(),
+        );
+        $this->assertNull(
+            $order->fieldValues()
+                ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', 'billing_special_features'))
+                ->value('value_text'),
+        );
+    }
+
+    public function test_corrupt_ruleset_blocks_optional_custom_header_partial_save(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = $this->createAndActivateOnSets(
+            $admin,
+            'RULE-B Optional Custom',
+            FieldAppliesTo::DispoOrder,
+            calc: false,
+            dispo: true,
+        );
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calculation->positions()->pluck('id')->all(),
+                $user,
+            )
+            ->order;
+
+        $this->corruptDispoSnapshotRules($order);
+        $lockBefore = (int) $order->lock_version;
+
+        $response = $this->actingAs($user)->from(route('dispo-orders.show', $order))->patch(route('dispo-orders.update', $order), [
+            'lock_version' => $order->lock_version,
+            'dynamic_field_values' => [
+                $definition->key => 'optional-wert',
+            ],
+        ]);
+
+        $response->assertRedirect(route('dispo-orders.show', $order));
+        $response->assertSessionHasErrors('dynamic_field_values');
+        $order->refresh();
+        $this->assertSame($lockBefore, (int) $order->lock_version);
+        $this->assertSame(
+            0,
+            $order->fieldValues()
+                ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', $definition->key))
+                ->count(),
+        );
+    }
+
+    public function test_corrupt_ruleset_blocks_position_text_partial_save(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $definition = app(FieldDefinitionCustomWriter::class)->create([
+            'label' => 'RULE-B Pos Text',
+            'field_type' => FieldType::ShortText,
+            'scope' => FieldScope::Position,
+            'applies_to' => FieldAppliesTo::DispoOrder,
+            'sort_default' => 80,
+            'reportable' => false,
+        ], $admin);
+        $this->addToActiveSet(
+            $admin,
+            app(FieldSetVersionAdminWriter::class),
+            AdminFieldSetCatalog::DISPO_ORDER_CORE,
+            $definition,
+        );
+        app(ConfigurationSnapshotMaterializer::class)
+            ->materializeFromActiveSet(AdminFieldSetCatalog::DISPO_ORDER_CORE);
+
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calculation->positions()->pluck('id')->all(),
+                $user,
+            )
+            ->order;
+        $position = $order->positions()->firstOrFail();
+
+        $this->corruptDispoSnapshotRules($order);
+        $lockBefore = (int) $order->lock_version;
+
+        $response = $this->actingAs($user)->from(route('dispo-orders.show', $order))->patch(
+            route('dispo-orders.update-position-customs', $order),
+            [
+                'lock_version' => $order->lock_version,
+                'position_dynamic_field_values' => [
+                    $position->id => [
+                        $definition->key => 'pos-wert',
+                    ],
+                ],
+            ],
+        );
+
+        $response->assertRedirect(route('dispo-orders.show', $order));
+        $response->assertSessionHasErrors('dynamic_field_values');
+        $order->refresh();
+        $this->assertSame($lockBefore, (int) $order->lock_version);
+        $this->assertSame(
+            0,
+            $position->fieldValues()
+                ->whereHas('snapshotFieldDefinition', fn ($q) => $q->where('key', $definition->key))
+                ->count(),
+        );
+    }
+
+    public function test_dyn005_skips_static_required_when_system_header_effectively_hidden(): void
+    {
+        $calculation = $this->savedCalculation();
+        $user = User::factory()->role(Role::Sales)->create();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation(
+                $calculation->fresh(['positions', 'configurationSnapshot']),
+                $calculation->positions()->pluck('id')->all(),
+                $user,
+            )
+            ->order;
+
+        $snapshot = $order->configurationSnapshot;
+        $this->assertNotNull($snapshot);
+        $billing = $snapshot->fieldDefinitions->firstWhere('key', 'billing_special_features');
+        $this->assertNotNull($billing);
+        $billing->required = true;
+        $billing->visible = false;
+        $billing->save();
+
+        // Partial-Save: basis-unsichtbares required Systemfeld darf nicht blockieren.
+        $response = $this->actingAs($user)->patch(route('dispo-orders.update', $order), [
+            'lock_version' => $order->lock_version,
+            'dynamic_field_values' => [
+                'billing_special_features' => '',
+                'disposition_notes' => 'ok',
+            ],
+        ]);
+        $response->assertRedirect();
+    }
+
+    public function test_calc_campaign_period_keep_when_missing_from_payload(): void
+    {
+        $calculation = $this->savedCalculation();
+        $writer = app(CalculationDynamicFieldWriter::class);
+        $writer->syncFromPayload($calculation, [
+            'dynamic_field_values' => [
+                'campaign_period' => ['start' => '2026-03-01', 'end' => '2026-03-31'],
+            ],
+            'positions' => $calculation->positions->values()->map(fn ($position): array => [
+                'id' => $position->id,
+                'client_key' => $position->client_key,
+                'dynamic_field_values' => [
+                    'period_open' => true,
+                ],
+            ])->all(),
+        ]);
+
+        $writer->syncFromPayload($calculation->fresh(['positions', 'fieldValues']), [
+            'dynamic_field_values' => [],
+            'positions' => $calculation->positions->values()->map(fn ($position): array => [
+                'id' => $position->id,
+                'client_key' => $position->client_key,
+                'dynamic_field_values' => [
+                    'period_open' => true,
+                ],
+            ])->all(),
+        ]);
+
+        $values = $writer->headerValuesForPayload($calculation->fresh(['fieldValues.snapshotFieldDefinition']));
+        $this->assertSame(
+            ['start' => '2026-03-01', 'end' => '2026-03-31'],
+            $values['campaign_period'] ?? null,
+        );
+    }
+
+    private function corruptDispoSnapshotRules(DispoOrder $order): void
+    {
+        $snapshot = $order->configurationSnapshot;
+        $this->assertNotNull($snapshot);
+        $rule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->orderBy('sort')
+            ->first();
+        if ($rule === null) {
+            SnapshotFieldRule::query()->create([
+                'configuration_snapshot_id' => $snapshot->id,
+                'sort' => 999,
+                'condition_json' => ['op' => '__corrupt__', 'field_key' => 'campaign_period'],
+                'action_json' => ['op' => 'require_field', 'field_key' => 'campaign_period'],
+                'dedupe_key' => 'test-corrupt-'.uniqid(),
+            ]);
+
+            return;
+        }
+
+        $rule->condition_json = ['op' => '__corrupt__', 'field_key' => 'campaign_period'];
+        $rule->save();
     }
 
     private function savedCalculation(): Calculation

@@ -11,6 +11,8 @@ use App\Models\SnapshotFieldDefinition;
 use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class UpdateDispoOrderPositionCustomsRequest extends FormRequest
 {
@@ -47,7 +49,16 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             if ($snapshot === null) {
                 return;
             }
-            $snapshot->assertReadable();
+            try {
+                $snapshot->assertReadable();
+            } catch (Throwable) {
+                $validator->errors()->add(
+                    'dynamic_field_values',
+                    'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.',
+                );
+
+                return;
+            }
 
             $order->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
             $positionsById = $order->positions->keyBy('id');
@@ -228,7 +239,13 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
             return $orderSnapshot;
         }
 
-        $effective->assertReadable();
+        try {
+            $effective->assertReadable();
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'dynamic_field_values' => 'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.',
+            ]);
+        }
         $effective->loadMissing('fieldDefinitions');
 
         return $effective;

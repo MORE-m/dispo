@@ -158,6 +158,7 @@ type FieldSchema = {
     }>;
     schema_fingerprint?: string | null;
     format_version?: number;
+    rules_integrity_error?: string | null;
 };
 
 type PositionDraft = {
@@ -778,8 +779,14 @@ export default function CalculationWizard({
                 rules: fieldSchema.rules as SnapshotFieldRule[],
                 scope: 'header',
                 headerValues: headerValuesForRules,
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
             }),
-        [fieldSchema.fields, fieldSchema.rules, headerValuesForRules],
+        [
+            fieldSchema.fields,
+            fieldSchema.rules,
+            fieldSchema.rules_integrity_error,
+            headerValuesForRules,
+        ],
     );
     const visibleHeaderTextFields = useMemo(
         () =>
@@ -1589,6 +1596,7 @@ export default function CalculationWizard({
                         field.scope === 'header' || field.scope === undefined,
                 ),
                 additionalRules: fieldSchema.rules as SnapshotFieldRule[],
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
             });
             if (positionRuntime.integrityError) {
                 setSaveError(
@@ -2158,50 +2166,83 @@ export default function CalculationWizard({
                                                 disabled={!canEdit}
                                             />
                                         </FormField>
-                                        <FormField
-                                            label={
-                                                fieldSchema.fields.find(
-                                                    (field) =>
-                                                        field.key ===
+                                        {headerRuntime.integrityError ? (
+                                            <p
+                                                className="text-destructive text-sm sm:col-span-2"
+                                                data-test="calculation-rules-integrity"
+                                                role="alert"
+                                            >
+                                                {headerRuntime.integrityError}
+                                            </p>
+                                        ) : null}
+                                        {headerRuntime.isFieldVisible(
+                                            'campaign_period',
+                                        ) ? (
+                                            <FormField
+                                                label={
+                                                    (fieldSchema.fields.find(
+                                                        (field) =>
+                                                            field.key ===
+                                                            'campaign_period',
+                                                    )?.label ??
+                                                        'Kampagnenzeitraum') +
+                                                    (headerRuntime.isFieldRequired(
                                                         'campaign_period',
-                                                )?.label ?? 'Kampagnenzeitraum'
-                                            }
-                                            htmlFor="campaign-period-start"
-                                            hint={
-                                                fieldSchema.fields.find(
-                                                    (field) =>
-                                                        field.key ===
-                                                        'campaign_period',
-                                                )?.help_text ?? undefined
-                                            }
-                                        >
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    id="campaign-period-start"
-                                                    type="date"
-                                                    value={campaignPeriodStart}
-                                                    onChange={(event) =>
-                                                        setCampaignPeriodStart(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                    data-test="campaign-period-start"
-                                                />
-                                                <Input
-                                                    id="campaign-period-end"
-                                                    type="date"
-                                                    value={campaignPeriodEnd}
-                                                    onChange={(event) =>
-                                                        setCampaignPeriodEnd(
-                                                            event.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!canEdit}
-                                                    data-test="campaign-period-end"
-                                                />
-                                            </div>
-                                        </FormField>
+                                                    )
+                                                        ? ' *'
+                                                        : '')
+                                                }
+                                                htmlFor="campaign-period-start"
+                                                hint={
+                                                    fieldSchema.fields.find(
+                                                        (field) =>
+                                                            field.key ===
+                                                            'campaign_period',
+                                                    )?.help_text ?? undefined
+                                                }
+                                            >
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <Input
+                                                        id="campaign-period-start"
+                                                        type="date"
+                                                        value={
+                                                            campaignPeriodStart
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCampaignPeriodStart(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            headerRuntime.integrityError !==
+                                                                null
+                                                        }
+                                                        data-test="campaign-period-start"
+                                                    />
+                                                    <Input
+                                                        id="campaign-period-end"
+                                                        type="date"
+                                                        value={
+                                                            campaignPeriodEnd
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCampaignPeriodEnd(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={
+                                                            !canEdit ||
+                                                            headerRuntime.integrityError !==
+                                                                null
+                                                        }
+                                                        data-test="campaign-period-end"
+                                                    />
+                                                </div>
+                                            </FormField>
+                                        ) : null}
                                         {visibleHeaderTextFields.length > 0 ||
                                         visibleHeaderChoiceFields.length > 0 ? (
                                             <div
@@ -2211,17 +2252,6 @@ export default function CalculationWizard({
                                                 <h3 className="text-sm font-semibold">
                                                     Weitere Angaben
                                                 </h3>
-                                                {headerRuntime.integrityError ? (
-                                                    <p
-                                                        className="text-destructive text-sm"
-                                                        data-test="calculation-rules-integrity"
-                                                        role="alert"
-                                                    >
-                                                        {
-                                                            headerRuntime.integrityError
-                                                        }
-                                                    </p>
-                                                ) : null}
                                                 <SchemaTextFields
                                                     fields={
                                                         visibleHeaderTextFields
@@ -2251,7 +2281,11 @@ export default function CalculationWizard({
                                                         customHeaderChoiceValues
                                                     }
                                                     errors={fieldErrors}
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        headerRuntime.integrityError !==
+                                                            null
+                                                    }
                                                     idPrefix="calc-choice"
                                                     onChange={(key, value) => {
                                                         setCustomHeaderChoiceValues(
@@ -2396,6 +2430,9 @@ export default function CalculationWizard({
                                                     ),
                                                 additionalRules:
                                                     fieldSchema.rules as SnapshotFieldRule[],
+                                                serverIntegrityError:
+                                                    fieldSchema.rules_integrity_error ??
+                                                    null,
                                             });
                                         const visiblePositionTextFields =
                                             applyEffectiveRequired(
@@ -2690,7 +2727,7 @@ export default function CalculationWizard({
                                                             ) ? (
                                                                 <FormField
                                                                     label={
-                                                                        positionFields.find(
+                                                                        (positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -2698,7 +2735,12 @@ export default function CalculationWizard({
                                                                                 'period_open',
                                                                         )
                                                                             ?.label ??
-                                                                        'Zeitraum offen'
+                                                                            'Zeitraum offen') +
+                                                                        (positionRuntime.isFieldRequired(
+                                                                            'period_open',
+                                                                        )
+                                                                            ? ' *'
+                                                                            : '')
                                                                     }
                                                                     htmlFor={`period-open-${index}`}
                                                                     hint={
@@ -2720,7 +2762,9 @@ export default function CalculationWizard({
                                                                             position.period_open
                                                                         }
                                                                         disabled={
-                                                                            !canEdit
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
                                                                         }
                                                                         onCheckedChange={(
                                                                             checked,
@@ -2809,12 +2853,23 @@ export default function CalculationWizard({
                                                         />
 
                                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            {positionRuntime.isFieldRequired(
+                                                            {rulesIntegrityError ? (
+                                                                <p
+                                                                    className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
+                                                                    data-test={`calculation-rules-integrity-${position.client_key}`}
+                                                                    role="alert"
+                                                                >
+                                                                    {
+                                                                        rulesIntegrityError
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                            {positionRuntime.isFieldVisible(
                                                                 'position_flight_period',
                                                             ) ? (
                                                                 <FormField
                                                                     label={
-                                                                        positionFields.find(
+                                                                        (positionFields.find(
                                                                             (
                                                                                 field,
                                                                             ) =>
@@ -2822,7 +2877,12 @@ export default function CalculationWizard({
                                                                                 'position_flight_period',
                                                                         )
                                                                             ?.label ??
-                                                                        'Flugzeitraum'
+                                                                            'Flugzeitraum') +
+                                                                        (positionRuntime.isFieldRequired(
+                                                                            'position_flight_period',
+                                                                        )
+                                                                            ? ' *'
+                                                                            : '')
                                                                     }
                                                                     htmlFor={`flight-start-${index}`}
                                                                     hint={
@@ -2845,7 +2905,9 @@ export default function CalculationWizard({
                                                                                 position.flight_period_start
                                                                             }
                                                                             disabled={
-                                                                                !canEdit
+                                                                                !canEdit ||
+                                                                                rulesIntegrityError !==
+                                                                                    null
                                                                             }
                                                                             data-test={`flight-period-start-${index}`}
                                                                             onChange={(
@@ -2869,7 +2931,9 @@ export default function CalculationWizard({
                                                                                 position.flight_period_end
                                                                             }
                                                                             disabled={
-                                                                                !canEdit
+                                                                                !canEdit ||
+                                                                                rulesIntegrityError !==
+                                                                                    null
                                                                             }
                                                                             data-test={`flight-period-end-${index}`}
                                                                             onChange={(
@@ -2901,17 +2965,6 @@ export default function CalculationWizard({
                                                                         Weitere
                                                                         Angaben
                                                                     </h3>
-                                                                    {rulesIntegrityError ? (
-                                                                        <p
-                                                                            className="text-destructive text-sm"
-                                                                            data-test={`calculation-rules-integrity-${position.client_key}`}
-                                                                            role="alert"
-                                                                        >
-                                                                            {
-                                                                                rulesIntegrityError
-                                                                            }
-                                                                        </p>
-                                                                    ) : null}
                                                                     <SchemaTextFields
                                                                         fields={
                                                                             visiblePositionTextFields
@@ -2961,7 +3014,9 @@ export default function CalculationWizard({
                                                                             `positions.${index}.dynamic_field_values`,
                                                                         ]}
                                                                         disabled={
-                                                                            !canEdit
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
                                                                         }
                                                                         idPrefix={`calc-pos-choice-${position.client_key}`}
                                                                         onChange={(
@@ -3819,6 +3874,7 @@ export default function CalculationWizard({
                                 disabled={
                                     busy ||
                                     schemaStillLoading ||
+                                    headerRuntime.integrityError !== null ||
                                     (planningMode === 'budget' &&
                                         positions.length === 0 &&
                                         !isBudgetSetup)

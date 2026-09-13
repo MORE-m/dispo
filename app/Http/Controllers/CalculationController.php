@@ -36,9 +36,11 @@ use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class CalculationController extends Controller
 {
@@ -599,10 +601,21 @@ class CalculationController extends Controller
             return $this->liveFieldSchemaProp($resolved);
         }
 
-        $snapshot->assertReadable();
+        $rulesIntegrityError = null;
+        try {
+            $snapshot->assertReadable();
+        } catch (Throwable $exception) {
+            Log::warning('Calculation field schema snapshot integrity failed', [
+                'calculation_id' => $calculation->id,
+                'snapshot_id' => $snapshot->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            $rulesIntegrityError = 'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.';
+        }
 
         // Gen 3: Positions-Schema aus eingefrorener Basis für gewähltes Medium.
-        if ((int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
+        if ($rulesIntegrityError === null
+            && (int) $snapshot->format_version === ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE
             && $mediumId !== null
             && $mediumId > 0
         ) {
@@ -650,6 +663,7 @@ class CalculationController extends Controller
             ])->values()->all(),
             'format_version' => (int) $snapshot->format_version,
             'schema_fingerprint' => $snapshot->schema_fingerprint,
+            'rules_integrity_error' => $rulesIntegrityError,
         ];
     }
 
@@ -683,7 +697,24 @@ class CalculationController extends Controller
             return null;
         }
 
-        $effective->assertReadable();
+        try {
+            $effective->assertReadable();
+        } catch (Throwable $exception) {
+            Log::warning('Calculation position field schema integrity failed', [
+                'calculation_id' => $calculation->id,
+                'position_id' => $position->id,
+                'snapshot_id' => $effective->id,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return [
+                'fields' => [],
+                'rules' => [],
+                'format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
+                'schema_fingerprint' => $effective->schema_fingerprint,
+                'rules_integrity_error' => 'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.',
+            ];
+        }
 
         $resolved = $this->freeze->resolvePositionSchemaFromBase(
             $base,

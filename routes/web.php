@@ -210,8 +210,14 @@ if (app()->environment('testing') && config('app.e2e_server')) {
             ->name('e2e.snapshot-choice-option-active');
         Route::post('snapshot-field-visible', [E2EChoiceSnapshotController::class, 'setFieldVisible'])
             ->name('e2e.snapshot-field-visible');
+        Route::post('snapshot-field-rule', [E2EChoiceSnapshotController::class, 'upsertRule'])
+            ->name('e2e.snapshot-field-rule');
+        Route::post('snapshot-rules-corrupt', [E2EChoiceSnapshotController::class, 'corruptRules'])
+            ->name('e2e.snapshot-rules-corrupt');
         Route::get('calculation-choice-value', [E2EChoiceSnapshotController::class, 'choiceValue'])
             ->name('e2e.calculation-choice-value');
+        Route::get('dynamic-field-text-value', [E2EChoiceSnapshotController::class, 'textValue'])
+            ->name('e2e.dynamic-field-text-value');
         Route::get('dispo-choice-value', [E2EChoiceSnapshotController::class, 'dispoChoiceValue'])
             ->name('e2e.dispo-choice-value');
         Route::get('dispo-positions', [E2EChoiceSnapshotController::class, 'dispoPositions'])

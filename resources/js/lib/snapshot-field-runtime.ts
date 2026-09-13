@@ -163,6 +163,8 @@ export function evaluateSnapshotFieldRuntime(args: {
     conditionFields?: RuntimeSchemaField[];
     additionalRules?: SnapshotFieldRule[];
     definitionFields?: RuntimeSchemaField[];
+    /** Serverseitig erkanntes Ruleset-/Snapshot-Integrity-Problem. */
+    serverIntegrityError?: string | null;
 }): SnapshotFieldRuntimeResult {
     const positionValues = args.positionValues ?? {};
     const catalogFields = args.definitionFields ?? [
@@ -181,6 +183,15 @@ export function evaluateSnapshotFieldRuntime(args: {
             basisMap(args.fields, args.scope, 'visible')[key] ?? false,
         isFieldRequired: () => false,
     };
+
+    if (args.serverIntegrityError) {
+        return {
+            ...empty,
+            integrityError: args.serverIntegrityError,
+            isFieldVisible: () => false,
+            isFieldRequired: () => false,
+        };
+    }
 
     if (Object.keys(defsByKey).length === 0) {
         return empty;
@@ -250,53 +261,4 @@ export function applyEffectiveRequired<
         ...field,
         required: runtime.isFieldRequired(field.key),
     }));
-}
-
-/** Alle Custom-Textfelder inkl. basis_visible=false (State/Init). */
-export function allCustomTextFieldsFromSchema(
-    fields: RuntimeSchemaField[],
-    scope: 'header' | 'position',
-): Array<{
-    key: string;
-    label: string;
-    help_text?: string | null;
-    field_type: string;
-    max_length?: number | null;
-    required?: boolean;
-    sort?: number;
-}> {
-    return fields
-        .filter(
-            (field) =>
-                field.is_system !== true &&
-                (field.scope === undefined || field.scope === scope) &&
-                (field.field_type === 'short_text' ||
-                    field.field_type === 'long_text'),
-        )
-        .map((field) => ({
-            key: field.key,
-            label: field.label,
-            help_text: field.help_text,
-            field_type: field.field_type,
-            sort: field.sort,
-            required: field.required === true,
-            max_length:
-                field.max_length ??
-                field.validation_json?.max_length ??
-                (field.field_type === 'short_text' ? 255 : 20000),
-        }));
-}
-
-/** Alle Custom-Choice-Felder inkl. basis_visible=false (State/Init). */
-export function allCustomChoiceFieldsFromSchema(
-    fields: RuntimeSchemaField[],
-    scope: 'header' | 'position',
-): RuntimeSchemaField[] {
-    return fields.filter(
-        (field) =>
-            field.is_system !== true &&
-            (field.scope === undefined || field.scope === scope) &&
-            (field.field_type === 'select' ||
-                field.field_type === 'multi_select'),
-    );
 }

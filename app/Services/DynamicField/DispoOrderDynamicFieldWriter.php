@@ -19,18 +19,24 @@ use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Support\DynamicField\ChoiceFieldValueContract;
+use App\Support\DynamicField\FieldRuleDefinitionContext;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * DF-2: Persistenz und Validierung dynamischer Dispo-Feldwerte.
  */
 final class DispoOrderDynamicFieldWriter
 {
+    private const RULESET_INTEGRITY_CLIENT_MESSAGE =
+        'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.';
+
     public function __construct(
         private readonly SnapshotFieldRuleEvaluator $rules,
         private readonly CalculationDynamicFieldWriter $calculationFields,
@@ -209,7 +215,17 @@ final class DispoOrderDynamicFieldWriter
             throw new RuntimeException("Dispoposition {$position->id} hat keinen Effektiv-Snapshot.");
         }
 
-        $effective->assertReadable();
+        try {
+            $effective->assertReadable();
+        } catch (Throwable $exception) {
+            // RULE-B Show/Payload: soft-fail. Mutationen bleiben über
+            // assertSnapshotRulesetIntegrity / requireSnapshot fail-closed.
+            Log::warning('Dispo position snapshot integrity failed', [
+                'position_id' => $position->id,
+                'snapshot_id' => $effective->id,
+                'exception' => $exception->getMessage(),
+            ]);
+        }
         $effective->loadMissing(['fieldDefinitions', 'rules']);
 
         return $effective;
@@ -387,6 +403,7 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $snapshot = $this->requireSnapshot($locked);
+            $this->assertSnapshotRulesetIntegrity($snapshot);
             $locked->loadMissing('fieldValues.snapshotFieldDefinition');
             $before = $this->textValuesForAudit($locked, $snapshot);
 
@@ -472,6 +489,7 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $snapshot = $this->requireSnapshot($locked);
+            $this->assertSnapshotRulesetIntegrity($snapshot);
             $locked->loadMissing(['positions.fieldValues.snapshotFieldDefinition']);
             $positionsById = $locked->positions->keyBy('id');
             $before = $this->positionCustomValuesForAudit($locked, $snapshot);
@@ -489,6 +507,7 @@ final class DispoOrderDynamicFieldWriter
                 }
 
                 $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+                $this->assertSnapshotRulesetIntegrity($snapshot, $positionSnapshot);
                 $editableKeys = [];
                 foreach ($this->positionDefinitions($snapshot, $position) as $def) {
                     if ($this->isNativeEditablePositionText($positionSnapshot, $def)) {
@@ -646,6 +665,7 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $snapshot = $this->requireSnapshot($locked);
+            $this->assertSnapshotRulesetIntegrity($snapshot);
             $calculation = $locked->calculation()->with([
                 'configurationSnapshot.fieldDefinitions',
                 'configurationSnapshot.rules',
@@ -831,7 +851,17 @@ final class DispoOrderDynamicFieldWriter
     public function fieldSchemaProp(DispoOrder $order): array
     {
         $snapshot = $order->configurationSnapshot;
-        $snapshot->assertReadable();
+        $rulesIntegrityError = null;
+        try {
+            $snapshot->assertReadable();
+        } catch (Throwable $exception) {
+            Log::warning('Dispo field schema snapshot integrity failed', [
+                'dispo_order_id' => $order->id,
+                'snapshot_id' => $snapshot->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            $rulesIntegrityError = self::RULESET_INTEGRITY_CLIENT_MESSAGE;
+        }
         $snapshot->loadMissing(['fieldDefinitions', 'rules']);
         $order->loadMissing('positions.effectiveConfigurationSnapshot.fieldDefinitions');
 
@@ -842,8 +872,12 @@ final class DispoOrderDynamicFieldWriter
             $entries,
         )));
         foreach ($order->positions as $position) {
-            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
-                $definitionIds[] = (int) $def->field_definition_id;
+            try {
+                foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+                    $definitionIds[] = (int) $def->field_definition_id;
+                }
+            } catch (Throwable) {
+                $rulesIntegrityError = self::RULESET_INTEGRITY_CLIENT_MESSAGE;
             }
         }
         $definitionIds = array_values(array_unique($definitionIds));
@@ -900,9 +934,20 @@ final class DispoOrderDynamicFieldWriter
         /** @var array<int, array{editable_custom_fields: list<array<string, mixed>>, calc_origin_custom_fields: list<array<string, mixed>>}> $positionFieldSchemas */
         $positionFieldSchemas = [];
         foreach ($order->positions as $position) {
-            $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            try {
+                $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            } catch (Throwable $exception) {
+                Log::warning('Dispo position field schema integrity failed', [
+                    'dispo_order_id' => $order->id,
+                    'position_id' => $position->id,
+                    'exception' => $exception->getMessage(),
+                ]);
+                $rulesIntegrityError = self::RULESET_INTEGRITY_CLIENT_MESSAGE;
+                $positionSnapshot = $snapshot;
+                $positionSnapshot->loadMissing(['fieldDefinitions', 'rules']);
+            }
             $positionFields = [];
-            foreach ($this->positionDefinitions($snapshot, $position) as $def) {
+            foreach ($positionSnapshot->fieldDefinitions->where('scope', FieldScope::Position) as $def) {
                 $positionFields[] = $this->mapSchemaFieldProp(
                     $def,
                     $positionSnapshot,
@@ -943,6 +988,7 @@ final class DispoOrderDynamicFieldWriter
             'editable_custom_position_fields' => $editableCustomPosition,
             'calc_origin_custom_position_fields' => $calcOriginCustomPosition,
             'position_field_schemas' => $positionFieldSchemas,
+            'rules_integrity_error' => $rulesIntegrityError,
         ];
     }
 
@@ -1865,9 +1911,60 @@ final class DispoOrderDynamicFieldWriter
         $order->loadMissing('configurationSnapshot.fieldDefinitions', 'configurationSnapshot.rules');
 
         $snapshot = $order->configurationSnapshot;
-        $snapshot->assertReadable();
+
+        try {
+            $snapshot->assertReadable();
+        } catch (Throwable $exception) {
+            Log::warning('Dispo dynamic-field snapshot readability failed', [
+                'snapshot_id' => $snapshot->id,
+                'schema_fingerprint' => $snapshot->schema_fingerprint,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'dynamic_field_values' => self::RULESET_INTEGRITY_CLIENT_MESSAGE,
+            ]);
+        }
 
         return $snapshot;
+    }
+
+    /**
+     * RULE-B fail-closed: beschädigtes Ruleset blockiert Partial-Save vor jeder Mutation
+     * (kein Wert-, Audit- oder Lock-Write). Getrennt von Required-Enforcement.
+     */
+    private function assertSnapshotRulesetIntegrity(
+        ConfigurationSnapshot $snapshot,
+        ?ConfigurationSnapshot $positionSnapshot = null,
+    ): void {
+        try {
+            $snapshot->loadMissing(['fieldDefinitions', 'rules', 'sources']);
+            $this->rules->assertRulesCompatibleWithDefinitions(
+                FieldRuleDefinitionContext::fromSnapshot($snapshot),
+                $snapshot->rules,
+                requireActiveOptionKeys: false,
+            );
+
+            if ($positionSnapshot !== null && $positionSnapshot->id !== $snapshot->id) {
+                $positionSnapshot->loadMissing(['fieldDefinitions', 'rules', 'sources']);
+                $this->rules->assertRulesCompatibleWithDefinitions(
+                    FieldRuleDefinitionContext::fromSnapshot($positionSnapshot),
+                    $positionSnapshot->rules,
+                    requireActiveOptionKeys: false,
+                );
+            }
+        } catch (Throwable $exception) {
+            Log::warning('Dispo dynamic-field ruleset integrity failed', [
+                'snapshot_id' => $snapshot->id,
+                'schema_fingerprint' => $snapshot->schema_fingerprint,
+                'position_snapshot_id' => $positionSnapshot?->id,
+                'exception' => $exception->getMessage(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'dynamic_field_values' => self::RULESET_INTEGRITY_CLIENT_MESSAGE,
+            ]);
+        }
     }
 
     private function assertReadyForRules(DispoOrder $order, ConfigurationSnapshot $snapshot): void

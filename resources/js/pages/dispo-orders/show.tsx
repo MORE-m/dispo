@@ -90,6 +90,7 @@ type FieldSchema = {
     editable_custom_position_fields?: SchemaField[];
     calc_origin_custom_position_fields?: SchemaField[];
     position_field_schemas?: Record<number | string, PositionFieldSchemaBucket>;
+    rules_integrity_error?: string | null;
 };
 
 type OrderPosition = {
@@ -489,8 +490,14 @@ export default function DispoOrderShow({
                 rules: fieldSchema.rules as SnapshotFieldRule[],
                 scope: 'header',
                 headerValues: headerValuesForRules,
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
             }),
-        [fieldSchema.fields, fieldSchema.rules, headerValuesForRules],
+        [
+            fieldSchema.fields,
+            fieldSchema.rules,
+            fieldSchema.rules_integrity_error,
+            headerValuesForRules,
+        ],
     );
 
     const visibleEditableHeaderTextFields = useMemo(
@@ -564,6 +571,7 @@ export default function DispoOrderShow({
                     (field) => field.scope === 'header',
                 ),
                 additionalRules: fieldSchema.rules as SnapshotFieldRule[],
+                serverIntegrityError: fieldSchema.rules_integrity_error ?? null,
             });
         }
 
@@ -622,6 +630,20 @@ export default function DispoOrderShow({
 
         return null;
     }, [headerRuntime, positionRuntimes, order.positions]);
+
+    const dynamicControlsLocked = rulesIntegrityError !== null;
+    const billingVisible =
+        !dynamicControlsLocked &&
+        headerRuntime.isFieldVisible('billing_special_features');
+    const dispositionVisible =
+        !dynamicControlsLocked &&
+        headerRuntime.isFieldVisible('disposition_notes');
+    const billingRequired = headerRuntime.isFieldRequired(
+        'billing_special_features',
+    );
+    const dispositionRequired = headerRuntime.isFieldRequired(
+        'disposition_notes',
+    );
 
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
@@ -684,6 +706,13 @@ export default function DispoOrderShow({
 
     function saveSystemNotes() {
         if (savingNotes) {
+            return;
+        }
+
+        if (rulesIntegrityError) {
+            setFieldErrors({
+                dynamic_field_values: rulesIntegrityError,
+            });
             return;
         }
 
@@ -876,6 +905,13 @@ export default function DispoOrderShow({
             return;
         }
 
+        if (rulesIntegrityError) {
+            setFieldErrors({
+                dynamic_field_values: rulesIntegrityError,
+            });
+            return;
+        }
+
         setSyncingCalcFields(true);
         router.post(
             `/dispoauftraege/${order.id}/sync-calculation-dynamic-fields`,
@@ -890,6 +926,7 @@ export default function DispoOrderShow({
     }
 
     const showHeaderCustomCard =
+        dynamicControlsLocked ||
         visibleEditableHeaderTextFields.length > 0 ||
         visibleEditableHeaderChoiceFields.length > 0;
     const showHeaderCalcOrigin =
@@ -1132,7 +1169,7 @@ export default function DispoOrderShow({
                             type="button"
                             variant="outline"
                             data-test="dispo-order-sync-calc-dynamic-fields"
-                            disabled={syncingCalcFields}
+                            disabled={syncingCalcFields || dynamicControlsLocked}
                             onClick={syncCalculationDynamicFields}
                         >
                             {syncingCalcFields
@@ -1154,9 +1191,12 @@ export default function DispoOrderShow({
                     <CardContent className="space-y-4 px-5 py-4">
                         {canUpdate ? (
                             <>
+                                {billingVisible ? (
                                 <div className="grid gap-2">
                                     <Label htmlFor="dispo-order-billing-special-features">
-                                        {billingLabel}
+                                        {billingRequired
+                                            ? `${billingLabel} *`
+                                            : billingLabel}
                                     </Label>
                                     {billingHelp ? (
                                         <p
@@ -1171,7 +1211,7 @@ export default function DispoOrderShow({
                                         className={formTextareaClass}
                                         value={billingSpecialFeatures}
                                         data-test="dispo-order-billing-special-features"
-                                        disabled={savingNotes}
+                                        disabled={savingNotes || dynamicControlsLocked}
                                         aria-describedby={
                                             billingHelp
                                                 ? 'dispo-order-billing-special-features-help'
@@ -1195,9 +1235,13 @@ export default function DispoOrderShow({
                                         </p>
                                     ) : null}
                                 </div>
+                                ) : null}
+                                {dispositionVisible ? (
                                 <div className="grid gap-2">
                                     <Label htmlFor="dispo-order-disposition-notes">
-                                        {dispositionLabel}
+                                        {dispositionRequired
+                                            ? `${dispositionLabel} *`
+                                            : dispositionLabel}
                                     </Label>
                                     {dispositionHelp ? (
                                         <p
@@ -1212,7 +1256,7 @@ export default function DispoOrderShow({
                                         className={formTextareaClass}
                                         value={dispositionNotes}
                                         data-test="dispo-order-disposition-notes"
-                                        disabled={savingNotes}
+                                        disabled={savingNotes || dynamicControlsLocked}
                                         aria-describedby={
                                             dispositionHelp
                                                 ? 'dispo-order-disposition-notes-help'
@@ -1236,6 +1280,7 @@ export default function DispoOrderShow({
                                         </p>
                                     ) : null}
                                 </div>
+                                ) : null}
                                 {fieldErrors.dynamic_field_values ||
                                 fieldErrors.lock_version ? (
                                     <p className="text-destructive text-xs">
@@ -1245,7 +1290,7 @@ export default function DispoOrderShow({
                                 ) : null}
                                 <Button
                                     type="button"
-                                    disabled={savingNotes}
+                                    disabled={savingNotes || dynamicControlsLocked}
                                     data-test="dispo-order-save-system-notes"
                                     onClick={saveSystemNotes}
                                 >
@@ -1256,24 +1301,32 @@ export default function DispoOrderShow({
                             </>
                         ) : (
                             <>
-                                <div data-test="dispo-order-billing-special-features">
-                                    <Detail
-                                        label={billingLabel}
-                                        value={displayOptionalText(
-                                            headerValues.billing_special_features,
-                                        )}
-                                        helpText={billingHelp}
-                                    />
-                                </div>
-                                <div data-test="dispo-order-disposition-notes">
-                                    <Detail
-                                        label={dispositionLabel}
-                                        value={displayOptionalText(
-                                            headerValues.disposition_notes,
-                                        )}
-                                        helpText={dispositionHelp}
-                                    />
-                                </div>
+                                {headerRuntime.isFieldVisible(
+                                    'billing_special_features',
+                                ) ? (
+                                    <div data-test="dispo-order-billing-special-features">
+                                        <Detail
+                                            label={billingLabel}
+                                            value={displayOptionalText(
+                                                headerValues.billing_special_features,
+                                            )}
+                                            helpText={billingHelp}
+                                        />
+                                    </div>
+                                ) : null}
+                                {headerRuntime.isFieldVisible(
+                                    'disposition_notes',
+                                ) ? (
+                                    <div data-test="dispo-order-disposition-notes">
+                                        <Detail
+                                            label={dispositionLabel}
+                                            value={displayOptionalText(
+                                                headerValues.disposition_notes,
+                                            )}
+                                            helpText={dispositionHelp}
+                                        />
+                                    </div>
+                                ) : null}
                             </>
                         )}
                     </CardContent>
@@ -1300,7 +1353,7 @@ export default function DispoOrderShow({
                                             }
                                             values={customHeaderValues}
                                             errors={fieldErrors}
-                                            disabled={savingNotes}
+                                            disabled={savingNotes || dynamicControlsLocked}
                                             idPrefix="dispo-custom"
                                             onChange={(key, value) =>
                                                 setCustomHeaderValues(
@@ -1323,7 +1376,7 @@ export default function DispoOrderShow({
                                                     customHeaderChoiceValues
                                                 }
                                                 errors={fieldErrors}
-                                                disabled={savingNotes}
+                                                disabled={savingNotes || dynamicControlsLocked}
                                                 idPrefix="dispo-custom-choice"
                                                 onChange={(key, value) => {
                                                     setCustomHeaderChoiceValues(
@@ -1360,7 +1413,7 @@ export default function DispoOrderShow({
                                     ) : null}
                                     <Button
                                         type="button"
-                                        disabled={savingNotes}
+                                        disabled={savingNotes || dynamicControlsLocked}
                                         data-test="dispo-order-save-custom-headers"
                                         onClick={saveCustomHeaders}
                                     >
@@ -1842,7 +1895,7 @@ export default function DispoOrderShow({
                                 ) : null}
                                 <Button
                                     type="button"
-                                    disabled={savingPositionCustoms}
+                                    disabled={savingPositionCustoms || dynamicControlsLocked}
                                     data-test="dispo-order-save-position-customs"
                                     onClick={savePositionCustoms}
                                 >

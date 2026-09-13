@@ -10,6 +10,8 @@ use App\Models\SnapshotFieldDefinition;
 use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class UpdateDispoOrderDraftRequest extends FormRequest
 {
@@ -86,7 +88,13 @@ class UpdateDispoOrderDraftRequest extends FormRequest
             $order = $this->dispoOrder();
             $snapshot = $order?->configurationSnapshot;
             if ($snapshot instanceof ConfigurationSnapshot) {
-                $snapshot->assertReadable();
+                try {
+                    $snapshot->assertReadable();
+                } catch (Throwable) {
+                    throw ValidationException::withMessages([
+                        'dynamic_field_values' => 'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.',
+                    ]);
+                }
             }
 
             foreach (array_keys($values) as $key) {
@@ -188,7 +196,13 @@ class UpdateDispoOrderDraftRequest extends FormRequest
             return [];
         }
 
-        $snapshot->assertReadable();
+        try {
+            $snapshot->assertReadable();
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'dynamic_field_values' => 'Die Feldregeln dieses Vorgangs sind ungültig. Speichern ist nicht möglich.',
+            ]);
+        }
 
         $calcKeys = $this->calcOriginKeys($snapshot);
         $editable = [];

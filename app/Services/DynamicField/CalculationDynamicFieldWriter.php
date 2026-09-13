@@ -13,8 +13,10 @@ use App\Models\SnapshotFieldDefinition;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
+use Throwable;
 
 /**
  * Persistiert typisierte Dyn-Werte gegen Snapshot-Definitionen.
@@ -141,7 +143,19 @@ final class CalculationDynamicFieldWriter
             );
         }
 
-        $effective->assertReadable();
+        try {
+            $effective->assertReadable();
+        } catch (Throwable $exception) {
+            // RULE-B: Show/Payload darf Integrity soft-failen; Mutation bleibt fail-closed.
+            Log::warning('Calculation position scope snapshot integrity failed', [
+                'position_id' => $position->id,
+                'snapshot_id' => $effective->id,
+                'exception' => $exception->getMessage(),
+            ]);
+            $effective->loadMissing(['fieldDefinitions', 'rules']);
+
+            return $effective;
+        }
         $effective->loadMissing(['fieldDefinitions', 'rules']);
 
         return $effective;
@@ -507,7 +521,7 @@ final class CalculationDynamicFieldWriter
         try {
             $startDate = Carbon::parse((string) $start)->startOfDay();
             $endDate = Carbon::parse((string) $end)->startOfDay();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             return 'Zeitraum enthält ungültige Datumsangaben.';
         }
 

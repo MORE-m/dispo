@@ -6,11 +6,16 @@ use App\Models\Calculation;
 use App\Models\CalculationFieldValue;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionFieldValue;
+use App\Models\ConfigurationSnapshot;
+use App\Models\ConfigurationSnapshotSource;
+use App\Models\ConfigurationSnapshotSourceRule;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderFieldValue;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
 use App\Models\SnapshotFieldDefinition;
+use App\Models\SnapshotFieldRule;
+use App\Services\DynamicField\SnapshotFieldRuleDedupeKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -228,6 +233,218 @@ class E2EChoiceSnapshotController
                 'effective_configuration_snapshot_id' => $position->effective_configuration_snapshot_id,
             ])->all(),
         ]);
+    }
+
+    public function upsertRule(Request $request): JsonResponse
+    {
+        $this->assertE2E();
+        $this->assertAuthenticated($request);
+
+        $validated = $request->validate([
+            'calculation_id' => ['required_without:dispo_order_id', 'nullable', 'integer'],
+            'dispo_order_id' => ['required_without:calculation_id', 'nullable', 'integer'],
+            'condition' => ['required', 'array'],
+            'action' => ['required', 'array'],
+            'sort' => ['sometimes', 'integer'],
+        ]);
+
+        $snapshot = $this->resolveTargetSnapshot($validated);
+        $condition = $validated['condition'];
+        $action = $validated['action'];
+        $dedupe = SnapshotFieldRuleDedupeKey::from($condition, $action);
+        $sort = (int) ($validated['sort'] ?? 100);
+        $source = $this->coreSourceOrFail($snapshot);
+
+        $existingRule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->where('dedupe_key', $dedupe)
+            ->first();
+        $existingSourceRule = ConfigurationSnapshotSourceRule::query()
+            ->where('configuration_snapshot_source_id', $source->id)
+            ->where('dedupe_key', $dedupe)
+            ->first();
+        $sourceFieldRuleId = (int) (
+            $existingRule?->source_field_rule_id
+            ?? $existingSourceRule?->source_field_rule_id
+            ?? $this->allocateE2ESourceFieldRuleId($snapshot)
+        );
+
+        $sourceRule = ConfigurationSnapshotSourceRule::query()->updateOrCreate(
+            [
+                'configuration_snapshot_source_id' => $source->id,
+                'dedupe_key' => $dedupe,
+            ],
+            [
+                'source_field_rule_id' => $sourceFieldRuleId,
+                'sort' => $sort,
+                'condition_json' => $condition,
+                'action_json' => $action,
+            ],
+        );
+
+        $rule = SnapshotFieldRule::query()->updateOrCreate(
+            [
+                'configuration_snapshot_id' => $snapshot->id,
+                'dedupe_key' => $dedupe,
+            ],
+            [
+                'sort' => $sort,
+                'condition_json' => $condition,
+                'action_json' => $action,
+                'provenance_source_id' => $source->id,
+                'source_field_rule_id' => (int) $sourceRule->source_field_rule_id,
+            ],
+        );
+
+        return response()->json(['ok' => true, 'rule_id' => $rule->id]);
+    }
+
+    public function corruptRules(Request $request): JsonResponse
+    {
+        $this->assertE2E();
+        $this->assertAuthenticated($request);
+
+        $validated = $request->validate([
+            'calculation_id' => ['required_without:dispo_order_id', 'nullable', 'integer'],
+            'dispo_order_id' => ['required_without:calculation_id', 'nullable', 'integer'],
+        ]);
+
+        $snapshot = $this->resolveTargetSnapshot($validated);
+        $corruptCondition = ['op' => '__corrupt__', 'field_key' => 'campaign_period'];
+        $corruptAction = ['op' => 'require_field', 'field_key' => 'campaign_period'];
+
+        $rule = SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->orderBy('sort')
+            ->first();
+
+        if ($rule === null) {
+            $source = $this->coreSourceOrFail($snapshot);
+            $sourceFieldRuleId = $this->allocateE2ESourceFieldRuleId($snapshot);
+            $dedupe = 'e2e-corrupt-'.uniqid('', true);
+            ConfigurationSnapshotSourceRule::query()->create([
+                'configuration_snapshot_source_id' => $source->id,
+                'source_field_rule_id' => $sourceFieldRuleId,
+                'sort' => 999,
+                'condition_json' => $corruptCondition,
+                'action_json' => $corruptAction,
+                'dedupe_key' => $dedupe,
+            ]);
+            $rule = SnapshotFieldRule::query()->create([
+                'configuration_snapshot_id' => $snapshot->id,
+                'sort' => 999,
+                'condition_json' => $corruptCondition,
+                'action_json' => $corruptAction,
+                'dedupe_key' => $dedupe,
+                'provenance_source_id' => $source->id,
+                'source_field_rule_id' => $sourceFieldRuleId,
+            ]);
+        } else {
+            $oldDedupe = (string) $rule->dedupe_key;
+            $newDedupe = 'e2e-corrupt-'.uniqid('', true);
+            $rule->condition_json = $corruptCondition;
+            $rule->action_json = $corruptAction;
+            $rule->dedupe_key = $newDedupe;
+            $rule->save();
+
+            if ($rule->provenance_source_id !== null) {
+                $sourceRule = ConfigurationSnapshotSourceRule::query()
+                    ->where('configuration_snapshot_source_id', $rule->provenance_source_id)
+                    ->where(function ($query) use ($oldDedupe, $rule): void {
+                        $query->where('dedupe_key', $oldDedupe);
+                        if ($rule->source_field_rule_id !== null) {
+                            $query->orWhere('source_field_rule_id', $rule->source_field_rule_id);
+                        }
+                    })
+                    ->first();
+                if ($sourceRule !== null) {
+                    $sourceRule->condition_json = $corruptCondition;
+                    $sourceRule->action_json = $corruptAction;
+                    $sourceRule->dedupe_key = $newDedupe;
+                    $sourceRule->save();
+                }
+            }
+        }
+
+        return response()->json(['ok' => true, 'rule_id' => $rule->id]);
+    }
+
+    public function textValue(Request $request): JsonResponse
+    {
+        $this->assertE2E();
+        $this->assertAuthenticated($request);
+
+        $validated = $request->validate([
+            'calculation_id' => ['required_without:dispo_order_id', 'nullable', 'integer'],
+            'dispo_order_id' => ['required_without:calculation_id', 'nullable', 'integer'],
+            'field_key' => ['required', 'string'],
+        ]);
+
+        if (! empty($validated['dispo_order_id'])) {
+            $order = $this->dispoOrderOrFail((int) $validated['dispo_order_id']);
+            $snap = $this->resolveDispoSnapshotField($order, $validated['field_key'], null);
+            $row = DispoOrderFieldValue::query()
+                ->where('dispo_order_id', $order->id)
+                ->where('snapshot_field_definition_id', $snap->id)
+                ->first();
+
+            return response()->json([
+                'exists' => $row !== null,
+                'value' => $row === null ? null : ($row->value_string ?? $row->value_text),
+            ]);
+        }
+
+        $calculation = $this->calculationOrFail((int) $validated['calculation_id']);
+        $snap = $this->resolveSnapshotField($calculation, $validated['field_key'], null);
+        $row = CalculationFieldValue::query()
+            ->where('calculation_id', $calculation->id)
+            ->where('snapshot_field_definition_id', $snap->id)
+            ->first();
+
+        return response()->json([
+            'exists' => $row !== null,
+            'value' => $row === null ? null : ($row->value_string ?? $row->value_text),
+        ]);
+    }
+
+    private function coreSourceOrFail(ConfigurationSnapshot $snapshot): ConfigurationSnapshotSource
+    {
+        $snapshot->loadMissing('sources');
+        $source = $snapshot->sources->firstWhere('role', ConfigurationSnapshotSource::ROLE_CORE);
+        if (! $source instanceof ConfigurationSnapshotSource) {
+            throw new RuntimeException('E2E: Core-Source fehlt am Snapshot.');
+        }
+
+        return $source;
+    }
+
+    private function allocateE2ESourceFieldRuleId(ConfigurationSnapshot $snapshot): int
+    {
+        $maxSnapshot = (int) SnapshotFieldRule::query()
+            ->where('configuration_snapshot_id', $snapshot->id)
+            ->max('source_field_rule_id');
+        $sourceIds = $snapshot->sources()->pluck('id');
+        $maxSource = (int) ConfigurationSnapshotSourceRule::query()
+            ->whereIn('configuration_snapshot_source_id', $sourceIds)
+            ->max('source_field_rule_id');
+
+        return max($maxSnapshot, $maxSource, 900_000) + 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function resolveTargetSnapshot(array $validated): ConfigurationSnapshot
+    {
+        if (! empty($validated['dispo_order_id'])) {
+            $order = $this->dispoOrderOrFail((int) $validated['dispo_order_id']);
+
+            return ConfigurationSnapshot::query()->findOrFail($order->configuration_snapshot_id);
+        }
+
+        $calculation = $this->calculationOrFail((int) $validated['calculation_id']);
+
+        return ConfigurationSnapshot::query()->findOrFail($calculation->configuration_snapshot_id);
     }
 
     /**
