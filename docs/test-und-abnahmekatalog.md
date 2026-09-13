@@ -14,6 +14,17 @@ Zusätzlich benötigt jede Umsetzung:
 Tests verwenden feste Preis- und Zeitdaten. Aktuelles Datum, Zeitzone und
 Zufallswerte werden kontrolliert, damit Ergebnisse reproduzierbar bleiben.
 
+### BL-P4-01a (ohne Excel-Import)
+
+Zusätzlich zu `AT-21` (Import, offen) gelten für den Lifecycle-Slice:
+
+- höchstens eine Active je Inventar/Jahr; mehrere Drafts/Archive zulässig
+- Jahresdefault = aktive Liste des aktuellen Kalenderjahres `Europe/Berlin`
+- fehlende aktuelle Jahresliste ohne stillen Fallback
+- historische Positionen bleiben an der gepinnten `price_list_id`
+- Budget-Fingerprint unterscheidet gleiche Versionsstrings verschiedener Listen
+- isolierte Playwright-Suite `playwright.blp401a.config.ts` (Port 8017)
+
 ## Mindestabnahme
 
 | ID | Betroffene Anforderungen | Szenario | Erwartung |

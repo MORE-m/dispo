@@ -87,6 +87,29 @@ Zusätzlich bricht `Tests\Support\MysqlTestDatabaseGuard` vor `RefreshDatabase` 
 `DatabaseMigrations` und in MySQL-Parallelworkern ab, wenn nicht exakt `dispo_test`
 aktiv ist.
 
+## BL-P4-01a – lokale Inbetriebnahme der Preislisten-Migration
+
+Die Migration `2026_09_13_220000_add_year_lock_and_revision_to_price_lists`
+erweitert bestehende `price_lists`:
+
+- `year` aus eindeutigem `valid_from` (kein Fallback auf 2026 oder das
+  Ausführungsjahr)
+- `revision_number` nach Insert-Reihenfolge je Inventar/Jahr (historische
+  `version`-Strings bleiben)
+- `lock_version` = 1
+- Unique Active je Inventar/Jahr
+
+Vorab: `php artisan migrate:status`. Backup der lokalen MySQL-Datenbank
+`dispo` erstellen. **Kein** `migrate:fresh` / `refresh` / `reset` / `db:wipe`
+gegen `dispo`. Rollback stellt die alte Unique `(inventory_id, version)`
+wieder her; das scheitert, sobald dieselbe Versionskennung in zwei Jahren
+desselben Inventars existiert. Auf MySQL muss der alte Unique-Index
+`(inventory_id, version)` erst nach den neuen Inventar-Indizes entfallen,
+weil er den FK `inventory_id` stützt. Daten werden dabei nicht gelöscht oder
+umnummeriert.
+
+Die UI darf erst gegen eine migrierte Datenbank als abgenommen gelten.
+
 ## Produktion (nicht lokal)
 
 - `APP_DEBUG=false`

@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle); Rest blockiert
+- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle ohne Excel-Import); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -252,12 +252,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-01 – Preislisten, Import, Tagesgruppen
 
 - **Phase:** 4
-- **Status:** offen
+- **Status:** in Arbeit (BL-P4-01a Preislisten-Admin-Lifecycle umgesetzt; Excel-Import und explizite Wizard-Jahreswahl offen)
 - **Anforderungen:** `PRI-001` bis `PRI-006`
 - **Abhängigkeiten:** BL-P3-02
-- **Ergebnis:** Versionen, Excel-Import mit Vorschau, atomare Aktivierung, abgeleitete Tagesgruppen
-- **Akzeptanz:** fehlerhafter Import aktiviert nichts; Intern mind. 4 Dezimalstellen
-- **Tests:** `AT-21`, Zahlenbeispiele Tagesgruppen
+- **Ergebnis 01a:** Jahresversionen, Draft/Copy/Activate/Archive, atomare Aktivierung, abgeleitete Tagesgruppen, Jahresdefault, Budget-Fingerprint
+- **Offen:** Excel-Import mit Vorschau (`AT-21`), explizite Wahl anderer aktiver Jahreslisten im Wizard (PRI-002-Rest)
+- **Akzeptanz 01a:** höchstens eine Active je Inventar/Jahr; historische Versionen unverändert; aktuelles Kalenderjahr als Default
+- **Tests:** Feature-/Constraint-/Runtime-Tests; isolierte Playwright-Suite `playwright.blp401a.config.ts` (Port 8017)
 
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 

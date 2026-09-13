@@ -1,28 +1,40 @@
 # Fortschritt V1
 
-Stand: 13. September 2026 (`BL-P2-01` Organisation und Inventare abgeschlossen –
-Inventar-Admin umgesetzt, Kombi-Mitgliedschaften entfallen durch PO-BL-P2-01-KOMBI;
-DF-3 Dyn-Feld-Pfad abgeschlossen)
+Stand: 13. September 2026 (`BL-P4-01a` Preislisten-Admin-Lifecycle auf Feature-Branch;
+`BL-P2-01` Organisation und Inventare abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 2: **`BL-P2-01` erledigt** (auf `main`). UX-GATE-D enthält Teilfreigaben für
-Dispo/Vier-Augen, Dynamische-Felder-Admin, Katalog Oberkategorien/Werbemittel
-(PO-ADV001b-1) und **Inventar-Admin-Lifecycle (BL-P2-01a)**. Preislisten-Admin
-und Kombinationstabellen-Admin bleiben gesperrt. Kombi-Mitgliedschaften sind
-kein V1-Lieferumfang.
+Phase 4: **`BL-P4-01a` in Arbeit** (Preislisten-Admin ohne Excel-Import).
+UX-GATE-D enthält Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin,
+Katalog Oberkategorien/Werbemittel (PO-ADV001b-1), Inventar-Admin-Lifecycle
+(BL-P2-01a) und **Preislisten-Lifecycle (BL-P4-01a)**. Excel-Import und
+Kombinationstabellen-Admin bleiben gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster fachlicher Fokus: `BL-P4-01` Preislisten-Admin / Excel-Import
-(UX-GATE-D dafür noch nicht teilfreigegeben) bzw. ADV-001-Rest.
-`BL-P2-02` Kombinationstabellen-Admin bleibt offen. Keine Membership-
-Implementierung, kein `BL-P2-01b`.
+`BL-P4-01a` Preislisten-Admin, Versionsschutz und sichere Jahresvorauswahl.
+`BL-P4-01` bleibt unvollständig (Excel-Import, explizite Wizard-Jahreswahl).
 
 ## Zuletzt abgeschlossene Aufgabe
 
 BL-P2-01 Inventare: Admin-Lifecycle plus PO-Vertragsbereinigung
-(Kombis als eigenständige Inventare ohne Sender-Mitgliedschaften; nur `/docs`).
+(Kombis als eigenständige Inventare ohne Sender-Mitgliedschaften).
+
+## BL-P4-01a – Preislisten-Admin-Lifecycle (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe Preislisten-Admin (ohne Excel-Import) | **freigegeben / umgesetzt** |
+| `year`, `revision_number`, `lock_version` an `price_lists` | **umgesetzt** |
+| Höchstens eine Active je Inventar/Jahr (SQLite Partial-Index, MySQL Generated Columns) | **umgesetzt** |
+| Draft anlegen, kopieren, Basispreise, Activate/Archive | **umgesetzt** |
+| Jahresdefault = aktive Liste des aktuellen Kalenderjahres (Europe/Berlin) | **umgesetzt** |
+| Budget-Fingerprint inkl. `price_list_id` + Jahr + Version | **umgesetzt** |
+| Historische Preislisten-IDs und Versionsstrings unverändert | **umgesetzt** |
+| E2E isoliert: `playwright.blp401a.config.ts` (Port 8017) | **umgesetzt** |
+| Excel-Import / Wizard-Jahreswahl | **nicht in diesem Slice** |
+| `BL-P4-01` insgesamt | **unvollständig** |
 
 ## BL-P2-01a – Inventory Admin Lifecycle (September 2026)
 
@@ -595,6 +607,6 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien und Inventar-Admin-Lifecycle teilfreigegeben; Preislisten/Kombinationstabelle gesperrt; Kombi-Mitgliedschaften entfallen) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien, Inventar-Admin-Lifecycle und Preislisten-Lifecycle ohne Import teilfreigegeben; Excel-Import/Kombinationstabelle gesperrt; Kombi-Mitgliedschaften entfallen) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |

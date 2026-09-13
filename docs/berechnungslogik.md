@@ -51,11 +51,14 @@ bleibt Index 95 gültig (`SPT-009`).
 
 ## Preis- und Regel-Snapshot (`PRI-004`, `VER-002`)
 
-- Neue Positionen und echte Inventar-/Werbemittelwechsel: nur aktive, zulässige
-  Kombinationen und aktive Preislisten.
+- Neue Positionen und echte Inventar-/Werbemittelwechsel: aktive Preisliste
+  des **aktuellen Kalenderjahres** (`Europe/Berlin`). Eine aktive Zukunftsliste
+  ersetzt diese Vorauswahl nicht. Fehlt die aktuelle Jahresliste, gibt es
+  keinen stillen Fallback auf ein anderes Jahr.
 - Unveränderte bestehende Position: gespeicherte Preisliste (auch archiviert),
   Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz aus dem
   Positionssnapshot – auch wenn Stammdaten inzwischen deaktiviert sind.
+  Zusätzliche Stunden derselben Position lesen aus derselben gepinnten Version.
 - Fehlende oder gelöschte Referenzen führen zu kontrollierter Ablehnung, kein
   stiller Ersatz durch aktuelle Stammdaten.
 - **Gate-B-Grenze:** Anzeigenamen von Sender/Werbemittel werden bei vorhandenem
