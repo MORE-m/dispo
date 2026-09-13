@@ -266,7 +266,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
         }
     }
 
-    public function test_invisible_native_position_key_rejected_on_partial_save(): void
+    public function test_basis_invisible_native_position_key_accepted_on_partial_save(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();
         $definition = $this->createAndActivateOnSets(
@@ -292,11 +292,19 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
                 'lock_version' => $order->lock_version,
                 'position_dynamic_field_values' => [
                     $positionId => [
-                        $definition->key => 'Hack',
+                        $definition->key => 'Erlaubt',
                     ],
                 ],
             ])
-            ->assertSessionHasErrors('position_dynamic_field_values.'.$positionId.'.'.$definition->key);
+            ->assertRedirect();
+
+        $order->refresh()->load('positions.fieldValues.snapshotFieldDefinition');
+        $position = $order->positions->firstOrFail();
+        $row = $position->fieldValues->first(
+            fn ($value) => $value->snapshotFieldDefinition?->key === $definition->key,
+        );
+        $this->assertNotNull($row);
+        $this->assertSame('Erlaubt', $row->value_string);
     }
 
     public function test_budget_apply_with_empty_required_position_custom_succeeds(): void

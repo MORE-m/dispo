@@ -536,12 +536,25 @@ final class DispoOrderDynamicFieldWriter
 
                             continue;
                         }
-                        if ($def->required && $def->visible
+                        if ($def->required
                             && ChoiceFieldValueContract::isEmpty($def->field_type, $value)) {
-                            $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
-                                $def->label.' ist erforderlich.';
+                            $headerOverlay = $this->headerValuesForValidation($locked, $snapshot);
+                            $positionOverlay = array_replace(
+                                $this->positionValuesForValidation($position, $snapshot),
+                                [$key => $value],
+                            );
+                            if ($this->rules->isEffectivelyVisible(
+                                $snapshot,
+                                $def,
+                                $headerOverlay,
+                                $positionOverlay,
+                                $positionSnapshot,
+                            )) {
+                                $errors["position_dynamic_field_values.{$positionId}.{$key}"] =
+                                    $def->label.' ist erforderlich.';
 
-                            continue;
+                                continue;
+                            }
                         }
                         $old = $previous;
                         if ($old === $value) {
@@ -735,14 +748,18 @@ final class DispoOrderDynamicFieldWriter
         }
 
         $errors = [];
+        $headerValues = $this->headerValuesForValidation($order, $snapshot);
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
-            if (! $def->required || ! $def->visible) {
+            if (! $def->required) {
                 continue;
             }
             if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
             if ($this->isCalcOriginKey($snapshot, $def->key)) {
+                continue;
+            }
+            if (! $this->rules->isEffectivelyVisible($snapshot, $def, $headerValues, [])) {
                 continue;
             }
 
@@ -753,14 +770,24 @@ final class DispoOrderDynamicFieldWriter
         }
         foreach ($order->positions as $position) {
             $positionSnapshot = $this->positionSnapshot($snapshot, $position);
+            $positionValues = $this->positionValuesForValidation($position, $snapshot);
             foreach ($this->positionDefinitions($snapshot, $position) as $def) {
-                if (! $def->required || ! $def->visible) {
+                if (! $def->required) {
                     continue;
                 }
                 if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                     continue;
                 }
                 if ($this->isCalcOriginKey($positionSnapshot, $def->key)) {
+                    continue;
+                }
+                if (! $this->rules->isEffectivelyVisible(
+                    $snapshot,
+                    $def,
+                    $headerValues,
+                    $positionValues,
+                    $positionSnapshot,
+                )) {
                     continue;
                 }
 
@@ -775,7 +802,6 @@ final class DispoOrderDynamicFieldWriter
             throw ValidationException::withMessages($errors);
         }
 
-        $headerValues = $this->headerValuesForValidation($order, $snapshot);
         $positionContexts = [];
         foreach ($order->positions->values() as $index => $position) {
             $positionContexts[] = [
@@ -885,6 +911,12 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $positionFieldSchemas[(int) $position->id] = [
+                'fields' => $positionFields,
+                'rules' => $positionSnapshot->rules->map(fn ($rule): array => [
+                    'sort' => $rule->sort,
+                    'condition' => $rule->condition_json,
+                    'action' => $rule->action_json,
+                ])->values()->all(),
                 'editable_custom_fields' => $this->filterCustomSchemaFields(
                     $positionFields,
                     FieldScope::Position,
@@ -904,7 +936,8 @@ final class DispoOrderDynamicFieldWriter
 
         return [
             'fields' => $fields,
-            'rules' => $this->schemaRules($order, $snapshot),
+            // Header-/Basisregeln nur – Positionsregeln liegen kontexttreu in position_field_schemas.
+            'rules' => $this->baseSchemaRules($snapshot),
             'editable_custom_header_fields' => $editableCustom,
             'calc_origin_custom_header_fields' => $calcOriginCustom,
             'editable_custom_position_fields' => $editableCustomPosition,
@@ -922,6 +955,8 @@ final class DispoOrderDynamicFieldWriter
         ConfigurationSnapshot $owner,
         $systemByDefinitionId,
     ): array {
+        $calcOrigin = $this->isCalcOriginKey($owner, $def->key);
+
         return [
             'key' => $def->key,
             'label' => $def->label,
@@ -937,7 +972,8 @@ final class DispoOrderDynamicFieldWriter
             'editable' => $def->scope === FieldScope::Header
                 ? $this->isNativeEditableHeaderText($owner, $def)
                 : $this->isNativeEditablePositionText($owner, $def),
-            'calc_origin' => $this->isCalcOriginKey($owner, $def->key),
+            'calc_origin' => $calcOrigin,
+            'action_target_readonly' => $calcOrigin,
             'max_length' => $this->maxLengthForDefinition($def),
             'validation_json' => $def->validation_json,
             'options_json' => ChoiceFieldValueContract::optionsForSchemaProp(
@@ -963,9 +999,6 @@ final class DispoOrderDynamicFieldWriter
             $fields,
             function (array $field) use ($scope, $editable, $calcOrigin, $customSchemaTypes): bool {
                 if (($field['is_system'] ?? false) === true) {
-                    return false;
-                }
-                if (($field['visible'] ?? false) !== true) {
                     return false;
                 }
                 if (($field['scope'] ?? null) !== $scope->value) {
@@ -1032,36 +1065,22 @@ final class DispoOrderDynamicFieldWriter
     }
 
     /**
-     * @return list<array<string, mixed>>
+     * Basis-Snapshot-Regeln für Header-Runtime (keine vereinigte Positionsmenge).
+     *
+     * @return list<array{sort: int, condition: mixed, action: mixed}>
      */
-    private function schemaRules(DispoOrder $order, ConfigurationSnapshot $snapshot): array
+    private function baseSchemaRules(ConfigurationSnapshot $snapshot): array
     {
-        /** @var list<array<string, mixed>> $rules */
+        $snapshot->loadMissing('rules');
+
+        /** @var list<array{sort: int, condition: mixed, action: mixed}> $rules */
         $rules = [];
-        /** @var array<string, true> $seen */
-        $seen = [];
-
-        $collect = function (ConfigurationSnapshot $source) use (&$rules, &$seen): void {
-            foreach ($source->rules as $rule) {
-                $dedupeKey = (string) $rule->dedupe_key;
-                if ($dedupeKey !== '' && isset($seen[$dedupeKey])) {
-                    continue;
-                }
-                $seen[$dedupeKey] = true;
-                $rules[] = [
-                    'sort' => $rule->sort,
-                    'condition' => $rule->condition_json,
-                    'action' => $rule->action_json,
-                ];
-            }
-        };
-
-        $collect($snapshot);
-
-        if ($this->isContextualFreeze($snapshot)) {
-            foreach ($order->positions as $position) {
-                $collect($this->positionSnapshot($snapshot, $position));
-            }
+        foreach ($snapshot->rules as $rule) {
+            $rules[] = [
+                'sort' => (int) $rule->sort,
+                'condition' => $rule->condition_json,
+                'action' => $rule->action_json,
+            ];
         }
 
         return $rules;
@@ -1369,11 +1388,17 @@ final class DispoOrderDynamicFieldWriter
 
                     continue;
                 }
-                if ($def->required && $def->visible
+                if ($def->required
                     && ChoiceFieldValueContract::isEmpty($def->field_type, $value)) {
-                    $errors["dynamic_field_values.{$key}"] = $def->label.' ist erforderlich.';
+                    $headerOverlay = array_replace(
+                        $this->headerValuesForValidation($order, $snapshot),
+                        [$key => $value],
+                    );
+                    if ($this->rules->isEffectivelyVisible($snapshot, $def, $headerOverlay, [])) {
+                        $errors["dynamic_field_values.{$key}"] = $def->label.' ist erforderlich.';
 
-                    continue;
+                        continue;
+                    }
                 }
                 $normalized[$key] = $value;
 
@@ -1469,14 +1494,12 @@ final class DispoOrderDynamicFieldWriter
 
     /**
      * Native bearbeitbare Positions-Customs: Short/Long-Text sowie Select/MultiSelect
-     * (sichtbar, nicht calc-origin).
+     * (nicht calc-origin). Basis-visible steuert nicht die Schreibbarkeit – RULE-B
+     * blendet über Effective Visible; Server akzeptiert native Keys inkl. basis_visible=false.
      */
     private function isNativeEditablePositionText(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
     {
         if ($def->scope !== FieldScope::Position) {
-            return false;
-        }
-        if (! $def->visible) {
             return false;
         }
         if (! $this->isTextOrChoiceFieldType($def->field_type)) {
@@ -1523,13 +1546,20 @@ final class DispoOrderDynamicFieldWriter
 
         $errors = [];
 
-        // PO-32b-1: sichtbare Custom-Header-Pflichtfelder der Calc blockieren Dispo-Create.
+        // PO-32b-1 / RULE-B: effektiv sichtbare Custom-Pflichtfelder der Calc blockieren Dispo-Create.
         $headerValues = $this->calculationFields->headerValuesForPayload($calculation);
         foreach ($calcSnapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
-            if (! $def->required || ! $def->visible) {
+            if (! $def->required) {
                 continue;
             }
             if (! $this->isTextOrChoiceFieldType($def->field_type)) {
+                continue;
+            }
+            if (! $this->calculationFields->isEffectivelyVisible(
+                $calcSnapshot,
+                $def,
+                $headerValues,
+            )) {
                 continue;
             }
 
@@ -1546,17 +1576,23 @@ final class DispoOrderDynamicFieldWriter
             }
 
             $scopeSnapshot = $this->calculationFields->positionScopeSnapshot($calcPosition, $calcSnapshot);
+            $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
             $requiredDefs = $scopeSnapshot->fieldDefinitions
                 ->where('scope', FieldScope::Position)
                 ->filter(fn (SnapshotFieldDefinition $def): bool => $def->required
-                    && $def->visible
-                    && $this->isTextOrChoiceFieldType($def->field_type));
+                    && $this->isTextOrChoiceFieldType($def->field_type)
+                    && $this->calculationFields->isEffectivelyVisible(
+                        $calcSnapshot,
+                        $def,
+                        $headerValues,
+                        $values,
+                        $scopeSnapshot,
+                    ));
 
             if ($requiredDefs->isEmpty()) {
                 continue;
             }
 
-            $values = $this->calculationFields->positionValuesForPayload($calcPosition, $calcSnapshot);
             foreach ($requiredDefs as $def) {
                 $raw = $values[$def->key] ?? null;
                 if ($this->isRequiredCustomEmpty($def, $raw)) {

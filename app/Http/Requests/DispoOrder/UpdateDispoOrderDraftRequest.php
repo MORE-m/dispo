@@ -103,25 +103,7 @@ class UpdateDispoOrderDraftRequest extends FormRequest
                         : 'Unbekanntes dynamisches Feld.',
                 );
             }
-
-            foreach ($this->editableHeaderDefinitions() as $def) {
-                if (! array_key_exists($def->key, $values)) {
-                    continue;
-                }
-                if (! $def->required || ! $def->visible) {
-                    continue;
-                }
-                $raw = $values[$def->key];
-                $isEmpty = $def->field_type === FieldType::MultiSelect
-                    ? ($raw === [] || $raw === null)
-                    : ($raw === null || $raw === '');
-                if ($isEmpty) {
-                    $validator->errors()->add(
-                        "dynamic_field_values.{$def->key}",
-                        $def->label.' ist erforderlich.',
-                    );
-                }
-            }
+            // RULE-B: Statisches Required inkl. DYN-005 prüft DispoOrderDynamicFieldWriter.
         });
     }
 

@@ -239,9 +239,6 @@ class UpdateDispoOrderPositionCustomsRequest extends FormRequest
         if ($def->scope !== FieldScope::Position) {
             return false;
         }
-        if (! $def->visible) {
-            return false;
-        }
         if (! in_array($def->field_type, [
             FieldType::ShortText,
             FieldType::LongText,

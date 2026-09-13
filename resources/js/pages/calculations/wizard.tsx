@@ -30,7 +30,6 @@ import {
     SchemaChoiceFields,
     customHeaderChoiceFieldsFromSchema,
     customPositionChoiceFieldsFromSchema,
-    visibleChoiceFields,
 } from '@/components/dynamic-fields/schema-choice-fields';
 import {
     SchemaTextFields,
@@ -106,7 +105,12 @@ import {
     firstValidationMessage,
     mapValidationErrors,
 } from '@/lib/validation-errors';
-import { requiredPositionFieldKeysFromSnapshotRules } from '@/lib/dynamic-field-rules';
+import {
+    applyEffectiveRequired,
+    evaluateSnapshotFieldRuntime,
+    filterByEffectiveVisible,
+} from '@/lib/snapshot-field-runtime';
+import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import {
     nextSchemaFetchGeneration,
@@ -691,10 +695,6 @@ export default function CalculationWizard({
         [fieldSchema.fields],
     );
     const [schemaRetryToken, setSchemaRetryToken] = useState(0);
-    const visibleHeaderChoiceFields = useMemo(
-        () => visibleChoiceFields(customHeaderChoiceFields),
-        [customHeaderChoiceFields],
-    );
     const existingGen3 =
         calculation !== null && (fieldSchema.format_version ?? 0) >= 3;
     const [customHeaderValues, setCustomHeaderValues] = useState<
@@ -742,6 +742,64 @@ export default function CalculationWizard({
 
         return meta;
     });
+    const headerValuesForRules = useMemo(() => {
+        const values: Record<string, unknown> = {
+            campaign_period:
+                campaignPeriodStart || campaignPeriodEnd
+                    ? {
+                          start: campaignPeriodStart || null,
+                          end: campaignPeriodEnd || null,
+                      }
+                    : null,
+        };
+        for (const [key, value] of Object.entries(customHeaderValues)) {
+            values[key] = value.trim() === '' ? null : value;
+        }
+        for (const [key, value] of Object.entries(customHeaderChoiceValues)) {
+            values[key] = value;
+        }
+
+        return values;
+    }, [
+        campaignPeriodStart,
+        campaignPeriodEnd,
+        customHeaderValues,
+        customHeaderChoiceValues,
+    ]);
+    const headerRuntime = useMemo(
+        () =>
+            evaluateSnapshotFieldRuntime({
+                fields: fieldSchema.fields.filter(
+                    (field) =>
+                        field.scope === 'header' || field.scope === undefined,
+                ),
+                // Vollständiger Def-Katalog: Header-Pass inkl. Positionsregeln (DF-1-Seed).
+                definitionFields: fieldSchema.fields,
+                rules: fieldSchema.rules as SnapshotFieldRule[],
+                scope: 'header',
+                headerValues: headerValuesForRules,
+            }),
+        [fieldSchema.fields, fieldSchema.rules, headerValuesForRules],
+    );
+    const visibleHeaderTextFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(customHeaderFields, headerRuntime),
+                headerRuntime,
+            ),
+        [customHeaderFields, headerRuntime],
+    );
+    const visibleHeaderChoiceFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(
+                    customHeaderChoiceFields,
+                    headerRuntime,
+                ),
+                headerRuntime,
+            ),
+        [customHeaderChoiceFields, headerRuntime],
+    );
     const [orderDiscounts, setOrderDiscounts] = useState<DiscountDraft[]>(() =>
         draftDiscounts(
             calculation?.order_discounts,
@@ -1498,6 +1556,48 @@ export default function CalculationWizard({
     }
 
     function save() {
+        if (headerRuntime.integrityError) {
+            setSaveError(
+                `Speichern nicht möglich: ${headerRuntime.integrityError}`,
+            );
+            return;
+        }
+
+        for (const position of positions) {
+            const positionFields = schemaFieldsForPosition(
+                position,
+                fieldSchema,
+                existingGen3,
+            );
+            const positionRules = schemaRulesForPosition(
+                position,
+                fieldSchema,
+                existingGen3,
+            );
+            const positionRuntime = evaluateSnapshotFieldRuntime({
+                fields: positionFields,
+                rules: positionRules as SnapshotFieldRule[],
+                scope: 'position',
+                headerValues: headerValuesForRules,
+                positionValues: {
+                    period_open: position.period_open,
+                    ...position.custom_fields,
+                    ...position.custom_choice_fields,
+                },
+                conditionFields: fieldSchema.fields.filter(
+                    (field) =>
+                        field.scope === 'header' || field.scope === undefined,
+                ),
+                additionalRules: fieldSchema.rules as SnapshotFieldRule[],
+            });
+            if (positionRuntime.integrityError) {
+                setSaveError(
+                    `Speichern nicht möglich: ${positionRuntime.integrityError}`,
+                );
+                return;
+            }
+        }
+
         const missingMethod = positions.find(
             (position) => !hasSubmittableCalculationMethodKey(position),
         );
@@ -2102,7 +2202,7 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         </FormField>
-                                        {customHeaderFields.length > 0 ||
+                                        {visibleHeaderTextFields.length > 0 ||
                                         visibleHeaderChoiceFields.length > 0 ? (
                                             <div
                                                 className="space-y-3 sm:col-span-2"
@@ -2111,11 +2211,28 @@ export default function CalculationWizard({
                                                 <h3 className="text-sm font-semibold">
                                                     Weitere Angaben
                                                 </h3>
+                                                {headerRuntime.integrityError ? (
+                                                    <p
+                                                        className="text-destructive text-sm"
+                                                        data-test="calculation-rules-integrity"
+                                                        role="alert"
+                                                    >
+                                                        {
+                                                            headerRuntime.integrityError
+                                                        }
+                                                    </p>
+                                                ) : null}
                                                 <SchemaTextFields
-                                                    fields={customHeaderFields}
+                                                    fields={
+                                                        visibleHeaderTextFields
+                                                    }
                                                     values={customHeaderValues}
                                                     errors={fieldErrors}
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        headerRuntime.integrityError !==
+                                                            null
+                                                    }
                                                     idPrefix="calc-custom"
                                                     onChange={(key, value) =>
                                                         setCustomHeaderValues(
@@ -2128,7 +2245,7 @@ export default function CalculationWizard({
                                                 />
                                                 <SchemaChoiceFields
                                                     fields={
-                                                        customHeaderChoiceFields
+                                                        visibleHeaderChoiceFields
                                                     }
                                                     values={
                                                         customHeaderChoiceValues
@@ -2231,10 +2348,74 @@ export default function CalculationWizard({
                                             customPositionChoiceFieldsFromSchema(
                                                 positionFields,
                                             );
-                                        const visiblePositionChoiceFields =
-                                            visibleChoiceFields(
-                                                positionChoiceFields,
+                                        const positionValuesForRules: Record<
+                                            string,
+                                            unknown
+                                        > = {
+                                            period_open: position.period_open,
+                                            position_flight_period:
+                                                position.flight_period_start ||
+                                                position.flight_period_end
+                                                    ? {
+                                                          start:
+                                                              position.flight_period_start ||
+                                                              null,
+                                                          end:
+                                                              position.flight_period_end ||
+                                                              null,
+                                                      }
+                                                    : null,
+                                            ...Object.fromEntries(
+                                                Object.entries(
+                                                    position.custom_fields,
+                                                ).map(([key, value]) => [
+                                                    key,
+                                                    value.trim() === ''
+                                                        ? null
+                                                        : value,
+                                                ]),
+                                            ),
+                                            ...position.custom_choice_fields,
+                                        };
+                                        const positionRuntime =
+                                            evaluateSnapshotFieldRuntime({
+                                                fields: positionFields,
+                                                rules: positionRules as SnapshotFieldRule[],
+                                                scope: 'position',
+                                                headerValues:
+                                                    headerValuesForRules,
+                                                positionValues:
+                                                    positionValuesForRules,
+                                                conditionFields:
+                                                    fieldSchema.fields.filter(
+                                                        (field) =>
+                                                            field.scope ===
+                                                                'header' ||
+                                                            field.scope ===
+                                                                undefined,
+                                                    ),
+                                                additionalRules:
+                                                    fieldSchema.rules as SnapshotFieldRule[],
+                                            });
+                                        const visiblePositionTextFields =
+                                            applyEffectiveRequired(
+                                                filterByEffectiveVisible(
+                                                    positionCustomFields,
+                                                    positionRuntime,
+                                                ),
+                                                positionRuntime,
                                             );
+                                        const visiblePositionChoiceFields =
+                                            applyEffectiveRequired(
+                                                filterByEffectiveVisible(
+                                                    positionChoiceFields,
+                                                    positionRuntime,
+                                                ),
+                                                positionRuntime,
+                                            );
+                                        const rulesIntegrityError =
+                                            headerRuntime.integrityError ??
+                                            positionRuntime.integrityError;
 
                                         return (
                                             <section
@@ -2504,6 +2685,9 @@ export default function CalculationWizard({
                                                                     }
                                                                 />
                                                             </FormField>
+                                                            {positionRuntime.isFieldVisible(
+                                                                'period_open',
+                                                            ) ? (
                                                             <FormField
                                                                 label={
                                                                     positionFields.find(
@@ -2551,6 +2735,7 @@ export default function CalculationWizard({
                                                                     }
                                                                 />
                                                             </FormField>
+                                                            ) : null}
                                                         </div>
 
                                                         <CalculationMethodSelector
@@ -2623,21 +2808,7 @@ export default function CalculationWizard({
                                                         />
 
                                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            {requiredPositionFieldKeysFromSnapshotRules(
-                                                                positionRules,
-                                                                {
-                                                                    period_open:
-                                                                        position.period_open,
-                                                                    position_flight_period:
-                                                                        position.flight_period_start ||
-                                                                        position.flight_period_end
-                                                                            ? {
-                                                                                  start: position.flight_period_start,
-                                                                                  end: position.flight_period_end,
-                                                                              }
-                                                                            : null,
-                                                                },
-                                                            ).includes(
+                                                            {positionRuntime.isFieldRequired(
                                                                 'position_flight_period',
                                                             ) ? (
                                                                 <FormField
@@ -2717,7 +2888,7 @@ export default function CalculationWizard({
                                                                     </div>
                                                                 </FormField>
                                                             ) : null}
-                                                            {positionCustomFields.length >
+                                                            {visiblePositionTextFields.length >
                                                                 0 ||
                                                             visiblePositionChoiceFields.length >
                                                                 0 ? (
@@ -2729,9 +2900,20 @@ export default function CalculationWizard({
                                                                         Weitere
                                                                         Angaben
                                                                     </h3>
+                                                                    {rulesIntegrityError ? (
+                                                                        <p
+                                                                            className="text-destructive text-sm"
+                                                                            data-test={`calculation-rules-integrity-${position.client_key}`}
+                                                                            role="alert"
+                                                                        >
+                                                                            {
+                                                                                rulesIntegrityError
+                                                                            }
+                                                                        </p>
+                                                                    ) : null}
                                                                     <SchemaTextFields
                                                                         fields={
-                                                                            positionCustomFields
+                                                                            visiblePositionTextFields
                                                                         }
                                                                         values={
                                                                             position.custom_fields
@@ -2743,7 +2925,9 @@ export default function CalculationWizard({
                                                                             `positions.${index}.dynamic_field_values`,
                                                                         ]}
                                                                         disabled={
-                                                                            !canEdit
+                                                                            !canEdit ||
+                                                                            rulesIntegrityError !==
+                                                                                null
                                                                         }
                                                                         idPrefix={`calc-pos-custom-${position.client_key}`}
                                                                         onChange={(
@@ -2764,7 +2948,7 @@ export default function CalculationWizard({
                                                                     />
                                                                     <SchemaChoiceFields
                                                                         fields={
-                                                                            positionChoiceFields
+                                                                            visiblePositionChoiceFields
                                                                         }
                                                                         values={
                                                                             position.custom_choice_fields

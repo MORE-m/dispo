@@ -34,7 +34,13 @@ import {
     type SchemaChoiceField,
 } from '@/lib/choice-field-values';
 import { formatDateOnly, formatDateTime } from '@/lib/date-time';
+import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import {
+    applyEffectiveRequired,
+    evaluateSnapshotFieldRuntime,
+    filterByEffectiveVisible,
+} from '@/lib/snapshot-field-runtime';
 import type {
     ApprovalHistoryEntry,
     DispoOrderRevisionLink,
@@ -54,6 +60,7 @@ type SchemaField = {
     is_system?: boolean;
     editable?: boolean;
     calc_origin?: boolean;
+    action_target_readonly?: boolean;
     options_json?: unknown;
     visible?: boolean;
     max_length?: number | null;
@@ -61,6 +68,12 @@ type SchemaField = {
 };
 
 type PositionFieldSchemaBucket = {
+    fields?: SchemaField[];
+    rules?: Array<{
+        sort?: number;
+        condition: { op?: string; field_key?: string; value?: unknown };
+        action: { op?: string; field_key?: string };
+    }>;
     editable_custom_fields?: SchemaField[];
     calc_origin_custom_fields?: SchemaField[];
 };
@@ -439,6 +452,185 @@ export default function DispoOrderShow({
         return initial;
     });
 
+    const headerValuesForRules = useMemo(() => {
+        const values: Record<string, unknown> = {
+            ...(order.dynamic_field_values ?? {}),
+            billing_special_features:
+                billingSpecialFeatures.trim() === ''
+                    ? null
+                    : billingSpecialFeatures,
+            disposition_notes:
+                dispositionNotes.trim() === '' ? null : dispositionNotes,
+        };
+        for (const [key, value] of Object.entries(customHeaderValues)) {
+            values[key] = value.trim() === '' ? null : value;
+        }
+        for (const [key, value] of Object.entries(customHeaderChoiceValues)) {
+            values[key] = value;
+        }
+
+        return values;
+    }, [
+        order.dynamic_field_values,
+        billingSpecialFeatures,
+        dispositionNotes,
+        customHeaderValues,
+        customHeaderChoiceValues,
+    ]);
+
+    const headerRuntime = useMemo(
+        () =>
+            evaluateSnapshotFieldRuntime({
+                fields: fieldSchema.fields.filter(
+                    (field) => field.scope === 'header',
+                ),
+                // Basis-Snapshot-Felder inkl. Position: Integrity für Header→Position-Regeln.
+                definitionFields: fieldSchema.fields,
+                rules: fieldSchema.rules as SnapshotFieldRule[],
+                scope: 'header',
+                headerValues: headerValuesForRules,
+            }),
+        [fieldSchema.fields, fieldSchema.rules, headerValuesForRules],
+    );
+
+    const visibleEditableHeaderTextFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(
+                    editableCustomTextFields,
+                    headerRuntime,
+                ),
+                headerRuntime,
+            ),
+        [editableCustomTextFields, headerRuntime],
+    );
+    const visibleEditableHeaderChoiceFields = useMemo(
+        () =>
+            applyEffectiveRequired(
+                filterByEffectiveVisible(
+                    editableCustomChoiceFields,
+                    headerRuntime,
+                ),
+                headerRuntime,
+            ),
+        [editableCustomChoiceFields, headerRuntime],
+    );
+    const visibleCalcOriginHeaderTextFields = useMemo(
+        () =>
+            filterByEffectiveVisible(
+                calcOriginCustomTextFields,
+                headerRuntime,
+            ),
+        [calcOriginCustomTextFields, headerRuntime],
+    );
+    const visibleCalcOriginHeaderChoiceFields = useMemo(
+        () =>
+            filterByEffectiveVisible(
+                calcOriginCustomChoiceFields,
+                headerRuntime,
+            ),
+        [calcOriginCustomChoiceFields, headerRuntime],
+    );
+
+    const positionRuntimes = useMemo(() => {
+        const map: Record<
+            number,
+            ReturnType<typeof evaluateSnapshotFieldRuntime>
+        > = {};
+        for (const position of order.positions) {
+            const bucket = positionFieldBucket(fieldSchema, position.id);
+            const stored = position.dynamic_field_values ?? {};
+            const draftText = positionCustomValues[position.id] ?? {};
+            const draftChoice = positionChoiceValues[position.id] ?? {};
+            const positionValues: Record<string, unknown> = { ...stored };
+            for (const [key, value] of Object.entries(draftText)) {
+                positionValues[key] = value.trim() === '' ? null : value;
+            }
+            for (const [key, value] of Object.entries(draftChoice)) {
+                positionValues[key] = value;
+            }
+            map[position.id] = evaluateSnapshotFieldRuntime({
+                fields:
+                    bucket.fields.length > 0
+                        ? bucket.fields
+                        : [
+                              ...bucket.editable_custom_fields,
+                              ...bucket.calc_origin_custom_fields,
+                          ],
+                rules: (bucket.rules.length > 0
+                    ? bucket.rules
+                    : fieldSchema.rules) as SnapshotFieldRule[],
+                scope: 'position',
+                headerValues: headerValuesForRules,
+                positionValues,
+                conditionFields: fieldSchema.fields.filter(
+                    (field) => field.scope === 'header',
+                ),
+                additionalRules: fieldSchema.rules as SnapshotFieldRule[],
+            });
+        }
+
+        return map;
+    }, [
+        order.positions,
+        fieldSchema,
+        positionCustomValues,
+        positionChoiceValues,
+        headerValuesForRules,
+    ]);
+
+    const visiblePositionFieldViews = useMemo(() => {
+        const map: Record<number, PositionFieldView> = {};
+        for (const position of order.positions) {
+            const view = positionFieldViews[position.id] ?? {
+                editableText: [],
+                editableChoice: [],
+                calcOriginText: [],
+                calcOriginChoice: [],
+            };
+            const runtime = positionRuntimes[position.id] ?? headerRuntime;
+            map[position.id] = {
+                editableText: applyEffectiveRequired(
+                    filterByEffectiveVisible(view.editableText, runtime),
+                    runtime,
+                ),
+                editableChoice: applyEffectiveRequired(
+                    filterByEffectiveVisible(view.editableChoice, runtime),
+                    runtime,
+                ),
+                calcOriginText: filterByEffectiveVisible(
+                    view.calcOriginText,
+                    runtime,
+                ),
+                calcOriginChoice: filterByEffectiveVisible(
+                    view.calcOriginChoice,
+                    runtime,
+                ),
+            };
+        }
+
+        return map;
+    }, [
+        order.positions,
+        positionFieldViews,
+        positionRuntimes,
+        headerRuntime,
+    ]);
+
+    const rulesIntegrityError = useMemo(() => {
+        if (headerRuntime.integrityError) {
+            return headerRuntime.integrityError;
+        }
+        for (const position of order.positions) {
+            const error = positionRuntimes[position.id]?.integrityError;
+            if (error) {
+                return error;
+            }
+        }
+
+        return null;
+    }, [headerRuntime, positionRuntimes, order.positions]);
+
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
     const [savingPositionCustoms, setSavingPositionCustoms] = useState(false);
@@ -539,6 +731,13 @@ export default function DispoOrderShow({
             return;
         }
 
+        if (rulesIntegrityError) {
+            setFieldErrors({
+                dynamic_field_values: rulesIntegrityError,
+            });
+            return;
+        }
+
         const choiceResult = choiceValuesForPayload(
             editableCustomChoiceFields,
             customHeaderChoiceValues,
@@ -596,6 +795,13 @@ export default function DispoOrderShow({
 
     function savePositionCustoms() {
         if (savingNotes || savingPositionCustoms) {
+            return;
+        }
+
+        if (rulesIntegrityError) {
+            setFieldErrors({
+                position_dynamic_field_values: rulesIntegrityError,
+            });
             return;
         }
 
@@ -692,11 +898,11 @@ export default function DispoOrderShow({
     }
 
     const showHeaderCustomCard =
-        editableCustomTextFields.length > 0 ||
-        editableCustomChoiceFields.length > 0;
+        visibleEditableHeaderTextFields.length > 0 ||
+        visibleEditableHeaderChoiceFields.length > 0;
     const showHeaderCalcOrigin =
-        calcOriginCustomTextFields.length > 0 ||
-        calcOriginCustomChoiceFields.length > 0;
+        visibleCalcOriginHeaderTextFields.length > 0 ||
+        visibleCalcOriginHeaderChoiceFields.length > 0;
 
     return (
         <>
@@ -714,6 +920,15 @@ export default function DispoOrderShow({
                 />
                 {flash.success ? (
                     <SuccessState message={flash.success} />
+                ) : null}
+                {rulesIntegrityError ? (
+                    <p
+                        className="text-destructive text-sm"
+                        data-test="dispo-order-rules-integrity"
+                        role="alert"
+                    >
+                        {rulesIntegrityError}
+                    </p>
                 ) : null}
 
                 <DispoOrderApprovalActions
@@ -879,11 +1094,11 @@ export default function DispoOrderShow({
                                 <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
                                     Aus Kalkulation übernommen
                                 </p>
-                                {calcOriginCustomTextFields.length > 0 ? (
+                                {visibleCalcOriginHeaderTextFields.length > 0 ? (
                                     <SchemaTextFields
-                                        fields={calcOriginCustomTextFields}
+                                        fields={visibleCalcOriginHeaderTextFields}
                                         values={Object.fromEntries(
-                                            calcOriginCustomTextFields.map(
+                                            visibleCalcOriginHeaderTextFields.map(
                                                 (field) => [
                                                     field.key,
                                                     textReadOnlyCapturedDisplay(
@@ -900,9 +1115,9 @@ export default function DispoOrderShow({
                                         onChange={() => undefined}
                                     />
                                 ) : null}
-                                {calcOriginCustomChoiceFields.length > 0 ? (
+                                {visibleCalcOriginHeaderChoiceFields.length > 0 ? (
                                     <SchemaChoiceReadonlyFields
-                                        fields={calcOriginCustomChoiceFields}
+                                        fields={visibleCalcOriginHeaderChoiceFields}
                                         values={headerValues}
                                         captured={headerCaptured}
                                         idPrefix="dispo-calc-origin-choice"
@@ -1079,9 +1294,9 @@ export default function DispoOrderShow({
                         <CardContent className="space-y-4 px-5 py-4">
                             {canUpdate ? (
                                 <>
-                                    {editableCustomTextFields.length > 0 ? (
+                                    {visibleEditableHeaderTextFields.length > 0 ? (
                                         <SchemaTextFields
-                                            fields={editableCustomTextFields}
+                                            fields={visibleEditableHeaderTextFields}
                                             values={customHeaderValues}
                                             errors={fieldErrors}
                                             disabled={savingNotes}
@@ -1096,11 +1311,11 @@ export default function DispoOrderShow({
                                             }
                                         />
                                     ) : null}
-                                    {editableCustomChoiceFields.length > 0 ? (
+                                    {visibleEditableHeaderChoiceFields.length > 0 ? (
                                         <div data-test="dispo-order-custom-header-choice-fields">
                                             <SchemaChoiceFields
                                                 fields={
-                                                    editableCustomChoiceFields
+                                                    visibleEditableHeaderChoiceFields
                                                 }
                                                 values={
                                                     customHeaderChoiceValues
@@ -1154,11 +1369,11 @@ export default function DispoOrderShow({
                                 </>
                             ) : (
                                 <>
-                                    {editableCustomTextFields.length > 0 ? (
+                                    {visibleEditableHeaderTextFields.length > 0 ? (
                                         <SchemaTextFields
-                                            fields={editableCustomTextFields}
+                                            fields={visibleEditableHeaderTextFields}
                                             values={Object.fromEntries(
-                                                editableCustomTextFields.map(
+                                                visibleEditableHeaderTextFields.map(
                                                     (field) => {
                                                         const raw =
                                                             headerValues[
@@ -1181,15 +1396,15 @@ export default function DispoOrderShow({
                                             onChange={() => undefined}
                                         />
                                     ) : null}
-                                    {editableCustomChoiceFields.length > 0 ? (
+                                    {visibleEditableHeaderChoiceFields.length > 0 ? (
                                         <div data-test="dispo-order-custom-header-choice-fields-ro">
                                             <SchemaChoiceReadonlyFields
                                                 fields={
-                                                    editableCustomChoiceFields
+                                                    visibleEditableHeaderChoiceFields
                                                 }
                                                 values={headerValues}
                                                 captured={nativeChoiceCapturedMap(
-                                                    editableCustomChoiceFields,
+                                                    visibleEditableHeaderChoiceFields,
                                                     headerCaptured,
                                                 )}
                                                 idPrefix="dispo-custom-choice-ro"
@@ -1288,7 +1503,7 @@ export default function DispoOrderShow({
                                 positionValues.position_flight_period,
                                 flightCaptured,
                             );
-                            const view = positionFieldViews[position.id] ?? {
+                            const view = visiblePositionFieldViews[position.id] ?? {
                                 editableText: [],
                                 editableChoice: [],
                                 calcOriginText: [],
@@ -1640,12 +1855,16 @@ function positionFieldBucket(
     fieldSchema: FieldSchema,
     positionId: number,
 ): {
+    fields: SchemaField[];
+    rules: FieldSchema['rules'];
     editable_custom_fields: SchemaField[];
     calc_origin_custom_fields: SchemaField[];
 } {
     const schemas = fieldSchema.position_field_schemas;
     if (!schemas) {
         return {
+            fields: [],
+            rules: [],
             editable_custom_fields: [],
             calc_origin_custom_fields: [],
         };
@@ -1654,6 +1873,8 @@ function positionFieldBucket(
     const bucket = schemas[positionId] ?? schemas[String(positionId)];
 
     return {
+        fields: bucket?.fields ?? [],
+        rules: bucket?.rules ?? [],
         editable_custom_fields: bucket?.editable_custom_fields ?? [],
         calc_origin_custom_fields: bucket?.calc_origin_custom_fields ?? [],
     };
