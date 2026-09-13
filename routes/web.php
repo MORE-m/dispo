@@ -8,6 +8,7 @@ use App\Http\Controllers\Administration\CatalogHubController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
+use App\Http\Controllers\Administration\InventoryAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
@@ -140,6 +141,26 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.assignments.activate');
         Route::post('administration/dynamische-felder/assignments/{assignment}/deaktivieren', [FieldSetAssignmentAdminController::class, 'deactivate'])
             ->name('administration.dynamic-fields.assignments.deactivate');
+
+        // BL-P2-01a Inventar-Admin-Lifecycle (UX-GATE-D Teilfreigabe; ohne Memberships)
+        Route::get('administration/inventare', [InventoryAdminController::class, 'index'])
+            ->name('administration.inventories.index');
+        Route::get('administration/inventare/neu', [InventoryAdminController::class, 'create'])
+            ->name('administration.inventories.create');
+        Route::post('administration/inventare', [InventoryAdminController::class, 'store'])
+            ->name('administration.inventories.store');
+        Route::get('administration/inventare/{inventory}', [InventoryAdminController::class, 'show'])
+            ->name('administration.inventories.show');
+        Route::put('administration/inventare/{inventory}', [InventoryAdminController::class, 'update'])
+            ->name('administration.inventories.update');
+        Route::post('administration/inventare/{inventory}/deaktivierungs-vorschau', [InventoryAdminController::class, 'deactivatePreview'])
+            ->name('administration.inventories.deactivate-preview');
+        Route::post('administration/inventare/{inventory}/deaktivieren', [InventoryAdminController::class, 'deactivate'])
+            ->name('administration.inventories.deactivate');
+        Route::post('administration/inventare/{inventory}/reaktivierungs-vorschau', [InventoryAdminController::class, 'reactivatePreview'])
+            ->name('administration.inventories.reactivate-preview');
+        Route::post('administration/inventare/{inventory}/reaktivieren', [InventoryAdminController::class, 'reactivate'])
+            ->name('administration.inventories.reactivate');
 
         // ADV-001b Katalog-Admin (PO-ADV001b-1 UX-GATE-D Teilfreigabe)
         Route::get('administration/katalog', CatalogHubController::class)

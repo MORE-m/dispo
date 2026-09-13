@@ -5,6 +5,7 @@ namespace App\Services\DispoOrder;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
+use App\Support\Inventory\InventoryIdentity;
 
 final class DispoOrderPositionAdoptionService
 {
@@ -54,7 +55,7 @@ final class DispoOrderPositionAdoptionService
 
             return [
                 'id' => $position->id,
-                'inventory_name' => $position->inventory->name ?? 'Unbekannt',
+                'inventory_name' => InventoryIdentity::displayName($position),
                 'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,

@@ -166,4 +166,34 @@ describe('CalculationSummaryPanel', () => {
             '450,00',
         );
     });
+
+    it('zeigt den eingefrorenen Inventarnamen statt des aktuellen Live-Namens', () => {
+        render(
+            <CalculationSummaryPanel
+                totals={{
+                    ...totals,
+                    positions: [
+                        {
+                            ...totals.positions[0],
+                            inventory_name: 'Radio Hamburg',
+                        },
+                    ],
+                }}
+                positions={[
+                    {
+                        inventory_id: 1,
+                        inventory_name: 'Radio Hamburg',
+                        total_spot_count: 30,
+                        length_seconds: 30,
+                    },
+                ]}
+                inventories={[
+                    { id: 1, name: 'Radio Hamburg Neu', logo_path: null },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('Radio Hamburg')).toBeTruthy();
+        expect(screen.queryByText('Radio Hamburg Neu')).toBeNull();
+    });
 });
