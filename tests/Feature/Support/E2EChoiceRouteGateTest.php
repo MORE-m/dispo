@@ -27,7 +27,10 @@ class E2EChoiceRouteGateTest extends TestCase
         $names = collect(Route::getRoutes())->map->getName()->filter()->values();
         $this->assertFalse($names->contains('e2e.snapshot-field-visible'));
         $this->assertFalse($names->contains('e2e.snapshot-choice-option-active'));
+        $this->assertFalse($names->contains('e2e.snapshot-field-rule'));
+        $this->assertFalse($names->contains('e2e.snapshot-rules-corrupt'));
         $this->assertFalse($names->contains('e2e.calculation-choice-value'));
+        $this->assertFalse($names->contains('e2e.dynamic-field-text-value'));
         $this->assertFalse($names->contains('e2e.dispo-choice-value'));
         $this->assertFalse($names->contains('e2e.dispo-positions'));
         $this->assertFalse($names->contains('e2e.dispo-snapshot-choice-options'));
@@ -75,12 +78,12 @@ class E2EChoiceRouteGateTest extends TestCase
     public function test_route_registration_requires_testing_and_e2e_server(): void
     {
         $this->assertSame(
-            7,
+            10,
             $this->countE2eRoutesViaArtisan([
                 'APP_ENV' => 'testing',
                 'E2E_SERVER' => '1',
             ]),
-            'testing + E2E_SERVER=1 muss die sieben /e2e-Routen registrieren.',
+            'testing + E2E_SERVER=1 muss die zehn /e2e-Routen registrieren.',
         );
 
         $this->assertSame(
