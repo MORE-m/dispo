@@ -641,9 +641,8 @@ export default function DispoOrderShow({
     const billingRequired = headerRuntime.isFieldRequired(
         'billing_special_features',
     );
-    const dispositionRequired = headerRuntime.isFieldRequired(
-        'disposition_notes',
-    );
+    const dispositionRequired =
+        headerRuntime.isFieldRequired('disposition_notes');
 
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [savingNotes, setSavingNotes] = useState(false);
@@ -1169,7 +1168,9 @@ export default function DispoOrderShow({
                             type="button"
                             variant="outline"
                             data-test="dispo-order-sync-calc-dynamic-fields"
-                            disabled={syncingCalcFields || dynamicControlsLocked}
+                            disabled={
+                                syncingCalcFields || dynamicControlsLocked
+                            }
                             onClick={syncCalculationDynamicFields}
                         >
                             {syncingCalcFields
@@ -1192,94 +1193,100 @@ export default function DispoOrderShow({
                         {canUpdate ? (
                             <>
                                 {billingVisible ? (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dispo-order-billing-special-features">
-                                        {billingRequired
-                                            ? `${billingLabel} *`
-                                            : billingLabel}
-                                    </Label>
-                                    {billingHelp ? (
-                                        <p
-                                            id="dispo-order-billing-special-features-help"
-                                            className="text-muted-foreground text-xs"
-                                        >
-                                            {billingHelp}
-                                        </p>
-                                    ) : null}
-                                    <textarea
-                                        id="dispo-order-billing-special-features"
-                                        className={formTextareaClass}
-                                        value={billingSpecialFeatures}
-                                        data-test="dispo-order-billing-special-features"
-                                        disabled={savingNotes || dynamicControlsLocked}
-                                        aria-describedby={
-                                            billingHelp
-                                                ? 'dispo-order-billing-special-features-help'
-                                                : undefined
-                                        }
-                                        onChange={(event) =>
-                                            setBillingSpecialFeatures(
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    {fieldErrors[
-                                        'dynamic_field_values.billing_special_features'
-                                    ] ? (
-                                        <p className="text-destructive text-xs">
-                                            {
-                                                fieldErrors[
-                                                    'dynamic_field_values.billing_special_features'
-                                                ]
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="dispo-order-billing-special-features">
+                                            {billingRequired
+                                                ? `${billingLabel} *`
+                                                : billingLabel}
+                                        </Label>
+                                        {billingHelp ? (
+                                            <p
+                                                id="dispo-order-billing-special-features-help"
+                                                className="text-muted-foreground text-xs"
+                                            >
+                                                {billingHelp}
+                                            </p>
+                                        ) : null}
+                                        <textarea
+                                            id="dispo-order-billing-special-features"
+                                            className={formTextareaClass}
+                                            value={billingSpecialFeatures}
+                                            data-test="dispo-order-billing-special-features"
+                                            disabled={
+                                                savingNotes ||
+                                                dynamicControlsLocked
                                             }
-                                        </p>
-                                    ) : null}
-                                </div>
+                                            aria-describedby={
+                                                billingHelp
+                                                    ? 'dispo-order-billing-special-features-help'
+                                                    : undefined
+                                            }
+                                            onChange={(event) =>
+                                                setBillingSpecialFeatures(
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        {fieldErrors[
+                                            'dynamic_field_values.billing_special_features'
+                                        ] ? (
+                                            <p className="text-destructive text-xs">
+                                                {
+                                                    fieldErrors[
+                                                        'dynamic_field_values.billing_special_features'
+                                                    ]
+                                                }
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 ) : null}
                                 {dispositionVisible ? (
-                                <div className="grid gap-2">
-                                    <Label htmlFor="dispo-order-disposition-notes">
-                                        {dispositionRequired
-                                            ? `${dispositionLabel} *`
-                                            : dispositionLabel}
-                                    </Label>
-                                    {dispositionHelp ? (
-                                        <p
-                                            id="dispo-order-disposition-notes-help"
-                                            className="text-muted-foreground text-xs"
-                                        >
-                                            {dispositionHelp}
-                                        </p>
-                                    ) : null}
-                                    <textarea
-                                        id="dispo-order-disposition-notes"
-                                        className={formTextareaClass}
-                                        value={dispositionNotes}
-                                        data-test="dispo-order-disposition-notes"
-                                        disabled={savingNotes || dynamicControlsLocked}
-                                        aria-describedby={
-                                            dispositionHelp
-                                                ? 'dispo-order-disposition-notes-help'
-                                                : undefined
-                                        }
-                                        onChange={(event) =>
-                                            setDispositionNotes(
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                    {fieldErrors[
-                                        'dynamic_field_values.disposition_notes'
-                                    ] ? (
-                                        <p className="text-destructive text-xs">
-                                            {
-                                                fieldErrors[
-                                                    'dynamic_field_values.disposition_notes'
-                                                ]
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="dispo-order-disposition-notes">
+                                            {dispositionRequired
+                                                ? `${dispositionLabel} *`
+                                                : dispositionLabel}
+                                        </Label>
+                                        {dispositionHelp ? (
+                                            <p
+                                                id="dispo-order-disposition-notes-help"
+                                                className="text-muted-foreground text-xs"
+                                            >
+                                                {dispositionHelp}
+                                            </p>
+                                        ) : null}
+                                        <textarea
+                                            id="dispo-order-disposition-notes"
+                                            className={formTextareaClass}
+                                            value={dispositionNotes}
+                                            data-test="dispo-order-disposition-notes"
+                                            disabled={
+                                                savingNotes ||
+                                                dynamicControlsLocked
                                             }
-                                        </p>
-                                    ) : null}
-                                </div>
+                                            aria-describedby={
+                                                dispositionHelp
+                                                    ? 'dispo-order-disposition-notes-help'
+                                                    : undefined
+                                            }
+                                            onChange={(event) =>
+                                                setDispositionNotes(
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                        {fieldErrors[
+                                            'dynamic_field_values.disposition_notes'
+                                        ] ? (
+                                            <p className="text-destructive text-xs">
+                                                {
+                                                    fieldErrors[
+                                                        'dynamic_field_values.disposition_notes'
+                                                    ]
+                                                }
+                                            </p>
+                                        ) : null}
+                                    </div>
                                 ) : null}
                                 {fieldErrors.dynamic_field_values ||
                                 fieldErrors.lock_version ? (
@@ -1290,7 +1297,9 @@ export default function DispoOrderShow({
                                 ) : null}
                                 <Button
                                     type="button"
-                                    disabled={savingNotes || dynamicControlsLocked}
+                                    disabled={
+                                        savingNotes || dynamicControlsLocked
+                                    }
                                     data-test="dispo-order-save-system-notes"
                                     onClick={saveSystemNotes}
                                 >
@@ -1353,7 +1362,10 @@ export default function DispoOrderShow({
                                             }
                                             values={customHeaderValues}
                                             errors={fieldErrors}
-                                            disabled={savingNotes || dynamicControlsLocked}
+                                            disabled={
+                                                savingNotes ||
+                                                dynamicControlsLocked
+                                            }
                                             idPrefix="dispo-custom"
                                             onChange={(key, value) =>
                                                 setCustomHeaderValues(
@@ -1376,7 +1388,10 @@ export default function DispoOrderShow({
                                                     customHeaderChoiceValues
                                                 }
                                                 errors={fieldErrors}
-                                                disabled={savingNotes || dynamicControlsLocked}
+                                                disabled={
+                                                    savingNotes ||
+                                                    dynamicControlsLocked
+                                                }
                                                 idPrefix="dispo-custom-choice"
                                                 onChange={(key, value) => {
                                                     setCustomHeaderChoiceValues(
@@ -1413,7 +1428,9 @@ export default function DispoOrderShow({
                                     ) : null}
                                     <Button
                                         type="button"
-                                        disabled={savingNotes || dynamicControlsLocked}
+                                        disabled={
+                                            savingNotes || dynamicControlsLocked
+                                        }
                                         data-test="dispo-order-save-custom-headers"
                                         onClick={saveCustomHeaders}
                                     >
@@ -1895,7 +1912,10 @@ export default function DispoOrderShow({
                                 ) : null}
                                 <Button
                                     type="button"
-                                    disabled={savingPositionCustoms || dynamicControlsLocked}
+                                    disabled={
+                                        savingPositionCustoms ||
+                                        dynamicControlsLocked
+                                    }
                                     data-test="dispo-order-save-position-customs"
                                     onClick={savePositionCustoms}
                                 >
