@@ -264,6 +264,119 @@ final class SnapshotFieldRuleEvaluator
     }
 
     /**
+     * Effektive Sichtbarkeit eines Snapshot-Feldes (Basis ⊕ set_visible).
+     *
+     * Header: nur Basis-Snapshot.
+     * Position: Basis-Regeln (Header→Position) plus optionaler Positions-Effektiv-Snapshot
+     * (Position→Position), ohne Regeln anderer Positionen.
+     *
+     * @param  array<string, mixed>  $headerValues
+     * @param  array<string, mixed>  $positionValues
+     */
+    public function isEffectivelyVisible(
+        ConfigurationSnapshot $baseSnapshot,
+        SnapshotFieldDefinition $def,
+        array $headerValues,
+        array $positionValues = [],
+        ?ConfigurationSnapshot $positionScopeSnapshot = null,
+    ): bool {
+        $map = $this->effectiveVisibilityMapForContext(
+            $baseSnapshot,
+            $def->scope,
+            $headerValues,
+            $positionValues,
+            $positionScopeSnapshot,
+        );
+
+        return (bool) ($map[$def->key] ?? false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $headerValues
+     * @param  array<string, mixed>  $positionValues
+     * @return array<string, bool>
+     */
+    public function effectiveVisibilityMapForContext(
+        ConfigurationSnapshot $baseSnapshot,
+        FieldScope $scope,
+        array $headerValues,
+        array $positionValues = [],
+        ?ConfigurationSnapshot $positionScopeSnapshot = null,
+    ): array {
+        $baseSnapshot->loadMissing(['fieldDefinitions', 'rules', 'sources']);
+        $scopeSnapshot = $positionScopeSnapshot ?? $baseSnapshot;
+        if ($scopeSnapshot->id !== $baseSnapshot->id) {
+            $scopeSnapshot->loadMissing(['fieldDefinitions', 'rules', 'sources']);
+        }
+
+        $defsByKey = $this->combinedDefinitionContext($baseSnapshot, $scopeSnapshot);
+        $rules = $this->combinedRulesForScope($baseSnapshot, $scopeSnapshot, $scope);
+
+        $definitions = $scope === FieldScope::Header
+            ? $baseSnapshot->fieldDefinitions
+            : $scopeSnapshot->fieldDefinitions;
+
+        return $this->effectiveVisibilityForScope(
+            $rules,
+            $defsByKey,
+            $headerValues,
+            $scope === FieldScope::Header ? [] : $positionValues,
+            $scope,
+            $this->basisVisibleMap($definitions, $scope),
+            requireActiveOptionKeys: false,
+        );
+    }
+
+    /**
+     * @return array<string, object>
+     */
+    private function combinedDefinitionContext(
+        ConfigurationSnapshot $baseSnapshot,
+        ConfigurationSnapshot $scopeSnapshot,
+    ): array {
+        if ($scopeSnapshot->id === $baseSnapshot->id) {
+            return FieldRuleDefinitionContext::fromSnapshot($baseSnapshot);
+        }
+
+        $baseDefs = FieldRuleDefinitionContext::fromSnapshot($baseSnapshot);
+        $scopeDefs = FieldRuleDefinitionContext::fromSnapshot($scopeSnapshot);
+
+        return FieldRuleContract::normalizeDefinitions(array_merge($baseDefs, $scopeDefs));
+    }
+
+    /**
+     * @return list<object>
+     */
+    private function combinedRulesForScope(
+        ConfigurationSnapshot $baseSnapshot,
+        ConfigurationSnapshot $scopeSnapshot,
+        FieldScope $scope,
+    ): array {
+        if ($scope === FieldScope::Header || $scopeSnapshot->id === $baseSnapshot->id) {
+            return $this->rulesAsList($baseSnapshot->rules);
+        }
+
+        /** @var array<string, true> $seen */
+        $seen = [];
+        /** @var list<object> $out */
+        $out = [];
+        foreach ([$baseSnapshot->rules, $scopeSnapshot->rules] as $ruleSet) {
+            foreach ($ruleSet as $rule) {
+                $dedupe = (string) ($rule->dedupe_key ?? '');
+                if ($dedupe !== '') {
+                    if (isset($seen[$dedupe])) {
+                        continue;
+                    }
+                    $seen[$dedupe] = true;
+                }
+                $out[] = $rule;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param  Collection<int, SnapshotFieldDefinition>|iterable<int, SnapshotFieldDefinition>  $definitions
      * @return array<string, bool>
      */

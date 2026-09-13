@@ -22,7 +22,6 @@ import {
     optionByKey,
     selectableSelectOptions,
     sortChoiceOptions,
-    visibleChoiceFields,
 } from '@/lib/choice-field-values';
 import { cn } from '@/lib/utils';
 import { useMemo, useState } from 'react';
@@ -374,7 +373,8 @@ export function SchemaChoiceFields({
     disabled = false,
     idPrefix = 'schema-choice',
 }: Props) {
-    const sorted = [...visibleChoiceFields(fields)].sort(
+    // RULE-B: Caller liefert bereits effektiv sichtbare Felder (keine Basis-visible-Filterung hier).
+    const sorted = [...fields].sort(
         (a, b) => (a.sort ?? 0) - (b.sort ?? 0) || a.key.localeCompare(b.key),
     );
 

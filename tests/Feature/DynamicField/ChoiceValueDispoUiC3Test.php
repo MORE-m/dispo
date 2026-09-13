@@ -825,16 +825,18 @@ class ChoiceValueDispoUiC3Test extends TestCase
                 'options_json' => json_encode(['broken' => true], JSON_THROW_ON_ERROR),
             ]);
 
-        // Bestehender Integrity-Vertrag: beschädigtes options_json macht den
-        // Snapshot unlesbar (assertReadable) – fail-closed, keine Mutation.
+        // Integrity fail-closed: beschädigtes options_json → Snapshot unlesbar,
+        // keine Mutation, keine technischen Details an den Client (Validation/Redirect).
         $this->actingAs($user)
+            ->from(route('dispo-orders.show', $order))
             ->patch(route('dispo-orders.update', $order), [
                 'lock_version' => $order->lock_version,
                 'dynamic_field_values' => [
                     $definition->key => 'opt_a',
                 ],
             ])
-            ->assertStatus(500);
+            ->assertRedirect(route('dispo-orders.show', $order))
+            ->assertSessionHasErrors('dynamic_field_values');
 
         $this->assertNull(
             DispoOrderFieldValue::query()

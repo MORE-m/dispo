@@ -149,7 +149,6 @@ function customTextFieldsFromSchema(
         .filter(
             (field) =>
                 field.is_system !== true &&
-                field.visible !== false &&
                 (field.scope === undefined || field.scope === scope) &&
                 (field.field_type === 'short_text' ||
                     field.field_type === 'long_text'),
