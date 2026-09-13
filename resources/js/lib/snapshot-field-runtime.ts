@@ -31,12 +31,7 @@ export type RuntimeSchemaField = {
     action_target_readonly?: boolean;
     max_length?: number | null;
     validation_json?: { max_length?: number } | null;
-    options_json?: Array<{
-        key: string;
-        label: string;
-        sort: number;
-        is_active: boolean;
-    }> | null;
+    options_json?: unknown;
     group_key?: string | null;
     applies_to?: string;
 };
@@ -88,7 +83,12 @@ export function toRuleFieldDefinition(
         key: field.key,
         field_type: fieldType,
         scope: asScope(field.scope, fallbackScope),
-        options_json: field.options_json ?? null,
+        options_json: Array.isArray(field.options_json)
+            ? (field.options_json as Array<{
+                  key: string;
+                  is_active?: boolean;
+              }>)
+            : null,
         action_target_readonly: readonly,
     };
 }
