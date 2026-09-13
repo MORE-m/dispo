@@ -74,13 +74,19 @@ function conditionOpsForField(
 
 function updateAtomic(
     condition: AtomicCondition,
-    patch: Partial<AtomicCondition> & { op?: string; field_key?: string },
+    patch: {
+        op?: string;
+        field_key?: string;
+        value?: unknown;
+    },
     catalog: FieldCatalogEntry[],
 ): AtomicCondition {
     const fieldKey = patch.field_key ?? condition.field_key;
     const ops = conditionOpsForField(catalog, fieldKey);
-    const op = (patch.op ?? condition.op) as AtomicCondition['op'];
-    const nextOp = ops.includes(op) ? op : (ops[0] as AtomicCondition['op']);
+    const requestedOp = patch.op ?? condition.op;
+    const nextOp = (
+        ops.includes(requestedOp) ? requestedOp : ops[0]
+    ) as AtomicCondition['op'];
     const entry = catalog.find((row) => row.key === fieldKey);
 
     if (nextOp === 'field_empty' || nextOp === 'field_not_empty') {
