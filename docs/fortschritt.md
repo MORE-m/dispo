@@ -23,8 +23,8 @@ oder UX-GATE-D-Rest – kein RULE-D.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3-RULE-C: administrativer Desired-State-Regel-Editor für Draft-Feldset-
-Versionen inkl. Seed-Schutz, Preview/Apply, Audit und Tests.
+DF-3-RULE-C Review-Fixes (PR #49): Vorschau mit Membership-Basiswerten,
+Calc-Origin im Admin-Regelkontext, editierbare Beispielwerte, erweiterte E2E.
 
 ## DF-3-RULE-C – Administrativer Regel-Editor (September 2026)
 
@@ -38,6 +38,10 @@ Versionen inkl. Seed-Schutz, Preview/Apply, Audit und Tests.
 | Admin-UI auf Feldset-Versionsseite | **umgesetzt** |
 | Audit `field_set.rules_replaced` | **umgesetzt** |
 | Keine Migration; Snapshots unverändert | **umgesetzt** |
+| Preview-Basis aus Membership-`visible`/`required_override` | **umgesetzt** |
+| Calc-Origin `action_target_readonly` im Admin-Kernkontext | **umgesetzt** |
+| Editierbare Header-/Positions-Beispielwerte in der UI | **umgesetzt** |
+| Freier-Draft-E2E inkl. CRUD/Duplikat/Read-only Active | **umgesetzt** |
 | SystemFieldSetting (ADV-002) | **außerhalb DF-3** |
 
 **PO-Festlegungen:** Desired-State; Seed nur in `system_calculation_core` via

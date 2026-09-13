@@ -418,7 +418,7 @@ class FieldSetAdminController extends Controller
                             && $dedupe === FieldRuleContract::SEED_RULE_DEDUPE_SHA256,
                     ];
                 }),
-                'field_catalog' => $version->fields->map(function (FieldSetVersionField $membership): array {
+                'field_catalog' => $version->fields->map(function (FieldSetVersionField $membership) use ($fieldSet): array {
                     $definition = $membership->definition ?? $membership->revision->definition;
                     $revision = $membership->revision;
                     $options = [];
@@ -434,6 +434,10 @@ class FieldSetAdminController extends Controller
                         'field_type' => $definition->field_type->value,
                         'scope' => $definition->scope->value,
                         'is_system' => (bool) $definition->is_system,
+                        'action_target_readonly' => AdminFieldSetCatalog::isCalcOriginActionTarget(
+                            $fieldSet->key,
+                            $definition->key,
+                        ),
                         'options' => $options,
                     ];
                 })->values()->all(),

@@ -9,6 +9,7 @@ export type FieldCatalogEntry = {
     field_type: string;
     scope: string;
     is_system: boolean;
+    action_target_readonly?: boolean;
     options: Array<{
         key: string;
         label: string;
@@ -79,11 +80,14 @@ export function emptyAtomicCondition(fieldKey = ''): AtomicCondition {
     return { op: 'field_equals', field_key: fieldKey, value: true };
 }
 
-export function emptyDraftRule(fieldKey = ''): DraftRule {
+export function emptyDraftRule(
+    fieldKey = '',
+    actionFieldKey = fieldKey,
+): DraftRule {
     return {
         localId: nextLocalId(),
         condition: emptyAtomicCondition(fieldKey),
-        action: { op: 'require_field', field_key: fieldKey },
+        action: { op: 'require_field', field_key: actionFieldKey },
         is_system_seed: false,
     };
 }
@@ -199,4 +203,53 @@ export function hasRequireAndHiddenWarning(rules: DraftRule[]): string[] {
     }
 
     return [...required].filter((key) => hidden.has(key));
+}
+
+export function defaultExampleValue(entry: FieldCatalogEntry): unknown {
+    const activeOptions = entry.options.filter((option) => option.is_active);
+    switch (entry.field_type) {
+        case 'boolean':
+            return entry.key === 'period_open' ? false : true;
+        case 'period':
+            return { start: '2026-01-01', end: '2026-01-31' };
+        case 'short_text':
+            return 'Beispiel';
+        case 'long_text':
+            return 'Beispieltext für die Admin-Vorschau.';
+        case 'select':
+            return activeOptions[0]?.key ?? '';
+        case 'multi_select':
+            return activeOptions[0] ? [activeOptions[0].key] : [];
+        default:
+            return null;
+    }
+}
+
+export function initialExampleValues(catalog: FieldCatalogEntry[]): {
+    header: Record<string, unknown>;
+    position: Record<string, unknown>;
+} {
+    const header: Record<string, unknown> = {};
+    const position: Record<string, unknown> = {};
+    for (const entry of catalog) {
+        const value = defaultExampleValue(entry);
+        if (entry.scope === 'header') {
+            header[entry.key] = value;
+        } else if (entry.scope === 'position') {
+            position[entry.key] = value;
+        }
+    }
+
+    return { header, position };
+}
+
+export function writableActionTargets(
+    catalog: FieldCatalogEntry[],
+    currentFieldKey?: string,
+): FieldCatalogEntry[] {
+    return catalog.filter(
+        (entry) =>
+            entry.action_target_readonly !== true ||
+            entry.key === currentFieldKey,
+    );
 }

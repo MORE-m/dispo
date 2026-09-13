@@ -6,15 +6,18 @@ import { Input } from '@/components/ui/input';
 import { JsonPostError, jsonPost, jsonPut } from '@/lib/json-post';
 import {
     allowedConditionOps,
+    defaultExampleValue,
     duplicateDraftRule,
     emptyAtomicCondition,
     emptyDraftRule,
     fieldLabel,
     hasRequireAndHiddenWarning,
+    initialExampleValues,
     moveDraftRule,
     rulesFromServer,
     summarizeRule,
     toPayloadRules,
+    writableActionTargets,
     type AtomicCondition,
     type DraftRule,
     type FieldCatalogEntry,
@@ -159,13 +162,40 @@ export default function FieldSetRulesEditor({
     const [busy, setBusy] = useState(false);
     const [preview, setPreview] = useState<PreviewResponse | null>(null);
     const [fingerprint, setFingerprint] = useState<string | null>(null);
+    const [exampleValues, setExampleValues] = useState(() =>
+        initialExampleValues(fieldCatalog),
+    );
 
     const structuralWarnings = useMemo(
         () => hasRequireAndHiddenWarning(rules),
         [rules],
     );
 
+    const headerFields = useMemo(
+        () => fieldCatalog.filter((entry) => entry.scope === 'header'),
+        [fieldCatalog],
+    );
+    const positionFields = useMemo(
+        () => fieldCatalog.filter((entry) => entry.scope === 'position'),
+        [fieldCatalog],
+    );
+
     const defaultFieldKey = fieldCatalog[0]?.key ?? '';
+
+    function updateExampleValue(
+        scope: 'header' | 'position',
+        key: string,
+        value: unknown,
+    ): void {
+        setExampleValues((current) => ({
+            ...current,
+            [scope]: {
+                ...current[scope],
+                [key]: value,
+            },
+        }));
+        setPreview(null);
+    }
 
     async function runPreview(): Promise<PreviewResponse | null> {
         setBusy(true);
@@ -176,6 +206,10 @@ export default function FieldSetRulesEditor({
             const result = await jsonPost<PreviewResponse>(routes.preview, {
                 lock_version: lockVersion,
                 rules: toPayloadRules(rules),
+                example_values: {
+                    header: exampleValues.header,
+                    position: exampleValues.position,
+                },
             });
             setPreview(result);
             setFingerprint(result.fingerprint);
@@ -209,6 +243,10 @@ export default function FieldSetRulesEditor({
                     {
                         lock_version: lockVersion,
                         rules: toPayloadRules(rules),
+                        example_values: {
+                            header: exampleValues.header,
+                            position: exampleValues.position,
+                        },
                     },
                 );
                 setPreview(previewResult);
@@ -252,6 +290,7 @@ export default function FieldSetRulesEditor({
             ),
         );
         setFingerprint(null);
+        setPreview(null);
     }
 
     function renderConditionEditor(
@@ -582,7 +621,10 @@ export default function FieldSetRulesEditor({
                             )
                         }
                     >
-                        {fieldCatalog.map((field) => (
+                        {writableActionTargets(
+                            fieldCatalog,
+                            action.field_key,
+                        ).map((field) => (
                             <option key={field.key} value={field.key}>
                                 {field.label} ({field.key}) · {field.scope}
                             </option>
@@ -614,6 +656,176 @@ export default function FieldSetRulesEditor({
         );
     }
 
+    function renderExampleFieldControl(
+        entry: FieldCatalogEntry,
+        scope: 'header' | 'position',
+    ) {
+        const value = exampleValues[scope][entry.key] ?? defaultExampleValue(entry);
+        const activeOptions = entry.options.filter((option) => option.is_active);
+        const inputId = `example-${scope}-${entry.key}`;
+
+        if (entry.field_type === 'boolean') {
+            return (
+                <label
+                    key={entry.key}
+                    className="block space-y-1 text-sm"
+                    htmlFor={inputId}
+                >
+                    <span className="font-medium">{entry.label}</span>
+                    <select
+                        id={inputId}
+                        className="border-input bg-background w-full rounded-md border px-3 py-2"
+                        data-test={`fieldset-example-${scope}-${entry.key}`}
+                        value={value === true ? 'true' : 'false'}
+                        onChange={(event) =>
+                            updateExampleValue(
+                                scope,
+                                entry.key,
+                                event.target.value === 'true',
+                            )
+                        }
+                    >
+                        <option value="true">Ja</option>
+                        <option value="false">Nein</option>
+                    </select>
+                </label>
+            );
+        }
+
+        if (entry.field_type === 'select') {
+            return (
+                <label
+                    key={entry.key}
+                    className="block space-y-1 text-sm"
+                    htmlFor={inputId}
+                >
+                    <span className="font-medium">{entry.label}</span>
+                    <select
+                        id={inputId}
+                        className="border-input bg-background w-full rounded-md border px-3 py-2"
+                        data-test={`fieldset-example-${scope}-${entry.key}`}
+                        value={typeof value === 'string' ? value : ''}
+                        onChange={(event) =>
+                            updateExampleValue(scope, entry.key, event.target.value)
+                        }
+                    >
+                        {activeOptions.map((option) => (
+                            <option key={option.key} value={option.key}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+            );
+        }
+
+        if (entry.field_type === 'multi_select') {
+            const selected = Array.isArray(value)
+                ? value.filter((item): item is string => typeof item === 'string')
+                : [];
+            return (
+                <fieldset
+                    key={entry.key}
+                    className="space-y-2 rounded-md border p-3"
+                    data-test={`fieldset-example-${scope}-${entry.key}`}
+                >
+                    <legend className="px-1 text-sm font-medium">
+                        {entry.label}
+                    </legend>
+                    {activeOptions.map((option) => {
+                        const checked = selected.includes(option.key);
+                        return (
+                            <label
+                                key={option.key}
+                                className="flex items-center gap-2 text-sm"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(event) => {
+                                        const next = event.target.checked
+                                            ? [...selected, option.key]
+                                            : selected.filter(
+                                                  (item) => item !== option.key,
+                                              );
+                                        updateExampleValue(scope, entry.key, next);
+                                    }}
+                                />
+                                {option.label}
+                            </label>
+                        );
+                    })}
+                </fieldset>
+            );
+        }
+
+        if (entry.field_type === 'period') {
+            const period =
+                value &&
+                typeof value === 'object' &&
+                !Array.isArray(value) &&
+                'start' in value &&
+                'end' in value
+                    ? (value as { start: string; end: string })
+                    : { start: '2026-01-01', end: '2026-01-31' };
+            return (
+                <div
+                    key={entry.key}
+                    className="space-y-2"
+                    data-test={`fieldset-example-${scope}-${entry.key}`}
+                >
+                    <p className="text-sm font-medium">{entry.label}</p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        <label className="block space-y-1 text-sm">
+                            <span>Start</span>
+                            <Input
+                                type="date"
+                                value={period.start}
+                                onChange={(event) =>
+                                    updateExampleValue(scope, entry.key, {
+                                        ...period,
+                                        start: event.target.value,
+                                    })
+                                }
+                            />
+                        </label>
+                        <label className="block space-y-1 text-sm">
+                            <span>Ende</span>
+                            <Input
+                                type="date"
+                                value={period.end}
+                                onChange={(event) =>
+                                    updateExampleValue(scope, entry.key, {
+                                        ...period,
+                                        end: event.target.value,
+                                    })
+                                }
+                            />
+                        </label>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <label
+                key={entry.key}
+                className="block space-y-1 text-sm"
+                htmlFor={inputId}
+            >
+                <span className="font-medium">{entry.label}</span>
+                <Input
+                    id={inputId}
+                    data-test={`fieldset-example-${scope}-${entry.key}`}
+                    value={typeof value === 'string' ? value : ''}
+                    onChange={(event) =>
+                        updateExampleValue(scope, entry.key, event.target.value)
+                    }
+                />
+            </label>
+        );
+    }
+
     return (
         <section className="space-y-4" data-test="fieldset-rules-editor">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -633,12 +845,17 @@ export default function FieldSetRulesEditor({
                             disabled={busy || fieldCatalog.length === 0}
                             data-test="fieldset-rules-add"
                             onClick={() => {
+                                const writable =
+                                    writableActionTargets(fieldCatalog);
+                                const actionKey =
+                                    writable[0]?.key ?? defaultFieldKey;
                                 setRules((current) => [
                                     ...current,
-                                    emptyDraftRule(defaultFieldKey),
+                                    emptyDraftRule(defaultFieldKey, actionKey),
                                 ]);
                                 setEditingIndex(rules.length);
                                 setFingerprint(null);
+                                setPreview(null);
                             }}
                         >
                             Regel hinzufügen
@@ -684,6 +901,49 @@ export default function FieldSetRulesEditor({
                     . Die Pflicht greift nur bei sichtbaren Feldern.
                 </div>
             ) : null}
+
+            <div
+                className="space-y-4 rounded-xl border p-4"
+                data-test="fieldset-rules-example-values"
+            >
+                <div>
+                    <h3 className="text-sm font-semibold">Beispielwerte</h3>
+                    <p className="text-muted-foreground text-sm">
+                        Nur für die Vorschau. Werden nicht gespeichert.
+                    </p>
+                </div>
+                <div className="grid gap-6 lg:grid-cols-2">
+                    <div className="space-y-3" data-test="fieldset-example-header">
+                        <h4 className="text-sm font-medium">Header</h4>
+                        {headerFields.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">
+                                Keine Header-Felder in dieser Version.
+                            </p>
+                        ) : (
+                            headerFields.map((entry) =>
+                                renderExampleFieldControl(entry, 'header'),
+                            )
+                        )}
+                    </div>
+                    <div
+                        className="space-y-3"
+                        data-test="fieldset-example-position"
+                    >
+                        <h4 className="text-sm font-medium">
+                            Position (eine Beispielposition)
+                        </h4>
+                        {positionFields.length === 0 ? (
+                            <p className="text-muted-foreground text-sm">
+                                Keine Positionsfelder in dieser Version.
+                            </p>
+                        ) : (
+                            positionFields.map((entry) =>
+                                renderExampleFieldControl(entry, 'position'),
+                            )
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {rules.length === 0 ? (
                 <p className="text-muted-foreground text-sm">
@@ -749,6 +1009,7 @@ export default function FieldSetRulesEditor({
                                                         ),
                                                     );
                                                     setFingerprint(null);
+                                                    setPreview(null);
                                                 }}
                                             >
                                                 Nach oben
@@ -771,6 +1032,7 @@ export default function FieldSetRulesEditor({
                                                         ),
                                                     );
                                                     setFingerprint(null);
+                                                    setPreview(null);
                                                 }}
                                             >
                                                 Nach unten
@@ -816,6 +1078,7 @@ export default function FieldSetRulesEditor({
                                                         return next;
                                                     });
                                                     setFingerprint(null);
+                                                    setPreview(null);
                                                     setEditingIndex(index + 1);
                                                 }}
                                             >
@@ -838,6 +1101,7 @@ export default function FieldSetRulesEditor({
                                                     );
                                                     setEditingIndex(null);
                                                     setFingerprint(null);
+                                                    setPreview(null);
                                                 }}
                                             >
                                                 Entfernen

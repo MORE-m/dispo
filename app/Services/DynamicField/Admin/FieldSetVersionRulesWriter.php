@@ -10,6 +10,7 @@ use App\Models\FieldRule;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
 use App\Models\FieldSetVersionField;
+use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\SnapshotFieldRuleEvaluator;
@@ -58,7 +59,7 @@ final class FieldSetVersionRulesWriter
         }
 
         $version->loadMissing(['fields.revision.definition', 'fields.revision.options', 'rules']);
-        $defsByKey = $this->definitionsFromMemberships($version->fields);
+        $defsByKey = $this->definitionsFromMemberships($fieldSet, $version->fields);
         $previous = $this->serializeStoredRules($fieldSet, $version);
         $this->assertStoredSystemCoreInvariant($fieldSet, $previous);
 
@@ -67,7 +68,13 @@ final class FieldSetVersionRulesWriter
         $hasChanges = ! $this->equalsCanonical($previous, $normalized);
 
         $examples = $this->resolveExampleValues($version, $defsByKey, $exampleHeader, $examplePosition);
-        $effects = $this->evaluateEffects($normalized, $defsByKey, $examples['header'], $examples['position']);
+        $effects = $this->evaluateEffects(
+            $normalized,
+            $defsByKey,
+            $version->fields,
+            $examples['header'],
+            $examples['position'],
+        );
 
         return [
             'lock_version' => (int) $fieldSet->lock_version,
@@ -83,7 +90,7 @@ final class FieldSetVersionRulesWriter
             'effective_visible' => $effects['effective_visible'],
             'effective_required' => $effects['effective_required'],
             'warnings' => $effects['warnings'],
-            'field_catalog' => $this->fieldCatalog($version->fields),
+            'field_catalog' => $this->fieldCatalog($fieldSet, $version->fields),
         ];
     }
 
@@ -135,7 +142,7 @@ final class FieldSetVersionRulesWriter
                 ->get(['id']);
 
             $lockedVersion->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
-            $defsByKey = $this->definitionsFromMemberships($lockedVersion->fields);
+            $defsByKey = $this->definitionsFromMemberships($locked, $lockedVersion->fields);
             $previous = $this->serializeStoredRules($locked, $lockedVersion);
             $this->assertStoredSystemCoreInvariant($locked, $previous);
 
@@ -438,7 +445,7 @@ final class FieldSetVersionRulesWriter
      *     action_target_readonly: bool
      * }>
      */
-    private function definitionsFromMemberships(iterable $memberships): array
+    private function definitionsFromMemberships(FieldSet $fieldSet, iterable $memberships): array
     {
         $defsByKey = [];
         foreach ($memberships as $membership) {
@@ -458,7 +465,10 @@ final class FieldSetVersionRulesWriter
                 'field_type' => $definition->field_type,
                 'scope' => $definition->scope,
                 'options_json' => $options,
-                'action_target_readonly' => false,
+                'action_target_readonly' => AdminFieldSetCatalog::isCalcOriginActionTarget(
+                    $fieldSet->key,
+                    $definition->key,
+                ),
             ]);
         }
 
@@ -612,6 +622,7 @@ final class FieldSetVersionRulesWriter
      *     options_json: list<array<string, mixed>>|null,
      *     action_target_readonly: bool
      * }>  $defsByKey
+     * @param  iterable<int, FieldSetVersionField>  $memberships
      * @param  array<string, mixed>  $headerValues
      * @param  array<string, mixed>  $positionValues
      * @return array{
@@ -624,6 +635,7 @@ final class FieldSetVersionRulesWriter
     private function evaluateEffects(
         array $rules,
         array $defsByKey,
+        iterable $memberships,
         array $headerValues,
         array $positionValues,
     ): array {
@@ -640,13 +652,24 @@ final class FieldSetVersionRulesWriter
         $basisVisiblePosition = [];
         $basisRequiredHeader = [];
         $basisRequiredPosition = [];
-        foreach ($defsByKey as $key => $def) {
-            if ($def->scope === FieldScope::Header) {
-                $basisVisibleHeader[$key] = true;
-                $basisRequiredHeader[$key] = false;
+        foreach ($memberships as $membership) {
+            $revision = $membership->revision;
+            $definition = $revision?->definition;
+            if ($definition === null) {
+                continue;
+            }
+            $key = $definition->key;
+            if (! array_key_exists($key, $defsByKey)) {
+                continue;
+            }
+            $basisVisible = SnapshotFieldDefinition::effectiveVisible($membership->visible_override);
+            $basisRequired = SnapshotFieldDefinition::effectiveRequired($membership->required_override);
+            if ($definition->scope === FieldScope::Header) {
+                $basisVisibleHeader[$key] = $basisVisible;
+                $basisRequiredHeader[$key] = $basisRequired;
             } else {
-                $basisVisiblePosition[$key] = true;
-                $basisRequiredPosition[$key] = false;
+                $basisVisiblePosition[$key] = $basisVisible;
+                $basisRequiredPosition[$key] = $basisRequired;
             }
         }
 
@@ -797,7 +820,7 @@ final class FieldSetVersionRulesWriter
      * @param  iterable<int, FieldSetVersionField>  $memberships
      * @return list<array<string, mixed>>
      */
-    private function fieldCatalog(iterable $memberships): array
+    private function fieldCatalog(FieldSet $fieldSet, iterable $memberships): array
     {
         $catalog = [];
         foreach ($memberships as $membership) {
@@ -823,6 +846,10 @@ final class FieldSetVersionRulesWriter
                 'field_type' => $definition->field_type->value,
                 'scope' => $definition->scope->value,
                 'is_system' => (bool) $definition->is_system,
+                'action_target_readonly' => AdminFieldSetCatalog::isCalcOriginActionTarget(
+                    $fieldSet->key,
+                    $definition->key,
+                ),
                 'options' => $options,
             ];
         }

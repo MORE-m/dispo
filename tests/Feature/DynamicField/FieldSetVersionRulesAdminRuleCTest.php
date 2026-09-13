@@ -17,6 +17,8 @@ use App\Models\FieldSetVersionField;
 use App\Models\User;
 use App\Services\DynamicField\Admin\AdminFieldSetCatalog;
 use App\Services\DynamicField\Admin\FieldSetVersionAdminWriter;
+use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
+use App\Services\DynamicField\DispoConfigurationSnapshotComposer;
 use App\Support\DynamicField\FieldRuleContract;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -206,17 +208,272 @@ class FieldSetVersionRulesAdminRuleCTest extends TestCase
             ])
             ->assertStatus(422);
 
-        $preview = $this->actingAs($admin)
+        $this->actingAs($admin)
             ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
                 'lock_version' => $fieldSet->fresh()->lock_version,
                 'rules' => [$seed, $extra],
+            ])
+            ->assertStatus(422);
+
+        $preview = $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+                'rules' => [$seed],
             ])
             ->assertOk()
             ->json();
 
         $this->assertTrue($preview['rules'][0]['is_system_seed']);
-        $this->assertFalse($preview['rules'][1]['is_system_seed']);
         $this->assertTrue($preview['matched'][0]);
+    }
+
+    public function test_calc_origin_actions_are_rejected_except_exact_seed(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        [$fieldSet, $draft] = $this->createCalculationCoreDraft($admin);
+        $lock = (int) $fieldSet->fresh()->lock_version;
+        $seed = $this->seedRulePayload();
+
+        foreach ([
+            [
+                'condition' => ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => true],
+                'action' => ['op' => 'require_field', 'field_key' => 'campaign_period'],
+            ],
+            [
+                'condition' => ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => true],
+                'action' => ['op' => 'set_visible', 'field_key' => 'campaign_period', 'value' => false],
+            ],
+            [
+                'condition' => ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => true],
+                'action' => ['op' => 'require_field', 'field_key' => 'period_open'],
+            ],
+            [
+                'condition' => ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => true],
+                'action' => ['op' => 'set_visible', 'field_key' => 'position_flight_period', 'value' => true],
+            ],
+        ] as $invalid) {
+            $this->actingAs($admin)
+                ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                    'lock_version' => $lock,
+                    'rules' => [$seed, $invalid],
+                ])
+                ->assertStatus(422);
+        }
+
+        $alteredSeed = $seed;
+        $alteredSeed['condition']['value'] = true;
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $lock,
+                'rules' => [$alteredSeed],
+            ])
+            ->assertStatus(422);
+
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $lock,
+                'rules' => [$seed],
+            ])
+            ->assertOk();
+    }
+
+    public function test_free_fieldset_does_not_treat_same_keys_as_calc_origin(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $writer = app(FieldSetVersionAdminWriter::class);
+        $fieldSet = $writer->createFreeFieldSet([
+            'name' => 'Kein Calc-Origin',
+            'key' => 'rule_c_no_calc_origin',
+            'applies_to' => FieldAppliesTo::Calculation,
+        ], $admin);
+        $draft = FieldSetVersion::query()->where('field_set_id', $fieldSet->id)->firstOrFail();
+        foreach (['period_open', 'position_flight_period', 'campaign_period'] as $index => $key) {
+            $definition = FieldDefinition::query()->where('key', $key)->firstOrFail();
+            FieldSetVersionField::query()->create([
+                'field_set_version_id' => $draft->id,
+                'field_definition_id' => $definition->id,
+                'field_definition_revision_id' => $definition->current_revision_id,
+                'sort' => ($index + 1) * 10,
+                'required_override' => null,
+                'visible_override' => null,
+            ]);
+        }
+
+        $rule = [
+            'condition' => ['op' => 'field_equals', 'field_key' => 'period_open', 'value' => true],
+            'action' => ['op' => 'set_visible', 'field_key' => 'position_flight_period', 'value' => false],
+        ];
+
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+                'rules' => [$rule],
+            ])
+            ->assertOk();
+
+        $headerAction = [
+            'condition' => ['op' => 'field_not_empty', 'field_key' => 'campaign_period'],
+            'action' => ['op' => 'require_field', 'field_key' => 'campaign_period'],
+        ];
+        $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+                'rules' => [$headerAction],
+            ])
+            ->assertOk();
+    }
+
+    public function test_preview_uses_membership_basis_visible_and_required(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $writer = app(FieldSetVersionAdminWriter::class);
+        $fieldSet = $writer->createFreeFieldSet([
+            'name' => 'Basis Overrides',
+            'key' => 'rule_c_basis',
+            'applies_to' => FieldAppliesTo::Calculation,
+        ], $admin);
+        $draft = FieldSetVersion::query()->where('field_set_id', $fieldSet->id)->firstOrFail();
+        $hidden = $this->addBooleanMembership($draft, 'basis_hidden', FieldScope::Header, null, false);
+        $required = $this->addBooleanMembership($draft, 'basis_required', FieldScope::Header, true, null);
+        $both = $this->addBooleanMembership($draft, 'basis_required_hidden', FieldScope::Header, true, false);
+        $extra = $this->addBooleanMembership($draft, 'basis_extra', FieldScope::Header);
+
+        $lock = (int) $fieldSet->fresh()->lock_version;
+        $emptyPreview = $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $lock,
+                'rules' => [],
+            ])
+            ->assertOk()
+            ->json();
+
+        $this->assertFalse($emptyPreview['effective_visible']['header']['basis_hidden']);
+        $this->assertTrue($emptyPreview['effective_required']['header']['basis_required']);
+        $this->assertFalse($emptyPreview['effective_visible']['header']['basis_required_hidden']);
+        $this->assertFalse($emptyPreview['effective_required']['header']['basis_required_hidden']);
+
+        $rule = [
+            'condition' => ['op' => 'field_equals', 'field_key' => 'basis_extra', 'value' => true],
+            'action' => ['op' => 'require_field', 'field_key' => 'basis_required'],
+        ];
+        $withRule = $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $lock,
+                'rules' => [$rule],
+                'example_values' => [
+                    'header' => ['basis_extra' => true],
+                ],
+            ])
+            ->assertOk()
+            ->json();
+
+        $this->assertTrue($withRule['matched'][0]);
+        $this->assertTrue($withRule['effective_required']['header']['basis_required']);
+
+        $this->actingAs($admin)
+            ->putJson(route('administration.dynamic-fields.field-sets.versions.rules.replace', [$fieldSet, $draft]), [
+                'lock_version' => $lock,
+                'fingerprint' => $withRule['fingerprint'],
+                'rules' => [$rule],
+            ])
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.versions.activate', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+            ])
+            ->assertRedirect();
+
+        $snapshot = app(ConfigurationSnapshotMaterializer::class)
+            ->materializeFromActiveSet($fieldSet->key);
+        $defs = $snapshot->fieldDefinitions->keyBy('key');
+
+        $this->assertFalse((bool) $defs['basis_hidden']->visible);
+        $this->assertTrue((bool) $defs['basis_required']->required);
+        $this->assertFalse((bool) $defs['basis_required_hidden']->visible);
+        $this->assertTrue((bool) $defs['basis_required_hidden']->required);
+
+        $this->assertSame(
+            (bool) $emptyPreview['effective_visible']['header']['basis_hidden'],
+            (bool) $defs['basis_hidden']->visible,
+        );
+        $this->assertSame(
+            (bool) $emptyPreview['effective_required']['header']['basis_required'],
+            (bool) $defs['basis_required']->required,
+        );
+
+        unset($hidden, $required, $both, $extra);
+    }
+
+    public function test_valid_system_core_rules_can_materialize_after_editor_apply(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        [$fieldSet, $draft] = $this->createCalculationCoreDraft($admin);
+        $seed = $this->seedRulePayload();
+
+        $preview = $this->actingAs($admin)
+            ->postJson(route('administration.dynamic-fields.field-sets.versions.rules.preview', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+                'rules' => [$seed],
+            ])
+            ->assertOk()
+            ->json();
+
+        $this->actingAs($admin)
+            ->putJson(route('administration.dynamic-fields.field-sets.versions.rules.replace', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+                'fingerprint' => $preview['fingerprint'],
+                'rules' => [$seed],
+            ])
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.versions.activate', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+            ])
+            ->assertRedirect();
+
+        $calcSnapshot = app(ConfigurationSnapshotMaterializer::class)
+            ->materializeFromActiveSet(AdminFieldSetCatalog::CALCULATION_CORE);
+        $this->assertGreaterThan(0, $calcSnapshot->rules()->count());
+
+        $dispoSnapshot = app(DispoConfigurationSnapshotComposer::class)
+            ->composeFromCalculationSnapshot($calcSnapshot);
+        $this->assertNotNull($dispoSnapshot->id);
+    }
+
+    public function test_activation_rejects_calc_origin_action_inserted_bypassing_editor(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        [$fieldSet, $draft] = $this->createCalculationCoreDraft($admin);
+        $seed = $this->seedRulePayload();
+
+        FieldRule::query()->where('field_set_version_id', $draft->id)->delete();
+        FieldRule::query()->create([
+            'field_set_version_id' => $draft->id,
+            'sort' => 0,
+            'condition_json' => $seed['condition'],
+            'action_json' => $seed['action'],
+        ]);
+        FieldRule::query()->create([
+            'field_set_version_id' => $draft->id,
+            'sort' => 10,
+            'condition_json' => [
+                'op' => 'field_equals',
+                'field_key' => 'period_open',
+                'value' => true,
+            ],
+            'action_json' => [
+                'op' => 'require_field',
+                'field_key' => 'campaign_period',
+            ],
+        ]);
+
+        $this->actingAs($admin)
+            ->post(route('administration.dynamic-fields.field-sets.versions.activate', [$fieldSet, $draft]), [
+                'lock_version' => $fieldSet->fresh()->lock_version,
+            ])
+            ->assertSessionHasErrors();
     }
 
     public function test_identical_seed_content_in_free_fieldset_is_editable(): void
@@ -528,8 +785,13 @@ class FieldSetVersionRulesAdminRuleCTest extends TestCase
         return [$fieldSet->fresh(), $draft];
     }
 
-    private function addBooleanMembership(FieldSetVersion $draft, string $key, FieldScope $scope): void
-    {
+    private function addBooleanMembership(
+        FieldSetVersion $draft,
+        string $key,
+        FieldScope $scope,
+        ?bool $requiredOverride = null,
+        ?bool $visibleOverride = null,
+    ): FieldSetVersionField {
         $definition = FieldDefinition::query()->create([
             'key' => $key,
             'field_type' => FieldType::Boolean,
@@ -553,13 +815,13 @@ class FieldSetVersionRulesAdminRuleCTest extends TestCase
         $definition->current_revision_id = $revision->id;
         $definition->save();
 
-        FieldSetVersionField::query()->create([
+        return FieldSetVersionField::query()->create([
             'field_set_version_id' => $draft->id,
             'field_definition_id' => $definition->id,
             'field_definition_revision_id' => $revision->id,
             'sort' => 10,
-            'required_override' => null,
-            'visible_override' => null,
+            'required_override' => $requiredOverride,
+            'visible_override' => $visibleOverride,
         ]);
     }
 

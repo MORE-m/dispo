@@ -503,7 +503,7 @@ final class FieldSetVersionAdminWriter
             }
 
             $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
-            $defsByKey = $this->ruleDefinitionsFromMemberships($lockedDraft->fields);
+            $defsByKey = $this->ruleDefinitionsFromMemberships($locked, $lockedDraft->fields);
             $this->rules->assertRulesCompatibleWithDefinitions($defsByKey, $lockedDraft->rules);
 
             $locked->lock_version = $locked->lock_version + 1;
@@ -606,10 +606,16 @@ final class FieldSetVersionAdminWriter
                 }
                 $defsByKey[$definition->key] = true;
             }
-            $this->rules->assertRulesCompatibleWithDefinitions(
-                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
-                $lockedDraft->rules,
-            );
+            try {
+                $this->rules->assertRulesCompatibleWithDefinitions(
+                    $this->ruleDefinitionsFromMemberships($locked, $lockedDraft->fields),
+                    $lockedDraft->rules,
+                );
+            } catch (RuntimeException $exception) {
+                throw ValidationException::withMessages([
+                    'rules' => $exception->getMessage(),
+                ]);
+            }
             $this->rulesWriter->assertSystemCoreRulesForActivation($locked, $lockedDraft->rules);
 
             $previousActiveId = $locked->active_version_id;
@@ -779,7 +785,7 @@ final class FieldSetVersionAdminWriter
 
             $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
             $this->rules->assertRulesCompatibleWithDefinitions(
-                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
+                $this->ruleDefinitionsFromMemberships($locked, $lockedDraft->fields),
                 $lockedDraft->rules,
             );
 
@@ -869,7 +875,7 @@ final class FieldSetVersionAdminWriter
 
             $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
             $this->rules->assertRulesCompatibleWithDefinitions(
-                $this->ruleDefinitionsFromMemberships($lockedDraft->fields),
+                $this->ruleDefinitionsFromMemberships($locked, $lockedDraft->fields),
                 $lockedDraft->rules,
             );
 
@@ -990,7 +996,7 @@ final class FieldSetVersionAdminWriter
      * @param  iterable<int, FieldSetVersionField>  $memberships
      * @return array<string, object>
      */
-    private function ruleDefinitionsFromMemberships(iterable $memberships): array
+    private function ruleDefinitionsFromMemberships(FieldSet $fieldSet, iterable $memberships): array
     {
         $defsByKey = [];
         foreach ($memberships as $membership) {
@@ -1008,6 +1014,10 @@ final class FieldSetVersionAdminWriter
                 'field_type' => $definition->field_type,
                 'scope' => $definition->scope,
                 'options_json' => $options,
+                'action_target_readonly' => AdminFieldSetCatalog::isCalcOriginActionTarget(
+                    $fieldSet->key,
+                    $definition->key,
+                ),
             ];
         }
 
