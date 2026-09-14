@@ -22,6 +22,7 @@ use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
+use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -1159,6 +1160,17 @@ final class CalculationWriter
     public function mergeProposalHourlyDistribution(array $positions, array $proposalPayload): array
     {
         $proposedPositions = $proposalPayload['positions'] ?? [];
+        $priceYear = PriceListYearSelection::resolveYearFromPayload($proposalPayload);
+        /** @var array<int, int> $expectedByInventory */
+        $expectedByInventory = [];
+        $identity = $proposalPayload['price_list_identity'] ?? null;
+        if (is_array($identity)) {
+            foreach ($identity as $inventoryId => $row) {
+                if (is_array($row) && isset($row['price_list_id'])) {
+                    $expectedByInventory[(int) $inventoryId] = (int) $row['price_list_id'];
+                }
+            }
+        }
         /** @var array<int, array<string, mixed>> $proposedByInventory */
         $proposedByInventory = [];
         foreach ($proposedPositions as $proposedPosition) {
@@ -1184,7 +1196,12 @@ final class CalculationWriter
             }
 
             $seenInventoryIds[] = $inventoryId;
-            $merged[] = $this->positionFromHourlyProposal($position, $proposed);
+            $merged[] = $this->positionFromHourlyProposal(
+                $position,
+                $proposed,
+                $priceYear,
+                $expectedByInventory[$inventoryId] ?? null,
+            );
         }
 
         foreach ($proposedPositions as $proposed) {
@@ -1195,7 +1212,7 @@ final class CalculationWriter
 
             $merged[] = $this->positionFromHourlyProposal([
                 'client_key' => (string) Str::uuid(),
-            ], $proposed);
+            ], $proposed, $priceYear, $expectedByInventory[$inventoryId] ?? null);
         }
 
         return $merged;
@@ -1206,8 +1223,12 @@ final class CalculationWriter
      * @param  array<string, mixed>  $proposed
      * @return array<string, mixed>
      */
-    private function positionFromHourlyProposal(array $position, array $proposed): array
-    {
+    private function positionFromHourlyProposal(
+        array $position,
+        array $proposed,
+        int $priceYear,
+        ?int $expectedPriceListId = null,
+    ): array {
         $timeRanges = [];
         $planRows = [];
 
@@ -1237,6 +1258,10 @@ final class CalculationWriter
         $position['needs_spot_redistribution'] = false;
         $position['time_ranges'] = $timeRanges;
         $position['plan_rows'] = $planRows;
+        $position['price_year'] = $priceYear;
+        if ($expectedPriceListId !== null) {
+            $position['expected_price_list_id'] = $expectedPriceListId;
+        }
 
         if (isset($proposed['position_discounts']) && is_array($proposed['position_discounts'])) {
             $position['position_discounts'] = $proposed['position_discounts'];
@@ -1553,6 +1578,7 @@ final class CalculationWriter
         $payload = $proposal->payloadArray();
         $input = [
             'target_budget_nn' => (string) $proposal->target_budget_nn,
+            'price_year' => PriceListYearSelection::resolveYearFromPayload($payload),
             'budget_elements' => is_array($payload['budget_elements'] ?? null) ? $payload['budget_elements'] : [],
             'order_discounts' => is_array($payload['order_discounts'] ?? null) ? $payload['order_discounts'] : [],
             'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
@@ -1592,6 +1618,7 @@ final class CalculationWriter
     {
         $payload = $proposal->payloadArray();
         $elements = is_array($payload['budget_elements'] ?? null) ? $payload['budget_elements'] : [];
+        $priceYear = PriceListYearSelection::resolveYearFromPayload($payload);
         $calculation->loadMissing('positions');
         $firstPosition = $calculation->positions->first();
         $mediumId = $firstPosition === null ? 0 : (int) $firstPosition->advertising_medium_id;
@@ -1604,7 +1631,7 @@ final class CalculationWriter
             if ($inventoryId < 1 || $mediumId < 1) {
                 continue;
             }
-            $catalog = $this->catalog->resolveInventoryForBudget($inventoryId, $mediumId);
+            $catalog = $this->catalog->resolveInventoryForBudget($inventoryId, $mediumId, $priceYear);
             $expectedId = (int) $catalog['priceList']->id;
             $position = $calculation->positions->firstWhere('inventory_id', $inventoryId);
             if ($position !== null && (int) $position->price_list_id !== $expectedId) {

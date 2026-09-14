@@ -15,6 +15,7 @@ use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
 use App\Support\PriceList\PriceListCalendar;
+use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -54,6 +55,9 @@ final class CatalogResolver
 
         $inventoryChanged = $existing !== null && $inventoryId !== $existing->inventory_id;
         $mediumChanged = $existing !== null && $mediumId !== $existing->advertising_medium_id;
+        $priceYearChanged = $existing !== null
+            && ! $inventoryChanged
+            && $this->shouldRebindPriceYear($position, $existing);
 
         if ($existing !== null && ! $mediumChanged) {
             // Lesen des gespeicherten Keys: forExecution=false erlaubt unbekannte historische Versionen.
@@ -64,6 +68,17 @@ final class CatalogResolver
             if ($methodUnchanged) {
                 if ($inventoryChanged) {
                     return $this->resolveInventoryChangeKeepingFreeze(
+                        $position,
+                        $existing,
+                        $inventoryId,
+                        $mediumId,
+                        $inventoryChanged,
+                        $mediumChanged,
+                    );
+                }
+
+                if ($priceYearChanged) {
+                    return $this->resolvePriceYearRebindKeepingFreeze(
                         $position,
                         $existing,
                         $inventoryId,
@@ -277,10 +292,114 @@ final class CatalogResolver
             ]);
         }
 
-        $priceList = $this->activePriceList($inventory->id);
+        $priceList = $this->bindActivePriceListForLive($position, $inventory);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'positions' => $this->missingCurrentYearPriceListMessage($inventory->name),
+                'positions' => $this->missingYearPriceListMessage(
+                    $inventory->name,
+                    $this->livePriceYearFromPayload($position),
+                ),
+            ]);
+        }
+
+        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+            $position,
+            $priceList,
+            $inventory->name,
+            $existing,
+            useSnapshot: false,
+        );
+
+        return [
+            'inventory' => $inventory,
+            'medium' => $medium,
+            'rule' => $rule,
+            'priceList' => $priceList,
+            'rows' => $rows,
+            'time_ranges' => $timeRanges,
+            'needs_spot_redistribution' => $needsRedistribution,
+            'total_spot_count' => $totalSpotCount,
+            'spot_method' => $freeze->legacySpotMethod(),
+            'freeze' => $freeze,
+            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
+            'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
+            'inventory_medium_rule_id' => $rule->id,
+            'inventory_changed' => $inventoryChanged,
+            'medium_changed' => $mediumChanged,
+        ];
+    }
+
+    /**
+     * PO-PRI-YEAR-1: bewusster Jahrwechsel an bestehender Position (Freeze bleibt).
+     *
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
+    private function resolvePriceYearRebindKeepingFreeze(
+        array $position,
+        CalculationPosition $existing,
+        int $inventoryId,
+        int $mediumId,
+        bool $inventoryChanged,
+        bool $mediumChanged,
+    ): array {
+        $freeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: true);
+
+        $inventory = Inventory::query()
+            ->whereKey($inventoryId)
+            ->where('is_active', true)
+            ->first();
+
+        if ($inventory === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Sender oder Kombi ist unbekannt oder inaktiv.',
+            ]);
+        }
+
+        $medium = AdvertisingMedium::query()->find($mediumId);
+        if ($medium === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Das gespeicherte Werbemittel ist ungültig.',
+            ]);
+        }
+
+        $rule = InventoryMediumRule::query()
+            ->where('inventory_id', $inventory->id)
+            ->where('advertising_medium_id', $medium->id)
+            ->where('is_active', true)
+            ->first();
+
+        if ($rule === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Die Kombination Sender/Werbemittel ist nicht zulässig.',
+            ]);
+        }
+
+        $priceList = $this->bindActivePriceListForLive($position, $inventory);
+        if ($priceList === null) {
+            throw ValidationException::withMessages([
+                'positions' => $this->missingYearPriceListMessage(
+                    $inventory->name,
+                    $this->livePriceYearFromPayload($position),
+                ),
             ]);
         }
 
@@ -393,10 +512,13 @@ final class CatalogResolver
             throw $exception;
         }
 
-        $priceList = $this->activePriceList($inventory->id);
+        $priceList = $this->bindActivePriceListForLive($position, $inventory);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'positions' => $this->missingCurrentYearPriceListMessage($inventory->name),
+                'positions' => $this->missingYearPriceListMessage(
+                    $inventory->name,
+                    $this->livePriceYearFromPayload($position),
+                ),
             ]);
         }
 
@@ -441,12 +563,72 @@ final class CatalogResolver
             ->first();
     }
 
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function shouldRebindPriceYear(array $position, CalculationPosition $existing): bool
+    {
+        if (! array_key_exists('price_year', $position) || $position['price_year'] === null || $position['price_year'] === '') {
+            return false;
+        }
+
+        $pinnedYear = $this->pinnedPriceYear($existing);
+        if ($pinnedYear === null) {
+            return true;
+        }
+
+        return (int) $position['price_year'] !== $pinnedYear;
+    }
+
+    private function pinnedPriceYear(CalculationPosition $existing): ?int
+    {
+        if ($existing->relationLoaded('priceList') && $existing->priceList !== null) {
+            return (int) $existing->priceList->year;
+        }
+
+        $year = PriceList::query()->whereKey($existing->price_list_id)->value('year');
+
+        return $year === null ? null : (int) $year;
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function livePriceYearFromPayload(array $position): int
+    {
+        return PriceListYearSelection::resolveYearFromPayload($position);
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function bindActivePriceListForLive(array $position, Inventory $inventory): ?PriceList
+    {
+        $year = $this->livePriceYearFromPayload($position);
+        PriceListYearSelection::assertAllowedLiveYear($year, 'positions');
+
+        $priceList = $this->activePriceList($inventory->id, $year);
+        if ($priceList === null) {
+            return null;
+        }
+
+        PriceListYearSelection::assertExpectedMatchesResolved(
+            $position['expected_price_list_id'] ?? null,
+            $priceList,
+        );
+
+        return $priceList;
+    }
+
+    private function missingYearPriceListMessage(string $inventoryName, int $year): string
+    {
+        return PriceListYearSelection::missingYearPriceListMessage($inventoryName, $year);
+    }
+
+    /** @deprecated Use missingYearPriceListMessage */
     private function missingCurrentYearPriceListMessage(string $inventoryName): string
     {
-        $year = PriceListCalendar::currentYear();
-
-        return 'Für '.$inventoryName.' liegt keine aktive Preisliste für '.$year
-            .' vor. Eine andere Jahrespreisliste wird nicht automatisch verwendet.';
+        return $this->missingYearPriceListMessage($inventoryName, PriceListCalendar::currentYear());
     }
 
     /**
@@ -737,7 +919,7 @@ final class CatalogResolver
      *     inventory_medium_rule_id: int
      * }
      */
-    public function resolveInventoryForBudget(int $inventoryId, int $mediumId): array
+    public function resolveInventoryForBudget(int $inventoryId, int $mediumId, ?int $priceYear = null): array
     {
         $inventory = Inventory::query()->find($inventoryId);
         if ($inventory === null || ! $inventory->is_active) {
@@ -787,10 +969,13 @@ final class CatalogResolver
             ]);
         }
 
-        $priceList = $this->activePriceList($inventory->id);
+        $year = $priceYear ?? PriceListCalendar::currentYear();
+        PriceListYearSelection::assertAllowedLiveYear($year, 'price_year');
+
+        $priceList = $this->activePriceList($inventory->id, $year);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'budget_wish_inventory_ids' => $this->missingCurrentYearPriceListMessage($inventory->name),
+                'budget_wish_inventory_ids' => $this->missingYearPriceListMessage($inventory->name, $year),
             ]);
         }
 

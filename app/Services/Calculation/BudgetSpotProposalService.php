@@ -9,6 +9,7 @@ use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
+use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -60,7 +61,20 @@ final class BudgetSpotProposalService
         $elementConfigs = [];
 
         foreach ($elements as $element) {
-            $catalog = $this->catalog->resolveInventoryForBudget($element['inventory_id'], $mediumId);
+            $catalog = $this->catalog->resolveInventoryForBudget(
+                $element['inventory_id'],
+                $mediumId,
+                PriceListYearSelection::resolveYearFromPayload($payload),
+            );
+            PriceListYearSelection::assertExpectedMatchesResolved(
+                is_array($payload['expected_price_list_ids'] ?? null)
+                    ? ($payload['expected_price_list_ids'][$element['inventory_id']]
+                        ?? $payload['expected_price_list_ids'][(string) $element['inventory_id']]
+                        ?? null)
+                    : null,
+                $catalog['priceList'],
+                'Die aktive Preisliste hat sich geändert. Bitte den Budgetvorschlag neu berechnen.',
+            );
             $buckets = $this->buildBuckets($element['distribution_ranges']);
             if ($buckets === []) {
                 throw ValidationException::withMessages([
@@ -122,9 +136,8 @@ final class BudgetSpotProposalService
             ? Decimal::roundMoney(Decimal::sub($nextPackageCost, $target))
             : '0.00';
 
-        $inputFingerprint = $this->fingerprint->compute(
-            $this->fingerprint->inputFromElements($payload, $elements, $catalogs),
-        );
+        $inputFingerprintPayload = $this->fingerprint->inputFromElements($payload, $elements, $catalogs);
+        $inputFingerprint = $this->fingerprint->compute($inputFingerprintPayload);
 
         $budgetElementsPayload = array_map(
             fn (array $element): array => [
@@ -153,6 +166,8 @@ final class BudgetSpotProposalService
             'next_package_exceeds_budget' => $nextPackageExceeds,
             'next_package_shortfall' => $nextPackageShortfall,
             'input_fingerprint' => $inputFingerprint,
+            'price_year' => PriceListYearSelection::resolveYearFromPayload($payload),
+            'price_list_identity' => $inputFingerprintPayload['price_list_identity'] ?? [],
             'budget_elements' => $budgetElementsPayload,
             'wish_inventory_ids' => $wishInventoryIds,
             'spot_length_seconds' => $elementConfigs[0]['length_seconds'] ?? 0,

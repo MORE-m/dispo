@@ -35,6 +35,8 @@ use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use App\Support\Inventory\InventoryIdentity;
+use App\Support\PriceList\PriceListCalendar;
+use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -525,6 +527,11 @@ class CalculationController extends Controller
                 'inventories' => $inventories,
                 'media' => $media,
                 'rules' => $rules,
+                'price_years_by_inventory' => PriceListYearSelection::optionsByInventoryIds(
+                    $inventories->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                ),
+                'current_price_year' => PriceListCalendar::currentYear(),
+                'next_price_year' => PriceListCalendar::nextYear(),
             ],
             'dayGroups' => DayGroup::options(),
             'discountTypes' => DiscountType::options(),
@@ -552,6 +559,8 @@ class CalculationController extends Controller
                 'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($calculation): array {
                     $snapshot = $calculation->configurationSnapshot;
                     $positionFieldSchema = $this->positionFieldSchemaProp($calculation, $position);
+                    $position->loadMissing('priceList');
+                    $pinnedList = $position->priceList;
 
                     return [
                         'id' => $position->id,
@@ -568,6 +577,10 @@ class CalculationController extends Controller
                         'length_seconds' => $position->length_seconds,
                         'total_spot_count' => $position->total_spot_count,
                         'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
+                        'price_year' => $pinnedList !== null ? (int) $pinnedList->year : null,
+                        'price_list_version' => $position->price_list_version,
+                        'price_list_status' => $pinnedList?->status?->value,
+                        'expected_price_list_id' => $position->price_list_id,
                         'position_discount_percent' => (string) $position->position_discount_percent,
                         'ae_percent' => (string) $position->ae_percent,
                         'plan_rows' => $position->planRows->map(fn (SpotClassicPlanRow $row): array => [
