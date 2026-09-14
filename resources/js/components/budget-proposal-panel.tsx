@@ -38,6 +38,7 @@ export type BudgetSpotProposal = {
     target_budget_nn: string;
     used_nn: string;
     nn_invest: string;
+    price_year?: number;
     remainder: string;
     spots_per_sender?: number;
     total_spots?: number;

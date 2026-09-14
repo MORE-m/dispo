@@ -14,6 +14,7 @@ import {
     type BudgetElementDraft,
 } from '@/lib/budget-planning';
 import type { DayGroupOption } from '@/lib/pricing-time';
+import type { PriceYearOption } from '@/lib/price-list-year-selection';
 
 export function BudgetElementsStep({
     elements,
@@ -21,6 +22,9 @@ export function BudgetElementsStep({
     dayGroups,
     canEdit,
     fieldErrors,
+    priceYear,
+    priceYearOptions,
+    onPriceYearChange,
     onChange,
 }: {
     elements: BudgetElementDraft[];
@@ -32,9 +36,15 @@ export function BudgetElementsStep({
     dayGroups: DayGroupOption[];
     canEdit: boolean;
     fieldErrors: Record<string, string[]>;
+    priceYear: number;
+    priceYearOptions: PriceYearOption[];
+    onPriceYearChange: (year: number) => void;
     onChange: (elements: BudgetElementDraft[]) => void;
 }) {
     const activeInventories = inventories.filter((item) => item.is_active);
+    const selectedYearOption = priceYearOptions.find(
+        (option) => option.year === priceYear,
+    );
 
     function updateElement(index: number, patch: Partial<BudgetElementDraft>) {
         onChange(
@@ -58,6 +68,54 @@ export function BudgetElementsStep({
 
     return (
         <div className="space-y-4" data-test="budget-elements-step">
+            <Card className={wizardCardClass} data-test="budget-price-year-card">
+                <CardHeader className={wizardCardHeaderClass}>
+                    <CardTitle className={wizardCardTitleClass}>
+                        Preisjahr
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className={`${wizardCardContentClass} space-y-2`}>
+                    <FormField
+                        label="Preisjahr für alle Werbeelemente"
+                        htmlFor="budget-price-year"
+                        hint="Das Folgejahr erscheint nur, wenn jedes gewählte Inventar eine aktive Folgejahresliste besitzt."
+                    >
+                        <select
+                            id="budget-price-year"
+                            data-test="budget-price-year"
+                            className={formSelectClass}
+                            value={priceYear}
+                            disabled={!canEdit}
+                            onChange={(event) =>
+                                onPriceYearChange(Number(event.target.value))
+                            }
+                        >
+                            {priceYearOptions.map((option) => (
+                                <option
+                                    key={option.year}
+                                    value={option.year}
+                                    disabled={!option.available}
+                                >
+                                    {option.year}
+                                    {option.available
+                                        ? ''
+                                        : ' · keine aktive Liste'}
+                                </option>
+                            ))}
+                        </select>
+                    </FormField>
+                    {selectedYearOption && !selectedYearOption.available ? (
+                        <p
+                            className="text-destructive text-xs"
+                            data-test="budget-price-year-missing"
+                        >
+                            Für mindestens ein Inventar fehlt die aktive
+                            Preisliste dieses Jahres. Vorschlag und Übernahme
+                            sind blockiert.
+                        </p>
+                    ) : null}
+                </CardContent>
+            </Card>
             {elements.map((element, index) => {
                 const inventory = inventories.find(
                     (item) => item.id === element.inventory_id,
