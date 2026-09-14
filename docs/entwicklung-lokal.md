@@ -131,6 +131,10 @@ Kanonischer Vertrag (kein erfundenes MORE-Layout):
 - Jahr in der UI; Workbook-Jahr falls vorhanden muss übereinstimmen
 - Aliase nur dokumentiert: `radio ffn`, `BOLLERWAGEN`
 - Import erzeugt Drafts; Aktivierung über bestehenden Lifecycle
+- Formeln werden nicht ausgewertet (`formula_not_allowed`)
+- Preflight vor Materialisierung: max. 50 MB, 20 Blätter, 5 000 Zeilen/Blatt,
+  32 Spalten, 10 000 Datenzeilen gesamt
+- Upload zuerst unter `temporary/price-list-imports/`, danach privater Archivpfad
 
 E2E: `npx playwright test -c playwright.blp401b.config.ts` (Port 8018).
 

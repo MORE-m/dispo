@@ -13,10 +13,12 @@ use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\Inventory;
 use App\Models\PriceList;
+use App\Models\PriceListImport;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\PriceList\Admin\PriceListAdminWriter;
 use App\Services\PriceList\Admin\PriceListImpactPreviewService;
+use App\Services\PriceList\Import\PriceListImportService;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -165,6 +167,13 @@ try {
                 $position = $updated->positions()->first();
 
                 return 'OK:apply_budget|'.$updated->id.'|'.($position?->price_list_id ?? 0).'|'.$updated->positions()->count();
+            })(),
+            'confirm_price_list_import' => (function () use ($app, $actor, $payload): string {
+                $import = PriceListImport::query()->findOrFail((int) $payload['import_id']);
+                $lists = $app->make(PriceListImportService::class)
+                    ->confirm($import, (string) $payload['fingerprint'], $actor);
+
+                return 'OK:confirm_price_list_import|'.$import->fresh()->status->value.'|'.count($lists);
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),
         };

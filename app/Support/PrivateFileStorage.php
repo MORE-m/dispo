@@ -26,6 +26,11 @@ class PrivateFileStorage
         return $this->disk()->put($path, $contents);
     }
 
+    public function move(string $from, string $to): bool
+    {
+        return $this->disk()->move($from, $to);
+    }
+
     public function get(string $path): ?string
     {
         return $this->disk()->get($path);

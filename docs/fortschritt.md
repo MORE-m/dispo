@@ -29,6 +29,8 @@ Preview, atomare Draft-Erzeugung ohne Auto-Aktivierung.
 | PhpSpreadsheet Parser (XLSX/XLS), kanonischer Spaltenvertrag | **umgesetzt** |
 | Inventarauflösung Code/Name + dokumentierte Aliase | **umgesetzt** |
 | Preview mit Fingerprint, Confirm atomar je Inventar/Jahr | **umgesetzt** |
+| Formeln fail-closed + Workbook-Preflight vor Materialisierung | **umgesetzt** |
+| Upload temp→Archiv, Confirm-Audit in derselben Transaktion | **umgesetzt** |
 | PO-PRI-HOURS-1 sparse Stunden im Import | **umgesetzt** |
 | E2E isoliert: `playwright.blp401b.config.ts` (Port 8018) | **umgesetzt** |
 | MORE-Produktiv-Workbook-Mapping | **offen** (Beispieldatei) |

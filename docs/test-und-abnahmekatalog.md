@@ -33,8 +33,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Upload XLSX/XLS → strukturelle Prüfung → Preview → Bestätigung → neue Drafts
 - keine Auto-Aktivierung; Aktivierung nur über BL-P4-01a-Lifecycle
 - kanonischer Spaltenvertrag; inventarauflösung Code/Name + dokumentierte Aliase
-- atomar je Importlauf (mehrere Inventare möglich, keine Teilübernahme)
-- Importdatei privat, Report JSON auditierbar
+- Formeln fail-closed (`formula_not_allowed`); Preflight vor Materialisierung
+- atomar je Importlauf (mehrere Inventare möglich, keine Teilübernahme; Confirm-Audit in derselben Transaktion)
+- Importdatei privat (temp→Archiv), Report JSON auditierbar
 - isolierte Playwright-Suite `playwright.blp401b.config.ts` (Port 8018)
 
 ## Mindestabnahme

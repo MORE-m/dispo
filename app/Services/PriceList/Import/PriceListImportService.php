@@ -5,6 +5,7 @@ namespace App\Services\PriceList\Import;
 use App\Enums\DayGroup;
 use App\Enums\PriceListImportStatus;
 use App\Exceptions\PriceListAdminConflictException;
+use App\Models\AuditEvent;
 use App\Models\Inventory;
 use App\Models\PriceList;
 use App\Models\PriceListImport;
@@ -51,26 +52,59 @@ final class PriceListImportService
 
         $checksum = hash('sha256', $binary);
         $storedName = Str::uuid()->toString().'.'.$extension;
-        $path = PriceListImportLimits::STORAGE_PREFIX.$storedName;
-        $this->files->put($path, $binary);
+        $temporaryPath = PriceListImportLimits::TEMPORARY_UPLOAD_PREFIX.$storedName;
+        $finalPath = PriceListImportLimits::STORAGE_PREFIX.$storedName;
 
-        $import = PriceListImport::query()->create([
-            'user_id' => $actor->id,
-            'year' => $year,
-            'status' => PriceListImportStatus::Uploaded,
-            'original_filename' => mb_substr($file->getClientOriginalName(), 0, 255),
-            'stored_path' => $path,
-            'checksum_sha256' => $checksum,
-            'mime_type' => $file->getMimeType(),
-            'file_size' => strlen($binary),
-        ]);
+        $written = $this->files->put($temporaryPath, $binary);
+        if ($written === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gespeichert werden.',
+            ]);
+        }
 
-        $this->audit->record($import, 'price_list_import.uploaded', $actor, null, [
-            'year' => $year,
-            'original_filename' => $import->original_filename,
-            'checksum_sha256' => $checksum,
-            'file_size' => $import->file_size,
-        ]);
+        try {
+            $import = DB::transaction(function () use ($actor, $year, $file, $finalPath, $checksum, $binary): PriceListImport {
+                $import = PriceListImport::query()->create([
+                    'user_id' => $actor->id,
+                    'year' => $year,
+                    'status' => PriceListImportStatus::Uploaded,
+                    'original_filename' => mb_substr($file->getClientOriginalName(), 0, 255),
+                    'stored_path' => $finalPath,
+                    'checksum_sha256' => $checksum,
+                    'mime_type' => $file->getMimeType(),
+                    'file_size' => strlen($binary),
+                ]);
+
+                $this->audit->record($import, 'price_list_import.uploaded', $actor, null, [
+                    'year' => $year,
+                    'original_filename' => $import->original_filename,
+                    'checksum_sha256' => $checksum,
+                    'file_size' => $import->file_size,
+                ]);
+
+                return $import;
+            });
+
+            if (! $this->files->move($temporaryPath, $finalPath)) {
+                $this->compensateFailedUploadArchive($import, $temporaryPath);
+
+                throw ValidationException::withMessages([
+                    'file' => 'Die Datei konnte nicht in den privaten Archivpfad übernommen werden.',
+                ]);
+            }
+        } catch (ValidationException $exception) {
+            $this->cleanupTemporaryUpload($temporaryPath);
+
+            throw $exception;
+        } catch (Throwable $exception) {
+            $this->cleanupTemporaryUpload($temporaryPath);
+
+            throw ValidationException::withMessages([
+                'file' => 'Der Upload konnte nicht persistent gespeichert werden.',
+            ]);
+        }
+
+        $this->cleanupTemporaryUpload($temporaryPath);
 
         return $import;
     }
@@ -173,7 +207,7 @@ final class PriceListImportService
         }
 
         try {
-            $created = DB::transaction(function () use ($import, $preview, $actor): array {
+            return DB::transaction(function () use ($import, $preview, $actor): array {
                 /** @var PriceListImport $locked */
                 $locked = PriceListImport::query()->whereKey($import->id)->lockForUpdate()->firstOrFail();
                 if ($locked->status === PriceListImportStatus::Imported) {
@@ -209,41 +243,44 @@ final class PriceListImportService
                     ], $actor);
                 }
 
-                $locked->status = PriceListImportStatus::Imported;
-                $locked->report = $preview;
-                $locked->fingerprint = $preview['fingerprint'];
-                $locked->created_price_list_ids = array_map(
+                $priceListIds = array_map(
                     fn (PriceList $list): int => (int) $list->id,
                     $lists,
                 );
+
+                $locked->status = PriceListImportStatus::Imported;
+                $locked->report = $preview;
+                $locked->fingerprint = $preview['fingerprint'];
+                $locked->created_price_list_ids = $priceListIds;
                 $locked->confirmed_at = now();
                 $locked->completed_at = now();
                 $locked->save();
+
+                $this->audit->record($locked, 'price_list_import.confirmed', $actor, null, [
+                    'year' => (int) $locked->year,
+                    'checksum_sha256' => $locked->checksum_sha256,
+                    'price_list_ids' => $priceListIds,
+                    'inventory_ids' => array_values(array_unique(array_map(
+                        fn (array $draft): int => (int) $draft['inventory_id'],
+                        $preview['drafts'],
+                    ))),
+                    'valid_row_count' => $preview['valid_row_count'],
+                    'warning_count' => $preview['warning_count'],
+                ]);
 
                 return $lists;
             });
         } catch (ValidationException|PriceListAdminConflictException $exception) {
             throw $exception;
         } catch (Throwable $exception) {
-            $import->status = PriceListImportStatus::Failed;
-            $import->failed_at = now();
-            $import->save();
+            $import->refresh();
+            if ($import->status !== PriceListImportStatus::Imported) {
+                $import->status = PriceListImportStatus::Failed;
+                $import->failed_at = now();
+                $import->save();
+            }
             throw $exception;
         }
-
-        $this->audit->record($import->fresh() ?? $import, 'price_list_import.confirmed', $actor, null, [
-            'year' => (int) $import->year,
-            'checksum_sha256' => $import->checksum_sha256,
-            'price_list_ids' => array_map(fn (PriceList $list): int => (int) $list->id, $created),
-            'inventory_ids' => array_values(array_unique(array_map(
-                fn (array $draft): int => (int) $draft['inventory_id'],
-                $preview['drafts'],
-            ))),
-            'valid_row_count' => $preview['valid_row_count'],
-            'warning_count' => $preview['warning_count'],
-        ]);
-
-        return $created;
     }
 
     /**
@@ -547,5 +584,31 @@ final class PriceListImportService
         }
 
         return rtrim($diskRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.ltrim($path, DIRECTORY_SEPARATOR);
+    }
+
+    private function cleanupTemporaryUpload(string $temporaryPath): void
+    {
+        if (! $this->files->exists($temporaryPath)) {
+            return;
+        }
+
+        try {
+            $this->files->deleteTemporary($temporaryPath);
+        } catch (Throwable) {
+            // Best effort: kein persistentes Archiv belassen.
+        }
+    }
+
+    private function compensateFailedUploadArchive(PriceListImport $import, string $temporaryPath): void
+    {
+        $this->cleanupTemporaryUpload($temporaryPath);
+
+        AuditEvent::query()
+            ->where('auditable_type', $import::class)
+            ->where('auditable_id', $import->id)
+            ->where('action', 'price_list_import.uploaded')
+            ->delete();
+
+        $import->delete();
     }
 }

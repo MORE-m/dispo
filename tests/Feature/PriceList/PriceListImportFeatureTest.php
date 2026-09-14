@@ -10,7 +10,9 @@ use App\Models\PriceList;
 use App\Models\PriceListImport;
 use App\Models\PriceListItem;
 use App\Models\User;
+use App\Support\PriceList\Import\PriceListImportLimits;
 use App\Support\PriceList\PriceListCalendar;
+use App\Support\PrivateFileStorage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -199,6 +201,150 @@ class PriceListImportFeatureTest extends TestCase
                 ->where('name', 'like', 'Import %')
                 ->count(),
         );
+    }
+
+    public function test_formula_workbook_blocks_confirm_and_creates_nothing(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = tempnam(sys_get_temp_dir(), 'pli').'.xlsx';
+        PriceListImportWorkbookFactory::withFormulas($path);
+
+        $preview = $this->actingAs($admin)->post(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'formula.xlsx', null, null, true),
+        ])->assertOk()->json();
+
+        $this->assertFalse($preview['preview']['can_proceed']);
+        $codes = array_column($preview['preview']['issues'], 'code');
+        $this->assertContains('formula_not_allowed', $codes);
+
+        $this->actingAs($admin)->postJson($preview['urls']['confirm'], [
+            'fingerprint' => $preview['preview']['fingerprint'],
+        ])->assertStatus(422);
+
+        $this->assertSame(0, PriceList::query()->where('name', 'like', 'Import %')->count());
+        $this->assertSame(0, AuditEvent::query()->where('action', 'price_list_import.confirmed')->count());
+    }
+
+    public function test_xls_happy_path_creates_draft(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = tempnam(sys_get_temp_dir(), 'pli').'.xls';
+        PriceListImportWorkbookFactory::canonicalFlat($path, [
+            ['RH', 8, 'mo_fr', '1.2500'],
+        ], format: 'xls');
+
+        $preview = $this->actingAs($admin)->post(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'prices.xls', 'application/vnd.ms-excel', null, true),
+        ])->assertOk()->json();
+
+        $this->assertTrue($preview['preview']['can_proceed']);
+        $this->actingAs($admin)->postJson($preview['urls']['confirm'], [
+            'fingerprint' => $preview['preview']['fingerprint'],
+        ])->assertOk();
+
+        $draft = PriceList::query()->where('name', 'like', 'Import %RH')->firstOrFail();
+        $this->assertSame(PriceListStatus::Draft, $draft->status);
+        $this->assertSame(1, $draft->items()->count());
+    }
+
+    public function test_upload_storage_put_failure_creates_no_import(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = $this->xlsxPath([['RH', 8, 'mo_fr', '1.0000']]);
+
+        $files = \Mockery::mock(PrivateFileStorage::class);
+        $files->shouldReceive('put')->once()->andReturn(false);
+        $this->app->instance(PrivateFileStorage::class, $files);
+
+        $this->actingAs($admin)->postJson(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'fail.xlsx', null, null, true),
+        ])->assertStatus(422);
+
+        $this->assertSame(0, PriceListImport::query()->count());
+        $this->assertSame(0, AuditEvent::query()->where('action', 'price_list_import.uploaded')->count());
+    }
+
+    public function test_upload_db_failure_after_temp_cleans_temporary_and_creates_no_import(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = $this->xlsxPath([['RH', 8, 'mo_fr', '1.0000']]);
+        $disk = Storage::disk(config('dispo.files_disk'));
+        $archiveBefore = $disk->allFiles(PriceListImportLimits::STORAGE_PREFIX);
+
+        AuditEvent::creating(function (AuditEvent $event): void {
+            if ($event->action === 'price_list_import.uploaded') {
+                throw new \RuntimeException('upload audit boom');
+            }
+        });
+
+        $this->actingAs($admin)->postJson(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'tempfail.xlsx', null, null, true),
+        ])->assertStatus(422);
+
+        $this->assertSame(0, PriceListImport::query()->count());
+        $this->assertSame([], $disk->allFiles(PriceListImportLimits::TEMPORARY_UPLOAD_PREFIX));
+        $this->assertSame($archiveBefore, $disk->allFiles(PriceListImportLimits::STORAGE_PREFIX));
+    }
+
+    public function test_upload_happy_path_stores_private_final_without_temp_artifact(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = $this->xlsxPath([['RH', 8, 'mo_fr', '1.0000']]);
+        $disk = Storage::disk(config('dispo.files_disk'));
+
+        $preview = $this->actingAs($admin)->post(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'ok.xlsx', null, null, true),
+        ])->assertOk()->json();
+
+        $import = PriceListImport::query()->findOrFail($preview['import']['id']);
+        $this->assertTrue(str_starts_with($import->stored_path, PriceListImportLimits::STORAGE_PREFIX));
+        $this->assertFalse(str_starts_with($import->stored_path, PrivateFileStorage::TEMPORARY_PREFIX));
+        $disk->assertExists($import->stored_path);
+        $this->assertSame([], $disk->allFiles(PriceListImportLimits::TEMPORARY_UPLOAD_PREFIX));
+        $this->assertSame(1, AuditEvent::query()->where('action', 'price_list_import.uploaded')->count());
+    }
+
+    public function test_confirm_audit_failure_rolls_back_drafts_and_status(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = $this->xlsxPath([['RH', 8, 'mo_fr', '1.0000']]);
+
+        $preview = $this->actingAs($admin)->post(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'audit.xlsx', null, null, true),
+        ])->assertOk()->json();
+
+        AuditEvent::creating(function (AuditEvent $event): void {
+            if ($event->action === 'price_list_import.confirmed') {
+                throw new \RuntimeException('confirm audit boom');
+            }
+        });
+
+        $this->actingAs($admin)->postJson($preview['urls']['confirm'], [
+            'fingerprint' => $preview['preview']['fingerprint'],
+        ])->assertStatus(500);
+
+        $import = PriceListImport::query()->findOrFail($preview['import']['id']);
+        $this->assertNotSame(PriceListImportStatus::Imported, $import->status);
+        $this->assertSame(0, PriceList::query()->where('name', 'like', 'Import %')->count());
+        $this->assertSame(0, AuditEvent::query()->where('action', 'price_list_import.confirmed')->count());
     }
 
     /**

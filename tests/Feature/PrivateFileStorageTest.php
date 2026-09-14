@@ -49,4 +49,18 @@ class PrivateFileStorageTest extends TestCase
 
         app(PrivateFileStorage::class)->deleteTemporary('uploads/kept.txt');
     }
+
+    public function test_move_relocates_file(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+
+        $storage = app(PrivateFileStorage::class);
+        $from = PrivateFileStorage::TEMPORARY_PREFIX.'src.bin';
+        $to = 'price-list-imports/dst.bin';
+        $storage->put($from, 'payload');
+
+        $this->assertTrue($storage->move($from, $to));
+        Storage::disk((string) config('dispo.files_disk'))->assertMissing($from);
+        Storage::disk((string) config('dispo.files_disk'))->assertExists($to);
+    }
 }
