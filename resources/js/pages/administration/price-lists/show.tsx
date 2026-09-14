@@ -447,13 +447,13 @@ export default function PriceListShow({
                         />
                     </FormField>
                     <p className="text-muted-foreground text-sm">
-                        Basispreise je Tagesgruppe und Stunde. Leeres Feld =
-                        für diese Tagesgruppe/Stunde nicht buchbar (kein Preis
-                        0). Mo–Sa und Mo–So erscheinen nur, wenn die
-                        erforderlichen Basispreise vorhanden sind; sonst „—“.
-                        Stunden dürfen je Tagesgruppe unterschiedlich sein.
-                        Aktivierung braucht mindestens einen Basispreis, keine
-                        vollständige 24×3-Matrix.
+                        Basispreise je Tagesgruppe und Stunde. Leeres Feld = für
+                        diese Tagesgruppe/Stunde nicht buchbar (kein Preis 0).
+                        Mo–Sa und Mo–So erscheinen nur, wenn die erforderlichen
+                        Basispreise vorhanden sind; sonst „—“. Stunden dürfen je
+                        Tagesgruppe unterschiedlich sein. Aktivierung braucht
+                        mindestens einen Basispreis, keine vollständige
+                        24×3-Matrix.
                     </p>
                     <div className="overflow-x-auto">
                         <table
