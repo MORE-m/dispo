@@ -10,6 +10,7 @@ use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\Administration\InventoryAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
+use App\Http\Controllers\Administration\PriceListImportController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
@@ -165,6 +166,14 @@ Route::middleware(['auth'])->group(function () {
 
         Route::get('administration/preislisten', [PriceListAdminController::class, 'index'])
             ->name('administration.price-lists.index');
+        Route::get('administration/preislisten/import', [PriceListImportController::class, 'create'])
+            ->name('administration.price-lists.import');
+        Route::post('administration/preislisten/import', [PriceListImportController::class, 'upload'])
+            ->name('administration.price-lists.import.upload');
+        Route::post('administration/preislisten/import/{priceListImport}/pruefen', [PriceListImportController::class, 'validateImport'])
+            ->name('administration.price-lists.import.validate');
+        Route::post('administration/preislisten/import/{priceListImport}/bestaetigen', [PriceListImportController::class, 'confirm'])
+            ->name('administration.price-lists.import.confirm');
         Route::get('administration/preislisten/neu', [PriceListAdminController::class, 'create'])
             ->name('administration.price-lists.create');
         Route::post('administration/preislisten', [PriceListAdminController::class, 'store'])

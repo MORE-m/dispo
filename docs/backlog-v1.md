@@ -252,13 +252,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-01 – Preislisten, Import, Tagesgruppen
 
 - **Phase:** 4
-- **Status:** in Arbeit (BL-P4-01a Preislisten-Admin-Lifecycle umgesetzt; Excel-Import und explizite Wizard-Jahreswahl offen)
+- **Status:** in Arbeit (BL-P4-01a Lifecycle und BL-P4-01b Excel-Import umgesetzt; Wizard-Jahreswahl offen)
 - **Anforderungen:** `PRI-001` bis `PRI-006`
 - **Abhängigkeiten:** BL-P3-02
 - **Ergebnis 01a:** Jahresversionen, Draft/Copy/Activate/Archive, atomare Aktivierung, abgeleitete Tagesgruppen, Jahresdefault, Budget-Fingerprint
-- **Offen:** Excel-Import mit Vorschau (`AT-21`), explizite Wahl anderer aktiver Jahreslisten im Wizard (PRI-002-Rest)
+- **Ergebnis 01b:** Excel-Import XLSX/XLS, Preview/Fingerprint, atomare Drafts, privater Storage/Report (`AT-21`)
+- **Offen:** explizite Wahl anderer aktiver Jahreslisten im Wizard (PRI-002-Rest); MORE-Produktiv-Workbook-Adapter nach Beispieldatei
 - **Akzeptanz 01a:** höchstens eine Active je Inventar/Jahr; historische Versionen unverändert; aktuelles Kalenderjahr als Default
-- **Tests:** Feature-/Constraint-/Runtime-Tests; isolierte Playwright-Suite `playwright.blp401a.config.ts` (Port 8017)
+- **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017) und `blp401b` (8018)
 
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 

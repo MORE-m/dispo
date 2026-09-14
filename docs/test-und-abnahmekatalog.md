@@ -16,7 +16,7 @@ Zufallswerte werden kontrolliert, damit Ergebnisse reproduzierbar bleiben.
 
 ### BL-P4-01a (ohne Excel-Import)
 
-Zusätzlich zu `AT-21` (Import, offen) gelten für den Lifecycle-Slice:
+Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 - höchstens eine Active je Inventar/Jahr; mehrere Drafts/Archive zulässig
 - Jahresdefault = aktive Liste des aktuellen Kalenderjahres `Europe/Berlin`
@@ -27,6 +27,15 @@ Zusätzlich zu `AT-21` (Import, offen) gelten für den Lifecycle-Slice:
   nicht buchbar (nicht 0); Aktivierung mit mind. einem Basispreis; Mo–Sa/Mo–So
   nur bei vollständigen Abhängigkeiten; keine 24×3-Pflicht
 - isolierte Playwright-Suite `playwright.blp401a.config.ts` (Port 8017)
+
+### BL-P4-01b (Excel-Import)
+
+- Upload XLSX/XLS → strukturelle Prüfung → Preview → Bestätigung → neue Drafts
+- keine Auto-Aktivierung; Aktivierung nur über BL-P4-01a-Lifecycle
+- kanonischer Spaltenvertrag; inventarauflösung Code/Name + dokumentierte Aliase
+- atomar je Importlauf (mehrere Inventare möglich, keine Teilübernahme)
+- Importdatei privat, Report JSON auditierbar
+- isolierte Playwright-Suite `playwright.blp401b.config.ts` (Port 8018)
 
 ## Mindestabnahme
 
