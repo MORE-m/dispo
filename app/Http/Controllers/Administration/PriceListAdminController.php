@@ -176,16 +176,7 @@ class PriceListAdminController extends Controller
         $updated = $writer->updateDraft($priceList, $validated, $actor);
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'Entwurf gespeichert.',
-                'lock_version' => $updated->lock_version,
-                'priceList' => $this->serializeDetail(
-                    $updated,
-                    app(PriceListImpactPreviewService::class)->derivedPrices(
-                        $this->writerBaseItems($updated),
-                    ),
-                ),
-            ]);
+            return $this->jsonWriterPayload($updated, 'Entwurf gespeichert.');
         }
 
         return redirect()
@@ -243,12 +234,7 @@ class PriceListAdminController extends Controller
 
         $updated = $writer->activate($priceList, $validated, $actor);
 
-        return response()->json([
-            'message' => 'Preisliste veröffentlicht.',
-            'lock_version' => $updated->lock_version,
-            'status' => $updated->status->value,
-            'status_label' => $updated->status->label(),
-        ]);
+        return $this->jsonWriterPayload($updated, 'Preisliste veröffentlicht.');
     }
 
     public function archivePreview(
@@ -280,12 +266,7 @@ class PriceListAdminController extends Controller
 
         $updated = $writer->archive($priceList, $validated, $actor);
 
-        return response()->json([
-            'message' => 'Preisliste archiviert.',
-            'lock_version' => $updated->lock_version,
-            'status' => $updated->status->value,
-            'status_label' => $updated->status->label(),
-        ]);
+        return $this->jsonWriterPayload($updated, 'Preisliste archiviert.');
     }
 
     public function destroy(): never
@@ -435,6 +416,24 @@ class PriceListAdminController extends Controller
         }
 
         return $items;
+    }
+
+    private function jsonWriterPayload(PriceList $list, string $message): JsonResponse
+    {
+        $list->loadMissing(['items', 'inventory']);
+        $impact = app(PriceListImpactPreviewService::class);
+
+        return response()->json([
+            'message' => $message,
+            'lock_version' => $list->lock_version,
+            'status' => $list->status->value,
+            'status_label' => $list->status->label(),
+            'priceList' => $this->serializeDetail(
+                $list,
+                $impact->derivedPrices($this->writerBaseItems($list)),
+            ),
+            'baseItems' => $this->baseItemPayload($list),
+        ]);
     }
 
     private function rejectServerOwnedFields(Request $request, bool $forCreate): void

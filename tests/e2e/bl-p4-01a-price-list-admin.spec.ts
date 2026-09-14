@@ -174,6 +174,141 @@ test.describe.serial('BL-P4-01a Preislisten-Admin', () => {
         ).toContainText(/parallel|veraltet|neu laden/i, { timeout: 15_000 });
     });
 
+    test('Preview ändert Formular-Sperrversion nicht und blockiert ungespeicherte Preise', async ({
+        page,
+        browser,
+    }) => {
+        await login(page, 'admin@example.com');
+        const suffix = Date.now().toString().slice(-6);
+
+        await page.goto('/administration/preislisten/neu');
+        await page
+            .locator('[data-test="price-list-inventory-input"]')
+            .selectOption({ label: 'Radio Hamburg (Sender)' });
+        await page
+            .locator('[data-test="price-list-name-input"]')
+            .fill(`E2E Lock ${suffix}`);
+        await page.locator('[data-test="price-list-create-submit"]').click();
+        await expect(page).toHaveURL(/\/administration\/preislisten\/\d+$/);
+
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('1,2500');
+        await page.locator('[data-test="price-cell-8-sa"]').fill('1,5000');
+        await page.locator('[data-test="price-cell-8-so"]').fill('0,8000');
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toBeVisible();
+
+        const lockBefore = await page
+            .locator('[data-test="price-list-status"]')
+            .textContent();
+        const formLock = Number(
+            lockBefore?.match(/Sperrversion\s+(\d+)/)?.[1] ?? 0,
+        );
+        expect(formLock).toBeGreaterThan(0);
+        const listUrl = page.url();
+        const listId = listUrl.match(/preislisten\/(\d+)/)?.[1];
+        expect(listId).toBeTruthy();
+
+        const other = await browser.newContext();
+        const pageB = await other.newPage();
+        try {
+            await login(pageB, 'admin@example.com');
+            await pageB.goto(listUrl);
+            await pageB
+                .locator('[data-test="price-cell-8-sa"]')
+                .fill('1,9000');
+            await pageB
+                .locator('[data-test="price-list-save-button"]')
+                .click();
+            await expect(
+                pageB.locator('[data-test="price-list-show-success"]'),
+            ).toBeVisible();
+
+            await page
+                .locator('[data-test="price-list-activate-preview-button"]')
+                .click();
+            await expect(
+                page.locator('[data-test="price-list-impact-preview"]'),
+            ).toBeVisible();
+            await expect(
+                page.locator('[data-test="price-list-status"]'),
+            ).toContainText(`Sperrversion ${formLock}`);
+
+            await page.locator('[data-test="price-list-save-button"]').click();
+            await expect(
+                page.locator('[data-test="price-list-show-error"]'),
+            ).toContainText(/parallel|veraltet|neu laden/i, { timeout: 15_000 });
+        } finally {
+            await other.close();
+        }
+
+        await page.reload();
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('2,0000');
+        await page
+            .locator('[data-test="price-list-activate-preview-button"]')
+            .click();
+        await expect(
+            page.locator('[data-test="price-list-show-error"]'),
+        ).toContainText(/speichern/i);
+        await expect(
+            page.locator('[data-test="price-list-impact-preview"]'),
+        ).toHaveCount(0);
+
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('1,2500');
+        await page.locator('[data-test="price-cell-8-sa"]').fill('1,9000');
+        await page.locator('[data-test="price-cell-8-so"]').fill('0,8000');
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toContainText(/Gespeichert|Entwurf/);
+
+        const lockAfterSave = Number(
+            (
+                await page.locator('[data-test="price-list-status"]').textContent()
+            )?.match(/Sperrversion\s+(\d+)/)?.[1] ?? 0,
+        );
+        expect(lockAfterSave).toBeGreaterThan(formLock);
+
+        await page
+            .locator('[data-test="price-list-activate-preview-button"]')
+            .click();
+        await expect(
+            page.locator('[data-test="price-list-impact-preview"]'),
+        ).toBeVisible();
+
+        await page.locator('[data-test="price-cell-8-so"]').fill('0,9000');
+        await expect(
+            page.locator('[data-test="price-list-impact-preview"]'),
+        ).toHaveCount(0);
+
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toBeVisible();
+        await page
+            .locator('[data-test="price-list-activate-preview-button"]')
+            .click();
+        await expect(
+            page.locator('[data-test="price-list-impact-preview"]'),
+        ).toBeVisible();
+        await page
+            .locator('[data-test="price-list-activate-confirm"]')
+            .click();
+        await expect(page.locator('[data-test="price-list-status"]')).toContainText(
+            'Aktiv',
+        );
+        await expect(page.locator('[data-test="price-cell-8-sa"]')).toHaveValue(
+            /1[,.]9000/,
+        );
+        await expect(page.locator('[data-test="price-cell-8-so"]')).toHaveValue(
+            /0[,.]9000/,
+        );
+        await expect(page.locator('[data-test="price-cell-8-mo_fr"]')).toHaveValue(
+            /1[,.]2500/,
+        );
+    });
+
     test('historische Kalkulation bleibt nach neuer Aktivierung sichtbar', async ({
         page,
     }) => {

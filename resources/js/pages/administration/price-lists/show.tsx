@@ -5,6 +5,17 @@ import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+    draftFormSnapshot,
+    formLockAfterPreview,
+    gridFromBaseItems,
+    isDraftDirty,
+    itemsFromGrid,
+    PRICE_LIST_BASE_GROUPS,
+    PRICE_LIST_HOURS,
+    UNSAVED_LIFECYCLE_MESSAGE,
+    type PriceListBaseItem,
+} from '@/lib/price-list-draft-form';
 
 type InventoryInfo = {
     id: number | null;
@@ -34,12 +45,6 @@ type PriceListDetail = {
     valid_from: string | null;
     inventory: InventoryInfo;
     derived: DerivedPrice[];
-};
-
-type BaseItem = {
-    hour: number;
-    day_group: string;
-    second_price: string;
 };
 
 type Routes = {
@@ -80,14 +85,6 @@ type Preview = {
     affects_current_year_default?: boolean;
 };
 
-const BASE_GROUPS = [
-    { value: 'mo_fr', label: 'Mo–Fr' },
-    { value: 'sa', label: 'Samstag' },
-    { value: 'so', label: 'Sonntag' },
-] as const;
-
-const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
-
 async function csrfHeaders(): Promise<Record<string, string>> {
     const token = document.cookie
         .split('; ')
@@ -107,37 +104,13 @@ function hourLabel(hour: number): string {
     return `${start}:00–${end}:59`;
 }
 
-function itemsFromGrid(
-    grid: Record<string, string>,
-): Array<{ hour: number; day_group: string; second_price: string }> {
-    const items: Array<{
-        hour: number;
-        day_group: string;
-        second_price: string;
-    }> = [];
-    for (const hour of HOURS) {
-        for (const group of BASE_GROUPS) {
-            const value = grid[`${hour}|${group.value}`]?.trim() ?? '';
-            if (value !== '') {
-                items.push({
-                    hour,
-                    day_group: group.value,
-                    second_price: value,
-                });
-            }
-        }
-    }
-
-    return items;
-}
-
 export default function PriceListShow({
     priceList,
     baseItems,
     routes,
 }: {
     priceList: PriceListDetail;
-    baseItems: BaseItem[];
+    baseItems: PriceListBaseItem[];
     routes: Routes;
 }) {
     const flash = usePage().props.flash;
@@ -145,21 +118,23 @@ export default function PriceListShow({
     const [lockVersion, setLockVersion] = useState(priceList.lock_version);
     const [editable, setEditable] = useState(priceList.editable);
     const [statusLabel, setStatusLabel] = useState(priceList.status_label);
+    const [status, setStatus] = useState(priceList.status);
     const [derived, setDerived] = useState(priceList.derived);
+    const [savedDerived, setSavedDerived] = useState(priceList.derived);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(
         flash.success ?? null,
     );
     const [preview, setPreview] = useState<Preview | null>(null);
-    const [grid, setGrid] = useState<Record<string, string>>(() => {
-        const initial: Record<string, string> = {};
-        for (const item of baseItems) {
-            initial[`${item.hour}|${item.day_group}`] = item.second_price;
-        }
+    const [grid, setGrid] = useState<Record<string, string>>(() =>
+        gridFromBaseItems(baseItems),
+    );
+    const [savedSnapshot, setSavedSnapshot] = useState(() =>
+        draftFormSnapshot(priceList.name, gridFromBaseItems(baseItems)),
+    );
 
-        return initial;
-    });
+    const dirty = isDraftDirty(savedSnapshot, name, grid);
 
     const derivedByKey = useMemo(() => {
         const map: Record<string, string> = {};
@@ -170,11 +145,54 @@ export default function PriceListShow({
         return map;
     }, [derived]);
 
-    function setCell(hour: number, group: string, value: string) {
-        setGrid((current) => ({
-            ...current,
-            [`${hour}|${group}`]: value,
-        }));
+    function markLocalChange(
+        nextName: string,
+        nextGrid: Record<string, string>,
+    ) {
+        setName(nextName);
+        setGrid(nextGrid);
+        setPreview(null);
+        setDerived(savedDerived);
+    }
+
+    function applySavedState(payload: {
+        lock_version?: number;
+        priceList?: PriceListDetail;
+        baseItems?: PriceListBaseItem[];
+        status?: string;
+        status_label?: string;
+    }) {
+        const nextLock =
+            payload.priceList?.lock_version ?? payload.lock_version;
+        if (typeof nextLock === 'number') {
+            setLockVersion(nextLock);
+        }
+        if (payload.priceList) {
+            setName(payload.priceList.name);
+            setEditable(payload.priceList.editable);
+            setStatusLabel(payload.priceList.status_label);
+            setStatus(payload.priceList.status);
+            if (payload.priceList.derived) {
+                setDerived(payload.priceList.derived);
+                setSavedDerived(payload.priceList.derived);
+            }
+        }
+        if (payload.status) {
+            setStatus(payload.status);
+        }
+        if (payload.status_label) {
+            setStatusLabel(payload.status_label);
+        }
+        const items = payload.baseItems;
+        const nextName = payload.priceList?.name ?? name;
+        if (items) {
+            const nextGrid = gridFromBaseItems(items);
+            setGrid(nextGrid);
+            setSavedSnapshot(draftFormSnapshot(nextName, nextGrid));
+        } else if (payload.priceList) {
+            setSavedSnapshot(draftFormSnapshot(payload.priceList.name, grid));
+        }
+        setPreview(null);
     }
 
     async function saveDraft(event: React.FormEvent) {
@@ -213,10 +231,7 @@ export default function PriceListShow({
                 );
                 return;
             }
-            setLockVersion(data.lock_version ?? lockVersion);
-            if (data.priceList?.derived) {
-                setDerived(data.priceList.derived);
-            }
+            applySavedState(data);
             setSuccess(data.message || 'Gespeichert.');
         } catch {
             setError('Speichern fehlgeschlagen.');
@@ -245,6 +260,9 @@ export default function PriceListShow({
                 return;
             }
             setDerived(data.derived ?? []);
+            if (!isDraftDirty(savedSnapshot, name, grid)) {
+                setSavedDerived(data.derived ?? []);
+            }
             setSuccess(
                 'Eingaben geprüft. Abgeleitete Tagesgruppen aktualisiert.',
             );
@@ -256,6 +274,12 @@ export default function PriceListShow({
     }
 
     async function loadPreview(url: string) {
+        if (dirty) {
+            setPreview(null);
+            setError(UNSAVED_LIFECYCLE_MESSAGE);
+            setSuccess(null);
+            return;
+        }
         setBusy(true);
         setError(null);
         setSuccess(null);
@@ -271,7 +295,9 @@ export default function PriceListShow({
                 return;
             }
             setPreview(data);
-            setLockVersion(data.lock_version ?? lockVersion);
+            setLockVersion(
+                formLockAfterPreview(lockVersion, data.lock_version),
+            );
         } catch {
             setError('Vorschau fehlgeschlagen.');
         } finally {
@@ -280,7 +306,11 @@ export default function PriceListShow({
     }
 
     async function confirmAction(url: string, successMessage: string) {
-        if (!preview) {
+        if (!preview || dirty) {
+            if (dirty) {
+                setPreview(null);
+                setError(UNSAVED_LIFECYCLE_MESSAGE);
+            }
             return;
         }
         setBusy(true);
@@ -310,12 +340,23 @@ export default function PriceListShow({
                 );
                 return;
             }
-            setPreview(null);
+            applySavedState(data);
             setEditable(false);
-            setStatusLabel(data.status_label ?? statusLabel);
-            setLockVersion(data.lock_version ?? lockVersion + 1);
             setSuccess(data.message || successMessage);
-            router.reload({ only: ['priceList', 'baseItems'] });
+            router.reload({
+                only: ['priceList', 'baseItems'],
+                onSuccess: (page) => {
+                    const props = page.props as {
+                        priceList?: PriceListDetail;
+                        baseItems?: PriceListBaseItem[];
+                    };
+                    applySavedState({
+                        priceList: props.priceList,
+                        baseItems: props.baseItems,
+                        lock_version: props.priceList?.lock_version,
+                    });
+                },
+            });
         } catch {
             setError('Aktion fehlgeschlagen.');
         } finally {
@@ -374,7 +415,9 @@ export default function PriceListShow({
                             id="name"
                             value={name}
                             readOnly={!editable}
-                            onChange={(event) => setName(event.target.value)}
+                            onChange={(event) =>
+                                markLocalChange(event.target.value, grid)
+                            }
                             data-test="price-list-name-input"
                         />
                     </FormField>
@@ -399,12 +442,12 @@ export default function PriceListShow({
                                 </tr>
                             </thead>
                             <tbody>
-                                {HOURS.map((hour) => (
+                                {PRICE_LIST_HOURS.map((hour) => (
                                     <tr key={hour} className="border-t">
                                         <td className="px-2 py-1 font-mono">
                                             {hourLabel(hour)}
                                         </td>
-                                        {BASE_GROUPS.map((group) => (
+                                        {PRICE_LIST_BASE_GROUPS.map((group) => (
                                             <td
                                                 key={group.value}
                                                 className="px-2 py-1"
@@ -417,11 +460,12 @@ export default function PriceListShow({
                                                     }
                                                     readOnly={!editable}
                                                     onChange={(event) =>
-                                                        setCell(
-                                                            hour,
-                                                            group.value,
-                                                            event.target.value,
-                                                        )
+                                                        markLocalChange(name, {
+                                                            ...grid,
+                                                            [`${hour}|${group.value}`]:
+                                                                event.target
+                                                                    .value,
+                                                        })
                                                     }
                                                     data-test={`price-cell-${hour}-${group.value}`}
                                                 />
@@ -483,7 +527,7 @@ export default function PriceListShow({
                         </div>
                     ) : (
                         <div className="flex flex-wrap gap-2">
-                            {priceList.status === 'active' ? (
+                            {status === 'active' ? (
                                 <Button
                                     type="button"
                                     variant="outline"
