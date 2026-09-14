@@ -10,6 +10,7 @@ use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
 use App\Support\PriceList\PriceListYearSelection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -34,6 +35,17 @@ final class BudgetSpotProposalService
      */
     public function propose(array $payload, ?Calculation $existing = null): array
     {
+        return DB::transaction(function () use ($payload, $existing): array {
+            return $this->proposeWithinTransaction($payload, $existing);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function proposeWithinTransaction(array $payload, ?Calculation $existing = null): array
+    {
         $target = Decimal::roundMoney((string) $payload['target_budget_nn']);
         if (Decimal::cmp($target, '0') <= 0) {
             throw ValidationException::withMessages([
@@ -42,6 +54,16 @@ final class BudgetSpotProposalService
         }
 
         $elements = $this->elementNormalizer->normalizeElements($payload);
+        $inventoryIds = array_map(
+            static fn (array $element): int => (int) $element['inventory_id'],
+            $elements,
+        );
+        PriceListYearSelection::assertBudgetExpectedMapComplete($payload, $inventoryIds);
+
+        if (PriceListYearSelection::hasExplicitPriceYear($payload)) {
+            $years = [PriceListYearSelection::resolveYearFromPayload($payload)];
+            PriceListYearSelection::lockInventoriesForLiveBinding($inventoryIds, $years);
+        }
 
         $mediumId = $this->spotClassicMediumId();
         $orderDiscounts = $this->orderDiscountInputs($payload);
@@ -68,12 +90,15 @@ final class BudgetSpotProposalService
             );
             PriceListYearSelection::assertExpectedMatchesResolved(
                 is_array($payload['expected_price_list_ids'] ?? null)
-                    ? ($payload['expected_price_list_ids'][$element['inventory_id']]
-                        ?? $payload['expected_price_list_ids'][(string) $element['inventory_id']]
-                        ?? null)
+                    ? PriceListYearSelection::expectedIdFromBudgetMap(
+                        $payload['expected_price_list_ids'],
+                        (int) $element['inventory_id'],
+                    )
                     : null,
                 $catalog['priceList'],
-                'Die aktive Preisliste hat sich geändert. Bitte den Budgetvorschlag neu berechnen.',
+                required: PriceListYearSelection::hasExplicitPriceYear($payload),
+                conflictMessage: 'Die aktive Preisliste hat sich geändert. Bitte den Budgetvorschlag neu berechnen.',
+                missingKey: 'expected_price_list_ids',
             );
             $buckets = $this->buildBuckets($element['distribution_ranges']);
             if ($buckets === []) {

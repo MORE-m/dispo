@@ -3,13 +3,20 @@
 namespace App\Support\PriceList;
 
 use App\Enums\PriceListStatus;
-use App\Exceptions\FieldSetAssignmentConflictException;
+use App\Exceptions\PriceListSelectionConflictException;
+use App\Models\Inventory;
 use App\Models\PriceList;
 use Carbon\CarbonInterface;
 use Illuminate\Validation\ValidationException;
 
 /**
  * PO-PRI-YEAR-1: wählbare Preisjahre (aktuelles + Folgejahr) und Expected-ID-Schutz.
+ *
+ * Expected-Token (`expected_price_list_id` / Budget-Map) ist verpflichtend, wenn der Client
+ * ausdrücklich `price_year` für eine Live-Bindung bzw. einen bewussten Rebind übermittelt
+ * und für Inventar/Jahr eine aktive Liste existiert. Legacy-Payloads ohne `price_year`
+ * behalten den bisherigen Live-Default ohne Expected-Pflicht. Unveränderte historische
+ * Pins (kein Jahrwechsel) brauchen keinen Live-Expected-Abgleich.
  */
 final class PriceListYearSelection
 {
@@ -23,6 +30,16 @@ final class PriceListYearSelection
         $current = PriceListCalendar::currentYear($now);
 
         return $year === $current || $year === $current + 1;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public static function hasExplicitPriceYear(array $payload): bool
+    {
+        return array_key_exists('price_year', $payload)
+            && $payload['price_year'] !== null
+            && $payload['price_year'] !== '';
     }
 
     /**
@@ -76,6 +93,40 @@ final class PriceListYearSelection
             ->first();
     }
 
+    /**
+     * Gemeinsame Serialisierungsgrenze mit BL-P4-01a-Aktivierung: Inventarzeile,
+     * deterministisch nach ID sortiert. Anschließend alle Listen des Jahres sperren.
+     *
+     * @param  list<int>|array<int, int>  $inventoryIds
+     * @param  list<int>|array<int, int>  $years
+     */
+    public static function lockInventoriesForLiveBinding(array $inventoryIds, array $years = []): void
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_map(static fn ($id): int => (int) $id, $inventoryIds),
+            static fn (int $id): bool => $id > 0,
+        )));
+        sort($ids);
+
+        $uniqueYears = array_values(array_unique(array_filter(
+            array_map(static fn ($year): int => (int) $year, $years),
+            static fn (int $year): bool => $year >= 2000,
+        )));
+        sort($uniqueYears);
+
+        foreach ($ids as $inventoryId) {
+            Inventory::query()->whereKey($inventoryId)->lockForUpdate()->first();
+            foreach ($uniqueYears as $year) {
+                PriceList::query()
+                    ->where('inventory_id', $inventoryId)
+                    ->where('year', $year)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get(['id']);
+            }
+        }
+    }
+
     public static function assertAllowedLiveYear(int $year, string $errorKey = 'positions'): void
     {
         if (! self::isAllowedSelectableYear($year)) {
@@ -85,18 +136,71 @@ final class PriceListYearSelection
         }
     }
 
+    /**
+     * @param  bool  $required  true bei ausdrücklichem price_year (Live-Bind/Rebind)
+     */
     public static function assertExpectedMatchesResolved(
         mixed $expectedPriceListId,
         PriceList $resolved,
-        string $message = 'Die aktive Preisliste hat sich geändert. Bitte neu laden und bewusst speichern.',
+        bool $required = false,
+        string $conflictMessage = 'Die aktive Preisliste hat sich geändert. Bitte neu laden und bewusst speichern.',
+        string $missingKey = 'expected_price_list_id',
     ): void {
         if ($expectedPriceListId === null || $expectedPriceListId === '') {
+            if ($required) {
+                throw ValidationException::withMessages([
+                    $missingKey => 'Die erwartete Preisliste fehlt. Bitte neu laden und bewusst speichern.',
+                ]);
+            }
+
             return;
         }
 
         if ((int) $expectedPriceListId !== (int) $resolved->id) {
-            throw new FieldSetAssignmentConflictException($message);
+            throw new PriceListSelectionConflictException($conflictMessage);
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  list<int>  $inventoryIds
+     */
+    public static function assertBudgetExpectedMapComplete(array $payload, array $inventoryIds): void
+    {
+        if (! self::hasExplicitPriceYear($payload)) {
+            return;
+        }
+
+        $map = $payload['expected_price_list_ids'] ?? null;
+        if (! is_array($map)) {
+            throw ValidationException::withMessages([
+                'expected_price_list_ids' => 'Für das gewählte Preisjahr müssen die erwarteten Preislisten angegeben werden.',
+            ]);
+        }
+
+        foreach ($inventoryIds as $inventoryId) {
+            if (self::expectedIdFromBudgetMap($map, (int) $inventoryId) === null) {
+                throw ValidationException::withMessages([
+                    'expected_price_list_ids' => 'Für jedes Inventar muss die erwartete Preisliste angegeben werden.',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $map
+     */
+    public static function expectedIdFromBudgetMap(array $map, int $inventoryId): mixed
+    {
+        if (array_key_exists($inventoryId, $map)) {
+            return $map[$inventoryId];
+        }
+
+        if (array_key_exists((string) $inventoryId, $map)) {
+            return $map[(string) $inventoryId];
+        }
+
+        return null;
     }
 
     public static function missingYearPriceListMessage(string $inventoryName, int $year): string
@@ -132,7 +236,7 @@ final class PriceListYearSelection
      */
     public static function resolveYearFromPayload(array $payload, ?int $fallback = null): int
     {
-        if (array_key_exists('price_year', $payload) && $payload['price_year'] !== null && $payload['price_year'] !== '') {
+        if (self::hasExplicitPriceYear($payload)) {
             return (int) $payload['price_year'];
         }
 

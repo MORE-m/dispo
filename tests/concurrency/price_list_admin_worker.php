@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 use App\Enums\DayGroup;
 use App\Exceptions\PriceListAdminConflictException;
+use App\Exceptions\PriceListSelectionConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\Inventory;
@@ -183,7 +184,15 @@ try {
                 $body['positions'][0]['price_year'] = (int) $payload['price_year'];
                 $body['positions'][0]['expected_price_list_id'] = (int) $payload['expected_price_list_id'];
                 if (isset($payload['total_spot_count'])) {
-                    $body['positions'][0]['total_spot_count'] = (int) $payload['total_spot_count'];
+                    $spotCount = (int) $payload['total_spot_count'];
+                    $body['positions'][0]['total_spot_count'] = $spotCount;
+                    if (isset($body['positions'][0]['time_ranges']) && is_array($body['positions'][0]['time_ranges'])) {
+                        foreach ($body['positions'][0]['time_ranges'] as $rangeIndex => $range) {
+                            if (is_array($range)) {
+                                $body['positions'][0]['time_ranges'][$rangeIndex]['spot_count'] = $spotCount;
+                            }
+                        }
+                    }
                 }
                 $updated = $writer->update($calculation, $body, $actor);
                 $position = $updated->positions()->firstOrFail();
@@ -218,6 +227,9 @@ try {
         $message = Str::limit(json_encode($exception->errors(), JSON_UNESCAPED_UNICODE) ?: $message, 240);
     }
     if ($exception instanceof PriceListAdminConflictException) {
+        $message = Str::limit($exception->getMessage(), 240);
+    }
+    if ($exception instanceof PriceListSelectionConflictException) {
         $message = Str::limit($exception->getMessage(), 240);
     }
     file_put_contents($resultFile, 'ERROR:'.$class.'|'.$message);

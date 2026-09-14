@@ -888,10 +888,25 @@ class PriceListRuntimeYearAndHistoryTest extends TestCase
         }
 
         $user = User::factory()->role(Role::Sales)->create();
+        $hamburgNext = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('year', $nextYear)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+        $rockNext = PriceList::query()
+            ->where('inventory_id', $catalog['rock']->id)
+            ->where('year', $nextYear)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
         $response = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
             'planning_mode' => PlanningMode::Budget->value,
             'target_budget_nn' => '5000',
             'price_year' => $nextYear,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburgNext->id,
+                $catalog['rock']->id => $rockNext->id,
+            ],
             'budget_elements' => [
                 [
                     'client_id' => 'hamburg',
@@ -926,6 +941,325 @@ class PriceListRuntimeYearAndHistoryTest extends TestCase
         foreach ($response->json('proposal.price_list_identity') as $identity) {
             $this->assertSame($nextYear, (int) $identity['year']);
         }
+    }
+
+    public function test_po_pri_year_1_explicit_year_without_expected_id_is_rejected(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $nextList = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Active,
+            'version' => '2027-RH-req',
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $nextList->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '3.0000',
+                ]);
+            }
+        }
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->actingAs($user)->post(
+            route('calculations.store'),
+            $this->withLiveSchemaFingerprint([
+                'planning_mode' => 'manual',
+                'order_discount_percent' => '0',
+                'positions' => [[
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'price_year' => $nextYear,
+                    'length_seconds' => 30,
+                    'total_spot_count' => 1,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]],
+            ]),
+        )->assertSessionHasErrors('expected_price_list_id');
+
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
+        ], $user);
+        $position = $calculation->positions()->firstOrFail();
+        $pinnedId = (int) $position->price_list_id;
+
+        $this->actingAs($user)->put(
+            route('calculations.update', $calculation),
+            [
+                'lock_version' => $calculation->fresh()->lock_version,
+                'planning_mode' => 'manual',
+                'schema_fingerprint' => $this->liveSchemaFingerprint(),
+                'order_discount_percent' => '0',
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [[
+                    'id' => $position->id,
+                    'client_key' => $position->client_key,
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'price_year' => $nextYear,
+                    'length_seconds' => 30,
+                    'total_spot_count' => 2,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]]),
+            ],
+        )->assertSessionHasErrors('expected_price_list_id');
+
+        $position->refresh();
+        $this->assertSame($pinnedId, (int) $position->price_list_id);
+        $this->assertSame(1, (int) $position->total_spot_count);
+    }
+
+    public function test_po_pri_year_1_expected_id_from_other_inventory_returns_409(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $hamburgNext = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Active,
+            'version' => 'hh-next',
+        ]);
+        $rockNext = PriceList::factory()->create([
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Active,
+            'version' => 'rock-next',
+        ]);
+        foreach ([$hamburgNext, $rockNext] as $list) {
+            foreach (range(0, 23) as $hour) {
+                foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                    PriceListItem::factory()->create([
+                        'price_list_id' => $list->id,
+                        'hour' => $hour,
+                        'day_group' => $group,
+                        'second_price' => '2.0000',
+                    ]);
+                }
+            }
+        }
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $response = $this->actingAs($user)->postJson(
+            route('calculations.store'),
+            $this->withLiveSchemaFingerprint([
+                'planning_mode' => 'manual',
+                'order_discount_percent' => '0',
+                'positions' => [[
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'price_year' => $nextYear,
+                    'expected_price_list_id' => $rockNext->id,
+                    'length_seconds' => 30,
+                    'total_spot_count' => 1,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]],
+            ]),
+        );
+        $response->assertStatus(409);
+        $this->assertSame(0, Calculation::query()->count());
+    }
+
+    public function test_po_pri_year_1_budget_requires_complete_expected_map(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $year = PriceListCalendar::currentYear();
+        $hamburg = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('year', $year)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '3000',
+            'price_year' => $year,
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ])->assertStatus(422)->assertJsonValidationErrors('expected_price_list_ids');
+
+        $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '3000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburg->id,
+            ],
+            'budget_elements' => [
+                [
+                    'client_id' => 'hamburg',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ])->assertStatus(422)->assertJsonValidationErrors('expected_price_list_ids');
+    }
+
+    public function test_po_pri_year_1_legacy_payload_without_price_year_still_binds_current(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $current = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->actingAs($user)->post(
+            route('calculations.store'),
+            $this->withLiveSchemaFingerprint([
+                'planning_mode' => 'manual',
+                'order_discount_percent' => '0',
+                'positions' => [[
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'length_seconds' => 30,
+                    'total_spot_count' => 1,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]],
+            ]),
+        )->assertRedirect();
+
+        $position = Calculation::query()->firstOrFail()->positions()->firstOrFail();
+        $this->assertSame($current->id, (int) $position->price_list_id);
+    }
+
+    public function test_po_pri_year_1_edit_props_expose_pinned_identity_not_successor(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
+        ], $user);
+        $position = $calculation->positions()->firstOrFail();
+        $pinned = PriceList::query()->findOrFail($position->price_list_id);
+        $year = (int) $pinned->year;
+        $this->activateSuccessor($catalog['hamburg']->id, $year, $pinned);
+
+        $this->actingAs($user)
+            ->get(route('calculations.edit', $calculation))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('calculations/wizard')
+                ->where('calculation.positions.0.expected_price_list_id', $pinned->id)
+                ->where('calculation.positions.0.price_list_version', $pinned->version)
+                ->where('calculation.positions.0.price_list_status', 'archived')
+                ->where('calculation.positions.0.price_year', $year));
+    }
+
+    public function test_po_pri_year_1_year_away_and_back_keeps_pin_on_quantity_save(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
+        ], $user);
+        $position = $calculation->positions()->firstOrFail();
+        $pinned = PriceList::query()->findOrFail($position->price_list_id);
+        $year = (int) $pinned->year;
+        $nextYear = $year + 1;
+        $this->activateSuccessor($catalog['hamburg']->id, $year, $pinned);
+        $nextList = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Active,
+            'version' => 'away-back-next',
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $nextList->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '2.0000',
+                ]);
+            }
+        }
+
+        // Bewusster Jahrwechsel + Speichern würde rebinden; hier nur zurück aufs Pin-Jahr.
+        $this->actingAs($user)->put(
+            route('calculations.update', $calculation),
+            [
+                'lock_version' => $calculation->fresh()->lock_version,
+                'planning_mode' => 'manual',
+                'schema_fingerprint' => $this->liveSchemaFingerprint(),
+                'order_discount_percent' => '0',
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [[
+                    'id' => $position->id,
+                    'client_key' => $position->client_key,
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'price_year' => $year,
+                    'expected_price_list_id' => $pinned->id,
+                    'length_seconds' => 30,
+                    'total_spot_count' => 4,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]]),
+            ],
+        )->assertRedirect();
+
+        $position->refresh();
+        $this->assertSame($pinned->id, (int) $position->price_list_id);
+        $this->assertSame($pinned->version, (string) $position->price_list_version);
+        $this->assertSame(4, (int) $position->total_spot_count);
+        $this->assertNotSame($nextList->id, (int) $position->price_list_id);
     }
 
     private function activateSuccessor(int $inventoryId, int $year, PriceList $predecessor, bool $archivePredecessor = true): PriceList

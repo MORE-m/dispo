@@ -7,12 +7,13 @@ use App\Enums\DayGroup;
 use App\Enums\PlanningMode;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
-use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
+use App\Services\PriceList\Admin\PriceListAdminWriter;
+use App\Services\PriceList\Admin\PriceListImpactPreviewService;
 use App\Support\PriceList\PriceListCalendar;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -166,11 +167,19 @@ class PriceListYearSelectionMysqlTest extends TestCase
             'positions' => [],
         ]);
         $calculation = Calculation::query()->firstOrFail();
+        $active = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('year', $year)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
 
         $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
             'planning_mode' => PlanningMode::Budget->value,
             'target_budget_nn' => '3000',
             'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $active->id,
+            ],
             'budget_elements' => [[
                 'client_id' => 'hamburg',
                 'inventory_id' => $catalog['hamburg']->id,
@@ -191,11 +200,6 @@ class PriceListYearSelectionMysqlTest extends TestCase
         $propose->assertOk();
         $proposalId = (int) $propose->json('proposal.id');
 
-        $active = PriceList::query()
-            ->where('inventory_id', $catalog['hamburg']->id)
-            ->where('year', $year)
-            ->where('status', PriceListStatus::Active)
-            ->firstOrFail();
         $active->status = PriceListStatus::Archived;
         $active->save();
         $this->createActiveList($catalog['hamburg']->id, $year, 'mysql-budget-successor');
@@ -213,9 +217,92 @@ class PriceListYearSelectionMysqlTest extends TestCase
         $this->assertSame(0, $calculation->fresh()->positions()->count());
     }
 
-    public function test_mysql_parallel_rebind_and_activate_do_not_deadlock(): void
+    public function test_mysql_activate_before_rebind_yields_409_without_partial_persist(): void
     {
-        $this->requireMysql('PRI-YEAR-REBIND-ACTIVATE-RACE');
+        $this->requireMysql('PRI-YEAR-ACTIVATE-THEN-REBIND');
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
+        ], $sales);
+        $position = $calculation->positions()->firstOrFail();
+        $pinnedBefore = (int) $position->price_list_id;
+        $spotsBefore = (int) $position->total_spot_count;
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $nextList = $this->createActiveList($catalog['hamburg']->id, $nextYear, 'mysql-ordered-next');
+
+        $draft = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Draft,
+            'version' => 'mysql-ordered-draft',
+            'name' => 'Ordered Draft',
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $draft->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '5.0000',
+                ]);
+            }
+        }
+
+        // Sequenz: Aktivierung zuerst, danach Rebind mit veraltetem Expected → 409.
+        $preview = app(PriceListImpactPreviewService::class)
+            ->previewActivate($draft);
+        app(PriceListAdminWriter::class)->activate($draft, [
+            'lock_version' => $draft->lock_version,
+            'fingerprint' => (string) $preview['fingerprint'],
+        ], $admin);
+
+        $this->assertSame(PriceListStatus::Archived, $nextList->fresh()->status);
+        $this->assertSame(PriceListStatus::Active, $draft->fresh()->status);
+
+        $response = $this->actingAs($sales)->putJson(
+            route('calculations.update', $calculation),
+            [
+                'lock_version' => $calculation->fresh()->lock_version,
+                'planning_mode' => 'manual',
+                'schema_fingerprint' => $this->liveSchemaFingerprint(),
+                'order_discount_percent' => '0',
+                'positions' => $this->withPositionSchemaFingerprints($calculation, [[
+                    'id' => $position->id,
+                    'client_key' => $position->client_key,
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'spot_method' => 'average',
+                    'price_year' => $nextYear,
+                    'expected_price_list_id' => $nextList->id,
+                    'length_seconds' => 30,
+                    'total_spot_count' => 7,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                ]]),
+            ],
+        );
+        $response->assertStatus(409);
+        $position->refresh();
+        $this->assertSame($pinnedBefore, (int) $position->price_list_id);
+        $this->assertSame($spotsBefore, (int) $position->total_spot_count);
+        $this->assertSame(
+            1,
+            PriceList::query()
+                ->where('inventory_id', $catalog['hamburg']->id)
+                ->where('year', $nextYear)
+                ->where('status', PriceListStatus::Active)
+                ->count(),
+        );
+    }
+
+    public function test_mysql_rebind_before_activate_pins_expected_list(): void
+    {
+        $this->requireMysql('PRI-YEAR-REBIND-THEN-ACTIVATE');
         Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
 
         $catalog = $this->createSpotClassicCatalog();
@@ -225,14 +312,14 @@ class PriceListYearSelectionMysqlTest extends TestCase
             ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
         ], $sales);
         $nextYear = PriceListCalendar::currentYear() + 1;
-        $nextList = $this->createActiveList($catalog['hamburg']->id, $nextYear, 'mysql-race-next');
+        $nextList = $this->createActiveList($catalog['hamburg']->id, $nextYear, 'mysql-rebind-first');
 
         $draft = PriceList::factory()->create([
             'inventory_id' => $catalog['hamburg']->id,
             'year' => $nextYear,
             'status' => PriceListStatus::Draft,
-            'version' => 'mysql-race-draft',
-            'name' => 'Race Draft',
+            'version' => 'mysql-rebind-first-draft',
+            'name' => 'Rebind First Draft',
         ]);
         foreach (range(0, 23) as $hour) {
             foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
@@ -255,6 +342,12 @@ class PriceListYearSelectionMysqlTest extends TestCase
                     'price_year' => $nextYear,
                     'expected_price_list_id' => $nextList->id,
                     'total_spot_count' => 7,
+                    'orchestration' => [
+                        'outer_transaction' => true,
+                        'prelock' => ['inventory_id' => $catalog['hamburg']->id],
+                        'signal_after_prelock' => 'rebind_holds_inventory',
+                        'wait_after_prelock' => ['activate_entered'],
+                    ],
                 ],
             ],
             [
@@ -263,38 +356,37 @@ class PriceListYearSelectionMysqlTest extends TestCase
                     'actor_id' => $admin->id,
                     'price_list_id' => $draft->id,
                     'lock_version' => $draft->lock_version,
+                    'orchestration' => [
+                        'wait_before' => ['rebind_holds_inventory'],
+                        'signal_before' => 'activate_entered',
+                    ],
                 ],
             ],
         );
 
         $this->assertNoDeadlockOrServerError($results);
         $this->assertTrue(
-            collect($results)->contains(fn (string $line): bool => str_starts_with($line, 'OK:')),
+            collect($results)->contains(fn (string $line): bool => str_starts_with($line, 'OK:rebind_calculation_year')),
+            implode(' || ', $results),
+        );
+        $this->assertTrue(
+            collect($results)->contains(fn (string $line): bool => str_starts_with($line, 'OK:activate')),
             implode(' || ', $results),
         );
 
         $position = $calculation->fresh()->positions()->firstOrFail();
-        $activeNext = PriceList::query()
-            ->where('inventory_id', $catalog['hamburg']->id)
-            ->where('year', $nextYear)
-            ->where('status', PriceListStatus::Active)
-            ->get();
-        $this->assertLessThanOrEqual(1, $activeNext->count());
-
-        $okRebind = collect($results)->first(fn (string $line): bool => str_starts_with($line, 'OK:rebind_calculation_year'));
-        if ($okRebind !== null) {
-            $this->assertSame($nextList->id, (int) $position->price_list_id);
-            $this->assertSame(7, (int) $position->total_spot_count);
-        } else {
-            $this->assertTrue(
-                collect($results)->contains(
-                    fn (string $line): bool => str_contains($line, FieldSetAssignmentConflictException::class)
-                        || str_contains($line, 'aktive Preisliste'),
-                ),
-                implode(' || ', $results),
-            );
-            $this->assertNotSame(7, (int) $position->total_spot_count);
-        }
+        $this->assertSame($nextList->id, (int) $position->price_list_id);
+        $this->assertSame(7, (int) $position->total_spot_count);
+        $this->assertSame(
+            1,
+            PriceList::query()
+                ->where('inventory_id', $catalog['hamburg']->id)
+                ->where('year', $nextYear)
+                ->where('status', PriceListStatus::Active)
+                ->count(),
+        );
+        $this->assertSame(PriceListStatus::Archived, $nextList->fresh()->status);
+        $this->assertSame(PriceListStatus::Active, $draft->fresh()->status);
     }
 
     private function createActiveList(int $inventoryId, int $year, string $version): PriceList

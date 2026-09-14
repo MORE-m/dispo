@@ -22,6 +22,7 @@ use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
+use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,8 @@ final class CalculationWriter
         }
 
         return DB::transaction(function () use ($payload, $user, $fingerprint): Calculation {
+            $this->lockInventoriesForPayloadLiveBinding($payload);
+
             [$year, $seq, $number] = $this->numbers->next();
 
             $calculation = new Calculation;
@@ -136,6 +139,7 @@ final class CalculationWriter
                 }
                 $this->dynamicFields->syncFromPayload($locked, $dynamicPayload);
             } else {
+                $this->lockInventoriesForPayloadLiveBinding($payload);
                 $this->fillAndPersist($locked, $payload, $user, isCreate: false);
                 $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();
@@ -1609,9 +1613,35 @@ final class CalculationWriter
             }
         }
         sort($inventoryIds);
-        foreach ($inventoryIds as $inventoryId) {
-            Inventory::query()->whereKey($inventoryId)->lockForUpdate()->first();
+        $years = [PriceListYearSelection::resolveYearFromPayload($proposal->payloadArray())];
+        PriceListYearSelection::lockInventoriesForLiveBinding($inventoryIds, $years);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function lockInventoriesForPayloadLiveBinding(array $payload): void
+    {
+        $inventoryIds = [];
+        $years = [];
+        foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+            $inventoryId = (int) ($position['inventory_id'] ?? 0);
+            if ($inventoryId > 0) {
+                $inventoryIds[$inventoryId] = $inventoryId;
+            }
+            if (PriceListYearSelection::hasExplicitPriceYear($position)) {
+                $years[] = (int) $position['price_year'];
+            }
         }
+        if ($years === []) {
+            $years[] = PriceListCalendar::currentYear();
+        }
+        $ids = array_values($inventoryIds);
+        sort($ids);
+        PriceListYearSelection::lockInventoriesForLiveBinding($ids, $years);
     }
 
     private function assertPersistedPriceListsMatchCurrentCatalog(Calculation $calculation, BudgetProposal $proposal): void

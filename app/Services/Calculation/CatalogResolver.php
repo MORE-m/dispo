@@ -615,6 +615,7 @@ final class CatalogResolver
         PriceListYearSelection::assertExpectedMatchesResolved(
             $position['expected_price_list_id'] ?? null,
             $priceList,
+            required: PriceListYearSelection::hasExplicitPriceYear($position),
         );
 
         return $priceList;
