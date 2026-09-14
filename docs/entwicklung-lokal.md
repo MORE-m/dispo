@@ -148,6 +148,16 @@ Kein Schema-Migrationsschritt. Payload-Felder:
 
 `positions.*.price_list_id` ist im HTTP-Payload prohibited (Serverautorität).
 
+**Expected-Token verpflichtend**, wenn der Client ausdrücklich `price_year` für
+eine Live-Bindung bzw. einen bewussten Rebind sendet und für Inventar/Jahr eine
+aktive Liste existiert. Fehlender Token → 422. Falscher/veralteter Token → 409
+(`PriceListSelectionConflictException`). Legacy-Payloads ohne `price_year`
+binden weiterhin das aktuelle Jahr ohne Expected-Pflicht. Unveränderte
+historische Pins (kein Jahrwechsel) brauchen keinen Live-Expected-Abgleich.
+
+Live-Bindung serialisiert über Inventarzeile (+ Listen des Jahres), analog
+BL-P4-01a-Aktivierung; Inventar-IDs stets aufsteigend.
+
 E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
 DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).
 
