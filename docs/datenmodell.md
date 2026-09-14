@@ -185,6 +185,9 @@ Snapshot-Mutation.
 `PriceList` bildet Jahr, Version, Status, `lock_version` und Gültigkeit ab.
 `revision_number` ist die fachliche Revisionsreihenfolge je Inventar/Jahr
 (nebenläufigkeitssicher vergeben; historische `version`-Strings bleiben).
+Neue Entwürfe und Kopien wählen die nächste freie numerische `version` ab
+dieser Revisionsnummer; eine historische Kennung wie `"2"` oder `e2e-RH`
+wird nicht umgeschrieben, auch wenn dadurch Lücken entstehen.
 `PriceListItem` speichert nur Basis-Tagesgruppen (Mo–Fr, Sa, So), Stunde und
 Sekundenpreis. Mo–Sa/Mo–So werden über `DayGroupPrice` abgeleitet.
 
