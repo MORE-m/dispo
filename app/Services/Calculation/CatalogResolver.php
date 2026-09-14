@@ -14,6 +14,7 @@ use App\Models\PriceListItem;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
+use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -279,7 +280,7 @@ final class CatalogResolver
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'positions' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+                'positions' => $this->missingCurrentYearPriceListMessage($inventory->name),
             ]);
         }
 
@@ -395,7 +396,7 @@ final class CatalogResolver
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'positions' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+                'positions' => $this->missingCurrentYearPriceListMessage($inventory->name),
             ]);
         }
 
@@ -427,22 +428,25 @@ final class CatalogResolver
         ];
     }
 
-    public function activePriceList(int $inventoryId): ?PriceList
+    public function activePriceList(int $inventoryId, ?int $year = null): ?PriceList
     {
-        /** @var Collection<int, PriceList> $activeLists */
-        $activeLists = PriceList::query()
+        $year ??= PriceListCalendar::currentYear();
+
+        return PriceList::query()
             ->where('inventory_id', $inventoryId)
             ->where('status', PriceListStatus::Active)
+            ->where('year', $year)
             ->with('items')
-            ->orderByDesc('valid_from')
             ->orderByDesc('id')
-            ->get();
+            ->first();
+    }
 
-        if ($activeLists->isEmpty()) {
-            return null;
-        }
+    private function missingCurrentYearPriceListMessage(string $inventoryName): string
+    {
+        $year = PriceListCalendar::currentYear();
 
-        return $activeLists->first();
+        return 'Für '.$inventoryName.' liegt keine aktive Preisliste für '.$year
+            .' vor. Eine andere Jahrespreisliste wird nicht automatisch verwendet.';
     }
 
     /**
@@ -706,14 +710,16 @@ final class CatalogResolver
                     && $candidate->day_group === $group,
             );
 
-            if ($item === null) {
-                return null;
+            if ($item !== null) {
+                $base[$group->value] = (string) $item->second_price;
             }
-
-            $base[$group->value] = (string) $item->second_price;
         }
 
-        return DayGroupPrice::fromBaseMap($base, $dayGroup);
+        try {
+            return DayGroupPrice::fromBaseMap($base, $dayGroup);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 
     /**
@@ -784,7 +790,7 @@ final class CatalogResolver
         $priceList = $this->activePriceList($inventory->id);
         if ($priceList === null) {
             throw ValidationException::withMessages([
-                'budget_wish_inventory_ids' => 'Für '.$inventory->name.' liegt keine aktive Preisliste vor.',
+                'budget_wish_inventory_ids' => $this->missingCurrentYearPriceListMessage($inventory->name),
             ]);
         }
 

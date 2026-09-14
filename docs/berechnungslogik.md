@@ -21,14 +21,26 @@ nachvollziehbar gespeichert oder reproduzierbar sein.
 
 ## Tagesgruppen
 
-Importierte Basispreise existieren je Uhrstunde für `Mo–Fr`, `Sa` und `So`.
+Basispreise existieren je Uhrstunde und Basis-Tagesgruppe (`Mo–Fr`, `Sa`, `So`).
+Laut **PO-PRI-HOURS-1** dürfen die buchbaren Stunden je Tagesgruppe
+unabhängig sein. Fehlt die Basiszeile für `(Stunde, Tagesgruppe)`, ist diese
+Kombination **nicht buchbar** – nicht Preis 0 und nicht still aus einer anderen
+Gruppe übernehmen.
 
 ```text
 P(Mo–Sa, h) = (5 × P(Mo–Fr, h) + P(Sa, h)) ÷ 6
 P(Mo–So, h) = (5 × P(Mo–Fr, h) + P(Sa, h) + P(So, h)) ÷ 7
 ```
 
-`Mo–Sa` und `Mo–So` sind Ableitungen und keine unabhängig pflegbaren Preise.
+Abhängigkeiten der Ableitung:
+
+- `Mo–Fr` / `Sa` / `So`: nur die jeweilige Basisgruppe
+- `Mo–Sa`: benötigt `Mo–Fr` und `Sa` derselben Stunde
+- `Mo–So`: benötigt `Mo–Fr`, `Sa` und `So` derselben Stunde
+
+Fehlt eine erforderliche Basisgruppe, ist die Ziel-Tagesgruppe nicht buchbar
+(fail-closed). `Mo–Sa` und `Mo–So` sind Ableitungen und keine unabhängig
+pflegbaren Preise.
 
 ## Spotlängenindex
 
@@ -51,11 +63,14 @@ bleibt Index 95 gültig (`SPT-009`).
 
 ## Preis- und Regel-Snapshot (`PRI-004`, `VER-002`)
 
-- Neue Positionen und echte Inventar-/Werbemittelwechsel: nur aktive, zulässige
-  Kombinationen und aktive Preislisten.
+- Neue Positionen und echte Inventar-/Werbemittelwechsel: aktive Preisliste
+  des **aktuellen Kalenderjahres** (`Europe/Berlin`). Eine aktive Zukunftsliste
+  ersetzt diese Vorauswahl nicht. Fehlt die aktuelle Jahresliste, gibt es
+  keinen stillen Fallback auf ein anderes Jahr.
 - Unveränderte bestehende Position: gespeicherte Preisliste (auch archiviert),
   Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz aus dem
   Positionssnapshot – auch wenn Stammdaten inzwischen deaktiviert sind.
+  Zusätzliche Stunden derselben Position lesen aus derselben gepinnten Version.
 - Fehlende oder gelöschte Referenzen führen zu kontrollierter Ablehnung, kein
   stiller Ersatz durch aktuelle Stammdaten.
 - **Gate-B-Grenze:** Anzeigenamen von Sender/Werbemittel werden bei vorhandenem

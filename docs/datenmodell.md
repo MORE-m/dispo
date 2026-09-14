@@ -182,11 +182,24 @@ Snapshot-Mutation.
 
 ## Preise
 
-`PriceList` bildet Jahr, Version, Status und Gültigkeit ab. `PriceListItem` speichert
-den fachlichen Schlüssel, z. B. Inventar, Stunde, Basistagesgruppe und Preisart.
+`PriceList` bildet Jahr, Version, Status, `lock_version` und Gültigkeit ab.
+`revision_number` ist die fachliche Revisionsreihenfolge je Inventar/Jahr
+(nebenläufigkeitssicher vergeben; historische `version`-Strings bleiben).
+Neue Entwürfe und Kopien wählen die nächste freie numerische `version` ab
+dieser Revisionsnummer; eine historische Kennung wie `"2"` oder `e2e-RH`
+wird nicht umgeschrieben, auch wenn dadurch Lücken entstehen.
+`PriceListItem` speichert nur Basis-Tagesgruppen (Mo–Fr, Sa, So), Stunde und
+Sekundenpreis. Eine Position ist `(price_list_id, hour, day_group)`.
+**PO-PRI-HOURS-1:** Stunden dürfen je Tagesgruppe unterschiedlich sein;
+fehlende Basiszeile = nicht buchbar (nicht 0). Mo–Sa/Mo–So werden über
+`DayGroupPrice` nur bei vorhandenen erforderlichen Basisgruppen abgeleitet.
+Aktivierung verlangt mindestens einen gültigen Basispreis; keine 24×3-Pflicht.
 
-Aktivierung ist atomar: Eine fehlerhafte Importdatei erzeugt keine teilweise aktive
-Preisliste. Importdatei und Validierungsbericht werden referenziert.
+Aktivierung ist atomar: höchstens eine `active` Preisliste je Inventar und
+Kalenderjahr (PO-PRI-ACTIVE-1). SQLite sichert das über einen partiellen Unique-
+Index, MySQL über generierte Spalten, die nur für `active` gefüllt sind.
+Entwürfe und Archive dürfen mehrfach existieren. Importdatei und
+Validierungsbericht gehören zum offenen Excel-Folgeslice, nicht zu BL-P4-01a.
 
 ## CRM-Stammdaten
 

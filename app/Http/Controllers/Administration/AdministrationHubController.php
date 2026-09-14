@@ -8,7 +8,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b) + Inventar-Admin (BL-P2-01a).
+ * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b) + Inventar-Admin (BL-P2-01a)
+ * + Preislisten-Admin-Lifecycle (BL-P4-01a, ohne Excel-Import).
  */
 class AdministrationHubController extends Controller
 {
@@ -42,9 +43,9 @@ class AdministrationHubController extends Controller
                 [
                     'key' => 'price-lists',
                     'title' => 'Preislisten',
-                    'description' => 'Noch nicht freigegeben (UX-GATE-D).',
-                    'href' => null,
-                    'available' => false,
+                    'description' => 'Jahresversionen anlegen, kopieren, bearbeiten und veröffentlichen (ohne Excel-Import).',
+                    'href' => '/administration/preislisten',
+                    'available' => true,
                 ],
             ],
         ]);

@@ -83,8 +83,8 @@ Feldset-Container, DF-3.3a1 Assignments/Resolver/Preview, DF-3.3a2α Gen2-Freeze
 DF-3.3a2β Gen3/VER-003 und DF-3.3b Assignment-Admin-UI; Options-Fundament bis
 Choice-UI (DF-3-REST-A–C3); Regelvertrag/Evaluatoren (RULE-A), Runtime
 Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
-abgeschlossen**. Offen außerhalb: Preislisten-Admin; ADV-002.
-ADV-001c3b1–c4b (Methoden) sind umgesetzt.
+abgeschlossen**. Preislisten-Admin-Lifecycle ohne Excel-Import: **BL-P4-01a**.
+Offen außerhalb: Excel-Import; Wizard-Jahreswahl; ADV-002.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

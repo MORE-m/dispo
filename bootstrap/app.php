@@ -3,6 +3,7 @@
 use App\Exceptions\CatalogAdminConflictException;
 use App\Exceptions\FieldDefinitionConflictException;
 use App\Exceptions\FieldSetAssignmentConflictException;
+use App\Exceptions\PriceListAdminConflictException;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Console\Scheduling\Schedule;
@@ -45,6 +46,10 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (CatalogAdminConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        });
+
+        $exceptions->render(function (PriceListAdminConflictException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         });
 

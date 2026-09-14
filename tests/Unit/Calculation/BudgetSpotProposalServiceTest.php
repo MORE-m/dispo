@@ -5,9 +5,12 @@ namespace Tests\Unit\Calculation;
 use App\Enums\BudgetStrategy;
 use App\Enums\DayGroup;
 use App\Enums\PlanningMode;
+use App\Enums\PriceListStatus;
+use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Services\Calculation\BudgetSpotProposalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
@@ -220,6 +223,62 @@ class BudgetSpotProposalServiceTest extends TestCase
         $this->expectException(ValidationException::class);
 
         $service->propose($this->basePayload($catalog['hamburg']->id, '500.00'), null);
+    }
+
+    public function test_mo_sa_range_works_without_sunday_and_missing_hour_is_not_zero(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $service = $this->service();
+        $list = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
+        PriceListItem::query()
+            ->where('price_list_id', $list->id)
+            ->where('day_group', DayGroup::So)
+            ->delete();
+
+        $ok = $service->propose([
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500.00',
+            'budget_strategy' => BudgetStrategy::EqualSpotCount->value,
+            'budget_wish_inventory_ids' => [$catalog['hamburg']->id],
+            'budget_spot_length_seconds' => 30,
+            'budget_distribution_ranges' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 10,
+                'day_group' => DayGroup::MoSa->value,
+            ]],
+        ], null);
+        $this->assertArrayHasKey('positions', $ok);
+        $this->assertNotEmpty($ok['positions']);
+
+        PriceListItem::query()
+            ->where('price_list_id', $list->id)
+            ->where('hour', 9)
+            ->where('day_group', DayGroup::Sa)
+            ->delete();
+
+        try {
+            $service->propose([
+                'planning_mode' => PlanningMode::Budget->value,
+                'target_budget_nn' => '500.00',
+                'budget_strategy' => BudgetStrategy::EqualSpotCount->value,
+                'budget_wish_inventory_ids' => [$catalog['hamburg']->id],
+                'budget_spot_length_seconds' => 30,
+                'budget_distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 10,
+                    'day_group' => DayGroup::MoSa->value,
+                ]],
+            ], null);
+            $this->fail('Erwartete ValidationException für nicht buchbare Stunde.');
+        } catch (ValidationException $exception) {
+            $message = implode(' ', Arr::flatten($exception->errors()));
+            $this->assertStringContainsString('fehlen Preise', $message);
+            $this->assertStringNotContainsString('0.0000', $message);
+        }
     }
 
     private function service(): BudgetSpotProposalService

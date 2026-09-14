@@ -6,10 +6,27 @@ use App\Enums\DayGroup;
 use InvalidArgumentException;
 
 /**
- * PRI-006 – abgeleitete Tagesgruppen.
+ * PRI-005 / PRI-006 / PO-PRI-HOURS-1 – abgeleitete Tagesgruppen.
+ *
+ * Fehlende Basiszeile = nicht buchbar, nicht Preis 0.
+ * Mo–Sa braucht Mo–Fr+Sa; Mo–So braucht Mo–Fr+Sa+So.
  */
 final class DayGroupPrice
 {
+    /**
+     * @return list<DayGroup>
+     */
+    public static function requiredBaseGroups(DayGroup $group): array
+    {
+        return match ($group) {
+            DayGroup::MoFr => [DayGroup::MoFr],
+            DayGroup::Sa => [DayGroup::Sa],
+            DayGroup::So => [DayGroup::So],
+            DayGroup::MoSa => [DayGroup::MoFr, DayGroup::Sa],
+            DayGroup::MoSo => [DayGroup::MoFr, DayGroup::Sa, DayGroup::So],
+        };
+    }
+
     public static function secondPrice(string $moFr, string $sa, string $so, DayGroup $group): string
     {
         return match ($group) {
@@ -29,21 +46,26 @@ final class DayGroupPrice
     }
 
     /**
-     * @param  array<string, string>  $baseByGroup  Keys mo_fr, sa, so
+     * @param  array<string, string>  $baseByGroup  nur vorhandene Keys mo_fr / sa / so
      */
     public static function fromBaseMap(array $baseByGroup, DayGroup $group): string
     {
-        foreach ([DayGroup::MoFr->value, DayGroup::Sa->value, DayGroup::So->value] as $required) {
-            if (! isset($baseByGroup[$required])) {
-                throw new InvalidArgumentException('Basispreis für Tagesgruppe fehlt: '.$required);
+        foreach (self::requiredBaseGroups($group) as $required) {
+            if (! isset($baseByGroup[$required->value])) {
+                throw new InvalidArgumentException('Basispreis für Tagesgruppe fehlt: '.$required->value);
             }
         }
 
-        return self::secondPrice(
-            $baseByGroup[DayGroup::MoFr->value],
-            $baseByGroup[DayGroup::Sa->value],
-            $baseByGroup[DayGroup::So->value],
-            $group,
-        );
+        $moFr = $baseByGroup[DayGroup::MoFr->value] ?? null;
+        $sa = $baseByGroup[DayGroup::Sa->value] ?? null;
+        $so = $baseByGroup[DayGroup::So->value] ?? null;
+
+        return match ($group) {
+            DayGroup::MoFr => Decimal::roundPrice((string) $moFr),
+            DayGroup::Sa => Decimal::roundPrice((string) $sa),
+            DayGroup::So => Decimal::roundPrice((string) $so),
+            DayGroup::MoSa => self::secondPrice((string) $moFr, (string) $sa, (string) $sa, $group),
+            DayGroup::MoSo => self::secondPrice((string) $moFr, (string) $sa, (string) $so, $group),
+        };
     }
 }

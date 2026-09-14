@@ -255,10 +255,11 @@ final class BudgetSpotProposalService
             $price = $this->catalog->findSecondPrice($priceList, $bucket->hour, $bucket->dayGroup);
             if ($price === null) {
                 $missingByDayGroup[$bucket->dayGroup->label()][] = TimeRangeHours::formatHour($bucket->hour);
-                $prices[] = '0';
-            } else {
-                $prices[] = $price;
+
+                continue;
             }
+
+            $prices[] = $price;
         }
 
         if ($missingByDayGroup !== []) {
