@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     importConfirmEnabled,
     importIssuesBySeverity,
+    type ImportIssue,
     type ImportPreview,
 } from './price-list-import';
 
@@ -27,7 +28,7 @@ describe('price-list-import helpers', () => {
     });
 
     it('filtert Issues nach Severity', () => {
-        const issues = [
+        const issues: ImportIssue[] = [
             {
                 severity: 'error',
                 code: 'x',
