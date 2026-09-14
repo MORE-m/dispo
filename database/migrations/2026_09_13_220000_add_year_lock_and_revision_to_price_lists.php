@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\Schema;
  * Jahr-Backfill nur aus valid_from (eindeutig belegt). Kein Fallback auf 2026
  * oder das Ausführungsjahr. Historische version-Strings und IDs bleiben.
  *
+ * Alle vorher prüfbaren Voraussetzungen laufen vor der ersten Schema- oder
+ * Datenänderung. Ein nicht verlustfreier Rollback wird verweigert, ohne den
+ * aktuellen Zustand zu beschädigen. MySQL-DDL gilt nicht als transaktional.
+ *
  * Eindeutigkeit Active:
  * - SQLite: partieller Unique-Index WHERE status = 'active'
  * - MySQL: generierte Spalten (NULL wenn nicht active) + UNIQUE
@@ -24,6 +28,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $this->assertDriverSupported();
+        $this->assertBackfillPrecondition();
+
         Schema::table('price_lists', function (Blueprint $table) {
             $table->unsignedSmallInteger('year')->default(0);
             $table->unsignedInteger('revision_number')->default(0);
@@ -32,7 +39,6 @@ return new class extends Migration
             $table->timestamp('archived_at')->nullable();
         });
 
-        $this->assertBackfillPrecondition();
         $this->backfillYearFromValidFrom();
         $this->backfillRevisionNumbers();
         $this->assertBackfillComplete();
@@ -52,6 +58,7 @@ return new class extends Migration
 
     public function down(): void
     {
+        $this->assertLegacyUniquenessRestorable();
         $this->dropActiveUniqueness();
 
         Schema::table('price_lists', function (Blueprint $table) {
@@ -77,6 +84,16 @@ return new class extends Migration
         return Schema::getConnection()->getDriverName();
     }
 
+    private function assertDriverSupported(): void
+    {
+        $driver = $this->driver();
+        if (! in_array($driver, ['sqlite', 'mysql'], true)) {
+            throw new RuntimeException(
+                'Nicht unterstützter Datenbanktreiber für Preislisten-Migration: '.$driver,
+            );
+        }
+    }
+
     private function yearExpression(): string
     {
         return $this->driver() === 'sqlite'
@@ -86,11 +103,28 @@ return new class extends Migration
 
     private function assertBackfillPrecondition(): void
     {
-        $nullValidFrom = (int) DB::table('price_lists')->whereNull('valid_from')->count();
-        if ($nullValidFrom > 0) {
+        $invalidValidFrom = $this->driver() === 'sqlite'
+            ? (int) DB::table('price_lists')
+                ->where(function ($query): void {
+                    $query->whereNull('valid_from')
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) IS NULL")
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) < 1990")
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) > 2100");
+                })
+                ->count()
+            : (int) DB::table('price_lists')
+                ->where(function ($query): void {
+                    $query->whereNull('valid_from')
+                        ->orWhereRaw('YEAR(valid_from) IS NULL')
+                        ->orWhereRaw('YEAR(valid_from) < 1990')
+                        ->orWhereRaw('YEAR(valid_from) > 2100');
+                })
+                ->count();
+        if ($invalidValidFrom > 0) {
             throw new RuntimeException(
-                'Jahr-Backfill nicht möglich: price_lists.valid_from ist für '
-                .$nullValidFrom.' Zeile(n) NULL. Kein pauschales Jahr raten.',
+                'Jahr-Backfill nicht möglich: price_lists.valid_from fehlt, ist nicht eindeutig auswertbar oder ergibt ein Kalenderjahr außerhalb 1990–2100 ('
+                .$invalidValidFrom
+                .' Zeile(n)). Kein pauschales Jahr raten.',
             );
         }
 
@@ -98,33 +132,73 @@ return new class extends Migration
             ? DB::table('price_lists')
                 ->select('inventory_id')
                 ->selectRaw("CAST(strftime('%Y', valid_from) AS INTEGER) as year_value")
-                ->selectRaw('COUNT(*) as active_n')
+                ->selectRaw('COUNT(*) as n')
                 ->where('status', 'active')
                 ->groupBy('inventory_id')
                 ->groupByRaw("CAST(strftime('%Y', valid_from) AS INTEGER)")
-                ->having('active_n', '>', 1)
+                ->having('n', '>', 1)
                 ->get()
             : DB::table('price_lists')
                 ->select('inventory_id')
                 ->selectRaw('YEAR(valid_from) as year_value')
-                ->selectRaw('COUNT(*) as active_n')
+                ->selectRaw('COUNT(*) as n')
                 ->where('status', 'active')
                 ->groupBy('inventory_id')
                 ->groupByRaw('YEAR(valid_from)')
-                ->having('active_n', '>', 1)
+                ->having('n', '>', 1)
                 ->get();
 
         if ($collisions->isNotEmpty()) {
             $sample = $collisions->map(
-                fn (object $row): string => 'inventory_id='.$row->inventory_id
-                    .' year='.$row->year_value
-                    .' active='.$row->active_n,
+                function (mixed $row): string {
+                    $data = (array) $row;
+
+                    return 'inventory_id='.($data['inventory_id'] ?? '')
+                        .' year='.($data['year_value'] ?? '')
+                        .' active='.($data['n'] ?? '');
+                },
             )->implode('; ');
 
             throw new RuntimeException(
                 'Jahr-Backfill nicht möglich: mehrere aktive Preislisten desselben Inventars und Jahres. '
                 .$sample
                 .'. Keine automatische Archivierung.',
+            );
+        }
+
+        $versionCollisions = $this->driver() === 'sqlite'
+            ? DB::table('price_lists')
+                ->select('inventory_id', 'version')
+                ->selectRaw("CAST(strftime('%Y', valid_from) AS INTEGER) as year_value")
+                ->selectRaw('COUNT(*) as n')
+                ->groupBy('inventory_id', 'version')
+                ->groupByRaw("CAST(strftime('%Y', valid_from) AS INTEGER)")
+                ->having('n', '>', 1)
+                ->get()
+            : DB::table('price_lists')
+                ->select('inventory_id', 'version')
+                ->selectRaw('YEAR(valid_from) as year_value')
+                ->selectRaw('COUNT(*) as n')
+                ->groupBy('inventory_id', 'version')
+                ->groupByRaw('YEAR(valid_from)')
+                ->having('n', '>', 1)
+                ->get();
+
+        if ($versionCollisions->isNotEmpty()) {
+            $sample = $versionCollisions->map(
+                function (mixed $row): string {
+                    $data = (array) $row;
+
+                    return 'inventory_id='.($data['inventory_id'] ?? '')
+                        .' year='.($data['year_value'] ?? '')
+                        .' version='.($data['version'] ?? '');
+                },
+            )->implode('; ');
+
+            throw new RuntimeException(
+                'Jahr-Backfill nicht möglich: UNIQUE(inventory_id, year, version) würde kollidieren. '
+                .$sample
+                .'. Keine automatische Umnummerierung.',
             );
         }
     }
@@ -157,10 +231,14 @@ return new class extends Migration
 
     private function assertBackfillComplete(): void
     {
-        $invalidYear = (int) DB::table('price_lists')->where('year', '<', 1990)->count();
+        $invalidYear = (int) DB::table('price_lists')
+            ->where(function ($query): void {
+                $query->where('year', '<', 1990)->orWhere('year', '>', 2100);
+            })
+            ->count();
         if ($invalidYear > 0) {
             throw new RuntimeException(
-                'Jahr-Backfill unvollständig: '.$invalidYear.' Zeile(n) ohne belegbares Kalenderjahr.',
+                'Jahr-Backfill unvollständig: '.$invalidYear.' Zeile(n) ohne belegbares Kalenderjahr 1990–2100.',
             );
         }
 
@@ -168,6 +246,34 @@ return new class extends Migration
         if ($invalidRevision > 0) {
             throw new RuntimeException(
                 'Revisions-Backfill unvollständig: '.$invalidRevision.' Zeile(n) ohne revision_number.',
+            );
+        }
+    }
+
+    private function assertLegacyUniquenessRestorable(): void
+    {
+        $collisions = DB::table('price_lists')
+            ->select('inventory_id', 'version')
+            ->selectRaw('COUNT(*) as n')
+            ->groupBy('inventory_id', 'version')
+            ->having('n', '>', 1)
+            ->get();
+
+        if ($collisions->isNotEmpty()) {
+            $sample = $collisions->map(
+                function (mixed $row): string {
+                    $data = (array) $row;
+
+                    return 'inventory_id='.($data['inventory_id'] ?? '')
+                        .' version='.($data['version'] ?? '')
+                        .' n='.($data['n'] ?? '');
+                },
+            )->implode('; ');
+
+            throw new RuntimeException(
+                'Rollback nicht möglich: UNIQUE(inventory_id, version) ist nicht wiederherstellbar. '
+                .$sample
+                .'. Schutzmechanismen und Spalten bleiben unverändert.',
             );
         }
     }
