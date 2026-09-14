@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PriceListImportStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,10 +20,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property array<string, mixed>|null $report
  * @property string|null $fingerprint
  * @property list<int>|null $created_price_list_ids
- * @property \Carbon\CarbonInterface|null $validated_at
- * @property \Carbon\CarbonInterface|null $confirmed_at
- * @property \Carbon\CarbonInterface|null $completed_at
- * @property \Carbon\CarbonInterface|null $failed_at
+ * @property CarbonInterface|null $validated_at
+ * @property CarbonInterface|null $confirmed_at
+ * @property CarbonInterface|null $completed_at
+ * @property CarbonInterface|null $failed_at
  */
 class PriceListImport extends Model
 {
