@@ -455,6 +455,164 @@ class PriceListRuntimeYearAndHistoryTest extends TestCase
 
         $this->assertSame(BudgetProposalStatus::Stale, BudgetProposal::query()->findOrFail($proposalId)->status);
         $this->assertSame(0, $calculation->fresh()->positions()->count());
+        $this->assertSame(BudgetProposalStatus::Stale, $calculation->fresh()->budget_proposal_status);
+    }
+
+    public function test_failed_apply_does_not_stale_newer_current_proposal(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+
+        $calculation = Calculation::query()->firstOrFail();
+        $first = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+            'calculation_id' => $calculation->id,
+        ]);
+        $first->assertOk();
+        $firstId = $first->json('proposal.id');
+
+        $old = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+        $this->activateSuccessor($catalog['hamburg']->id, (int) $old->year, $old);
+
+        $second = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+            'calculation_id' => $calculation->id,
+        ]);
+        $second->assertOk();
+        $secondId = $second->json('proposal.id');
+        $this->assertNotSame($firstId, $secondId);
+        $this->assertSame(BudgetProposalStatus::Current, $calculation->fresh()->budget_proposal_status);
+
+        $this->actingAs($user)
+            ->from(route('calculations.edit', $calculation))
+            ->post(route('calculations.budget-apply', [
+                'calculation' => $calculation,
+                'proposal' => $firstId,
+            ]))
+            ->assertRedirect()
+            ->assertSessionHasErrors('proposal');
+
+        $this->assertSame(BudgetProposalStatus::Stale, BudgetProposal::query()->findOrFail($firstId)->status);
+        $this->assertSame(BudgetProposalStatus::Current, BudgetProposal::query()->findOrFail($secondId)->status);
+        $this->assertSame(BudgetProposalStatus::Current, $calculation->fresh()->budget_proposal_status);
+        $this->assertSame(0, $calculation->fresh()->positions()->count());
+    }
+
+    public function test_second_apply_does_not_unapply_successful_proposal(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $this->actingAs($user)->post(route('calculations.store'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'schema_fingerprint' => $this->liveSchemaFingerprint(),
+            'target_budget_nn' => '500',
+            'order_discount_percent' => '0',
+            'positions' => [],
+        ]);
+        $calculation = Calculation::query()->firstOrFail();
+        $propose = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '500',
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+            'calculation_id' => $calculation->id,
+        ]);
+        $propose->assertOk();
+        $proposalId = $propose->json('proposal.id');
+        $pinnedListId = (int) PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->value('id');
+
+        $this->actingAs($user)
+            ->post(route('calculations.budget-apply', [
+                'calculation' => $calculation,
+                'proposal' => $proposalId,
+            ]))
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $calculation->refresh();
+        $this->assertSame(BudgetProposalStatus::Applied, $calculation->budget_proposal_status);
+        $this->assertGreaterThan(0, $calculation->positions()->count());
+        $this->assertSame(
+            $pinnedListId,
+            (int) $calculation->positions()->firstOrFail()->price_list_id,
+        );
+
+        $this->actingAs($user)
+            ->from(route('calculations.edit', $calculation))
+            ->post(route('calculations.budget-apply', [
+                'calculation' => $calculation,
+                'proposal' => $proposalId,
+            ]))
+            ->assertStatus(422);
+
+        $proposal = BudgetProposal::query()->findOrFail($proposalId);
+        $this->assertNotNull($proposal->applied_at);
+        $this->assertSame(BudgetProposalStatus::Applied, $proposal->status);
+        $this->assertSame(BudgetProposalStatus::Applied, $calculation->fresh()->budget_proposal_status);
+        $this->assertSame(
+            $pinnedListId,
+            (int) $calculation->fresh()->positions()->firstOrFail()->price_list_id,
+        );
     }
 
     private function activateSuccessor(int $inventoryId, int $year, PriceList $predecessor, bool $archivePredecessor = true): PriceList
