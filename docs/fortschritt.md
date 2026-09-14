@@ -1,6 +1,6 @@
 # Fortschritt V1
 
-Stand: 13. September 2026 (`BL-P4-01a` Preislisten-Admin-Lifecycle auf Feature-Branch;
+Stand: 14. September 2026 (`BL-P4-01a` Preislisten-Admin-Lifecycle auf Feature-Branch;
 `BL-P2-01` Organisation und Inventare abgeschlossen)
 
 ## Aktuelle Phase
@@ -32,6 +32,7 @@ BL-P2-01 Inventare: Admin-Lifecycle plus PO-Vertragsbereinigung
 | Jahresdefault = aktive Liste des aktuellen Kalenderjahres (Europe/Berlin) | **umgesetzt** |
 | Budget-Fingerprint inkl. `price_list_id` + Jahr + Version | **umgesetzt** |
 | Historische Preislisten-IDs und Versionsstrings unverändert | **umgesetzt** |
+| **PO-PRI-HOURS-1** buchbare Stunden je Tagesgruppe unabhängig | **umgesetzt** |
 | E2E isoliert: `playwright.blp401a.config.ts` (Port 8017) | **umgesetzt** |
 | Excel-Import / Wizard-Jahreswahl | **nicht in diesem Slice** |
 | `BL-P4-01` insgesamt | **unvollständig** |

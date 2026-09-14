@@ -8,8 +8,10 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * BL-P4-01a: Basis-Stundenpreise validieren. Abgeleitete Tagesgruppen werden
- * nicht persistiert. Fehlender Preis ist nicht Preis 0.
+ * BL-P4-01a / PO-PRI-HOURS-1: Basis-Stundenpreise validieren.
+ * Abgeleitete Tagesgruppen werden nicht persistiert.
+ * Fehlende Basiszeile = nicht buchbar, nicht Preis 0.
+ * Stunden je Tagesgruppe dürfen unabhängig sein (keine Trio-Pflicht).
  */
 final class PriceListItemContract
 {
@@ -73,25 +75,10 @@ final class PriceListItemContract
      */
     public static function assertActivationCoverage(array $items): void
     {
-        $byHour = [];
-        foreach ($items as $item) {
-            $byHour[$item['hour']][$item['day_group']->value] = $item['second_price'];
-        }
-
-        if ($byHour === []) {
+        if ($items === []) {
             throw ValidationException::withMessages([
-                'items' => 'Zum Aktivieren ist mindestens eine vollständige Preisstunde mit Mo–Fr, Samstag und Sonntag erforderlich.',
+                'items' => 'Zum Aktivieren ist mindestens ein gültiger Basispreis erforderlich. Eine leere Preisliste kann nicht aktiviert werden.',
             ]);
-        }
-
-        foreach ($byHour as $hour => $groups) {
-            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $required) {
-                if (! isset($groups[$required->value])) {
-                    throw ValidationException::withMessages([
-                        'items' => 'Für Stunde '.$hour.' fehlen Basispreise. Mo–Fr, Samstag und Sonntag müssen gemeinsam vorliegen. Fehlende Preise werden nicht als 0 angenommen.',
-                    ]);
-                }
-            }
         }
     }
 

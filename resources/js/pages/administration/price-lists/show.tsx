@@ -447,9 +447,13 @@ export default function PriceListShow({
                         />
                     </FormField>
                     <p className="text-muted-foreground text-sm">
-                        Basispreise für Mo–Fr, Samstag und Sonntag. Mo–Sa und
-                        Mo–So werden abgeleitet, nicht gespeichert. Leere Felder
-                        sind kein Preis 0.
+                        Basispreise je Tagesgruppe und Stunde. Leeres Feld =
+                        für diese Tagesgruppe/Stunde nicht buchbar (kein Preis
+                        0). Mo–Sa und Mo–So erscheinen nur, wenn die
+                        erforderlichen Basispreise vorhanden sind; sonst „—“.
+                        Stunden dürfen je Tagesgruppe unterschiedlich sein.
+                        Aktivierung braucht mindestens einen Basispreis, keine
+                        vollständige 24×3-Matrix.
                     </p>
                     <div className="overflow-x-auto">
                         <table
@@ -496,11 +500,17 @@ export default function PriceListShow({
                                                 />
                                             </td>
                                         ))}
-                                        <td className="text-muted-foreground px-2 py-1 font-mono">
+                                        <td
+                                            className="text-muted-foreground px-2 py-1 font-mono"
+                                            data-test={`price-derived-${hour}-mo_sa`}
+                                        >
                                             {derivedByKey[`${hour}|mo_sa`] ??
                                                 '—'}
                                         </td>
-                                        <td className="text-muted-foreground px-2 py-1 font-mono">
+                                        <td
+                                            className="text-muted-foreground px-2 py-1 font-mono"
+                                            data-test={`price-derived-${hour}-mo_so`}
+                                        >
                                             {derivedByKey[`${hour}|mo_so`] ??
                                                 '—'}
                                         </td>

@@ -189,7 +189,11 @@ Neue Entwürfe und Kopien wählen die nächste freie numerische `version` ab
 dieser Revisionsnummer; eine historische Kennung wie `"2"` oder `e2e-RH`
 wird nicht umgeschrieben, auch wenn dadurch Lücken entstehen.
 `PriceListItem` speichert nur Basis-Tagesgruppen (Mo–Fr, Sa, So), Stunde und
-Sekundenpreis. Mo–Sa/Mo–So werden über `DayGroupPrice` abgeleitet.
+Sekundenpreis. Eine Position ist `(price_list_id, hour, day_group)`.
+**PO-PRI-HOURS-1:** Stunden dürfen je Tagesgruppe unterschiedlich sein;
+fehlende Basiszeile = nicht buchbar (nicht 0). Mo–Sa/Mo–So werden über
+`DayGroupPrice` nur bei vorhandenen erforderlichen Basisgruppen abgeleitet.
+Aktivierung verlangt mindestens einen gültigen Basispreis; keine 24×3-Pflicht.
 
 Aktivierung ist atomar: höchstens eine `active` Preisliste je Inventar und
 Kalenderjahr (PO-PRI-ACTIVE-1). SQLite sichert das über einen partiellen Unique-

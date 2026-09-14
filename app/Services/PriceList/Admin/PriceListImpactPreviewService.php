@@ -214,19 +214,17 @@ final class PriceListImpactPreviewService
         $derived = [];
         ksort($byHour);
         foreach ($byHour as $hour => $groups) {
-            if (
-                ! isset($groups[DayGroup::MoFr->value], $groups[DayGroup::Sa->value], $groups[DayGroup::So->value])
-            ) {
-                continue;
-            }
-
             foreach ([DayGroup::MoSa, DayGroup::MoSo] as $group) {
-                $derived[] = [
-                    'hour' => (int) $hour,
-                    'day_group' => $group->value,
-                    'day_group_label' => $group->label(),
-                    'second_price' => DayGroupPrice::fromBaseMap($groups, $group),
-                ];
+                try {
+                    $derived[] = [
+                        'hour' => (int) $hour,
+                        'day_group' => $group->value,
+                        'day_group_label' => $group->label(),
+                        'second_price' => DayGroupPrice::fromBaseMap($groups, $group),
+                    ];
+                } catch (\InvalidArgumentException) {
+                    // PO-PRI-HOURS-1: fehlende erforderliche Basisgruppe → Spalte „—“
+                }
             }
         }
 

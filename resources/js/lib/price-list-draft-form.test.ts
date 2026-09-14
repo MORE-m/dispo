@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    canDeriveMoSa,
+    canDeriveMoSo,
     draftFormSnapshot,
     formFieldsReadOnly,
     formLockAfterPreview,
@@ -74,5 +76,23 @@ describe('price-list-draft-form', () => {
         expect(formFieldsReadOnly(true, true)).toBe(true);
         expect(formFieldsReadOnly(false, false)).toBe(true);
         expect(formFieldsReadOnly(false, true)).toBe(true);
+    });
+
+    it('leitet Mo–Sa/Mo–So nur bei vollständigen Basisgruppen ab', () => {
+        const onlyMoFr = { '6|mo_fr': '1.0000' };
+        expect(canDeriveMoSa(onlyMoFr, 6)).toBe(false);
+        expect(canDeriveMoSo(onlyMoFr, 6)).toBe(false);
+
+        const moFrSa = { '8|mo_fr': '1.0000', '8|sa': '2.0000' };
+        expect(canDeriveMoSa(moFrSa, 8)).toBe(true);
+        expect(canDeriveMoSo(moFrSa, 8)).toBe(false);
+
+        const all = {
+            '10|mo_fr': '1.0000',
+            '10|sa': '1.0000',
+            '10|so': '1.0000',
+        };
+        expect(canDeriveMoSa(all, 10)).toBe(true);
+        expect(canDeriveMoSo(all, 10)).toBe(true);
     });
 });

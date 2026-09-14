@@ -21,14 +21,26 @@ nachvollziehbar gespeichert oder reproduzierbar sein.
 
 ## Tagesgruppen
 
-Importierte Basispreise existieren je Uhrstunde für `Mo–Fr`, `Sa` und `So`.
+Basispreise existieren je Uhrstunde und Basis-Tagesgruppe (`Mo–Fr`, `Sa`, `So`).
+Laut **PO-PRI-HOURS-1** dürfen die buchbaren Stunden je Tagesgruppe
+unabhängig sein. Fehlt die Basiszeile für `(Stunde, Tagesgruppe)`, ist diese
+Kombination **nicht buchbar** – nicht Preis 0 und nicht still aus einer anderen
+Gruppe übernehmen.
 
 ```text
 P(Mo–Sa, h) = (5 × P(Mo–Fr, h) + P(Sa, h)) ÷ 6
 P(Mo–So, h) = (5 × P(Mo–Fr, h) + P(Sa, h) + P(So, h)) ÷ 7
 ```
 
-`Mo–Sa` und `Mo–So` sind Ableitungen und keine unabhängig pflegbaren Preise.
+Abhängigkeiten der Ableitung:
+
+- `Mo–Fr` / `Sa` / `So`: nur die jeweilige Basisgruppe
+- `Mo–Sa`: benötigt `Mo–Fr` und `Sa` derselben Stunde
+- `Mo–So`: benötigt `Mo–Fr`, `Sa` und `So` derselben Stunde
+
+Fehlt eine erforderliche Basisgruppe, ist die Ziel-Tagesgruppe nicht buchbar
+(fail-closed). `Mo–Sa` und `Mo–So` sind Ableitungen und keine unabhängig
+pflegbaren Preise.
 
 ## Spotlängenindex
 

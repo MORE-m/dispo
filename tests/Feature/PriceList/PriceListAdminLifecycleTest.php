@@ -11,6 +11,8 @@ use App\Models\Inventory;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
+use App\Services\Calculation\CatalogResolver;
+use App\Services\PriceList\Admin\PriceListImpactPreviewService;
 use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -278,43 +280,132 @@ class PriceListAdminLifecycleTest extends TestCase
         $this->assertSame('2026-RH', $source->fresh()->version);
     }
 
-    public function test_activation_requires_one_complete_hour_not_twenty_four(): void
+    public function test_po_pri_hours_1_sparse_hours_activation_and_derived_preview(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $admin = User::factory()->role(Role::Admin)->create();
         $year = PriceListCalendar::currentYear();
+        $resolver = app(CatalogResolver::class);
+        $preview = app(PriceListImpactPreviewService::class);
 
+        // A: nur MoFr Stunde 6
         $this->actingAs($admin)->post(route('administration.price-lists.store'), [
             'inventory_id' => $catalog['rock']->id,
             'year' => $year,
-            'name' => 'Unvollständig',
+            'name' => 'Nur MoFr 6',
             'items' => [
-                ['hour' => 8, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.0000'],
-                ['hour' => 8, 'day_group' => DayGroup::Sa->value, 'second_price' => '1.0000'],
+                ['hour' => 6, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.0000'],
             ],
         ])->assertRedirect();
-        $incomplete = PriceList::query()->where('name', 'Unvollständig')->firstOrFail();
-        $preview = $this->actingAs($admin)
-            ->postJson(route('administration.price-lists.activate-preview', $incomplete))
-            ->assertOk()
-            ->json();
-        $this->assertFalse($preview['can_proceed']);
+        $onlyMoFr = PriceList::query()->where('name', 'Nur MoFr 6')->firstOrFail();
+        $this->assertTrue(
+            $this->actingAs($admin)
+                ->postJson(route('administration.price-lists.activate-preview', $onlyMoFr))
+                ->assertOk()
+                ->json('can_proceed'),
+        );
+        $onlyMoFr->load('items');
+        $this->assertSame('1.0000', $resolver->findSecondPrice($onlyMoFr, 6, DayGroup::MoFr));
+        $this->assertNull($resolver->findSecondPrice($onlyMoFr, 6, DayGroup::Sa));
+        $this->assertNull($resolver->findSecondPrice($onlyMoFr, 6, DayGroup::So));
+        $this->assertNull($resolver->findSecondPrice($onlyMoFr, 6, DayGroup::MoSa));
+        $this->assertNull($resolver->findSecondPrice($onlyMoFr, 6, DayGroup::MoSo));
+        $derivedA = collect($preview->derivedPrices([
+            ['hour' => 6, 'day_group' => DayGroup::MoFr, 'second_price' => '1.0000'],
+        ]));
+        $this->assertTrue($derivedA->isEmpty());
 
+        // B: MoFr + Sa Stunde 8
+        $itemsB = [
+            ['hour' => 8, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.0000'],
+            ['hour' => 8, 'day_group' => DayGroup::Sa->value, 'second_price' => '2.0000'],
+        ];
         $this->actingAs($admin)->post(route('administration.price-lists.store'), [
             'inventory_id' => $catalog['rock']->id,
             'year' => $year,
-            'name' => 'Eine Stunde',
-            'items' => $this->hourItems(8, '1.0000'),
+            'name' => 'MoFr Sa 8',
+            'items' => $itemsB,
         ])->assertRedirect();
-        $complete = PriceList::query()->where('name', 'Eine Stunde')->firstOrFail();
-        $ok = $this->actingAs($admin)
-            ->postJson(route('administration.price-lists.activate-preview', $complete))
+        $moFrSa = PriceList::query()->where('name', 'MoFr Sa 8')->firstOrFail();
+        $this->assertTrue(
+            $this->actingAs($admin)
+                ->postJson(route('administration.price-lists.activate-preview', $moFrSa))
+                ->assertOk()
+                ->json('can_proceed'),
+        );
+        $moFrSa->load('items');
+        $this->assertSame('1.1667', $resolver->findSecondPrice($moFrSa, 8, DayGroup::MoSa));
+        $this->assertNull($resolver->findSecondPrice($moFrSa, 8, DayGroup::MoSo));
+        $derivedB = collect($preview->derivedPrices([
+            ['hour' => 8, 'day_group' => DayGroup::MoFr, 'second_price' => '1.0000'],
+            ['hour' => 8, 'day_group' => DayGroup::Sa, 'second_price' => '2.0000'],
+        ]));
+        $this->assertSame(
+            '1.1667',
+            $derivedB->firstWhere('day_group', DayGroup::MoSa->value)['second_price'] ?? null,
+        );
+        $this->assertNull($derivedB->firstWhere('day_group', DayGroup::MoSo->value));
+
+        // C: alle drei Stunde 10
+        $derivedC = collect($preview->derivedPrices([
+            ['hour' => 10, 'day_group' => DayGroup::MoFr, 'second_price' => '1.0000'],
+            ['hour' => 10, 'day_group' => DayGroup::Sa, 'second_price' => '1.0000'],
+            ['hour' => 10, 'day_group' => DayGroup::So, 'second_price' => '1.0000'],
+        ]));
+        $this->assertSame(
+            '1.0000',
+            $derivedC->firstWhere('day_group', DayGroup::MoSa->value)['second_price'] ?? null,
+        );
+        $this->assertSame(
+            '1.0000',
+            $derivedC->firstWhere('day_group', DayGroup::MoSo->value)['second_price'] ?? null,
+        );
+
+        // D: unterschiedliche Zeitfenster
+        $windowItems = [];
+        for ($hour = 6; $hour <= 22; $hour++) {
+            $windowItems[] = ['hour' => $hour, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.0000'];
+        }
+        for ($hour = 8; $hour <= 20; $hour++) {
+            $windowItems[] = ['hour' => $hour, 'day_group' => DayGroup::Sa->value, 'second_price' => '1.5000'];
+        }
+        for ($hour = 10; $hour <= 18; $hour++) {
+            $windowItems[] = ['hour' => $hour, 'day_group' => DayGroup::So->value, 'second_price' => '0.8000'];
+        }
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $year,
+            'name' => 'Fenster',
+            'items' => $windowItems,
+        ])->assertRedirect();
+        $windows = PriceList::query()->where('name', 'Fenster')->firstOrFail();
+        $this->activate($admin, $windows);
+        $windows->load('items');
+        $this->assertSame('1.0000', $resolver->findSecondPrice($windows, 6, DayGroup::MoFr));
+        $this->assertNull($resolver->findSecondPrice($windows, 6, DayGroup::Sa));
+        $this->assertSame('1.5000', $resolver->findSecondPrice($windows, 8, DayGroup::Sa));
+        $this->assertNull($resolver->findSecondPrice($windows, 8, DayGroup::So));
+        $this->assertSame('0.8000', $resolver->findSecondPrice($windows, 10, DayGroup::So));
+        $this->assertNull($resolver->findSecondPrice($windows, 22, DayGroup::Sa));
+        $this->assertNull($resolver->findSecondPrice($windows, 9, DayGroup::So));
+
+        // E: leere Liste – Draft ok, Aktivierung blockiert
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $year,
+            'name' => 'Leer',
+            'items' => [],
+        ])->assertRedirect();
+        $empty = PriceList::query()->where('name', 'Leer')->firstOrFail();
+        $emptyPreview = $this->actingAs($admin)
+            ->postJson(route('administration.price-lists.activate-preview', $empty))
             ->assertOk()
             ->json();
-        $this->assertTrue($ok['can_proceed']);
-        $this->activate($admin, $complete);
-        $this->assertSame(PriceListStatus::Active, $complete->fresh()->status);
-        $this->assertSame(3, $complete->items()->count());
+        $this->assertFalse($emptyPreview['can_proceed']);
+        $this->assertStringContainsString(
+            'mindestens ein gültiger Basispreis',
+            (string) ($emptyPreview['blocking_reasons'][0]['message'] ?? ''),
+        );
     }
 
     public function test_validation_rejects_invalid_duplicate_and_derived_prices(): void

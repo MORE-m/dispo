@@ -427,4 +427,66 @@ test.describe.serial('BL-P4-01a Preislisten-Admin', () => {
             page.locator('[data-test="calculation-summary"]'),
         ).toContainText(/e2e-RH|Radio Hamburg/);
     });
+
+    test('Sparse Stunden je Tagesgruppe: Aktivierung und „—“ für nicht ableitbare Gruppen', async ({
+        page,
+    }) => {
+        await login(page, 'admin@example.com');
+        const suffix = Date.now().toString().slice(-6);
+
+        await page.goto('/administration/preislisten/neu');
+        await page
+            .locator('[data-test="price-list-inventory-input"]')
+            .selectOption({ label: 'ROCK ANTENNE Hamburg (Sender)' });
+        await page
+            .locator('[data-test="price-list-name-input"]')
+            .fill(`E2E Sparse ${suffix}`);
+        await page.locator('[data-test="price-list-create-submit"]').click();
+        await expect(page).toHaveURL(/\/administration\/preislisten\/\d+$/);
+
+        await page.locator('[data-test="price-cell-6-mo_fr"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-8-sa"]').fill('2,0000');
+        await page.locator('[data-test="price-cell-10-mo_fr"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-10-sa"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-10-so"]').fill('1,0000');
+        await page.locator('[data-test="price-list-inspect-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toBeVisible();
+
+        await expect(
+            page.locator('[data-test="price-derived-6-mo_sa"]'),
+        ).toHaveText('—');
+        await expect(
+            page.locator('[data-test="price-derived-6-mo_so"]'),
+        ).toHaveText('—');
+        await expect(
+            page.locator('[data-test="price-derived-8-mo_sa"]'),
+        ).not.toHaveText('—');
+        await expect(
+            page.locator('[data-test="price-derived-8-mo_so"]'),
+        ).toHaveText('—');
+        await expect(
+            page.locator('[data-test="price-derived-10-mo_sa"]'),
+        ).not.toHaveText('—');
+        await expect(
+            page.locator('[data-test="price-derived-10-mo_so"]'),
+        ).not.toHaveText('—');
+
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toBeVisible();
+        await page
+            .locator('[data-test="price-list-activate-preview-button"]')
+            .click();
+        await expect(
+            page.locator('[data-test="price-list-impact-preview"]'),
+        ).toBeVisible();
+        await page.locator('[data-test="price-list-activate-confirm"]').click();
+        await expect(page.locator('[data-test="price-list-status"]')).toContainText(
+            'Aktiv',
+        );
+    });
 });

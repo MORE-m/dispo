@@ -305,7 +305,12 @@ Mögliche Werte für 'Einplanung durch': Disposition, OAP, PDM-Digital / Niklas 
 
 ## 7.2 Tagesgruppen
 
-Importiert werden ausschließlich Stunden-Sekundenpreise für Mo-Fr, Samstag und Sonntag. Abgeleitete Gruppen werden je Uhrstunde berechnet:
+Importiert bzw. gepflegt werden ausschließlich Stunden-Sekundenpreise für die
+Basisgruppen Mo-Fr, Samstag und Sonntag. **PO-PRI-HOURS-1:** Die buchbaren
+Stunden dürfen je Basis-Tagesgruppe unterschiedlich sein. Fehlt eine Basiszeile
+für `(Stunde, Tagesgruppe)`, ist die Kombination nicht buchbar (nicht Preis 0).
+Abgeleitete Gruppen werden je Uhrstunde nur berechnet, wenn die erforderlichen
+Basispreise derselben Stunde vorliegen:
 
 | **Mo-Sa** P(Mo-Sa, h) = \[5 x P(Mo-Fr, h) + P(Sa, h)\] / 6 |
 |------------------------------------------------------------|

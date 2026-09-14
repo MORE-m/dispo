@@ -710,14 +710,16 @@ final class CatalogResolver
                     && $candidate->day_group === $group,
             );
 
-            if ($item === null) {
-                return null;
+            if ($item !== null) {
+                $base[$group->value] = (string) $item->second_price;
             }
-
-            $base[$group->value] = (string) $item->second_price;
         }
 
-        return DayGroupPrice::fromBaseMap($base, $dayGroup);
+        try {
+            return DayGroupPrice::fromBaseMap($base, $dayGroup);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
     }
 
     /**

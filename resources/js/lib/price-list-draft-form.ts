@@ -75,3 +75,24 @@ export function formLockAfterPreview(
 export function formFieldsReadOnly(editable: boolean, busy: boolean): boolean {
     return !editable || busy;
 }
+
+/** PO-PRI-HOURS-1: Mo–Sa nur bei Mo–Fr + Sa derselben Stunde. */
+export function canDeriveMoSa(
+    grid: Record<string, string>,
+    hour: number,
+): boolean {
+    return (
+        (grid[`${hour}|mo_fr`]?.trim() ?? '') !== '' &&
+        (grid[`${hour}|sa`]?.trim() ?? '') !== ''
+    );
+}
+
+/** PO-PRI-HOURS-1: Mo–So nur bei Mo–Fr + Sa + So derselben Stunde. */
+export function canDeriveMoSo(
+    grid: Record<string, string>,
+    hour: number,
+): boolean {
+    return (
+        canDeriveMoSa(grid, hour) && (grid[`${hour}|so`]?.trim() ?? '') !== ''
+    );
+}
