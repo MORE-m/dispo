@@ -17,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-01a: Admin-Lifecycle für Preislisten. Kein Hard Delete, keine Excel-Importe.
+ * BL-P4-01a: Admin-Lifecycle für Preislisten. Kein Hard Delete.
+ * Excel-Import liegt in BL-P4-01b und erzeugt Drafts über createDraft().
  */
 final class PriceListAdminWriter
 {
