@@ -625,12 +625,6 @@ final class CatalogResolver
         return PriceListYearSelection::missingYearPriceListMessage($inventoryName, $year);
     }
 
-    /** @deprecated Use missingYearPriceListMessage */
-    private function missingCurrentYearPriceListMessage(string $inventoryName): string
-    {
-        return $this->missingYearPriceListMessage($inventoryName, PriceListCalendar::currentYear());
-    }
-
     /**
      * @param  array<string, mixed>  $position
      * @return array{0: list<PlanRowInput>, 1: list<TimeRangeInput>, 2: int, 3: bool}

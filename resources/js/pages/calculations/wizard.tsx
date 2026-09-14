@@ -588,20 +588,24 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             custom_choice_touched: {},
             custom_choice_meta: {},
             price_year: year,
-            original_price_year: null,
+            original_price_year: year,
             expected_price_list_id: expectedPriceListIdForYear(
                 catalog,
                 inventory.id,
                 year,
             ),
             price_list_version:
-                resolveDisplayedPriceYearOptions(catalog, inventory.id, year).find(
-                    (option) => option.year === year,
-                )?.version ?? null,
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.version ?? null,
             price_list_status:
-                resolveDisplayedPriceYearOptions(catalog, inventory.id, year).find(
-                    (option) => option.year === year,
-                )?.status ?? null,
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.status ?? null,
         };
     }
 
@@ -1578,11 +1582,7 @@ export default function CalculationWizard({
                         return item;
                     }
 
-                    const rule = ruleFor(
-                        catalog,
-                        nextInventoryId,
-                        medium.id,
-                    );
+                    const rule = ruleFor(catalog, nextInventoryId, medium.id);
                     const methodState = methodStateAfterMediumIdChange(
                         item.advertising_medium_id,
                         medium.id,
@@ -1601,7 +1601,10 @@ export default function CalculationWizard({
                     const selectedInventory = catalog.inventories.find(
                         (candidate) => candidate.id === nextInventoryId,
                     );
-                    const resetYear = defaultPriceYear(catalog, nextInventoryId);
+                    const resetYear = defaultPriceYear(
+                        catalog,
+                        nextInventoryId,
+                    );
                     const resetOption = resolveDisplayedPriceYearOptions(
                         catalog,
                         nextInventoryId,
@@ -1625,7 +1628,7 @@ export default function CalculationWizard({
                         position_discounts: [],
                         total_spot_count: 0,
                         price_year: resetYear,
-                        original_price_year: null,
+                        original_price_year: resetYear,
                         expected_price_list_id: expectedPriceListIdForYear(
                             catalog,
                             nextInventoryId,
@@ -1881,7 +1884,10 @@ export default function CalculationWizard({
                     catalog,
                     budgetElements
                         .map((element) => element.inventory_id)
-                        .filter((id): id is number => typeof id === 'number' && id > 0),
+                        .filter(
+                            (id): id is number =>
+                                typeof id === 'number' && id > 0,
+                        ),
                     budgetPriceYear,
                 ),
             });
@@ -2516,7 +2522,10 @@ export default function CalculationWizard({
                                     priceYearOptions={budgetPriceYearOptions(
                                         catalog,
                                         budgetElements
-                                            .map((element) => element.inventory_id)
+                                            .map(
+                                                (element) =>
+                                                    element.inventory_id,
+                                            )
                                             .filter(
                                                 (id): id is number =>
                                                     typeof id === 'number' &&
@@ -3001,7 +3010,9 @@ export default function CalculationWizard({
                                                                                         position.original_price_year
                                                                                 }
                                                                             >
-                                                                                {option.year}
+                                                                                {
+                                                                                    option.year
+                                                                                }
                                                                                 {option.version
                                                                                     ? ` · ${option.version}`
                                                                                     : option.available
@@ -3025,14 +3036,16 @@ export default function CalculationWizard({
                                                                             position.price_year &&
                                                                         option.available,
                                                                 ) &&
-                                                                position.original_price_year !==
-                                                                    position.price_year ? (
+                                                                position.price_list_status !==
+                                                                    'archived' ? (
                                                                     <p
                                                                         className="text-destructive mt-1 text-xs"
                                                                         data-test={`position-price-year-missing-${index}`}
                                                                     >
-                                                                        Für dieses
-                                                                        Jahr liegt
+                                                                        Für
+                                                                        dieses
+                                                                        Jahr
+                                                                        liegt
                                                                         keine
                                                                         aktive
                                                                         Preisliste

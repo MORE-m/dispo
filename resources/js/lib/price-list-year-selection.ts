@@ -28,7 +28,11 @@ export function defaultPriceYear(
     const preferred =
         options.find((option) => option.is_default) ?? options[0] ?? null;
 
-    return preferred?.year ?? catalog.current_price_year ?? new Date().getFullYear();
+    return (
+        preferred?.year ??
+        catalog.current_price_year ??
+        new Date().getFullYear()
+    );
 }
 
 export function expectedPriceListIdForYear(

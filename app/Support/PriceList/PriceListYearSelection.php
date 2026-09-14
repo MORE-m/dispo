@@ -106,8 +106,8 @@ final class PriceListYearSelection
     }
 
     /**
-     * @param  list<int>  $inventoryIds
-     * @return array<string, list<array{
+     * @param  array<int, int>  $inventoryIds
+     * @return array<int, list<array{
      *     year: int,
      *     price_list_id: int|null,
      *     version: string|null,
@@ -120,12 +120,16 @@ final class PriceListYearSelection
     {
         $map = [];
         foreach (array_values(array_unique(array_filter($inventoryIds))) as $inventoryId) {
-            $map[(string) $inventoryId] = self::optionsForInventory((int) $inventoryId, $now);
+            $id = (int) $inventoryId;
+            $map[$id] = self::optionsForInventory($id, $now);
         }
 
         return $map;
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     public static function resolveYearFromPayload(array $payload, ?int $fallback = null): int
     {
         if (array_key_exists('price_year', $payload) && $payload['price_year'] !== null && $payload['price_year'] !== '') {

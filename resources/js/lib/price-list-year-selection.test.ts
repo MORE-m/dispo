@@ -73,6 +73,8 @@ describe('price-list-year-selection', () => {
         expect(priceYearDirty(2026, 2026)).toBe(false);
         expect(priceYearDirty(2026, 2027)).toBe(true);
         expect(priceYearDirty(null, 2026)).toBe(false);
+        // Neue Position: initiales Jahr als Original → Folgejahrwechsel dirty
+        expect(priceYearDirty(2026, 2027)).toBe(true);
     });
 
     it('offers budget next year only when every inventory has it', () => {

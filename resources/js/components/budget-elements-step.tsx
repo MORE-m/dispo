@@ -68,7 +68,10 @@ export function BudgetElementsStep({
 
     return (
         <div className="space-y-4" data-test="budget-elements-step">
-            <Card className={wizardCardClass} data-test="budget-price-year-card">
+            <Card
+                className={wizardCardClass}
+                data-test="budget-price-year-card"
+            >
                 <CardHeader className={wizardCardHeaderClass}>
                     <CardTitle className={wizardCardTitleClass}>
                         Preisjahr

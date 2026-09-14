@@ -168,6 +168,28 @@ try {
 
                 return 'OK:apply_budget|'.$updated->id.'|'.($position?->price_list_id ?? 0).'|'.$updated->positions()->count();
             })(),
+            'rebind_calculation_year' => (function () use ($app, $actor, $payload): string {
+                $calculation = Calculation::query()->with([
+                    'positions.planRows',
+                    'positions.timeRanges',
+                    'positions.discounts',
+                    'orderDiscounts',
+                    'configurationSnapshot',
+                    'fieldValues',
+                ])->findOrFail((int) $payload['calculation_id']);
+                $writer = $app->make(CalculationWriter::class);
+                $body = $writer->payloadFromCalculation($calculation);
+                $body['lock_version'] = (int) ($payload['lock_version'] ?? $calculation->lock_version);
+                $body['positions'][0]['price_year'] = (int) $payload['price_year'];
+                $body['positions'][0]['expected_price_list_id'] = (int) $payload['expected_price_list_id'];
+                if (isset($payload['total_spot_count'])) {
+                    $body['positions'][0]['total_spot_count'] = (int) $payload['total_spot_count'];
+                }
+                $updated = $writer->update($calculation, $body, $actor);
+                $position = $updated->positions()->firstOrFail();
+
+                return 'OK:rebind_calculation_year|'.$position->price_list_id.'|'.$position->total_spot_count;
+            })(),
             'confirm_price_list_import' => (function () use ($app, $actor, $payload): string {
                 $import = PriceListImport::query()->findOrFail((int) $payload['import_id']);
                 $lists = $app->make(PriceListImportService::class)
