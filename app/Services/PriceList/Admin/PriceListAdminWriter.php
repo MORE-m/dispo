@@ -40,28 +40,8 @@ final class PriceListAdminWriter
                 forActivation: false,
             );
 
-            $this->lockInventoryYear($inventory->id, $year);
-            $revision = $this->nextRevisionNumber($inventory->id, $year);
-
-            try {
-                $list = new PriceList;
-                $list->inventory()->associate($inventory);
-                $list->name = $name;
-                $list->year = $year;
-                $list->revision_number = $revision;
-                $list->version = (string) $revision;
-                $list->status = PriceListStatus::Draft;
-                $list->valid_from = null;
-                $list->lock_version = 1;
-                $list->save();
-            } catch (UniqueConstraintViolationException) {
-                throw $this->duplicateIdentity();
-            } catch (QueryException $exception) {
-                if ($this->isUniqueViolation($exception)) {
-                    throw $this->duplicateIdentity();
-                }
-                throw $exception;
-            }
+            $this->lockInventoryYears($inventory->id, $year);
+            $list = $this->insertDraftRow((int) $inventory->id, $year, $name);
 
             $this->replaceItems($list, $items);
 
@@ -83,29 +63,19 @@ final class PriceListAdminWriter
     public function copyAsDraft(PriceList $source, array $payload, User $actor): PriceList
     {
         return DB::transaction(function () use ($source, $payload, $actor): PriceList {
-            /** @var PriceList $lockedSource */
-            $lockedSource = PriceList::query()->whereKey($source->id)->lockForUpdate()->firstOrFail();
-            $lockedSource->load(['items', 'inventory']);
-
+            $sourceYear = (int) $source->year;
             $year = array_key_exists('year', $payload)
                 ? $this->assertYear($payload['year'])
-                : (int) $lockedSource->year;
+                : $sourceYear;
+            $inventoryId = (int) $source->inventory_id;
+            $this->lockInventoryYears($inventoryId, $sourceYear, $year);
+
+            /** @var PriceList $lockedSource */
+            $lockedSource = PriceList::query()->whereKey($source->id)->firstOrFail();
+            $lockedSource->load(['items', 'inventory']);
+
             $name = $this->assertName((string) ($payload['name'] ?? $lockedSource->name));
-            $inventoryId = (int) $lockedSource->inventory_id;
-
-            $this->lockInventoryYear($inventoryId, $year);
-            $revision = $this->nextRevisionNumber($inventoryId, $year);
-
-            $copy = new PriceList;
-            $copy->inventory()->associate($inventoryId);
-            $copy->name = $name;
-            $copy->year = $year;
-            $copy->revision_number = $revision;
-            $copy->version = (string) $revision;
-            $copy->status = PriceListStatus::Draft;
-            $copy->valid_from = null;
-            $copy->lock_version = 1;
-            $copy->save();
+            $copy = $this->insertDraftRow($inventoryId, $year, $name);
 
             $copied = [];
             foreach ($lockedSource->items as $item) {
@@ -143,8 +113,9 @@ final class PriceListAdminWriter
     {
         return DB::transaction(function () use ($priceList, $payload, $actor): PriceList {
             $this->assertClientLockPresent($payload);
+            $this->lockInventoryYears((int) $priceList->inventory_id, (int) $priceList->year);
             /** @var PriceList $locked */
-            $locked = PriceList::query()->whereKey($priceList->id)->lockForUpdate()->firstOrFail();
+            $locked = PriceList::query()->whereKey($priceList->id)->firstOrFail();
             $this->assertLock($locked, (int) $payload['lock_version']);
             $this->assertDraft($locked);
             $this->rejectImmutableRebind($payload, $locked);
@@ -194,7 +165,7 @@ final class PriceListAdminWriter
 
             $inventoryId = (int) $priceList->inventory_id;
             $year = (int) $priceList->year;
-            $this->lockInventoryYear($inventoryId, $year);
+            $this->lockInventoryYears($inventoryId, $year);
 
             /** @var PriceList $locked */
             $locked = PriceList::query()->whereKey($priceList->id)->firstOrFail();
@@ -279,7 +250,7 @@ final class PriceListAdminWriter
                 ]);
             }
 
-            $this->lockInventoryYear((int) $priceList->inventory_id, (int) $priceList->year);
+            $this->lockInventoryYears((int) $priceList->inventory_id, (int) $priceList->year);
 
             /** @var PriceList $locked */
             $locked = PriceList::query()->whereKey($priceList->id)->firstOrFail();
@@ -327,15 +298,64 @@ final class PriceListAdminWriter
         );
     }
 
-    private function lockInventoryYear(int $inventoryId, int $year): void
+    private function lockInventoryYears(int $inventoryId, int ...$years): void
     {
         Inventory::query()->whereKey($inventoryId)->lockForUpdate()->firstOrFail();
-        PriceList::query()
-            ->where('inventory_id', $inventoryId)
-            ->where('year', $year)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get();
+        $uniqueYears = array_values(array_unique($years));
+        sort($uniqueYears);
+        foreach ($uniqueYears as $year) {
+            PriceList::query()
+                ->where('inventory_id', $inventoryId)
+                ->where('year', $year)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+        }
+    }
+
+    /**
+     * @return array{revision: int, version: string}
+     */
+    private function allocateIdentity(int $inventoryId, int $year): array
+    {
+        $revision = $this->nextRevisionNumber($inventoryId, $year);
+
+        return [
+            'revision' => $revision,
+            'version' => $this->nextAvailableVersion($inventoryId, $year, $revision),
+        ];
+    }
+
+    private function insertDraftRow(int $inventoryId, int $year, string $name): PriceList
+    {
+        $attempts = 0;
+        while ($attempts < 64) {
+            $attempts++;
+            $identity = $this->allocateIdentity($inventoryId, $year);
+            try {
+                $list = new PriceList;
+                $list->inventory()->associate($inventoryId);
+                $list->name = $name;
+                $list->year = $year;
+                $list->revision_number = $identity['revision'];
+                $list->version = $identity['version'];
+                $list->status = PriceListStatus::Draft;
+                $list->valid_from = null;
+                $list->lock_version = 1;
+                $list->save();
+
+                return $list;
+            } catch (UniqueConstraintViolationException) {
+                continue;
+            } catch (QueryException $exception) {
+                if ($this->isUniqueViolation($exception)) {
+                    continue;
+                }
+                throw $exception;
+            }
+        }
+
+        throw $this->duplicateIdentity();
     }
 
     private function nextRevisionNumber(int $inventoryId, int $year): int
@@ -343,9 +363,35 @@ final class PriceListAdminWriter
         $max = PriceList::query()
             ->where('inventory_id', $inventoryId)
             ->where('year', $year)
+            ->lockForUpdate()
             ->max('revision_number');
 
         return ((int) $max) + 1;
+    }
+
+    private function nextAvailableVersion(int $inventoryId, int $year, int $start): string
+    {
+        $taken = PriceList::query()
+            ->where('inventory_id', $inventoryId)
+            ->where('year', $year)
+            ->lockForUpdate()
+            ->pluck('version')
+            ->map(fn (mixed $version): string => (string) $version)
+            ->all();
+        $candidate = $start;
+        $guard = 0;
+
+        while (in_array((string) $candidate, $taken, true)) {
+            $candidate++;
+            $guard++;
+            if ($guard > 10000) {
+                throw ValidationException::withMessages([
+                    'version' => 'Keine freie Versionskennung in diesem Inventar und Jahr.',
+                ]);
+            }
+        }
+
+        return (string) $candidate;
     }
 
     /**

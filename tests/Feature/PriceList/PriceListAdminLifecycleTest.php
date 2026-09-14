@@ -182,6 +182,141 @@ class PriceListAdminLifecycleTest extends TestCase
         $this->assertGreaterThan(0, PriceListItem::query()->where('price_list_id', $draft->id)->count());
     }
 
+    public function test_legacy_numeric_version_is_skipped_without_rewriting_history(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $inventory = Inventory::factory()->create([
+            'organization_id' => $catalog['hamburg']->organization_id,
+            'code' => 'LG2',
+        ]);
+        $year = PriceListCalendar::currentYear();
+        $legacy = PriceList::factory()->create([
+            'inventory_id' => $inventory->id,
+            'year' => $year,
+            'version' => '2',
+            'revision_number' => 1,
+            'status' => PriceListStatus::Archived,
+            'name' => 'Legacy zwei',
+        ]);
+        $legacyPrice = '4.2500';
+        PriceListItem::factory()->create([
+            'price_list_id' => $legacy->id,
+            'hour' => 8,
+            'day_group' => DayGroup::MoFr,
+            'second_price' => $legacyPrice,
+        ]);
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $inventory->id,
+            'year' => $year,
+            'name' => 'Nach Legacy',
+            'items' => $this->hourItems(8, '1.0000'),
+        ])->assertRedirect();
+
+        $draft = PriceList::query()->where('name', 'Nach Legacy')->firstOrFail();
+        $this->assertSame(2, (int) $draft->revision_number);
+        $this->assertSame('3', $draft->version);
+        $this->assertSame('2', $legacy->fresh()->version);
+        $this->assertSame(1, (int) $legacy->fresh()->revision_number);
+        $this->assertSame(
+            $legacyPrice,
+            (string) PriceListItem::query()->where('price_list_id', $legacy->id)->value('second_price'),
+        );
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $inventory->id,
+            'year' => $year,
+            'name' => 'Kopie Legacy',
+            'copy_from_id' => $legacy->id,
+        ])->assertRedirect();
+        $copy = PriceList::query()->where('name', 'Kopie Legacy')->firstOrFail();
+        $this->assertSame($year, (int) $copy->year);
+        $this->assertSame('4', $copy->version);
+        $this->assertNotSame('2', $copy->version);
+        $this->assertSame('2', $legacy->fresh()->version);
+    }
+
+    public function test_non_numeric_legacy_version_and_copy_into_other_year(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $source = PriceList::query()->where('inventory_id', $catalog['hamburg']->id)->firstOrFail();
+        $this->assertSame('2026-RH', $source->version);
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $year,
+            'name' => 'Draft neben e2e',
+            'items' => $this->hourItems(8, '1.0000'),
+        ])->assertRedirect();
+        $first = PriceList::query()->where('name', 'Draft neben e2e')->firstOrFail();
+        $this->assertSame((string) $first->revision_number, $first->version);
+        $this->assertNotSame('2026-RH', $first->version);
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $year,
+            'name' => 'Zweiter Draft',
+            'items' => $this->hourItems(8, '1.1000'),
+        ])->assertRedirect();
+        $second = PriceList::query()->where('name', 'Zweiter Draft')->firstOrFail();
+        $this->assertNotSame($first->version, $second->version);
+        $this->assertSame('2026-RH', $source->fresh()->version);
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $year + 1,
+            'name' => 'Kopie anderes Jahr',
+            'copy_from_id' => $source->id,
+        ])->assertRedirect();
+        $otherYear = PriceList::query()->where('name', 'Kopie anderes Jahr')->firstOrFail();
+        $this->assertSame($year + 1, (int) $otherYear->year);
+        $this->assertSame('1', $otherYear->version);
+        $this->assertSame($source->items()->count(), $otherYear->items()->count());
+        $this->assertSame('2026-RH', $source->fresh()->version);
+    }
+
+    public function test_activation_requires_one_complete_hour_not_twenty_four(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $year,
+            'name' => 'Unvollständig',
+            'items' => [
+                ['hour' => 8, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.0000'],
+                ['hour' => 8, 'day_group' => DayGroup::Sa->value, 'second_price' => '1.0000'],
+            ],
+        ])->assertRedirect();
+        $incomplete = PriceList::query()->where('name', 'Unvollständig')->firstOrFail();
+        $preview = $this->actingAs($admin)
+            ->postJson(route('administration.price-lists.activate-preview', $incomplete))
+            ->assertOk()
+            ->json();
+        $this->assertFalse($preview['can_proceed']);
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $year,
+            'name' => 'Eine Stunde',
+            'items' => $this->hourItems(8, '1.0000'),
+        ])->assertRedirect();
+        $complete = PriceList::query()->where('name', 'Eine Stunde')->firstOrFail();
+        $ok = $this->actingAs($admin)
+            ->postJson(route('administration.price-lists.activate-preview', $complete))
+            ->assertOk()
+            ->json();
+        $this->assertTrue($ok['can_proceed']);
+        $this->activate($admin, $complete);
+        $this->assertSame(PriceListStatus::Active, $complete->fresh()->status);
+        $this->assertSame(3, $complete->items()->count());
+    }
+
     public function test_validation_rejects_invalid_duplicate_and_derived_prices(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -232,6 +367,45 @@ class PriceListAdminLifecycleTest extends TestCase
                 ],
             ])
             ->assertSessionHasErrors('items');
+    }
+
+    public function test_json_update_returns_base_items_and_advances_lock_version(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+
+        $this->actingAs($admin)->post(route('administration.price-lists.store'), [
+            'inventory_id' => $catalog['rock']->id,
+            'year' => $year,
+            'name' => 'JSON Draft',
+            'items' => $this->hourItems(8, '1.0000'),
+        ])->assertRedirect();
+        $draft = PriceList::query()->where('name', 'JSON Draft')->firstOrFail();
+
+        $first = $this->actingAs($admin)
+            ->putJson(route('administration.price-lists.update', $draft), [
+                'name' => 'JSON Draft v2',
+                'lock_version' => $draft->lock_version,
+                'items' => $this->hourItems(8, '1.5000'),
+            ])
+            ->assertOk()
+            ->json();
+        $this->assertSame(2, $first['lock_version']);
+        $this->assertSame('JSON Draft v2', $first['priceList']['name']);
+        $this->assertNotEmpty($first['baseItems']);
+        $this->assertSame('1.5000', $first['baseItems'][0]['second_price'] ?? null);
+
+        $second = $this->actingAs($admin)
+            ->putJson(route('administration.price-lists.update', $draft), [
+                'name' => 'JSON Draft v3',
+                'lock_version' => $first['lock_version'],
+                'items' => $this->hourItems(8, '1.7500'),
+            ])
+            ->assertOk()
+            ->json();
+        $this->assertSame(3, $second['lock_version']);
+        $this->assertSame('1.7500', $second['baseItems'][0]['second_price'] ?? null);
     }
 
     public function test_cardinality_allows_multiple_drafts_and_archives_but_not_two_actives(): void
