@@ -2,11 +2,16 @@
 
 namespace Tests\Feature\PriceList;
 
+use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
+use App\Enums\Role;
 use App\Models\Inventory;
 use App\Models\Organization;
 use App\Models\PriceList;
+use App\Models\User;
 use App\Services\Calculation\Decimal;
+use App\Services\PriceList\Admin\PriceListAdminWriter;
+use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListItemContract;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -151,12 +156,14 @@ class PriceListSchemaAndConstraintTest extends TestCase
         $first = PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2025,
+            'valid_from' => '2025-01-01',
             'version' => 'shared',
             'status' => PriceListStatus::Archived,
         ]);
         $second = PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'version' => 'shared',
             'status' => PriceListStatus::Draft,
         ]);
@@ -190,6 +197,82 @@ class PriceListSchemaAndConstraintTest extends TestCase
 
         $second->version = 'shared-b';
         $second->save();
+    }
+
+    public function test_down_refuses_writer_draft_with_null_valid_from_before_any_change(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $inventory = Inventory::factory()->create(['code' => 'WR']);
+        $year = PriceListCalendar::currentYear();
+        $draft = app(PriceListAdminWriter::class)->createDraft([
+            'inventory_id' => $inventory->id,
+            'year' => $year,
+            'name' => 'Writer Draft',
+            'items' => [
+                ['hour' => 8, 'day_group' => DayGroup::MoFr->value, 'second_price' => '1.2500'],
+                ['hour' => 8, 'day_group' => DayGroup::Sa->value, 'second_price' => '1.2500'],
+                ['hour' => 8, 'day_group' => DayGroup::So->value, 'second_price' => '1.2500'],
+            ],
+        ], $admin);
+
+        $this->assertNull($draft->valid_from);
+        $this->assertSame($year, (int) $draft->year);
+        $before = $this->schemaSnapshot();
+        $beforeVersion = $draft->version;
+        $migration = $this->migration();
+
+        try {
+            $migration->down();
+            $this->fail('down() hätte den Jahresbezug verweigern müssen.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Jahresbezug', $exception->getMessage());
+        }
+
+        $this->assertSame($before, $this->schemaSnapshot());
+        $this->assertTrue(Schema::hasColumn('price_lists', 'year'));
+        $this->assertTrue(Schema::hasColumn('price_lists', 'revision_number'));
+        $this->assertTrue(Schema::hasColumn('price_lists', 'lock_version'));
+        $this->assertActiveUniquenessIntact();
+        $fresh = $draft->fresh();
+        $this->assertNotNull($fresh);
+        $this->assertNull($fresh->valid_from);
+        $this->assertSame($year, (int) $fresh->year);
+        $this->assertSame($beforeVersion, $fresh->version);
+        $this->assertSame(PriceListStatus::Draft, $fresh->status);
+
+        // TearDown (migrate:rollback) braucht wieder rekonstruierbaren Jahresbezug.
+        $fresh->valid_from = sprintf('%04d-01-01', $year);
+        $fresh->save();
+    }
+
+    public function test_down_refuses_mismatched_year_and_valid_from_before_any_change(): void
+    {
+        $list = PriceList::factory()->create([
+            'year' => 2026,
+            'valid_from' => '2025-06-15',
+            'version' => 'year-mismatch',
+            'status' => PriceListStatus::Draft,
+        ]);
+        $before = $this->schemaSnapshot();
+        $migration = $this->migration();
+
+        try {
+            $migration->down();
+            $this->fail('down() hätte abweichenden Jahresbezug verweigern müssen.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('Jahresbezug', $exception->getMessage());
+        }
+
+        $this->assertSame($before, $this->schemaSnapshot());
+        $this->assertTrue(Schema::hasColumn('price_lists', 'year'));
+        $this->assertActiveUniquenessIntact();
+        $fresh = $list->fresh();
+        $this->assertSame(2026, (int) $fresh->year);
+        $this->assertSame('2025-06-15', $fresh->valid_from?->toDateString());
+        $this->assertSame('year-mismatch', $fresh->version);
+
+        $fresh->valid_from = '2026-01-01';
+        $fresh->save();
     }
 
     public function test_down_and_up_roundtrip_keeps_restorable_legacy_identity(): void
@@ -270,36 +353,42 @@ class PriceListSchemaAndConstraintTest extends TestCase
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Draft,
             'version' => 'd1',
         ]);
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Draft,
             'version' => 'd2',
         ]);
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Archived,
             'version' => 'a1',
         ]);
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Archived,
             'version' => 'a2',
         ]);
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Active,
             'version' => 'act-2026',
         ]);
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2027,
+            'valid_from' => '2027-01-01',
             'status' => PriceListStatus::Active,
             'version' => 'act-2027',
         ]);
@@ -312,6 +401,7 @@ class PriceListSchemaAndConstraintTest extends TestCase
         PriceList::factory()->create([
             'inventory_id' => $inventory->id,
             'year' => 2026,
+            'valid_from' => '2026-01-01',
             'status' => PriceListStatus::Active,
             'version' => 'act-2026-b',
         ]);
@@ -389,6 +479,26 @@ class PriceListSchemaAndConstraintTest extends TestCase
     {
         if (! Schema::hasColumn('price_lists', 'year')) {
             $migration->up();
+        }
+    }
+
+    private function assertActiveUniquenessIntact(): void
+    {
+        $driver = Schema::getConnection()->getDriverName();
+        if ($driver === 'mysql') {
+            $this->assertTrue(Schema::hasColumn('price_lists', 'active_inventory_id'));
+            $this->assertTrue(Schema::hasColumn('price_lists', 'active_year'));
+            $indexes = collect(DB::select('SHOW INDEX FROM price_lists'))
+                ->pluck('Key_name')
+                ->all();
+            $this->assertContains('price_lists_one_active_per_inventory_year', $indexes);
+
+            return;
+        }
+
+        if ($driver === 'sqlite') {
+            $indexes = collect(DB::select("PRAGMA index_list('price_lists')"))->pluck('name')->all();
+            $this->assertContains('price_lists_one_active_per_inventory_year', $indexes);
         }
     }
 }

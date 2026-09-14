@@ -59,6 +59,7 @@ return new class extends Migration
     public function down(): void
     {
         $this->assertLegacyUniquenessRestorable();
+        $this->assertYearReconstructableFromValidFrom();
         $this->dropActiveUniqueness();
 
         Schema::table('price_lists', function (Blueprint $table) {
@@ -274,6 +275,39 @@ return new class extends Migration
                 'Rollback nicht möglich: UNIQUE(inventory_id, version) ist nicht wiederherstellbar. '
                 .$sample
                 .'. Schutzmechanismen und Spalten bleiben unverändert.',
+            );
+        }
+    }
+
+    private function assertYearReconstructableFromValidFrom(): void
+    {
+        $mismatched = $this->driver() === 'sqlite'
+            ? (int) DB::table('price_lists')
+                ->where(function ($query): void {
+                    $query->whereNull('valid_from')
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) IS NULL")
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) < 1990")
+                        ->orWhereRaw("CAST(strftime('%Y', valid_from) AS INTEGER) > 2100")
+                        ->orWhereRaw('year != CAST(strftime(\'%Y\', valid_from) AS INTEGER)');
+                })
+                ->count()
+            : (int) DB::table('price_lists')
+                ->where(function ($query): void {
+                    $query->whereNull('valid_from')
+                        ->orWhereRaw('YEAR(valid_from) IS NULL')
+                        ->orWhereRaw('YEAR(valid_from) < 1990')
+                        ->orWhereRaw('YEAR(valid_from) > 2100')
+                        ->orWhereRaw('year != YEAR(valid_from)');
+                })
+                ->count();
+
+        if ($mismatched > 0) {
+            throw new RuntimeException(
+                'Rollback nicht möglich: der Jahresbezug ist nicht verlustfrei aus valid_from rekonstruierbar ('
+                .$mismatched
+                .' Zeile(n) mit fehlendem, ungültigem oder abweichendem valid_from). '
+                .'year/revision/lock, Active-Eindeutigkeit und Daten bleiben unverändert. '
+                .'Kein Nachfüllen von valid_from und keine Jahresüberschreibung.',
             );
         }
     }

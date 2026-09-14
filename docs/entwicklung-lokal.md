@@ -105,13 +105,17 @@ gegen `dispo`. `up()` prüft Treiber, `valid_from` und erkennbare
 Constraint-Kollisionen **bevor** Schema oder Daten geändert werden; bei
 Ablehnung bleiben Altbestand und Schema unverändert. Rollback stellt die
 alte Unique `(inventory_id, version)` wieder her, **nachdem** geprüft wurde,
-ob sie wiederherstellbar ist. Das scheitert kontrolliert, sobald dieselbe
-Versionskennung in zwei Jahren desselben Inventars existiert – ohne Active-
-Indizes, Generated Columns oder Jahres-/Lock-Spalten zu entfernen. Auf MySQL
-muss der alte Unique-Index `(inventory_id, version)` erst nach den neuen
-Inventar-Indizes entfallen, weil er den FK `inventory_id` stützt. MySQL-DDL
-gilt nicht als vollständig durch `DB::transaction` rückrollbar. Daten werden
-dabei nicht gelöscht oder umnummeriert.
+ob sie wiederherstellbar ist und ob der Jahresbezug verlustfrei aus
+`valid_from` rekonstruierbar ist (`valid_from` belegt, Jahr 1990–2100,
+stimmt mit gespeichertem `year` überein). Neu angelegte Entwürfe mit
+`year` und `valid_from = null` verweigern den Rollback kontrolliert –
+ohne Active-Indizes, Generated Columns oder Jahres-/Lock-Spalten zu
+entfernen und ohne `valid_from` nachträglich zu erfinden. Dasselbe gilt,
+wenn dieselbe Versionskennung in zwei Jahren desselben Inventars existiert.
+Auf MySQL muss der alte Unique-Index `(inventory_id, version)` erst nach
+den neuen Inventar-Indizes entfallen, weil er den FK `inventory_id` stützt.
+MySQL-DDL gilt nicht als vollständig durch `DB::transaction` rückrollbar.
+Daten werden dabei nicht gelöscht oder umnummeriert.
 
 Die UI darf erst gegen eine migrierte Datenbank als abgenommen gelten.
 
