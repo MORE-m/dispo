@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
@@ -26,6 +27,20 @@ class PriceListConcurrencyTest extends TestCase
 {
     use CreatesSpotClassicCatalog;
     use DatabaseMigrations;
+
+    protected function tearDown(): void
+    {
+        // Writer-Entwürfe haben year + valid_from=null; migrate:rollback darf daran
+        // nicht scheitern. Leere Tabellen sind für den Migrations-down unproblematisch.
+        if (Schema::hasTable('price_list_items')) {
+            DB::table('price_list_items')->delete();
+        }
+        if (Schema::hasTable('price_lists')) {
+            DB::table('price_lists')->delete();
+        }
+
+        parent::tearDown();
+    }
 
     public function test_concurrent_create_assigns_distinct_versions(): void
     {

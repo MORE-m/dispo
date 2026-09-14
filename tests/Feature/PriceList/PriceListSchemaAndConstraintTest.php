@@ -24,6 +24,20 @@ class PriceListSchemaAndConstraintTest extends TestCase
 {
     use DatabaseMigrations;
 
+    protected function tearDown(): void
+    {
+        // Abgelehnte down()-Fälle und Writer-Entwürfe hinterlassen oft year ohne
+        // rekonstruierbares valid_from; TearDown braucht leere Listen für Rollback.
+        if (Schema::hasTable('price_list_items')) {
+            DB::table('price_list_items')->delete();
+        }
+        if (Schema::hasTable('price_lists')) {
+            DB::table('price_lists')->delete();
+        }
+
+        parent::tearDown();
+    }
+
     public function test_migration_backfills_year_from_valid_from_without_rewriting_versions(): void
     {
         $organizationId = Organization::factory()->create()->id;
