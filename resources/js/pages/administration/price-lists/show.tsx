@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ErrorState, SuccessState } from '@/components/feedback/states';
 import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     draftFormSnapshot,
+    formFieldsReadOnly,
     formLockAfterPreview,
     gridFromBaseItems,
     isDraftDirty,
@@ -122,6 +123,7 @@ export default function PriceListShow({
     const [derived, setDerived] = useState(priceList.derived);
     const [savedDerived, setSavedDerived] = useState(priceList.derived);
     const [busy, setBusy] = useState(false);
+    const requestInFlight = useRef(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(
         flash.success ?? null,
@@ -135,6 +137,21 @@ export default function PriceListShow({
     );
 
     const dirty = isDraftDirty(savedSnapshot, name, grid);
+    const fieldsReadOnly = formFieldsReadOnly(editable, busy);
+
+    function beginRequest(): boolean {
+        if (requestInFlight.current) {
+            return false;
+        }
+        requestInFlight.current = true;
+        setBusy(true);
+        return true;
+    }
+
+    function endRequest(): void {
+        requestInFlight.current = false;
+        setBusy(false);
+    }
 
     const derivedByKey = useMemo(() => {
         const map: Record<string, string> = {};
@@ -149,6 +166,9 @@ export default function PriceListShow({
         nextName: string,
         nextGrid: Record<string, string>,
     ) {
+        if (requestInFlight.current || !editable) {
+            return;
+        }
         setName(nextName);
         setGrid(nextGrid);
         setPreview(null);
@@ -197,10 +217,9 @@ export default function PriceListShow({
 
     async function saveDraft(event: React.FormEvent) {
         event.preventDefault();
-        if (!editable) {
+        if (!editable || !beginRequest()) {
             return;
         }
-        setBusy(true);
         setError(null);
         setSuccess(null);
         setPreview(null);
@@ -236,12 +255,14 @@ export default function PriceListShow({
         } catch {
             setError('Speichern fehlgeschlagen.');
         } finally {
-            setBusy(false);
+            endRequest();
         }
     }
 
     async function inspectDraft() {
-        setBusy(true);
+        if (!beginRequest()) {
+            return;
+        }
         setError(null);
         setSuccess(null);
         try {
@@ -269,7 +290,7 @@ export default function PriceListShow({
         } catch {
             setError('Prüfung fehlgeschlagen.');
         } finally {
-            setBusy(false);
+            endRequest();
         }
     }
 
@@ -280,7 +301,9 @@ export default function PriceListShow({
             setSuccess(null);
             return;
         }
-        setBusy(true);
+        if (!beginRequest()) {
+            return;
+        }
         setError(null);
         setSuccess(null);
         try {
@@ -301,7 +324,7 @@ export default function PriceListShow({
         } catch {
             setError('Vorschau fehlgeschlagen.');
         } finally {
-            setBusy(false);
+            endRequest();
         }
     }
 
@@ -313,7 +336,9 @@ export default function PriceListShow({
             }
             return;
         }
-        setBusy(true);
+        if (!beginRequest()) {
+            return;
+        }
         setError(null);
         try {
             const response = await fetch(url, {
@@ -360,7 +385,7 @@ export default function PriceListShow({
         } catch {
             setError('Aktion fehlgeschlagen.');
         } finally {
-            setBusy(false);
+            endRequest();
         }
     }
 
@@ -414,7 +439,7 @@ export default function PriceListShow({
                         <Input
                             id="name"
                             value={name}
-                            readOnly={!editable}
+                            readOnly={fieldsReadOnly}
                             onChange={(event) =>
                                 markLocalChange(event.target.value, grid)
                             }
@@ -458,7 +483,7 @@ export default function PriceListShow({
                                                             `${hour}|${group.value}`
                                                         ] ?? ''
                                                     }
-                                                    readOnly={!editable}
+                                                    readOnly={fieldsReadOnly}
                                                     onChange={(event) =>
                                                         markLocalChange(name, {
                                                             ...grid,

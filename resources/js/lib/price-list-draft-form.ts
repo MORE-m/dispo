@@ -70,3 +70,8 @@ export function formLockAfterPreview(
 ): number {
     return formLockVersion;
 }
+
+/** Active/Archived bleiben read-only; während laufender Anfragen auch Entwürfe. */
+export function formFieldsReadOnly(editable: boolean, busy: boolean): boolean {
+    return !editable || busy;
+}

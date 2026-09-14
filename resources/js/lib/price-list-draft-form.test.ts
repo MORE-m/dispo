@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     draftFormSnapshot,
+    formFieldsReadOnly,
     formLockAfterPreview,
     gridFromBaseItems,
     isDraftDirty,
@@ -66,5 +67,12 @@ describe('price-list-draft-form', () => {
 
     it('benennt den Speicherhinweis fest', () => {
         expect(UNSAVED_LIFECYCLE_MESSAGE).toContain('speichern');
+    });
+
+    it('sperrt Eingaben bei laufender Anfrage und bei nicht editierbarem Stand', () => {
+        expect(formFieldsReadOnly(true, false)).toBe(false);
+        expect(formFieldsReadOnly(true, true)).toBe(true);
+        expect(formFieldsReadOnly(false, false)).toBe(true);
+        expect(formFieldsReadOnly(false, true)).toBe(true);
     });
 });

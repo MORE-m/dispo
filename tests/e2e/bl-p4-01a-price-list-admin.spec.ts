@@ -309,6 +309,113 @@ test.describe.serial('BL-P4-01a Preislisten-Admin', () => {
         );
     });
 
+    test('verzögerte Save-Antwort überschreibt keine Eingaben und sperrt Felder', async ({
+        page,
+    }) => {
+        await login(page, 'admin@example.com');
+        const suffix = Date.now().toString().slice(-6);
+
+        await page.goto('/administration/preislisten/neu');
+        await page
+            .locator('[data-test="price-list-inventory-input"]')
+            .selectOption({ label: 'Radio Hamburg (Sender)' });
+        await page
+            .locator('[data-test="price-list-name-input"]')
+            .fill(`E2E Busy ${suffix}`);
+        await page.locator('[data-test="price-list-create-submit"]').click();
+        await expect(page).toHaveURL(/\/administration\/preislisten\/\d+$/);
+
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-8-sa"]').fill('1,0000');
+        await page.locator('[data-test="price-cell-8-so"]').fill('1,0000');
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toBeVisible();
+
+        let releaseSave!: () => void;
+        const saveGate = new Promise<void>((resolve) => {
+            releaseSave = resolve;
+        });
+        await page.route('**/administration/preislisten/**', async (route) => {
+            if (route.request().method() === 'PUT') {
+                await saveGate;
+            }
+            await route.continue();
+        });
+
+        await page.locator('[data-test="price-cell-8-mo_fr"]').fill('1,2500');
+        await page.locator('[data-test="price-list-save-button"]').click();
+        await expect(
+            page.locator('[data-test="price-cell-8-mo_fr"]'),
+        ).toHaveAttribute('readonly', '');
+        await expect(
+            page.locator('[data-test="price-list-name-input"]'),
+        ).toHaveAttribute('readonly', '');
+        await expect(
+            page.locator('[data-test="price-list-save-button"]'),
+        ).toBeDisabled();
+        await expect(
+            page.locator('[data-test="price-list-inspect-button"]'),
+        ).toBeDisabled();
+        await expect(
+            page.locator('[data-test="price-list-activate-preview-button"]'),
+        ).toBeDisabled();
+
+        // Kein locator.fill: Playwright leert read-only Inputs vor dem Abbruch.
+        await page
+            .locator('[data-test="price-cell-8-mo_fr"]')
+            .evaluate((el: HTMLInputElement) => {
+                el.value = '1,5000';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+
+        releaseSave();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toContainText(/Gespeichert|Entwurf/);
+        await expect(
+            page.locator('[data-test="price-cell-8-mo_fr"]'),
+        ).toHaveValue(/1[,.]2500/);
+        await expect(
+            page.locator('[data-test="price-cell-8-mo_fr"]'),
+        ).not.toHaveAttribute('readonly');
+        await expect(
+            page.locator('[data-test="price-list-save-button"]'),
+        ).toBeEnabled();
+
+        let releaseInspect!: () => void;
+        const inspectGate = new Promise<void>((resolve) => {
+            releaseInspect = resolve;
+        });
+        await page.unroute('**/administration/preislisten/**');
+        await page.route('**/administration/preislisten/**/pruefen', async (route) => {
+            await inspectGate;
+            await route.continue();
+        });
+
+        await page.locator('[data-test="price-cell-8-sa"]').fill('1,7500');
+        await page.locator('[data-test="price-list-inspect-button"]').click();
+        await expect(
+            page.locator('[data-test="price-cell-8-sa"]'),
+        ).toHaveAttribute('readonly', '');
+        await page
+            .locator('[data-test="price-cell-8-sa"]')
+            .evaluate((el: HTMLInputElement) => {
+                el.value = '9,9999';
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            });
+        releaseInspect();
+        await expect(
+            page.locator('[data-test="price-list-show-success"]'),
+        ).toContainText(/geprüft/i);
+        await expect(
+            page.locator('[data-test="price-cell-8-sa"]'),
+        ).toHaveValue(/1[,.]7500/);
+    });
+
     test('historische Kalkulation bleibt nach neuer Aktivierung sichtbar', async ({
         page,
     }) => {
