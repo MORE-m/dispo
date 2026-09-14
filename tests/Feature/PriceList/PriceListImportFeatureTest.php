@@ -273,6 +273,57 @@ class PriceListImportFeatureTest extends TestCase
         $this->assertSame(0, AuditEvent::query()->where('action', 'price_list_import.uploaded')->count());
     }
 
+    public function test_upload_archive_move_failure_keeps_uploaded_audit_and_marks_failed(): void
+    {
+        $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $year = PriceListCalendar::currentYear();
+        $path = $this->xlsxPath([['RH', 8, 'mo_fr', '1.0000']]);
+        $disk = Storage::disk(config('dispo.files_disk'));
+        $auditCountBefore = AuditEvent::query()->count();
+
+        $real = app(PrivateFileStorage::class);
+        $files = \Mockery::mock(PrivateFileStorage::class);
+        $files->shouldReceive('put')->andReturnUsing(fn (string $p, string $c) => $real->put($p, $c));
+        $files->shouldReceive('exists')->andReturnUsing(fn (string $p) => $real->exists($p));
+        $files->shouldReceive('deleteTemporary')->andReturnUsing(fn (string $p) => $real->deleteTemporary($p));
+        $files->shouldReceive('disk')->andReturn($real->disk());
+        $files->shouldReceive('move')->once()->andReturn(false);
+        $this->app->instance(PrivateFileStorage::class, $files);
+
+        $this->actingAs($admin)->postJson(route('administration.price-lists.import.upload'), [
+            'year' => $year,
+            'file' => new UploadedFile($path, 'movefail.xlsx', null, null, true),
+        ])->assertStatus(422);
+
+        $this->assertSame(1, PriceListImport::query()->count());
+        $import = PriceListImport::query()->firstOrFail();
+        $this->assertSame(PriceListImportStatus::Failed, $import->status);
+        $this->assertNotNull($import->failed_at);
+        $this->assertNull($import->confirmed_at);
+        $this->assertNull($import->completed_at);
+        $this->assertNull($import->created_price_list_ids);
+        $this->assertSame('archive_move_failed', data_get($import->report, 'failure.code'));
+
+        $this->assertSame(0, PriceList::query()->where('name', 'like', 'Import %')->count());
+        $this->assertSame(0, PriceListItem::query()->whereHas('priceList', fn ($q) => $q->where('name', 'like', 'Import %'))->count());
+
+        $this->assertSame(1, AuditEvent::query()->where('action', 'price_list_import.uploaded')->count());
+        $this->assertSame(1, AuditEvent::query()->where('action', 'price_list_import.failed')->count());
+        $this->assertSame(0, AuditEvent::query()->where('action', 'price_list_import.confirmed')->count());
+        $this->assertSame($auditCountBefore + 2, AuditEvent::query()->count());
+
+        $this->assertSame([], $disk->allFiles(PriceListImportLimits::TEMPORARY_UPLOAD_PREFIX));
+        $this->assertFalse($disk->exists($import->stored_path));
+
+        $this->actingAs($admin)->postJson(route('administration.price-lists.import.validate', $import))
+            ->assertStatus(422);
+        $this->actingAs($admin)->postJson(route('administration.price-lists.import.confirm', $import), [
+            'fingerprint' => str_repeat('a', 64),
+        ])->assertStatus(422);
+        $this->assertSame(0, PriceList::query()->where('name', 'like', 'Import %')->count());
+    }
+
     public function test_upload_db_failure_after_temp_cleans_temporary_and_creates_no_import(): void
     {
         $this->createSpotClassicCatalog();

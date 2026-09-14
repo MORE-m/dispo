@@ -5,7 +5,6 @@ namespace App\Services\PriceList\Import;
 use App\Enums\DayGroup;
 use App\Enums\PriceListImportStatus;
 use App\Exceptions\PriceListAdminConflictException;
-use App\Models\AuditEvent;
 use App\Models\Inventory;
 use App\Models\PriceList;
 use App\Models\PriceListImport;
@@ -85,8 +84,18 @@ final class PriceListImportService
                 return $import;
             });
 
-            if (! $this->files->move($temporaryPath, $finalPath)) {
-                $this->compensateFailedUploadArchive($import, $temporaryPath);
+            try {
+                $moved = $this->files->move($temporaryPath, $finalPath);
+            } catch (Throwable) {
+                $this->markUploadArchiveFailed($import, $actor, $temporaryPath);
+
+                throw ValidationException::withMessages([
+                    'file' => 'Die Datei konnte nicht in den privaten Archivpfad übernommen werden.',
+                ]);
+            }
+
+            if ($moved === false) {
+                $this->markUploadArchiveFailed($import, $actor, $temporaryPath);
 
                 throw ValidationException::withMessages([
                     'file' => 'Die Datei konnte nicht in den privaten Archivpfad übernommen werden.',
@@ -118,6 +127,11 @@ final class PriceListImportService
         if ($import->status === PriceListImportStatus::Imported) {
             throw ValidationException::withMessages([
                 'import' => 'Dieser Importlauf wurde bereits übernommen.',
+            ]);
+        }
+        if ($import->status === PriceListImportStatus::Failed) {
+            throw ValidationException::withMessages([
+                'import' => 'Dieser Importlauf ist fehlgeschlagen und kann nicht geprüft werden.',
             ]);
         }
 
@@ -163,6 +177,12 @@ final class PriceListImportService
         if ($import->status === PriceListImportStatus::Imported) {
             throw ValidationException::withMessages([
                 'import' => 'Dieser Importlauf wurde bereits übernommen. Es werden keine weiteren Entwürfe erzeugt.',
+            ]);
+        }
+
+        if ($import->status === PriceListImportStatus::Failed) {
+            throw ValidationException::withMessages([
+                'import' => 'Dieser Importlauf ist fehlgeschlagen und kann nicht übernommen werden.',
             ]);
         }
 
@@ -595,20 +615,36 @@ final class PriceListImportService
         try {
             $this->files->deleteTemporary($temporaryPath);
         } catch (Throwable) {
-            // Best effort: kein persistentes Archiv belassen.
+            // Best effort: nur temporäre Pfade, niemals persistierte Archive.
         }
     }
 
-    private function compensateFailedUploadArchive(PriceListImport $import, string $temporaryPath): void
+    /**
+     * Archiv-Move fehlgeschlagen nachdem Import + uploaded-Audit committed sind.
+     * AUD-001: bestehende Audits bleiben; Kompensation nur append-only + Failed-Status.
+     */
+    private function markUploadArchiveFailed(PriceListImport $import, User $actor, string $temporaryPath): void
     {
         $this->cleanupTemporaryUpload($temporaryPath);
 
-        AuditEvent::query()
-            ->where('auditable_type', $import::class)
-            ->where('auditable_id', $import->id)
-            ->where('action', 'price_list_import.uploaded')
-            ->delete();
+        $import->status = PriceListImportStatus::Failed;
+        $import->failed_at = now();
+        $import->created_price_list_ids = null;
+        $import->confirmed_at = null;
+        $import->completed_at = null;
+        $import->report = [
+            'failure' => [
+                'code' => 'archive_move_failed',
+                'message' => 'Die Datei konnte nicht in den privaten Archivpfad übernommen werden.',
+            ],
+        ];
+        $import->save();
 
-        $import->delete();
+        $this->audit->record($import, 'price_list_import.failed', $actor, null, [
+            'code' => 'archive_move_failed',
+            'year' => (int) $import->year,
+            'checksum_sha256' => $import->checksum_sha256,
+            'original_filename' => $import->original_filename,
+        ]);
     }
 }
