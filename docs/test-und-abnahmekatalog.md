@@ -38,6 +38,16 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Importdatei privat (temp→Archiv), Report JSON auditierbar
 - isolierte Playwright-Suite `playwright.blp401b.config.ts` (Port 8018)
 
+### BL-P4-01c (Wizard-Jahreswahl / PO-PRI-YEAR-1)
+
+- Default = aktuelles Kalenderjahr `Europe/Berlin`; Folgejahr nur bei Active
+- Rebind nur bei tatsächlichem Jahrwechsel + bewusstem Speichern
+- historische Pins stabil (archiviert / neuere Active desselben Jahres)
+- kein stiller Fallback; fehlende Active fail-closed; kein Preis 0
+- `expected_price_list_id` → HTTP 409 bei Active-Wechsel zwischen Render und Save
+- Budget denselben Jahresvertrag; keine gemischten Jahre im Vorschlag
+- isolierte Playwright-Suite `playwright.blp401c.config.ts` (Port 8019)
+
 ## Mindestabnahme
 
 | ID | Betroffene Anforderungen | Szenario | Erwartung |

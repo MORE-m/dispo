@@ -1,24 +1,38 @@
 # Fortschritt V1
 
-Stand: 14. September 2026 (`BL-P4-01b` Preislisten-Excel-Import auf Feature-Branch;
-`BL-P4-01a` gemergt; `BL-P2-01` abgeschlossen)
+Stand: 15. September 2026 (`BL-P4-01c` Preislisten-Jahreswahl; `BL-P4-01a`/`BL-P4-01b`
+gemergt; `BL-P2-01` abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01b` in Arbeit** (Excel-Import mit Preview/atomarer Draft-Übernahme).
-UX-GATE-D enthält Teilfreigaben für Dispo/Vier-Augen, Dynamische-Felder-Admin,
-Katalog, Inventar-Admin, Preislisten-Lifecycle (**BL-P4-01a**) und
-**Preislisten-Excel-Import (BL-P4-01b)**. Kombinationstabellen-Admin bleibt gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen** (Lifecycle, Excel-Import, Wizard-Jahreswahl).
+Nächster fachlicher Hauptblock: **`BL-P4-02`**. UX-GATE-D enthält Teilfreigaben für
+Dispo/Vier-Augen, Dynamische-Felder-Admin, Katalog, Inventar-Admin,
+Preislisten-Lifecycle (**BL-P4-01a**), Excel-Import (**BL-P4-01b**) und
+Wizard-Jahreswahl (**BL-P4-01c** / PO-PRI-YEAR-1). Kombinationstabellen-Admin bleibt
+gesperrt.
 
 ## Aktuelle Aufgabe
 
-`BL-P4-01b` strukturierter Excel-Import (XLSX/XLS), kanonischer V1-Vertrag,
-Preview, atomare Draft-Erzeugung ohne Auto-Aktivierung.
-`BL-P4-01` bleibt unvollständig (explizite Wizard-Jahreswahl).
+`BL-P4-02` Spot Durchschnitt, Planer, Index, Komponenten (nächster Hauptblock).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-`BL-P4-01a` Preislisten-Admin-Lifecycle inkl. PO-PRI-HOURS-1 (gemergt).
+`BL-P4-01c` explizite Preislisten-Jahreswahl im Kalkulationswizard (PO-PRI-YEAR-1).
+
+## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe Wizard-Jahreswahl (PO-PRI-YEAR-1) | **freigegeben / umgesetzt** |
+| Pro Position: aktuelles Jahr Default, Folgejahr nur bei Active | **umgesetzt** |
+| Rebind nur bei tatsächlichem Jahrwechsel + bewusstem Speichern | **umgesetzt** |
+| Historische Pins stabil (auch archiviert / neuere Active) | **umgesetzt** |
+| `expected_price_list_id` → HTTP 409 bei Active-Wechsel | **umgesetzt** |
+| Budget denselben Jahresvertrag | **umgesetzt** |
+| E2E isoliert: `playwright.blp401c.config.ts` (Port 8019) | **umgesetzt** |
+| MORE-Produktiv-Workbook-Mapping | **offen** (Lieferdaten/Adapter; macht 01c nicht unvollständig) |
+| `BL-P4-01` insgesamt | **erledigt** |
 
 ## BL-P4-01b – Preislisten-Excel-Import (September 2026)
 
@@ -34,8 +48,8 @@ Preview, atomare Draft-Erzeugung ohne Auto-Aktivierung.
 | PO-PRI-HOURS-1 sparse Stunden im Import | **umgesetzt** |
 | E2E isoliert: `playwright.blp401b.config.ts` (Port 8018) | **umgesetzt** |
 | MORE-Produktiv-Workbook-Mapping | **offen** (Beispieldatei) |
-| Wizard-Jahreswahl | **nicht in diesem Slice** |
-| `BL-P4-01` insgesamt | **unvollständig** |
+| Wizard-Jahreswahl | **BL-P4-01c** |
+| `BL-P4-01` insgesamt | **erledigt** (nach 01c) |
 
 ## BL-P4-01a – Preislisten-Admin-Lifecycle (September 2026)
 
@@ -51,8 +65,8 @@ Preview, atomare Draft-Erzeugung ohne Auto-Aktivierung.
 | **PO-PRI-HOURS-1** buchbare Stunden je Tagesgruppe unabhängig | **umgesetzt** |
 | E2E isoliert: `playwright.blp401a.config.ts` (Port 8017) | **umgesetzt** |
 | Excel-Import | **BL-P4-01b** |
-| Wizard-Jahreswahl | **nicht in diesem Slice** |
-| `BL-P4-01` insgesamt | **unvollständig** |
+| Wizard-Jahreswahl | **BL-P4-01c** |
+| `BL-P4-01` insgesamt | **erledigt** (nach 01c) |
 
 ## BL-P2-01a – Inventory Admin Lifecycle (September 2026)
 
@@ -625,6 +639,6 @@ PR #24 / `8edcbd7`. Generation 2 bleibt unverändert; neue Vorgänge frieren sei
 | ID | Thema |
 |---|---|
 | BLK-005 | UX-GATE-C |
-| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien, Inventar-Admin-Lifecycle, Preislisten-Lifecycle und Excel-Import teilfreigegeben; Kombinationstabelle gesperrt; Kombi-Mitgliedschaften entfallen) |
+| BLK-006 | UX-GATE-D (Rest; Dyn-Feld-Admin, Katalog Kat/Medien, Inventar-Admin-Lifecycle, Preislisten-Lifecycle, Excel-Import und Wizard-Jahreswahl teilfreigegeben; Kombinationstabelle gesperrt; Kombi-Mitgliedschaften entfallen) |
 | BLK-001 | Initialkataloge Kapitel 27 |
 | BLK-002 | Speedit-Parameter vor Produktiv-Deploy |

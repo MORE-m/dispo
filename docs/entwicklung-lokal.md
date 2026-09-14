@@ -138,6 +138,19 @@ Kanonischer Vertrag (kein erfundenes MORE-Layout):
 
 E2E: `npx playwright test -c playwright.blp401b.config.ts` (Port 8018).
 
+## BL-P4-01c – Wizard-Preisjahrwahl
+
+Kein Schema-Migrationsschritt. Payload-Felder:
+
+- `positions.*.price_year` (int)
+- `positions.*.expected_price_list_id` (int, Expected-Active zum Renderzeitpunkt)
+- Budget: `price_year`, optional `expected_price_list_ids`
+
+`positions.*.price_list_id` ist im HTTP-Payload prohibited (Serverautorität).
+
+E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
+DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).
+
 ## Produktion (nicht lokal)
 
 - `APP_DEBUG=false`

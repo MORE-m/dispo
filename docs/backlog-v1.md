@@ -209,7 +209,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Status:** erledigt (DF-1 … DF-3-RULE-C; Dyn-Feld-Pfad inkl. Optionen und Regel-Editor)
 - **Anforderungen:** `DYN-001` bis `DYN-008`, `ADM-001`, `ADM-002`
 - **Geplante Folge:** ADV-001a → … → Optionen / Regel-Editor – **erledigt**; Inventar-Admin erledigt; danach Preislisten-Admin / ADV-002
-- **Offen außerhalb DF-3:** ADV-002, Preislisten-Admin.
+- **Offen außerhalb DF-3:** ADV-002.
 - **Abhängigkeiten:** BL-P2-02 / ADV-001a (für Vererbung/Assignments; nicht für DF-3.1/3.2a/b/fs)
 - **Ergebnis:** Typen, Optionen, Pflicht/Sichtbarkeit, Admin-Vorschau, Versionen, Regel-Editor
 - **Akzeptanz:** serverseitige Auswertung; ausgeblendete Felder ohne versehentliche Pflichtfehler
@@ -252,26 +252,26 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-01 – Preislisten, Import, Tagesgruppen
 
 - **Phase:** 4
-- **Status:** in Arbeit (BL-P4-01a Lifecycle und BL-P4-01b Excel-Import umgesetzt; Wizard-Jahreswahl offen)
+- **Status:** erledigt (`BL-P4-01a` Lifecycle, `BL-P4-01b` Excel-Import, `BL-P4-01c` Wizard-Jahreswahl / PO-PRI-YEAR-1)
 - **Anforderungen:** `PRI-001` bis `PRI-006`
 - **Abhängigkeiten:** BL-P3-02
 - **Ergebnis 01a:** Jahresversionen, Draft/Copy/Activate/Archive, atomare Aktivierung, abgeleitete Tagesgruppen, Jahresdefault, Budget-Fingerprint
 - **Ergebnis 01b:** Excel-Import XLSX/XLS, Preview/Fingerprint, atomare Drafts, privater Storage/Report (`AT-21`)
-- **Offen:** explizite Wahl anderer aktiver Jahreslisten im Wizard (PRI-002-Rest); MORE-Produktiv-Workbook-Adapter nach Beispieldatei
+- **Ergebnis 01c:** explizite Jahreswahl je Position und im Budget (aktuelles + Folgejahr), Rebind nur bei Jahrwechsel + Speichern, historische Pins stabil, 409 bei Active-Drift
+- **Offen außerhalb 01:** MORE-Produktiv-Workbook-Adapter nach Beispieldatei (Lieferdaten; macht `BL-P4-01` nicht unvollständig)
 - **Akzeptanz 01a:** höchstens eine Active je Inventar/Jahr; historische Versionen unverändert; aktuelles Kalenderjahr als Default
-- **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017) und `blp401b` (8018)
+- **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017), `blp401b` (8018), `blp401c` (8019)
 
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen
+- **Status:** offen (nächster fachlicher Hauptblock; Average-/Mehrsender-/Längen-Kern bereits in UX-GATE-B)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis:** Spotkalkulation mit frei editierbarer Länge, Mehrsender-Positionen, Live-Summe und Rechenerklärung
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24`
 - **Tests:** Pest Formeln inkl. Rundung; UI an Serverregeln; Mehrsender-Beispiel Radio Hamburg + ROCK ANTENNE Hamburg
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Dieses Paket bleibt für Durchschnitt, Kalenderplaner, Komponenten und Preisimport.
-
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Dieses Paket bleibt für Kalenderplaner, Komponenten und Abnahme-Härtung.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
