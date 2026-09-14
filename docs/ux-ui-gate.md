@@ -1,10 +1,10 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 13. September 2026
+- **Stand:** 14. September 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
-  + Preislisten-Admin-Lifecycle BL-P4-01a ohne Excel-Import)
+  + Preislisten-Admin-Lifecycle BL-P4-01a + Excel-Import BL-P4-01b ohne Auto-Aktivierung)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 
@@ -20,7 +20,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle ohne Excel-Import) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -213,7 +213,6 @@ Mitgliedschaften. Der Typfilter `Typ: Alle / Sender / Kombi` bleibt korrekt.
 
 Ausdrücklich **nicht** freigegeben bleiben:
 
-- Excel-Import von Preislisten
 - allgemeine Preislistenauswahl im Wizard als zusätzlicher Bedienablauf
 - Kombinationstabellen-Admin
 - Standardangebote
@@ -248,14 +247,18 @@ Diese Entscheidung gibt **nicht** das gesamte UX-GATE-D frei.
 
 Ausdrücklich **nicht** in BL-P4-01a enthalten:
 
-- Excel-Importoberfläche, Upload oder Parser
+- Excel-Importoberfläche, Upload oder Parser (**BL-P4-01b**)
 - allgemeine Preislistenauswahl im Wizard als zusätzlicher Bedienablauf
 - Kombinationstabellen-Admin
 - neue Kalkulationsarten, Online-Audio-/TKP-Admin, Produktionspreislisten
 - Standardangebote, operative Disposition, Reports, ADV-002
 
-`BL-P4-01` bleibt insgesamt unvollständig (Import und explizite Jahreswahl im
-Wizard offen).
+**Product-Owner-Teilfreigabe (14. September 2026, UX-GATE-D / BL-P4-01b):**
+Excel-Import für Spot-Stundenpreislisten freigegeben: Upload XLSX/XLS, Prüfung,
+Preview mit Fingerprint, Bestätigung, atomare Draft-Erzeugung, privater Storage
+und Report. **Keine Auto-Aktivierung.** Kanonischer V1-Spaltenvertrag; Adapter für
+eine echte MORE-Produktivdatei bleibt bis Beispieldatei offen. Explizite
+Wizard-Jahreswahl bleibt offen. `BL-P4-01` bleibt insgesamt unvollständig.
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
@@ -264,9 +267,9 @@ Wizard offen).
 - vollständiger Statusworkflow ab `In Bearbeitung`
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
-- Administration der übrigen Initialkataloge (Excel-Import Preislisten,
-  Kombinationstabelle) – Oberkategorien/Werbemittel (ADV-001b), Inventar-Admin
-  (BL-P2-01a) und Preislisten-Lifecycle ohne Import (BL-P4-01a) sind
+- Administration der übrigen Initialkataloge (Kombinationstabelle) –
+  Oberkategorien/Werbemittel (ADV-001b), Inventar-Admin (BL-P2-01a),
+  Preislisten-Lifecycle (BL-P4-01a) und Excel-Import (BL-P4-01b) sind
   teilfreigegeben; Kombi-Mitgliedschaften entfallen (PO-BL-P2-01-KOMBI)
 - Auswertungen und abschließende Fachoberflächen
 - Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
@@ -282,8 +285,8 @@ bleiben definiert, aber noch nicht erreichbar.
 | Gate-Status | Erlaubt |
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
-| C und D blockiert | nur Sperr-/Leerzustände in der Navigation, keine Schein-Fachseiten |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin (inkl. DF-3.3b) + Katalog Oberkategorien/Werbemittel (ADV-001b) + Inventar-Admin-Lifecycle (BL-P2-01a) + Preislisten-Admin-Lifecycle ohne Excel-Import (BL-P4-01a); operative Disposition und Excel-Import weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b); operative Disposition und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

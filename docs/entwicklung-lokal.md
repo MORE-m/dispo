@@ -119,6 +119,25 @@ Daten werden dabei nicht gelöscht oder umnummeriert.
 
 Die UI darf erst gegen eine migrierte Datenbank als abgenommen gelten.
 
+## BL-P4-01b – Excel-Import
+
+Migration `2026_09_14_120000_create_price_list_imports_table`. Dependency:
+`phpoffice/phpspreadsheet` (MIT). Formate: XLSX und XLS; CSV nicht.
+
+Kanonischer Vertrag (kein erfundenes MORE-Layout):
+
+- Spalten `inventory_code`/`inventory`, `hour`, `day_group`, `second_price`, optional `year`
+- oder Blattname = Inventar + Spalten ohne Inventarspalte
+- Jahr in der UI; Workbook-Jahr falls vorhanden muss übereinstimmen
+- Aliase nur dokumentiert: `radio ffn`, `BOLLERWAGEN`
+- Import erzeugt Drafts; Aktivierung über bestehenden Lifecycle
+- Formeln werden nicht ausgewertet (`formula_not_allowed`)
+- Preflight vor Materialisierung: max. 50 MB, 20 Blätter, 5 000 Zeilen/Blatt,
+  32 Spalten, 10 000 Datenzeilen gesamt
+- Upload zuerst unter `temporary/price-list-imports/`, danach privater Archivpfad
+
+E2E: `npx playwright test -c playwright.blp401b.config.ts` (Port 8018).
+
 ## Produktion (nicht lokal)
 
 - `APP_DEBUG=false`

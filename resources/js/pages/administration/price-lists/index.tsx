@@ -79,6 +79,14 @@ export default function PriceListIndex({
                                     Administration
                                 </Link>
                             </Button>
+                            <Button variant="outline" asChild>
+                                <Link
+                                    href="/administration/preislisten/import"
+                                    data-test="price-list-import-link"
+                                >
+                                    Excel importieren
+                                </Link>
+                            </Button>
                             <Button asChild>
                                 <Link
                                     href="/administration/preislisten/neu"

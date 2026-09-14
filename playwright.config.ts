@@ -37,6 +37,7 @@ export default defineConfig({
         '**/df3rulec-*.spec.ts',
         '**/bl-p2-01a-*.spec.ts',
         '**/bl-p4-01a-*.spec.ts',
+        '**/bl-p4-01b-*.spec.ts',
     ],
     // Hauptsuite: seriell (u. a. DF-3.2a mutiert Feldsets). DF-3.2b / DF-3.3-fs /
     // DF-3.3a2α / DF-3.3a2β / DF-3.3b / ADV-001b / ADV-001c3a / ADV-001c3b1 /
