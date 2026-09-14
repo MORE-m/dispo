@@ -13,6 +13,35 @@ export type PriceYearCatalog = {
     next_price_year?: number;
 };
 
+export type OriginalPriceListPin = {
+    year: number;
+    price_list_id: number | null;
+    version: string | null;
+    status: string | null;
+};
+
+/** Serverautoritatives aktuelles Preisjahr – kein Browser-/OS-Fallback. */
+export function requireCurrentPriceYear(catalog: PriceYearCatalog): number {
+    if (typeof catalog.current_price_year !== 'number') {
+        throw new Error(
+            'Preisjahr-Katalog unvollständig: current_price_year fehlt.',
+        );
+    }
+
+    return catalog.current_price_year;
+}
+
+/** Serverautoritatives Folgejahr – kein lokaler current+1-Fallback. */
+export function requireNextPriceYear(catalog: PriceYearCatalog): number {
+    if (typeof catalog.next_price_year !== 'number') {
+        throw new Error(
+            'Preisjahr-Katalog unvollständig: next_price_year fehlt.',
+        );
+    }
+
+    return catalog.next_price_year;
+}
+
 export function priceYearOptionsForInventory(
     catalog: PriceYearCatalog,
     inventoryId: number,
@@ -28,11 +57,11 @@ export function defaultPriceYear(
     const preferred =
         options.find((option) => option.is_default) ?? options[0] ?? null;
 
-    return (
-        preferred?.year ??
-        catalog.current_price_year ??
-        new Date().getFullYear()
-    );
+    if (preferred?.year !== undefined) {
+        return preferred.year;
+    }
+
+    return requireCurrentPriceYear(catalog);
 }
 
 export function expectedPriceListIdForYear(
@@ -47,17 +76,46 @@ export function expectedPriceListIdForYear(
     return option?.price_list_id ?? null;
 }
 
+/**
+ * Anzeigeoptionen: Für das ursprüngliche Pin-Jahr immer die gepinnte Identität,
+ * auch wenn inzwischen eine neue Active-Revision desselben Jahres existiert.
+ */
 export function resolveDisplayedPriceYearOptions(
     catalog: PriceYearCatalog,
     inventoryId: number,
     selectedYear: number | null,
-    historical?: {
-        version: string | null;
-        status: string | null;
-        price_list_id?: number | null;
-    },
+    originalPin?: OriginalPriceListPin | null,
 ): PriceYearOption[] {
-    const options = [...priceYearOptionsForInventory(catalog, inventoryId)];
+    let options = [...priceYearOptionsForInventory(catalog, inventoryId)];
+
+    if (
+        originalPin &&
+        !options.some((option) => option.year === originalPin.year)
+    ) {
+        options.unshift({
+            year: originalPin.year,
+            price_list_id: originalPin.price_list_id,
+            version: originalPin.version,
+            status: originalPin.status ?? 'archived',
+            is_default: false,
+            available: false,
+        });
+    }
+
+    if (originalPin) {
+        options = options.map((option) =>
+            option.year === originalPin.year
+                ? {
+                      year: originalPin.year,
+                      price_list_id: originalPin.price_list_id,
+                      version: originalPin.version,
+                      status: originalPin.status,
+                      is_default: option.is_default,
+                      available: false,
+                  }
+                : option,
+        );
+    }
 
     if (
         selectedYear !== null &&
@@ -65,9 +123,9 @@ export function resolveDisplayedPriceYearOptions(
     ) {
         options.unshift({
             year: selectedYear,
-            price_list_id: historical?.price_list_id ?? null,
-            version: historical?.version ?? null,
-            status: historical?.status ?? 'archived',
+            price_list_id: null,
+            version: null,
+            status: 'archived',
             is_default: false,
             available: false,
         });
@@ -87,6 +145,22 @@ export function priceYearDirty(
     return originalYear !== selectedYear;
 }
 
+export function restoreOriginalPriceListPin(
+    originalPin: OriginalPriceListPin,
+): {
+    price_year: number;
+    expected_price_list_id: number | null;
+    price_list_version: string | null;
+    price_list_status: string | null;
+} {
+    return {
+        price_year: originalPin.year,
+        expected_price_list_id: originalPin.price_list_id,
+        price_list_version: originalPin.version,
+        price_list_status: originalPin.status,
+    };
+}
+
 /**
  * Budget: Folgejahr nur, wenn jedes gewählte Inventar eine aktive Folgejahresliste hat.
  */
@@ -95,7 +169,7 @@ export function budgetPriceYearOptions(
     inventoryIds: number[],
 ): PriceYearOption[] {
     const ids = inventoryIds.filter((id) => id > 0);
-    const current = catalog.current_price_year ?? new Date().getFullYear();
+    const current = requireCurrentPriceYear(catalog);
     const currentAvailable =
         ids.length === 0
             ? false
@@ -117,7 +191,7 @@ export function budgetPriceYearOptions(
         },
     ];
 
-    const next = catalog.next_price_year ?? current + 1;
+    const next = requireNextPriceYear(catalog);
     const nextAvailable =
         ids.length > 0 &&
         ids.every((id) => {

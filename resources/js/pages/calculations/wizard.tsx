@@ -108,6 +108,8 @@ import {
     expectedPriceListIdsForBudget,
     priceYearDirty,
     resolveDisplayedPriceYearOptions,
+    restoreOriginalPriceListPin,
+    type OriginalPriceListPin,
 } from '@/lib/price-list-year-selection';
 import {
     firstValidationMessage,
@@ -208,6 +210,10 @@ type PositionDraft = {
     price_year: number;
     /** Ursprünglich persistiertes Jahr (für Dirty/Rebind-Hinweis). */
     original_price_year: number | null;
+    /** Unveränderlicher historischer Pin (Jahrwechsel weg/zurück). */
+    original_price_list_id: number | null;
+    original_price_list_version: string | null;
+    original_price_list_status: string | null;
     expected_price_list_id: number | null;
     price_list_version: string | null;
     price_list_status: string | null;
@@ -589,6 +595,11 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             custom_choice_meta: {},
             price_year: year,
             original_price_year: year,
+            original_price_list_id: expectedPriceListIdForYear(
+                catalog,
+                inventory.id,
+                year,
+            ),
             expected_price_list_id: expectedPriceListIdForYear(
                 catalog,
                 inventory.id,
@@ -601,6 +612,18 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                     year,
                 ).find((option) => option.year === year)?.version ?? null,
             price_list_status:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.status ?? null,
+            original_price_list_version:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.version ?? null,
+            original_price_list_status:
                 resolveDisplayedPriceYearOptions(
                     catalog,
                     inventory.id,
@@ -978,6 +1001,12 @@ export default function CalculationWizard({
                         position.needs_spot_redistribution,
                     price_year: pinnedYear,
                     original_price_year: position.price_year ?? pinnedYear,
+                    original_price_list_id:
+                        position.expected_price_list_id ?? null,
+                    original_price_list_version:
+                        position.price_list_version ?? null,
+                    original_price_list_status:
+                        position.price_list_status ?? null,
                     expected_price_list_id:
                         position.expected_price_list_id ??
                         expectedPriceListIdForYear(
@@ -1629,6 +1658,14 @@ export default function CalculationWizard({
                         total_spot_count: 0,
                         price_year: resetYear,
                         original_price_year: resetYear,
+                        original_price_list_id: expectedPriceListIdForYear(
+                            catalog,
+                            nextInventoryId,
+                            resetYear,
+                        ),
+                        original_price_list_version:
+                            resetOption?.version ?? null,
+                        original_price_list_status: resetOption?.status ?? null,
                         expected_price_list_id: expectedPriceListIdForYear(
                             catalog,
                             nextInventoryId,
@@ -2007,6 +2044,12 @@ export default function CalculationWizard({
                         budgetPriceYear ??
                         defaultPriceYear(catalog, item.inventory_id),
                     original_price_year: existing?.original_price_year ?? null,
+                    original_price_list_id:
+                        existing?.original_price_list_id ?? null,
+                    original_price_list_version:
+                        existing?.original_price_list_version ?? null,
+                    original_price_list_status:
+                        existing?.original_price_list_status ?? null,
                     expected_price_list_id: expectedPriceListIdForYear(
                         catalog,
                         item.inventory_id,
@@ -2940,18 +2983,39 @@ export default function CalculationWizard({
                                                                                     .target
                                                                                     .value,
                                                                             );
+                                                                        const originalPin: OriginalPriceListPin | null =
+                                                                            position.original_price_year !==
+                                                                            null
+                                                                                ? {
+                                                                                      year: position.original_price_year,
+                                                                                      price_list_id:
+                                                                                          position.original_price_list_id,
+                                                                                      version:
+                                                                                          position.original_price_list_version,
+                                                                                      status: position.original_price_list_status,
+                                                                                  }
+                                                                                : null;
+
+                                                                        if (
+                                                                            originalPin &&
+                                                                            year ===
+                                                                                originalPin.year
+                                                                        ) {
+                                                                            updatePosition(
+                                                                                index,
+                                                                                restoreOriginalPriceListPin(
+                                                                                    originalPin,
+                                                                                ),
+                                                                            );
+                                                                            return;
+                                                                        }
+
                                                                         const option =
                                                                             resolveDisplayedPriceYearOptions(
                                                                                 catalog,
                                                                                 position.inventory_id,
                                                                                 year,
-                                                                                {
-                                                                                    version:
-                                                                                        position.price_list_version,
-                                                                                    status: position.price_list_status,
-                                                                                    price_list_id:
-                                                                                        position.expected_price_list_id,
-                                                                                },
+                                                                                originalPin,
                                                                             ).find(
                                                                                 (
                                                                                     row,
@@ -2986,13 +3050,17 @@ export default function CalculationWizard({
                                                                         catalog,
                                                                         position.inventory_id,
                                                                         position.price_year,
-                                                                        {
-                                                                            version:
-                                                                                position.price_list_version,
-                                                                            status: position.price_list_status,
-                                                                            price_list_id:
-                                                                                position.expected_price_list_id,
-                                                                        },
+                                                                        position.original_price_year !==
+                                                                            null
+                                                                            ? {
+                                                                                  year: position.original_price_year,
+                                                                                  price_list_id:
+                                                                                      position.original_price_list_id,
+                                                                                  version:
+                                                                                      position.original_price_list_version,
+                                                                                  status: position.original_price_list_status,
+                                                                              }
+                                                                            : null,
                                                                     ).map(
                                                                         (
                                                                             option,
@@ -3030,6 +3098,17 @@ export default function CalculationWizard({
                                                                     catalog,
                                                                     position.inventory_id,
                                                                     position.price_year,
+                                                                    position.original_price_year !==
+                                                                        null
+                                                                        ? {
+                                                                              year: position.original_price_year,
+                                                                              price_list_id:
+                                                                                  position.original_price_list_id,
+                                                                              version:
+                                                                                  position.original_price_list_version,
+                                                                              status: position.original_price_list_status,
+                                                                          }
+                                                                        : null,
                                                                 ).find(
                                                                     (option) =>
                                                                         option.year ===
@@ -3037,7 +3116,13 @@ export default function CalculationWizard({
                                                                         option.available,
                                                                 ) &&
                                                                 position.price_list_status !==
-                                                                    'archived' ? (
+                                                                    'archived' &&
+                                                                !(
+                                                                    position.original_price_year ===
+                                                                        position.price_year &&
+                                                                    position.original_price_list_id !==
+                                                                        null
+                                                                ) ? (
                                                                     <p
                                                                         className="text-destructive mt-1 text-xs"
                                                                         data-test={`position-price-year-missing-${index}`}
