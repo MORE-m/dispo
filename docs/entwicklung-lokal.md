@@ -178,11 +178,22 @@ Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422
 
 Folgerisiko `BL-P4-02`: Wenn `calendar`/`fixed_price` wählbar werden, darf ein
 Methodenwechsel bei gleichem Inventar/Jahr den historischen Pin nicht über
-`resolveActivePosition` ersetzen. Aktuell sind diese Methoden planned und werden
-abgelehnt; Spot Classic ist das einzige freigegebene Medium.
+`resolveActivePosition` ersetzen. **`BL-P4-02a`:** bei unverändertem Inventar und
+Preisjahr behält `CatalogResolver::resolveMethodChangeKeepingPriceListPin` den
+gespeicherten Pin; Live-Bind nur neu / Inventarwechsel / expliziter Jahrwechsel.
+`calendar`/`fixed_price` bleiben in der Registry `planned` (keine Freigabe in 02a).
 
 E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
 DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).
+
+## BL-P4-02a – Average-Pin-Härtung
+
+Kein Schema-Migrationsschritt. Resolver-Pfad:
+
+- reiner Methodenwechsel + gleiches Inventar + gleiches Preisjahr → historischer Pin
+- Tests: `PriceListPinOnMethodChangeTest`, `PriceListPinOnMethodChangeMysqlTest`,
+  `SpotClassicAverageAcceptanceHardeningTest`
+- MySQL: `vendor/bin/pest --configuration=phpunit.mysql.xml --filter=PriceListPinOnMethodChangeMysqlTest`
 
 ## Produktion (nicht lokal)
 

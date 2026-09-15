@@ -86,7 +86,9 @@ Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
 abgeschlossen**. Preislisten-Admin-Lifecycle: **BL-P4-01a** (gemergt).
 Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswahl:
 **BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. Offen außerhalb:
-ADV-002; MORE-Produktiv-Workbook-Adapter. Nächster Hauptblock: **BL-P4-02**.
+ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; Teilblock
+**BL-P4-02a** (Average-Abnahme + Pin bei Methodenwechsel) umgesetzt – Kalender/
+Komponenten/Festpreis und Registry-Freigabe `calendar`/`fixed_price` folgen später.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

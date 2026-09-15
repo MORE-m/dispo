@@ -1,24 +1,38 @@
 # Fortschritt V1
 
-Stand: 15. September 2026 (`BL-P4-01c` Preislisten-Jahreswahl; `BL-P4-01a`/`BL-P4-01b`
-gemergt; `BL-P2-01` abgeschlossen)
+Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme + Preislisten-Pin in offenem
+PR #56; Origin-Retention-Hotfix PR #57 auf `main`; `BL-P4-01` abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen** (Lifecycle, Excel-Import, Wizard-Jahreswahl).
-Nächster fachlicher Hauptblock: **`BL-P4-02`**. UX-GATE-D enthält Teilfreigaben für
-Dispo/Vier-Augen, Dynamische-Felder-Admin, Katalog, Inventar-Admin,
-Preislisten-Lifecycle (**BL-P4-01a**), Excel-Import (**BL-P4-01b**) und
-Wizard-Jahreswahl (**BL-P4-01c** / PO-PRI-YEAR-1). Kombinationstabellen-Admin bleibt
-gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. Origin-Retention-Hotfix (**PR #57**) auf `main`.
+Teilblock **`BL-P4-02a`** (Average-Abnahme + Pin-Vertrag bei Methodenwechsel) im
+Feature-Stand **umgesetzt** (offener PR #56, noch nicht gemergt). Gesamtblock
+**`BL-P4-02` bleibt offen** (Kalenderplaner, Komponenten, Festpreis nicht begonnen).
+UX-GATE-D: bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-`BL-P4-02` Spot Durchschnitt, Planer, Index, Komponenten (nächster Hauptblock).
+Offener PR #56 (`BL-P4-02a`) nach Integration von `main` inkl. PR #57. Nächster
+Teilblock von `BL-P4-02` (Kalender/AT-02, Komponenten/AT-04 oder Festpreis) noch
+nicht begonnen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-`BL-P4-01c` explizite Preislisten-Jahreswahl im Kalkulationswizard (PO-PRI-YEAR-1).
+DF-3.3a2β Origin-Retention-Hotfix (PR #57): historische Dispo-Origin behält
+Calc-Effektiv-Snapshot.
+
+## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** (PR #56 offen) |
+| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (PR #56 offen) |
+| Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
+| AT-01/03/23/24 gezielte Härtung (keine Kalender-/Komponenten-Claims) | **gehärtet** (PR #56 offen) |
+| `calendar` / `fixed_price` Registry-Status | **weiterhin planned** |
+| Kalenderplaner / AT-02 / Komponenten / AT-04 | **nicht begonnen** |
+| `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 
@@ -461,7 +475,7 @@ PR #25 / `100c79a` (Feature-HEAD `81d75b7`). Generation 3 auf `main`.
 | Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
 | Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
 | Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
-| Historische Dispo-Origin behält Calc-Effektiv nach Owner-Wegfall (Hotfix) | umgesetzt |
+| Historische Dispo-Origin behält Calc-Effektiv nach Owner-Wegfall (Hotfix) | **umgesetzt** (PR #57 / `main`) |
 | E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
 | Assignment-Admin-UI | umgesetzt in DF-3.3b |
 

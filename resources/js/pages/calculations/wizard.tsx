@@ -66,6 +66,7 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
 import {
     EmptyState,
     ErrorState,
@@ -2918,6 +2919,9 @@ export default function CalculationWizard({
                                                             <FormField
                                                                 label="Länge (Sekunden)"
                                                                 htmlFor={`length-${index}`}
+                                                                hint={spotLengthSpt010Hint(
+                                                                    position.length_seconds,
+                                                                )}
                                                             >
                                                                 <Input
                                                                     id={`length-${index}`}

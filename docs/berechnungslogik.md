@@ -74,6 +74,9 @@ bleibt Index 95 gültig (`SPT-009`).
   (auch archiviert), Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz
   aus dem Positionssnapshot – auch wenn eine neuere Active-Revision desselben Jahres
   existiert. Zusätzliche Stunden derselben Position lesen aus derselben gepinnten Version.
+- Reiner Methodenwechsel bei unverändertem Inventar und Preisjahr (`BL-P4-02a`):
+  neuer Methoden-Freeze, aber **kein** Live-Rebind der Preisliste; Pin und Version
+  bleiben. Live-Bind nur bei neuer Position, Inventarwechsel oder explizitem Jahrwechsel.
 - Fehlende oder gelöschte Referenzen führen zu kontrollierter Ablehnung, kein
   stiller Ersatz durch aktuelle Stammdaten.
 - Budgetplanung verwendet denselben Jahresvertrag.
