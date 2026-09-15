@@ -87,6 +87,16 @@ Zusätzlich bricht `Tests\Support\MysqlTestDatabaseGuard` vor `RefreshDatabase` 
 `DatabaseMigrations` und in MySQL-Parallelworkern ab, wenn nicht exakt `dispo_test`
 aktiv ist.
 
+## DF-3.3a2β – historische Dispo-Origin-Retention
+
+Kein Schema-Migrationsschritt. Beim Cleanup eines Calc-Effektiv-Snapshots bleiben
+legitime Dispo-Origins (`source_configuration_snapshot_id`) erhalten; der Snapshot
+wird nicht gelöscht und blockiert Calc-Updates nicht. Tests:
+
+- `ConfigurationSnapshotHistoricalOriginRetentionTest`
+- MySQL: `ConfigurationSnapshotHistoricalOriginRetentionMysqlTest`
+  (`vendor/bin/pest --configuration=phpunit.mysql.xml --filter=ConfigurationSnapshotHistoricalOriginRetentionMysqlTest`)
+
 ## BL-P4-01a – lokale Inbetriebnahme der Preislisten-Migration
 
 Die Migration `2026_09_13_220000_add_year_lock_and_revision_to_price_lists`

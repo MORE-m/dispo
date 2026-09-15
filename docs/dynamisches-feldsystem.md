@@ -106,6 +106,12 @@ Auf `main` (PR #25 / `100c79a`). **Kein** Abschluss von DF-3.
 - **Wizard/API:** Positions-`schema_fingerprint`, Schema-API mit Medium.
 - **PO-32b-1:** leeres Custom-Pflichtfeld blockiert Dispo-Create, nicht Calc.
 - E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005).
+- **Hotfix historische Origin-Retention:** Ein Dispo-Effektiv darf einen Calc-Effektiv
+  über `source_configuration_snapshot_id` referenzieren, auch wenn die Calc-Position
+  gelöscht oder auf einen neuen Effektiv umgebunden wurde. `deleteEffectiveIfUnreferenced`
+  behält den Calc-Effektiv bei ausschließlich solchen legitimen Origin-Refs
+  (`assertReadableInternal` bleibt gültig). Direkte Owner-/Parent-Refs und typfremde
+  Origins bleiben fail-closed. **BL-P4-02 unberührt.**
 
 ### Bewusst nicht in DF-3.3a2β
 
