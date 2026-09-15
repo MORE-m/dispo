@@ -94,8 +94,12 @@ final class PriceListYearSelection
     }
 
     /**
-     * Gemeinsame Serialisierungsgrenze mit BL-P4-01a-Aktivierung: Inventarzeile,
-     * deterministisch nach ID sortiert. Anschließend alle Listen des Jahres sperren.
+     * Gemeinsame Serialisierungsgrenze mit BL-P4-01a-Aktivierung.
+     *
+     * Reihenfolge (interleaved je Inventar, IDs aufsteigend):
+     * je Inventar → Inventory-Zeile → zugehörige PriceLists der angegebenen Jahre
+     * (Jahre aufsteigend, Listen-IDs aufsteigend). Keine globale
+     * „erst alle Inventare, dann alle Preislisten“-Garantie.
      *
      * @param  list<int>|array<int, int>  $inventoryIds
      * @param  list<int>|array<int, int>  $years
@@ -162,8 +166,12 @@ final class PriceListYearSelection
     }
 
     /**
+     * Prüft Expected-Map-Vollständigkeit erst, nachdem für jedes Inventar eine
+     * aktive Liste des gewählten Jahres erfolgreich aufgelöst wurde.
+     * Aufrufer muss Missing-Active zuvor bereits als fachlichen Fehler behandelt haben.
+     *
      * @param  array<string, mixed>  $payload
-     * @param  list<int>  $inventoryIds
+     * @param  list<int>  $inventoryIds  Inventare mit nachweislich aktiver Liste (ASC empfohlen)
      */
     public static function assertBudgetExpectedMapComplete(array $payload, array $inventoryIds): void
     {
@@ -178,8 +186,11 @@ final class PriceListYearSelection
             ]);
         }
 
-        foreach ($inventoryIds as $inventoryId) {
-            if (self::expectedIdFromBudgetMap($map, (int) $inventoryId) === null) {
+        $ids = array_values(array_unique(array_map(static fn ($id): int => (int) $id, $inventoryIds)));
+        sort($ids);
+
+        foreach ($ids as $inventoryId) {
+            if (self::expectedIdFromBudgetMap($map, $inventoryId) === null) {
                 throw ValidationException::withMessages([
                     'expected_price_list_ids' => 'Für jedes Inventar muss die erwartete Preisliste angegeben werden.',
                 ]);

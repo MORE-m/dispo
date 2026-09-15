@@ -54,18 +54,33 @@ final class BudgetSpotProposalService
         }
 
         $elements = $this->elementNormalizer->normalizeElements($payload);
-        $inventoryIds = array_map(
+        $inventoryIds = array_values(array_unique(array_map(
             static fn (array $element): int => (int) $element['inventory_id'],
             $elements,
-        );
-        PriceListYearSelection::assertBudgetExpectedMapComplete($payload, $inventoryIds);
+        )));
+        sort($inventoryIds);
 
+        $priceYear = PriceListYearSelection::resolveYearFromPayload($payload);
         if (PriceListYearSelection::hasExplicitPriceYear($payload)) {
-            $years = [PriceListYearSelection::resolveYearFromPayload($payload)];
-            PriceListYearSelection::lockInventoriesForLiveBinding($inventoryIds, $years);
+            PriceListYearSelection::assertAllowedLiveYear($priceYear, 'price_year');
+            PriceListYearSelection::lockInventoriesForLiveBinding($inventoryIds, [$priceYear]);
         }
 
         $mediumId = $this->spotClassicMediumId();
+
+        // Active zuerst (deterministisch nach Inventar-ID), Expected erst danach.
+        /** @var array<int, array<string, mixed>> $catalogsByInventory */
+        $catalogsByInventory = [];
+        foreach ($inventoryIds as $inventoryId) {
+            $catalogsByInventory[$inventoryId] = $this->catalog->resolveInventoryForBudget(
+                $inventoryId,
+                $mediumId,
+                $priceYear,
+            );
+        }
+
+        PriceListYearSelection::assertBudgetExpectedMapComplete($payload, $inventoryIds);
+
         $orderDiscounts = $this->orderDiscountInputs($payload);
         $orderDiscountPercent = $this->effectivePercentFromDiscounts($orderDiscounts);
         $aeEnabled = (bool) ($payload['ae_enabled'] ?? false);
@@ -83,16 +98,13 @@ final class BudgetSpotProposalService
         $elementConfigs = [];
 
         foreach ($elements as $element) {
-            $catalog = $this->catalog->resolveInventoryForBudget(
-                $element['inventory_id'],
-                $mediumId,
-                PriceListYearSelection::resolveYearFromPayload($payload),
-            );
+            $inventoryId = (int) $element['inventory_id'];
+            $catalog = $catalogsByInventory[$inventoryId];
             PriceListYearSelection::assertExpectedMatchesResolved(
                 is_array($payload['expected_price_list_ids'] ?? null)
                     ? PriceListYearSelection::expectedIdFromBudgetMap(
                         $payload['expected_price_list_ids'],
-                        (int) $element['inventory_id'],
+                        $inventoryId,
                     )
                     : null,
                 $catalog['priceList'],

@@ -155,8 +155,20 @@ aktive Liste existiert. Fehlender Token → 422. Falscher/veralteter Token → 4
 binden weiterhin das aktuelle Jahr ohne Expected-Pflicht. Unveränderte
 historische Pins (kein Jahrwechsel) brauchen keinen Live-Expected-Abgleich.
 
-Live-Bindung serialisiert über Inventarzeile (+ Listen des Jahres), analog
-BL-P4-01a-Aktivierung; Inventar-IDs stets aufsteigend.
+Live-Bindung / Aktivierung – Lock-Reihenfolge (interleaved je Inventar):
+
+```text
+Calculation (nur Calc-Update) → je Inventar in aufsteigender ID:
+  Inventory → zugehörige PriceLists (Jahre ASC, Listen-IDs ASC)
+```
+
+Keine globale „erst alle Inventare, dann alle Preislisten“-Garantie.
+Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422.
+
+Folgerisiko `BL-P4-02`: Wenn `calendar`/`fixed_price` wählbar werden, darf ein
+Methodenwechsel bei gleichem Inventar/Jahr den historischen Pin nicht über
+`resolveActivePosition` ersetzen. Aktuell sind diese Methoden planned und werden
+abgelehnt; Spot Classic ist das einzige freigegebene Medium.
 
 E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
 DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).

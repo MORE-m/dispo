@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Calculation\BudgetProposalFingerprint;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Support\PriceList\PriceListCalendar;
+use App\Support\PriceList\PriceListYearSelection;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesSavedCalculation;
@@ -1142,6 +1143,269 @@ class PriceListRuntimeYearAndHistoryTest extends TestCase
             'ae_enabled' => false,
             'positions' => [],
         ])->assertStatus(422)->assertJsonValidationErrors('expected_price_list_ids');
+    }
+
+    public function test_po_pri_year_1_budget_missing_active_precedes_expected_token_errors(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+        $catalog = $this->createSpotClassicCatalog();
+        $year = PriceListCalendar::currentYear();
+        $missingMessage = PriceListYearSelection::missingYearPriceListMessage($catalog['hamburg']->name, $year);
+
+        PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('year', $year)
+            ->where('status', PriceListStatus::Active)
+            ->update(['status' => PriceListStatus::Archived]);
+
+        $user = User::factory()->role(Role::Sales)->create();
+
+        // 1) Explizites Jahr, keine Active, leere Expected-Map → Missing-List, nicht Token.
+        $response = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '3000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [],
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('budget_wish_inventory_ids')
+            ->assertJsonMissingValidationErrors('expected_price_list_ids');
+        $this->assertStringContainsString(
+            $missingMessage,
+            collect($response->json('errors.budget_wish_inventory_ids') ?? [])->implode(' '),
+        );
+
+        // Restore hamburg active for subsequent cases via successor recreate.
+        $hamburgActive = $this->activateSuccessor($catalog['hamburg']->id, $year, PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('year', $year)
+            ->orderByDesc('id')
+            ->firstOrFail(), archivePredecessor: false);
+        $rockActive = PriceList::query()
+            ->where('inventory_id', $catalog['rock']->id)
+            ->where('year', $year)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
+        // 2) Active vorhanden, Expected-Map fehlt → 422 Token.
+        $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '3000',
+            'price_year' => $year,
+            'budget_elements' => [[
+                'client_id' => 'hamburg',
+                'inventory_id' => $catalog['hamburg']->id,
+                'spot_length_seconds' => 30,
+                'distribution_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 12,
+                    'day_group' => DayGroup::MoFr->value,
+                ]],
+                'position_discounts' => [],
+            ]],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ])->assertStatus(422)->assertJsonValidationErrors('expected_price_list_ids');
+
+        // 3) Zwei Inventare, eines ohne Active + Mapping unvollständig → Missing hat Vorrang.
+        PriceList::query()
+            ->where('inventory_id', $catalog['rock']->id)
+            ->where('year', $year)
+            ->where('status', PriceListStatus::Active)
+            ->update(['status' => PriceListStatus::Archived]);
+        $rockMissing = PriceListYearSelection::missingYearPriceListMessage($catalog['rock']->name, $year);
+
+        $response = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburgActive->id,
+                // rock mapping absichtlich fehlend
+            ],
+            'budget_elements' => [
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'hamburg',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors('budget_wish_inventory_ids')
+            ->assertJsonMissingValidationErrors('expected_price_list_ids');
+        $this->assertStringContainsString(
+            $rockMissing,
+            collect($response->json('errors.budget_wish_inventory_ids') ?? [])->implode(' '),
+        );
+        $this->assertSame(0, BudgetProposal::query()->count());
+
+        // Restore rock active.
+        $rockActive = $this->activateSuccessor($catalog['rock']->id, $year, PriceList::query()
+            ->where('inventory_id', $catalog['rock']->id)
+            ->where('year', $year)
+            ->orderByDesc('id')
+            ->firstOrFail(), archivePredecessor: false);
+
+        // 4) Beide Active, Mapping für eines fehlt → 422 Expected.
+        $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburgActive->id,
+            ],
+            'budget_elements' => [
+                [
+                    'client_id' => 'hamburg',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ])->assertStatus(422)->assertJsonValidationErrors('expected_price_list_ids');
+
+        // 5) Beide Active, vollständige korrekte Map → Vorschlag OK.
+        $ok = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburgActive->id,
+                $catalog['rock']->id => $rockActive->id,
+            ],
+            'budget_elements' => [
+                [
+                    'client_id' => 'hamburg',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ]);
+        $ok->assertOk();
+        $this->assertSame($year, (int) $ok->json('proposal.price_year'));
+        $this->assertNotEmpty($ok->json('proposal.positions'));
+        $this->assertCount(2, $ok->json('proposal.price_list_identity') ?? []);
+        $this->assertFalse((bool) $ok->json('proposal.insufficient_budget'));
+
+        // 6) Beide Active, vollständige Map, eine ID veraltet → 409.
+        $stale = $this->actingAs($user)->postJson(route('calculations.budget-propose'), [
+            'planning_mode' => PlanningMode::Budget->value,
+            'target_budget_nn' => '5000',
+            'price_year' => $year,
+            'expected_price_list_ids' => [
+                $catalog['hamburg']->id => $hamburgActive->id,
+                $catalog['rock']->id => 999999,
+            ],
+            'budget_elements' => [
+                [
+                    'client_id' => 'hamburg',
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+                [
+                    'client_id' => 'rock',
+                    'inventory_id' => $catalog['rock']->id,
+                    'spot_length_seconds' => 30,
+                    'distribution_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 12,
+                        'day_group' => DayGroup::MoFr->value,
+                    ]],
+                    'position_discounts' => [],
+                ],
+            ],
+            'order_discount_percent' => '0',
+            'order_discounts' => [],
+            'ae_enabled' => false,
+            'positions' => [],
+        ]);
+        $stale->assertStatus(409);
     }
 
     public function test_po_pri_year_1_legacy_payload_without_price_year_still_binds_current(): void

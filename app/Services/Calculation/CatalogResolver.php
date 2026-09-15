@@ -61,6 +61,10 @@ final class CatalogResolver
 
         if ($existing !== null && ! $mediumChanged) {
             // Lesen des gespeicherten Keys: forExecution=false erlaubt unbekannte historische Versionen.
+            // Ohne Inventar-/Jahrwechsel bleibt der Pin (resolveSnapshotPosition).
+            // Inventarwechsel / bewusster Jahrwechsel → Live-Bind (bindActivePriceListForLive).
+            // Methodenwechsel bei gleichem Medium: aktuell nur average erreichbar;
+            // calendar/fixed_price sind planned und werden mit 422 abgelehnt (Folgerisiko BL-P4-02).
             $storedFreeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: false);
             $methodUnchanged = ! $methodIntent['present']
                 || $methodIntent['key'] === $storedFreeze->calculationMethodKey;
@@ -99,6 +103,9 @@ final class CatalogResolver
             }
         }
 
+        // Neue Position, Mediumwechsel oder (zukünftig) Methodenwechsel → Live-Bind.
+        // Mediumwechsel ohne Jahrwechsel bei gleichem Inventar würde theoretisch den Pin
+        // ersetzen; Spot Classic ist derzeit das einzige freigegebene Medium.
         $requestedMethod = $methodIntent['present'] ? $methodIntent['key'] : null;
 
         return $this->resolveActivePosition(
