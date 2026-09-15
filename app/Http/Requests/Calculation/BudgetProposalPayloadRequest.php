@@ -31,6 +31,9 @@ class BudgetProposalPayloadRequest extends FormRequest
         return [
             'planning_mode' => ['required', Rule::enum(PlanningMode::class)],
             'target_budget_nn' => ['required', 'numeric', 'gt:0', 'max:999999999999.99'],
+            'price_year' => ['sometimes', 'nullable', 'integer', 'min:2000', 'max:2100'],
+            'expected_price_list_ids' => ['sometimes', 'array'],
+            'expected_price_list_ids.*' => ['integer', 'min:1'],
             'budget_elements' => ['sometimes', 'array', 'min:1'],
             'budget_elements.*.client_id' => ['nullable', 'string', 'max:120'],
             'budget_elements.*.inventory_id' => ['required_with:budget_elements', 'integer', 'min:1'],

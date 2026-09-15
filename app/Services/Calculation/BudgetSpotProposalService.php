@@ -9,6 +9,8 @@ use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
+use App\Support\PriceList\PriceListYearSelection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -33,6 +35,17 @@ final class BudgetSpotProposalService
      */
     public function propose(array $payload, ?Calculation $existing = null): array
     {
+        return DB::transaction(function () use ($payload, $existing): array {
+            return $this->proposeWithinTransaction($payload, $existing);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function proposeWithinTransaction(array $payload, ?Calculation $existing = null): array
+    {
         $target = Decimal::roundMoney((string) $payload['target_budget_nn']);
         if (Decimal::cmp($target, '0') <= 0) {
             throw ValidationException::withMessages([
@@ -41,8 +54,33 @@ final class BudgetSpotProposalService
         }
 
         $elements = $this->elementNormalizer->normalizeElements($payload);
+        $inventoryIds = array_values(array_unique(array_map(
+            static fn (array $element): int => (int) $element['inventory_id'],
+            $elements,
+        )));
+        sort($inventoryIds);
+
+        $priceYear = PriceListYearSelection::resolveYearFromPayload($payload);
+        if (PriceListYearSelection::hasExplicitPriceYear($payload)) {
+            PriceListYearSelection::assertAllowedLiveYear($priceYear, 'price_year');
+            PriceListYearSelection::lockInventoriesForLiveBinding($inventoryIds, [$priceYear]);
+        }
 
         $mediumId = $this->spotClassicMediumId();
+
+        // Active zuerst (deterministisch nach Inventar-ID), Expected erst danach.
+        /** @var array<int, array<string, mixed>> $catalogsByInventory */
+        $catalogsByInventory = [];
+        foreach ($inventoryIds as $inventoryId) {
+            $catalogsByInventory[$inventoryId] = $this->catalog->resolveInventoryForBudget(
+                $inventoryId,
+                $mediumId,
+                $priceYear,
+            );
+        }
+
+        PriceListYearSelection::assertBudgetExpectedMapComplete($payload, $inventoryIds);
+
         $orderDiscounts = $this->orderDiscountInputs($payload);
         $orderDiscountPercent = $this->effectivePercentFromDiscounts($orderDiscounts);
         $aeEnabled = (bool) ($payload['ae_enabled'] ?? false);
@@ -60,7 +98,20 @@ final class BudgetSpotProposalService
         $elementConfigs = [];
 
         foreach ($elements as $element) {
-            $catalog = $this->catalog->resolveInventoryForBudget($element['inventory_id'], $mediumId);
+            $inventoryId = (int) $element['inventory_id'];
+            $catalog = $catalogsByInventory[$inventoryId];
+            PriceListYearSelection::assertExpectedMatchesResolved(
+                is_array($payload['expected_price_list_ids'] ?? null)
+                    ? PriceListYearSelection::expectedIdFromBudgetMap(
+                        $payload['expected_price_list_ids'],
+                        $inventoryId,
+                    )
+                    : null,
+                $catalog['priceList'],
+                required: PriceListYearSelection::hasExplicitPriceYear($payload),
+                conflictMessage: 'Die aktive Preisliste hat sich geändert. Bitte den Budgetvorschlag neu berechnen.',
+                missingKey: 'expected_price_list_ids',
+            );
             $buckets = $this->buildBuckets($element['distribution_ranges']);
             if ($buckets === []) {
                 throw ValidationException::withMessages([
@@ -122,9 +173,8 @@ final class BudgetSpotProposalService
             ? Decimal::roundMoney(Decimal::sub($nextPackageCost, $target))
             : '0.00';
 
-        $inputFingerprint = $this->fingerprint->compute(
-            $this->fingerprint->inputFromElements($payload, $elements, $catalogs),
-        );
+        $inputFingerprintPayload = $this->fingerprint->inputFromElements($payload, $elements, $catalogs);
+        $inputFingerprint = $this->fingerprint->compute($inputFingerprintPayload);
 
         $budgetElementsPayload = array_map(
             fn (array $element): array => [
@@ -153,6 +203,8 @@ final class BudgetSpotProposalService
             'next_package_exceeds_budget' => $nextPackageExceeds,
             'next_package_shortfall' => $nextPackageShortfall,
             'input_fingerprint' => $inputFingerprint,
+            'price_year' => PriceListYearSelection::resolveYearFromPayload($payload),
+            'price_list_identity' => $inputFingerprintPayload['price_list_identity'] ?? [],
             'budget_elements' => $budgetElementsPayload,
             'wish_inventory_ids' => $wishInventoryIds,
             'spot_length_seconds' => $elementConfigs[0]['length_seconds'] ?? 0,

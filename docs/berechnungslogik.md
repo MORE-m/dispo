@@ -61,18 +61,22 @@ bleibt Index 95 gültig (`SPT-009`).
   (kein Browser-Input).
 - Geänderte Spotlänge: Index neu bestimmen und persistieren.
 
-## Preis- und Regel-Snapshot (`PRI-004`, `VER-002`)
+## Preis- und Regel-Snapshot (`PRI-004`, `VER-002`, `PO-PRI-YEAR-1`)
 
-- Neue Positionen und echte Inventar-/Werbemittelwechsel: aktive Preisliste
-  des **aktuellen Kalenderjahres** (`Europe/Berlin`). Eine aktive Zukunftsliste
-  ersetzt diese Vorauswahl nicht. Fehlt die aktuelle Jahresliste, gibt es
-  keinen stillen Fallback auf ein anderes Jahr.
-- Unveränderte bestehende Position: gespeicherte Preisliste (auch archiviert),
-  Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz aus dem
-  Positionssnapshot – auch wenn Stammdaten inzwischen deaktiviert sind.
-  Zusätzliche Stunden derselben Position lesen aus derselben gepinnten Version.
+- Neue Positionen und echte Inventar-/Werbemittelwechsel: aktive Preisliste des
+  **gewählten Preisjahres** (Default: aktuelles Kalenderjahr `Europe/Berlin`).
+  Das Folgejahr ist nur wählbar, wenn für das Inventar eine Active-Liste existiert.
+  Fehlt die Liste des gewählten Jahres, gibt es keinen stillen Fallback und keinen
+  Preis 0.
+- Bewusster Jahrwechsel an bestehender Position: Rebind erst beim Speichern auf die
+  dann erwartete Active-Liste (`expected_price_list_id`); Active-Drift → HTTP 409.
+- Unveränderte bestehende Position (kein Jahrwechsel): gespeicherte Preisliste
+  (auch archiviert), Stundenpreise, Aufschlag, Rabatt-/AE-Fähigkeit und Regelreferenz
+  aus dem Positionssnapshot – auch wenn eine neuere Active-Revision desselben Jahres
+  existiert. Zusätzliche Stunden derselben Position lesen aus derselben gepinnten Version.
 - Fehlende oder gelöschte Referenzen führen zu kontrollierter Ablehnung, kein
   stiller Ersatz durch aktuelle Stammdaten.
+- Budgetplanung verwendet denselben Jahresvertrag.
 - **Gate-B-Grenze:** Anzeigenamen von Sender/Werbemittel werden bei vorhandenem
   Datensatz aus der Referenz geladen; dedizierte Namens-Snapshotfelder auf
   Positionsebene folgen in späteren Gates (nicht UX-GATE-C/D vorwegnehmen).

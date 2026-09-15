@@ -138,6 +138,42 @@ Kanonischer Vertrag (kein erfundenes MORE-Layout):
 
 E2E: `npx playwright test -c playwright.blp401b.config.ts` (Port 8018).
 
+## BL-P4-01c – Wizard-Preisjahrwahl
+
+Kein Schema-Migrationsschritt. Payload-Felder:
+
+- `positions.*.price_year` (int)
+- `positions.*.expected_price_list_id` (int, Expected-Active zum Renderzeitpunkt)
+- Budget: `price_year`, optional `expected_price_list_ids`
+
+`positions.*.price_list_id` ist im HTTP-Payload prohibited (Serverautorität).
+
+**Expected-Token verpflichtend**, wenn der Client ausdrücklich `price_year` für
+eine Live-Bindung bzw. einen bewussten Rebind sendet und für Inventar/Jahr eine
+aktive Liste existiert. Fehlender Token → 422. Falscher/veralteter Token → 409
+(`PriceListSelectionConflictException`). Legacy-Payloads ohne `price_year`
+binden weiterhin das aktuelle Jahr ohne Expected-Pflicht. Unveränderte
+historische Pins (kein Jahrwechsel) brauchen keinen Live-Expected-Abgleich.
+
+Live-Bindung / Aktivierung – Lock-Reihenfolge (interleaved je Inventar):
+
+```text
+Calculation (Calc-Update, lockForUpdate) → je Inventar in aufsteigender ID:
+  Inventory → zugehörige PriceLists (Jahre ASC, Listen-IDs ASC)
+→ erst danach nicht-lockende Relationen-/Katalog-Reads (MySQL REPEATABLE READ)
+```
+
+Keine globale „erst alle Inventare, dann alle Preislisten“-Garantie.
+Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422.
+
+Folgerisiko `BL-P4-02`: Wenn `calendar`/`fixed_price` wählbar werden, darf ein
+Methodenwechsel bei gleichem Inventar/Jahr den historischen Pin nicht über
+`resolveActivePosition` ersetzen. Aktuell sind diese Methoden planned und werden
+abgelehnt; Spot Classic ist das einzige freigegebene Medium.
+
+E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
+DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).
+
 ## Produktion (nicht lokal)
 
 - `APP_DEBUG=false`

@@ -155,6 +155,8 @@ export function buildBudgetProposalPayload({
     budgetPositionDiscounts,
     calculationId,
     lockVersion,
+    priceYear,
+    expectedPriceListIds,
 }: {
     planningMode: string;
     customerName: string;
@@ -169,6 +171,8 @@ export function buildBudgetProposalPayload({
     budgetPositionDiscounts: BudgetPositionDiscountsByClientId;
     calculationId?: number;
     lockVersion?: number;
+    priceYear?: number;
+    expectedPriceListIds?: Record<number, number>;
 }) {
     const elementsPayload = payloadBudgetElements(budgetElements).map(
         (element) => ({
@@ -194,6 +198,8 @@ export function buildBudgetProposalPayload({
         ae_enabled: aeEnabled,
         target_budget_nn: targetBudget,
         budget_strategy: 'equal_spot_count',
+        price_year: priceYear ?? null,
+        expected_price_list_ids: expectedPriceListIds ?? {},
         budget_elements: elementsPayload,
         budget_proposal_manual: false,
         positions: [],

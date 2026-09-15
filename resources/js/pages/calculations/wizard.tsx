@@ -102,6 +102,16 @@ import {
     type BudgetPositionDiscountsByClientId,
 } from '@/lib/budget-planning';
 import {
+    budgetPriceYearOptions,
+    defaultPriceYear,
+    expectedPriceListIdForYear,
+    expectedPriceListIdsForBudget,
+    priceYearDirty,
+    resolveDisplayedPriceYearOptions,
+    restoreOriginalPriceListPin,
+    type OriginalPriceListPin,
+} from '@/lib/price-list-year-selection';
+import {
     firstValidationMessage,
     mapValidationErrors,
 } from '@/lib/validation-errors';
@@ -196,6 +206,17 @@ type PositionDraft = {
         string,
         Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>
     >;
+    /** PO-PRI-YEAR-1: gewähltes Preisjahr (Formularzustand). */
+    price_year: number;
+    /** Ursprünglich persistiertes Jahr (für Dirty/Rebind-Hinweis). */
+    original_price_year: number | null;
+    /** Unveränderlicher historischer Pin (Jahrwechsel weg/zurück). */
+    original_price_list_id: number | null;
+    original_price_list_version: string | null;
+    original_price_list_status: string | null;
+    expected_price_list_id: number | null;
+    price_list_version: string | null;
+    price_list_status: string | null;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -230,6 +251,19 @@ type Catalog = {
         is_ae_eligible: boolean;
         is_active: boolean;
     }[];
+    price_years_by_inventory?: Record<
+        string,
+        Array<{
+            year: number;
+            price_list_id: number | null;
+            version: string | null;
+            status: string | null;
+            is_default: boolean;
+            available: boolean;
+        }>
+    >;
+    current_price_year?: number;
+    next_price_year?: number;
 };
 
 type Totals = {
@@ -354,6 +388,10 @@ type SavedCalculation = {
         length_seconds: number;
         total_spot_count: number;
         needs_spot_redistribution?: boolean;
+        price_year?: number | null;
+        price_list_version?: string | null;
+        price_list_status?: string | null;
+        expected_price_list_id?: number | null;
         position_discount_percent: string;
         ae_percent: string;
         plan_rows: PlanRow[];
@@ -530,6 +568,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
         const methodState = initMethodStateForNewPosition(
             preferredMedium.calculation_method_options,
         );
+        const year = defaultPriceYear(catalog, inventory.id);
 
         return {
             client_key: newClientKey(),
@@ -554,6 +593,42 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             custom_choice_fields: {},
             custom_choice_touched: {},
             custom_choice_meta: {},
+            price_year: year,
+            original_price_year: year,
+            original_price_list_id: expectedPriceListIdForYear(
+                catalog,
+                inventory.id,
+                year,
+            ),
+            expected_price_list_id: expectedPriceListIdForYear(
+                catalog,
+                inventory.id,
+                year,
+            ),
+            price_list_version:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.version ?? null,
+            price_list_status:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.status ?? null,
+            original_price_list_version:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.version ?? null,
+            original_price_list_status:
+                resolveDisplayedPriceYearOptions(
+                    catalog,
+                    inventory.id,
+                    year,
+                ).find((option) => option.year === year)?.status ?? null,
         };
     }
 
@@ -865,6 +940,13 @@ export default function CalculationWizard({
                 defaultSpotLength,
             ),
     );
+    const [budgetPriceYear, setBudgetPriceYear] = useState<number>(() => {
+        const fromProposal = latestBudgetProposal?.payload?.price_year;
+        if (typeof fromProposal === 'number') {
+            return fromProposal;
+        }
+        return catalog.current_price_year ?? defaultPriceYear(catalog, 0);
+    });
     const [budgetPositionDiscounts, setBudgetPositionDiscounts] =
         useState<BudgetPositionDiscountsByClientId>(() =>
             initBudgetPositionDiscountsByClientId(
@@ -899,6 +981,9 @@ export default function CalculationWizard({
                         null,
                     position.calculation_method_name ?? null,
                 );
+                const pinnedYear =
+                    position.price_year ??
+                    defaultPriceYear(catalog, position.inventory_id);
 
                 return {
                     id: position.id,
@@ -914,6 +999,23 @@ export default function CalculationWizard({
                     total_spot_count: position.total_spot_count,
                     needs_spot_redistribution:
                         position.needs_spot_redistribution,
+                    price_year: pinnedYear,
+                    original_price_year: position.price_year ?? pinnedYear,
+                    original_price_list_id:
+                        position.expected_price_list_id ?? null,
+                    original_price_list_version:
+                        position.price_list_version ?? null,
+                    original_price_list_status:
+                        position.price_list_status ?? null,
+                    expected_price_list_id:
+                        position.expected_price_list_id ??
+                        expectedPriceListIdForYear(
+                            catalog,
+                            position.inventory_id,
+                            pinnedYear,
+                        ),
+                    price_list_version: position.price_list_version ?? null,
+                    price_list_status: position.price_list_status ?? null,
                     position_discount_percent: String(
                         position.position_discount_percent,
                     ),
@@ -1314,6 +1416,9 @@ export default function CalculationWizard({
                           ),
                           needs_spot_redistribution:
                               position.needs_spot_redistribution ?? false,
+                          price_year: position.price_year,
+                          expected_price_list_id:
+                              position.expected_price_list_id,
                           position_discount_percent: '0',
                           ae_percent: '0',
                           time_ranges: ranges,
@@ -1489,7 +1594,8 @@ export default function CalculationWizard({
                 }
 
                 if (patch.inventory_id !== undefined) {
-                    const media = allowedMediaFor(patch.inventory_id);
+                    const nextInventoryId = patch.inventory_id;
+                    const media = allowedMediaFor(nextInventoryId);
                     const medium =
                         media.find(
                             (candidate) =>
@@ -1505,11 +1611,7 @@ export default function CalculationWizard({
                         return item;
                     }
 
-                    const rule = ruleFor(
-                        catalog,
-                        patch.inventory_id,
-                        medium.id,
-                    );
+                    const rule = ruleFor(catalog, nextInventoryId, medium.id);
                     const methodState = methodStateAfterMediumIdChange(
                         item.advertising_medium_id,
                         medium.id,
@@ -1526,12 +1628,21 @@ export default function CalculationWizard({
                     );
 
                     const selectedInventory = catalog.inventories.find(
-                        (candidate) => candidate.id === patch.inventory_id,
+                        (candidate) => candidate.id === nextInventoryId,
                     );
+                    const resetYear = defaultPriceYear(
+                        catalog,
+                        nextInventoryId,
+                    );
+                    const resetOption = resolveDisplayedPriceYearOptions(
+                        catalog,
+                        nextInventoryId,
+                        resetYear,
+                    ).find((option) => option.year === resetYear);
 
                     next = {
                         ...next,
-                        inventory_id: patch.inventory_id,
+                        inventory_id: nextInventoryId,
                         inventory_name: selectedInventory?.name ?? null,
                         inventory_code: selectedInventory?.code ?? null,
                         advertising_medium_id: medium.id,
@@ -1545,6 +1656,23 @@ export default function CalculationWizard({
                         time_ranges: [emptyTimeRange()],
                         position_discounts: [],
                         total_spot_count: 0,
+                        price_year: resetYear,
+                        original_price_year: resetYear,
+                        original_price_list_id: expectedPriceListIdForYear(
+                            catalog,
+                            nextInventoryId,
+                            resetYear,
+                        ),
+                        original_price_list_version:
+                            resetOption?.version ?? null,
+                        original_price_list_status: resetOption?.status ?? null,
+                        expected_price_list_id: expectedPriceListIdForYear(
+                            catalog,
+                            nextInventoryId,
+                            resetYear,
+                        ),
+                        price_list_version: resetOption?.version ?? null,
+                        price_list_status: resetOption?.status ?? null,
                     };
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(
@@ -1788,6 +1916,17 @@ export default function CalculationWizard({
                 budgetPositionDiscounts,
                 calculationId: calculation?.id,
                 lockVersion: calculation?.lock_version,
+                priceYear: budgetPriceYear,
+                expectedPriceListIds: expectedPriceListIdsForBudget(
+                    catalog,
+                    budgetElements
+                        .map((element) => element.inventory_id)
+                        .filter(
+                            (id): id is number =>
+                                typeof id === 'number' && id > 0,
+                        ),
+                    budgetPriceYear,
+                ),
             });
             const data = await jsonPost<{ proposal: Proposal }>(
                 '/kalkulationen/budget-vorschlag',
@@ -1900,6 +2039,26 @@ export default function CalculationWizard({
                             ? summedSpotCount
                             : item.total_spot_count,
                     needs_spot_redistribution: false,
+                    price_year:
+                        proposal.price_year ??
+                        budgetPriceYear ??
+                        defaultPriceYear(catalog, item.inventory_id),
+                    original_price_year: existing?.original_price_year ?? null,
+                    original_price_list_id:
+                        existing?.original_price_list_id ?? null,
+                    original_price_list_version:
+                        existing?.original_price_list_version ?? null,
+                    original_price_list_status:
+                        existing?.original_price_list_status ?? null,
+                    expected_price_list_id: expectedPriceListIdForYear(
+                        catalog,
+                        item.inventory_id,
+                        proposal.price_year ??
+                            budgetPriceYear ??
+                            defaultPriceYear(catalog, item.inventory_id),
+                    ),
+                    price_list_version: null,
+                    price_list_status: null,
                     position_discount_percent: '0',
                     ae_percent: '0',
                     time_ranges,
@@ -2402,6 +2561,24 @@ export default function CalculationWizard({
                                     dayGroups={dayGroups}
                                     canEdit={canEdit}
                                     fieldErrors={fieldErrors}
+                                    priceYear={budgetPriceYear}
+                                    priceYearOptions={budgetPriceYearOptions(
+                                        catalog,
+                                        budgetElements
+                                            .map(
+                                                (element) =>
+                                                    element.inventory_id,
+                                            )
+                                            .filter(
+                                                (id): id is number =>
+                                                    typeof id === 'number' &&
+                                                    id > 0,
+                                            ),
+                                    )}
+                                    onPriceYearChange={(year) => {
+                                        setBudgetPriceYear(year);
+                                        markBudgetInputsChanged();
+                                    }}
                                     onChange={(elements) => {
                                         setBudgetElements(elements);
                                         markBudgetInputsChanged();
@@ -2769,6 +2946,197 @@ export default function CalculationWizard({
                                                                         )
                                                                     }
                                                                 />
+                                                            </FormField>
+                                                            <FormField
+                                                                label="Preisjahr"
+                                                                htmlFor={`price-year-${index}`}
+                                                                hint={
+                                                                    priceYearDirty(
+                                                                        position.original_price_year,
+                                                                        position.price_year,
+                                                                    )
+                                                                        ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
+                                                                        : position.price_list_status ===
+                                                                            'archived'
+                                                                          ? 'Historische Preisliste (unverändert gepinnt).'
+                                                                          : undefined
+                                                                }
+                                                            >
+                                                                <select
+                                                                    id={`price-year-${index}`}
+                                                                    data-test={`position-price-year-${index}`}
+                                                                    className={
+                                                                        formSelectClass
+                                                                    }
+                                                                    value={
+                                                                        position.price_year
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    onChange={(
+                                                                        event,
+                                                                    ) => {
+                                                                        const year =
+                                                                            Number(
+                                                                                event
+                                                                                    .target
+                                                                                    .value,
+                                                                            );
+                                                                        const originalPin: OriginalPriceListPin | null =
+                                                                            position.original_price_year !==
+                                                                            null
+                                                                                ? {
+                                                                                      year: position.original_price_year,
+                                                                                      price_list_id:
+                                                                                          position.original_price_list_id,
+                                                                                      version:
+                                                                                          position.original_price_list_version,
+                                                                                      status: position.original_price_list_status,
+                                                                                  }
+                                                                                : null;
+
+                                                                        if (
+                                                                            originalPin &&
+                                                                            year ===
+                                                                                originalPin.year
+                                                                        ) {
+                                                                            updatePosition(
+                                                                                index,
+                                                                                restoreOriginalPriceListPin(
+                                                                                    originalPin,
+                                                                                ),
+                                                                            );
+                                                                            return;
+                                                                        }
+
+                                                                        const option =
+                                                                            resolveDisplayedPriceYearOptions(
+                                                                                catalog,
+                                                                                position.inventory_id,
+                                                                                year,
+                                                                                originalPin,
+                                                                            ).find(
+                                                                                (
+                                                                                    row,
+                                                                                ) =>
+                                                                                    row.year ===
+                                                                                    year,
+                                                                            );
+
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                price_year:
+                                                                                    year,
+                                                                                expected_price_list_id:
+                                                                                    option?.price_list_id ??
+                                                                                    expectedPriceListIdForYear(
+                                                                                        catalog,
+                                                                                        position.inventory_id,
+                                                                                        year,
+                                                                                    ),
+                                                                                price_list_version:
+                                                                                    option?.version ??
+                                                                                    null,
+                                                                                price_list_status:
+                                                                                    option?.status ??
+                                                                                    null,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    {resolveDisplayedPriceYearOptions(
+                                                                        catalog,
+                                                                        position.inventory_id,
+                                                                        position.price_year,
+                                                                        position.original_price_year !==
+                                                                            null
+                                                                            ? {
+                                                                                  year: position.original_price_year,
+                                                                                  price_list_id:
+                                                                                      position.original_price_list_id,
+                                                                                  version:
+                                                                                      position.original_price_list_version,
+                                                                                  status: position.original_price_list_status,
+                                                                              }
+                                                                            : null,
+                                                                    ).map(
+                                                                        (
+                                                                            option,
+                                                                        ) => (
+                                                                            <option
+                                                                                key={
+                                                                                    option.year
+                                                                                }
+                                                                                value={
+                                                                                    option.year
+                                                                                }
+                                                                                disabled={
+                                                                                    !option.available &&
+                                                                                    option.year !==
+                                                                                        position.original_price_year
+                                                                                }
+                                                                            >
+                                                                                {
+                                                                                    option.year
+                                                                                }
+                                                                                {option.version
+                                                                                    ? ` · ${option.version}`
+                                                                                    : option.available
+                                                                                      ? ''
+                                                                                      : ' · keine aktive Liste'}
+                                                                                {option.status ===
+                                                                                'archived'
+                                                                                    ? ' · historisch'
+                                                                                    : ''}
+                                                                            </option>
+                                                                        ),
+                                                                    )}
+                                                                </select>
+                                                                {!resolveDisplayedPriceYearOptions(
+                                                                    catalog,
+                                                                    position.inventory_id,
+                                                                    position.price_year,
+                                                                    position.original_price_year !==
+                                                                        null
+                                                                        ? {
+                                                                              year: position.original_price_year,
+                                                                              price_list_id:
+                                                                                  position.original_price_list_id,
+                                                                              version:
+                                                                                  position.original_price_list_version,
+                                                                              status: position.original_price_list_status,
+                                                                          }
+                                                                        : null,
+                                                                ).find(
+                                                                    (option) =>
+                                                                        option.year ===
+                                                                            position.price_year &&
+                                                                        option.available,
+                                                                ) &&
+                                                                position.price_list_status !==
+                                                                    'archived' &&
+                                                                !(
+                                                                    position.original_price_year ===
+                                                                        position.price_year &&
+                                                                    position.original_price_list_id !==
+                                                                        null
+                                                                ) ? (
+                                                                    <p
+                                                                        className="text-destructive mt-1 text-xs"
+                                                                        data-test={`position-price-year-missing-${index}`}
+                                                                    >
+                                                                        Für
+                                                                        dieses
+                                                                        Jahr
+                                                                        liegt
+                                                                        keine
+                                                                        aktive
+                                                                        Preisliste
+                                                                        vor.
+                                                                    </p>
+                                                                ) : null}
                                                             </FormField>
                                                             {positionRuntime.isFieldVisible(
                                                                 'period_open',

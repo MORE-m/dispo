@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 use App\Enums\DayGroup;
 use App\Exceptions\PriceListAdminConflictException;
+use App\Exceptions\PriceListSelectionConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\Inventory;
@@ -113,6 +114,22 @@ try {
 
         $writer = $app->make(PriceListAdminWriter::class);
 
+        $assertWaiterBlockedWhileHolding = static function (
+            float $seconds,
+            string $waiterWorkerId,
+        ) use ($runDir): void {
+            $peerResult = $runDir.'/worker-'.$waiterWorkerId.'.result';
+            $deadline = microtime(true) + $seconds;
+            while (microtime(true) < $deadline) {
+                if (is_file($peerResult)) {
+                    throw new RuntimeException(
+                        'Waiter finished while production inventory lock was still held ('.$peerResult.')',
+                    );
+                }
+                usleep(50_000);
+            }
+        };
+
         $result = match ($action) {
             'create_draft' => (function () use ($writer, $actor, $payload, $hourItems): string {
                 $list = $writer->createDraft([
@@ -168,6 +185,36 @@ try {
 
                 return 'OK:apply_budget|'.$updated->id.'|'.($position?->price_list_id ?? 0).'|'.$updated->positions()->count();
             })(),
+            'rebind_calculation_year' => (function () use ($app, $actor, $payload): string {
+                $calculation = Calculation::query()->with([
+                    'positions.planRows',
+                    'positions.timeRanges',
+                    'positions.discounts',
+                    'orderDiscounts',
+                    'configurationSnapshot',
+                    'fieldValues',
+                ])->findOrFail((int) $payload['calculation_id']);
+                $writer = $app->make(CalculationWriter::class);
+                $body = $writer->payloadFromCalculation($calculation);
+                $body['lock_version'] = (int) ($payload['lock_version'] ?? $calculation->lock_version);
+                $body['positions'][0]['price_year'] = (int) $payload['price_year'];
+                $body['positions'][0]['expected_price_list_id'] = (int) $payload['expected_price_list_id'];
+                if (isset($payload['total_spot_count'])) {
+                    $spotCount = (int) $payload['total_spot_count'];
+                    $body['positions'][0]['total_spot_count'] = $spotCount;
+                    if (isset($body['positions'][0]['time_ranges']) && is_array($body['positions'][0]['time_ranges'])) {
+                        foreach ($body['positions'][0]['time_ranges'] as $rangeIndex => $range) {
+                            if (is_array($range)) {
+                                $body['positions'][0]['time_ranges'][$rangeIndex]['spot_count'] = $spotCount;
+                            }
+                        }
+                    }
+                }
+                $updated = $writer->update($calculation, $body, $actor);
+                $position = $updated->positions()->firstOrFail();
+
+                return 'OK:rebind_calculation_year|'.$position->price_list_id.'|'.$position->total_spot_count;
+            })(),
             'confirm_price_list_import' => (function () use ($app, $actor, $payload): string {
                 $import = PriceListImport::query()->findOrFail((int) $payload['import_id']);
                 $lists = $app->make(PriceListImportService::class)
@@ -177,6 +224,23 @@ try {
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),
         };
+
+        if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
+            $signal($orch['signal_after']);
+        }
+        if (isset($orch['wait_before_blocked_assert']) && is_array($orch['wait_before_blocked_assert'])) {
+            $waitForFiles(array_map('strval', $orch['wait_before_blocked_assert']));
+        }
+        if (isset($orch['assert_waiter_blocked_seconds'])) {
+            $assertWaiterBlockedWhileHolding(
+                (float) $orch['assert_waiter_blocked_seconds'],
+                (string) ($orch['waiter_worker_id'] ?? '1'),
+            );
+            $signal('waiter_blocked_while_lock_held');
+        }
+        if (isset($orch['wait_after_action']) && is_array($orch['wait_after_action'])) {
+            $waitForFiles(array_map('strval', $orch['wait_after_action']));
+        }
 
         if ($useOuter) {
             DB::commit();
@@ -196,6 +260,9 @@ try {
         $message = Str::limit(json_encode($exception->errors(), JSON_UNESCAPED_UNICODE) ?: $message, 240);
     }
     if ($exception instanceof PriceListAdminConflictException) {
+        $message = Str::limit($exception->getMessage(), 240);
+    }
+    if ($exception instanceof PriceListSelectionConflictException) {
         $message = Str::limit($exception->getMessage(), 240);
     }
     file_put_contents($resultFile, 'ERROR:'.$class.'|'.$message);

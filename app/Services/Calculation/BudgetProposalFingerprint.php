@@ -5,6 +5,7 @@ namespace App\Services\Calculation;
 use App\Enums\BudgetProposalStatus;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
+use App\Support\PriceList\PriceListYearSelection;
 
 /**
  * Fingerprint für Budgetvorschlag-Eingaben und Aktualitätsprüfung.
@@ -60,6 +61,7 @@ final class BudgetProposalFingerprint
         return [
             'algorithm_version' => BudgetSpotAllocator::ALGORITHM_VERSION,
             'target_budget_nn' => Decimal::roundMoney((string) $payload['target_budget_nn']),
+            'price_year' => PriceListYearSelection::resolveYearFromPayload($payload),
             'budget_elements' => $elementFingerprint,
             'order_discounts' => $payload['order_discounts'] ?? [],
             'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
@@ -84,11 +86,16 @@ final class BudgetProposalFingerprint
         if ($elements !== []) {
             $resolver = app(CatalogResolver::class);
             $mediumId = (int) (AdvertisingMedium::query()->where('code', 'spot_classic')->value('id') ?? 0);
+            $priceYear = PriceListYearSelection::resolveYearFromPayload($payload);
             foreach ($elements as $element) {
                 $inventoryId = $element['inventory_id'];
                 if ($mediumId > 0 && ! isset($catalogs[$inventoryId])) {
                     try {
-                        $catalogs[$inventoryId] = $resolver->resolveInventoryForBudget($inventoryId, $mediumId);
+                        $catalogs[$inventoryId] = $resolver->resolveInventoryForBudget(
+                            $inventoryId,
+                            $mediumId,
+                            $priceYear,
+                        );
                     } catch (\Throwable) {
                         $catalogs[$inventoryId] = ['priceList' => (object) [
                             'id' => 0,

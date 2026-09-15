@@ -17,4 +17,9 @@ final class PriceListCalendar
 
         return (int) $clock->copy()->timezone(self::TIMEZONE)->year;
     }
+
+    public static function nextYear(?CarbonInterface $now = null): int
+    {
+        return self::currentYear($now) + 1;
+    }
 }
