@@ -798,9 +798,10 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
         $child->forceFill(['source_configuration_snapshot_id' => $effective->id])->save();
         try {
             $freeze->deleteEffectiveIfUnreferenced($effective->fresh());
-            $this->fail('Herkunfts-Restreferenz muss fail-closed sein.');
+            $this->fail('Ungültige Herkunfts-Restreferenz muss fail-closed sein.');
         } catch (\RuntimeException $exception) {
             $this->assertStringContainsString('origin=[', $exception->getMessage());
+            $this->assertStringContainsString('unerwartete Restreferenzen', $exception->getMessage());
         }
     }
 
