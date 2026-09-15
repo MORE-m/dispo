@@ -467,6 +467,10 @@ PR #25 / `100c79a`.
   Live-Ableitung Medium→Kategorie).
 - Remap nur per `field_definition_id`; PO-32b-1 (leeres Custom-Pflichtfeld blockiert
   Dispo-Create, nicht Calc).
+- **Origin-Retention:** `dispo_order_position_effective.source_configuration_snapshot_id`
+  → historischer `calculation_position_effective` bleibt nach Wegfall/Ersetzung des
+  direkten Calc-Owners erhalten (intern lesbar). Direkte Mehrfach-/Fremd-Owner und
+  unzulässige Parent-/Origin-Taxonomie bleiben fail-closed.
 
 ### Spätere Ausbaustufen
 

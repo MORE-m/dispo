@@ -461,6 +461,7 @@ PR #25 / `100c79a` (Feature-HEAD `81d75b7`). Generation 3 auf `main`.
 | Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
 | Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
 | Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
+| Historische Dispo-Origin behält Calc-Effektiv nach Owner-Wegfall (Hotfix) | umgesetzt |
 | E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
 | Assignment-Admin-UI | umgesetzt in DF-3.3b |
 
