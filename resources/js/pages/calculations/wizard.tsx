@@ -2918,6 +2918,12 @@ export default function CalculationWizard({
                                                             <FormField
                                                                 label="Länge (Sekunden)"
                                                                 htmlFor={`length-${index}`}
+                                                                hint={
+                                                                    position.length_seconds >
+                                                                    45
+                                                                        ? 'Hinweis: Single-Spots über 45 Sekunden bleiben plan- und kalkulierbar (SPT-010).'
+                                                                        : undefined
+                                                                }
                                                             >
                                                                 <Input
                                                                     id={`length-${index}`}
