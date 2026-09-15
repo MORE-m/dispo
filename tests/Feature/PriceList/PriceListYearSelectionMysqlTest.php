@@ -446,11 +446,13 @@ class PriceListYearSelectionMysqlTest extends TestCase
                     'price_list_id' => $draft->id,
                     'lock_version' => $draft->lock_version,
                     'orchestration' => [
-                        // Äußere TX hält die von activate() erworbenen Locks bis nach LOCK-WAIT-Nachweis.
+                        // Äußere TX hält die von activate() erworbenen Locks; ohne Test-Prelock.
+                        // Nachweis: Rebind-Worker schreibt kein Resultat, solange der Lock gehalten wird.
                         'outer_transaction' => true,
                         'signal_after' => 'activate_holds_via_production',
-                        'wait_before_lock_wait_assert' => ['rebind_entered'],
-                        'assert_peer_lock_wait' => true,
+                        'wait_before_blocked_assert' => ['rebind_entered'],
+                        'assert_waiter_blocked_seconds' => 2.0,
+                        'waiter_worker_id' => '1',
                     ],
                 ],
             ],

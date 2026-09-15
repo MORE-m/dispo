@@ -114,22 +114,20 @@ try {
 
         $writer = $app->make(PriceListAdminWriter::class);
 
-        $assertPeerLockWait = static function (float $seconds = 25.0) use ($signal): void {
+        $assertWaiterBlockedWhileHolding = static function (
+            float $seconds,
+            string $waiterWorkerId,
+        ) use ($runDir): void {
+            $peerResult = $runDir.'/worker-'.$waiterWorkerId.'.result';
             $deadline = microtime(true) + $seconds;
             while (microtime(true) < $deadline) {
-                $row = DB::selectOne(
-                    "SELECT COUNT(*) AS c FROM information_schema.innodb_trx WHERE trx_state = 'LOCK WAIT'",
-                );
-                $count = (int) ($row->c ?? 0);
-                if ($count > 0) {
-                    $signal('peer_lock_wait_observed');
-
-                    return;
+                if (is_file($peerResult)) {
+                    throw new RuntimeException(
+                        'Waiter finished while production inventory lock was still held ('.$peerResult.')',
+                    );
                 }
-                usleep(20_000);
+                usleep(50_000);
             }
-
-            throw new RuntimeException('Peer LOCK WAIT was not observed on information_schema.innodb_trx');
         };
 
         $result = match ($action) {
@@ -230,11 +228,15 @@ try {
         if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
             $signal($orch['signal_after']);
         }
-        if (! empty($orch['assert_peer_lock_wait'])) {
-            if (isset($orch['wait_before_lock_wait_assert']) && is_array($orch['wait_before_lock_wait_assert'])) {
-                $waitForFiles(array_map('strval', $orch['wait_before_lock_wait_assert']));
-            }
-            $assertPeerLockWait();
+        if (isset($orch['wait_before_blocked_assert']) && is_array($orch['wait_before_blocked_assert'])) {
+            $waitForFiles(array_map('strval', $orch['wait_before_blocked_assert']));
+        }
+        if (isset($orch['assert_waiter_blocked_seconds'])) {
+            $assertWaiterBlockedWhileHolding(
+                (float) $orch['assert_waiter_blocked_seconds'],
+                (string) ($orch['waiter_worker_id'] ?? '1'),
+            );
+            $signal('waiter_blocked_while_lock_held');
         }
         if (isset($orch['wait_after_action']) && is_array($orch['wait_after_action'])) {
             $waitForFiles(array_map('strval', $orch['wait_after_action']));
