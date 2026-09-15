@@ -114,6 +114,10 @@ final class CalculationWriter
                 ]);
             }
 
+            // Inventare/Jahre sperren, bevor nicht-lockende Reads den RR-Snapshot setzen.
+            // Sonst kann activePriceList eine vor Aktivierung sichtbare Active lesen.
+            $this->lockInventoriesForPayloadLiveBinding($payload);
+
             $locked->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
             $this->assertClientFingerprintsForGen3Update($locked, $payload);
             $before = $this->calculationSnapshot($locked);
@@ -139,7 +143,6 @@ final class CalculationWriter
                 }
                 $this->dynamicFields->syncFromPayload($locked, $dynamicPayload);
             } else {
-                $this->lockInventoriesForPayloadLiveBinding($payload);
                 $this->fillAndPersist($locked, $payload, $user, isCreate: false);
                 $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();

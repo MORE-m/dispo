@@ -158,8 +158,9 @@ historische Pins (kein Jahrwechsel) brauchen keinen Live-Expected-Abgleich.
 Live-Bindung / Aktivierung – Lock-Reihenfolge (interleaved je Inventar):
 
 ```text
-Calculation (nur Calc-Update) → je Inventar in aufsteigender ID:
+Calculation (Calc-Update, lockForUpdate) → je Inventar in aufsteigender ID:
   Inventory → zugehörige PriceLists (Jahre ASC, Listen-IDs ASC)
+→ erst danach nicht-lockende Relationen-/Katalog-Reads (MySQL REPEATABLE READ)
 ```
 
 Keine globale „erst alle Inventare, dann alle Preislisten“-Garantie.
