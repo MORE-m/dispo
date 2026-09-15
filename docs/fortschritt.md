@@ -1,32 +1,35 @@
 # Fortschritt V1
 
-Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme-Härtung + Preislisten-Pin;
-`BL-P4-01c` gemergt; `BL-P4-01` abgeschlossen)
+Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme + Preislisten-Pin in offenem
+PR #56; Origin-Retention-Hotfix PR #57 auf `main`; `BL-P4-01` abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. Teilblock **`BL-P4-02a`** (Average-Abnahme +
-Pin-Vertrag bei Methodenwechsel) **umgesetzt** (PR #56). Gesamtblock **`BL-P4-02` bleibt offen**
-(Kalenderplaner, Komponenten, Festpreis nicht begonnen). UX-GATE-D: bisherige
-Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. Origin-Retention-Hotfix (**PR #57**) auf `main`.
+Teilblock **`BL-P4-02a`** (Average-Abnahme + Pin-Vertrag bei Methodenwechsel) im
+Feature-Stand **umgesetzt** (offener PR #56, noch nicht gemergt). Gesamtblock
+**`BL-P4-02` bleibt offen** (Kalenderplaner, Komponenten, Festpreis nicht begonnen).
+UX-GATE-D: bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächster Teilblock von `BL-P4-02` (noch nicht begonnen; Kalender/AT-02, Komponenten/AT-04
-oder Festpreis – Abgrenzung offen).
+Offener PR #56 (`BL-P4-02a`) nach Integration von `main` inkl. PR #57. Nächster
+Teilblock von `BL-P4-02` (Kalender/AT-02, Komponenten/AT-04 oder Festpreis) noch
+nicht begonnen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-`BL-P4-02a` Average-Abnahme-Härtung und Preislisten-Pin-Vertrag (PR #56).
+DF-3.3a2β Origin-Retention-Hotfix (PR #57): historische Dispo-Origin behält
+Calc-Effektiv-Snapshot.
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** |
-| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** |
+| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** (PR #56 offen) |
+| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (PR #56 offen) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
-| AT-01/03/23/24 gezielte Härtung (keine Kalender-/Komponenten-Claims) | **gehärtet** |
+| AT-01/03/23/24 gezielte Härtung (keine Kalender-/Komponenten-Claims) | **gehärtet** (PR #56 offen) |
 | `calendar` / `fixed_price` Registry-Status | **weiterhin planned** |
 | Kalenderplaner / AT-02 / Komponenten / AT-04 | **nicht begonnen** |
 | `BL-P4-02` insgesamt | **offen** |
@@ -472,7 +475,7 @@ PR #25 / `100c79a` (Feature-HEAD `81d75b7`). Generation 3 auf `main`.
 | Cross-Table-Ownership + Source↔Owner fail-closed | umgesetzt |
 | Calc→Dispo übernimmt historischen Calc-Effektiv-Kontext | umgesetzt |
 | Remap nur per `field_definition_id`; PO-32b-1 | umgesetzt |
-| Historische Dispo-Origin behält Calc-Effektiv nach Owner-Wegfall (Hotfix) | umgesetzt |
+| Historische Dispo-Origin behält Calc-Effektiv nach Owner-Wegfall (Hotfix) | **umgesetzt** (PR #57 / `main`) |
 | E2E isoliert: `playwright.df33a2b.config.ts` (Port 8005) | umgesetzt |
 | Assignment-Admin-UI | umgesetzt in DF-3.3b |
 
