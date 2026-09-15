@@ -114,6 +114,24 @@ try {
 
         $writer = $app->make(PriceListAdminWriter::class);
 
+        $assertPeerLockWait = static function (float $seconds = 25.0) use ($signal): void {
+            $deadline = microtime(true) + $seconds;
+            while (microtime(true) < $deadline) {
+                $row = DB::selectOne(
+                    "SELECT COUNT(*) AS c FROM information_schema.innodb_trx WHERE trx_state = 'LOCK WAIT'",
+                );
+                $count = (int) ($row->c ?? 0);
+                if ($count > 0) {
+                    $signal('peer_lock_wait_observed');
+
+                    return;
+                }
+                usleep(20_000);
+            }
+
+            throw new RuntimeException('Peer LOCK WAIT was not observed on information_schema.innodb_trx');
+        };
+
         $result = match ($action) {
             'create_draft' => (function () use ($writer, $actor, $payload, $hourItems): string {
                 $list = $writer->createDraft([
@@ -208,6 +226,19 @@ try {
             })(),
             default => throw new InvalidArgumentException('Unknown action: '.$action),
         };
+
+        if (isset($orch['signal_after']) && is_string($orch['signal_after']) && $orch['signal_after'] !== '') {
+            $signal($orch['signal_after']);
+        }
+        if (! empty($orch['assert_peer_lock_wait'])) {
+            if (isset($orch['wait_before_lock_wait_assert']) && is_array($orch['wait_before_lock_wait_assert'])) {
+                $waitForFiles(array_map('strval', $orch['wait_before_lock_wait_assert']));
+            }
+            $assertPeerLockWait();
+        }
+        if (isset($orch['wait_after_action']) && is_array($orch['wait_after_action'])) {
+            $waitForFiles(array_map('strval', $orch['wait_after_action']));
+        }
 
         if ($useOuter) {
             DB::commit();

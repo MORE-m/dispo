@@ -7,6 +7,7 @@ use App\Enums\DayGroup;
 use App\Enums\PlanningMode;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
+use App\Exceptions\PriceListSelectionConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\PriceList;
@@ -300,7 +301,13 @@ class PriceListYearSelectionMysqlTest extends TestCase
         );
     }
 
-    public function test_mysql_rebind_before_activate_pins_expected_list(): void
+    /**
+     * Reihenfolge bewusst testseitig erzwungen (äußere Worker-Transaktion + Prelock
+     * der Inventarzeile), damit Rebind vor Aktivierung linearisiert. Beweist nicht
+     * allein, dass CalculationWriter die Inventarsperre selbst erwirbt – siehe
+     * test_mysql_activate_holds_production_lock_rebind_waits_then_409.
+     */
+    public function test_mysql_rebind_before_activate_with_outer_prelock_pins_expected_list(): void
     {
         $this->requireMysql('PRI-YEAR-REBIND-THEN-ACTIVATE');
         Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
@@ -343,6 +350,7 @@ class PriceListYearSelectionMysqlTest extends TestCase
                     'expected_price_list_id' => $nextList->id,
                     'total_spot_count' => 7,
                     'orchestration' => [
+                        // Testorchestrierung: äußere TX + Prelock erzwingen Rebind-first.
                         'outer_transaction' => true,
                         'prelock' => ['inventory_id' => $catalog['hamburg']->id],
                         'signal_after_prelock' => 'rebind_holds_inventory',
@@ -387,6 +395,108 @@ class PriceListYearSelectionMysqlTest extends TestCase
         );
         $this->assertSame(PriceListStatus::Archived, $nextList->fresh()->status);
         $this->assertSame(PriceListStatus::Active, $draft->fresh()->status);
+    }
+
+    /**
+     * Produktionspfad: Aktivierung hält Inventarsperre über äußere TX nach
+     * PriceListAdminWriter::activate (ohne Test-Prelock). Rebind startet ohne
+     * Prelock über CalculationWriter und muss an der Writer-Inventarsperre warten;
+     * danach veraltetes Expected → 409, keine Teilpersistenz.
+     */
+    public function test_mysql_activate_holds_production_lock_rebind_waits_then_409(): void
+    {
+        $this->requireMysql('PRI-YEAR-ACTIVATE-HOLD-REBIND-WAIT');
+        Carbon::setTestNow(Carbon::parse('2026-06-15 12:00:00', 'Europe/Berlin'));
+
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id, 'total_spot_count' => 1, 'hour' => 8],
+        ], $sales);
+        $position = $calculation->positions()->firstOrFail();
+        $pinnedBefore = (int) $position->price_list_id;
+        $spotsBefore = (int) $position->total_spot_count;
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $nextList = $this->createActiveList($catalog['hamburg']->id, $nextYear, 'mysql-prod-lock-next');
+
+        $draft = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'year' => $nextYear,
+            'status' => PriceListStatus::Draft,
+            'version' => 'mysql-prod-lock-draft',
+            'name' => 'Prod Lock Draft',
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $draft->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '5.0000',
+                ]);
+            }
+        }
+
+        $results = $this->runParallelWorkers(
+            [
+                'action' => 'activate',
+                'payload' => [
+                    'actor_id' => $admin->id,
+                    'price_list_id' => $draft->id,
+                    'lock_version' => $draft->lock_version,
+                    'orchestration' => [
+                        // Äußere TX hält die von activate() erworbenen Locks bis nach LOCK-WAIT-Nachweis.
+                        'outer_transaction' => true,
+                        'signal_after' => 'activate_holds_via_production',
+                        'wait_before_lock_wait_assert' => ['rebind_entered'],
+                        'assert_peer_lock_wait' => true,
+                    ],
+                ],
+            ],
+            [
+                'action' => 'rebind_calculation_year',
+                'payload' => [
+                    'actor_id' => $sales->id,
+                    'calculation_id' => $calculation->id,
+                    'lock_version' => $calculation->lock_version,
+                    'price_year' => $nextYear,
+                    'expected_price_list_id' => $nextList->id,
+                    'total_spot_count' => 7,
+                    'orchestration' => [
+                        'wait_before' => ['activate_holds_via_production'],
+                        'signal_before' => 'rebind_entered',
+                    ],
+                ],
+            ],
+        );
+
+        $this->assertNoDeadlockOrServerError($results);
+        $this->assertTrue(
+            collect($results)->contains(fn (string $line): bool => str_starts_with($line, 'OK:activate')),
+            'Aktivierung muss erfolgreich sein: '.implode(' || ', $results),
+        );
+        $this->assertTrue(
+            collect($results)->contains(
+                fn (string $line): bool => str_starts_with($line, 'ERROR:'.PriceListSelectionConflictException::class)
+                    || str_contains($line, 'PriceListSelectionConflictException'),
+            ),
+            'Rebind muss nach Aktivierung mit 409/Conflict enden: '.implode(' || ', $results),
+        );
+
+        $position->refresh();
+        $this->assertSame($pinnedBefore, (int) $position->price_list_id);
+        $this->assertSame($spotsBefore, (int) $position->total_spot_count);
+        $this->assertSame(PriceListStatus::Active, $draft->fresh()->status);
+        $this->assertSame(PriceListStatus::Archived, $nextList->fresh()->status);
+        $this->assertSame(
+            1,
+            PriceList::query()
+                ->where('inventory_id', $catalog['hamburg']->id)
+                ->where('year', $nextYear)
+                ->where('status', PriceListStatus::Active)
+                ->count(),
+        );
     }
 
     private function createActiveList(int $inventoryId, int $year, string $version): PriceList
