@@ -48,6 +48,14 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Budget denselben Jahresvertrag; keine gemischten Jahre im Vorschlag
 - isolierte Playwright-Suite `playwright.blp401c.config.ts` (Port 8019)
 
+### BL-P4-02a (Average-Abnahme + Pin bei Methodenwechsel)
+
+- reiner Methodenwechsel bei gleichem Inventar/Preisjahr behält `price_list_id`/`price_list_version`
+- Neubindung nur: neue Position, Inventarwechsel, expliziter Jahrwechsel (01c-Vertrag)
+- AT-01/03/23/24 gezielt gehärtet; kein AT-02-/AT-04-Claim; `calendar`/`fixed_price` bleiben `planned`
+- Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
+- MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
+
 ## Mindestabnahme
 
 | ID | Betroffene Anforderungen | Szenario | Erwartung |

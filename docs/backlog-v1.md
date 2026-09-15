@@ -265,13 +265,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen (nächster fachlicher Hauptblock; Average-/Mehrsender-/Längen-Kern bereits in UX-GATE-B)
+- **Status:** offen (`BL-P4-02a` Teilblock: Average-Abnahme-Härtung + Preislisten-Pin bei Methodenwechsel; Kalender/Komponenten/Festpreis offen)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
-- **Ergebnis:** Spotkalkulation mit frei editierbarer Länge, Mehrsender-Positionen, Live-Summe und Rechenerklärung
-- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24`
-- **Tests:** Pest Formeln inkl. Rundung; UI an Serverregeln; Mehrsender-Beispiel Radio Hamburg + ROCK ANTENNE Hamburg
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Dieses Paket bleibt für Kalenderplaner, Komponenten und Abnahme-Härtung.
+- **Ergebnis 02a:** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet; `calendar`/`fixed_price` bleiben `planned`
+- **Offen für 02b+:** Kalenderplaner (AT-02), Komponenten/Allonge (AT-04), Festpreis-Engine, Registry-Freigabe geplanter Methoden
+- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02a: kein vollständiges AT-02-/AT-04-Claim)
+- **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`; Jahrwechsel/409 weiter in BL-P4-01c
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Kalenderplaner, Komponenten und weitere Abnahme.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4

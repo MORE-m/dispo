@@ -1,24 +1,34 @@
 # Fortschritt V1
 
-Stand: 15. September 2026 (`BL-P4-01c` Preislisten-Jahreswahl; `BL-P4-01a`/`BL-P4-01b`
-gemergt; `BL-P2-01` abgeschlossen)
+Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme-Härtung + Preislisten-Pin;
+`BL-P4-01c` gemergt; `BL-P4-01` abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen** (Lifecycle, Excel-Import, Wizard-Jahreswahl).
-Nächster fachlicher Hauptblock: **`BL-P4-02`**. UX-GATE-D enthält Teilfreigaben für
-Dispo/Vier-Augen, Dynamische-Felder-Admin, Katalog, Inventar-Admin,
-Preislisten-Lifecycle (**BL-P4-01a**), Excel-Import (**BL-P4-01b**) und
-Wizard-Jahreswahl (**BL-P4-01c** / PO-PRI-YEAR-1). Kombinationstabellen-Admin bleibt
-gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. Teilblock **`BL-P4-02a`** (Average-Abnahme +
+Pin-Vertrag bei Methodenwechsel) in Arbeit / PR. Gesamtblock **`BL-P4-02` bleibt offen**
+(Kalenderplaner, Komponenten, Festpreis nicht begonnen). UX-GATE-D: bisherige
+Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-`BL-P4-02` Spot Durchschnitt, Planer, Index, Komponenten (nächster Hauptblock).
+`BL-P4-02a` – Average-Abnahme-Härtung und Preislisten-Pin-Vertrag (Teilblock von `BL-P4-02`).
 
 ## Zuletzt abgeschlossene Aufgabe
 
 `BL-P4-01c` explizite Preislisten-Jahreswahl im Kalkulationswizard (PO-PRI-YEAR-1).
+
+## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** |
+| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** |
+| Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
+| AT-01/03/23/24 gezielte Härtung (keine Kalender-/Komponenten-Claims) | **gehärtet** |
+| `calendar` / `fixed_price` Registry-Status | **weiterhin planned** |
+| Kalenderplaner / AT-02 / Komponenten / AT-04 | **nicht begonnen** |
+| `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 
