@@ -6,17 +6,18 @@ Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme-Härtung + Preislisten-Pi
 ## Aktuelle Phase
 
 Phase 4: **`BL-P4-01` abgeschlossen**. Teilblock **`BL-P4-02a`** (Average-Abnahme +
-Pin-Vertrag bei Methodenwechsel) in Arbeit / PR. Gesamtblock **`BL-P4-02` bleibt offen**
+Pin-Vertrag bei Methodenwechsel) **umgesetzt** (PR #56). Gesamtblock **`BL-P4-02` bleibt offen**
 (Kalenderplaner, Komponenten, Festpreis nicht begonnen). UX-GATE-D: bisherige
 Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-`BL-P4-02a` – Average-Abnahme-Härtung und Preislisten-Pin-Vertrag (Teilblock von `BL-P4-02`).
+Nächster Teilblock von `BL-P4-02` (noch nicht begonnen; Kalender/AT-02, Komponenten/AT-04
+oder Festpreis – Abgrenzung offen).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-`BL-P4-01c` explizite Preislisten-Jahreswahl im Kalkulationswizard (PO-PRI-YEAR-1).
+`BL-P4-02a` Average-Abnahme-Härtung und Preislisten-Pin-Vertrag (PR #56).
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
 

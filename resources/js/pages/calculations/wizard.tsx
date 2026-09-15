@@ -66,6 +66,7 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
 import {
     EmptyState,
     ErrorState,
@@ -2918,12 +2919,9 @@ export default function CalculationWizard({
                                                             <FormField
                                                                 label="Länge (Sekunden)"
                                                                 htmlFor={`length-${index}`}
-                                                                hint={
-                                                                    position.length_seconds >
-                                                                    45
-                                                                        ? 'Hinweis: Single-Spots über 45 Sekunden bleiben plan- und kalkulierbar (SPT-010).'
-                                                                        : undefined
-                                                                }
+                                                                hint={spotLengthSpt010Hint(
+                                                                    position.length_seconds,
+                                                                )}
                                                             >
                                                                 <Input
                                                                     id={`length-${index}`}

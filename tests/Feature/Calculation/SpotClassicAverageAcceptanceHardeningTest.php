@@ -2,8 +2,12 @@
 
 namespace Tests\Feature\Calculation;
 
+use App\Enums\DayGroup;
+use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\Calculation;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
@@ -31,6 +35,23 @@ class SpotClassicAverageAcceptanceHardeningTest extends TestCase
         $catalog['hamburg']->mediumRules()->where('advertising_medium_id', $catalog['medium']->id)
             ->update(['surcharge_percent' => '10']);
 
+        $activeList = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->firstOrFail();
+
+        // Unterschiedliche Sekundenpreise je Stunde – sonst würde Gleichgewichtung unbemerkt bleiben.
+        PriceListItem::query()
+            ->where('price_list_id', $activeList->id)
+            ->where('hour', 8)
+            ->where('day_group', DayGroup::MoFr)
+            ->update(['second_price' => '2.0000']);
+        PriceListItem::query()
+            ->where('price_list_id', $activeList->id)
+            ->where('hour', 14)
+            ->where('day_group', DayGroup::MoFr)
+            ->update(['second_price' => '3.0000']);
+
         $payload = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
@@ -38,7 +59,7 @@ class SpotClassicAverageAcceptanceHardeningTest extends TestCase
                 'inventory_id' => $catalog['hamburg']->id,
                 'advertising_medium_id' => $catalog['medium']->id,
                 'spot_method' => 'average',
-                'length_seconds' => 30,
+                'length_seconds' => 20, // Index 105
                 'position_discount_percent' => '0',
                 'ae_percent' => '0',
                 'time_ranges' => [
@@ -60,17 +81,20 @@ class SpotClassicAverageAcceptanceHardeningTest extends TestCase
             ]],
         ]);
 
-        // 10 Spots × 1.00 × 30 × 1.00 × 1.10 + 5 Spots × 1.00 × 30 × 1.00 × 1.10 = 330 + 165 = 495
+        // Zeitraum 08–09: 10 × 2,00 × 20 × 1,05 × 1,10 = 462,00
+        // Zeitraum 14–15:  5 × 3,00 × 20 × 1,05 × 1,10 = 346,50
+        // Summe = 808,50 (≠ Gleichgewichtung / nur ein Stundenpreis)
         $preview = $this->actingAs($user)->postJson(route('calculations.preview'), $payload);
         $preview->assertOk();
-        $this->assertSame('495.00', $preview->json('totals.media_gross'));
+        $this->assertSame('808.50', $preview->json('totals.media_gross'));
         $this->assertSame(15, $preview->json('totals.positions.0.spot_count'));
-        $this->assertSame(100, $preview->json('totals.positions.0.length_index'));
+        $this->assertSame(105, $preview->json('totals.positions.0.length_index'));
 
         $this->actingAs($user)->post(route('calculations.store'), $payload)->assertRedirect();
         $calculation = Calculation::query()->firstOrFail()->load('positions.timeRanges');
-        $this->assertSame('495.00', (string) $calculation->media_gross);
-        $this->assertSame(100, $calculation->positions[0]->length_index);
+        $this->assertSame('808.50', (string) $calculation->media_gross);
+        $this->assertSame(105, $calculation->positions[0]->length_index);
+        $this->assertSame(20, $calculation->positions[0]->length_seconds);
         $this->assertCount(2, $calculation->positions[0]->timeRanges);
     }
 
