@@ -1373,10 +1373,16 @@ final class ConfigurationSnapshotFreezeService
     }
 
     /**
-     * Löscht einen Effektiv-Snapshot nur, wenn keinerlei Restreferenz existiert.
-     * Jede unerwartete Restreferenz ist ein Integritätsfehler (Transaktions-Rollback).
+     * Löscht einen Effektiv-Snapshot nur, wenn keine direkte Owner-/Parent-Referenz
+     * und keine ungültige Herkunftsreferenz existiert.
+     *
+     * Historische Dispo-Effektiv-Snapshots dürfen den Calc-Effektiv über
+     * `source_configuration_snapshot_id` weiterhin referenzieren (Retention).
+     * In dem Fall wird der Snapshot behalten und nicht als Fehler gewertet.
+     *
+     * @return bool true = gelöscht, false = wegen legitimer historischer Origin-Retention behalten
      */
-    public function deleteEffectiveIfUnreferenced(ConfigurationSnapshot $effective): void
+    public function deleteEffectiveIfUnreferenced(ConfigurationSnapshot $effective): bool
     {
         if (! $effective->isEffectiveSnapshot()) {
             throw new RuntimeException(
@@ -1401,11 +1407,7 @@ final class ConfigurationSnapshotFreezeService
             ->pluck('id')
             ->all();
 
-        if ($calculationRefs !== []
-            || $dispoRefs !== []
-            || $childParents !== []
-            || $originRefs !== []
-        ) {
+        if ($calculationRefs !== [] || $dispoRefs !== [] || $childParents !== []) {
             throw new RuntimeException(
                 "Effektiv-Snapshot {$effective->id} besitzt unerwartete Restreferenzen "
                 .'(calc=['.implode(',', $calculationRefs).'] '
@@ -1413,6 +1415,29 @@ final class ConfigurationSnapshotFreezeService
                 .'parent=['.implode(',', $childParents).'] '
                 .'origin=['.implode(',', $originRefs).']).',
             );
+        }
+
+        if ($originRefs !== []) {
+            $invalidOriginRefs = [];
+            foreach ($originRefs as $originRefId) {
+                if (! $this->isLegitimateHistoricalDispoOriginRetention(
+                    $effective,
+                    (int) $originRefId,
+                )) {
+                    $invalidOriginRefs[] = (int) $originRefId;
+                }
+            }
+
+            if ($invalidOriginRefs !== []) {
+                throw new RuntimeException(
+                    "Effektiv-Snapshot {$effective->id} besitzt unerwartete Restreferenzen "
+                    .'(calc=[] dispo=[] parent=[] '
+                    .'origin=['.implode(',', $invalidOriginRefs).']).',
+                );
+            }
+
+            // Ausschließlich legitime Dispo-Origin-Retention → Snapshot behalten.
+            return false;
         }
 
         $sourceIds = ConfigurationSnapshotSource::query()
@@ -1426,6 +1451,56 @@ final class ConfigurationSnapshotFreezeService
             ConfigurationSnapshotSource::query()->whereIn('id', $sourceIds)->delete();
         }
         $effective->delete();
+
+        return true;
+    }
+
+    /**
+     * DF-3.3a2β Hotfix: Dispo-Effektiv → Calc-Effektiv über
+     * `source_configuration_snapshot_id` ist eine historische Abhängigkeit und
+     * kein Cleanup-Fehler, solange Struktur und Ownership stimmen.
+     */
+    private function isLegitimateHistoricalDispoOriginRetention(
+        ConfigurationSnapshot $calcEffective,
+        int $referencingSnapshotId,
+    ): bool {
+        if ($calcEffective->source !== ConfigurationSnapshotSourceEnum::CalculationPositionEffective) {
+            return false;
+        }
+
+        $referrer = ConfigurationSnapshot::query()->find($referencingSnapshotId);
+        if ($referrer === null) {
+            return false;
+        }
+
+        if ($referrer->source !== ConfigurationSnapshotSourceEnum::DispoOrderPositionEffective) {
+            return false;
+        }
+
+        if ((int) $referrer->source_configuration_snapshot_id !== (int) $calcEffective->id) {
+            return false;
+        }
+
+        if ((int) $referrer->id === (int) $calcEffective->id) {
+            return false;
+        }
+
+        $dispoOwnerCount = DispoOrderPosition::query()
+            ->where('effective_configuration_snapshot_id', $referrer->id)
+            ->count();
+        if ($dispoOwnerCount !== 1) {
+            return false;
+        }
+
+        try {
+            // Gen3-Vertrag inkl. Dispo-Basis-Parent, Kontext und Calc-Herkunft;
+            // ohne Eigentümerpflicht am Calc-Origin (assertReadableInternal).
+            $this->integrity->assertReadableInternal($referrer);
+        } catch (RuntimeException) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
