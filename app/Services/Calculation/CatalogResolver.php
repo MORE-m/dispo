@@ -53,8 +53,8 @@ final class CatalogResolver
         $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
         $methodIntent = $this->methodKeyNormalizer->normalize($position);
 
-        $inventoryChanged = $existing !== null && $inventoryId !== $existing->inventory_id;
-        $mediumChanged = $existing !== null && $mediumId !== $existing->advertising_medium_id;
+        $inventoryChanged = $existing !== null && $inventoryId !== (int) $existing->inventory_id;
+        $mediumChanged = $existing !== null && $mediumId !== (int) $existing->advertising_medium_id;
         $priceYearChanged = $existing !== null
             && ! $inventoryChanged
             && $this->shouldRebindPriceYear($position, $existing);
@@ -63,8 +63,7 @@ final class CatalogResolver
             // Lesen des gespeicherten Keys: forExecution=false erlaubt unbekannte historische Versionen.
             // Ohne Inventar-/Jahrwechsel bleibt der Pin (resolveSnapshotPosition).
             // Inventarwechsel / bewusster Jahrwechsel → Live-Bind (bindActivePriceListForLive).
-            // Methodenwechsel bei gleichem Medium: aktuell nur average erreichbar;
-            // calendar/fixed_price sind planned und werden mit 422 abgelehnt (Folgerisiko BL-P4-02).
+            // Methodenwechsel bei gleichem Inventar und Preisjahr: Freeze neu, Preisliste gepinnt (BL-P4-02a).
             $storedFreeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: false);
             $methodUnchanged = ! $methodIntent['present']
                 || $methodIntent['key'] === $storedFreeze->calculationMethodKey;
@@ -101,11 +100,23 @@ final class CatalogResolver
                     $mediumChanged,
                 );
             }
+
+            // BL-P4-02a: reiner Methodenwechsel ohne Inventar-/Jahrwechsel darf den Pin nicht live ersetzen.
+            if (! $inventoryChanged && ! $priceYearChanged) {
+                return $this->resolveMethodChangeKeepingPriceListPin(
+                    $position,
+                    $existing,
+                    $inventoryId,
+                    $mediumId,
+                    $inventoryChanged,
+                    $mediumChanged,
+                    $methodIntent['key'],
+                );
+            }
         }
 
-        // Neue Position, Mediumwechsel oder (zukünftig) Methodenwechsel → Live-Bind.
-        // Mediumwechsel ohne Jahrwechsel bei gleichem Inventar würde theoretisch den Pin
-        // ersetzen; Spot Classic ist derzeit das einzige freigegebene Medium.
+        // Neue Position, Mediumwechsel oder Inventarwechsel mit Methodenwechsel → Live-Bind.
+        // Mediumwechsel ohne Jahrwechsel bei gleichem Inventar ersetzt den Pin (bestehendes Verhalten, nicht BL-P4-02a).
         $requestedMethod = $methodIntent['present'] ? $methodIntent['key'] : null;
 
         return $this->resolveActivePosition(
@@ -149,7 +160,7 @@ final class CatalogResolver
         bool $mediumChanged,
     ): array {
         // Historischer Freeze ist maßgeblich – nicht Live-Kind, Aktivstatus oder Zuordnungen.
-        // Methodenwechsel bei gleichem Medium läuft über resolveActivePosition.
+        // Methodenwechsel bei gleichem Inventar/Jahr: resolveMethodChangeKeepingPriceListPin.
         $freeze = $this->freezeResolver->resolveStoredPosition($existing, forExecution: true);
 
         $inventory = Inventory::query()->find($inventoryId);
@@ -214,27 +225,6 @@ final class CatalogResolver
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $position
-     * @return array{
-     *     inventory: Inventory,
-     *     medium: AdvertisingMedium,
-     *     rule: InventoryMediumRule,
-     *     priceList: PriceList,
-     *     rows: list<PlanRowInput>,
-     *     time_ranges: list<TimeRangeInput>,
-     *     needs_spot_redistribution: bool,
-     *     total_spot_count: int,
-     *     spot_method: SpotCalculationMethod,
-     *     freeze: CalculationMethodFreezeDescriptor,
-     *     surcharge_percent: string,
-     *     is_discountable: bool,
-     *     is_ae_eligible: bool,
-     *     inventory_medium_rule_id: int|null,
-     *     inventory_changed: bool,
-     *     medium_changed: bool
-     * }
-     */
     /**
      * ADV-001c4a: reiner Inventarwechsel bei unverändertem Medium/Methodenschlüssel.
      * Freeze bytegenau erhalten; Inventar/Rule/Preisliste live prüfen.
@@ -332,6 +322,113 @@ final class CatalogResolver
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
+            'inventory_changed' => $inventoryChanged,
+            'medium_changed' => $mediumChanged,
+        ];
+    }
+
+    /**
+     * BL-P4-02a: Methodenwechsel bei unverändertem Inventar und Preisjahr.
+     * Neuer Freeze über Live-Buchbarkeit; historische price_list_id/version bleiben.
+     *
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule|null,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
+    private function resolveMethodChangeKeepingPriceListPin(
+        array $position,
+        CalculationPosition $existing,
+        int $inventoryId,
+        int $mediumId,
+        bool $inventoryChanged,
+        bool $mediumChanged,
+        ?string $requestedMethod,
+    ): array {
+        $inventory = Inventory::query()->find($inventoryId);
+        if ($inventory === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Der gespeicherte Sender existiert nicht mehr.',
+            ]);
+        }
+
+        $medium = AdvertisingMedium::query()->find($mediumId);
+        if ($medium === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Das gespeicherte Werbemittel ist ungültig.',
+            ]);
+        }
+
+        try {
+            $freeze = $this->freezeResolver->resolveForNewCombination($medium, $requestedMethod);
+        } catch (ValidationException $exception) {
+            if ($requestedMethod !== null && trim($requestedMethod) !== '') {
+                throw ValidationException::withMessages([
+                    'positions' => 'Die Berechnungsmethode ist für dieses Werbemittel nicht mehr verfügbar. Bitte Auswahl aktualisieren.',
+                ]);
+            }
+
+            throw $exception;
+        }
+
+        $priceList = PriceList::query()->with('items')->find($existing->price_list_id);
+        if ($priceList === null) {
+            throw ValidationException::withMessages([
+                'positions' => 'Die gespeicherte Preisliste der Position existiert nicht mehr.',
+            ]);
+        }
+
+        if ((int) $priceList->inventory_id !== (int) $inventory->id) {
+            throw ValidationException::withMessages([
+                'positions' => 'Die gespeicherte Preisliste der Position ist ungültig.',
+            ]);
+        }
+
+        $rule = $existing->inventory_medium_rule_id !== null
+            ? InventoryMediumRule::query()->find($existing->inventory_medium_rule_id)
+            : InventoryMediumRule::query()
+                ->where('inventory_id', $inventory->id)
+                ->where('advertising_medium_id', $medium->id)
+                ->first();
+
+        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+            $position,
+            $priceList,
+            $inventory->name,
+            $existing,
+            useSnapshot: true,
+        );
+
+        return [
+            'inventory' => $inventory,
+            'medium' => $medium,
+            'rule' => $rule,
+            'priceList' => $priceList,
+            'rows' => $rows,
+            'time_ranges' => $timeRanges,
+            'needs_spot_redistribution' => $needsRedistribution,
+            'total_spot_count' => $totalSpotCount,
+            'spot_method' => $freeze->legacySpotMethod(),
+            'freeze' => $freeze,
+            'surcharge_percent' => (string) $existing->surcharge_percent,
+            'is_discountable' => (bool) $existing->is_discountable,
+            'is_ae_eligible' => (bool) $existing->is_ae_eligible,
+            'inventory_medium_rule_id' => $existing->inventory_medium_rule_id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
         ];
