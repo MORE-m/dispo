@@ -58,17 +58,19 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 ### BL-P4-02b (Kalenderplaner / AT-02)
 
-- Abnahme **AT-02** mit `SPT-005`–`SPT-007` (+ Anzeige-Teil `SPT-008`): Datum bestimmt Tagesgruppe; jede Zelle
-  `(Datum, Stunde)` mit eigener Spotanzahl und Stundenpreis; Mo–Fr/Sa/So korrekt
-- Jahresvertrag: Kalenderdaten müssen zum Preisjahr der gepinnten Liste passen; gemischte Jahre fail-closed
-- Monatsnavigation Referenzwoche ohne Änderung bestehender Zeilen (`SPT-007`)
-- Methode `calendar`: keine parallelen Average-`time_ranges`; leere Planerzeilen fail-closed
-- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (Feature-PR offen); `fixed_price` weiter `planned`
-- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige
+- Abnahme **AT-02** mit `SPT-005`–`SPT-007` (+ Anzeige-Teil `SPT-008`): **Wochenmatrix**
+  Mo–So × Preisstunden; Datum bestimmt Tagesgruppe; jede Zelle `(Datum, Stunde)` mit
+  eigener Spotanzahl und Stundenpreis; Mo–Fr/Sa/So korrekt (nur Basisgruppen, keine
+  abgeleiteten `mo_sa`/`mo_so`)
+- Jahresvertrag: Kalenderdaten müssen zum Preisjahr der gepinnten Liste passen; gemischte Jahre fail-closed; UI zeigt Preisjahr und Hinweis auf getrennte Positionen
+- Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb der sichtbaren Woche bleiben im React-State (`SPT-007`)
+- Methode `calendar`: keine parallelen Average-`time_ranges`; leere/0-Zellen entfernen den Eintrag
+- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (Feature-PR **#58** offen); `fixed_price` weiter `planned`
+- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige (chronologisch unverändert)
 - Dispo-Export der Verteilung (`SPT-008` Export) **nicht** Teil dieses PR
 - Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim
 - Unit: `CalendarCalculationTest`
-- Feature: `SpotClassicCalendarCalculationTest`, `SpotClassicCalendarYearContractMysqlTest`, `BlP402bWithOriginRetentionCompatTest`
+- Feature: `SpotClassicCalendarCalculationTest` (inkl. `price_list_hours_by_id` in Wizard-Props), `SpotClassicCalendarYearContractMysqlTest`, `BlP402bWithOriginRetentionCompatTest`
 - Vitest: `spot-calendar-planner.test.tsx`, `pricing-calendar.test.ts`, `dispo-planner-display.test.ts`
 - isolierte Playwright-Suite `playwright.blp402b.config.ts` (Port **8022**, DB `database/e2e-bl-p4-02b.sqlite`)
 

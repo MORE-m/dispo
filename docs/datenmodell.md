@@ -274,9 +274,10 @@ Unterobjekte werden typbezogen normalisiert:
 - `CalculationPositionPlannerEntry` (`calculation_position_planner_entries`) für
   Kalenderplaner-Zellen: `date`, `hour` (0–23), `spot_count`, aufgelöste
   `day_group`, persistierter `second_price` und `line_gross`; Unique je Position
-  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR offen).
-  Fachlich: alle Datumszeilen einer Position müssen zum Preisjahr der gepinnten
-  Preisliste passen (Jahresvertrag; jahresübergreifend → getrennte Positionen),
+  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR **#58** offen).
+  Wizard: Wochenmatrix Mo–So × buchbare Basis-Preisstunden. Fachlich: alle
+  Datumszeilen einer Position müssen zum Preisjahr der gepinnten Preisliste passen
+  (Jahresvertrag; jahresübergreifend → getrennte Positionen),
 - `CalculationPositionDiscount` und `CalculationOrderDiscount` für gestaffelte
   Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
 - `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
@@ -302,7 +303,7 @@ ist unzulässig.
 `dispo_order_approval_requests`. Positionsdaten werden beim Anlegen als Snapshot
 in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
 **BL-P4-02b** zusätzlich `planner_entries_snapshot` JSON für Kalenderplaner-Zellen,
-Feature-PR offen). Freigabeanforderungen sind append-only
+Feature-PR **#58** offen). Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
 Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und

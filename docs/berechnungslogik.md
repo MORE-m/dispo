@@ -148,8 +148,10 @@ und Rabatten in derselben Kalkulation (`CAL-001`).
 ## Kalenderplaner Spot
 
 **Umsetzung:** Rechenweg und Formeln unverändert; fachlich umgesetzt in **`BL-P4-02b`**
-(Feature-PR offen, Abnahme **AT-02**, `SPT-005`–`SPT-007` plus Anzeige-Teil **`SPT-008`**).
-Durchschnitts-`time_ranges` und Kalender-`planner_entries` schließen sich gegenseitig aus.
+(Feature-PR **#58** offen, Abnahme **AT-02**, `SPT-005`–`SPT-007` plus Anzeige-Teil **`SPT-008`**).
+Wizard-UI: visuelle **Wochenmatrix** (Spalten Mo–So, Zeilen Preisstunden der gepinnten
+Liste, Zellen = Spotanzahl). Durchschnitts-`time_ranges` und Kalender-`planner_entries`
+schließen sich gegenseitig aus.
 
 **Jahresvertrag:** Eine Kalenderposition ist an genau ein Preisjahr gebunden (gepinnte
 Preisliste). Jedes belegte Kalenderdatum muss in dieses Jahr fallen. Planung über

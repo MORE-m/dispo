@@ -2,22 +2,23 @@
 
 Stand: 16. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a` und **PR #57**
 Origin-Retention, Base SHA `0b6c2b7`; **`BL-P4-02b`** Kalenderplaner/AT-02 im
-offenen Feature-PR, noch nicht auf `main`; `BL-P4-01` abgeschlossen)
+offenen Feature-PR **#58**, Wochenmatrix-UX; noch nicht auf `main`; `BL-P4-01` abgeschlossen)
 
 ## Aktuelle Phase
 
 Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`** (Average-Abnahme + Pin bei
 Methodenwechsel) auf **`main`**. Teilblock **`BL-P4-02b`** (Kalenderplaner, AT-02,
-Registry-Freigabe `calendar` released/v1) **umgesetzt** im offenen Feature-PR, noch
-nicht gemergt. Gesamtblock **`BL-P4-02` bleibt offen** (Komponenten/AT-04,
-Festpreis/`fixed_price` nicht begonnen). UX-GATE-D: bisherige Teilfreigaben
-unverändert; Kombinationstabellen-Admin gesperrt.
+Registry-Freigabe `calendar` released/v1, **visuelle Wochenmatrix** Mo–So ×
+Preisstunden) **umgesetzt** im offenen Feature-PR **#58**, noch nicht gemergt.
+Gesamtblock **`BL-P4-02` bleibt offen** (Komponenten/AT-04, Festpreis/`fixed_price`
+nicht begonnen). UX-GATE-D: bisherige Teilfreigaben unverändert;
+Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Offener Feature-PR **`BL-P4-02b`**: Review/Integration gegen `main` (Stand
-`0b6c2b7`). Nächste Teilblöcke von `BL-P4-02`: Komponenten/Allonge (AT-04),
-Festpreis-Engine – noch nicht begonnen.
+Offener Feature-PR **`BL-P4-02b` (#58)**: Review/Integration gegen `main`. Nächste
+Teilblöcke von `BL-P4-02`: Komponenten/Allonge (AT-04), Festpreis-Engine – noch
+nicht begonnen. **SPT-008 Export** der Spotverteilung bleibt offen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
@@ -28,15 +29,16 @@ Methodenwechsel ohne Inventar-/Jahrwechsel.
 
 | Teil | Status |
 |------|--------|
-| Stunden-/datumsbezogene Planerzeilen (`SPT-005`–`SPT-007`, Abnahme AT-02) | **umgesetzt** (Feature-PR offen) |
-| Jahresvertrag Kalender: eine Position = ein Preisjahr; jahresübergreifend getrennte Positionen | **umgesetzt** (Feature-PR offen) |
-| Monatsnavigation Referenzwoche (`SPT-007`) | **umgesetzt** (Feature-PR offen) |
-| Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (Feature-PR offen) |
-| Dispo-Positions-Snapshot `planner_entries_snapshot` + lesbare Anzeige (`SPT-008` Anzeige) | **umgesetzt** (Feature-PR offen) |
+| Stunden-/datumsbezogene Planerzellen (`SPT-005`–`SPT-007`, Abnahme AT-02) | **umgesetzt** (Feature-PR #58 offen) |
+| Visuelle Wochenmatrix (Mo–So × Preisstunden, Direkt-Spotanzahl je Zelle) | **umgesetzt** (Feature-PR #58 offen) |
+| Jahresvertrag Kalender: eine Position = ein Preisjahr; jahresübergreifend getrennte Positionen | **umgesetzt** (Feature-PR #58 offen) |
+| Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb sichtbarer Woche bleiben im State | **umgesetzt** (Feature-PR #58 offen) |
+| Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (Feature-PR #58 offen) |
+| Dispo-Positions-Snapshot `planner_entries_snapshot` + lesbare Anzeige (`SPT-008` Anzeige) | **umgesetzt** (Feature-PR #58 offen) |
 | Dispo-Export Spot-Verteilung (`SPT-008` Export) | **offen** |
-| Registry `spot_classic`/`calendar` | **released / v1** (Feature-PR offen) |
-| Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (Feature-PR offen) |
-| E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (Feature-PR offen) |
+| Registry `spot_classic`/`calendar` | **released / v1** (Feature-PR #58 offen) |
+| Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (Feature-PR #58 offen) |
+| E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (Feature-PR #58 offen) |
 | Komponenten / AT-04 / `fixed_price` | **nicht begonnen** |
 | `BL-P4-02` insgesamt | **offen** |
 

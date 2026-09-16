@@ -179,8 +179,8 @@ Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422
 Folgerisiko `BL-P4-02`: Methodenwechsel bei gleichem Inventar/Jahr darf den
 historischen Pin nicht über Live-Aktivierung ersetzen. **`BL-P4-02a` (`main`):**
 `CatalogResolver::resolveMethodChangeKeepingPriceListPin`; Live-Bind nur neu /
-Inventarwechsel / expliziter Jahrwechsel. **`BL-P4-02b` (Feature-PR offen):**
-Registry `calendar` **released/v1**; `fixed_price` weiter **`planned`**.
+Inventarwechsel / expliziter Jahrwechsel. **`BL-P4-02b` (Feature-PR #58 offen):**
+Registry `calendar` **released/v1**; Wochenmatrix-UX; `fixed_price` weiter **`planned`**.
 
 **Git-Worktree:** Liegt `vendor` per Symlink im Hauptprojekt, setzt
 `tests/bootstrap.php` `APP_BASE_PATH` auf das Worktree-Root – sonst fehlen
@@ -202,7 +202,8 @@ Kein Schema-Migrationsschritt. Resolver-Pfad:
 
 Migration `calculation_position_planner_entries` + `planner_entries_snapshot` auf
 `dispo_order_positions`. Jahresvertrag im `CatalogResolver` (Kalenderdaten ↔
-Preisjahr der Position). Tests: `CalendarCalculationTest`,
+Preisjahr der Position). Wizard-Katalog `price_list_hours_by_id` (Basisgruppen
+`mo_fr`/`sa`/`so`) für die Wochenmatrix. Tests: `CalendarCalculationTest`,
 `SpotClassicCalendarCalculationTest`, `SpotClassicCalendarYearContractMysqlTest`,
 `BlP402bWithOriginRetentionCompatTest`; Vitest `spot-calendar-planner.test.tsx`,
 `pricing-calendar.test.ts`, `dispo-planner-display.test.ts`.
