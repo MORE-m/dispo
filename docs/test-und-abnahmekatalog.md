@@ -52,9 +52,22 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 - reiner Methodenwechsel bei gleichem Inventar/Preisjahr behält `price_list_id`/`price_list_version`
 - Neubindung nur: neue Position, Inventarwechsel, expliziter Jahrwechsel (01c-Vertrag)
-- AT-01/03/23/24 gezielt gehärtet; kein AT-02-/AT-04-Claim; `calendar`/`fixed_price` bleiben `planned`
+- AT-01/03/23/24 gezielt gehärtet (auf `main`, PR #56)
 - Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
+
+### BL-P4-02b (Kalenderplaner / AT-02)
+
+- Abnahme **AT-02** mit `SPT-005`–`SPT-008`: Datum bestimmt Tagesgruppe; jede Zelle
+  `(Datum, Stunde)` mit eigener Spotanzahl und Stundenpreis; Mo–Fr/Sa/So korrekt
+- Methode `calendar`: keine parallelen Average-`time_ranges`; leere Planerzeilen fail-closed
+- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (Feature-PR offen); `fixed_price` weiter `planned`
+- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`
+- Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim
+- Unit: `CalendarCalculationTest`
+- Feature: `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`
+- Vitest: `spot-calendar-planner.test.tsx`
+- isolierte Playwright-Suite `playwright.blp402b.config.ts` (Port **8022**, DB `database/e2e-bl-p4-02b.sqlite`)
 
 ## Mindestabnahme
 

@@ -176,12 +176,15 @@ Calculation (Calc-Update, lockForUpdate) → je Inventar in aufsteigender ID:
 Keine globale „erst alle Inventare, dann alle Preislisten“-Garantie.
 Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422.
 
-Folgerisiko `BL-P4-02`: Wenn `calendar`/`fixed_price` wählbar werden, darf ein
-Methodenwechsel bei gleichem Inventar/Jahr den historischen Pin nicht über
-`resolveActivePosition` ersetzen. **`BL-P4-02a`:** bei unverändertem Inventar und
-Preisjahr behält `CatalogResolver::resolveMethodChangeKeepingPriceListPin` den
-gespeicherten Pin; Live-Bind nur neu / Inventarwechsel / expliziter Jahrwechsel.
-`calendar`/`fixed_price` bleiben in der Registry `planned` (keine Freigabe in 02a).
+Folgerisiko `BL-P4-02`: Methodenwechsel bei gleichem Inventar/Jahr darf den
+historischen Pin nicht über Live-Aktivierung ersetzen. **`BL-P4-02a` (`main`):**
+`CatalogResolver::resolveMethodChangeKeepingPriceListPin`; Live-Bind nur neu /
+Inventarwechsel / expliziter Jahrwechsel. **`BL-P4-02b` (Feature-PR offen):**
+Registry `calendar` **released/v1**; `fixed_price` weiter **`planned`**.
+
+**Git-Worktree:** Liegt `vendor` per Symlink im Hauptprojekt, setzt
+`tests/bootstrap.php` `APP_BASE_PATH` auf das Worktree-Root – sonst fehlen
+worktree-spezifische Migrationen (z. B. BL-P4-02b) in Pest/Feature-Tests.
 
 E2E: `npx playwright test -c playwright.blp401c.config.ts` (Port 8019,
 DB `database/e2e-bl-p4-01c.sqlite` – niemals Dev-DB `dispo`).
@@ -194,6 +197,17 @@ Kein Schema-Migrationsschritt. Resolver-Pfad:
 - Tests: `PriceListPinOnMethodChangeTest`, `PriceListPinOnMethodChangeMysqlTest`,
   `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `vendor/bin/pest --configuration=phpunit.mysql.xml --filter=PriceListPinOnMethodChangeMysqlTest`
+
+## BL-P4-02b – Kalenderplaner
+
+Migration `calculation_position_planner_entries` + `planner_entries_snapshot` auf
+`dispo_order_positions`. Tests: `CalendarCalculationTest`,
+`SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`;
+Vitest `spot-calendar-planner.test.tsx`.
+
+E2E: `npx playwright test -c playwright.blp402b.config.ts` (Port **8022**,
+DB `database/e2e-bl-p4-02b.sqlite`, Seeder `E2ECalendarPlannerSeeder` – niemals
+Dev-DB `dispo`).
 
 ## Produktion (nicht lokal)
 

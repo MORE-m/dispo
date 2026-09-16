@@ -154,7 +154,8 @@ Methoden-UX in **ADV-001c4b**. Budget bleibt average. Keine Migration.
 0-/1-/n-Optionen und historische Freeze-Anzeige. Medienfilter ohne
 Spot-Classic-Code-Hardcode. Moderner Payload nur `calculation_method_key`;
 `spot_method` bleibt serverseitiger Legacy-Alias. Keine Migration; keine neue
-Engine; `calendar`/`fixed_price` weiter planned; Budget ohne Methodenauswahl.
+Engine; Budget ohne Methodenauswahl. **`BL-P4-02b`:** Registry `calendar`
+released/v1 (Feature-PR offen); `fixed_price` weiter `planned`.
 
 **ADV-001 insgesamt noch offen:** weitere Defaults
 (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen; technische
@@ -268,11 +269,16 @@ Unterobjekte werden typbezogen normalisiert:
 
 - `PositionComponent` für Spot/SWF-Komponenten,
 - `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
-  Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme),
+  Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme)
+  – Methode `average`,
+- `CalculationPositionPlannerEntry` (`calculation_position_planner_entries`) für
+  Kalenderplaner-Zellen: `date`, `hour` (0–23), `spot_count`, aufgelöste
+  `day_group`, persistierter `second_price` und `line_gross`; Unique je Position
+  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR offen),
 - `CalculationPositionDiscount` und `CalculationOrderDiscount` für gestaffelte
   Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
 - `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
-  (ohne Kalenderdatum; volle Datumszellen später `PlannerEntry`),
+  (ohne Kalenderdatum; Erklärungs-/Legacy-Pfad Durchschnitt),
 - `PlatformAllocation` für Online-Audio-Mengen,
 - `TargetingSelection` für technische/DMP-Targetings,
 - `SocialElement` und `InfluencerItem`,
@@ -292,7 +298,9 @@ ist unzulässig.
 **Implementiert (September 2026):** Tabellen `dispo_orders`,
 `dispo_order_positions`, `dispo_order_number_sequences`,
 `dispo_order_approval_requests`. Positionsdaten werden beim Anlegen als Snapshot
-in `dispo_order_positions` persistiert. Freigabeanforderungen sind append-only
+in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
+**BL-P4-02b** zusätzlich `planner_entries_snapshot` JSON für Kalenderplaner-Zellen,
+Feature-PR offen). Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
 Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und

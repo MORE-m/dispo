@@ -147,6 +147,11 @@ und Rabatten in derselben Kalkulation (`CAL-001`).
 
 ## Kalenderplaner Spot
 
+**Umsetzung:** Rechenweg und Formeln unverändert; fachlich umgesetzt in **`BL-P4-02b`**
+(Feature-PR offen, Abnahme **AT-02**, `SPT-005`–`SPT-008`). Durchschnitts-`time_ranges`
+und Kalender-`planner_entries` schließen sich gegenseitig aus. Komponenten (AT-04) und
+Festpreis folgen in späteren Teilblöcken.
+
 Für jede belegte Zelle aus Datum und Stunde:
 
 ```text

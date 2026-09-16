@@ -1,38 +1,51 @@
 # Fortschritt V1
 
-Stand: 15. September 2026 (`BL-P4-02a` Average-Abnahme + Preislisten-Pin in offenem
-PR #56; Origin-Retention-Hotfix PR #57 auf `main`; `BL-P4-01` abgeschlossen)
+Stand: 16. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a` und **PR #57**
+Origin-Retention, Base SHA `0b6c2b7`; **`BL-P4-02b`** Kalenderplaner/AT-02 im
+offenen Feature-PR, noch nicht auf `main`; `BL-P4-01` abgeschlossen)
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. Origin-Retention-Hotfix (**PR #57**) auf `main`.
-Teilblock **`BL-P4-02a`** (Average-Abnahme + Pin-Vertrag bei Methodenwechsel) im
-Feature-Stand **umgesetzt** (offener PR #56, noch nicht gemergt). Gesamtblock
-**`BL-P4-02` bleibt offen** (Kalenderplaner, Komponenten, Festpreis nicht begonnen).
-UX-GATE-D: bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`** (Average-Abnahme + Pin bei
+Methodenwechsel) auf **`main`**. Teilblock **`BL-P4-02b`** (Kalenderplaner, AT-02,
+Registry-Freigabe `calendar` released/v1) **umgesetzt** im offenen Feature-PR, noch
+nicht gemergt. Gesamtblock **`BL-P4-02` bleibt offen** (Komponenten/AT-04,
+Festpreis/`fixed_price` nicht begonnen). UX-GATE-D: bisherige Teilfreigaben
+unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Offener PR #56 (`BL-P4-02a`) nach Integration von `main` inkl. PR #57. Nächster
-Teilblock von `BL-P4-02` (Kalender/AT-02, Komponenten/AT-04 oder Festpreis) noch
-nicht begonnen.
+Offener Feature-PR **`BL-P4-02b`**: Review/Integration gegen `main` (Stand
+`0b6c2b7`). Nächste Teilblöcke von `BL-P4-02`: Komponenten/Allonge (AT-04),
+Festpreis-Engine – noch nicht begonnen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-DF-3.3a2β Origin-Retention-Hotfix (PR #57): historische Dispo-Origin behält
-Calc-Effektiv-Snapshot.
+**BL-P4-02a** (PR #56 auf `main`): Average-Abnahme-Härtung + Preislisten-Pin bei
+Methodenwechsel ohne Inventar-/Jahrwechsel.
+
+## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Stunden-/datumsbezogene Planerzeilen (`SPT-005`–`SPT-008`, Abnahme AT-02) | **umgesetzt** (Feature-PR offen) |
+| Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (Feature-PR offen) |
+| Dispo-Positions-Snapshot `planner_entries_snapshot` | **umgesetzt** (Feature-PR offen) |
+| Registry `spot_classic`/`calendar` | **released / v1** (Feature-PR offen) |
+| Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (Feature-PR offen) |
+| E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (Feature-PR offen) |
+| Komponenten / AT-04 / `fixed_price` | **nicht begonnen** |
+| `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** (PR #56 offen) |
-| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (PR #56 offen) |
+| Methodenwechsel bei gleichem Inventar/Jahr behält `price_list_id`/`price_list_version` | **umgesetzt** (`main`, PR #56) |
+| Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (`main`, PR #56) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
-| AT-01/03/23/24 gezielte Härtung (keine Kalender-/Komponenten-Claims) | **gehärtet** (PR #56 offen) |
-| `calendar` / `fixed_price` Registry-Status | **weiterhin planned** |
-| Kalenderplaner / AT-02 / Komponenten / AT-04 | **nicht begonnen** |
-| `BL-P4-02` insgesamt | **offen** |
+| AT-01/03/23/24 gezielte Härtung (ohne Kalender-/Komponenten-Scope von 02b) | **gehärtet** (`main`, PR #56) |
+| `BL-P4-02` insgesamt | **offen** (02b+ offener PR; AT-04/Festpreis folgen) |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 
