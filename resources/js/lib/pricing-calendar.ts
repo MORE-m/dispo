@@ -380,10 +380,7 @@ export function spotsForCell(
     return match?.spot_count ?? '';
 }
 
-export function daySpotSum(
-    entries: PlannerEntryDraft[],
-    date: string,
-): number {
+export function daySpotSum(entries: PlannerEntryDraft[], date: string): number {
     return entries.reduce((sum, entry) => {
         if (!isCompletePlannerEntry(entry) || entry.date !== date) {
             return sum;

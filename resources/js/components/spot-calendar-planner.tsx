@@ -352,8 +352,7 @@ export function SpotCalendarPlanner({
                                                         )
                                                     }
                                                 />
-                                                {!bookable &&
-                                                disabledReason ? (
+                                                {!bookable && disabledReason ? (
                                                     <span
                                                         id={`${inputId}-hint`}
                                                         className="sr-only"
