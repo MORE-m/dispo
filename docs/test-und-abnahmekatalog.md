@@ -65,7 +65,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Jahresvertrag: Kalenderdaten müssen zum Preisjahr der gepinnten Liste passen; gemischte Jahre fail-closed; UI zeigt Preisjahr und Hinweis auf getrennte Positionen
 - Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb der sichtbaren Woche bleiben im React-State (`SPT-007`)
 - Methode `calendar`: keine parallelen Average-`time_ranges`; leere/0-Zellen entfernen den Eintrag
-- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (Feature-PR **#58** offen); `fixed_price` weiter `planned`
+- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (`BL-P4-02b` umgesetzt, PR #58); `fixed_price` weiter `planned`
 - Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige (chronologisch unverändert)
 - Dispo-Export der Verteilung (`SPT-008` Export) **nicht** Teil dieses PR
 - Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim

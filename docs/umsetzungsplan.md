@@ -87,10 +87,11 @@ abgeschlossen**. Preislisten-Admin-Lifecycle: **BL-P4-01a** (gemergt).
 Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswahl:
 **BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. Offen außerhalb:
 ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a** auf
-`main`; **02b** Kalenderplaner im offenen Feature-PR **#58** (**`calendar` released/v1**,
-Wochenmatrix Mo–So × Preisstunden, `SPT-005`–`SPT-007`, Dispo-Anzeige-Teil `SPT-008`;
-Jahresvertrag je Position; Export Spot-Verteilung offen). Komponenten (AT-04) und
-Festpreis (`fixed_price` Registry `planned`) folgen.
+`main`; **02b umgesetzt (PR #58)** – Kalenderplaner/AT-02, **`calendar` released/v1**,
+echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
+Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
+umgesetzt, Export Spot-Verteilung offen. Komponenten (AT-04) und Festpreis
+(`fixed_price` Registry `planned`) folgen; `BL-P4-02` insgesamt offen.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

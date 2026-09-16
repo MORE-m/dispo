@@ -154,8 +154,8 @@ Methoden-UX in **ADV-001c4b**. Budget bleibt average. Keine Migration.
 0-/1-/n-Optionen und historische Freeze-Anzeige. Medienfilter ohne
 Spot-Classic-Code-Hardcode. Moderner Payload nur `calculation_method_key`;
 `spot_method` bleibt serverseitiger Legacy-Alias. Keine Migration; keine neue
-Engine; Budget ohne Methodenauswahl. **`BL-P4-02b`:** Registry `calendar`
-released/v1 (Feature-PR offen); `fixed_price` weiter `planned`.
+Engine; Budget ohne Methodenauswahl. **`BL-P4-02b` umgesetzt (PR #58):** Registry
+`calendar` released/v1; `fixed_price` weiter `planned`.
 
 **ADV-001 insgesamt noch offen:** weitere Defaults
 (Feldsets, Rabatt/AE/Preisdefaults); Legacy-Felder entfernen; technische

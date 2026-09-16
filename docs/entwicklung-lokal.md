@@ -179,8 +179,8 @@ Budget-Propose: Active-Auflösung vor Expected-Map; Missing-Active vor Token-422
 Folgerisiko `BL-P4-02`: Methodenwechsel bei gleichem Inventar/Jahr darf den
 historischen Pin nicht über Live-Aktivierung ersetzen. **`BL-P4-02a` (`main`):**
 `CatalogResolver::resolveMethodChangeKeepingPriceListPin`; Live-Bind nur neu /
-Inventarwechsel / expliziter Jahrwechsel. **`BL-P4-02b` (Feature-PR #58 offen):**
-Registry `calendar` **released/v1**; Wochenmatrix-UX; `fixed_price` weiter **`planned`**.
+Inventarwechsel / expliziter Jahrwechsel. **`BL-P4-02b` umgesetzt (PR #58):**
+Registry `calendar` **released/v1**; echte Wochenmatrix; `fixed_price` weiter **`planned`**.
 
 **Git-Worktree:** Liegt `vendor` per Symlink im Hauptprojekt, setzt
 `tests/bootstrap.php` `APP_BASE_PATH` auf das Worktree-Root – sonst fehlen
