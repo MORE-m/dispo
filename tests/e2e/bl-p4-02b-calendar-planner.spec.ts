@@ -146,4 +146,54 @@ test.describe.serial('BL-P4-02b Kalenderplaner', () => {
             timeout: 15_000,
         });
     });
+
+    test('übernimmt Kalenderverteilung in Dispoauftrag und zeigt sie an', async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        await login(page);
+        await openNewCalculationStepTwo(page);
+
+        await page
+            .locator('[data-test="calculation-method-radio-0-calendar"]')
+            .check();
+        await page.locator('[data-test="position-length-seconds-0"]').fill('30');
+        await page
+            .locator('[data-test="planner-date-0-0"]')
+            .fill(plannerDate);
+        await page.locator('[data-test="planner-hour-0-0"]').selectOption('9');
+        await page.locator('[data-test="planner-spots-0-0"]').fill('4');
+
+        await waitForCalculationPreview(page);
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
+            timeout: 30_000,
+        });
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="dispo-order-create-open"]').click();
+        await expect(
+            page.locator('[data-test="dispo-order-create-dialog"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="dispo-order-create-dialog"]'),
+        ).toContainText(plannerDate);
+        await expect(
+            page.locator('[data-test="dispo-order-create-dialog"]'),
+        ).toContainText('4 Spots');
+
+        await page.locator('[data-test="dispo-order-submit"]').click();
+        await expect(page).toHaveURL(/dispoauftraege\/\d+/, {
+            timeout: 30_000,
+        });
+
+        const plannerList = page.locator(
+            '[data-test^="dispo-planner-entries-"]',
+        );
+        await expect(plannerList).toBeVisible();
+        await expect(plannerList).toContainText(plannerDate);
+        await expect(plannerList).toContainText('09:00');
+        await expect(plannerList).toContainText('4 Spots');
+    });
 });
