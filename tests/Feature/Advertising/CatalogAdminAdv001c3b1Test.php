@@ -93,7 +93,11 @@ class CatalogAdminAdv001c3b1Test extends TestCase
         $this->assertSame('released', $pairs[0]['pair_status']);
         $this->assertSame('v1', $pairs[0]['current_released_version']);
 
-        $planned = EngineProfileRegistry::pairsForMethodKey('calendar');
+        $calendar = EngineProfileRegistry::pairsForMethodKey('calendar');
+        $this->assertSame('released', $calendar[0]['pair_status']);
+        $this->assertSame('v1', $calendar[0]['current_released_version']);
+
+        $planned = EngineProfileRegistry::pairsForMethodKey('fixed_price');
         $this->assertSame('planned', $planned[0]['pair_status']);
         $this->assertNull($planned[0]['current_released_version']);
 

@@ -153,15 +153,30 @@ class CalculationMethodFreezeResolverTest extends TestCase
         $this->assertSame('average', $read->calculationMethodKey);
     }
 
-    public function test_planned_pair_freeze_with_unknown_version_is_not_executable(): void
+    public function test_released_calendar_v1_freeze_is_executable(): void
     {
-        // calendar ist pair_status=planned ohne versions-Eintrag → statusForVersion fail-closed.
         $position = (object) [
             'kind' => 'spot_classic',
             'spot_method' => 'calendar',
             'engine_profile_key' => 'spot_classic',
             'calculation_method_key' => 'calendar',
             'calculation_method_name' => 'Kalenderplaner',
+            'algorithm_version' => 'v1',
+        ];
+
+        $executable = $this->resolver->resolveStoredPosition($position, forExecution: true);
+        $this->assertSame('calendar', $executable->calculationMethodKey);
+        $this->assertSame('v1', $executable->algorithmVersion);
+    }
+
+    public function test_planned_fixed_price_v1_freeze_is_not_executable(): void
+    {
+        $position = (object) [
+            'kind' => 'spot_classic',
+            'spot_method' => 'fixed_price',
+            'engine_profile_key' => 'spot_classic',
+            'calculation_method_key' => 'fixed_price',
+            'calculation_method_name' => 'Festpreis',
             'algorithm_version' => 'v1',
         ];
 
@@ -174,10 +189,6 @@ class CalculationMethodFreezeResolverTest extends TestCase
                 $exception->errors()['positions'] ?? null,
             );
         }
-
-        $read = $this->resolver->resolveStoredPosition($position, forExecution: false);
-        $this->assertSame('calendar', $read->calculationMethodKey);
-        $this->assertSame('v1', $read->algorithmVersion);
     }
 
     public function test_unknown_legacy_combo_without_freeze_is_rejected(): void

@@ -404,6 +404,7 @@ class CatalogAdminAdv001c3cTest extends TestCase
         $admin = User::factory()->role(Role::Admin)->create();
         $average = $this->method('average');
         $calendar = $this->method('calendar');
+        $fixedPrice = $this->method('fixed_price');
         $medium = $this->unbookableMedium('c3c_def');
 
         AdvertisingMediumCalculationMethod::factory()->create([
@@ -419,6 +420,13 @@ class CatalogAdminAdv001c3cTest extends TestCase
             'engine_profile_key' => 'spot_classic',
             'is_active' => true,
             'sort' => 20,
+        ]);
+        AdvertisingMediumCalculationMethod::factory()->create([
+            'advertising_medium_id' => $medium->id,
+            'calculation_method_id' => $fixedPrice->id,
+            'engine_profile_key' => 'spot_classic',
+            'is_active' => true,
+            'sort' => 30,
         ]);
 
         $ok = [
@@ -436,16 +444,27 @@ class CatalogAdminAdv001c3cTest extends TestCase
                     'is_active' => true,
                     'sort' => 20,
                 ],
+                [
+                    'calculation_method_id' => (int) $fixedPrice->id,
+                    'is_active' => true,
+                    'sort' => 30,
+                ],
             ],
         ];
         $this->actingAs($admin)
             ->postJson(route('administration.catalog.media.calculation-methods-preview', $medium), $ok)
             ->assertOk();
 
-        $planned = $ok;
-        $planned['default_calculation_method_id'] = (int) $calendar->id;
+        $calendarDefault = $ok;
+        $calendarDefault['default_calculation_method_id'] = (int) $calendar->id;
         $this->actingAs($admin)
-            ->postJson(route('administration.catalog.media.calculation-methods-preview', $medium), $planned)
+            ->postJson(route('administration.catalog.media.calculation-methods-preview', $medium), $calendarDefault)
+            ->assertOk();
+
+        $plannedFixedPrice = $ok;
+        $plannedFixedPrice['default_calculation_method_id'] = (int) $fixedPrice->id;
+        $this->actingAs($admin)
+            ->postJson(route('administration.catalog.media.calculation-methods-preview', $medium), $plannedFixedPrice)
             ->assertUnprocessable()
             ->assertJsonValidationErrors('default_calculation_method_id');
 

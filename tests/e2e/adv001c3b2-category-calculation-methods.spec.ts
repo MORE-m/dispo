@@ -18,7 +18,7 @@ async function login(page: Page, email: string) {
 }
 
 test.describe('ADV-001c3b2 category calculation methods', () => {
-    test('methods section, planned calendar, preview, apply tkp, noop, focus', async ({
+    test('methods section, released calendar, planned fixed_price, preview, apply tkp, noop, focus', async ({
         page,
     }) => {
         await login(page, 'admin@example.com');
@@ -40,9 +40,18 @@ test.describe('ADV-001c3b2 category calculation methods', () => {
         ).toBeVisible();
         await expect(
             page.locator('[data-test="category-method-tech-calendar"]'),
-        ).toContainText('Geplant');
+        ).toContainText('Freigegeben');
         await expect(
             page.locator('[data-test="category-method-registry-calendar"]'),
+        ).toContainText('released');
+        await expect(
+            page.locator('[data-test="category-method-row-fixed_price"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="category-method-tech-fixed_price"]'),
+        ).toContainText('Geplant');
+        await expect(
+            page.locator('[data-test="category-method-registry-fixed_price"]'),
         ).toContainText('planned');
 
         await expect(
@@ -50,6 +59,9 @@ test.describe('ADV-001c3b2 category calculation methods', () => {
         ).toHaveCount(1);
         await expect(
             page.locator('[data-test="category-default-option-calendar"]'),
+        ).toHaveCount(1);
+        await expect(
+            page.locator('[data-test="category-default-option-fixed_price"]'),
         ).toHaveCount(0);
         await expect(
             page.locator('[data-test="category-default-option-tkp"]'),

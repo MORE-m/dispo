@@ -62,18 +62,32 @@ class AdvertisingMediumLiveBookabilityTest extends TestCase
         $this->assertSame('v1', $result->algorithmVersion);
     }
 
-    public function test_planned_only_method_is_not_bookable(): void
+    public function test_planned_fixed_price_method_is_not_bookable(): void
     {
         $medium = AdvertisingMedium::factory()->create([
             'code' => 'spot_classic_planned',
             'kind' => CalculationKind::SpotClassic,
         ]);
 
-        $result = $this->bookability->evaluate($medium, 'calendar');
+        $result = $this->bookability->evaluate($medium, 'fixed_price');
 
         $this->assertFalse($result->isBookableForNewPositions);
         $this->assertNotNull($result->unbookableReason);
         $this->assertStringContainsString('noch nicht freigegeben', (string) $result->unbookableReason);
+    }
+
+    public function test_calendar_method_is_bookable(): void
+    {
+        $medium = AdvertisingMedium::factory()->create([
+            'code' => 'spot_classic_calendar',
+            'kind' => CalculationKind::SpotClassic,
+        ]);
+
+        $result = $this->bookability->evaluate($medium, 'calendar');
+
+        $this->assertTrue($result->isBookableForNewPositions);
+        $this->assertSame('calendar', $result->calculationMethodKey);
+        $this->assertSame('v1', $result->algorithmVersion);
     }
 
     public function test_inactive_medium_is_not_bookable(): void

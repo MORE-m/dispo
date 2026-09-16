@@ -50,16 +50,20 @@ class PriceListPinOnMethodChangeTest extends TestCase
         $payload = $this->positionPayloadFromExisting($position, [
             'calculation_method_key' => 'calendar',
             'spot_method' => 'calendar',
+            'planner_entries' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'spot_count' => (int) $position->total_spot_count],
+            ],
+            'time_ranges' => [],
+            'plan_rows' => [],
         ]);
 
-        $resolved = (new CatalogResolver($this->calendarAllowingFreezeResolver()))
-            ->resolvePosition($payload, $position->fresh());
+        $resolved = (new CatalogResolver)->resolvePosition($payload, $position->fresh());
 
         $this->assertSame($pinnedId, $resolved['priceList']->id);
         $this->assertSame($pinnedVersion, $resolved['priceList']->version);
         $this->assertNotSame($newer->id, $resolved['priceList']->id);
         $this->assertSame('calendar', $resolved['freeze']->calculationMethodKey);
-        $this->assertSame('average', $position->fresh()->calculation_method_key);
+        $this->assertSame('average', $position->fresh()->calculation_method_key); // nur Resolve, kein Save
         $this->assertSame($pinnedId, $position->fresh()->price_list_id);
     }
 
@@ -90,7 +94,7 @@ class PriceListPinOnMethodChangeTest extends TestCase
         $this->assertSame('average', $fresh->calculation_method_key);
     }
 
-    public function test_planned_method_change_is_rejected_without_rebinding_pin(): void
+    public function test_planned_fixed_price_method_change_is_rejected_without_rebinding_pin(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -108,8 +112,8 @@ class PriceListPinOnMethodChangeTest extends TestCase
             $calculation->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
         );
         $payload['lock_version'] = $calculation->lock_version;
-        $payload['positions'][0]['calculation_method_key'] = 'calendar';
-        $payload['positions'][0]['spot_method'] = 'calendar';
+        $payload['positions'][0]['calculation_method_key'] = 'fixed_price';
+        $payload['positions'][0]['spot_method'] = 'fixed_price';
 
         try {
             $writer->update($calculation->fresh(), $payload, $user);
@@ -129,7 +133,7 @@ class PriceListPinOnMethodChangeTest extends TestCase
             'planned',
             EngineProfileRegistry::pairStatus(
                 EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
-                'calendar',
+                'fixed_price',
             )->value,
         );
     }

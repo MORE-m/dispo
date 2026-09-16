@@ -128,7 +128,9 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
         $writer = app(CalculationWriter::class);
         $payload = $writer->payloadFromCalculation($calculation);
         $payload['lock_version'] = $calculation->lock_version;
-        $payload['positions'][0]['spot_method'] = 'calendar';
+        // BL-P4-02b: calendar ist released; geplante Ablehnung über fixed_price.
+        $payload['positions'][0]['spot_method'] = 'fixed_price';
+        $payload['positions'][0]['calculation_method_key'] = 'fixed_price';
 
         try {
             $writer->update($calculation, $payload, $user);
@@ -670,12 +672,13 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
         ], $user);
         $position = $calculation->positions()->firstOrFail();
 
+        // BL-P4-02b: calendar/v1 ist released; geplante Methode ohne Versionskatalog = fixed_price.
         DB::table('calculation_positions')->where('id', $position->id)->update([
             'kind' => 'spot_classic',
-            'spot_method' => 'calendar',
+            'spot_method' => 'fixed_price',
             'engine_profile_key' => 'spot_classic',
-            'calculation_method_key' => 'calendar',
-            'calculation_method_name' => 'Kalenderplaner',
+            'calculation_method_key' => 'fixed_price',
+            'calculation_method_name' => 'Festpreis',
             'algorithm_version' => 'v1',
         ]);
 

@@ -44,15 +44,15 @@ class AdvertisingMediumCalculationMethodOptionsResolverTest extends TestCase
         $this->assertSame($medium->id, $options->mediumId);
         $this->assertSame(AdvertisingMediumCalculationMethodOptions::SOURCE_CATEGORY, $options->source);
         $this->assertSame('average', $options->defaultCalculationMethodKey);
-        $this->assertCount(1, $options->methods);
-        $this->assertSame('average', $options->methods[0]['key']);
+        $this->assertCount(2, $options->methods);
+        $this->assertSame(['average', 'calendar'], array_column($options->methods, 'key'));
         $this->assertTrue($options->methods[0]['is_default']);
         $this->assertSame('Durchschnitt', $options->methods[0]['name']);
         $this->assertArrayNotHasKey('engine_profile_key', $options->toPayload());
         $this->assertArrayNotHasKey('algorithm_version', $options->methods[0]);
     }
 
-    public function test_planned_calendar_and_fixed_price_are_excluded(): void
+    public function test_released_calendar_and_planned_fixed_price_options(): void
     {
         $medium = AdvertisingMedium::factory()->create([
             'code' => 'c4a_planned_excluded',
@@ -61,8 +61,7 @@ class AdvertisingMediumCalculationMethodOptionsResolverTest extends TestCase
 
         $keys = array_column($this->resolver->resolve($medium)->methods, 'key');
 
-        $this->assertSame(['average'], $keys);
-        $this->assertNotContains('calendar', $keys);
+        $this->assertSame(['average', 'calendar'], $keys);
         $this->assertNotContains('fixed_price', $keys);
     }
 
@@ -168,10 +167,10 @@ class AdvertisingMediumCalculationMethodOptionsResolverTest extends TestCase
             'kind' => CalculationKind::SpotClassic,
         ]);
 
-        // calendar bleibt planned → nur average; Sortierung trotzdem deterministisch.
+        // calendar ist released; Sortierung nach Assignment-Sort (calendar=5 vor average=20).
         $options = $this->resolver->resolve($medium);
-        $this->assertSame(['average'], array_column($options->methods, 'key'));
-        $this->assertSame(1, count(array_unique(array_column($options->methods, 'key'))));
+        $this->assertSame(['calendar', 'average'], array_column($options->methods, 'key'));
+        $this->assertSame(2, count(array_unique(array_column($options->methods, 'key'))));
     }
 
     public function test_null_kind_medium_has_no_selectable_methods(): void

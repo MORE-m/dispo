@@ -125,7 +125,7 @@ class Adv001c4aCalculationMethodOptionsAndFreezeTest extends TestCase
                     'inventory_id' => $catalog['hamburg']->id,
                     'advertising_medium_id' => $catalog['medium']->id,
                     'schema_fingerprint' => $positionFingerprint,
-                    'calculation_method_key' => 'calendar',
+                    'calculation_method_key' => 'fixed_price',
                     'length_seconds' => 30,
                     'total_spot_count' => 1,
                     'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
@@ -134,7 +134,7 @@ class Adv001c4aCalculationMethodOptionsAndFreezeTest extends TestCase
             $this->fail('Erwartete ValidationException für planned Key.');
         } catch (ValidationException $exception) {
             $this->assertSame(
-                ['Kalkulationsart Kalenderplaner ist noch nicht freigegeben.'],
+                ['Kalkulationsart Festpreis ist noch nicht freigegeben.'],
                 $exception->errors()['positions'] ?? null,
             );
         }

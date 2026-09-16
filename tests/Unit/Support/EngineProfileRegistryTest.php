@@ -93,9 +93,28 @@ class EngineProfileRegistryTest extends TestCase
     }
 
     #[Test]
+    public function spot_classic_calendar_v1_is_released(): void
+    {
+        $this->assertSame(
+            EngineCapabilityStatus::Released,
+            EngineProfileRegistry::pairStatus(
+                EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
+                'calendar',
+            ),
+        );
+        $this->assertSame(
+            'v1',
+            EngineProfileRegistry::currentReleasedVersion(
+                EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
+                'calendar',
+            ),
+        );
+    }
+
+    #[Test]
     public function planned_pairs_have_no_current_version_and_no_invented_versions(): void
     {
-        foreach (['calendar', 'fixed_price'] as $method) {
+        foreach (['fixed_price'] as $method) {
             $this->assertSame(
                 EngineCapabilityStatus::Planned,
                 EngineProfileRegistry::pairStatus(
@@ -221,9 +240,11 @@ class EngineProfileRegistryTest extends TestCase
                     ],
                 ],
                 'calendar' => [
-                    'pair_status' => EngineCapabilityStatus::Planned,
-                    'current_released_version' => null,
-                    'versions' => [],
+                    'pair_status' => EngineCapabilityStatus::Released,
+                    'current_released_version' => 'v1',
+                    'versions' => [
+                        'v1' => EngineCapabilityStatus::Released,
+                    ],
                 ],
                 'fixed_price' => [
                     'pair_status' => EngineCapabilityStatus::Planned,
