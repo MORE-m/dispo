@@ -10,6 +10,7 @@ import {
     formatHour,
     isCompletePlannerEntry,
     parseDateOnly,
+    shiftMonthAnchor,
     startOfWeekMonday,
     totalPlannerSpotCount,
     type PlannerEntryDraft,
@@ -66,6 +67,10 @@ export function SpotCalendarPlanner({
         setWeekAnchor((current) => addDays(current, deltaDays));
     }
 
+    function shiftMonth(deltaMonths: number) {
+        setWeekAnchor((current) => shiftMonthAnchor(current, deltaMonths));
+    }
+
     function addEntry() {
         onChange([...entries, emptyPlannerEntry(formatDateOnly(weekAnchor))]);
     }
@@ -94,6 +99,15 @@ export function SpotCalendarPlanner({
                         type="button"
                         variant="outline"
                         size="sm"
+                        data-test={`planner-month-prev-${positionIndex}`}
+                        onClick={() => shiftMonth(-1)}
+                    >
+                        Vorheriger Monat
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         data-test={`planner-week-prev-${positionIndex}`}
                         onClick={() => shiftWeek(-7)}
                     >
@@ -113,6 +127,15 @@ export function SpotCalendarPlanner({
                         onClick={() => shiftWeek(7)}
                     >
                         Nächste Woche
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        data-test={`planner-month-next-${positionIndex}`}
+                        onClick={() => shiftMonth(1)}
+                    >
+                        Nächster Monat
                     </Button>
                 </div>
             ) : (

@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
     addDays,
+    addMonths,
     emptyPlannerEntry,
     formatDateOnly,
     formatHour,
     HOURS,
     payloadPlannerEntries,
     positionTimingPayload,
+    shiftMonthAnchor,
     startOfWeekMonday,
     totalPlannerSpotCount,
 } from '@/lib/pricing-calendar';
@@ -44,6 +46,23 @@ describe('pricing-calendar', () => {
         const monday = startOfWeekMonday(new Date(2026, 8, 16));
         expect(formatDateOnly(monday)).toBe('2026-09-14');
         expect(formatDateOnly(addDays(monday, 7))).toBe('2026-09-21');
+    });
+
+    it('addMonths lands on the first day of the target month across year boundaries', () => {
+        expect(formatDateOnly(addMonths(new Date(2026, 0, 31), 1))).toBe(
+            '2026-02-01',
+        );
+        expect(formatDateOnly(addMonths(new Date(2026, 11, 15), 1))).toBe(
+            '2027-01-01',
+        );
+    });
+
+    it('shiftMonthAnchor uses Monday week containing the first of the target month', () => {
+        const anchor = shiftMonthAnchor(new Date(2026, 8, 14), 1);
+        expect(formatDateOnly(anchor)).toBe('2026-09-28');
+
+        const previous = shiftMonthAnchor(new Date(2026, 2, 10), -1);
+        expect(formatDateOnly(previous)).toBe('2026-01-26');
     });
 
     it('branches preview payload between calendar and average', () => {

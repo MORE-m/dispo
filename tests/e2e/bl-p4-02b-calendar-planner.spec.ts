@@ -92,6 +92,36 @@ test.describe.serial('BL-P4-02b Kalenderplaner', () => {
         );
     });
 
+    test('Monatsnavigation ändert Referenzwoche ohne Einträge zu verändern', async ({
+        page,
+    }) => {
+        await login(page);
+        await openNewCalculationStepTwo(page);
+
+        await page
+            .locator('[data-test="calculation-method-radio-0-calendar"]')
+            .check();
+        await page.locator('[data-test="position-length-seconds-0"]').fill('30');
+        await page
+            .locator('[data-test="planner-date-0-0"]')
+            .fill(plannerDate);
+        await page.locator('[data-test="planner-hour-0-0"]').selectOption('8');
+        await page.locator('[data-test="planner-spots-0-0"]').fill('7');
+
+        const weekLabel = page.locator('[data-test="planner-week-label-0"]');
+        const labelBefore = await weekLabel.textContent();
+
+        await page.locator('[data-test="planner-month-next-0"]').click();
+        await expect(weekLabel).not.toHaveText(labelBefore ?? '');
+
+        await expect(page.locator('[data-test="planner-date-0-0"]')).toHaveValue(
+            plannerDate,
+        );
+        await expect(page.locator('[data-test="planner-spots-0-0"]')).toHaveValue(
+            '7',
+        );
+    });
+
     test('zeigt Validierungsfehler bei ungültiger Spotanzahl', async ({
         page,
     }) => {

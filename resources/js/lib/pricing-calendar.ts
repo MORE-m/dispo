@@ -159,6 +159,16 @@ export function addDays(date: Date, days: number): Date {
     return next;
 }
 
+/** Erster Tag des Zielmonats (Monats-/Jahresüberlauf über Date-Konstruktor). */
+export function addMonths(date: Date, months: number): Date {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+/** Monatsnavigation für die Referenzwoche: 1. des Zielmonats, dann Montag dieser Woche. */
+export function shiftMonthAnchor(weekAnchor: Date, deltaMonths: number): Date {
+    return startOfWeekMonday(addMonths(weekAnchor, deltaMonths));
+}
+
 export function isCalendarCalculationMethod(
     methodKey: string | null | undefined,
 ): boolean {
