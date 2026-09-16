@@ -94,6 +94,49 @@ class SpotClassicCalendarCalculationTest extends TestCase
         ], $roundtrip['positions'][0]['planner_entries']);
     }
 
+    public function test_wizard_props_expose_price_list_hours_by_id(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $list = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', $year)
+            ->firstOrFail();
+
+        PriceListItem::factory()->create([
+            'price_list_id' => $list->id,
+            'hour' => 8,
+            'day_group' => DayGroup::MoSa,
+            'second_price' => '9.0000',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('calculations.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('calculations/wizard')
+                ->has('catalog.price_list_hours_by_id.'.$list->id)
+                ->where('catalog.price_list_hours_by_id.'.$list->id, function ($items): bool {
+                    $rows = collect($items);
+                    if ($rows->isEmpty()) {
+                        return false;
+                    }
+
+                    $hasDerived = $rows->contains(
+                        fn ($item): bool => ($item['day_group'] ?? null) === DayGroup::MoSa->value,
+                    );
+                    $hasBaseHour = $rows->contains(
+                        fn ($item): bool => (int) ($item['hour'] ?? -1) === 8
+                            && ($item['day_group'] ?? null) === DayGroup::MoFr->value
+                            && isset($item['second_price']),
+                    );
+
+                    return ! $hasDerived && $hasBaseHour;
+                }));
+    }
+
     public function test_validation_rejects_average_with_planner_entries(): void
     {
         $catalog = $this->createSpotClassicCatalog();
