@@ -5,14 +5,17 @@ namespace Tests\Feature\Calculation;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
+use App\Models\DispoOrder;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
@@ -329,6 +332,207 @@ class SpotClassicCalendarCalculationTest extends TestCase
             ->assertJsonValidationErrors(['positions.0.planner_entries.0.spot_count']);
     }
 
+    public function test_planner_dates_in_price_year_succeed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $date = sprintf('%04d-09-14', $year);
+
+        $calculation = app(CalculationWriter::class)->create(
+            $this->calendarPayload($catalog, [
+                ['date' => $date, 'hour' => 8, 'spot_count' => 2],
+            ]),
+            $user,
+        );
+
+        $this->assertCount(1, $calculation->positions()->firstOrFail()->plannerEntries);
+    }
+
+    public function test_planner_date_in_following_year_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $date = sprintf('%04d-01-15', $nextYear);
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(CalculationWriter::class)->preview(
+                $this->calendarPayload($catalog, [
+                    ['date' => $date, 'hour' => 8, 'spot_count' => 1],
+                ]),
+                $user,
+            );
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.planner_entries.0.date', $exception->errors());
+            $message = implode(' ', $exception->errors()['positions.0.planner_entries.0.date']);
+            $this->assertStringContainsString($date, $message);
+            $this->assertStringContainsString('getrennte Position', $message);
+
+            throw $exception;
+        }
+    }
+
+    public function test_mixed_planner_years_in_one_position_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $nextYear = $year + 1;
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(CalculationWriter::class)->preview(
+                $this->calendarPayload($catalog, [
+                    ['date' => sprintf('%04d-09-14', $year), 'hour' => 8, 'spot_count' => 1],
+                    ['date' => sprintf('%04d-01-10', $nextYear), 'hour' => 9, 'spot_count' => 1],
+                ]),
+                $user,
+            );
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.planner_entries.1.date', $exception->errors());
+
+            throw $exception;
+        }
+    }
+
+    public function test_explicit_price_year_change_with_matching_dates_succeeds(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $nextList = $this->createActivePriceListForYear($catalog['hamburg']->id, $nextYear, 'calendar-next-RH');
+        $date = sprintf('%04d-03-20', $nextYear);
+
+        $calculation = app(CalculationWriter::class)->create(
+            $this->calendarPayload($catalog, [
+                ['date' => $date, 'hour' => 8, 'spot_count' => 4],
+            ], priceYear: $nextYear, expectedPriceListId: $nextList->id),
+            $user,
+        );
+
+        $position = $calculation->positions()->firstOrFail();
+        $this->assertSame($nextList->id, $position->price_list_id);
+        $this->assertSame($date, $position->plannerEntries->first()->dateIso());
+    }
+
+    public function test_explicit_price_year_change_with_wrong_dates_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $currentYear = PriceListCalendar::currentYear();
+        $nextYear = $currentYear + 1;
+        $nextList = $this->createActivePriceListForYear($catalog['hamburg']->id, $nextYear, 'calendar-next-mismatch');
+
+        $this->expectException(ValidationException::class);
+
+        try {
+            app(CalculationWriter::class)->preview(
+                $this->calendarPayload($catalog, [
+                    ['date' => sprintf('%04d-09-14', $currentYear), 'hour' => 8, 'spot_count' => 1],
+                ], priceYear: $nextYear, expectedPriceListId: $nextList->id),
+                $user,
+            );
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.planner_entries.0.date', $exception->errors());
+
+            throw $exception;
+        }
+    }
+
+    public function test_year_contract_preview_matches_store(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $payload = $this->calendarPayload($catalog, [
+            ['date' => sprintf('%04d-12-01', $year), 'hour' => 10, 'spot_count' => 3],
+        ]);
+
+        $writer = app(CalculationWriter::class);
+        $preview = $writer->preview($payload, $user)->toArray();
+
+        try {
+            $writer->create($payload, $user);
+        } catch (ValidationException $exception) {
+            $this->fail('Store sollte dieselbe Jahresprüfung wie Preview bestehen: '.json_encode($exception->errors()));
+        }
+
+        $this->assertSame(
+            $preview['positions'][0]['planner_entries'][0]['date'] ?? null,
+            sprintf('%04d-12-01', $year),
+        );
+    }
+
+    public function test_dispo_from_calendar_includes_planner_entries_in_show_props(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $date = sprintf('%04d-09-19', $year);
+
+        $calculation = app(CalculationWriter::class)->create(
+            $this->calendarPayload($catalog, [
+                ['date' => $date, 'hour' => 9, 'spot_count' => 3],
+            ]),
+            $user,
+        );
+        $position = $calculation->positions()->firstOrFail();
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, [$position->id], $user)
+            ->order;
+
+        $snapshot = json_encode($order->positions()->firstOrFail()->planner_entries_snapshot);
+        $this->assertStringContainsString($date, (string) $snapshot);
+
+        $this->actingAs($user)
+            ->get(route('dispo-orders.show', $order))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('dispo-orders/show')
+                ->has('order.positions', 1)
+                ->where('order.positions.0.planner_entries.0.date', $date)
+                ->where('order.positions.0.planner_entries.0.hour', 9)
+                ->where('order.positions.0.planner_entries.0.spot_count', 3));
+    }
+
+    public function test_dispo_planner_snapshot_unchanged_after_calculation_update(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $date = sprintf('%04d-09-14', $year);
+
+        $calculation = app(CalculationWriter::class)->create(
+            $this->calendarPayload($catalog, [
+                ['date' => $date, 'hour' => 8, 'spot_count' => 5],
+            ]),
+            $user,
+        );
+        $position = $calculation->positions()->firstOrFail();
+
+        app(DispoOrderWriter::class)->createFromCalculation($calculation, [$position->id], $user);
+        $order = DispoOrder::query()->with('positions')->firstOrFail();
+        $originalSnapshot = $order->positions->first()->planner_entries_snapshot;
+
+        $writer = app(CalculationWriter::class);
+        $payload = $writer->payloadFromCalculation(
+            $calculation->fresh(['positions.plannerEntries', 'positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'][0]['planner_entries'] = [
+            ['date' => $date, 'hour' => 14, 'spot_count' => 99],
+        ];
+        $writer->update($calculation->fresh(), $payload, $user);
+
+        $order->refresh()->load('positions');
+        $this->assertSame($originalSnapshot, $order->positions->first()->planner_entries_snapshot);
+    }
+
     public function test_zero_spot_count_entry_is_skipped(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -344,6 +548,30 @@ class SpotClassicCalendarCalculationTest extends TestCase
         $this->assertSame(2, $position->total_spot_count);
         $this->assertCount(1, $position->plannerEntries);
         $this->assertSame(9, $position->plannerEntries->first()->hour);
+    }
+
+    private function createActivePriceListForYear(int $inventoryId, int $year, string $version): PriceList
+    {
+        $list = PriceList::factory()->create([
+            'inventory_id' => $inventoryId,
+            'year' => $year,
+            'status' => PriceListStatus::Active,
+            'version' => $version,
+            'valid_from' => sprintf('%04d-01-01', $year),
+        ]);
+
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $list->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '2.0000',
+                ]);
+            }
+        }
+
+        return $list;
     }
 
     private function activateNewerListForSameYear(int $inventoryId, int $previousActiveId): PriceList
@@ -379,28 +607,41 @@ class SpotClassicCalendarCalculationTest extends TestCase
      * @param  list<array{date: string, hour: int, spot_count: int}>  $entries
      * @return array<string, mixed>
      */
-    private function calendarPayload(array $catalog, array $entries): array
-    {
+    private function calendarPayload(
+        array $catalog,
+        array $entries,
+        ?int $priceYear = null,
+        ?int $expectedPriceListId = null,
+    ): array {
         $fingerprint = app(ConfigurationSnapshotFreezeService::class)
             ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
         $positionFingerprint = app(ConfigurationSnapshotFreezeService::class)
             ->resolveLivePositionSchema((int) $catalog['medium']->id)['schema_fingerprint'];
 
+        $position = [
+            'inventory_id' => $catalog['hamburg']->id,
+            'advertising_medium_id' => $catalog['medium']->id,
+            'schema_fingerprint' => $positionFingerprint,
+            'spot_method' => 'calendar',
+            'calculation_method_key' => 'calendar',
+            'length_seconds' => 30,
+            'position_discount_percent' => '0',
+            'ae_percent' => '0',
+            'planner_entries' => $entries,
+        ];
+
+        if ($priceYear !== null) {
+            $position['price_year'] = $priceYear;
+        }
+        if ($expectedPriceListId !== null) {
+            $position['expected_price_list_id'] = $expectedPriceListId;
+        }
+
         return [
             'planning_mode' => 'manual',
             'order_discount_percent' => '0',
             'schema_fingerprint' => $fingerprint,
-            'positions' => [[
-                'inventory_id' => $catalog['hamburg']->id,
-                'advertising_medium_id' => $catalog['medium']->id,
-                'schema_fingerprint' => $positionFingerprint,
-                'spot_method' => 'calendar',
-                'calculation_method_key' => 'calendar',
-                'length_seconds' => 30,
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-                'planner_entries' => $entries,
-            ]],
+            'positions' => [$position],
         ];
     }
 }

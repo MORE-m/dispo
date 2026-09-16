@@ -784,7 +784,7 @@ final class CalculationWriter
         $existingByClient = $existing?->positions->keyBy('client_key') ?? collect();
         $resolved = [];
 
-        foreach ($payload['positions'] ?? [] as $position) {
+        foreach ($payload['positions'] ?? [] as $index => $position) {
             $existingPosition = null;
 
             if (isset($position['id'])) {
@@ -793,7 +793,7 @@ final class CalculationWriter
                 $existingPosition = $existingByClient->get((string) $position['client_key']);
             }
 
-            $catalog = $this->catalog->resolvePosition($position, $existingPosition);
+            $catalog = $this->catalog->resolvePosition($position, $existingPosition, (int) $index);
             $length = (int) ($position['length_seconds']
                 ?? ($existingPosition !== null ? $existingPosition->length_seconds : null)
                 ?? ($catalog['rule'] !== null ? $catalog['rule']->default_length_seconds : null)

@@ -22,6 +22,8 @@ use Illuminate\Validation\ValidationException;
 
 final class CatalogResolver
 {
+    private ?int $currentPositionIndex = null;
+
     public function __construct(
         private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
         private readonly CalculationPositionMethodKeyNormalizer $methodKeyNormalizer = new CalculationPositionMethodKeyNormalizer,
@@ -49,7 +51,41 @@ final class CatalogResolver
      *     medium_changed: bool
      * }
      */
-    public function resolvePosition(array $position, ?CalculationPosition $existing = null): array
+    public function resolvePosition(array $position, ?CalculationPosition $existing = null, ?int $positionIndex = null): array
+    {
+        $previousPositionIndex = $this->currentPositionIndex;
+        $this->currentPositionIndex = $positionIndex;
+
+        try {
+            return $this->resolvePositionInner($position, $existing);
+        } finally {
+            $this->currentPositionIndex = $previousPositionIndex;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule|null,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
+    private function resolvePositionInner(array $position, ?CalculationPosition $existing): array
     {
         $inventoryId = (int) ($position['inventory_id'] ?? 0);
         $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
@@ -884,6 +920,8 @@ final class CatalogResolver
         Collection $existingEntries,
         bool $useSnapshot,
     ): array {
+        $this->assertPlannerEntryDatesMatchPriceYear($entries, $priceList);
+
         $plannerEntries = [];
         /** @var array<string, list<string>> $missingByDayGroup */
         $missingByDayGroup = [];
@@ -922,6 +960,45 @@ final class CatalogResolver
         }
 
         return $plannerEntries;
+    }
+
+    /**
+     * @param  list<array{date: string, hour: int, spot_count: int, sort: int}>  $entries
+     */
+    private function assertPlannerEntryDatesMatchPriceYear(array $entries, PriceList $priceList): void
+    {
+        $priceYear = (int) $priceList->year;
+        $errors = [];
+        $prefix = $this->plannerEntriesFieldPrefix();
+
+        foreach ($entries as $entry) {
+            $entryYear = (int) substr($entry['date'], 0, 4);
+            if ($entryYear === $priceYear) {
+                continue;
+            }
+
+            $fieldKey = $prefix.'.'.$entry['sort'].'.date';
+            $errors[$fieldKey] = [
+                sprintf(
+                    'Das Datum %s gehört nicht zum Preisjahr %d dieser Position. Für ein weiteres Preisjahr legen Sie bitte eine getrennte Position an.',
+                    $entry['date'],
+                    $priceYear,
+                ),
+            ];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function plannerEntriesFieldPrefix(): string
+    {
+        if ($this->currentPositionIndex !== null) {
+            return 'positions.'.$this->currentPositionIndex.'.planner_entries';
+        }
+
+        return 'positions';
     }
 
     /**
