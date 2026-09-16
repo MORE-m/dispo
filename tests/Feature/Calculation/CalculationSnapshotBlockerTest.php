@@ -583,7 +583,9 @@ class CalculationSnapshotBlockerTest extends TestCase
         $mediaBefore = (string) $calculation->media_gross;
 
         $positions = $this->positionsFromCalculation($calculation);
-        $positions[0]['spot_method'] = 'calendar';
+        // BL-P4-02b: calendar ist freigegeben; ungeplante/nicht implementierte Methode = fixed_price.
+        $positions[0]['spot_method'] = 'fixed_price';
+        $positions[0]['calculation_method_key'] = 'fixed_price';
 
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             ...$payload,

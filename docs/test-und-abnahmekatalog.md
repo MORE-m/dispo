@@ -52,16 +52,34 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 - reiner Methodenwechsel bei gleichem Inventar/Preisjahr behält `price_list_id`/`price_list_version`
 - Neubindung nur: neue Position, Inventarwechsel, expliziter Jahrwechsel (01c-Vertrag)
-- AT-01/03/23/24 gezielt gehärtet; kein AT-02-/AT-04-Claim; `calendar`/`fixed_price` bleiben `planned`
+- AT-01/03/23/24 gezielt gehärtet (auf `main`, PR #56)
 - Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
+
+### BL-P4-02b (Kalenderplaner / AT-02)
+
+- Abnahme **AT-02** mit `SPT-005`–`SPT-007` (+ Anzeige-Teil `SPT-008`): **Wochenmatrix**
+  Mo–So × Preisstunden; Datum bestimmt Tagesgruppe; jede Zelle `(Datum, Stunde)` mit
+  eigener Spotanzahl und Stundenpreis; Mo–Fr/Sa/So korrekt (nur Basisgruppen, keine
+  abgeleiteten `mo_sa`/`mo_so`)
+- Jahresvertrag: Kalenderdaten müssen zum Preisjahr der gepinnten Liste passen; gemischte Jahre fail-closed; UI zeigt Preisjahr und Hinweis auf getrennte Positionen
+- Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb der sichtbaren Woche bleiben im React-State (`SPT-007`)
+- Methode `calendar`: keine parallelen Average-`time_ranges`; leere/0-Zellen entfernen den Eintrag
+- Registry-Freigabe `spot_classic`/`calendar` **released/v1** (`BL-P4-02b` umgesetzt, PR #58); `fixed_price` weiter `planned`
+- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige (chronologisch unverändert)
+- Dispo-Export der Verteilung (`SPT-008` Export) **nicht** Teil dieses PR
+- Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim
+- Unit: `CalendarCalculationTest`
+- Feature: `SpotClassicCalendarCalculationTest` (inkl. `price_list_hours_by_id` in Wizard-Props), `SpotClassicCalendarYearContractMysqlTest`, `BlP402bWithOriginRetentionCompatTest`
+- Vitest: `spot-calendar-planner.test.tsx`, `pricing-calendar.test.ts`, `dispo-planner-display.test.ts`
+- isolierte Playwright-Suite `playwright.blp402b.config.ts` (Port **8022**, DB `database/e2e-bl-p4-02b.sqlite`)
 
 ## Mindestabnahme
 
 | ID | Betroffene Anforderungen | Szenario | Erwartung |
 |---|---|---|---|
 | AT-01 | SPT-001–SPT-004, SPT-009, PRI-006 | Mo–Fr, zwei Preiszeiträume mit eigener Spotanzahl | Jeder Zeitraum separat; Summe der Zeitraumssummen; Index und Rundung unverändert |
-| AT-02 | SPT-005–SPT-008 | Planer über Mo–Fr, Samstag und Sonntag | Datum bestimmt Tagesgruppe; jede Zelle nutzt richtigen Stundenpreis |
+| AT-02 | SPT-005–SPT-007 (+ Anzeige SPT-008) | Planer über Mo–Fr, Samstag und Sonntag | Datum bestimmt Tagesgruppe; jede Zelle nutzt richtigen Stundenpreis; ein Preisjahr je Position |
 | AT-03 | SPT-009, SPT-010 | Single-Spots mit 46 s und 100 s | 46 s erzeugt nur Hinweis; beide berechenbar mit Index 95 |
 | AT-04 | SPT-012–SPT-014 | Hauptspot plus Allonge | Komponenten sichtbar; je Regel einzeln oder über Gesamtlänge gerechnet |
 | AT-05 | SWF-001–SWF-005 | Trailer 20 s, +30 %, Zeitfenster | Sekundenpreis × 20 × 1,30; kein Spotlängenindex |

@@ -47,7 +47,12 @@ final class DispoOrderPositionAdoptionService
      */
     public function selectablePositions(Calculation $calculation): array
     {
-        $calculation->loadMissing(['positions.inventory', 'positions.advertisingMedium', 'positions.timeRanges']);
+        $calculation->loadMissing([
+            'positions.inventory',
+            'positions.advertisingMedium',
+            'positions.timeRanges',
+            'positions.plannerEntries',
+        ]);
         $adoptions = $this->adoptionsForCalculation($calculation);
 
         return array_values($calculation->positions->map(function (CalculationPosition $position) use ($adoptions): array {
@@ -65,6 +70,12 @@ final class DispoOrderPositionAdoptionService
                     'end_hour_exclusive' => $range->end_hour_exclusive,
                     'day_group' => $range->day_group->value,
                     'spot_count' => $range->spot_count,
+                ])->all(),
+                'planner_entries' => $position->plannerEntries->map(fn ($entry): array => [
+                    'date' => $entry->dateIso(),
+                    'hour' => $entry->hour,
+                    'day_group' => $entry->day_group->value,
+                    'spot_count' => $entry->spot_count,
                 ])->all(),
                 'already_adopted' => $existing !== [],
                 'adoptions' => $existing,

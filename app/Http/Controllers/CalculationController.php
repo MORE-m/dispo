@@ -16,12 +16,14 @@ use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
 use App\Models\FieldDefinition;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
+use App\Models\PriceList;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -284,7 +286,7 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
 
         $latestBudgetProposal = null;
         $appliedBudgetProposal = null;
@@ -497,6 +499,14 @@ class CalculationController extends Controller
                         'average_second_price' => $range->average_second_price === null ? null : (string) $range->average_second_price,
                         'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
                     ])->all(),
+                    'planner_entries' => $position->plannerEntries->map(fn (CalculationPositionPlannerEntry $entry): array => [
+                        'date' => $entry->dateIso(),
+                        'hour' => $entry->hour,
+                        'day_group' => $entry->day_group->value,
+                        'spot_count' => $entry->spot_count,
+                        'second_price' => (string) $entry->second_price,
+                        'line_gross' => (string) $entry->line_gross,
+                    ])->all(),
                     'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
                         'type' => $discount->type->value,
                         'custom_label' => $discount->custom_label,
@@ -522,13 +532,18 @@ class CalculationController extends Controller
             }
         }
 
+        $inventoryIds = $inventories->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $priceYearsByInventory = PriceListYearSelection::optionsByInventoryIds($inventoryIds);
+
         return [
             'catalog' => [
                 'inventories' => $inventories,
                 'media' => $media,
                 'rules' => $rules,
-                'price_years_by_inventory' => PriceListYearSelection::optionsByInventoryIds(
-                    $inventories->pluck('id')->map(fn ($id): int => (int) $id)->all(),
+                'price_years_by_inventory' => $priceYearsByInventory,
+                'price_list_hours_by_id' => $this->priceListHoursById(
+                    $priceYearsByInventory,
+                    $calculation,
                 ),
                 'current_price_year' => PriceListCalendar::currentYear(),
                 'next_price_year' => PriceListCalendar::nextYear(),
@@ -593,6 +608,11 @@ class CalculationController extends Controller
                             'end_hour_exclusive' => $range->end_hour_exclusive,
                             'day_group' => $range->day_group->value,
                             'spot_count' => $range->spot_count,
+                        ])->all(),
+                        'planner_entries' => $position->plannerEntries->map(fn (CalculationPositionPlannerEntry $entry): array => [
+                            'date' => $entry->dateIso(),
+                            'hour' => $entry->hour,
+                            'spot_count' => $entry->spot_count,
                         ])->all(),
                         'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
                             'type' => $discount->type->value,
@@ -871,6 +891,84 @@ class CalculationController extends Controller
         }
 
         return ChoiceFieldValueContract::optionsForSchemaProp($optionsJson, $fieldType);
+    }
+
+    /**
+     * Basis-Preisstunden je Preisliste für den Kalenderplaner (keine abgeleiteten Tagesgruppen).
+     *
+     * @param  array<int, list<array{
+     *     year: int,
+     *     price_list_id: int|null,
+     *     version: string|null,
+     *     status: string|null,
+     *     is_default: bool,
+     *     available: bool
+     * }>>  $priceYearsByInventory
+     * @return array<int, list<array{hour: int, day_group: string, second_price: string}>>
+     */
+    private function priceListHoursById(array $priceYearsByInventory, ?Calculation $calculation): array
+    {
+        $ids = [];
+        foreach ($priceYearsByInventory as $options) {
+            foreach ($options as $option) {
+                if ($option['price_list_id'] !== null) {
+                    $ids[] = (int) $option['price_list_id'];
+                }
+            }
+        }
+
+        if ($calculation !== null) {
+            foreach ($calculation->positions as $position) {
+                if ($position->price_list_id !== null) {
+                    $ids[] = (int) $position->price_list_id;
+                }
+            }
+        }
+
+        $ids = array_values(array_unique(array_filter(
+            $ids,
+            static fn (int $id): bool => $id > 0,
+        )));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $lists = PriceList::query()
+            ->with('items')
+            ->whereIn('id', $ids)
+            ->get();
+
+        $map = [];
+        foreach ($lists as $list) {
+            $map[(int) $list->id] = $this->basePriceListHourPayload($list);
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return list<array{hour: int, day_group: string, second_price: string}>
+     */
+    private function basePriceListHourPayload(PriceList $list): array
+    {
+        $items = [];
+        foreach ($list->items as $item) {
+            if ($item->day_group->isDerived()) {
+                continue;
+            }
+            $items[] = [
+                'hour' => (int) $item->hour,
+                'day_group' => $item->day_group->value,
+                'second_price' => (string) $item->second_price,
+            ];
+        }
+        usort(
+            $items,
+            fn (array $left, array $right): int => [$left['hour'], $left['day_group']] <=> [$right['hour'], $right['day_group']],
+        );
+
+        return $items;
     }
 
     /**

@@ -44,12 +44,20 @@ import {
     type ChoiceValue,
 } from '@/lib/choice-field-values';
 import { PriceTimeRanges } from '@/components/price-time-ranges';
+import { SpotCalendarPlanner } from '@/components/spot-calendar-planner';
+import {
+    draftPlannerEntries,
+    initialTimingFieldsForMethod,
+    isCalendarCalculationMethod,
+    positionTimingPayload,
+    totalPlannerSpotCount,
+    type PlannerEntryDraft,
+} from '@/lib/pricing-calendar';
 import {
     emptyTimeRange,
     type DistributionRangeDraft,
     formatHour,
     formatInclusiveEnd,
-    payloadTimeRanges,
     totalSpotCount,
     type DayGroupOption,
     type TimeRangeDraft,
@@ -195,6 +203,7 @@ type PositionDraft = {
     ae_percent: string;
     plan_rows: PlanRow[];
     time_ranges: TimeRangeDraft[];
+    planner_entries: PlannerEntryDraft[];
     position_discounts: DiscountDraft[];
     period_open: boolean;
     flight_period_start: string;
@@ -265,6 +274,14 @@ type Catalog = {
     >;
     current_price_year?: number;
     next_price_year?: number;
+    price_list_hours_by_id?: Record<
+        string,
+        Array<{
+            hour: number;
+            day_group: string;
+            second_price: string;
+        }>
+    >;
 };
 
 type Totals = {
@@ -299,6 +316,14 @@ type Totals = {
             spot_count: number;
             average_second_price: string;
             range_gross: string;
+        }>;
+        planner_entries?: Array<{
+            date: string;
+            hour: number;
+            day_group?: string;
+            spot_count: number;
+            second_price?: string;
+            line_gross?: string;
         }>;
         position_discounts?: Array<{
             label: string;
@@ -400,6 +425,11 @@ type SavedCalculation = {
             start_hour: number;
             end_hour_exclusive: number;
             day_group: string;
+            spot_count: number;
+        }>;
+        planner_entries?: Array<{
+            date: string;
+            hour: number;
             spot_count: number;
         }>;
         position_discounts?: Array<{
@@ -581,11 +611,10 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             length_seconds:
                 rule.default_length_seconds ??
                 preferredMedium.default_length_seconds,
-            total_spot_count: 0,
             position_discount_percent: '0',
             ae_percent: '0',
             plan_rows: [],
-            time_ranges: [emptyTimeRange()],
+            ...initialTimingFieldsForMethod(methodState.calculation_method_key),
             position_discounts: [],
             period_open: true,
             flight_period_start: '',
@@ -1026,7 +1055,15 @@ export default function CalculationWizard({
                         day_group: row.day_group,
                         second_price: row.second_price,
                     })),
-                    time_ranges: draftTimeRanges(position),
+                    time_ranges: isCalendarCalculationMethod(
+                        methodState.calculation_method_key,
+                    )
+                        ? []
+                        : draftTimeRanges(position),
+                    planner_entries: draftPlannerEntries(
+                        position,
+                        methodState.calculation_method_key,
+                    ),
                     position_discounts: draftDiscounts(
                         position.position_discounts,
                         position.position_discount_percent,
@@ -1399,7 +1436,11 @@ export default function CalculationWizard({
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
-                      const ranges = payloadTimeRanges(position.time_ranges);
+                      const timing = positionTimingPayload(
+                          position.calculation_method_key,
+                          position.time_ranges,
+                          position.planner_entries,
+                      );
                       const methodPayload =
                           calculationMethodPayloadFields(position);
 
@@ -1412,9 +1453,7 @@ export default function CalculationWizard({
                               position.schema_fingerprint ?? null,
                           ...methodPayload,
                           length_seconds: position.length_seconds,
-                          total_spot_count: totalSpotCount(
-                              position.time_ranges,
-                          ),
+                          total_spot_count: timing.total_spot_count,
                           needs_spot_redistribution:
                               position.needs_spot_redistribution ?? false,
                           price_year: position.price_year,
@@ -1422,7 +1461,8 @@ export default function CalculationWizard({
                               position.expected_price_list_id,
                           position_discount_percent: '0',
                           ae_percent: '0',
-                          time_ranges: ranges,
+                          time_ranges: timing.time_ranges,
+                          planner_entries: timing.planner_entries,
                           position_discounts: payloadDiscounts(
                               position.position_discounts,
                           ),
@@ -1469,7 +1509,7 @@ export default function CalculationWizard({
                                   position.custom_choice_meta,
                               ).payload,
                           },
-                          plan_rows: ranges.flatMap((range) =>
+                          plan_rows: timing.time_ranges.flatMap((range) =>
                               Array.from(
                                   {
                                       length:
@@ -1654,9 +1694,10 @@ export default function CalculationWizard({
                         position_discount_percent: '0',
                         ae_percent: '0',
                         plan_rows: [],
-                        time_ranges: [emptyTimeRange()],
+                        ...initialTimingFieldsForMethod(
+                            methodState.calculation_method_key,
+                        ),
                         position_discounts: [],
-                        total_spot_count: 0,
                         price_year: resetYear,
                         original_price_year: resetYear,
                         original_price_list_id: expectedPriceListIdForYear(
@@ -2063,6 +2104,7 @@ export default function CalculationWizard({
                     position_discount_percent: '0',
                     ae_percent: '0',
                     time_ranges,
+                    planner_entries: [],
                     position_discounts:
                         proposalDiscounts?.map((discount) => ({
                             type: discount.type,
@@ -3250,7 +3292,12 @@ export default function CalculationWizard({
                                                                     );
                                                                 updatePosition(
                                                                     index,
-                                                                    next,
+                                                                    {
+                                                                        ...next,
+                                                                        ...initialTimingFieldsForMethod(
+                                                                            key,
+                                                                        ),
+                                                                    },
                                                                 );
                                                             }}
                                                             onRestoreHistorical={() =>
@@ -3490,49 +3537,111 @@ export default function CalculationWizard({
                                                             ) : null}
                                                         </div>
 
-                                                        <PriceTimeRanges
-                                                            positionIndex={
-                                                                index
-                                                            }
-                                                            ranges={
-                                                                position.time_ranges
-                                                            }
-                                                            dayGroups={
-                                                                dayGroups
-                                                            }
-                                                            canEdit={canEdit}
-                                                            fieldErrors={
-                                                                fieldErrors
-                                                            }
-                                                            rangeTotals={
-                                                                displayTotals
-                                                                    ?.positions[
+                                                        {isCalendarCalculationMethod(
+                                                            position.calculation_method_key,
+                                                        ) ? (
+                                                            <SpotCalendarPlanner
+                                                                positionIndex={
                                                                     index
-                                                                ]?.time_ranges
-                                                            }
-                                                            legacyTotalSpotCount={
-                                                                position.needs_spot_redistribution
-                                                                    ? position.total_spot_count
-                                                                    : null
-                                                            }
-                                                            needsRedistribution={
-                                                                position.needs_spot_redistribution
-                                                            }
-                                                            onChange={(
-                                                                time_ranges,
-                                                            ) =>
-                                                                updatePosition(
-                                                                    index,
-                                                                    {
-                                                                        time_ranges,
-                                                                        total_spot_count:
-                                                                            totalSpotCount(
-                                                                                time_ranges,
-                                                                            ),
-                                                                    },
-                                                                )
-                                                            }
-                                                        />
+                                                                }
+                                                                entries={
+                                                                    position.planner_entries
+                                                                }
+                                                                canEdit={
+                                                                    canEdit
+                                                                }
+                                                                fieldErrors={
+                                                                    fieldErrors
+                                                                }
+                                                                entryTotals={
+                                                                    displayTotals
+                                                                        ?.positions[
+                                                                        index
+                                                                    ]
+                                                                        ?.planner_entries
+                                                                }
+                                                                positionMediaGross={
+                                                                    displayTotals
+                                                                        ?.positions[
+                                                                        index
+                                                                    ]
+                                                                        ?.media_gross
+                                                                }
+                                                                priceListHours={
+                                                                    catalog
+                                                                        .price_list_hours_by_id?.[
+                                                                        String(
+                                                                            position.expected_price_list_id ??
+                                                                                '',
+                                                                        )
+                                                                    ] ?? []
+                                                                }
+                                                                priceYear={
+                                                                    position.price_year
+                                                                }
+                                                                onChange={(
+                                                                    planner_entries,
+                                                                ) =>
+                                                                    updatePosition(
+                                                                        index,
+                                                                        {
+                                                                            planner_entries,
+                                                                            total_spot_count:
+                                                                                totalPlannerSpotCount(
+                                                                                    planner_entries,
+                                                                                ),
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <PriceTimeRanges
+                                                                positionIndex={
+                                                                    index
+                                                                }
+                                                                ranges={
+                                                                    position.time_ranges
+                                                                }
+                                                                dayGroups={
+                                                                    dayGroups
+                                                                }
+                                                                canEdit={
+                                                                    canEdit
+                                                                }
+                                                                fieldErrors={
+                                                                    fieldErrors
+                                                                }
+                                                                rangeTotals={
+                                                                    displayTotals
+                                                                        ?.positions[
+                                                                        index
+                                                                    ]
+                                                                        ?.time_ranges
+                                                                }
+                                                                legacyTotalSpotCount={
+                                                                    position.needs_spot_redistribution
+                                                                        ? position.total_spot_count
+                                                                        : null
+                                                                }
+                                                                needsRedistribution={
+                                                                    position.needs_spot_redistribution
+                                                                }
+                                                                onChange={(
+                                                                    time_ranges,
+                                                                ) =>
+                                                                    updatePosition(
+                                                                        index,
+                                                                        {
+                                                                            time_ranges,
+                                                                            total_spot_count:
+                                                                                totalSpotCount(
+                                                                                    time_ranges,
+                                                                                ),
+                                                                        },
+                                                                    )
+                                                                }
+                                                            />
+                                                        )}
 
                                                         {displayTotals
                                                             ?.positions[

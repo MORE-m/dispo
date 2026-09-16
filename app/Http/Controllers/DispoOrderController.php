@@ -402,6 +402,7 @@ class DispoOrderController extends Controller
                 'ae_amount' => (string) $position->ae_amount,
                 'nn_invest' => (string) $position->nn_invest,
                 'time_ranges' => $position->time_ranges_snapshot ?? [],
+                'planner_entries' => $position->planner_entries_snapshot ?? [],
                 'position_discounts' => $position->position_discounts_snapshot ?? [],
                 'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
                 'dynamic_field_captured' => $dynamicValues['positions_captured'][(int) $position->id] ?? [],

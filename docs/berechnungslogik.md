@@ -147,6 +147,21 @@ und Rabatten in derselben Kalkulation (`CAL-001`).
 
 ## Kalenderplaner Spot
 
+**Umsetzung:** Rechenweg und Formeln unverändert; fachlich **`BL-P4-02b` umgesetzt
+(PR #58)** (Abnahme **AT-02**, `SPT-005`–`SPT-007`; `SPT-008` Snapshot/Anzeige
+umgesetzt, Export offen). Wizard-UI: echte **Wochenmatrix** (Spalten Mo–So, Zeilen
+Preisstunden der gepinnten Liste, Spotanzahl direkt je Datum-/Stundenzelle) mit
+Wochen- und Monatsnavigation. Durchschnitts-`time_ranges` und Kalender-`planner_entries`
+schließen sich gegenseitig aus.
+
+**Jahresvertrag:** Eine Kalenderposition ist an genau ein Preisjahr gebunden (gepinnte
+Preisliste). Jedes belegte Kalenderdatum muss in dieses Jahr fallen. Planung über
+Jahresgrenzen hinweg erfordert **getrennte Positionen** (ggf. mit explizitem
+`price_year` je Position). Kein Auto-Rebind der Preisliste anhand der Datumszeilen.
+
+Komponenten (AT-04), Festpreis und Dispo-**Export** der Spot-Verteilung folgen in
+späteren Teilblöcken.
+
 Für jede belegte Zelle aus Datum und Stunde:
 
 ```text
@@ -160,7 +175,8 @@ Positionsbrutto = Σ Zeilenbrutto
 
 Der Wochentag wird aus dem echten Datum bestimmt. Mo–Fr, Samstag und Sonntag
 verwenden ihre jeweiligen Basispreise. Leere Zellen entsprechen null; negative
-oder nicht ganzzahlige Spotmengen sind ungültig.
+oder nicht ganzzahlige Spotmengen sind ungültig. Abweichende Kalenderjahre in
+derselben Position werden fail-closed abgewiesen (siehe Jahresvertrag oben).
 
 ## Komponenten und Gesamtlänge
 

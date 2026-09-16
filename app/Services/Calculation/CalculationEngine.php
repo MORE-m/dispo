@@ -125,10 +125,74 @@ final class CalculationEngine
                 $orderDiscountPercent,
                 $this->resolveDiscountList($orderDiscounts, $orderDiscountPercent),
             ),
-            SpotCalculationMethod::Calendar, SpotCalculationMethod::FixedPrice => throw new \InvalidArgumentException(
+            SpotCalculationMethod::Calendar => $this->calculateCalendarPosition(
+                $position,
+                $orderDiscountPercent,
+                $this->resolveDiscountList($orderDiscounts, $orderDiscountPercent),
+            ),
+            SpotCalculationMethod::FixedPrice => throw new \InvalidArgumentException(
                 'Kalkulationsart '.$position->spotMethod->value.' ist in UX-GATE-B noch nicht implementiert.',
             ),
         };
+    }
+
+    /**
+     * @param  list<DiscountInput>  $orderDiscounts
+     */
+    private function calculateCalendarPosition(
+        PositionInput $position,
+        string $orderDiscountPercent,
+        array $orderDiscounts,
+    ): PositionResult {
+        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $mediaGrossInternal = '0';
+        $totalSpots = 0;
+        $plannerResults = [];
+        $priceSum = '0';
+        $entryCount = 0;
+
+        foreach ($position->plannerEntries as $entry) {
+            if ($entry->spotCount < 1) {
+                continue;
+            }
+
+            $lineGrossInternal = $this->spotPrice($entry->secondPrice, $position, $index, $entry->spotCount);
+            $mediaGrossInternal = Decimal::add($mediaGrossInternal, $lineGrossInternal);
+            $totalSpots += $entry->spotCount;
+            $priceSum = Decimal::add($priceSum, $entry->secondPrice);
+            $entryCount++;
+
+            $plannerResults[] = [
+                'date' => $entry->date,
+                'hour' => $entry->hour,
+                'day_group' => $entry->dayGroup->value,
+                'spot_count' => $entry->spotCount,
+                'second_price' => Decimal::roundPrice($entry->secondPrice),
+                'line_gross' => Decimal::roundMoney($lineGrossInternal),
+            ];
+        }
+
+        if ($plannerResults === []) {
+            return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
+        }
+
+        $displayAverage = $this->weightedAverageSecondPrice($mediaGrossInternal, $position, $index, $totalSpots);
+        if ($displayAverage === null && $entryCount > 0) {
+            $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $entryCount, 4));
+        }
+
+        return $this->finalizePosition(
+            $position,
+            $orderDiscountPercent,
+            $orderDiscounts,
+            $mediaGrossInternal,
+            $totalSpots,
+            $index,
+            [],
+            $displayAverage ?? '0',
+            [],
+            $plannerResults,
+        );
     }
 
     /**
@@ -413,6 +477,7 @@ final class CalculationEngine
      * @param  list<DiscountInput>  $orderDiscounts
      * @param  list<array{hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $rowResults
      * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, average_second_price: string, range_gross: string, hours: list<int>}>  $timeRanges
+     * @param  list<array{date: string, hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $plannerEntries
      */
     private function finalizePosition(
         PositionInput $position,
@@ -424,6 +489,7 @@ final class CalculationEngine
         array $rowResults,
         string $averageSecondPrice,
         array $timeRanges = [],
+        array $plannerEntries = [],
     ): PositionResult {
         $positionDiscounts = $position->isDiscountable
             ? $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent)
@@ -468,6 +534,7 @@ final class CalculationEngine
             rows: $rowResults,
             averageSecondPrice: Decimal::roundPrice($averageSecondPrice),
             timeRanges: $timeRanges,
+            plannerEntries: $plannerEntries,
             positionDiscounts: $positionSequence,
             orderDiscounts: $orderSequence,
             needsSpotRedistribution: $position->needsSpotRedistribution,

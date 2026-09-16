@@ -17,10 +17,13 @@ use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 final class CatalogResolver
 {
+    private ?int $currentPositionIndex = null;
+
     public function __construct(
         private readonly CalculationMethodFreezeResolver $freezeResolver = new CalculationMethodFreezeResolver,
         private readonly CalculationPositionMethodKeyNormalizer $methodKeyNormalizer = new CalculationPositionMethodKeyNormalizer,
@@ -35,6 +38,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -47,7 +51,41 @@ final class CatalogResolver
      *     medium_changed: bool
      * }
      */
-    public function resolvePosition(array $position, ?CalculationPosition $existing = null): array
+    public function resolvePosition(array $position, ?CalculationPosition $existing = null, ?int $positionIndex = null): array
+    {
+        $previousPositionIndex = $this->currentPositionIndex;
+        $this->currentPositionIndex = $positionIndex;
+
+        try {
+            return $this->resolvePositionInner($position, $existing);
+        } finally {
+            $this->currentPositionIndex = $previousPositionIndex;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return array{
+     *     inventory: Inventory,
+     *     medium: AdvertisingMedium,
+     *     rule: InventoryMediumRule|null,
+     *     priceList: PriceList,
+     *     rows: list<PlanRowInput>,
+     *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
+     *     needs_spot_redistribution: bool,
+     *     total_spot_count: int,
+     *     spot_method: SpotCalculationMethod,
+     *     freeze: CalculationMethodFreezeDescriptor,
+     *     surcharge_percent: string,
+     *     is_discountable: bool,
+     *     is_ae_eligible: bool,
+     *     inventory_medium_rule_id: int|null,
+     *     inventory_changed: bool,
+     *     medium_changed: bool
+     * }
+     */
+    private function resolvePositionInner(array $position, ?CalculationPosition $existing): array
     {
         $inventoryId = (int) ($position['inventory_id'] ?? 0);
         $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
@@ -139,6 +177,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -197,12 +236,13 @@ final class CatalogResolver
                 ->where('advertising_medium_id', $medium->id)
                 ->first();
 
-        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+        [$rows, $timeRanges, $plannerEntries, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
             $inventory->name,
             $existing,
             useSnapshot: true,
+            spotMethod: $freeze->legacySpotMethod(),
         );
 
         return [
@@ -212,6 +252,7 @@ final class CatalogResolver
             'priceList' => $priceList,
             'rows' => $rows,
             'time_ranges' => $timeRanges,
+            'planner_entries' => $plannerEntries,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
@@ -237,6 +278,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -299,12 +341,13 @@ final class CatalogResolver
             ]);
         }
 
-        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+        [$rows, $timeRanges, $plannerEntries, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
             $inventory->name,
             $existing,
             useSnapshot: false,
+            spotMethod: $freeze->legacySpotMethod(),
         );
 
         return [
@@ -314,6 +357,7 @@ final class CatalogResolver
             'priceList' => $priceList,
             'rows' => $rows,
             'time_ranges' => $timeRanges,
+            'planner_entries' => $plannerEntries,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
@@ -339,6 +383,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -406,12 +451,13 @@ final class CatalogResolver
                 ->where('advertising_medium_id', $medium->id)
                 ->first();
 
-        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+        [$rows, $timeRanges, $plannerEntries, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
             $inventory->name,
             $existing,
             useSnapshot: true,
+            spotMethod: $freeze->legacySpotMethod(),
         );
 
         return [
@@ -421,6 +467,7 @@ final class CatalogResolver
             'priceList' => $priceList,
             'rows' => $rows,
             'time_ranges' => $timeRanges,
+            'planner_entries' => $plannerEntries,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
@@ -445,6 +492,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -507,12 +555,13 @@ final class CatalogResolver
             ]);
         }
 
-        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+        [$rows, $timeRanges, $plannerEntries, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
             $inventory->name,
             $existing,
             useSnapshot: false,
+            spotMethod: $freeze->legacySpotMethod(),
         );
 
         return [
@@ -522,6 +571,7 @@ final class CatalogResolver
             'priceList' => $priceList,
             'rows' => $rows,
             'time_ranges' => $timeRanges,
+            'planner_entries' => $plannerEntries,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
@@ -544,6 +594,7 @@ final class CatalogResolver
      *     priceList: PriceList,
      *     rows: list<PlanRowInput>,
      *     time_ranges: list<TimeRangeInput>,
+     *     planner_entries: list<PlannerEntryInput>,
      *     needs_spot_redistribution: bool,
      *     total_spot_count: int,
      *     spot_method: SpotCalculationMethod,
@@ -626,12 +677,13 @@ final class CatalogResolver
             ]);
         }
 
-        [$rows, $timeRanges, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
+        [$rows, $timeRanges, $plannerEntries, $totalSpotCount, $needsRedistribution] = $this->resolvePlan(
             $position,
             $priceList,
             $inventory->name,
             null,
             useSnapshot: false,
+            spotMethod: $freeze->legacySpotMethod(),
         );
 
         return [
@@ -641,6 +693,7 @@ final class CatalogResolver
             'priceList' => $priceList,
             'rows' => $rows,
             'time_ranges' => $timeRanges,
+            'planner_entries' => $plannerEntries,
             'needs_spot_redistribution' => $needsRedistribution,
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
@@ -732,7 +785,7 @@ final class CatalogResolver
 
     /**
      * @param  array<string, mixed>  $position
-     * @return array{0: list<PlanRowInput>, 1: list<TimeRangeInput>, 2: int, 3: bool}
+     * @return array{0: list<PlanRowInput>, 1: list<TimeRangeInput>, 2: list<PlannerEntryInput>, 3: int, 4: bool}
      */
     private function resolvePlan(
         array $position,
@@ -740,7 +793,24 @@ final class CatalogResolver
         string $inventoryName,
         ?CalculationPosition $existing,
         bool $useSnapshot,
+        SpotCalculationMethod $spotMethod,
     ): array {
+        if ($spotMethod === SpotCalculationMethod::Calendar) {
+            $plannerEntries = $this->resolvePlannerEntries(
+                $position,
+                $priceList,
+                $inventoryName,
+                $existing,
+                $useSnapshot,
+            );
+            $totalSpots = array_sum(array_map(
+                fn (PlannerEntryInput $entry): int => $entry->spotCount,
+                $plannerEntries,
+            ));
+
+            return [[], [], $plannerEntries, $totalSpots, false];
+        }
+
         $existingRows = $this->existingPlanRows($existing);
         $payloadRanges = $position['time_ranges'] ?? null;
 
@@ -762,7 +832,7 @@ final class CatalogResolver
                 $totalSpots = array_sum(array_map(fn (TimeRangeInput $range): int => $range->spotCount, $timeRanges));
                 $needsRedistribution = $this->redistributionStillOpen($existing, $totalSpots);
 
-                return [$rows, $timeRanges, $totalSpots, $needsRedistribution];
+                return [$rows, $timeRanges, [], $totalSpots, $needsRedistribution];
             }
         }
 
@@ -781,10 +851,193 @@ final class CatalogResolver
                 hours: [$row],
             )];
 
-            return [$rows, $timeRanges, $legacyTotal, false];
+            return [$rows, $timeRanges, [], $legacyTotal, false];
         }
 
-        return [$rows, [], $legacyTotal, $legacyAmbiguous];
+        return [$rows, [], [], $legacyTotal, $legacyAmbiguous];
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return list<PlannerEntryInput>
+     */
+    private function resolvePlannerEntries(
+        array $position,
+        PriceList $priceList,
+        string $inventoryName,
+        ?CalculationPosition $existing,
+        bool $useSnapshot,
+    ): array {
+        $payloadEntries = $position['planner_entries'] ?? null;
+        $existingEntries = $this->existingPlannerEntries($existing);
+
+        if (is_array($payloadEntries) && $payloadEntries !== []) {
+            $validated = (new PlannerEntryValidator)->validated(
+                $payloadEntries,
+                'positions',
+                requireAtLeastOne: false,
+            );
+
+            if ($validated !== []) {
+                return $this->hydratePlannerEntries(
+                    $validated,
+                    $priceList,
+                    $inventoryName,
+                    $existingEntries,
+                    $useSnapshot,
+                );
+            }
+        }
+
+        if ($existingEntries->isNotEmpty()) {
+            $entries = [];
+            foreach ($existingEntries as $stored) {
+                $date = $stored->dateIso();
+                $entries[] = new PlannerEntryInput(
+                    date: $date,
+                    hour: (int) $stored->hour,
+                    spotCount: (int) $stored->spot_count,
+                    dayGroup: $stored->day_group,
+                    secondPrice: (string) $stored->second_price,
+                );
+            }
+
+            return $entries;
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  list<array{date: string, hour: int, spot_count: int, sort: int}>  $entries
+     * @param  Collection<string, mixed>  $existingEntries
+     * @return list<PlannerEntryInput>
+     */
+    private function hydratePlannerEntries(
+        array $entries,
+        PriceList $priceList,
+        string $inventoryName,
+        Collection $existingEntries,
+        bool $useSnapshot,
+    ): array {
+        $this->assertPlannerEntryDatesMatchPriceYear($entries, $priceList);
+
+        $plannerEntries = [];
+        /** @var array<string, list<string>> $missingByDayGroup */
+        $missingByDayGroup = [];
+
+        foreach ($entries as $entry) {
+            $dayGroup = DayGroupFromDate::resolve($entry['date']);
+            $price = $this->resolvePlannerEntryPrice(
+                $priceList,
+                $entry['date'],
+                $entry['hour'],
+                $dayGroup,
+                $existingEntries,
+                $useSnapshot,
+            );
+
+            if ($price === null) {
+                $missingByDayGroup[$dayGroup->label()][] = $entry['date'].' '.TimeRangeHours::formatHour($entry['hour']);
+
+                continue;
+            }
+
+            $plannerEntries[] = new PlannerEntryInput(
+                date: $entry['date'],
+                hour: $entry['hour'],
+                spotCount: $entry['spot_count'],
+                dayGroup: $dayGroup,
+                secondPrice: $price,
+                sort: $entry['sort'],
+            );
+        }
+
+        if ($missingByDayGroup !== []) {
+            throw ValidationException::withMessages([
+                'positions' => $this->formatMissingPriceMessage($inventoryName, $missingByDayGroup),
+            ]);
+        }
+
+        return $plannerEntries;
+    }
+
+    /**
+     * @param  list<array{date: string, hour: int, spot_count: int, sort: int}>  $entries
+     */
+    private function assertPlannerEntryDatesMatchPriceYear(array $entries, PriceList $priceList): void
+    {
+        $priceYear = (int) $priceList->year;
+        $errors = [];
+        $prefix = $this->plannerEntriesFieldPrefix();
+
+        foreach ($entries as $entry) {
+            $entryYear = (int) substr($entry['date'], 0, 4);
+            if ($entryYear === $priceYear) {
+                continue;
+            }
+
+            $fieldKey = $prefix.'.'.$entry['sort'].'.date';
+            $errors[$fieldKey] = [
+                sprintf(
+                    'Das Datum %s gehört nicht zum Preisjahr %d dieser Position. Für ein weiteres Preisjahr legen Sie bitte eine getrennte Position an.',
+                    $entry['date'],
+                    $priceYear,
+                ),
+            ];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    private function plannerEntriesFieldPrefix(): string
+    {
+        if ($this->currentPositionIndex !== null) {
+            return 'positions.'.$this->currentPositionIndex.'.planner_entries';
+        }
+
+        return 'positions';
+    }
+
+    /**
+     * @return Collection<string, mixed>
+     */
+    private function existingPlannerEntries(?CalculationPosition $existing): Collection
+    {
+        if ($existing === null || ! Schema::hasTable('calculation_position_planner_entries')) {
+            return collect();
+        }
+
+        $entries = $existing->relationLoaded('plannerEntries')
+            ? $existing->plannerEntries
+            : $existing->plannerEntries()->get();
+
+        return $entries->keyBy(function ($row): string {
+            $date = $row->dateIso();
+
+            return $date.'|'.$row->hour;
+        });
+    }
+
+    /**
+     * @param  Collection<string, mixed>  $existingEntries
+     */
+    private function resolvePlannerEntryPrice(
+        PriceList $priceList,
+        string $date,
+        int $hour,
+        DayGroup $dayGroup,
+        Collection $existingEntries,
+        bool $useSnapshot,
+    ): ?string {
+        $stored = $existingEntries->get($date.'|'.$hour);
+        if ($useSnapshot && $stored !== null) {
+            return (string) $stored->second_price;
+        }
+
+        return $this->findSecondPrice($priceList, $hour, $dayGroup);
     }
 
     /**

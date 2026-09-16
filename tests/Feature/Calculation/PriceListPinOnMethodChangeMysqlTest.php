@@ -118,7 +118,7 @@ class PriceListPinOnMethodChangeMysqlTest extends TestCase
         $this->assertNotSame($newer->id, $resolved['priceList']->id);
         $this->assertSame('calendar', $resolved['freeze']->calculationMethodKey);
         $this->assertSame(
-            'planned',
+            'released',
             EngineProfileRegistry::pairStatus(
                 EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
                 'calendar',

@@ -86,9 +86,12 @@ Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
 abgeschlossen**. Preislisten-Admin-Lifecycle: **BL-P4-01a** (gemergt).
 Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswahl:
 **BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. Offen außerhalb:
-ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; Teilblock
-**BL-P4-02a** (Average-Abnahme + Pin bei Methodenwechsel) umgesetzt – Kalender/
-Komponenten/Festpreis und Registry-Freigabe `calendar`/`fixed_price` folgen später.
+ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a** auf
+`main`; **02b umgesetzt (PR #58)** – Kalenderplaner/AT-02, **`calendar` released/v1**,
+echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
+Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
+umgesetzt, Export Spot-Verteilung offen. Komponenten (AT-04) und Festpreis
+(`fixed_price` Registry `planned`) folgen; `BL-P4-02` insgesamt offen.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.
@@ -102,7 +105,7 @@ Umfang:
 - Tagesgruppenableitung,
 - explizite Preisjahrwahl im Wizard (aktuelles + Folgejahr),
 - Durchschnittskalkulation mit mehreren Zeitfenstern,
-- Kalenderplaner mit einzelnen Preisstunden (keine gruppierten Zeitschienen),
+- Kalenderplaner als visuelle Wochenmatrix mit einzelnen Preisstunden (keine gruppierten Zeitschienen),
 - frei editierbare tatsächliche Spotlänge je Sender-/Kombinationsposition,
 - Mehrsender-/Kombipositionen und Live-Gesamtsumme,
 - Spotlängenindex, Aufschläge und Komponenten,

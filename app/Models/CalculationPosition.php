@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $advertising_category_name
  * @property int|null $effective_configuration_snapshot_id
  * @property-read Collection<int, CalculationPositionTimeRange> $timeRanges
+ * @property-read Collection<int, CalculationPositionPlannerEntry> $plannerEntries
  * @property-read Collection<int, CalculationPositionDiscount> $discounts
  * @property int $length_seconds
  * @property string $position_discount_percent
@@ -168,6 +169,17 @@ class CalculationPosition extends Model
     public function timeRanges(): HasMany
     {
         return $this->hasMany(CalculationPositionTimeRange::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<CalculationPositionPlannerEntry, $this>
+     */
+    public function plannerEntries(): HasMany
+    {
+        return $this->hasMany(CalculationPositionPlannerEntry::class)
+            ->orderBy('date')
+            ->orderBy('hour')
+            ->orderBy('id');
     }
 
     /**

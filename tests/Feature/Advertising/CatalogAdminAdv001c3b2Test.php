@@ -474,12 +474,12 @@ class CatalogAdminAdv001c3b2Test extends TestCase
             ->assertJsonPath('has_changes', true);
     }
 
-    public function test_released_average_default_ok_planned_calendar_default_422(): void
+    public function test_released_average_default_ok_planned_fixed_price_default_422(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();
         $spots = $this->spots();
         $average = $this->method('average');
-        $calendar = $this->method('calendar');
+        $fixedPrice = $this->method('fixed_price');
 
         $desiredAvg = $this->buildDesiredFromCurrent($spots);
         $desiredAvg['default_calculation_method_id'] = (int) $average->id;
@@ -491,10 +491,10 @@ class CatalogAdminAdv001c3b2Test extends TestCase
             ]))
             ->assertOk();
 
-        $desiredCal = $this->buildDesiredFromCurrent($spots->fresh());
-        $desiredCal['default_calculation_method_id'] = (int) $calendar->id;
+        $desiredFixed = $this->buildDesiredFromCurrent($spots->fresh());
+        $desiredFixed['default_calculation_method_id'] = (int) $fixedPrice->id;
         $this->actingAs($admin)
-            ->postJson(route('administration.catalog.categories.calculation-methods-preview', $spots), $desiredCal)
+            ->postJson(route('administration.catalog.categories.calculation-methods-preview', $spots), $desiredFixed)
             ->assertUnprocessable()
             ->assertJsonValidationErrors('default_calculation_method_id');
     }

@@ -125,14 +125,14 @@ class Adv001c2BudgetLiveCatalogTest extends TestCase
     public function test_budget_rejects_planned_method_pair_with_budget_field(): void
     {
         $catalog = $this->createSpotClassicCatalog();
-        // calendar ist pair_status=planned; gleiche zentrale Live-Logik, Fehler unter Budget-Feld.
+        // fixed_price ist pair_status=planned; gleiche zentrale Live-Logik, Fehler unter Budget-Feld.
         $resolver = new CatalogResolver(new class extends FreezeResolver
         {
             public function resolveForNewCombination(
                 AdvertisingMedium $medium,
                 ?string $requestedMethodKey,
             ): CalculationMethodFreezeDescriptor {
-                return parent::resolveForNewCombination($medium, 'calendar');
+                return parent::resolveForNewCombination($medium, 'fixed_price');
             }
         });
 

@@ -11,7 +11,8 @@
         "check:fix": "vp check --fix",
         "types:check": "tsc --noEmit",
         "test:unit": "vitest run",
-        "test:e2e": "playwright test"
+        "test:e2e": "playwright test",
+        "test:e2e:blp402b": "playwright test -c playwright.blp402b.config.ts"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",

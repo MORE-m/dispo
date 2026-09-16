@@ -6,6 +6,7 @@ import {
     DISPO_ORDERS_CACHE_TAG,
     flushDispoOrderInertiaCache,
 } from '@/lib/dispo-order-inertia-cache';
+import { formatPlannerEntriesSummary } from '@/lib/dispo-planner-display';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
     firstValidationMessage,
@@ -37,6 +38,12 @@ type SelectablePosition = {
         day_group?: string;
         spot_count: number;
     }[];
+    planner_entries?: {
+        date: string;
+        hour: number;
+        day_group?: string;
+        spot_count: number;
+    }[];
     already_adopted: boolean;
     adoptions: { dispo_order_id: number; dispo_order_number: string }[];
 };
@@ -62,6 +69,14 @@ function formatTimeRanges(ranges: SelectablePosition['time_ranges']): string {
                 `${formatHour(range.start_hour)}–${formatInclusiveEnd(range.end_hour_exclusive)} · ${range.spot_count} Spots`,
         )
         .join('; ');
+}
+
+function formatPositionTiming(position: SelectablePosition): string {
+    if (position.planner_entries && position.planner_entries.length > 0) {
+        return formatPlannerEntriesSummary(position.planner_entries);
+    }
+
+    return formatTimeRanges(position.time_ranges);
 }
 
 function defaultSelectedIds(
@@ -320,8 +335,8 @@ export function DispoOrderCreateDialog({
                                                                 position.length_seconds
                                                             }
                                                             s ·{' '}
-                                                            {formatTimeRanges(
-                                                                position.time_ranges,
+                                                            {formatPositionTiming(
+                                                                position,
                                                             )}
                                                         </p>
                                                         <p className="text-primary text-sm font-semibold tabular-nums">
