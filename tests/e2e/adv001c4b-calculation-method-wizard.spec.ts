@@ -7,8 +7,8 @@ import { expect, test, type Page } from '@playwright/test';
  * ADV-001c4b isolierte Suite: Wizard-Methodenauswahl und Medienfilter.
  * Läuft nur über playwright.adv001c4b.config.ts (eigene DB, Port 8012).
  *
- * Mehrere released Methoden: keine produktive Registry-Erweiterung.
- * Mehrmethoden-UX wird in Vitest mit synthetischen Props abgedeckt.
+ * BL-P4-02b: Spot Classic bietet live average + calendar (beide released).
+ * Historische/nicht wählbare Methode: fixed_price (weiterhin planned).
  */
 
 const e2eDb = path.resolve(
@@ -98,26 +98,36 @@ async function readWizardPayload(page: Page): Promise<WizardPagePayload> {
     });
 }
 
+async function expectLiveMethodChooser(page: Page) {
+    await expect(
+        page.locator('[data-test="calculation-method-fieldset-0"]'),
+    ).toBeVisible();
+    await expect(
+        page.locator('[data-test="calculation-method-radio-0-average"]'),
+    ).toBeVisible();
+    await expect(
+        page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+    ).toBeVisible();
+    await expect(
+        page.locator('[data-test="calculation-method-single-0"]'),
+    ).toHaveCount(0);
+    await expect(
+        page.locator('[data-test="calculation-method-empty-0"]'),
+    ).toHaveCount(0);
+}
+
 test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
-    test('neue Spot-Classic-Position zeigt Durchschnitt ohne leere Auswahl', async ({
+    test('neue Spot-Classic-Position zeigt Durchschnitt und Kalenderplaner', async ({
         page,
     }) => {
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
+        await expectLiveMethodChooser(page);
         await expect(
-            page.locator('[data-test="calculation-method-single-0"]'),
-        ).toBeVisible();
-        await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Berechnungsmethode: Durchschnitt');
-        await expect(
-            page.locator('[data-test="calculation-method-fieldset-0"]'),
-        ).toHaveCount(0);
-        await expect(
-            page.locator('[data-test="calculation-method-empty-0"]'),
-        ).toHaveCount(0);
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
 
         const payload = await readWizardPayload(page);
         const spot = payload.catalog.media.find(
@@ -127,6 +137,12 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         expect(
             spot?.calculation_method_options?.default_calculation_method_key,
         ).toBe('average');
+        const keys =
+            spot?.calculation_method_options?.methods.map(
+                (method) => method.key,
+            ) ?? [];
+        expect(keys).toEqual(expect.arrayContaining(['average', 'calendar']));
+        expect(keys).not.toContain('fixed_price');
     });
 
     test('Methodenauswahl bleibt über Wizard-Navigation erhalten und speichert', async ({
@@ -138,11 +154,14 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await page.locator('#customer').fill('C4b Nav GmbH');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
+        await expectLiveMethodChooser(page);
         await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Durchschnitt');
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
 
-        await page.locator('[data-test="position-length-seconds-0"]').fill('30');
+        await page
+            .locator('[data-test="position-length-seconds-0"]')
+            .fill('30');
         await page.locator('[data-test="range-end-0-0"]').selectOption('9');
         await page.locator('[data-test="range-spots-0-0"]').fill('2');
 
@@ -150,8 +169,8 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
         await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Durchschnitt');
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.locator('[data-test="wizard-save"]').click();
@@ -162,8 +181,8 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Durchschnitt');
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
 
         const props = await readWizardPayload(page);
         expect(props.calculation?.positions[0]?.calculation_method_key).toBe(
@@ -205,8 +224,8 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
 
         await mediumSelect.selectOption(String(spotB!.id));
         await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Durchschnitt');
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
 
         const inventories = props.catalog.inventories.filter(
             (item) => item.is_active,
@@ -218,8 +237,8 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
 
         await expect(mediumSelect).toHaveValue(String(spotB!.id));
         await expect(
-            page.locator('[data-test="calculation-method-single-label-0"]'),
-        ).toContainText('Durchschnitt');
+            page.locator('[data-test="calculation-method-radio-0-average"]'),
+        ).toBeChecked();
     });
 
     test('historische Methode wird angezeigt und nicht automatisch ersetzt', async ({
@@ -250,9 +269,11 @@ $calc = app(\\App\\Services\\Calculation\\CalculationWriter::class)->create([
     ]],
 ], $user);
 $position = $calc->positions()->firstOrFail();
+// BL-P4-02b: calendar ist live wählbar; historische Nicht-Verfügbarkeit über fixed_price.
 \\Illuminate\\Support\\Facades\\DB::table('calculation_positions')->where('id', $position->id)->update([
-    'calculation_method_key' => 'calendar',
-    'calculation_method_name' => 'Historischer Kalender',
+    'calculation_method_key' => 'fixed_price',
+    'calculation_method_name' => 'Historischer Festpreis',
+    'spot_method' => 'fixed_price',
 ]);
 echo $calc->id;
 `);
@@ -270,7 +291,7 @@ echo $calc->id;
         ).toBeVisible();
         await expect(
             page.locator('[data-test="calculation-method-historical-label-0"]'),
-        ).toContainText('Historischer Kalender');
+        ).toContainText('Historischer Festpreis');
         await expect(
             page.locator('[data-test="calculation-method-historical-0"]'),
         ).toContainText(/nicht mehr auswählbar/);
@@ -282,10 +303,12 @@ echo $calc->id;
             page.locator('[data-test="calculation-method-radio-0-average"]'),
         ).not.toBeChecked();
 
-        await page.locator('[data-test="position-length-seconds-0"]').fill('25');
+        await page
+            .locator('[data-test="position-length-seconds-0"]')
+            .fill('25');
         await expect(
             page.locator('[data-test="calculation-method-historical-label-0"]'),
-        ).toContainText('Historischer Kalender');
+        ).toContainText('Historischer Festpreis');
         await expect(
             page.locator('[data-test="calculation-method-radio-0-average"]'),
         ).not.toBeChecked();
@@ -303,13 +326,11 @@ echo $calc->id;
         ).toBeVisible();
 
         await page
-            .locator(
-                '[data-test="calculation-method-restore-historical-0"]',
-            )
+            .locator('[data-test="calculation-method-restore-historical-0"]')
             .click();
         await expect(
             page.locator('[data-test="calculation-method-historical-label-0"]'),
-        ).toContainText('Historischer Kalender');
+        ).toContainText('Historischer Festpreis');
     });
 
     test('nicht buchbare Medien bleiben ausgeschlossen; Tastaturfokus sichtbar', async ({
@@ -339,7 +360,9 @@ echo $calc->id;
         }
 
         await page.locator('[data-test="position-medium-0"]').focus();
-        await expect(page.locator('[data-test="position-medium-0"]')).toBeFocused();
+        await expect(
+            page.locator('[data-test="position-medium-0"]'),
+        ).toBeFocused();
         await page.keyboard.press('Tab');
     });
 });
