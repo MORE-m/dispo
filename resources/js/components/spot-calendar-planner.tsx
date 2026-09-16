@@ -1,25 +1,31 @@
 import { useMemo, useState } from 'react';
-import { FormField, formSelectClass, money } from '@/components/form-field';
+import { money } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-    HOURS,
     addDays,
-    emptyPlannerEntry,
+    cellFieldError,
+    daySpotSum,
+    entryTotalsByCellKey,
     formatDateOnly,
     formatHour,
-    isCompletePlannerEntry,
+    hourSpotSum,
+    isDateInPriceYear,
+    isHourBookable,
     parseDateOnly,
     shiftMonthAnchor,
+    spotsForCell,
+    spotsOutsideWeek,
     startOfWeekMonday,
     totalPlannerSpotCount,
+    upsertPlannerCellSpots,
+    visibleHoursFromPriceListItems,
+    weekDates,
     type PlannerEntryDraft,
+    type PriceListHourItem,
 } from '@/lib/pricing-calendar';
 
-type EntryTotals = {
-    line_gross?: string;
-    second_price?: string;
-};
+const WEEKDAY_LABELS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'] as const;
 
 export function SpotCalendarPlanner({
     positionIndex,
@@ -28,18 +34,35 @@ export function SpotCalendarPlanner({
     fieldErrors,
     entryTotals,
     positionMediaGross,
+    priceListHours,
+    priceYear,
     onChange,
 }: {
     positionIndex: number;
     entries: PlannerEntryDraft[];
     canEdit: boolean;
     fieldErrors: Record<string, string[]>;
-    entryTotals?: EntryTotals[];
+    entryTotals?: Array<{
+        date: string;
+        hour: number;
+        line_gross?: string;
+        second_price?: string;
+    }>;
     positionMediaGross?: string | null;
+    priceListHours: PriceListHourItem[];
+    priceYear: number | null;
     onChange: (entries: PlannerEntryDraft[]) => void;
 }) {
     const spots = totalPlannerSpotCount(entries);
-    const hasCompleteEntry = entries.some(isCompletePlannerEntry);
+    const hasCompleteEntry = spots > 0;
+    const hours = useMemo(
+        () => visibleHoursFromPriceListItems(priceListHours),
+        [priceListHours],
+    );
+    const totalsByKey = useMemo(
+        () => entryTotalsByCellKey(entryTotals),
+        [entryTotals],
+    );
 
     const initialWeekAnchor = useMemo(() => {
         const firstDated = entries.find((entry) => entry.date.trim() !== '');
@@ -54,14 +77,10 @@ export function SpotCalendarPlanner({
     }, [entries]);
 
     const [weekAnchor, setWeekAnchor] = useState(initialWeekAnchor);
-
-    function updateEntry(index: number, patch: Partial<PlannerEntryDraft>) {
-        onChange(
-            entries.map((entry, current) =>
-                current === index ? { ...entry, ...patch } : entry,
-            ),
-        );
-    }
+    const dates = weekDates(weekAnchor);
+    const weekEnd = addDays(weekAnchor, 6);
+    const weekLabel = `${formatDateOnly(weekAnchor)} – ${formatDateOnly(weekEnd)}`;
+    const outsideWeek = spotsOutsideWeek(entries, dates);
 
     function shiftWeek(deltaDays: number) {
         setWeekAnchor((current) => addDays(current, deltaDays));
@@ -71,12 +90,14 @@ export function SpotCalendarPlanner({
         setWeekAnchor((current) => shiftMonthAnchor(current, deltaMonths));
     }
 
-    function addEntry() {
-        onChange([...entries, emptyPlannerEntry(formatDateOnly(weekAnchor))]);
+    function goToCurrentWeek() {
+        setWeekAnchor(startOfWeekMonday(new Date()));
     }
 
-    const weekEnd = addDays(weekAnchor, 6);
-    const weekLabel = `${formatDateOnly(weekAnchor)} – ${formatDateOnly(weekEnd)}`;
+    function setCellSpots(date: string, hour: number, raw: string) {
+        const spotCount = raw === '' ? '' : Number(raw);
+        onChange(upsertPlannerCellSpots(entries, date, hour, spotCount));
+    }
 
     return (
         <div className="space-y-3">
@@ -93,231 +114,307 @@ export function SpotCalendarPlanner({
                 </p>
             </div>
 
-            {canEdit ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test={`planner-month-prev-${positionIndex}`}
-                        onClick={() => shiftMonth(-1)}
-                    >
-                        Vorheriger Monat
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test={`planner-week-prev-${positionIndex}`}
-                        onClick={() => shiftWeek(-7)}
-                    >
-                        Vorherige Woche
-                    </Button>
-                    <p
-                        className="text-muted-foreground text-sm tabular-nums"
-                        data-test={`planner-week-label-${positionIndex}`}
-                    >
-                        Referenzwoche: {weekLabel}
-                    </p>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test={`planner-week-next-${positionIndex}`}
-                        onClick={() => shiftWeek(7)}
-                    >
-                        Nächste Woche
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-test={`planner-month-next-${positionIndex}`}
-                        onClick={() => shiftMonth(1)}
-                    >
-                        Nächster Monat
-                    </Button>
-                </div>
-            ) : (
+            {priceYear != null ? (
+                <p
+                    className="text-muted-foreground text-sm"
+                    data-test={`planner-price-year-${positionIndex}`}
+                >
+                    Preisjahr {priceYear}. Jahresübergreifende Planung braucht
+                    getrennte Positionen.
+                </p>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2">
+                {canEdit ? (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test={`planner-month-prev-${positionIndex}`}
+                            onClick={() => shiftMonth(-1)}
+                        >
+                            Vorheriger Monat
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test={`planner-week-prev-${positionIndex}`}
+                            onClick={() => shiftWeek(-7)}
+                        >
+                            Vorherige Woche
+                        </Button>
+                    </>
+                ) : null}
                 <p
                     className="text-muted-foreground text-sm tabular-nums"
                     data-test={`planner-week-label-${positionIndex}`}
                 >
-                    Referenzwoche: {weekLabel}
+                    Woche: {weekLabel}
                 </p>
-            )}
+                {canEdit ? (
+                    <>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test={`planner-week-next-${positionIndex}`}
+                            onClick={() => shiftWeek(7)}
+                        >
+                            Nächste Woche
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test={`planner-month-next-${positionIndex}`}
+                            onClick={() => shiftMonth(1)}
+                        >
+                            Nächster Monat
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            data-test={`planner-today-${positionIndex}`}
+                            onClick={goToCurrentWeek}
+                        >
+                            Aktuelle Woche
+                        </Button>
+                    </>
+                ) : null}
+            </div>
 
             {!hasCompleteEntry ? (
                 <p
                     className="text-muted-foreground text-sm"
                     data-test={`planner-empty-${positionIndex}`}
                 >
-                    Noch keine Kalendereinträge. Füge mindestens eine Zeile mit
-                    Datum, Preisstunde und Spotanzahl hinzu.
+                    Noch keine Kalendereinträge. Trage Spotanzahlen in buchbare
+                    Zellen der Woche ein.
                 </p>
             ) : null}
 
-            <div className="space-y-3">
-                {entries.map((entry, entryIndex) => {
-                    const complete = isCompletePlannerEntry(entry);
-                    const totals = entryTotals?.[entryIndex];
-
-                    return (
-                        <div
-                            key={`planner-${entryIndex}`}
-                            className="border-border/60 bg-muted/15 space-y-3 rounded-lg border p-3"
-                            data-test={`planner-entry-${positionIndex}-${entryIndex}`}
-                        >
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,7rem)_auto]">
-                                <FormField
-                                    label="Datum"
-                                    htmlFor={`planner-date-${positionIndex}-${entryIndex}`}
-                                    error={
-                                        fieldErrors[
-                                            `positions.${positionIndex}.planner_entries.${entryIndex}.date`
-                                        ]?.[0] ??
-                                        fieldErrors[
-                                            `positions.${positionIndex}.planner_entries`
-                                        ]?.[0]
-                                    }
-                                >
-                                    <Input
-                                        id={`planner-date-${positionIndex}-${entryIndex}`}
-                                        data-test={`planner-date-${positionIndex}-${entryIndex}`}
-                                        type="date"
-                                        value={entry.date}
-                                        disabled={!canEdit}
-                                        onChange={(event) =>
-                                            updateEntry(entryIndex, {
-                                                date: event.target.value,
-                                            })
-                                        }
-                                    />
-                                </FormField>
-                                <FormField
-                                    label="Preisstunde"
-                                    htmlFor={`planner-hour-${positionIndex}-${entryIndex}`}
-                                    error={
-                                        fieldErrors[
-                                            `positions.${positionIndex}.planner_entries.${entryIndex}.hour`
-                                        ]?.[0]
-                                    }
-                                >
-                                    <select
-                                        id={`planner-hour-${positionIndex}-${entryIndex}`}
-                                        data-test={`planner-hour-${positionIndex}-${entryIndex}`}
-                                        className={formSelectClass}
-                                        value={entry.hour}
-                                        disabled={!canEdit}
-                                        onChange={(event) => {
-                                            const raw = event.target.value;
-                                            updateEntry(entryIndex, {
-                                                hour:
-                                                    raw === ''
-                                                        ? ''
-                                                        : Number(raw),
-                                            });
-                                        }}
-                                    >
-                                        <option value="">–</option>
-                                        {HOURS.map((hour) => (
-                                            <option key={hour} value={hour}>
-                                                {formatHour(hour)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </FormField>
-                                <FormField
-                                    label="Spots"
-                                    htmlFor={`planner-spots-${positionIndex}-${entryIndex}`}
-                                    error={
-                                        fieldErrors[
-                                            `positions.${positionIndex}.planner_entries.${entryIndex}.spot_count`
-                                        ]?.[0]
-                                    }
-                                >
-                                    <Input
-                                        id={`planner-spots-${positionIndex}-${entryIndex}`}
-                                        data-test={`planner-spots-${positionIndex}-${entryIndex}`}
-                                        type="number"
-                                        step={1}
-                                        value={entry.spot_count}
-                                        disabled={!canEdit}
-                                        onChange={(event) => {
-                                            const raw = event.target.value;
-                                            updateEntry(entryIndex, {
-                                                spot_count:
-                                                    raw === ''
-                                                        ? ''
-                                                        : Number(raw),
-                                            });
-                                        }}
-                                    />
-                                </FormField>
-                                {complete && totals?.line_gross ? (
-                                    <div className="flex flex-col justify-end text-sm">
-                                        <span className="text-muted-foreground">
-                                            Zeilensumme
-                                        </span>
-                                        <span
-                                            className="text-foreground font-medium tabular-nums"
-                                            data-test={`planner-line-gross-${positionIndex}-${entryIndex}`}
-                                        >
-                                            {money(totals.line_gross)}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <div className="hidden lg:block" />
-                                )}
-                                {canEdit && entries.length > 1 ? (
-                                    <div className="flex items-end">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            data-test={`planner-remove-${positionIndex}-${entryIndex}`}
-                                            onClick={() =>
-                                                onChange(
-                                                    entries.filter(
-                                                        (_, current) =>
-                                                            current !==
-                                                            entryIndex,
-                                                    ),
-                                                )
-                                            }
-                                        >
-                                            Entfernen
-                                        </Button>
-                                    </div>
-                                ) : null}
-                            </div>
-                            {complete && totals?.line_gross ? (
-                                <p className="text-muted-foreground text-xs lg:hidden">
-                                    Zeilensumme{' '}
-                                    <span
-                                        className="text-foreground font-medium"
-                                        data-test={`planner-line-gross-mobile-${positionIndex}-${entryIndex}`}
-                                    >
-                                        {money(totals.line_gross)}
-                                    </span>
-                                </p>
-                            ) : null}
-                        </div>
-                    );
-                })}
-            </div>
-
-            {canEdit ? (
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    data-test={`planner-add-${positionIndex}`}
-                    onClick={addEntry}
+            {outsideWeek > 0 ? (
+                <p
+                    className="text-muted-foreground text-sm"
+                    data-test={`planner-outside-week-${positionIndex}`}
                 >
-                    Kalendereintrag hinzufügen
-                </Button>
+                    {outsideWeek} Spots außerhalb der sichtbaren Woche bleiben
+                    erhalten.
+                </p>
             ) : null}
+
+            {hours.length === 0 ? (
+                <p className="text-muted-foreground text-sm">
+                    Für die gewählte Preisliste liegen keine buchbaren
+                    Preisstunden vor.
+                </p>
+            ) : (
+                <div
+                    className="overflow-x-auto"
+                    data-test={`planner-grid-${positionIndex}`}
+                >
+                    <table className="border-border/60 w-full min-w-[44rem] border-collapse text-sm">
+                        <thead>
+                            <tr>
+                                <th
+                                    scope="col"
+                                    className="bg-background border-border/60 sticky left-0 z-10 border px-2 py-2 text-left font-medium"
+                                >
+                                    Stunde
+                                </th>
+                                {dates.map((date, dayIndex) => {
+                                    const inYear = isDateInPriceYear(
+                                        date,
+                                        priceYear,
+                                    );
+
+                                    return (
+                                        <th
+                                            key={date}
+                                            scope="col"
+                                            className="border-border/60 border px-2 py-2 text-center font-medium"
+                                            data-test={`planner-day-header-${positionIndex}-${date}`}
+                                        >
+                                            <span className="block">
+                                                {WEEKDAY_LABELS[dayIndex]}
+                                            </span>
+                                            <span className="text-muted-foreground block text-xs tabular-nums">
+                                                {date}
+                                            </span>
+                                            {!inYear ? (
+                                                <span className="text-muted-foreground mt-1 block text-xs font-normal">
+                                                    Außerhalb Preisjahr{' '}
+                                                    {priceYear}
+                                                </span>
+                                            ) : null}
+                                        </th>
+                                    );
+                                })}
+                                <th
+                                    scope="col"
+                                    className="border-border/60 border px-2 py-2 text-center font-medium"
+                                >
+                                    Summe
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {hours.map((hour) => (
+                                <tr
+                                    key={hour}
+                                    data-test={`planner-hour-row-${positionIndex}-${hour}`}
+                                >
+                                    <th
+                                        scope="row"
+                                        className="bg-background border-border/60 sticky left-0 z-10 border px-2 py-1.5 text-left font-medium tabular-nums"
+                                    >
+                                        {formatHour(hour)}
+                                    </th>
+                                    {dates.map((date) => {
+                                        const inYear = isDateInPriceYear(
+                                            date,
+                                            priceYear,
+                                        );
+                                        const bookable =
+                                            inYear &&
+                                            isHourBookable(
+                                                priceListHours,
+                                                date,
+                                                hour,
+                                            );
+                                        const value = spotsForCell(
+                                            entries,
+                                            date,
+                                            hour,
+                                        );
+                                        const error = cellFieldError(
+                                            fieldErrors,
+                                            positionIndex,
+                                            entries,
+                                            date,
+                                            hour,
+                                        );
+                                        const gross =
+                                            totalsByKey[`${date}|${hour}`]
+                                                ?.line_gross;
+                                        const inputId = `planner-cell-spots-${positionIndex}-${date}-${hour}`;
+                                        const disabledReason = !inYear
+                                            ? `Datum ${date} liegt außerhalb des Preisjahres ${priceYear}.`
+                                            : !bookable
+                                              ? `Stunde ${formatHour(hour)} am ${date} ist nicht buchbar.`
+                                              : undefined;
+
+                                        return (
+                                            <td
+                                                key={`${date}-${hour}`}
+                                                className="border-border/60 border px-1.5 py-1 align-top"
+                                                data-test={`planner-cell-${positionIndex}-${date}-${hour}`}
+                                            >
+                                                <label
+                                                    className="sr-only"
+                                                    htmlFor={inputId}
+                                                >
+                                                    Spots am {date} um{' '}
+                                                    {formatHour(hour)}
+                                                </label>
+                                                <Input
+                                                    id={inputId}
+                                                    data-test={inputId}
+                                                    type="number"
+                                                    step={1}
+                                                    min={0}
+                                                    value={value}
+                                                    disabled={
+                                                        !canEdit || !bookable
+                                                    }
+                                                    aria-disabled={
+                                                        !bookable
+                                                            ? true
+                                                            : undefined
+                                                    }
+                                                    title={disabledReason}
+                                                    aria-describedby={
+                                                        disabledReason
+                                                            ? `${inputId}-hint`
+                                                            : error
+                                                              ? `${inputId}-error`
+                                                              : undefined
+                                                    }
+                                                    className="h-8 text-center tabular-nums"
+                                                    onChange={(event) =>
+                                                        setCellSpots(
+                                                            date,
+                                                            hour,
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                />
+                                                {!bookable &&
+                                                disabledReason ? (
+                                                    <span
+                                                        id={`${inputId}-hint`}
+                                                        className="sr-only"
+                                                    >
+                                                        {disabledReason}
+                                                    </span>
+                                                ) : null}
+                                                {gross ? (
+                                                    <p
+                                                        className="text-muted-foreground mt-1 text-center text-xs tabular-nums"
+                                                        data-test={`planner-cell-gross-${positionIndex}-${date}-${hour}`}
+                                                    >
+                                                        {money(gross)}
+                                                    </p>
+                                                ) : null}
+                                                {error ? (
+                                                    <p
+                                                        id={`${inputId}-error`}
+                                                        className="text-destructive mt-1 text-xs"
+                                                        role="alert"
+                                                    >
+                                                        {error}
+                                                    </p>
+                                                ) : null}
+                                            </td>
+                                        );
+                                    })}
+                                    <td
+                                        className="border-border/60 border px-2 py-1 text-center font-medium tabular-nums"
+                                        data-test={`planner-hour-sum-${positionIndex}-${hour}`}
+                                    >
+                                        {hourSpotSum(entries, hour, dates)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th
+                                    scope="row"
+                                    className="bg-background border-border/60 sticky left-0 z-10 border px-2 py-2 text-left font-medium"
+                                >
+                                    Tagessumme
+                                </th>
+                                {dates.map((date) => (
+                                    <td
+                                        key={`sum-${date}`}
+                                        className="border-border/60 border px-2 py-2 text-center font-medium tabular-nums"
+                                        data-test={`planner-day-sum-${positionIndex}-${date}`}
+                                    >
+                                        {daySpotSum(entries, date)}
+                                    </td>
+                                ))}
+                                <td className="border-border/60 border px-2 py-2 text-center font-medium tabular-nums">
+                                    {spots}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            )}
 
             {positionMediaGross ? (
                 <p

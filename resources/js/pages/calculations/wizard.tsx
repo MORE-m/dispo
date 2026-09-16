@@ -274,6 +274,14 @@ type Catalog = {
     >;
     current_price_year?: number;
     next_price_year?: number;
+    price_list_hours_by_id?: Record<
+        string,
+        Array<{
+            hour: number;
+            day_group: string;
+            second_price: string;
+        }>
+    >;
 };
 
 type Totals = {
@@ -3558,6 +3566,18 @@ export default function CalculationWizard({
                                                                         index
                                                                     ]
                                                                         ?.media_gross
+                                                                }
+                                                                priceListHours={
+                                                                    catalog
+                                                                        .price_list_hours_by_id?.[
+                                                                        String(
+                                                                            position.expected_price_list_id ??
+                                                                                '',
+                                                                        )
+                                                                    ] ?? []
+                                                                }
+                                                                priceYear={
+                                                                    position.price_year
                                                                 }
                                                                 onChange={(
                                                                     planner_entries,
