@@ -12,6 +12,19 @@ export type PlannerEntryDraft = {
     spot_count: number | '';
 };
 
+export type PriceListHourItem = {
+    hour: number;
+    day_group: string;
+    second_price: string;
+};
+
+export type DayGroupBase = 'mo_fr' | 'sa' | 'so';
+
+export type EntryTotals = {
+    line_gross?: string;
+    second_price?: string;
+};
+
 export const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 export { formatHour };
@@ -43,7 +56,7 @@ export function draftPlannerEntries(
     }
 
     if (isCalendarCalculationMethod(methodKey)) {
-        return [emptyPlannerEntry()];
+        return [];
     }
 
     return [];
@@ -169,6 +182,237 @@ export function shiftMonthAnchor(weekAnchor: Date, deltaMonths: number): Date {
     return startOfWeekMonday(addMonths(weekAnchor, deltaMonths));
 }
 
+export function plannerCellKey(date: string, hour: number): string {
+    return `${date}|${hour}`;
+}
+
+/** Spiegelt DayGroupFromDate (Europe/Berlin-Datumsfelder, lokal ausgewertet). */
+export function dayGroupFromDate(dateIso: string): DayGroupBase | null {
+    const date = parseDateOnly(dateIso);
+    if (!date) {
+        return null;
+    }
+
+    const weekday = date.getDay();
+    if (weekday === 0) {
+        return 'so';
+    }
+    if (weekday === 6) {
+        return 'sa';
+    }
+
+    return 'mo_fr';
+}
+
+export function weekDates(weekAnchor: Date): string[] {
+    return Array.from({ length: 7 }, (_, offset) =>
+        formatDateOnly(addDays(weekAnchor, offset)),
+    );
+}
+
+export function sortPlannerEntries(
+    entries: PlannerEntryDraft[],
+): PlannerEntryDraft[] {
+    return [...entries].sort((left, right) => {
+        const dateCmp = left.date.localeCompare(right.date);
+        if (dateCmp !== 0) {
+            return dateCmp;
+        }
+
+        const hourLeft = left.hour === '' ? -1 : Number(left.hour);
+        const hourRight = right.hour === '' ? -1 : Number(right.hour);
+
+        return hourLeft - hourRight;
+    });
+}
+
+/** Leeres Feld oder 0 entfernt die Zelle aus planner_entries. */
+export function upsertPlannerCellSpots(
+    entries: PlannerEntryDraft[],
+    date: string,
+    hour: number,
+    spotCount: number | '',
+): PlannerEntryDraft[] {
+    const withoutCell = entries.filter(
+        (entry) => !(entry.date === date && entry.hour === hour),
+    );
+
+    if (spotCount === '' || spotCount === 0) {
+        return sortPlannerEntries(withoutCell);
+    }
+
+    return sortPlannerEntries([
+        ...withoutCell,
+        { date, hour, spot_count: spotCount },
+    ]);
+}
+
+export function isHourBookable(
+    items: PriceListHourItem[],
+    date: string,
+    hour: number,
+): boolean {
+    const dayGroup = dayGroupFromDate(date);
+    if (dayGroup === null) {
+        return false;
+    }
+
+    return items.some(
+        (item) => item.hour === hour && item.day_group === dayGroup,
+    );
+}
+
+export function secondPriceForCell(
+    items: PriceListHourItem[],
+    date: string,
+    hour: number,
+): string | null {
+    const dayGroup = dayGroupFromDate(date);
+    if (dayGroup === null) {
+        return null;
+    }
+
+    const match = items.find(
+        (item) => item.hour === hour && item.day_group === dayGroup,
+    );
+
+    return match?.second_price ?? null;
+}
+
+export function visibleHoursFromPriceListItems(
+    items: PriceListHourItem[],
+): number[] {
+    return [...new Set(items.map((item) => item.hour))].sort((a, b) => a - b);
+}
+
+export function isDateInPriceYear(
+    dateIso: string,
+    priceYear: number | null | undefined,
+): boolean {
+    if (priceYear == null) {
+        return true;
+    }
+
+    const date = parseDateOnly(dateIso);
+    if (!date) {
+        return false;
+    }
+
+    return date.getFullYear() === priceYear;
+}
+
+export function spotsOutsideWeek(
+    entries: PlannerEntryDraft[],
+    datesInWeek: string[],
+): number {
+    const weekSet = new Set(datesInWeek);
+
+    return entries.reduce((sum, entry) => {
+        if (!isCompletePlannerEntry(entry) || weekSet.has(entry.date)) {
+            return sum;
+        }
+
+        return sum + Number(entry.spot_count);
+    }, 0);
+}
+
+export function entryTotalsByCellKey(
+    totals:
+        | Array<{
+              date: string;
+              hour: number;
+              line_gross?: string;
+              second_price?: string;
+          }>
+        | undefined,
+): Record<string, EntryTotals> {
+    const map: Record<string, EntryTotals> = {};
+
+    for (const entry of totals ?? []) {
+        map[plannerCellKey(entry.date, entry.hour)] = {
+            line_gross: entry.line_gross,
+            second_price: entry.second_price,
+        };
+    }
+
+    return map;
+}
+
+export function cellFieldError(
+    fieldErrors: Record<string, string[]>,
+    positionIndex: number,
+    entries: PlannerEntryDraft[],
+    date: string,
+    hour: number,
+): string | undefined {
+    const payload = plannerEntriesForPayload(entries);
+    const index = payload.findIndex(
+        (entry) => entry.date === date && entry.hour === hour,
+    );
+
+    if (index < 0) {
+        return fieldErrors[`positions.${positionIndex}.planner_entries`]?.[0];
+    }
+
+    return (
+        fieldErrors[
+            `positions.${positionIndex}.planner_entries.${index}.spot_count`
+        ]?.[0] ??
+        fieldErrors[
+            `positions.${positionIndex}.planner_entries.${index}.date`
+        ]?.[0] ??
+        fieldErrors[
+            `positions.${positionIndex}.planner_entries.${index}.hour`
+        ]?.[0] ??
+        fieldErrors[`positions.${positionIndex}.planner_entries`]?.[0]
+    );
+}
+
+export function spotsForCell(
+    entries: PlannerEntryDraft[],
+    date: string,
+    hour: number,
+): number | '' {
+    const match = entries.find(
+        (entry) => entry.date === date && entry.hour === hour,
+    );
+
+    return match?.spot_count ?? '';
+}
+
+export function daySpotSum(
+    entries: PlannerEntryDraft[],
+    date: string,
+): number {
+    return entries.reduce((sum, entry) => {
+        if (!isCompletePlannerEntry(entry) || entry.date !== date) {
+            return sum;
+        }
+
+        return sum + Number(entry.spot_count);
+    }, 0);
+}
+
+export function hourSpotSum(
+    entries: PlannerEntryDraft[],
+    hour: number,
+    datesInWeek: string[],
+): number {
+    const weekSet = new Set(datesInWeek);
+
+    return entries.reduce((sum, entry) => {
+        if (
+            !isCompletePlannerEntry(entry) ||
+            entry.hour !== hour ||
+            !weekSet.has(entry.date)
+        ) {
+            return sum;
+        }
+
+        return sum + Number(entry.spot_count);
+    }, 0);
+}
+
 export function isCalendarCalculationMethod(
     methodKey: string | null | undefined,
 ): boolean {
@@ -183,7 +427,7 @@ export function initialTimingFieldsForMethod(methodKey: string | null): {
     if (isCalendarCalculationMethod(methodKey)) {
         return {
             time_ranges: [],
-            planner_entries: [emptyPlannerEntry()],
+            planner_entries: [],
             total_spot_count: 0,
         };
     }
