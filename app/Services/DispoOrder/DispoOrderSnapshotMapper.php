@@ -7,6 +7,7 @@ use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\SpecialApprovalAssessor;
@@ -77,7 +78,7 @@ final class DispoOrderSnapshotMapper
      */
     public function positionFromCalculationPosition(CalculationPosition $position, int $sort): array
     {
-        $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'discounts']);
+        $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'plannerEntries', 'discounts']);
 
         // Dispoerzeugung ist Mutation: Descriptor muss ausführbar sein.
         $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
@@ -132,6 +133,16 @@ final class DispoOrderSnapshotMapper
                     'spot_count' => $range->spot_count,
                     'average_second_price' => $range->average_second_price === null ? null : (string) $range->average_second_price,
                     'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
+                ]
+            )->all(),
+            'planner_entries_snapshot' => $position->plannerEntries->map(
+                fn (CalculationPositionPlannerEntry $entry): array => [
+                    'date' => $entry->dateIso(),
+                    'hour' => $entry->hour,
+                    'day_group' => $entry->day_group->value,
+                    'spot_count' => $entry->spot_count,
+                    'second_price' => (string) $entry->second_price,
+                    'line_gross' => (string) $entry->line_gross,
                 ]
             )->all(),
             'position_discounts_snapshot' => $position->discounts->map(

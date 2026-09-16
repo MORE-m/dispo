@@ -7,12 +7,14 @@ use App\Enums\BudgetStrategy;
 use App\Enums\CalculationStatus;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
+use App\Enums\SpotCalculationMethod;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\BudgetProposal;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\Inventory;
@@ -240,7 +242,10 @@ final class CalculationWriter
         array $positionEffectives = [],
         bool $derivePositionFingerprints = false,
     ): void {
-        $calculation->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
+        $calculation->loadMissing([
+            ...$this->calculationPositionRelationsForLoad(),
+            'orderDiscounts',
+        ]);
         $existingById = $calculation->positions->keyBy('id');
         $existingByClient = $calculation->positions->keyBy('client_key');
 
@@ -348,8 +353,15 @@ final class CalculationWriter
                 $payload['positions'][$index]['client_key'] = $position->client_key;
             }
 
-            $this->syncPlanRows($position, $result);
-            $this->syncTimeRanges($position, $result);
+            if ($item['spot_method'] === SpotCalculationMethod::Calendar) {
+                $position->timeRanges()->delete();
+                $this->syncPlannerEntries($position, $result);
+                $this->syncPlanRows($position, $result);
+            } else {
+                $this->deletePlannerEntries($position);
+                $this->syncPlanRows($position, $result);
+                $this->syncTimeRanges($position, $result);
+            }
             $this->syncPositionDiscounts($position, $item['position_discounts']);
         }
 
@@ -362,6 +374,7 @@ final class CalculationWriter
                 ->each(function (CalculationPosition $orphan): void {
                     $orphan->planRows()->delete();
                     $orphan->timeRanges()->delete();
+                    $this->deletePlannerEntries($orphan);
                     $orphan->discounts()->delete();
                     $orphan->fieldValues()->delete();
                     $orphan->delete();
@@ -732,6 +745,7 @@ final class CalculationWriter
                 rows: $item['rows'],
                 lengthIndex: $lengthIndex,
                 timeRanges: $item['time_ranges'],
+                plannerEntries: $item['planner_entries'],
                 positionDiscounts: $item['is_discountable'] ? $item['position_discounts'] : [],
                 needsSpotRedistribution: $item['needs_spot_redistribution'],
             );
@@ -893,6 +907,19 @@ final class CalculationWriter
                 ];
             }
 
+            $plannerEntries = [];
+            foreach ($position['planner_entries'] ?? [] as $entry) {
+                $plannerEntries[] = [
+                    'date' => (string) ($entry['date'] ?? ''),
+                    'hour' => (int) ($entry['hour'] ?? 0),
+                    'spot_count' => (int) ($entry['spot_count'] ?? 0),
+                ];
+            }
+            usort(
+                $plannerEntries,
+                fn (array $a, array $b): int => strcmp($a['date'], $b['date']) ?: $a['hour'] <=> $b['hour'],
+            );
+
             $discounts = [];
             foreach ($position['position_discounts'] ?? [] as $discount) {
                 $discounts[] = [
@@ -914,6 +941,7 @@ final class CalculationWriter
                 'ae_percent' => (string) ($position['ae_percent'] ?? '0'),
                 'plan_rows' => $rows,
                 'time_ranges' => $ranges,
+                'planner_entries' => $plannerEntries,
                 'position_discounts' => $discounts,
                 'dynamic_field_values' => $position['dynamic_field_values'] ?? null,
             ];
@@ -929,9 +957,7 @@ final class CalculationWriter
     public function payloadFromCalculation(Calculation $calculation): array
     {
         $calculation->loadMissing([
-            'positions.planRows',
-            'positions.timeRanges',
-            'positions.discounts',
+            ...$this->calculationPositionRelationsForLoad(),
             'positions.fieldValues.snapshotFieldDefinition',
             'orderDiscounts',
             'configurationSnapshot.fieldDefinitions',
@@ -975,6 +1001,7 @@ final class CalculationWriter
                     'day_group' => $range->day_group->value,
                     'spot_count' => $range->spot_count,
                 ])->all(),
+                'planner_entries' => $this->plannerEntriesForPayload($position),
                 'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
                     'type' => $discount->type->value,
                     'custom_label' => $discount->custom_label,
@@ -1014,9 +1041,7 @@ final class CalculationWriter
     public function calculationSnapshot(Calculation $calculation): array
     {
         $calculation->loadMissing([
-            'positions.planRows',
-            'positions.timeRanges',
-            'positions.discounts',
+            ...$this->calculationPositionRelationsForLoad(),
             'positions.priceList',
             'positions.fieldValues.snapshotFieldDefinition',
             'orderDiscounts',
@@ -1086,6 +1111,7 @@ final class CalculationWriter
                             'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
                         ]
                     )->all(),
+                    'planner_entries' => $this->plannerEntriesSnapshotForPosition($position),
                     'position_discounts' => $position->discounts->map(
                         fn (CalculationPositionDiscount $discount): array => [
                             'type' => $discount->type->value,
@@ -1105,9 +1131,7 @@ final class CalculationWriter
     {
         $calculation->refresh();
         $calculation->load([
-            'positions.planRows',
-            'positions.timeRanges',
-            'positions.discounts',
+            ...$this->calculationPositionRelationsForLoad(),
             'positions.inventory',
             'positions.priceList',
             'positions.fieldValues.snapshotFieldDefinition',
@@ -1411,6 +1435,79 @@ final class CalculationWriter
         }
 
         return Decimal::roundPrice(Decimal::mul(Decimal::sub('1', $factor), '100'));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function calculationPositionRelationsForLoad(): array
+    {
+        return [
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.plannerEntries',
+        ];
+    }
+
+    /**
+     * @return list<array{date: string, hour: int, spot_count: int}>
+     */
+    private function plannerEntriesForPayload(CalculationPosition $position): array
+    {
+        return array_values($position->plannerEntries->map(fn (CalculationPositionPlannerEntry $entry): array => [
+            'date' => $entry->dateIso(),
+            'hour' => $entry->hour,
+            'spot_count' => $entry->spot_count,
+        ])->all());
+    }
+
+    /**
+     * @return list<array{date: string, hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>
+     */
+    private function plannerEntriesSnapshotForPosition(CalculationPosition $position): array
+    {
+        return array_values($position->plannerEntries->map(
+            fn (CalculationPositionPlannerEntry $entry): array => [
+                'date' => $entry->dateIso(),
+                'hour' => $entry->hour,
+                'day_group' => $entry->day_group->value,
+                'spot_count' => $entry->spot_count,
+                'second_price' => (string) $entry->second_price,
+                'line_gross' => (string) $entry->line_gross,
+            ]
+        )->all());
+    }
+
+    private function deletePlannerEntries(CalculationPosition $position): void
+    {
+        $position->plannerEntries()->delete();
+    }
+
+    private function syncPlannerEntries(CalculationPosition $position, PositionResult $result): void
+    {
+        $existing = $position->plannerEntries()->get()->values();
+        $seen = [];
+
+        foreach ($result->plannerEntries as $index => $entry) {
+            $model = $existing->get($index) ?? new CalculationPositionPlannerEntry;
+            $model->fill([
+                'date' => $entry['date'],
+                'hour' => $entry['hour'],
+                'day_group' => $entry['day_group'],
+                'spot_count' => $entry['spot_count'],
+                'second_price' => $entry['second_price'],
+                'line_gross' => $entry['line_gross'],
+            ]);
+            $model->position()->associate($position);
+            $model->save();
+            $seen[] = $model->id;
+        }
+
+        CalculationPositionPlannerEntry::query()
+            ->where('calculation_position_id', $position->id)
+            ->when($seen !== [], fn ($query) => $query->whereNotIn('id', $seen))
+            ->delete();
     }
 
     private function syncTimeRanges(CalculationPosition $position, PositionResult $result): void

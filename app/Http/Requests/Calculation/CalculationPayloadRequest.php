@@ -16,6 +16,7 @@ use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\DiscountValidator;
+use App\Services\Calculation\PlannerEntryValidator;
 use App\Services\Calculation\TimeRangeValidator;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
@@ -252,6 +253,10 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.time_ranges.*.end_hour_exclusive' => ['nullable', 'integer', 'min:1', 'max:24'],
             'positions.*.time_ranges.*.day_group' => ['nullable', Rule::enum(DayGroup::class)],
             'positions.*.time_ranges.*.spot_count' => ['nullable'],
+            'positions.*.planner_entries' => ['sometimes', 'array'],
+            'positions.*.planner_entries.*.date' => ['nullable', 'date_format:Y-m-d'],
+            'positions.*.planner_entries.*.hour' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'positions.*.planner_entries.*.spot_count' => ['nullable'],
             'positions.*.position_discounts' => ['sometimes', 'array'],
             'positions.*.position_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
@@ -303,6 +308,8 @@ class CalculationPayloadRequest extends FormRequest
 
             $isPreview = $this->routeIs('calculations.preview');
             $rangeValidator = new TimeRangeValidator;
+            $plannerValidator = new PlannerEntryValidator;
+            $methodNormalizer = app(CalculationPositionMethodKeyNormalizer::class);
             $discountValidator = new DiscountValidator;
 
             try {
@@ -366,28 +373,79 @@ class CalculationPayloadRequest extends FormRequest
             }
 
             foreach ($positions as $index => $position) {
+                if (! is_array($position)) {
+                    continue;
+                }
+
+                $methodKey = 'average';
+                try {
+                    $normalized = $methodNormalizer->normalize($position);
+                    $methodKey = $normalized['present'] ? (string) $normalized['key'] : 'average';
+                } catch (ValidationException) {
+                    continue;
+                }
+
+                $isCalendar = $methodKey === SpotCalculationMethod::Calendar->value;
                 $ranges = $position['time_ranges'] ?? [];
                 $planRows = $position['plan_rows'] ?? [];
+                $plannerEntries = $position['planner_entries'] ?? [];
 
-                if (is_array($ranges) && $ranges !== []) {
-                    try {
-                        $rangeValidator->validated(
-                            $ranges,
-                            "positions.{$index}.time_ranges",
-                            requireAtLeastOne: ! $isPreview,
-                        );
-                    } catch (ValidationException $exception) {
-                        foreach ($exception->errors() as $key => $messages) {
-                            foreach ($messages as $message) {
-                                $validator->errors()->add($key, $message);
+                if ($isCalendar) {
+                    if (is_array($plannerEntries) && $plannerEntries !== []) {
+                        try {
+                            $plannerValidator->validated(
+                                $plannerEntries,
+                                "positions.{$index}.planner_entries",
+                                requireAtLeastOne: ! $isPreview && ! $isBudgetMode,
+                            );
+                        } catch (ValidationException $exception) {
+                            foreach ($exception->errors() as $key => $messages) {
+                                foreach ($messages as $message) {
+                                    $validator->errors()->add($key, $message);
+                                }
                             }
                         }
+                    } elseif (! $isPreview && ! $isBudgetMode) {
+                        $validator->errors()->add(
+                            "positions.{$index}.planner_entries",
+                            'Mindestens ein vollständiger Kalendereintrag mit mindestens einem Spot ist erforderlich.',
+                        );
                     }
-                } elseif (! $isPreview && ! $isBudgetMode && (! is_array($planRows) || $planRows === [])) {
-                    $validator->errors()->add(
-                        "positions.{$index}.time_ranges",
-                        'Mindestens ein vollständiger Preiszeitraum mit mindestens einem Spot ist erforderlich.',
-                    );
+
+                    if (is_array($ranges) && $ranges !== []) {
+                        $validator->errors()->add(
+                            "positions.{$index}.time_ranges",
+                            'Preiszeiträume sind für den Kalenderplaner nicht zulässig.',
+                        );
+                    }
+                } else {
+                    if (is_array($plannerEntries) && $plannerEntries !== []) {
+                        $validator->errors()->add(
+                            "positions.{$index}.planner_entries",
+                            'Kalendereinträge sind für die Durchschnittsplanung nicht zulässig.',
+                        );
+                    }
+
+                    if (is_array($ranges) && $ranges !== []) {
+                        try {
+                            $rangeValidator->validated(
+                                $ranges,
+                                "positions.{$index}.time_ranges",
+                                requireAtLeastOne: ! $isPreview,
+                            );
+                        } catch (ValidationException $exception) {
+                            foreach ($exception->errors() as $key => $messages) {
+                                foreach ($messages as $message) {
+                                    $validator->errors()->add($key, $message);
+                                }
+                            }
+                        }
+                    } elseif (! $isPreview && ! $isBudgetMode && (! is_array($planRows) || $planRows === [])) {
+                        $validator->errors()->add(
+                            "positions.{$index}.time_ranges",
+                            'Mindestens ein vollständiger Preiszeitraum mit mindestens einem Spot ist erforderlich.',
+                        );
+                    }
                 }
 
                 try {

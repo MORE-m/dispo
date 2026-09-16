@@ -16,6 +16,7 @@ use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
@@ -284,7 +285,7 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
 
         $latestBudgetProposal = null;
         $appliedBudgetProposal = null;
@@ -497,6 +498,14 @@ class CalculationController extends Controller
                         'average_second_price' => $range->average_second_price === null ? null : (string) $range->average_second_price,
                         'range_gross' => $range->range_gross === null ? null : (string) $range->range_gross,
                     ])->all(),
+                    'planner_entries' => $position->plannerEntries->map(fn (CalculationPositionPlannerEntry $entry): array => [
+                        'date' => $entry->dateIso(),
+                        'hour' => $entry->hour,
+                        'day_group' => $entry->day_group->value,
+                        'spot_count' => $entry->spot_count,
+                        'second_price' => (string) $entry->second_price,
+                        'line_gross' => (string) $entry->line_gross,
+                    ])->all(),
                     'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
                         'type' => $discount->type->value,
                         'custom_label' => $discount->custom_label,
@@ -593,6 +602,11 @@ class CalculationController extends Controller
                             'end_hour_exclusive' => $range->end_hour_exclusive,
                             'day_group' => $range->day_group->value,
                             'spot_count' => $range->spot_count,
+                        ])->all(),
+                        'planner_entries' => $position->plannerEntries->map(fn (CalculationPositionPlannerEntry $entry): array => [
+                            'date' => $entry->dateIso(),
+                            'hour' => $entry->hour,
+                            'spot_count' => $entry->spot_count,
                         ])->all(),
                         'position_discounts' => $position->discounts->map(fn (CalculationPositionDiscount $discount): array => [
                             'type' => $discount->type->value,

@@ -68,6 +68,7 @@ class DispoOrderPosition extends Model
         'nn_invest',
         'plan_rows_snapshot',
         'time_ranges_snapshot',
+        'planner_entries_snapshot',
         'position_discounts_snapshot',
     ];
 
@@ -93,6 +94,7 @@ class DispoOrderPosition extends Model
             'nn_invest' => 'decimal:2',
             'plan_rows_snapshot' => 'array',
             'time_ranges_snapshot' => 'array',
+            'planner_entries_snapshot' => 'array',
             'position_discounts_snapshot' => 'array',
         ];
     }

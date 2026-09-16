@@ -42,9 +42,11 @@ final class EngineProfileRegistry
                 ],
             ],
             'calendar' => [
-                'pair_status' => EngineCapabilityStatus::Planned,
-                'current_released_version' => null,
-                'versions' => [],
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
             ],
             'fixed_price' => [
                 'pair_status' => EngineCapabilityStatus::Planned,

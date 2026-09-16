@@ -9,6 +9,7 @@ final readonly class PositionInput
     /**
      * @param  list<PlanRowInput>  $rows
      * @param  list<TimeRangeInput>  $timeRanges
+     * @param  list<PlannerEntryInput>  $plannerEntries
      * @param  list<DiscountInput>  $positionDiscounts
      */
     public function __construct(
@@ -26,6 +27,7 @@ final readonly class PositionInput
         public array $rows,
         public ?int $lengthIndex = null,
         public array $timeRanges = [],
+        public array $plannerEntries = [],
         public array $positionDiscounts = [],
         public bool $needsSpotRedistribution = false,
     ) {}
