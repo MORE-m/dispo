@@ -35,6 +35,10 @@ import {
 } from '@/lib/choice-field-values';
 import { formatDateOnly, formatDateTime } from '@/lib/date-time';
 import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
+import {
+    formatPlannerEntryLine,
+    sortPlannerEntriesForDisplay,
+} from '@/lib/dispo-planner-display';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
     applyEffectiveRequired,
@@ -113,6 +117,13 @@ type OrderPosition = {
         day_group?: string;
         spot_count: number;
         range_gross?: string | null;
+    }[];
+    planner_entries?: {
+        date: string;
+        hour: number;
+        day_group?: string;
+        spot_count: number;
+        line_gross?: string | null;
     }[];
     position_discounts: {
         type?: string;
@@ -1880,6 +1891,28 @@ export default function DispoOrderShow({
                                                     </li>
                                                 ),
                                             )}
+                                        </ul>
+                                    ) : null}
+                                    {position.planner_entries &&
+                                    position.planner_entries.length > 0 ? (
+                                        <ul
+                                            className="text-muted-foreground mt-2 space-y-0.5 text-xs"
+                                            data-test={`dispo-planner-entries-${position.id}`}
+                                        >
+                                            {sortPlannerEntriesForDisplay(
+                                                position.planner_entries,
+                                            ).map((entry) => (
+                                                <li
+                                                    key={`${entry.date}-${entry.hour}`}
+                                                >
+                                                    {formatPlannerEntryLine(
+                                                        entry,
+                                                    )}
+                                                    {entry.line_gross
+                                                        ? ` · ${money(entry.line_gross)}`
+                                                        : ''}
+                                                </li>
+                                            ))}
                                         </ul>
                                     ) : null}
                                     {position.position_discounts.length > 0 ? (
