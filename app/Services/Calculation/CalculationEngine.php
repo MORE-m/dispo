@@ -2,11 +2,13 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 
 /**
- * GEN-002, SPT-001–SPT-004, SPT-009, SPT-015, SPT-016, CAL-005, COM-001, COM-002, COM-007, COM-008
+ * GEN-002, SPT-001–SPT-004, SPT-009, SPT-012–SPT-015, SPT-016, CAL-005, COM-001, COM-002, COM-007, COM-008
+ * BL-P4-02c / AT-04: Spot-Komponenten (Hauptspot + Allonge).
  */
 final class CalculationEngine
 {
@@ -144,19 +146,36 @@ final class CalculationEngine
         string $orderDiscountPercent,
         array $orderDiscounts,
     ): PositionResult {
-        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $resolved = $this->resolveComponentPlan($position);
+        $index = $resolved['position_index'];
         $mediaGrossInternal = '0';
         $totalSpots = 0;
         $plannerResults = [];
         $priceSum = '0';
         $entryCount = 0;
+        $componentGrosses = [];
+        foreach ($resolved['components'] as $_) {
+            $componentGrosses[] = '0';
+        }
 
         foreach ($position->plannerEntries as $entry) {
             if ($entry->spotCount < 1) {
                 continue;
             }
 
-            $lineGrossInternal = $this->spotPrice($entry->secondPrice, $position, $index, $entry->spotCount);
+            $lineGrossInternal = '0';
+            foreach ($resolved['components'] as $componentOffset => $component) {
+                $part = $this->lengthSpotPrice(
+                    $entry->secondPrice,
+                    $component['length_seconds'],
+                    $component['length_index'],
+                    $position->surchargePercent,
+                    $entry->spotCount,
+                );
+                $lineGrossInternal = Decimal::add($lineGrossInternal, $part);
+                $componentGrosses[$componentOffset] = Decimal::add($componentGrosses[$componentOffset], $part);
+            }
+
             $mediaGrossInternal = Decimal::add($mediaGrossInternal, $lineGrossInternal);
             $totalSpots += $entry->spotCount;
             $priceSum = Decimal::add($priceSum, $entry->secondPrice);
@@ -176,7 +195,13 @@ final class CalculationEngine
             return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
         }
 
-        $displayAverage = $this->weightedAverageSecondPrice($mediaGrossInternal, $position, $index, $totalSpots);
+        $displayAverage = $this->weightedAverageSecondPrice(
+            $mediaGrossInternal,
+            $position->lengthSeconds,
+            $index,
+            $position->surchargePercent,
+            $totalSpots,
+        );
         if ($displayAverage === null && $entryCount > 0) {
             $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $entryCount, 4));
         }
@@ -192,6 +217,7 @@ final class CalculationEngine
             $displayAverage ?? '0',
             [],
             $plannerResults,
+            $this->componentResults($resolved, array_values($componentGrosses)),
         );
     }
 
@@ -214,9 +240,23 @@ final class CalculationEngine
         }
 
         $averageSecondPrice = $this->averageSecondPrice($uniqueRows);
-        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $resolved = $this->resolveComponentPlan($position);
+        $index = $resolved['position_index'];
         $spotCount = max(0, $position->totalSpotCount);
-        $mediaGrossInternal = $this->spotPrice($averageSecondPrice, $position, $index, $spotCount);
+        $mediaGrossInternal = '0';
+        $componentGrosses = [];
+
+        foreach ($resolved['components'] as $component) {
+            $part = $this->lengthSpotPrice(
+                $averageSecondPrice,
+                $component['length_seconds'],
+                $component['length_index'],
+                $position->surchargePercent,
+                $spotCount,
+            );
+            $mediaGrossInternal = Decimal::add($mediaGrossInternal, $part);
+            $componentGrosses[] = $part;
+        }
 
         $rowResults = [];
         foreach ($uniqueRows as $row) {
@@ -238,6 +278,9 @@ final class CalculationEngine
             $index,
             $rowResults,
             $averageSecondPrice,
+            [],
+            [],
+            $this->componentResults($resolved, $componentGrosses),
         );
     }
 
@@ -251,13 +294,18 @@ final class CalculationEngine
         string $orderDiscountPercent,
         array $orderDiscounts,
     ): PositionResult {
-        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $resolved = $this->resolveComponentPlan($position);
+        $index = $resolved['position_index'];
         $mediaGrossInternal = '0';
         $totalSpots = 0;
         $rangeResults = [];
         $rowResults = [];
         $priceSum = '0';
         $hourCount = 0;
+        $componentGrosses = [];
+        foreach ($resolved['components'] as $_) {
+            $componentGrosses[] = '0';
+        }
 
         foreach ($position->timeRanges as $range) {
             if ($range->hours === [] || $range->spotCount < 1) {
@@ -265,7 +313,18 @@ final class CalculationEngine
             }
 
             $averageSecondPrice = $this->averageSecondPrice($range->hours);
-            $rangeGross = $this->spotPrice($averageSecondPrice, $position, $index, $range->spotCount);
+            $rangeGross = '0';
+            foreach ($resolved['components'] as $componentOffset => $component) {
+                $part = $this->lengthSpotPrice(
+                    $averageSecondPrice,
+                    $component['length_seconds'],
+                    $component['length_index'],
+                    $position->surchargePercent,
+                    $range->spotCount,
+                );
+                $rangeGross = Decimal::add($rangeGross, $part);
+                $componentGrosses[$componentOffset] = Decimal::add($componentGrosses[$componentOffset], $part);
+            }
             $mediaGrossInternal = Decimal::add($mediaGrossInternal, $rangeGross);
             $totalSpots += $range->spotCount;
 
@@ -298,7 +357,13 @@ final class CalculationEngine
             return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
         }
 
-        $displayAverage = $this->weightedAverageSecondPrice($mediaGrossInternal, $position, $index, $totalSpots);
+        $displayAverage = $this->weightedAverageSecondPrice(
+            $mediaGrossInternal,
+            $position->lengthSeconds,
+            $index,
+            $position->surchargePercent,
+            $totalSpots,
+        );
         if ($displayAverage === null && $hourCount > 0) {
             $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $hourCount, 4));
         }
@@ -313,17 +378,24 @@ final class CalculationEngine
             $rowResults,
             $displayAverage ?? '0',
             $rangeResults,
+            [],
+            $this->componentResults($resolved, array_values($componentGrosses)),
         );
     }
 
-    private function spotPrice(string $averageSecondPrice, PositionInput $position, int $index, int $spotCount): string
-    {
+    private function lengthSpotPrice(
+        string $secondPrice,
+        int $lengthSeconds,
+        int $index,
+        string $surchargePercent,
+        int $spotCount,
+    ): string {
         $lengthFactor = Decimal::div((string) $index, '100');
-        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
+        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($surchargePercent));
 
         return Decimal::mulMany([
-            $averageSecondPrice,
-            (string) $position->lengthSeconds,
+            $secondPrice,
+            (string) $lengthSeconds,
             $lengthFactor,
             $surchargeFactor,
             (string) max(0, $spotCount),
@@ -332,19 +404,20 @@ final class CalculationEngine
 
     private function weightedAverageSecondPrice(
         string $mediaGrossInternal,
-        PositionInput $position,
+        int $lengthSeconds,
         int $index,
+        string $surchargePercent,
         int $spotCount,
     ): ?string {
-        if ($spotCount < 1 || $position->lengthSeconds < 1) {
+        if ($spotCount < 1 || $lengthSeconds < 1) {
             return null;
         }
 
         $lengthFactor = Decimal::div((string) $index, '100');
-        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($position->surchargePercent));
+        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($surchargePercent));
         $divisor = Decimal::mulMany([
             (string) $spotCount,
-            (string) $position->lengthSeconds,
+            (string) $lengthSeconds,
             $lengthFactor,
             $surchargeFactor,
         ]);
@@ -354,6 +427,135 @@ final class CalculationEngine
         }
 
         return Decimal::roundPrice(Decimal::div($mediaGrossInternal, $divisor, 4));
+    }
+
+    /**
+     * @return array{
+     *     strategy: ComponentCalculationStrategy|null,
+     *     position_index: int,
+     *     components: list<array{role: string, label: string, length_seconds: int, sort: int, length_index: int}>
+     * }
+     */
+    private function resolveComponentPlan(PositionInput $position): array
+    {
+        if (! $position->hasComponents()) {
+            $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+
+            return [
+                'strategy' => null,
+                'position_index' => $index,
+                'components' => [[
+                    'role' => 'legacy',
+                    'label' => 'Spot',
+                    'length_seconds' => $position->lengthSeconds,
+                    'sort' => 0,
+                    'length_index' => $index,
+                ]],
+            ];
+        }
+
+        $strategy = $position->componentCalculationStrategy
+            ?? ComponentCalculationStrategy::SharedTotalLength;
+
+        if ($strategy === ComponentCalculationStrategy::SharedTotalLength) {
+            $totalLength = array_sum(array_map(
+                fn (ComponentInput $component): int => $component->lengthSeconds,
+                $position->components,
+            ));
+            $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($totalLength);
+            $components = [];
+            foreach ($position->components as $component) {
+                $components[] = [
+                    'role' => $component->role->value,
+                    'label' => $component->label,
+                    'length_seconds' => $component->lengthSeconds,
+                    'sort' => $component->sort,
+                    'length_index' => $index,
+                ];
+            }
+
+            return [
+                'strategy' => $strategy,
+                'position_index' => $index,
+                'components' => [[
+                    'role' => 'shared',
+                    'label' => 'Gesamtlänge',
+                    'length_seconds' => $totalLength,
+                    'sort' => 0,
+                    'length_index' => $index,
+                    '_display' => $components,
+                ]],
+            ];
+        }
+
+        $components = [];
+        foreach ($position->components as $component) {
+            $componentIndex = $component->lengthIndex ?? SpotLengthIndex::forSeconds($component->lengthSeconds);
+            $components[] = [
+                'role' => $component->role->value,
+                'label' => $component->label,
+                'length_seconds' => $component->lengthSeconds,
+                'sort' => $component->sort,
+                'length_index' => $componentIndex,
+            ];
+        }
+
+        $totalLength = array_sum(array_column($components, 'length_seconds'));
+        $positionIndex = $position->lengthIndex ?? SpotLengthIndex::forSeconds(max(1, $totalLength));
+
+        return [
+            'strategy' => $strategy,
+            'position_index' => $positionIndex,
+            'components' => $components,
+        ];
+    }
+
+    /**
+     * @param  array{
+     *     strategy: ComponentCalculationStrategy|null,
+     *     position_index: int,
+     *     components: list<array<string, mixed>>
+     * }  $resolved
+     * @param  array<int, string>  $componentGrosses
+     * @return list<array{role: string, label: string, length_seconds: int, sort: int, length_index: int, media_gross: string}>
+     */
+    private function componentResults(array $resolved, array $componentGrosses): array
+    {
+        if ($resolved['strategy'] === null) {
+            return [];
+        }
+
+        if ($resolved['strategy'] === ComponentCalculationStrategy::SharedTotalLength) {
+            $display = $resolved['components'][0]['_display'] ?? [];
+            $rows = [];
+            foreach ($display as $component) {
+                $rows[] = [
+                    'role' => (string) $component['role'],
+                    'label' => (string) $component['label'],
+                    'length_seconds' => (int) $component['length_seconds'],
+                    'sort' => (int) $component['sort'],
+                    'length_index' => (int) $component['length_index'],
+                    // Gemeinsames Brutto liegt am Positionsbrutto; Komponenten zeigen keine Einzelbeträge.
+                    'media_gross' => '',
+                ];
+            }
+
+            return $rows;
+        }
+
+        $rows = [];
+        foreach ($resolved['components'] as $offset => $component) {
+            $rows[] = [
+                'role' => (string) $component['role'],
+                'label' => (string) $component['label'],
+                'length_seconds' => (int) $component['length_seconds'],
+                'sort' => (int) $component['sort'],
+                'length_index' => (int) $component['length_index'],
+                'media_gross' => Decimal::roundMoney($componentGrosses[$offset] ?? '0'),
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -437,6 +639,8 @@ final class CalculationEngine
             lengthIndex: $position->lengthIndex,
             timeRanges: [],
             positionDiscounts: $position->positionDiscounts,
+            components: $position->components,
+            componentCalculationStrategy: $position->componentCalculationStrategy,
         );
 
         return $this->calculateAveragePosition(
@@ -464,6 +668,8 @@ final class CalculationEngine
             lengthIndex: $position->lengthIndex,
             timeRanges: [],
             positionDiscounts: $position->positionDiscounts,
+            components: $position->components,
+            componentCalculationStrategy: $position->componentCalculationStrategy,
         );
 
         return $this->calculateAveragePosition(
@@ -478,6 +684,7 @@ final class CalculationEngine
      * @param  list<array{hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $rowResults
      * @param  list<array{start_hour: int, end_hour_exclusive: int, day_group: string, spot_count: int, average_second_price: string, range_gross: string, hours: list<int>}>  $timeRanges
      * @param  list<array{date: string, hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $plannerEntries
+     * @param  list<array{role: string, label: string, length_seconds: int, sort: int, length_index: int, media_gross: string}>  $components
      */
     private function finalizePosition(
         PositionInput $position,
@@ -490,6 +697,7 @@ final class CalculationEngine
         string $averageSecondPrice,
         array $timeRanges = [],
         array $plannerEntries = [],
+        array $components = [],
     ): PositionResult {
         $positionDiscounts = $position->isDiscountable
             ? $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent)
@@ -539,6 +747,10 @@ final class CalculationEngine
             orderDiscounts: $orderSequence,
             needsSpotRedistribution: $position->needsSpotRedistribution,
             legacyTotalSpotCount: $position->needsSpotRedistribution ? $position->totalSpotCount : null,
+            components: $components,
+            componentCalculationStrategy: $position->hasComponents()
+                ? ($position->componentCalculationStrategy ?? ComponentCalculationStrategy::SharedTotalLength)
+                : null,
         );
     }
 

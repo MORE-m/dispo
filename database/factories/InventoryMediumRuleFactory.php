@@ -22,6 +22,7 @@ class InventoryMediumRuleFactory extends Factory
             'surcharge_percent' => 0,
             'is_discountable' => true,
             'is_ae_eligible' => true,
+            'component_calculation_strategy' => 'shared_total_length',
         ];
     }
 }

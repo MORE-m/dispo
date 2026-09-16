@@ -33,8 +33,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $effective_configuration_snapshot_id
  * @property-read Collection<int, CalculationPositionTimeRange> $timeRanges
  * @property-read Collection<int, CalculationPositionPlannerEntry> $plannerEntries
+ * @property-read Collection<int, CalculationPositionComponent> $components
  * @property-read Collection<int, CalculationPositionDiscount> $discounts
  * @property int $length_seconds
+ * @property string|null $component_calculation_strategy
  * @property string $position_discount_percent
  * @property string $ae_percent
  */
@@ -61,6 +63,7 @@ class CalculationPosition extends Model
         'kind',
         'spot_method',
         'length_seconds',
+        'component_calculation_strategy',
         'total_spot_count',
         'needs_spot_redistribution',
         'average_second_price',
@@ -179,6 +182,16 @@ class CalculationPosition extends Model
         return $this->hasMany(CalculationPositionPlannerEntry::class)
             ->orderBy('date')
             ->orderBy('hour')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<CalculationPositionComponent, $this>
+     */
+    public function components(): HasMany
+    {
+        return $this->hasMany(CalculationPositionComponent::class)
+            ->orderBy('sort')
             ->orderBy('id');
     }
 

@@ -394,6 +394,8 @@ class DispoOrderController extends Controller
                 'spot_method' => $position->spot_method->value,
                 'spot_method_label' => $position->spot_method->label(),
                 'length_seconds' => $position->length_seconds,
+                'component_calculation_strategy' => $position->component_calculation_strategy,
+                'components' => $position->components_snapshot ?? [],
                 'total_spot_count' => $position->total_spot_count,
                 'price_list_version' => $position->price_list_version,
                 'media_gross' => (string) $position->media_gross,

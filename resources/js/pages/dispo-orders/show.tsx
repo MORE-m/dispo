@@ -104,6 +104,15 @@ type OrderPosition = {
     spot_method: string;
     spot_method_label: string;
     length_seconds: number;
+    component_calculation_strategy?: string | null;
+    components?: Array<{
+        role: string;
+        label: string;
+        length_seconds: number;
+        sort?: number;
+        length_index?: number | null;
+        media_gross?: string | null;
+    }>;
     total_spot_count: number;
     price_list_version: string | null;
     media_gross: string;
@@ -1623,6 +1632,41 @@ export default function DispoOrderShow({
                                             ? ` · Preisliste ${position.price_list_version}`
                                             : ''}
                                     </p>
+                                    {position.components &&
+                                    position.components.length > 0 ? (
+                                        <div
+                                            className="text-muted-foreground mt-2 space-y-1 text-xs"
+                                            data-test={`dispo-order-position-components-${index}`}
+                                        >
+                                            <p>
+                                                Spot-Komponenten ·{' '}
+                                                {position.component_calculation_strategy ===
+                                                'individual'
+                                                    ? 'Komponenten einzeln berechnen'
+                                                    : 'Gemeinsame Gesamtlänge'}
+                                            </p>
+                                            <ul className="list-inside list-disc">
+                                                {position.components.map(
+                                                    (component) => (
+                                                        <li
+                                                            key={`${component.role}-${component.sort ?? 0}`}
+                                                        >
+                                                            {component.label}:{' '}
+                                                            {
+                                                                component.length_seconds
+                                                            }
+                                                            s
+                                                            {position.component_calculation_strategy ===
+                                                                'individual' &&
+                                                            component.media_gross
+                                                                ? ` · ${component.media_gross}`
+                                                                : ''}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </div>
+                                    ) : null}
                                     <div className="text-muted-foreground mt-2 space-y-1 text-xs">
                                         <p>
                                             {periodOpenLabel}:{' '}

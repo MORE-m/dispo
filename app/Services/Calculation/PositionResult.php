@@ -2,6 +2,8 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\ComponentCalculationStrategy;
+
 final readonly class PositionResult
 {
     /**
@@ -10,6 +12,7 @@ final readonly class PositionResult
      * @param  list<array{date: string, hour: int, day_group: string, spot_count: int, second_price: string, line_gross: string}>  $plannerEntries
      * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $positionDiscounts
      * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $orderDiscounts
+     * @param  list<array{role: string, label: string, length_seconds: int, sort: int, length_index: int, media_gross: string}>  $components
      */
     public function __construct(
         public string $mediaGross,
@@ -30,6 +33,8 @@ final readonly class PositionResult
         public array $orderDiscounts = [],
         public bool $needsSpotRedistribution = false,
         public ?int $legacyTotalSpotCount = null,
+        public array $components = [],
+        public ?ComponentCalculationStrategy $componentCalculationStrategy = null,
     ) {}
 
     /**
@@ -56,6 +61,8 @@ final readonly class PositionResult
             'order_discounts' => $this->orderDiscounts,
             'needs_spot_redistribution' => $this->needsSpotRedistribution,
             'legacy_total_spot_count' => $this->legacyTotalSpotCount,
+            'components' => $this->components,
+            'component_calculation_strategy' => $this->componentCalculationStrategy?->value,
         ];
     }
 }

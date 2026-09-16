@@ -56,6 +56,13 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
 
+### BL-P4-02c (Spot-Komponenten / AT-04)
+
+- Abnahme **AT-04** (Hauptspot + Allonge) im **offenen PR**: beide Strategien,
+  Average + Calendar, Preview=Store, Freeze/Admin-Stabilität, Dispo-Snapshot
+- Unit-/Feature-/MySQL-/Vitest-/Playwright (`playwright.blp402c.config.ts`, Port 8025)
+- SPT-012/013 nicht als vollständig dokumentieren; `fixed_price` planned; SPT-008 Export offen
+
 ### BL-P4-02b (Kalenderplaner / AT-02)
 
 - Abnahme **AT-02** mit `SPT-005`–`SPT-007` (+ Anzeige-Teil `SPT-008`): **Wochenmatrix**

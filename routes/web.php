@@ -9,6 +9,7 @@ use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\Administration\InventoryAdminController;
+use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\Administration\PriceListImportController;
 use App\Http\Controllers\AdministrationAccessController;
@@ -155,6 +156,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.inventories.show');
         Route::put('administration/inventare/{inventory}', [InventoryAdminController::class, 'update'])
             ->name('administration.inventories.update');
+        Route::put('administration/inventare/{inventory}/werbemittel-regeln/{rule}', [InventoryMediumRuleAdminController::class, 'update'])
+            ->name('administration.inventories.medium-rules.update');
         Route::post('administration/inventare/{inventory}/deaktivierungs-vorschau', [InventoryAdminController::class, 'deactivatePreview'])
             ->name('administration.inventories.deactivate-preview');
         Route::post('administration/inventare/{inventory}/deaktivieren', [InventoryAdminController::class, 'deactivate'])

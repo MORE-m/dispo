@@ -265,12 +265,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen (`BL-P4-02a` auf `main`; `BL-P4-02b` umgesetzt (PR #58); Komponenten/AT-04 und Festpreis offen)
+- **Status:** offen (`BL-P4-02a`/`02b` auf `main`; `BL-P4-02c` AT-04 im offenen PR; Festpreis offen)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
 - **Ergebnis 02b (PR #58):** Kalenderplaner/AT-02 als echte **Wochenmatrix** Mo–So × Preisstunden; Spotanzahl direkt je Datum-/Stundenzelle; Jahresvertrag (ein Preisjahr je Position); Wochen-/Monatsnavigation mit State-Erhalt; Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot + Anzeige (`SPT-008` Snapshot/Anzeige umgesetzt, Export offen); Pin-Vertrag 02a unverändert kompatibel
-- **Offen:** Komponenten/Allonge (AT-04), Festpreis-Engine (`fixed_price` Registry weiter `planned`), SPT-008 Export
+- **Ergebnis 02c (offener PR):** Hauptspot+Allonge, Strategien `shared_total_length`/`individual`, Admin-Freeze, Average+Calendar, Dispo-Snapshot/Anzeige; SPT-012/013 nicht vollständig
+- **Offen:** Festpreis-Engine (`fixed_price` Registry weiter `planned`), SPT-008 Export, Abbinder/Reminder/Tandem/Tridem
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02b: AT-02; kein AT-04-/Festpreis-Claim)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)

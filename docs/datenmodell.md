@@ -267,7 +267,13 @@ geschrieben (`BUD-008`).
 
 Unterobjekte werden typbezogen normalisiert:
 
-- `PositionComponent` für Spot/SWF-Komponenten,
+- `CalculationPositionComponent` (`calculation_position_components`) für Spot-Komponenten
+  (BL-P4-02c / AT-04 im offenen PR): `role` (`main_spot`, `allonge`; erweiterbar),
+  `label`, `length_seconds`, `sort`, optionale Snapshot-Felder `length_index`/`media_gross`.
+  Position: nullable `component_calculation_strategy` (Freeze). Ohne Komponenten bleibt
+  Legacy-`length_seconds`. Admin-Default auf `inventory_medium_rules.component_calculation_strategy`
+  (`shared_total_length`). Dispo: `components_snapshot` + eingefrorene Strategie.
+  SPT-012/013 (Abbinder/Reminder/Tandem/Tridem) nicht vollständig in diesem Teilblock,
 - `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
   Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme)
   – Methode `average`,

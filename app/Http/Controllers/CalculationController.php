@@ -286,7 +286,7 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.components', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
 
         $latestBudgetProposal = null;
         $appliedBudgetProposal = null;
@@ -416,6 +416,7 @@ class CalculationController extends Controller
                 'is_discountable',
                 'is_ae_eligible',
                 'is_active',
+                'component_calculation_strategy',
             ]);
 
         $historicalRuleIds = $calculation !== null
@@ -455,6 +456,7 @@ class CalculationController extends Controller
                     'is_discountable',
                     'is_ae_eligible',
                     'is_active',
+                    'component_calculation_strategy',
                 ]);
         }
 
@@ -590,6 +592,15 @@ class CalculationController extends Controller
                         'calculation_method_key' => $position->calculation_method_key,
                         'calculation_method_name' => $position->calculation_method_name,
                         'length_seconds' => $position->length_seconds,
+                        'component_calculation_strategy' => $position->component_calculation_strategy,
+                        'components' => $position->components->map(fn ($component): array => [
+                            'role' => $component->role->value,
+                            'label' => $component->label,
+                            'length_seconds' => $component->length_seconds,
+                            'sort' => $component->sort,
+                            'length_index' => $component->length_index,
+                            'media_gross' => $component->media_gross === null ? null : (string) $component->media_gross,
+                        ])->values()->all(),
                         'total_spot_count' => $position->total_spot_count,
                         'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
                         'price_year' => $pinnedList !== null ? (int) $pinnedList->year : null,

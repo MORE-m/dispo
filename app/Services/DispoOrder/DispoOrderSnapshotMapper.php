@@ -6,6 +6,7 @@ use App\Enums\DispoOrderApprovalKind;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
+use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
@@ -78,7 +79,7 @@ final class DispoOrderSnapshotMapper
      */
     public function positionFromCalculationPosition(CalculationPosition $position, int $sort): array
     {
-        $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'plannerEntries', 'discounts']);
+        $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'plannerEntries', 'components', 'discounts']);
 
         // Dispoerzeugung ist Mutation: Descriptor muss ausführbar sein.
         $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
@@ -99,6 +100,7 @@ final class DispoOrderSnapshotMapper
             'calculation_method_name' => $freeze->calculationMethodName,
             'algorithm_version' => $freeze->algorithmVersion,
             'length_seconds' => $position->length_seconds,
+            'component_calculation_strategy' => $position->component_calculation_strategy,
             'total_spot_count' => $position->total_spot_count,
             'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
             'price_list_id' => $position->price_list_id,
@@ -145,6 +147,16 @@ final class DispoOrderSnapshotMapper
                     'line_gross' => (string) $entry->line_gross,
                 ]
             )->all(),
+            'components_snapshot' => $position->components->map(
+                fn (CalculationPositionComponent $component): array => [
+                    'role' => $component->role->value,
+                    'label' => $component->label,
+                    'length_seconds' => $component->length_seconds,
+                    'sort' => $component->sort,
+                    'length_index' => $component->length_index,
+                    'media_gross' => $component->media_gross === null ? null : (string) $component->media_gross,
+                ]
+            )->values()->all(),
             'position_discounts_snapshot' => $position->discounts->map(
                 fn (CalculationPositionDiscount $discount): array => [
                     'type' => $discount->type->value,

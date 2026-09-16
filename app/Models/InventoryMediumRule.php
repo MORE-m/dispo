@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ComponentCalculationStrategy;
 use Database\Factories\InventoryMediumRuleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $default_length_seconds
  * @property bool $is_discountable
  * @property bool $is_ae_eligible
+ * @property ComponentCalculationStrategy $component_calculation_strategy
  */
 class InventoryMediumRule extends Model
 {
@@ -26,6 +28,7 @@ class InventoryMediumRule extends Model
         'surcharge_percent',
         'is_discountable',
         'is_ae_eligible',
+        'component_calculation_strategy',
     ];
 
     /**
@@ -38,6 +41,7 @@ class InventoryMediumRule extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'surcharge_percent' => 'decimal:4',
+            'component_calculation_strategy' => ComponentCalculationStrategy::class,
         ];
     }
 

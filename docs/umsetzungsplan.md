@@ -91,7 +91,7 @@ ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a**
 echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
 Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
 umgesetzt, Export Spot-Verteilung offen. Komponenten (AT-04) und Festpreis
-(`fixed_price` Registry `planned`) folgen; `BL-P4-02` insgesamt offen.
+**02c im offenen PR** (AT-04 Hauptspot+Allonge); Festpreis (`fixed_price` Registry `planned`) folgt; `BL-P4-02` insgesamt offen.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

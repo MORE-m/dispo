@@ -1,27 +1,38 @@
 # Fortschritt V1
 
-Stand: 16. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a` und **PR #57**
-Origin-Retention, Base SHA `0b6c2b7`; **`BL-P4-02b` umgesetzt (PR #58)** –
-Kalenderplaner/AT-02, Wochenmatrix-UX; `BL-P4-01` abgeschlossen)
+Stand: 17. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a`, **PR #57**
+Origin-Retention, **PR #58** `BL-P4-02b`; Base SHA `746303c`). **`BL-P4-02c` (AT-04)
+im offenen PR** – nicht auf `main`. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`** (Average-Abnahme + Pin bei
-Methodenwechsel) auf **`main`**. Teilblock **`BL-P4-02b` umgesetzt (PR #58)**
-(Kalenderplaner/AT-02, Registry `calendar` released/v1, echte Wochenmatrix Mo–So ×
-Preisstunden, Spotanzahl direkt je Datum-/Stundenzelle). Gesamtblock **`BL-P4-02`
-bleibt offen** (Komponenten/AT-04, Festpreis/`fixed_price` nicht begonnen).
+Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`** und **`BL-P4-02b`** auf
+**`main`**. Teilblock **`BL-P4-02c` im offenen PR** (Hauptspot+Allonge / AT-04).
+Gesamtblock **`BL-P4-02` bleibt offen** (Festpreis/`fixed_price` nicht begonnen).
 UX-GATE-D: bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächste Teilblöcke von `BL-P4-02`: Komponenten/Allonge (AT-04), Festpreis-Engine –
+Teilblock `BL-P4-02c` (AT-04 Hauptspot+Allonge) im **offenen PR**. Nächste offene Teile: Festpreis-Engine –
 noch nicht begonnen. **SPT-008 Export** der Spotverteilung bleibt offen.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-**BL-P4-02a** (PR #56 auf `main`): Average-Abnahme-Härtung + Preislisten-Pin bei
-Methodenwechsel ohne Inventar-/Jahrwechsel.
+**BL-P4-02b** (PR #58 auf `main`): Kalenderplaner/AT-02, Registry `calendar` released/v1.
+
+## BL-P4-02c – Spot-Komponenten / Hauptspot + Allonge / AT-04 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Hauptspot + Allonge sichtbar/editierbar/speicherbar | **im offenen PR** |
+| Strategien `shared_total_length` / `individual` | **im offenen PR** |
+| Admin-Strategie je Inventar-/Werbemedium-Regel + Positions-Freeze | **im offenen PR** |
+| Average + Calendar | **im offenen PR** |
+| Dispo-Snapshot `components_snapshot` + Anzeige | **im offenen PR** |
+| Abbinder / Reminder / Tandem / Tridem | **nicht** vollständig (SPT-012/013 offen) |
+| `fixed_price` | **planned** / nicht begonnen |
+| SPT-008 Export | **offen** |
+| `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
 
@@ -37,7 +48,7 @@ Methodenwechsel ohne Inventar-/Jahrwechsel.
 | Registry `spot_classic`/`calendar` | **released / v1** (PR #58) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (PR #58) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (PR #58) |
-| Komponenten / AT-04 / `fixed_price` | **nicht begonnen** (`fixed_price` planned) |
+| Komponenten / AT-04 | **im offenen PR (02c)**; `fixed_price` planned / nicht begonnen |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)

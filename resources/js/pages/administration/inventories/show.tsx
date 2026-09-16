@@ -34,7 +34,22 @@ type Routes = {
     deactivate: string;
     reactivatePreview: string;
     reactivate: string;
+    updateMediumRule: string;
 };
+
+type MediumRuleRow = {
+    id: number;
+    advertising_medium_id: number;
+    advertising_medium_name: string;
+    advertising_medium_code: string | null;
+    is_active: boolean;
+    surcharge_percent: string;
+    default_length_seconds: number | null;
+    component_calculation_strategy: string;
+    component_calculation_strategy_label: string;
+};
+
+type StrategyOption = { value: string; label: string };
 
 type ImpactPreview = {
     fingerprint: string;
@@ -65,9 +80,13 @@ async function csrfHeaders(): Promise<Record<string, string>> {
 export default function InventoryShow({
     inventory,
     routes,
+    mediumRules = [],
+    componentStrategyOptions = [],
 }: {
     inventory: Inventory;
     routes: Routes;
+    mediumRules?: MediumRuleRow[];
+    componentStrategyOptions?: StrategyOption[];
 }) {
     const flash = usePage().props.flash;
     const [name, setName] = useState(inventory.name);
@@ -78,6 +97,7 @@ export default function InventoryShow({
     const [statusLabel, setStatusLabel] = useState(inventory.status_label);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [rules, setRules] = useState(mediumRules);
     const [success, setSuccess] = useState<string | null>(
         flash.success ?? null,
     );
@@ -363,6 +383,153 @@ export default function InventoryShow({
                         Speichern
                     </Button>
                 </form>
+
+                <section
+                    className="space-y-3 rounded-xl border p-4"
+                    data-test="inventory-medium-rules-section"
+                    aria-labelledby="inventory-medium-rules-heading"
+                >
+                    <div>
+                        <h2
+                            id="inventory-medium-rules-heading"
+                            className="text-base font-semibold"
+                        >
+                            Inventar-/Werbemedium-Regeln
+                        </h2>
+                        <p className="text-muted-foreground mt-1 text-sm">
+                            Komponenten-Berechnungsstrategie je Kombination
+                            (Hauptspot/Allonge). Bestehende Kalkulationen
+                            bleiben historisch eingefroren.
+                        </p>
+                    </div>
+                    {rules.length === 0 ? (
+                        <p
+                            className="text-muted-foreground text-sm"
+                            data-test="inventory-medium-rules-empty"
+                        >
+                            Keine Regeln für dieses Inventar.
+                        </p>
+                    ) : (
+                        <ul className="space-y-3">
+                            {rules.map((rule) => (
+                                <li
+                                    key={rule.id}
+                                    className="grid gap-2 rounded-lg border p-3 sm:grid-cols-[1fr_auto] sm:items-end"
+                                    data-test={`inventory-medium-rule-${rule.id}`}
+                                >
+                                    <div>
+                                        <p className="font-medium">
+                                            {rule.advertising_medium_name}
+                                        </p>
+                                        <p className="text-muted-foreground text-xs">
+                                            {rule.advertising_medium_code ??
+                                                'ohne Code'}{' '}
+                                            ·{' '}
+                                            {rule.is_active
+                                                ? 'aktiv'
+                                                : 'inaktiv'}{' '}
+                                            · Aufschlag {rule.surcharge_percent}
+                                            %
+                                        </p>
+                                    </div>
+                                    <FormField
+                                        label="Komponentenstrategie"
+                                        htmlFor={`rule-strategy-${rule.id}`}
+                                    >
+                                        <select
+                                            id={`rule-strategy-${rule.id}`}
+                                            className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                                            value={
+                                                rule.component_calculation_strategy
+                                            }
+                                            data-test={`inventory-medium-rule-strategy-${rule.id}`}
+                                            disabled={busy}
+                                            onChange={async (event) => {
+                                                const next = event.target.value;
+                                                setBusy(true);
+                                                setError(null);
+                                                try {
+                                                    const url =
+                                                        routes.updateMediumRule.replace(
+                                                            'RULE_ID',
+                                                            String(rule.id),
+                                                        );
+                                                    const response =
+                                                        await fetch(url, {
+                                                            method: 'PUT',
+                                                            headers:
+                                                                await csrfHeaders(),
+                                                            body: JSON.stringify(
+                                                                {
+                                                                    component_calculation_strategy:
+                                                                        next,
+                                                                },
+                                                            ),
+                                                        });
+                                                    const payload =
+                                                        await response.json();
+                                                    if (!response.ok) {
+                                                        throw new Error(
+                                                            payload.message ??
+                                                                'Speichern fehlgeschlagen.',
+                                                        );
+                                                    }
+                                                    setRules((current) =>
+                                                        current.map((row) =>
+                                                            row.id === rule.id
+                                                                ? {
+                                                                      ...row,
+                                                                      component_calculation_strategy:
+                                                                          payload
+                                                                              .rule
+                                                                              .component_calculation_strategy,
+                                                                      component_calculation_strategy_label:
+                                                                          payload
+                                                                              .rule
+                                                                              .component_calculation_strategy_label,
+                                                                  }
+                                                                : row,
+                                                        ),
+                                                    );
+                                                } catch (err) {
+                                                    setError(
+                                                        err instanceof Error
+                                                            ? err.message
+                                                            : 'Speichern fehlgeschlagen.',
+                                                    );
+                                                } finally {
+                                                    setBusy(false);
+                                                }
+                                            }}
+                                        >
+                                            {(componentStrategyOptions.length >
+                                            0
+                                                ? componentStrategyOptions
+                                                : [
+                                                      {
+                                                          value: 'shared_total_length',
+                                                          label: 'Gemeinsame Gesamtlänge',
+                                                      },
+                                                      {
+                                                          value: 'individual',
+                                                          label: 'Komponenten einzeln berechnen',
+                                                      },
+                                                  ]
+                                            ).map((option) => (
+                                                <option
+                                                    key={option.value}
+                                                    value={option.value}
+                                                >
+                                                    {option.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </FormField>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </section>
 
                 <div className="flex flex-wrap gap-2">
                     {isActive ? (
