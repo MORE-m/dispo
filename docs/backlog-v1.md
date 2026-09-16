@@ -269,7 +269,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
-- **Ergebnis 02b (Feature-PR offen):** Kalenderplaner stunden-/datumsbezogen (`SPT-005`–`SPT-008`, AT-02); Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot; Pin-Vertrag 02a unverändert kompatibel
+- **Ergebnis 02b (Feature-PR offen):** Kalenderplaner stunden-/datumsbezogen (`SPT-005`–`SPT-007`, AT-02); Jahresvertrag (ein Preisjahr je Position); Monatsnavigation; Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot + Anzeige (`SPT-008` Anzeige, Export offen); Pin-Vertrag 02a unverändert kompatibel
 - **Offen:** Komponenten/Allonge (AT-04), Festpreis-Engine (`fixed_price` Registry weiter `planned`)
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02b: AT-02; kein AT-04-/Festpreis-Claim)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`

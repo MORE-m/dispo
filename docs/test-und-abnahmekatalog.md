@@ -58,15 +58,18 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 ### BL-P4-02b (Kalenderplaner / AT-02)
 
-- Abnahme **AT-02** mit `SPT-005`–`SPT-008`: Datum bestimmt Tagesgruppe; jede Zelle
+- Abnahme **AT-02** mit `SPT-005`–`SPT-007` (+ Anzeige-Teil `SPT-008`): Datum bestimmt Tagesgruppe; jede Zelle
   `(Datum, Stunde)` mit eigener Spotanzahl und Stundenpreis; Mo–Fr/Sa/So korrekt
+- Jahresvertrag: Kalenderdaten müssen zum Preisjahr der gepinnten Liste passen; gemischte Jahre fail-closed
+- Monatsnavigation Referenzwoche ohne Änderung bestehender Zeilen (`SPT-007`)
 - Methode `calendar`: keine parallelen Average-`time_ranges`; leere Planerzeilen fail-closed
 - Registry-Freigabe `spot_classic`/`calendar` **released/v1** (Feature-PR offen); `fixed_price` weiter `planned`
-- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`
+- Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige
+- Dispo-Export der Verteilung (`SPT-008` Export) **nicht** Teil dieses PR
 - Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim
 - Unit: `CalendarCalculationTest`
-- Feature: `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`
-- Vitest: `spot-calendar-planner.test.tsx`
+- Feature: `SpotClassicCalendarCalculationTest`, `SpotClassicCalendarYearContractMysqlTest`, `BlP402bWithOriginRetentionCompatTest`
+- Vitest: `spot-calendar-planner.test.tsx`, `pricing-calendar.test.ts`, `dispo-planner-display.test.ts`
 - isolierte Playwright-Suite `playwright.blp402b.config.ts` (Port **8022**, DB `database/e2e-bl-p4-02b.sqlite`)
 
 ## Mindestabnahme
@@ -74,7 +77,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | ID | Betroffene Anforderungen | Szenario | Erwartung |
 |---|---|---|---|
 | AT-01 | SPT-001–SPT-004, SPT-009, PRI-006 | Mo–Fr, zwei Preiszeiträume mit eigener Spotanzahl | Jeder Zeitraum separat; Summe der Zeitraumssummen; Index und Rundung unverändert |
-| AT-02 | SPT-005–SPT-008 | Planer über Mo–Fr, Samstag und Sonntag | Datum bestimmt Tagesgruppe; jede Zelle nutzt richtigen Stundenpreis |
+| AT-02 | SPT-005–SPT-007 (+ Anzeige SPT-008) | Planer über Mo–Fr, Samstag und Sonntag | Datum bestimmt Tagesgruppe; jede Zelle nutzt richtigen Stundenpreis; ein Preisjahr je Position |
 | AT-03 | SPT-009, SPT-010 | Single-Spots mit 46 s und 100 s | 46 s erzeugt nur Hinweis; beide berechenbar mit Index 95 |
 | AT-04 | SPT-012–SPT-014 | Hauptspot plus Allonge | Komponenten sichtbar; je Regel einzeln oder über Gesamtlänge gerechnet |
 | AT-05 | SWF-001–SWF-005 | Trailer 20 s, +30 %, Zeitfenster | Sekundenpreis × 20 × 1,30; kein Spotlängenindex |

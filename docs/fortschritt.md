@@ -28,9 +28,12 @@ Methodenwechsel ohne Inventar-/Jahrwechsel.
 
 | Teil | Status |
 |------|--------|
-| Stunden-/datumsbezogene Planerzeilen (`SPT-005`–`SPT-008`, Abnahme AT-02) | **umgesetzt** (Feature-PR offen) |
+| Stunden-/datumsbezogene Planerzeilen (`SPT-005`–`SPT-007`, Abnahme AT-02) | **umgesetzt** (Feature-PR offen) |
+| Jahresvertrag Kalender: eine Position = ein Preisjahr; jahresübergreifend getrennte Positionen | **umgesetzt** (Feature-PR offen) |
+| Monatsnavigation Referenzwoche (`SPT-007`) | **umgesetzt** (Feature-PR offen) |
 | Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (Feature-PR offen) |
-| Dispo-Positions-Snapshot `planner_entries_snapshot` | **umgesetzt** (Feature-PR offen) |
+| Dispo-Positions-Snapshot `planner_entries_snapshot` + lesbare Anzeige (`SPT-008` Anzeige) | **umgesetzt** (Feature-PR offen) |
+| Dispo-Export Spot-Verteilung (`SPT-008` Export) | **offen** |
 | Registry `spot_classic`/`calendar` | **released / v1** (Feature-PR offen) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (Feature-PR offen) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (Feature-PR offen) |

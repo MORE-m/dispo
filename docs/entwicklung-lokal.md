@@ -201,9 +201,11 @@ Kein Schema-Migrationsschritt. Resolver-Pfad:
 ## BL-P4-02b – Kalenderplaner
 
 Migration `calculation_position_planner_entries` + `planner_entries_snapshot` auf
-`dispo_order_positions`. Tests: `CalendarCalculationTest`,
-`SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`;
-Vitest `spot-calendar-planner.test.tsx`.
+`dispo_order_positions`. Jahresvertrag im `CatalogResolver` (Kalenderdaten ↔
+Preisjahr der Position). Tests: `CalendarCalculationTest`,
+`SpotClassicCalendarCalculationTest`, `SpotClassicCalendarYearContractMysqlTest`,
+`BlP402bWithOriginRetentionCompatTest`; Vitest `spot-calendar-planner.test.tsx`,
+`pricing-calendar.test.ts`, `dispo-planner-display.test.ts`.
 
 E2E: `npx playwright test -c playwright.blp402b.config.ts` (Port **8022**,
 DB `database/e2e-bl-p4-02b.sqlite`, Seeder `E2ECalendarPlannerSeeder` – niemals

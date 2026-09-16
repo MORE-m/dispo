@@ -274,7 +274,9 @@ Unterobjekte werden typbezogen normalisiert:
 - `CalculationPositionPlannerEntry` (`calculation_position_planner_entries`) für
   Kalenderplaner-Zellen: `date`, `hour` (0–23), `spot_count`, aufgelöste
   `day_group`, persistierter `second_price` und `line_gross`; Unique je Position
-  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR offen),
+  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR offen).
+  Fachlich: alle Datumszeilen einer Position müssen zum Preisjahr der gepinnten
+  Preisliste passen (Jahresvertrag; jahresübergreifend → getrennte Positionen),
 - `CalculationPositionDiscount` und `CalculationOrderDiscount` für gestaffelte
   Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
 - `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
