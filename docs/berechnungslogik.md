@@ -161,8 +161,10 @@ Jahresgrenzen hinweg erfordert **getrennte Positionen** (ggf. mit explizitem
 
 **BL-P4-02c (offener PR):** Hauptspot + Allonge mit Strategien `shared_total_length`
 und `individual` für `average` und `calendar`; Strategie historisch auf der Position
-eingefroren. Abbinder/Reminder/Tandem/Tridem und Festpreis sowie Dispo-**Export**
-der Spot-Verteilung folgen in späteren Teilblöcken.
+eingefroren. Der angezeigte `average_second_price` ist der **spotgewichtete
+Sekundenpreis** der bepreisten Buckets (Zeiträume/Kalenderzellen), unabhängig von
+Komponentenlängen und -indizes. Abbinder/Reminder/Tandem/Tridem und Festpreis sowie
+Dispo-**Export** der Spot-Verteilung folgen in späteren Teilblöcken.
 
 Für jede belegte Zelle aus Datum und Stunde:
 

@@ -59,9 +59,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 
 - Abnahme **AT-04** (Hauptspot + Allonge) im **offenen PR**: beide Strategien,
-  Average + Calendar, Preview=Store, Freeze/Admin-Stabilität, Dispo-Snapshot
+  Average + Calendar, Preview=Store, Freeze/Admin-Stabilität, Dispo-Snapshot;
+  spotgewichteter Durchschnittspreis; Komponenten-Payload absent/`null`/`[]`;
+  Strategie-Mismatch 422; kanonische Labels; Admin-`lock_version`/409
 - Unit-/Feature-/MySQL-/Vitest-/Playwright (`playwright.blp402c.config.ts`, Port 8025)
-- SPT-012/013 nicht als vollständig dokumentieren; `fixed_price` planned; SPT-008 Export offen
+- SPT-012 offen; SPT-013 nur teilweise; SPT-014 Hauptspot/Allonge; SPT-015 unverändert;
+  nicht als vollständig dokumentieren; `fixed_price` planned; SPT-008 Export offen
 
 ### BL-P4-02b (Kalenderplaner / AT-02)
 

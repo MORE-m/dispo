@@ -7,8 +7,10 @@ use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 
 /**
- * GEN-002, SPT-001–SPT-004, SPT-009, SPT-012–SPT-015, SPT-016, CAL-005, COM-001, COM-002, COM-007, COM-008
+ * GEN-002, SPT-001–SPT-004, SPT-009, SPT-014 (Hauptspot/Allonge), SPT-015, SPT-016,
+ * CAL-005, COM-001, COM-002, COM-007, COM-008.
  * BL-P4-02c / AT-04: Spot-Komponenten (Hauptspot + Allonge).
+ * SPT-012 und Tandem/Tridem/Abbinder/Reminder sind nicht vollständig umgesetzt.
  */
 final class CalculationEngine
 {
@@ -195,12 +197,14 @@ final class CalculationEngine
             return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
         }
 
-        $displayAverage = $this->weightedAverageSecondPrice(
-            $mediaGrossInternal,
-            $position->lengthSeconds,
-            $index,
-            $position->surchargePercent,
-            $totalSpots,
+        $displayAverage = $this->spotWeightedAverageSecondPrice(
+            array_map(
+                fn (array $entry): array => [
+                    'spot_count' => (int) $entry['spot_count'],
+                    'second_price' => (string) $entry['second_price'],
+                ],
+                $plannerResults,
+            ),
         );
         if ($displayAverage === null && $entryCount > 0) {
             $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $entryCount, 4));
@@ -357,12 +361,14 @@ final class CalculationEngine
             return $this->emptyPositionResult($position, $orderDiscountPercent, $orderDiscounts);
         }
 
-        $displayAverage = $this->weightedAverageSecondPrice(
-            $mediaGrossInternal,
-            $position->lengthSeconds,
-            $index,
-            $position->surchargePercent,
-            $totalSpots,
+        $displayAverage = $this->spotWeightedAverageSecondPrice(
+            array_map(
+                fn (array $range): array => [
+                    'spot_count' => (int) $range['spot_count'],
+                    'second_price' => (string) $range['average_second_price'],
+                ],
+                $rangeResults,
+            ),
         );
         if ($displayAverage === null && $hourCount > 0) {
             $displayAverage = Decimal::roundPrice(Decimal::div($priceSum, (string) $hourCount, 4));
@@ -402,31 +408,35 @@ final class CalculationEngine
         ]);
     }
 
-    private function weightedAverageSecondPrice(
-        string $mediaGrossInternal,
-        int $lengthSeconds,
-        int $index,
-        string $surchargePercent,
-        int $spotCount,
-    ): ?string {
-        if ($spotCount < 1 || $lengthSeconds < 1) {
+    /**
+     * Spotgewichteter durchschnittlicher Sekundenpreis aus den bepreisten Buckets.
+     * Unabhängig von Komponentenlängen/-indizes und Aufschlag (gemeinsamer Vertrag für
+     * Legacy, shared_total_length und individual).
+     *
+     * @param  list<array{spot_count: int, second_price: string}>  $buckets
+     */
+    private function spotWeightedAverageSecondPrice(array $buckets): ?string
+    {
+        $weighted = '0';
+        $totalSpots = 0;
+
+        foreach ($buckets as $bucket) {
+            $spots = max(0, (int) $bucket['spot_count']);
+            if ($spots < 1) {
+                continue;
+            }
+            $weighted = Decimal::add(
+                $weighted,
+                Decimal::mul((string) $bucket['second_price'], (string) $spots),
+            );
+            $totalSpots += $spots;
+        }
+
+        if ($totalSpots < 1) {
             return null;
         }
 
-        $lengthFactor = Decimal::div((string) $index, '100');
-        $surchargeFactor = Decimal::add('1', Decimal::percentFactor($surchargePercent));
-        $divisor = Decimal::mulMany([
-            (string) $spotCount,
-            (string) $lengthSeconds,
-            $lengthFactor,
-            $surchargeFactor,
-        ]);
-
-        if (Decimal::cmp($divisor, '0') === 0) {
-            return null;
-        }
-
-        return Decimal::roundPrice(Decimal::div($mediaGrossInternal, $divisor, 4));
+        return Decimal::roundPrice(Decimal::div($weighted, (string) $totalSpots, 4));
     }
 
     /**

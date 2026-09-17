@@ -808,6 +808,7 @@ final class CalculationWriter
                 $position,
                 (int) $index,
                 $catalog['spot_method'],
+                $existingPosition,
             );
             $componentStrategy = $this->resolveComponentStrategy(
                 $normalizedComponents,
@@ -857,6 +858,13 @@ final class CalculationWriter
             return null;
         }
 
+        $clientProvided = array_key_exists('component_calculation_strategy', $positionPayload)
+            && $positionPayload['component_calculation_strategy'] !== null
+            && $positionPayload['component_calculation_strategy'] !== '';
+        $clientStrategy = $clientProvided
+            ? $this->componentValidator->parseStrategy($positionPayload['component_calculation_strategy'], $index)
+            : null;
+
         $inventoryChanged = (bool) ($catalog['inventory_changed'] ?? false);
         $mediumChanged = (bool) ($catalog['medium_changed'] ?? false);
         $comboUnchanged = $existing !== null && ! $inventoryChanged && ! $mediumChanged;
@@ -869,11 +877,7 @@ final class CalculationWriter
                 ]);
             }
 
-            if (array_key_exists('component_calculation_strategy', $positionPayload)
-                && $positionPayload['component_calculation_strategy'] !== null
-                && $positionPayload['component_calculation_strategy'] !== ''
-                && (string) $positionPayload['component_calculation_strategy'] !== $frozen->value
-            ) {
+            if ($clientStrategy !== null && $clientStrategy !== $frozen) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.component_calculation_strategy" => 'Die Komponentenstrategie ist historisch eingefroren und darf nicht manipuliert werden.',
                 ]);
@@ -886,6 +890,12 @@ final class CalculationWriter
         $fromRule = $rule?->component_calculation_strategy;
         if (! $fromRule instanceof ComponentCalculationStrategy) {
             $fromRule = ComponentCalculationStrategy::SharedTotalLength;
+        }
+
+        if ($clientStrategy !== null && $clientStrategy !== $fromRule) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_calculation_strategy" => 'Die Komponentenstrategie muss der Inventar-/Werbemedium-Regel entsprechen.',
+            ]);
         }
 
         return $fromRule;
@@ -957,6 +967,16 @@ final class CalculationWriter
 
         $position->component_calculation_strategy = $strategy?->value;
         $position->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function payloadPositionHasComponents(array $position): bool
+    {
+        return isset($position['components'])
+            && is_array($position['components'])
+            && $position['components'] !== [];
     }
 
     /**
@@ -1076,6 +1096,35 @@ final class CalculationWriter
                 ];
             }
 
+            $components = null;
+            if (array_key_exists('components', $position)) {
+                if ($position['components'] === null) {
+                    $components = null;
+                } elseif (! is_array($position['components'])) {
+                    $components = ['__invalid__'];
+                } else {
+                    $components = [];
+                    foreach ($position['components'] as $component) {
+                        if (! is_array($component)) {
+                            $components[] = ['__invalid__' => true];
+
+                            continue;
+                        }
+                        $components[] = [
+                            'role' => (string) ($component['role'] ?? ''),
+                            'label' => (string) ($component['label'] ?? ''),
+                            'length_seconds' => (int) ($component['length_seconds'] ?? 0),
+                            'sort' => (int) ($component['sort'] ?? 0),
+                        ];
+                    }
+                    usort(
+                        $components,
+                        fn (array $a, array $b): int => ($a['sort'] ?? 0) <=> ($b['sort'] ?? 0)
+                            ?: strcmp((string) ($a['role'] ?? ''), (string) ($b['role'] ?? '')),
+                    );
+                }
+            }
+
             $normalized[] = [
                 'id' => isset($position['id']) ? (int) $position['id'] : null,
                 'client_key' => $position['client_key'] ?? null,
@@ -1083,6 +1132,15 @@ final class CalculationWriter
                 'advertising_medium_id' => (int) ($position['advertising_medium_id'] ?? 0),
                 'spot_method' => (string) ($position['spot_method'] ?? 'average'),
                 'length_seconds' => (int) ($position['length_seconds'] ?? 0),
+                'component_calculation_strategy' => array_key_exists('component_calculation_strategy', $position)
+                    ? ($position['component_calculation_strategy'] === null || $position['component_calculation_strategy'] === ''
+                        ? null
+                        : (string) $position['component_calculation_strategy'])
+                    : '__absent__',
+                'components_presence' => array_key_exists('components', $position)
+                    ? ($position['components'] === null ? 'null' : (is_array($position['components']) && $position['components'] === [] ? 'empty' : 'filled'))
+                    : 'absent',
+                'components' => $components,
                 'total_spot_count' => (int) ($position['total_spot_count'] ?? 0),
                 'position_discount_percent' => (string) ($position['position_discount_percent'] ?? '0'),
                 'ae_percent' => (string) ($position['ae_percent'] ?? '0'),
@@ -1335,7 +1393,15 @@ final class CalculationWriter
                 $position['time_ranges'] = $this->scaleTimeRangeSpots($position['time_ranges'] ?? [], 0);
             } else {
                 $position['total_spot_count'] = (int) ($item['total_spot_count'] ?? 0);
-                $position['length_seconds'] = $item['length_seconds'] ?? $position['length_seconds'];
+                // Komponentenpositionen behalten ihre Komponentenlängen; Budget setzt nur Spotzahlen.
+                if (! $this->payloadPositionHasComponents($position)) {
+                    $position['length_seconds'] = $item['length_seconds'] ?? $position['length_seconds'];
+                } else {
+                    $position['length_seconds'] = array_sum(array_map(
+                        static fn (array $component): int => (int) ($component['length_seconds'] ?? 0),
+                        is_array($position['components'] ?? null) ? $position['components'] : [],
+                    ));
+                }
                 $position['time_ranges'] = $this->scaleTimeRangeSpots(
                     $position['time_ranges'] ?? [],
                     (int) $position['total_spot_count'],
@@ -1448,7 +1514,14 @@ final class CalculationWriter
 
         $position['inventory_id'] = (int) $proposed['inventory_id'];
         $position['advertising_medium_id'] = (int) ($proposed['advertising_medium_id'] ?? $position['advertising_medium_id'] ?? 0);
-        $position['length_seconds'] = (int) $proposed['length_seconds'];
+        if ($this->payloadPositionHasComponents($position)) {
+            $position['length_seconds'] = array_sum(array_map(
+                static fn (array $component): int => (int) ($component['length_seconds'] ?? 0),
+                is_array($position['components'] ?? null) ? $position['components'] : [],
+            ));
+        } else {
+            $position['length_seconds'] = (int) $proposed['length_seconds'];
+        }
         $position['total_spot_count'] = (int) $proposed['total_spot_count'];
         $position['spot_method'] = 'average';
         $position['needs_spot_redistribution'] = false;

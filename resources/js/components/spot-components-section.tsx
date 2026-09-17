@@ -141,7 +141,10 @@ export function SpotComponentsSection({
                                 />
                             </FormField>
                             {isIndividual ? (
-                                <p className="text-muted-foreground text-xs">
+                                <p
+                                    className="text-muted-foreground text-xs"
+                                    data-test={`spot-component-result-${component.role}-${positionIndex}`}
+                                >
                                     Index: {result?.length_index ?? '–'}
                                     {result?.media_gross
                                         ? ` · Brutto ${result.media_gross}`

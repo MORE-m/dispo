@@ -5,6 +5,7 @@ namespace Tests\Feature\Calculation;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
+use App\Models\AuditEvent;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
@@ -75,6 +76,8 @@ class SpotClassicComponentsTest extends TestCase
 
         $this->assertSame('1120.00', $preview['media_gross']);
         $this->assertSame('1120.00', (string) $calc->media_gross);
+        $this->assertSame('2.3333', $preview['positions'][0]['average_second_price']);
+        $this->assertSame('2.3333', (string) $calc->positions->first()->average_second_price);
         $this->assertSame(15, $calc->positions->first()->total_spot_count);
         $this->assertCount(2, $calc->positions->first()->plannerEntries);
     }
@@ -263,11 +266,163 @@ class SpotClassicComponentsTest extends TestCase
         $this->actingAs($admin)
             ->putJson(route('administration.inventories.medium-rules.update', [$catalog['hamburg'], $rule]), [
                 'component_calculation_strategy' => 'individual',
+                'lock_version' => $catalog['hamburg']->lock_version,
             ])
             ->assertOk()
-            ->assertJsonPath('rule.component_calculation_strategy', 'individual');
+            ->assertJsonPath('rule.component_calculation_strategy', 'individual')
+            ->assertJsonPath('lock_version', $catalog['hamburg']->lock_version + 1);
 
         $this->assertSame('individual', $rule->fresh()->component_calculation_strategy->value);
+        $this->assertSame($catalog['hamburg']->lock_version + 1, $catalog['hamburg']->fresh()->lock_version);
+    }
+
+    public function test_admin_strategy_update_conflict_keeps_value_and_skips_audit(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $rule = InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('advertising_medium_id', $catalog['medium']->id)
+            ->firstOrFail();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+
+        $beforeCount = AuditEvent::query()->count();
+
+        $this->actingAs($admin)
+            ->putJson(route('administration.inventories.medium-rules.update', [$catalog['hamburg'], $rule]), [
+                'component_calculation_strategy' => 'individual',
+                'lock_version' => $catalog['hamburg']->lock_version + 5,
+            ])
+            ->assertStatus(409);
+
+        $this->assertSame('shared_total_length', $rule->fresh()->component_calculation_strategy->value);
+        $this->assertSame($catalog['hamburg']->lock_version, $catalog['hamburg']->fresh()->lock_version);
+        $this->assertSame($beforeCount, AuditEvent::query()->count());
+    }
+
+    public function test_missing_components_field_keeps_existing_components(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->averagePayload($catalog, ComponentCalculationStrategy::Individual), $user);
+
+        $payload = $writer->payloadFromCalculation($calc);
+        $payload['lock_version'] = $calc->lock_version;
+        $payload['customer_name'] = 'Header geändert';
+        unset($payload['positions'][0]['components']);
+        unset($payload['positions'][0]['component_calculation_strategy']);
+
+        $calc = $writer->update($calc, $payload, $user);
+        $this->assertSame('Header geändert', $calc->customer_name);
+        $this->assertCount(2, $calc->positions->first()->components);
+        $this->assertSame('individual', $calc->positions->first()->component_calculation_strategy);
+    }
+
+    public function test_null_components_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->averagePayload($catalog, ComponentCalculationStrategy::Individual), $user);
+
+        $payload = $writer->payloadFromCalculation($calc);
+        $payload['lock_version'] = $calc->lock_version;
+        $payload['positions'][0]['components'] = null;
+
+        try {
+            $writer->update($calc, $payload, $user);
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.components', $exception->errors());
+        }
+
+        $this->assertCount(2, $calc->fresh()->positions->first()->components);
+    }
+
+    public function test_explicit_empty_components_deactivates(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->averagePayload($catalog, ComponentCalculationStrategy::SharedTotalLength), $user);
+
+        $payload = $writer->payloadFromCalculation($calc);
+        $payload['lock_version'] = $calc->lock_version;
+        $payload['positions'][0]['components'] = [];
+        $payload['positions'][0]['component_calculation_strategy'] = null;
+        $payload['positions'][0]['length_seconds'] = 30;
+
+        $calc = $writer->update($calc, $payload, $user);
+        $this->assertCount(0, $calc->positions->first()->components);
+        $this->assertNull($calc->positions->first()->component_calculation_strategy);
+    }
+
+    public function test_strategy_mismatch_on_create_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $payload = $this->averagePayload($catalog, ComponentCalculationStrategy::Individual);
+
+        try {
+            app(CalculationWriter::class)->create($payload, $user);
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.component_calculation_strategy', $exception->errors());
+        }
+    }
+
+    public function test_missing_strategy_is_derived_from_rule(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+        $payload = $this->averagePayload($catalog, ComponentCalculationStrategy::Individual);
+        unset($payload['positions'][0]['component_calculation_strategy']);
+
+        $calc = app(CalculationWriter::class)->create($payload, $user);
+        $this->assertSame('individual', $calc->positions->first()->component_calculation_strategy);
+    }
+
+    public function test_manipulated_label_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $payload = $this->averagePayload($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $payload['positions'][0]['components'][0]['label'] = 'Allonge';
+
+        try {
+            app(CalculationWriter::class)->create($payload, $user);
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.components.0.label', $exception->errors());
+        }
+    }
+
+    public function test_frozen_strategy_mismatch_is_rejected(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->averagePayload($catalog, ComponentCalculationStrategy::Individual), $user);
+
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $payload = $writer->payloadFromCalculation($calc);
+        $payload['lock_version'] = $calc->lock_version;
+        $payload['positions'][0]['component_calculation_strategy'] = 'shared_total_length';
+
+        try {
+            $writer->update($calc, $payload, $user);
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.component_calculation_strategy', $exception->errors());
+        }
     }
 
     /**

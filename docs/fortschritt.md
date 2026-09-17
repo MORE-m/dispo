@@ -29,6 +29,9 @@ noch nicht begonnen. **SPT-008 Export** der Spotverteilung bleibt offen.
 | Admin-Strategie je Inventar-/Werbemedium-Regel + Positions-Freeze | **im offenen PR** |
 | Average + Calendar | **im offenen PR** |
 | Dispo-Snapshot `components_snapshot` + Anzeige | **im offenen PR** |
+| Spotgewichteter `average_second_price` (kein Längen×Index-Rückrechnen) | **im offenen PR** |
+| Komponenten-Payload absent/`null`/`[]` + Strategie fail-closed | **im offenen PR** |
+| Kanonische Labels + Admin-`lock_version` | **im offenen PR** |
 | Abbinder / Reminder / Tandem / Tridem | **nicht** vollständig (SPT-012/013 offen) |
 | `fixed_price` | **planned** / nicht begonnen |
 | SPT-008 Export | **offen** |

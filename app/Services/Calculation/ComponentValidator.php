@@ -5,6 +5,7 @@ namespace App\Services\Calculation;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\SpotCalculationMethod;
 use App\Enums\SpotComponentRole;
+use App\Models\CalculationPosition;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,18 +21,29 @@ final class ComponentValidator
         array $position,
         int $index,
         SpotCalculationMethod $method,
+        ?CalculationPosition $existing = null,
     ): array {
-        $raw = $position['components'] ?? null;
+        $keyPresent = array_key_exists('components', $position);
+        $raw = $keyPresent ? $position['components'] : null;
 
-        if ($raw === null || $raw === []) {
-            if (array_key_exists('component_calculation_strategy', $position)
-                && $position['component_calculation_strategy'] !== null
-                && $position['component_calculation_strategy'] !== ''
-            ) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
-                ]);
+        if (! $keyPresent) {
+            if ($this->existingHasComponents($existing)) {
+                return $this->fromExisting($existing);
             }
+
+            $this->assertNoOrphanStrategy($position, $index);
+
+            return [];
+        }
+
+        if ($raw === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.components" => 'Komponenten dürfen nicht null sein. Fehlendes Feld behält bestehende Komponenten; [] deaktiviert sie explizit.',
+            ]);
+        }
+
+        if ($raw === []) {
+            $this->assertNoOrphanStrategy($position, $index);
 
             return [];
         }
@@ -79,16 +91,21 @@ final class ComponentValidator
                 "positions.{$index}.components.{$componentIndex}.length_seconds",
             );
 
-            $label = trim((string) ($component['label'] ?? $role->label()));
-            if ($label === '') {
-                $label = $role->label();
+            $canonicalLabel = $role->label();
+            if (array_key_exists('label', $component) && $component['label'] !== null && $component['label'] !== '') {
+                $clientLabel = trim((string) $component['label']);
+                if ($clientLabel !== $canonicalLabel) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.components.{$componentIndex}.label" => "Die Bezeichnung für {$role->value} muss „{$canonicalLabel}“ sein.",
+                    ]);
+                }
             }
 
             $sort = array_key_exists('sort', $component) ? (int) $component['sort'] : $componentIndex;
 
             $normalized[] = [
                 'role' => $role->value,
-                'label' => $label,
+                'label' => $canonicalLabel,
                 'length_seconds' => $lengthSeconds,
                 'sort' => $sort,
             ];
@@ -144,6 +161,53 @@ final class ComponentValidator
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function assertNoOrphanStrategy(array $position, int $index): void
+    {
+        if (array_key_exists('component_calculation_strategy', $position)
+            && $position['component_calculation_strategy'] !== null
+            && $position['component_calculation_strategy'] !== ''
+        ) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
+            ]);
+        }
+    }
+
+    private function existingHasComponents(?CalculationPosition $existing): bool
+    {
+        if ($existing === null) {
+            return false;
+        }
+
+        $existing->loadMissing('components');
+
+        return $existing->components->isNotEmpty();
+    }
+
+    /**
+     * @return list<array{role: string, label: string, length_seconds: int, sort: int}>
+     */
+    private function fromExisting(CalculationPosition $existing): array
+    {
+        $existing->loadMissing('components');
+
+        $rows = [];
+        foreach ($existing->components->sortBy('sort')->values() as $component) {
+            $role = $component->role;
+            $rows[] = [
+                'role' => $role->value,
+                'label' => $role->label(),
+                'length_seconds' => (int) $component->length_seconds,
+                'sort' => (int) $component->sort,
+            ];
+        }
+
+        return $rows;
     }
 
     private function positiveIntegerSeconds(mixed $length, string $errorKey): int

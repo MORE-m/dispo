@@ -4,9 +4,9 @@ const monday = '2026-09-14';
 const hour8 = 8;
 const hour14 = 14;
 
-async function login(page: Page) {
+async function login(page: Page, email = 'sales@example.com') {
     await page.goto('/login');
-    await page.locator('#email').fill('sales@example.com');
+    await page.locator('#email').fill(email);
     await page.locator('#password').fill('password');
     await page.locator('[data-test="login-button"]').click();
     await page.waitForFunction(
@@ -14,6 +14,12 @@ async function login(page: Page) {
         undefined,
         { timeout: 30_000 },
     );
+}
+
+async function logout(page: Page) {
+    await page.context().clearCookies();
+    await page.goto('/login');
+    await expect(page.locator('#email')).toBeVisible({ timeout: 30_000 });
 }
 
 async function openNewCalculationStepTwo(page: Page) {
@@ -61,8 +67,23 @@ async function ensureWeekContainsDate(page: Page, date: string) {
     await expect(header).toBeVisible();
 }
 
+async function setRuleStrategyIndividual(page: Page) {
+    await login(page, 'admin@example.com');
+    await page.goto('/administration/inventare');
+    await page.getByRole('link', { name: 'Radio Hamburg' }).click();
+    await expect(page).toHaveURL(/\/administration\/inventare\/\d+$/);
+
+    const strategySelect = page.locator(
+        '[data-test^="inventory-medium-rule-strategy-"]',
+    );
+    await expect(strategySelect.first()).toBeVisible();
+    await strategySelect.first().selectOption('individual');
+    await expect(strategySelect.first()).toHaveValue('individual');
+    await logout(page);
+}
+
 test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
-    test('Average: Hauptspot + Allonge speichern und neu laden', async ({
+    test('Average shared: Hauptspot + Allonge speichern und neu laden', async ({
         page,
     }) => {
         await login(page);
@@ -83,7 +104,6 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
             page.locator('[data-test="position-length-seconds-0"]'),
         ).toHaveCount(0);
 
-        // Zeitraum mit 10 Spots anlegen
         if ((await page.locator('[data-test="range-spots-0-0"]').count()) === 0) {
             await page.locator('[data-test="range-add-0"]').click();
         }
@@ -116,7 +136,7 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
         ).toHaveValue('10');
     });
 
-    test('Calendar: zwei Zellen, Komponenten, Reload und Dispo', async ({
+    test('Calendar shared: zwei Zellen, Reload und Dispo', async ({
         page,
     }) => {
         test.setTimeout(120_000);
@@ -178,4 +198,66 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
             page.locator('[data-test="dispo-order-position-components-0"]'),
         ).toContainText('Allonge');
     });
+
+    test('Average individual: Admin-Strategie, Einzelbruttos, Reload', async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        await setRuleStrategyIndividual(page);
+        await login(page, 'sales@example.com');
+        await openNewCalculationStepTwo(page);
+
+        await page
+            .locator('[data-test="calculation-method-radio-0-average"]')
+            .check();
+        await activateComponentsWithAllonge(page);
+
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Komponenten einzeln berechnen');
+
+        if ((await page.locator('[data-test="range-spots-0-0"]').count()) === 0) {
+            await page.locator('[data-test="range-add-0"]').click();
+        }
+        await page.locator('[data-test="range-start-0-0"]').selectOption('8');
+        await page.locator('[data-test="range-end-0-0"]').selectOption('9');
+        await page.locator('[data-test="range-day-0-0"]').selectOption('mo_fr');
+        await page.locator('[data-test="range-spots-0-0"]').fill('10');
+        await waitForCalculationPreview(page);
+
+        await expect(
+            page.locator('[data-test="spot-component-result-main_spot-0"]'),
+        ).toContainText('Index: 105');
+        await expect(
+            page.locator('[data-test="spot-component-result-main_spot-0"]'),
+        ).toContainText('420.00');
+        await expect(
+            page.locator('[data-test="spot-component-result-allonge-0"]'),
+        ).toContainText('Index: 110');
+        await expect(
+            page.locator('[data-test="spot-component-result-allonge-0"]'),
+        ).toContainText('220.00');
+        await expect(
+            page.locator('[data-test="spot-components-position-gross-0"]'),
+        ).toContainText('640.00');
+
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Komponenten einzeln berechnen');
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-allonge-0"]'),
+        ).toHaveValue('10');
+    });
+
 });

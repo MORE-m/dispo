@@ -119,8 +119,41 @@ class SpotComponentCalculationTest extends TestCase
         // Total = 1120
         $this->assertSame('1120.00', $result->mediaGross);
         $this->assertSame(15, $result->spotCount);
+        $this->assertSame('2.3333', $result->averageSecondPrice);
         $this->assertSame('640.00', $result->plannerEntries[0]['line_gross']);
         $this->assertSame('480.00', $result->plannerEntries[1]['line_gross']);
+    }
+
+    public function test_calendar_shared_average_second_price_is_spot_weighted(): void
+    {
+        $position = new PositionInput(
+            inventoryId: 1,
+            inventoryName: 'Test',
+            positionKey: 'k',
+            lengthSeconds: 30,
+            surchargePercent: '0',
+            positionDiscountPercent: '0',
+            aePercent: '0',
+            isDiscountable: true,
+            isAeEligible: false,
+            totalSpotCount: 15,
+            spotMethod: SpotCalculationMethod::Calendar,
+            rows: [],
+            plannerEntries: [
+                new PlannerEntryInput('2026-09-14', 8, 10, DayGroup::MoFr, '2.0000'),
+                new PlannerEntryInput('2026-09-14', 14, 5, DayGroup::MoFr, '3.0000'),
+            ],
+            components: [
+                new ComponentInput(SpotComponentRole::MainSpot, 'Hauptspot', 20, 0),
+                new ComponentInput(SpotComponentRole::Allonge, 'Allonge', 10, 1),
+            ],
+            componentCalculationStrategy: ComponentCalculationStrategy::SharedTotalLength,
+        );
+
+        $result = (new CalculationEngine)->calculatePosition($position, '0');
+
+        $this->assertSame('1050.00', $result->mediaGross);
+        $this->assertSame('2.3333', $result->averageSecondPrice);
     }
 
     public function test_legacy_without_components_unchanged(): void

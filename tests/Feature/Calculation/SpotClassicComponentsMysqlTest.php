@@ -147,8 +147,72 @@ class SpotClassicComponentsMysqlTest extends TestCase
         // 10×2×30×1 + 5×3×30×1 = 600 + 450 = 1050
         $this->assertSame('1050.00', $preview['media_gross']);
         $this->assertSame('1050.00', (string) $calc->media_gross);
+        $this->assertSame('2.3333', $preview['positions'][0]['average_second_price']);
         $this->assertSame('shared_total_length', $calc->positions->first()->component_calculation_strategy);
         $this->assertCount(2, $calc->positions->first()->components);
+    }
+
+    public function test_mysql_calendar_individual_components_and_average_price(): void
+    {
+        $this->requireMysql('BL-P4-02c calendar individual');
+
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->update(['component_calculation_strategy' => ComponentCalculationStrategy::Individual->value]);
+
+        $list = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', 'active')
+            ->firstOrFail();
+        PriceListItem::query()->where('price_list_id', $list->id)->where('hour', 8)->update(['second_price' => '2.0000']);
+        PriceListItem::query()->where('price_list_id', $list->id)->where('hour', 14)->update(['second_price' => '3.0000']);
+
+        $year = (int) $list->year;
+        $payload = [
+            'planning_mode' => 'manual',
+            'customer_name' => 'MySQL Calendar Individual',
+            'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
+                ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'],
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
+                    ->resolveLivePositionSchema((int) $catalog['medium']->id)['schema_fingerprint'],
+                'spot_method' => 'calendar',
+                'length_seconds' => 30,
+                'component_calculation_strategy' => 'individual',
+                'components' => [
+                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
+                    ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
+                ],
+                'total_spot_count' => 15,
+                'planner_entries' => [
+                    ['date' => "{$year}-09-14", 'hour' => 8, 'spot_count' => 10],
+                    ['date' => "{$year}-09-14", 'hour' => 14, 'spot_count' => 5],
+                ],
+            ]],
+        ];
+
+        $writer = app(CalculationWriter::class);
+        $preview = $writer->preview($payload, $user)->toArray();
+        $calc = $writer->create($payload, $user);
+
+        $this->assertSame('1120.00', $preview['media_gross']);
+        $this->assertSame('1120.00', (string) $calc->media_gross);
+        $this->assertSame('2.3333', $preview['positions'][0]['average_second_price']);
+        $this->assertSame('2.3333', (string) $calc->positions->first()->average_second_price);
+        $this->assertSame('individual', $calc->positions->first()->component_calculation_strategy);
+        $this->assertCount(2, $calc->positions->first()->components);
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calc, [$calc->positions->first()->id], $user)
+            ->order
+            ->load('positions');
+        $this->assertCount(2, $order->positions->first()->components_snapshot);
+        $this->assertSame('individual', $order->positions->first()->component_calculation_strategy);
     }
 
     private function requireMysql(string $label): void

@@ -463,15 +463,36 @@ export default function InventoryShow({
                                                                 {
                                                                     component_calculation_strategy:
                                                                         next,
+                                                                    lock_version:
+                                                                        lockVersion,
                                                                 },
                                                             ),
                                                         });
                                                     const payload =
                                                         await response.json();
+                                                    if (
+                                                        response.status === 409
+                                                    ) {
+                                                        setError(
+                                                            payload.message ||
+                                                                'Parallel geändert. Bitte Seite neu laden.',
+                                                        );
+                                                        return;
+                                                    }
                                                     if (!response.ok) {
                                                         throw new Error(
                                                             payload.message ??
+                                                                payload.errors
+                                                                    ?.component_calculation_strategy?.[0] ??
                                                                 'Speichern fehlgeschlagen.',
+                                                        );
+                                                    }
+                                                    if (
+                                                        payload.lock_version !=
+                                                        null
+                                                    ) {
+                                                        setLockVersion(
+                                                            payload.lock_version,
                                                         );
                                                     }
                                                     setRules((current) =>
