@@ -293,18 +293,40 @@ bleiben unverändert; die Berechnungsbasis ist der AE-fähige Restbetrag.
 Bestehende Kalkulationen mit explizitem AE-Wert größer 0 behalten ihre
 bisherige Wirkung. Neue Kalkulationen starten mit deaktiviertem AE.
 
-## Festpreis
+## Festpreis (Preisabschluss, BL-P4-02d)
 
-Der Festpreis ist der vereinbarte rabattierte N/N-Endpreis der Medienleistung,
-nicht ein neuer Listenpreis.
+**Zweiteilung:** Die **Berechnungsbasis** bleibt `average` oder `calendar`
+(Mediabrutto, Spotlogik, Pin-Vertrag wie 02a–02c). Der **Preisabschluss**
+(`pricing_settlement_mode`) steuert separat, ob der N/N-Endbetrag aus der
+Rabatt-/AE-Pipeline kommt (`normal`) oder vereinbart wird (`fixed_price`).
+
+Der Registry-Eintrag **`fixed_price`** als eigene Kalkulationsmethode bleibt
+**`planned`** und ist **nicht** der live wählbare Weg in Spot Classic v1.
+Live: Basis `average`|`calendar` + `pricing_settlement_mode=fixed_price`.
+
+Der Festpreis ist der vereinbarte **N/N-Endbetrag** der Medienleistung, kein
+neuer Listenpreis. Positions- und Auftragsrabatte sowie AE wirken im Modus
+`fixed_price` **nicht forward** auf diesen Betrag (Mediabrutto bleibt
+referenzbasiert aus der gewählten Basis).
 
 ```text
-Effektiver Nettofaktor = Festpreis ÷ zugehöriges Mediabrutto
-Effektiver Rabatt = 1 - effektiver Nettofaktor
+Mediabrutto     = Ergebnis aus average|calendar (unverändert zur Basis)
+nn_invest       = fixed_price_nn (bei fixed_price)
+Payfaktor (%)   = nn_invest ÷ Mediabrutto × 100
+Positionsabschlag = Mediabrutto − nn_invest (Anzeige; kein Forward-Rabatt)
+Effektiver Nettofaktor = nn_invest ÷ Mediabrutto
+Effektiver Rabatt      = 1 − effektiver Nettofaktor
 ```
+
+Bei `nn_invest = Mediabrutto`: Payfaktor 100 %, effektiver Rabatt 0.
+Wechsel zurück zu `normal`: `fixed_price_nn` entfällt; die übliche
+Rabatt-/AE-Pipeline gilt wieder.
 
 Nicht rabattierbare Zusatzzeilen bleiben separat. Bei Mediabrutto null ist die
 Rückrechnung nicht zulässig und erfordert kaufmännische Prüfung.
+
+**Abgrenzung Phase 7:** SWF-/Online-Audio-Festpreis und Registry-Freigabe
+`fixed_price` als Methodenwechsel sind **nicht** Teil von BL-P4-02d.
 
 ## Payfaktor
 

@@ -56,6 +56,22 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
 
+### BL-P4-02d (Preisabschluss Festpreis / N/N)
+
+- Positionsfeld **`pricing_settlement_mode`**: `normal` (Rabatt-/AE-Pipeline) oder
+  `fixed_price` (vereinbarter N/N-Endbetrag); Basis bleibt **`average`** oder **`calendar`**
+- Registry-Methode **`fixed_price`** weiter **`planned`** – **nicht** der live wählbare Weg
+- Festpreis: Mediabrutto aus gewählter Basis; kein Forward-Rabatt/AE auf den Fest-N/N;
+  effektiver Payfaktor und Positionsabschlag rückwärts; `fixed_price_nn` = `nn_invest`
+- Wechsel `fixed_price` → `normal`: `fixed_price_nn` wird geleert; Rabattpipeline greift wieder
+- Pin-Vertrag **02a** bei Abschluss-/Basiswechsel unverändert
+- Budget-Vorschlag übernehmen: Abschluss zurück auf **`normal`**
+- Dispo-Snapshot/-Anzeige: `pricing_settlement_mode`, `fixed_price_nn`
+- Feature: `SpotClassicFixedPriceSettlementTest`; MySQL: `SpotClassicFixedPriceSettlementMysqlTest`
+- Vitest: `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`
+- E2E: `playwright.blp402d.config.ts` (Port **8026**, Seeder `E2ESpotComponentsSeeder`)
+- `BL-P4-02` insgesamt weiter offen (SPT-008 Export, SPT-012, …)
+
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 
 - Abnahme **AT-04** (Hauptspot + Allonge) **umgesetzt und manuell abgenommen** (PR #59):

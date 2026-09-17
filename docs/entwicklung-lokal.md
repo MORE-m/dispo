@@ -204,6 +204,22 @@ Isolierte Playwright-Suite: `npm run test:e2e:blp402c` (Port **8025**, DB
 `database/e2e-bl-p4-02c.sqlite`, Seeder `E2ESpotComponentsSeeder`). Keine Dev-DB
 `dispo` migrieren; Worktree-Migrationen nur in Pest/Feature-Tests.
 
+## BL-P4-02d – Preisabschluss Festpreis
+
+Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`
+und `dispo_order_positions`. Live-Abschluss **`fixed_price`** nur über
+`pricing_settlement_mode` (Basis weiter `average`|`calendar`); Registry-Methode
+**`fixed_price`** bleibt **`planned`**.
+
+Tests: `SpotClassicFixedPriceSettlementTest` (+ MySQL); Vitest
+`resources/js/lib/pricing-settlement.test.ts`,
+`resources/js/components/pricing-settlement-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp402d` bzw.
+`npx playwright test -c playwright.blp402d.config.ts` (Port **8026**, DB
+`database/e2e-bl-p4-02d.sqlite`, Seeder `E2ESpotComponentsSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P4-02b – Kalenderplaner
 
 Migration `calculation_position_planner_entries` + `planner_entries_snapshot` auf

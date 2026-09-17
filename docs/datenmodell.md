@@ -262,6 +262,9 @@ geschrieben (`BUD-008`).
 - Zeitraum/offen,
 - Mengen und tatsächliche Länge (Spot Classic: frei editierbares Sekundenfeld je Position, `SPT-015`),
 - Preis-, Rabatt-, AE- und Payfaktorwerte,
+- **Preisabschluss (BL-P4-02d):** `pricing_settlement_mode` (`normal`|`fixed_price`,
+  Default `normal`); optional `fixed_price_nn` (N/N-Festbetrag, nur bei `fixed_price`;
+  bei `normal` muss NULL sein),
 - Berechnungserklärung,
 - Snapshotdaten.
 
@@ -309,7 +312,9 @@ ist unzulässig.
 `dispo_order_approval_requests`. Positionsdaten werden beim Anlegen als Snapshot
 in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
 **BL-P4-02b** zusätzlich `planner_entries_snapshot` JSON für Kalenderplaner-Zellen,
-Feature-PR **#58** offen). Freigabeanforderungen sind append-only
+PR **#58**). Ab **BL-P4-02d** zusätzlich `pricing_settlement_mode` und
+`fixed_price_nn` im Positions-Snapshot (Parität zu `CalculationPosition`).
+Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
 Snapshot. Kalkulationen speichern zusätzlich `special_approval_reasons` und

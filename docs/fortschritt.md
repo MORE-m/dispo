@@ -1,25 +1,46 @@
 # Fortschritt V1
 
-Stand: 17. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a`, **PR #57**
-Origin-Retention, **PR #58** `BL-P4-02b`, **PR #59** `BL-P4-02c`). **`BL-P4-02c` (AT-04)
-umgesetzt und manuell abgenommen**. `BL-P4-01` abgeschlossen.
+Stand: 17. September 2026 (`main`-Basis inkl. **PR #56**–**#59**; **`BL-P4-02d`**
+Preisabschluss Festpreis **umgesetzt**, noch **nicht gemergt** / offener PR).
+**`BL-P4-02c` (AT-04) manuell abgenommen**. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`**, **`BL-P4-02b`** und
-**`BL-P4-02c`** auf **`main`**. Gesamtblock **`BL-P4-02` bleibt offen**
-(Festpreis/`fixed_price` nicht begonnen). UX-GATE-D: bisherige Teilfreigaben
-unverändert; Kombinationstabellen-Admin gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`–`02c`** auf **`main`**.
+**`BL-P4-02d`** im Feature-Worktree umgesetzt (Preisabschluss `normal`|`fixed_price`).
+Gesamtblock **`BL-P4-02` bleibt offen** (SPT-008 Export, SPT-012, …). UX-GATE-D:
+bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächste offene Teile von `BL-P4-02`: Festpreis-Engine – noch nicht begonnen.
-**SPT-008 Export** der Spotverteilung bleibt offen. SPT-012 offen; SPT-013 nur teilweise.
+Offener PR / Merge **`BL-P4-02d`**. Danach weiter **`BL-P4-02`**: SPT-008 Export,
+SPT-012, Abbinder/Reminder/Tandem/Tridem. Registry-Methode **`fixed_price`** bleibt
+**`planned`** (kein separater Live-Rechenweg).
 
 ## Zuletzt abgeschlossene Aufgabe
 
-**BL-P4-02c** (PR #59 auf `main`): Spot-Komponenten / AT-04 Hauptspot+Allonge,
-manuell abgenommen; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten.
+**BL-P4-02d** (Worktree, noch nicht gemergt): Preisabschluss Festpreis (N/N) für
+Spot Classic Average/Calendar; Pin-Vertrag; Dispo-Snapshot; isolierte E2E Port **8026**.
+
+## BL-P4-02d – Preisabschluss Festpreis / N/N (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Positionsfeld `pricing_settlement_mode` `normal`\|`fixed_price` | **umgesetzt** (Worktree, offener PR) |
+| Berechnungsbasis bleibt `average`\|`calendar` (kein Registry-Wechsel auf `fixed_price`) | **umgesetzt** |
+| Registry `calculation_methods.fixed_price` | weiter **`planned`** / **nicht released** |
+| N/N-Festpreis; Mediabrutto aus gewählter Basis | **umgesetzt** |
+| Keine Forward-Rabatte/AE auf Festpreis-N/N; Payfaktor/Gesamtabschlag rückwärts | **umgesetzt** |
+| Pin-Vertrag 02a bei Abschluss-/Basiswechsel | **umgesetzt** |
+| Dispo-Snapshot `pricing_settlement_mode` + `fixed_price_nn` | **umgesetzt** |
+| Budget-Übernahme setzt Abschluss zurück auf `normal` | **umgesetzt** |
+| E2E isoliert: `playwright.blp402d.config.ts` (Port **8026**) | **umgesetzt** |
+| SPT-008 Export, SPT-012, Abbinder/Reminder/Tandem/Tridem | **offen** |
+| `BL-P4-02` insgesamt | **offen** |
+
+**Hinweis:** Live wählbar ist **`pricing_settlement_mode=fixed_price`** zusammen mit
+Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** ist
+**nicht** der produktive Methodenwechsel (Phase 7 / andere Profile bleiben getrennt).
 
 ## BL-P4-02c – Spot-Komponenten / Hauptspot + Allonge / AT-04 (September 2026)
 
@@ -37,7 +58,7 @@ manuell abgenommen; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strate
 | Manuelle UX-Abnahme AT-04 | **erfolgreich** |
 | Abbinder / Reminder / Tandem / Tridem | **nicht** vollständig (SPT-012 offen; SPT-013 teilweise) |
 | SPT-014 Hauptspot/Allonge | **umgesetzt** (PR #59) |
-| `fixed_price` | **planned** / nicht begonnen |
+| Festpreis-Abschluss (`BL-P4-02d`) | **umgesetzt** (Worktree; Registry `fixed_price` weiter planned) |
 | SPT-008 Export | **offen** |
 | `BL-P4-02` insgesamt | **offen** |
 
@@ -55,7 +76,7 @@ manuell abgenommen; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strate
 | Registry `spot_classic`/`calendar` | **released / v1** (PR #58) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (PR #58) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (PR #58) |
-| Komponenten / AT-04 | **umgesetzt** (PR #59); `fixed_price` planned / nicht begonnen |
+| Komponenten / AT-04 | **umgesetzt** (PR #59); Festpreis-Abschluss siehe **BL-P4-02d** |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
