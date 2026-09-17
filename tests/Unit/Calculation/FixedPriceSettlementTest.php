@@ -263,9 +263,6 @@ class FixedPriceSettlementTest extends TestCase
         $this->assertNull($result->effectiveDiscountBeforeAePercent);
     }
 
-    /**
-     * @return PositionInput
-     */
     private function fixedPosition(string $aePercent): PositionInput
     {
         return new PositionInput(
