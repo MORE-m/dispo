@@ -15,6 +15,7 @@ type Props = {
     state: CalculationMethodDraftState;
     disabled?: boolean;
     error?: string;
+    legendLabel?: string;
     onSelectLiveKey: (key: string) => void;
     onRestoreHistorical?: () => void;
 };
@@ -28,6 +29,7 @@ export function CalculationMethodSelector({
     state,
     disabled = false,
     error,
+    legendLabel = 'Berechnungsmethode',
     onSelectLiveKey,
     onRestoreHistorical,
 }: Props) {
@@ -97,12 +99,12 @@ export function CalculationMethodSelector({
                     className="space-y-1.5"
                     data-test={`calculation-method-single-${positionIndex}`}
                 >
-                    <p className="text-sm font-medium">Berechnungsmethode</p>
+                    <p className="text-sm font-medium">{legendLabel}</p>
                     <p
                         className="text-foreground text-sm font-semibold"
                         data-test={`calculation-method-single-label-${positionIndex}`}
                     >
-                        Berechnungsmethode: {methods[0].name}
+                        {legendLabel}: {methods[0].name}
                     </p>
                     {methods[0].help_text ? (
                         <p className="text-muted-foreground text-sm">
@@ -120,7 +122,7 @@ export function CalculationMethodSelector({
                     <legend className="text-sm font-medium">
                         {historicalActive || hasHistoricalBaseline
                             ? 'Auf aktuelle Berechnungsmethode wechseln'
-                            : 'Berechnungsmethode'}
+                            : legendLabel}
                     </legend>
                     <div className="grid gap-3 sm:grid-cols-2">
                         {methods.map((method) => {
