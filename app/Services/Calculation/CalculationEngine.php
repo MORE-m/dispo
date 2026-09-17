@@ -4,12 +4,14 @@ namespace App\Services\Calculation;
 
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DiscountType;
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 
 /**
  * GEN-002, SPT-001–SPT-004, SPT-009, SPT-014 (Hauptspot/Allonge), SPT-015, SPT-016,
  * CAL-005, COM-001, COM-002, COM-007, COM-008.
  * BL-P4-02c / AT-04: Spot-Komponenten (Hauptspot + Allonge).
+ * BL-P4-02d: Preisabschluss normal|fixed_price (Festpreis-N/N unabhängig von spot_method).
  * SPT-012 und Tandem/Tridem/Abbinder/Reminder sind nicht vollständig umgesetzt.
  */
 final class CalculationEngine
@@ -709,6 +711,54 @@ final class CalculationEngine
         array $plannerEntries = [],
         array $components = [],
     ): PositionResult {
+        $mediaGrossRounded = Decimal::roundMoney($mediaGrossInternal);
+
+        if ($position->pricingSettlementMode === PricingSettlementMode::FixedPrice) {
+            if (Decimal::cmp($mediaGrossInternal, '0') === 0) {
+                throw new \InvalidArgumentException(
+                    'Festpreis erfordert ein berechenbares Mediabrutto größer 0.',
+                );
+            }
+
+            $fixedNnRaw = $position->fixedPriceNn ?? '0';
+            if (Decimal::cmp($fixedNnRaw, '0') <= 0) {
+                throw new \InvalidArgumentException(
+                    'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                );
+            }
+
+            $nnInvest = Decimal::roundMoney($fixedNnRaw);
+            $factors = $this->deriveSettlementFactors($mediaGrossInternal, $nnInvest);
+
+            return new PositionResult(
+                mediaGross: $mediaGrossRounded,
+                positionDiscountAmount: '0.00',
+                afterPositionDiscount: $mediaGrossRounded,
+                orderDiscountAmount: '0.00',
+                afterOrderDiscount: $mediaGrossRounded,
+                aeAmount: '0.00',
+                nnInvest: $nnInvest,
+                effectiveDiscountPercent: $factors['effectiveDiscountPercent'],
+                spotCount: $spotCount,
+                lengthIndex: $index,
+                rows: $rowResults,
+                averageSecondPrice: Decimal::roundPrice($averageSecondPrice),
+                timeRanges: $timeRanges,
+                plannerEntries: $plannerEntries,
+                positionDiscounts: [],
+                orderDiscounts: [],
+                needsSpotRedistribution: $position->needsSpotRedistribution,
+                legacyTotalSpotCount: $position->needsSpotRedistribution ? $position->totalSpotCount : null,
+                components: $components,
+                componentCalculationStrategy: $position->hasComponents()
+                    ? ($position->componentCalculationStrategy ?? ComponentCalculationStrategy::SharedTotalLength)
+                    : null,
+                pricingSettlementMode: PricingSettlementMode::FixedPrice,
+                fixedPriceNn: $nnInvest,
+                effectivePayFactorPercent: $factors['effectivePayFactorPercent'],
+            );
+        }
+
         $positionDiscounts = $position->isDiscountable
             ? $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent)
             : [];
@@ -738,6 +788,13 @@ final class CalculationEngine
             );
         }
 
+        $effectivePayFactor = null;
+        if (Decimal::cmp($mediaGrossInternal, '0') !== 0) {
+            $effectivePayFactor = Decimal::roundPrice(
+                Decimal::mul(Decimal::div($nnInternal, $mediaGrossInternal), '100'),
+            );
+        }
+
         return new PositionResult(
             mediaGross: Decimal::roundMoney($mediaGrossInternal),
             positionDiscountAmount: Decimal::roundMoney(Decimal::sub($mediaGrossInternal, $afterPosition)),
@@ -761,6 +818,9 @@ final class CalculationEngine
             componentCalculationStrategy: $position->hasComponents()
                 ? ($position->componentCalculationStrategy ?? ComponentCalculationStrategy::SharedTotalLength)
                 : null,
+            pricingSettlementMode: PricingSettlementMode::Normal,
+            fixedPriceNn: null,
+            effectivePayFactorPercent: $effectivePayFactor,
         );
     }
 
@@ -770,6 +830,16 @@ final class CalculationEngine
     private function emptyPositionResult(PositionInput $position, string $orderDiscountPercent, array $orderDiscounts): PositionResult
     {
         $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+
+        if ($position->pricingSettlementMode === PricingSettlementMode::FixedPrice
+            && $position->fixedPriceNn !== null
+            && $position->fixedPriceNn !== ''
+            && Decimal::cmp($position->fixedPriceNn, '0') > 0
+        ) {
+            throw new \InvalidArgumentException(
+                'Festpreis erfordert ein berechenbares Mediabrutto größer 0.',
+            );
+        }
 
         return $this->finalizePosition(
             $position,
@@ -781,6 +851,24 @@ final class CalculationEngine
             [],
             '0',
         );
+    }
+
+    /**
+     * @return array{effectiveDiscountPercent: string, effectivePayFactorPercent: string}
+     */
+    private function deriveSettlementFactors(string $mediaGrossInternal, string $nnInternal): array
+    {
+        return [
+            'effectiveDiscountPercent' => Decimal::roundPrice(
+                Decimal::mul(
+                    Decimal::sub('1', Decimal::div($nnInternal, $mediaGrossInternal)),
+                    '100',
+                ),
+            ),
+            'effectivePayFactorPercent' => Decimal::roundPrice(
+                Decimal::mul(Decimal::div($nnInternal, $mediaGrossInternal), '100'),
+            ),
+        ];
     }
 
     /**

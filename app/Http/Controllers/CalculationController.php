@@ -630,6 +630,8 @@ class CalculationController extends Controller
                             'custom_label' => $discount->custom_label,
                             'percent' => (string) $discount->percent,
                         ])->all(),
+                        'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+                        'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
                         'dynamic_field_values' => $snapshot === null
                             ? ['period_open' => true]
                             : $this->dynamicFields->positionValuesForPayload($position, $snapshot),

@@ -10,6 +10,7 @@ use App\Enums\DiscountType;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\PlanningMode;
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\Calculation;
@@ -269,6 +270,8 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.position_discounts.*.type' => ['nullable', Rule::enum(DiscountType::class)],
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', Rule::enum(PricingSettlementMode::class)],
+            'positions.*.fixed_price_nn' => ['sometimes', 'nullable'],
             'positions.*.dynamic_field_values' => ['sometimes', 'array'],
             'positions.*.dynamic_field_values.period_open' => ['sometimes', 'boolean'],
             'positions.*.dynamic_field_values.position_flight_period' => ['nullable', 'array'],
@@ -479,8 +482,77 @@ class CalculationPayloadRequest extends FormRequest
                         }
                     }
                 }
+
+                $this->validatePricingSettlement($validator, $position, (int) $index);
             }
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function validatePricingSettlement(Validator $validator, array $position, int $index): void
+    {
+        $modeRaw = $position['pricing_settlement_mode'] ?? 'normal';
+        $mode = PricingSettlementMode::tryFrom(is_scalar($modeRaw) ? (string) $modeRaw : 'normal');
+        if ($mode === null) {
+            $validator->errors()->add(
+                "positions.{$index}.pricing_settlement_mode",
+                'Der Preisabschluss ist ungültig.',
+            );
+
+            return;
+        }
+
+        $hasFixedNn = array_key_exists('fixed_price_nn', $position)
+            && $position['fixed_price_nn'] !== null
+            && $position['fixed_price_nn'] !== '';
+
+        if ($mode === PricingSettlementMode::FixedPrice) {
+            if (! $hasFixedNn) {
+                $validator->errors()->add(
+                    "positions.{$index}.fixed_price_nn",
+                    'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                );
+
+                return;
+            }
+
+            $normalized = str_replace(',', '.', trim((string) $position['fixed_price_nn']));
+            if (preg_match('/^(-?)(\d+)(?:\.(\d+))?$/', $normalized, $matches) !== 1) {
+                $validator->errors()->add(
+                    "positions.{$index}.fixed_price_nn",
+                    'Festpreis-N/N ist ungültig.',
+                );
+
+                return;
+            }
+
+            if (strlen($matches[3] ?? '') > 2) {
+                $validator->errors()->add(
+                    "positions.{$index}.fixed_price_nn",
+                    'Festpreis-N/N darf höchstens zwei Nachkommastellen haben.',
+                );
+
+                return;
+            }
+
+            if ((float) $normalized <= 0) {
+                $validator->errors()->add(
+                    "positions.{$index}.fixed_price_nn",
+                    'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                );
+            }
+
+            return;
+        }
+
+        if ($hasFixedNn) {
+            $validator->errors()->add(
+                "positions.{$index}.fixed_price_nn",
+                'Festpreis-N/N ist nur im Festpreis-Modus zulässig.',
+            );
+        }
     }
 
     /**

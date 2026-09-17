@@ -8,6 +8,7 @@ use App\Enums\CalculationStatus;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Enums\SpotComponentRole;
 use App\Exceptions\FieldSetAssignmentConflictException;
@@ -318,6 +319,10 @@ final class CalculationWriter
                 'order_discount_amount' => $result->orderDiscountAmount,
                 'ae_amount' => $result->aeAmount,
                 'nn_invest' => $result->nnInvest,
+                'pricing_settlement_mode' => $result->pricingSettlementMode->value,
+                'fixed_price_nn' => $result->fixedPriceNn,
+                'effective_pay_factor_percent' => $result->effectivePayFactorPercent,
+                'effective_total_discount_percent' => $result->effectiveDiscountPercent,
                 'sort' => $index,
             ]);
             $this->stampInventoryIdentity(
@@ -758,6 +763,8 @@ final class CalculationWriter
                 needsSpotRedistribution: $item['needs_spot_redistribution'],
                 components: $componentInputs,
                 componentCalculationStrategy: $item['component_calculation_strategy'],
+                pricingSettlementMode: $item['pricing_settlement_mode'],
+                fixedPriceNn: $item['fixed_price_nn'],
             );
         }
 
@@ -828,11 +835,15 @@ final class CalculationWriter
                     ?? 30);
             }
 
+            $settlement = $this->parseSettlementFromPayloadPosition($position, (int) $index);
+
             $resolved[] = [
                 ...$catalog,
                 'length_seconds' => $length,
                 'components' => $normalizedComponents,
                 'component_calculation_strategy' => $componentStrategy,
+                'pricing_settlement_mode' => $settlement['mode'],
+                'fixed_price_nn' => $settlement['fixed_price_nn'],
                 'position_discount_percent' => $position['position_discount_percent'] ?? 0,
                 'position_discounts' => $this->positionDiscountInputs($position),
                 'ae_percent' => $this->resolveAePercent($payload, $position, $catalog['is_ae_eligible'], $existingPosition),
@@ -1149,6 +1160,12 @@ final class CalculationWriter
                 'planner_entries' => $plannerEntries,
                 'position_discounts' => $discounts,
                 'dynamic_field_values' => $position['dynamic_field_values'] ?? null,
+                'pricing_settlement_mode' => (string) ($position['pricing_settlement_mode'] ?? 'normal'),
+                'fixed_price_nn' => array_key_exists('fixed_price_nn', $position)
+                    && $position['fixed_price_nn'] !== null
+                    && $position['fixed_price_nn'] !== ''
+                    ? (string) $position['fixed_price_nn']
+                    : null,
             ];
         }
 
@@ -1219,6 +1236,14 @@ final class CalculationWriter
                     'custom_label' => $discount->custom_label,
                     'percent' => (string) $discount->percent,
                 ])->all(),
+                'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+                'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
+                'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
+                    ? null
+                    : (string) $position->effective_pay_factor_percent,
+                'effective_total_discount_percent' => $position->effective_total_discount_percent === null
+                    ? null
+                    : (string) $position->effective_total_discount_percent,
                 'dynamic_field_values' => $snapshot === null
                     ? ['period_open' => true]
                     : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
@@ -1342,6 +1367,14 @@ final class CalculationWriter
                             'percent' => (string) $discount->percent,
                         ]
                     )->all(),
+                    'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+                    'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
+                    'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
+                        ? null
+                        : (string) $position->effective_pay_factor_percent,
+                    'effective_total_discount_percent' => $position->effective_total_discount_percent === null
+                        ? null
+                        : (string) $position->effective_total_discount_percent,
                     'dynamic_field_values' => $snapshot === null
                         ? ['period_open' => true]
                         : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
@@ -1524,6 +1557,8 @@ final class CalculationWriter
         }
         $position['total_spot_count'] = (int) $proposed['total_spot_count'];
         $position['spot_method'] = 'average';
+        $position['pricing_settlement_mode'] = 'normal';
+        $position['fixed_price_nn'] = null;
         $position['needs_spot_redistribution'] = false;
         $position['time_ranges'] = $timeRanges;
         $position['plan_rows'] = $planRows;
@@ -1557,6 +1592,67 @@ final class CalculationWriter
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return array{mode: PricingSettlementMode, fixed_price_nn: ?string}
+     */
+    private function parseSettlementFromPayloadPosition(array $position, int $index): array
+    {
+        $modeRaw = $position['pricing_settlement_mode'] ?? 'normal';
+        $mode = PricingSettlementMode::tryFrom(is_scalar($modeRaw) ? (string) $modeRaw : 'normal');
+        if ($mode === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.pricing_settlement_mode" => 'Der Preisabschluss ist ungültig.',
+            ]);
+        }
+
+        $fixedNn = null;
+        if (array_key_exists('fixed_price_nn', $position)
+            && $position['fixed_price_nn'] !== null
+            && $position['fixed_price_nn'] !== ''
+        ) {
+            $fixedNn = $this->parseFixedPriceNnFromPayload((string) $position['fixed_price_nn'], $index);
+        }
+
+        if ($mode === PricingSettlementMode::FixedPrice) {
+            if ($fixedNn === null || Decimal::cmp($fixedNn, '0') <= 0) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.fixed_price_nn" => 'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                ]);
+            }
+
+            return ['mode' => $mode, 'fixed_price_nn' => $fixedNn];
+        }
+
+        return ['mode' => PricingSettlementMode::Normal, 'fixed_price_nn' => null];
+    }
+
+    private function parseFixedPriceNnFromPayload(string $raw, int $index): string
+    {
+        $normalized = str_replace(',', '.', trim($raw));
+
+        if (preg_match('/^(-?)(\d+)(?:\.(\d+))?$/', $normalized, $matches) !== 1) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N ist ungültig.',
+            ]);
+        }
+
+        $fraction = $matches[3] ?? '';
+        if (strlen($fraction) > 2) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N darf höchstens zwei Nachkommastellen haben.',
+            ]);
+        }
+
+        try {
+            return Decimal::of($normalized);
+        } catch (\InvalidArgumentException) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N ist ungültig.',
+            ]);
+        }
     }
 
     private function resolveClientKey(?CalculationPosition $existing): string
