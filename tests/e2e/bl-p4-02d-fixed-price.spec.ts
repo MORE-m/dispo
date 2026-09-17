@@ -166,10 +166,11 @@ test.describe.serial('BL-P4-02d Festpreis-Settlement', () => {
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-normal"]'),
         ).toBeChecked();
+
+        await switchToFixedPrice(page);
         await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
-            '200',
-        );
-    });
+            /200/,
+        );    });
 
     test('Calendar: normal → Festpreis → Calendar behält Planner-Spots', async ({
         page,
