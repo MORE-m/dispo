@@ -34,6 +34,10 @@ async function waitForCalculationPreview(page: Page) {
     });
 }
 
+async function selectInventory(page: Page, name: string) {
+    await page.getByRole('button', { name, exact: true }).click();
+}
+
 async function activateComponentsWithAllonge(page: Page) {
     await page.locator('[data-test="spot-components-activate-0"]').click();
     await expect(
@@ -70,7 +74,7 @@ async function ensureWeekContainsDate(page: Page, date: string) {
 async function setRuleStrategyIndividual(page: Page) {
     await login(page, 'admin@example.com');
     await page.goto('/administration/inventare');
-    await page.getByRole('link', { name: 'Radio Hamburg' }).click();
+    await page.getByRole('link', { name: 'Radio Hamburg Shared' }).click();
     await expect(page).toHaveURL(/\/administration\/inventare\/\d+$/);
 
     const strategySelect = page.locator(
@@ -110,6 +114,7 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
     }) => {
         await login(page);
         await openNewCalculationStepTwo(page);
+        await selectInventory(page, 'Radio Hamburg Shared');
 
         await page
             .locator('[data-test="calculation-method-radio-0-average"]')
@@ -164,6 +169,7 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
         test.setTimeout(120_000);
         await login(page);
         await openNewCalculationStepTwo(page);
+        await selectInventory(page, 'Radio Hamburg Shared');
 
         await page
             .locator('[data-test="calculation-method-radio-0-calendar"]')
@@ -221,13 +227,106 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
         ).toContainText('Allonge');
     });
 
-    test('Average individual: Admin-Strategie, Einzelbruttos, Reload', async ({
+    test('Calendar Inventarwechsel behält Spotzahlen und rechnet Strategie neu', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+        await login(page);
+        await openNewCalculationStepTwo(page);
+        await selectInventory(page, 'Radio Hamburg Individual');
+
+        await page
+            .locator('[data-test="calculation-method-radio-0-calendar"]')
+            .check();
+        await expect(page.locator('[data-test="planner-grid-0"]')).toBeVisible();
+        await activateComponentsWithAllonge(page);
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Komponenten einzeln berechnen');
+        await ensureWeekContainsDate(page, monday);
+
+        const cell8 = page.locator(
+            `[data-test="planner-cell-spots-0-${monday}-${hour8}"]`,
+        );
+        const cell14 = page.locator(
+            `[data-test="planner-cell-spots-0-${monday}-${hour14}"]`,
+        );
+        await cell8.fill('10');
+        await cell14.fill('5');
+        await waitForCalculationPreview(page);
+
+        // individual: 10×2×20×1.05 + 10×2×10×1.10 = 420+220 = 640 at 08:00
+        await expect(
+            page.locator(
+                `[data-test="planner-cell-gross-0-${monday}-${hour8}"]`,
+            ),
+        ).toContainText('640,00');
+
+        await selectInventory(page, 'Radio Hamburg Shared');
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Gemeinsame Gesamtlänge');
+        await expect(cell8).toHaveValue('10');
+        await expect(cell14).toHaveValue('5');
+        await expect(page.getByText(/mindestens eine Stunde/i)).toHaveCount(0);
+        await expect(
+            page.getByText(/Mindestens ein vollständiger Kalendereintrag/i),
+        ).toHaveCount(0);
+
+        await waitForCalculationPreview(page);
+        // shared: 10×2×30×1 = 600 at 08:00 — alter Individual-Preis 640 darf weg sein
+        await expect(
+            page.locator(
+                `[data-test="planner-cell-gross-0-${monday}-${hour8}"]`,
+            ),
+        ).toContainText('600,00');
+        await expect(
+            page.locator(
+                `[data-test="planner-cell-gross-0-${monday}-${hour8}"]`,
+            ),
+        ).not.toContainText('640,00');
+
+        await selectInventory(page, 'Radio Hamburg Individual');
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Komponenten einzeln berechnen');
+        await expect(cell8).toHaveValue('10');
+        await expect(cell14).toHaveValue('5');
+        await waitForCalculationPreview(page);
+        await expect(
+            page.locator(
+                `[data-test="planner-cell-gross-0-${monday}-${hour8}"]`,
+            ),
+        ).toContainText('640,00');
+
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Komponenten einzeln berechnen');
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-allonge-0"]'),
+        ).toHaveValue('10');
+        await expect(cell8).toHaveValue('10');
+        await expect(cell14).toHaveValue('5');
+    });
+
+    test('Average individual: Inventar Individual, Einzelbruttos, Reload', async ({
         page,
     }) => {
         test.setTimeout(120_000);
-        await setRuleStrategyIndividual(page);
         await login(page, 'sales@example.com');
         await openNewCalculationStepTwo(page);
+        await selectInventory(page, 'Radio Hamburg Individual');
 
         await page
             .locator('[data-test="calculation-method-radio-0-average"]')
@@ -282,4 +381,8 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
         ).toHaveValue('10');
     });
 
+    test('Admin kann Komponentenstrategie speichern', async ({ page }) => {
+        test.setTimeout(60_000);
+        await setRuleStrategyIndividual(page);
+    });
 });

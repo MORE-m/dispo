@@ -74,6 +74,7 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
 import { SpotComponentsSection } from '@/components/spot-components-section';
 import {
@@ -1682,88 +1683,29 @@ export default function CalculationWizard({
                 }
 
                 if (patch.inventory_id !== undefined) {
-                    const nextInventoryId = patch.inventory_id;
-                    const media = allowedMediaFor(nextInventoryId);
-                    const medium =
-                        media.find(
-                            (candidate) =>
-                                candidate.id === item.advertising_medium_id,
-                        ) ??
-                        media.find(
-                            (candidate) =>
-                                candidate.id === next.advertising_medium_id,
-                        ) ??
-                        media[0];
+                    const rebound = rebindPositionOnInventoryChange(
+                        item,
+                        patch.inventory_id,
+                        catalog,
+                        allowedMediaFor(patch.inventory_id),
+                    );
 
-                    if (!medium) {
+                    if (!rebound) {
                         return item;
                     }
 
-                    const rule = ruleFor(catalog, nextInventoryId, medium.id);
-                    const methodState = methodStateAfterMediumIdChange(
-                        item.advertising_medium_id,
-                        medium.id,
-                        {
-                            calculation_method_key: item.calculation_method_key,
-                            calculation_method_name:
-                                item.calculation_method_name,
-                            historical_calculation_method_key:
-                                item.historical_calculation_method_key,
-                            historical_calculation_method_name:
-                                item.historical_calculation_method_name,
-                        },
-                        medium.calculation_method_options,
-                    );
-
-                    const selectedInventory = catalog.inventories.find(
-                        (candidate) => candidate.id === nextInventoryId,
-                    );
-                    const resetYear = defaultPriceYear(
-                        catalog,
-                        nextInventoryId,
-                    );
-                    const resetOption = resolveDisplayedPriceYearOptions(
-                        catalog,
-                        nextInventoryId,
-                        resetYear,
-                    ).find((option) => option.year === resetYear);
+                    const {
+                        plan_rows: _ignoredPlanRows,
+                        position_discounts: _ignoredDiscounts,
+                        ...reboundFields
+                    } = rebound;
 
                     next = {
                         ...next,
-                        inventory_id: nextInventoryId,
-                        inventory_name: selectedInventory?.name ?? null,
-                        inventory_code: selectedInventory?.code ?? null,
-                        advertising_medium_id: medium.id,
-                        ...methodState,
-                        length_seconds:
-                            rule?.default_length_seconds ??
-                            medium.default_length_seconds,
-                        components: [],
-                        component_calculation_strategy: null,
-                        position_discount_percent: '0',
-                        ae_percent: '0',
+                        ...reboundFields,
                         plan_rows: [],
-                        ...initialTimingFieldsForMethod(
-                            methodState.calculation_method_key,
-                        ),
                         position_discounts: [],
-                        price_year: resetYear,
-                        original_price_year: resetYear,
-                        original_price_list_id: expectedPriceListIdForYear(
-                            catalog,
-                            nextInventoryId,
-                            resetYear,
-                        ),
-                        original_price_list_version:
-                            resetOption?.version ?? null,
-                        original_price_list_status: resetOption?.status ?? null,
-                        expected_price_list_id: expectedPriceListIdForYear(
-                            catalog,
-                            nextInventoryId,
-                            resetYear,
-                        ),
-                        price_list_version: resetOption?.version ?? null,
-                        price_list_status: resetOption?.status ?? null,
+                        field_schema: null,
                     };
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(

@@ -20,6 +20,9 @@ use Illuminate\Database\Seeder;
 
 /**
  * E2E-Katalog für BL-P4-02c Spot-Komponenten (isolierter Port).
+ *
+ * Zwei Inventare mit gleichen Sekundenpreisen, aber unterschiedlichen Strategien,
+ * damit Inventarwechsel Calendar-Retention und Strategiebeträge prüfbar sind.
  */
 class E2ESpotComponentsSeeder extends Seeder
 {
@@ -54,42 +57,61 @@ class E2ESpotComponentsSeeder extends Seeder
             'kind' => CalculationKind::SpotClassic,
         ]);
 
-        $inventory = Inventory::factory()->create([
-            'organization_id' => $organization->id,
-            'name' => 'Radio Hamburg',
-            'code' => 'RH',
-            'sort' => 1,
-            'logo_path' => null,
-        ]);
+        $inventories = [
+            [
+                'name' => 'Radio Hamburg Shared',
+                'code' => 'RHS',
+                'sort' => 1,
+                'strategy' => ComponentCalculationStrategy::SharedTotalLength,
+                'version' => 'e2e-components-shared',
+            ],
+            [
+                'name' => 'Radio Hamburg Individual',
+                'code' => 'RHI',
+                'sort' => 2,
+                'strategy' => ComponentCalculationStrategy::Individual,
+                'version' => 'e2e-components-individual',
+            ],
+        ];
 
-        InventoryMediumRule::factory()->create([
-            'inventory_id' => $inventory->id,
-            'advertising_medium_id' => $medium->id,
-            'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength,
-        ]);
+        foreach ($inventories as $row) {
+            $inventory = Inventory::factory()->create([
+                'organization_id' => $organization->id,
+                'name' => $row['name'],
+                'code' => $row['code'],
+                'sort' => $row['sort'],
+                'logo_path' => null,
+            ]);
 
-        $list = PriceList::factory()->create([
-            'inventory_id' => $inventory->id,
-            'status' => PriceListStatus::Active,
-            'year' => (int) now('Europe/Berlin')->year,
-            'version' => 'e2e-components-rh',
-            'valid_from' => now()->toDateString(),
-        ]);
+            InventoryMediumRule::factory()->create([
+                'inventory_id' => $inventory->id,
+                'advertising_medium_id' => $medium->id,
+                'component_calculation_strategy' => $row['strategy'],
+            ]);
 
-        foreach (range(0, 23) as $hour) {
-            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
-                $secondPrice = match ($hour) {
-                    8 => '2.0000',
-                    14 => '3.0000',
-                    default => '1.0000',
-                };
+            $list = PriceList::factory()->create([
+                'inventory_id' => $inventory->id,
+                'status' => PriceListStatus::Active,
+                'year' => (int) now('Europe/Berlin')->year,
+                'version' => $row['version'],
+                'valid_from' => now()->toDateString(),
+            ]);
 
-                PriceListItem::factory()->create([
-                    'price_list_id' => $list->id,
-                    'hour' => $hour,
-                    'day_group' => $group,
-                    'second_price' => $secondPrice,
-                ]);
+            foreach (range(0, 23) as $hour) {
+                foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                    $secondPrice = match ($hour) {
+                        8 => '2.0000',
+                        14 => '3.0000',
+                        default => '1.0000',
+                    };
+
+                    PriceListItem::factory()->create([
+                        'price_list_id' => $list->id,
+                        'hour' => $hour,
+                        'day_group' => $group,
+                        'second_price' => $secondPrice,
+                    ]);
+                }
             }
         }
     }
