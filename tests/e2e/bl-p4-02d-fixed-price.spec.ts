@@ -114,12 +114,16 @@ test.describe.serial('BL-P4-02d Festpreis-Settlement', () => {
         await switchToFixedPrice(page);
         await enterFixedPrice(page, '250,00');
 
+        // Seed: Stunde 8 = 2,00 €/s → Mediabrutto 2×30×10 = 600; Payfaktor 250/600.
+        await expect(
+            page.locator('[data-test="fixed-price-media-gross-0"]'),
+        ).toContainText('600,00');
         await expect(
             page.locator('[data-test="fixed-price-nn-preview-0"]'),
         ).toContainText('250,00');
         await expect(
             page.locator('[data-test="fixed-price-pay-factor-0"]'),
-        ).toContainText('83,3333');
+        ).toContainText('41,6667');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.locator('[data-test="wizard-save"]').click();
