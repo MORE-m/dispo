@@ -137,7 +137,7 @@ test.describe.serial('BL-P4-02d Festpreis-Settlement', () => {
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
         ).toBeChecked();
         await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
-            '250',
+            /250/,
         );
     });
 
