@@ -49,9 +49,14 @@ export function useCalculationPreview<TTotals>({
         const controller = new AbortController();
         controllerRef.current = controller;
 
-        const handle = window.setTimeout(() => {
-            setPreviewLoading(true);
+        // Sofort invalidieren: alter Preis darf nicht als aktuell sichtbar bleiben,
+        // während Debounce/Request zur neuen Payload laufen.
+        setTotals(null);
+        setError(null);
+        setFieldErrors({});
+        setPreviewLoading(true);
 
+        const handle = window.setTimeout(() => {
             void jsonPost<{ totals: TTotals }>(url, payload, controller.signal)
                 .then((data) => {
                     if (seq !== previewSeq.current) {

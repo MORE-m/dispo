@@ -4,6 +4,7 @@ namespace App\Http\Requests\Calculation;
 
 use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\FieldScope;
@@ -15,6 +16,7 @@ use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
+use App\Services\Calculation\ComponentValidator;
 use App\Services\Calculation\DiscountValidator;
 use App\Services\Calculation\PlannerEntryValidator;
 use App\Services\Calculation\TimeRangeValidator;
@@ -242,6 +244,12 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.calculation_method_name' => ['prohibited'],
             'positions.*.algorithm_version' => ['prohibited'],
             'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
+            'positions.*.component_calculation_strategy' => ['sometimes', 'nullable', 'string', Rule::enum(ComponentCalculationStrategy::class)],
+            'positions.*.components' => ['sometimes', 'nullable', 'array'],
+            'positions.*.components.*.role' => ['required_with:positions.*.components', 'string'],
+            'positions.*.components.*.label' => ['nullable', 'string', 'max:120'],
+            'positions.*.components.*.length_seconds' => ['required_with:positions.*.components', 'integer', 'min:1', 'max:3600'],
+            'positions.*.components.*.sort' => ['nullable', 'integer', 'min:0'],
             'positions.*.total_spot_count' => ['nullable', 'integer', 'min:0', 'max:100000'],
             'positions.*.position_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.ae_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -383,6 +391,17 @@ class CalculationPayloadRequest extends FormRequest
                     $methodKey = $normalized['present'] ? (string) $normalized['key'] : 'average';
                 } catch (ValidationException) {
                     continue;
+                }
+
+                $method = SpotCalculationMethod::tryFrom($methodKey) ?? SpotCalculationMethod::Average;
+                try {
+                    app(ComponentValidator::class)->validateAndNormalize($position, (int) $index, $method);
+                } catch (ValidationException $exception) {
+                    foreach ($exception->errors() as $key => $messages) {
+                        foreach ($messages as $message) {
+                            $validator->errors()->add($key, $message);
+                        }
+                    }
                 }
 
                 $isCalendar = $methodKey === SpotCalculationMethod::Calendar->value;

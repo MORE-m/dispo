@@ -267,14 +267,20 @@ geschrieben (`BUD-008`).
 
 Unterobjekte werden typbezogen normalisiert:
 
-- `PositionComponent` für Spot/SWF-Komponenten,
+- `CalculationPositionComponent` (`calculation_position_components`) für Spot-Komponenten
+  (BL-P4-02c / AT-04, PR #59): `role` (`main_spot`, `allonge`; erweiterbar),
+  `label`, `length_seconds`, `sort`, optionale Snapshot-Felder `length_index`/`media_gross`.
+  Position: nullable `component_calculation_strategy` (Freeze). Ohne Komponenten bleibt
+  Legacy-`length_seconds`. Admin-Default auf `inventory_medium_rules.component_calculation_strategy`
+  (`shared_total_length`). Dispo: `components_snapshot` + eingefrorene Strategie.
+  SPT-012 offen; SPT-013 teilweise; SPT-014 Hauptspot/Allonge umgesetzt,
 - `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
   Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme)
   – Methode `average`,
 - `CalculationPositionPlannerEntry` (`calculation_position_planner_entries`) für
   Kalenderplaner-Zellen: `date`, `hour` (0–23), `spot_count`, aufgelöste
   `day_group`, persistierter `second_price` und `line_gross`; Unique je Position
-  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, Feature-PR **#58** offen).
+  über `(date, hour)` – Methode `calendar` (**BL-P4-02b**, PR **#58** auf `main`).
   Wizard: Wochenmatrix Mo–So × buchbare Basis-Preisstunden. Fachlich: alle
   Datumszeilen einer Position müssen zum Preisjahr der gepinnten Preisliste passen
   (Jahresvertrag; jahresübergreifend → getrennte Positionen),

@@ -49,6 +49,7 @@ class DispoOrderPosition extends Model
         'calculation_method_name',
         'algorithm_version',
         'length_seconds',
+        'component_calculation_strategy',
         'total_spot_count',
         'needs_spot_redistribution',
         'price_list_id',
@@ -69,6 +70,7 @@ class DispoOrderPosition extends Model
         'plan_rows_snapshot',
         'time_ranges_snapshot',
         'planner_entries_snapshot',
+        'components_snapshot',
         'position_discounts_snapshot',
     ];
 
@@ -95,6 +97,7 @@ class DispoOrderPosition extends Model
             'plan_rows_snapshot' => 'array',
             'time_ranges_snapshot' => 'array',
             'planner_entries_snapshot' => 'array',
+            'components_snapshot' => 'array',
             'position_discounts_snapshot' => 'array',
         ];
     }

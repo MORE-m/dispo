@@ -198,6 +198,12 @@ Kein Schema-Migrationsschritt. Resolver-Pfad:
   `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `vendor/bin/pest --configuration=phpunit.mysql.xml --filter=PriceListPinOnMethodChangeMysqlTest`
 
+## BL-P4-02c – Spot-Komponenten
+
+Isolierte Playwright-Suite: `npm run test:e2e:blp402c` (Port **8025**, DB
+`database/e2e-bl-p4-02c.sqlite`, Seeder `E2ESpotComponentsSeeder`). Keine Dev-DB
+`dispo` migrieren; Worktree-Migrationen nur in Pest/Feature-Tests.
+
 ## BL-P4-02b – Kalenderplaner
 
 Migration `calculation_position_planner_entries` + `planner_entries_snapshot` auf

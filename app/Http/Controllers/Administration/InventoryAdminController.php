@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\InventoryType;
 use App\Http\Controllers\Controller;
 use App\Models\CalculationPosition;
@@ -143,8 +144,47 @@ class InventoryAdminController extends Controller
 
         $impact = app(InventoryImpactPreviewService::class)->previewDeactivate($inventory);
 
+        $rules = InventoryMediumRule::query()
+            ->with('advertisingMedium:id,name,code')
+            ->where('inventory_id', $inventory->id)
+            ->orderBy('id')
+            ->get()
+            ->map(function (InventoryMediumRule $rule): array {
+                $strategy = $rule->component_calculation_strategy
+                    ?? ComponentCalculationStrategy::SharedTotalLength;
+
+                return [
+                    'id' => $rule->id,
+                    'advertising_medium_id' => $rule->advertising_medium_id,
+                    'advertising_medium_name' => $rule->advertisingMedium !== null
+                        ? $rule->advertisingMedium->name
+                        : 'Unbekannt',
+                    'advertising_medium_code' => $rule->advertisingMedium !== null
+                        ? $rule->advertisingMedium->code
+                        : null,
+                    'is_active' => $rule->is_active,
+                    'surcharge_percent' => (string) $rule->surcharge_percent,
+                    'default_length_seconds' => $rule->default_length_seconds,
+                    'component_calculation_strategy' => $strategy->value,
+                    'component_calculation_strategy_label' => $strategy->label(),
+                ];
+            })
+            ->values()
+            ->all();
+
         return Inertia::render('administration/inventories/show', [
             'inventory' => $this->serializeDetail($inventory, $impact),
+            'mediumRules' => $rules,
+            'componentStrategyOptions' => [
+                [
+                    'value' => ComponentCalculationStrategy::SharedTotalLength->value,
+                    'label' => ComponentCalculationStrategy::SharedTotalLength->label(),
+                ],
+                [
+                    'value' => ComponentCalculationStrategy::Individual->value,
+                    'label' => ComponentCalculationStrategy::Individual->label(),
+                ],
+            ],
             'typeOptions' => $this->typeOptions(),
             'routes' => [
                 'index' => route('administration.inventories.index'),
@@ -153,6 +193,7 @@ class InventoryAdminController extends Controller
                 'deactivate' => route('administration.inventories.deactivate', $inventory),
                 'reactivatePreview' => route('administration.inventories.reactivate-preview', $inventory),
                 'reactivate' => route('administration.inventories.reactivate', $inventory),
+                'updateMediumRule' => route('administration.inventories.medium-rules.update', [$inventory, 'RULE_ID']),
             ],
         ]);
     }

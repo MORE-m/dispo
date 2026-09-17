@@ -76,7 +76,7 @@ export function CalculationSummaryPanel({
     className?: string;
 }) {
     const hasPositions = positions.some((p) => p.total_spot_count > 0);
-    const showLoading = Boolean(loading && hasPositions);
+    const showLoading = Boolean(loading);
     const showAe = aeEnabled || Number(totals?.ae_total ?? 0) > 0;
     const orderDiscounts = totals?.order_discounts ?? [];
     const hasOrderDiscounts =

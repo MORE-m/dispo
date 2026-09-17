@@ -40,11 +40,13 @@ export default defineConfig({
         '**/bl-p4-01b-*.spec.ts',
         '**/bl-p4-01c-*.spec.ts',
         '**/bl-p4-02b-*.spec.ts',
+        '**/bl-p4-02c-*.spec.ts',
     ],
     // Hauptsuite: seriell (u. a. DF-3.2a mutiert Feldsets). DF-3.2b / DF-3.3-fs /
     // DF-3.3a2α / DF-3.3a2β / DF-3.3b / ADV-001b / ADV-001c3a / ADV-001c3b1 /
     // ADV-001c3b2 / ADV-001c3c / ADV-001c4b / DF-3-REST-B / DF-3-REST-C /
-    // DF-3-RULE-C / BL-P2-01a / BL-P4-01a / BL-P4-01b / BL-P4-01c / BL-P4-02b
+    // DF-3-RULE-C / BL-P2-01a / BL-P4-01a / BL-P4-01b / BL-P4-01c / BL-P4-02b /
+    // BL-P4-02c
     // laufen separat mit eigener DB/Port.
     // BL-P2-01a darf nicht in der Hauptsuite laufen: der Freeze-Test benennt
     // das Seed-Inventar „Radio Hamburg“ um und würde sonst CAL-001/BUD-00*

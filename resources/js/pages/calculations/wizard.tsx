@@ -74,7 +74,16 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
+import { SpotComponentsSection } from '@/components/spot-components-section';
+import {
+    activateComponentsFromLength,
+    resolveStrategyFromRule,
+    totalComponentLength,
+    type ComponentCalculationStrategy,
+    type SpotComponentDraft,
+} from '@/lib/spot-components';
 import {
     EmptyState,
     ErrorState,
@@ -197,6 +206,8 @@ type PositionDraft = {
     historical_calculation_method_key: string | null;
     historical_calculation_method_name: string | null;
     length_seconds: number;
+    components: SpotComponentDraft[];
+    component_calculation_strategy: ComponentCalculationStrategy | null;
     total_spot_count: number;
     needs_spot_redistribution?: boolean;
     position_discount_percent: string;
@@ -260,6 +271,7 @@ type Catalog = {
         is_discountable: boolean;
         is_ae_eligible: boolean;
         is_active: boolean;
+        component_calculation_strategy?: string | null;
     }[];
     price_years_by_inventory?: Record<
         string,
@@ -325,6 +337,16 @@ type Totals = {
             second_price?: string;
             line_gross?: string;
         }>;
+        components?: Array<{
+            role: string;
+            label: string;
+            length_seconds: number;
+            sort?: number;
+            length_index?: number | null;
+            media_gross?: string | null;
+        }>;
+        component_calculation_strategy?: string | null;
+        length_index?: number | null;
         position_discounts?: Array<{
             label: string;
             percent: string;
@@ -412,6 +434,8 @@ type SavedCalculation = {
         calculation_method_key?: string | null;
         calculation_method_name?: string | null;
         length_seconds: number;
+        components?: SpotComponentDraft[];
+        component_calculation_strategy?: string | null;
         total_spot_count: number;
         needs_spot_redistribution?: boolean;
         price_year?: number | null;
@@ -611,6 +635,8 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             length_seconds:
                 rule.default_length_seconds ??
                 preferredMedium.default_length_seconds,
+            components: [],
+            component_calculation_strategy: null,
             position_discount_percent: '0',
             ae_percent: '0',
             plan_rows: [],
@@ -1026,6 +1052,17 @@ export default function CalculationWizard({
                     field_schema: position.field_schema ?? null,
                     ...methodState,
                     length_seconds: position.length_seconds,
+                    components: (position.components ?? []).map(
+                        (component, sort) => ({
+                            role: component.role as SpotComponentDraft['role'],
+                            label: component.label,
+                            length_seconds: component.length_seconds,
+                            sort: component.sort ?? sort,
+                        }),
+                    ),
+                    component_calculation_strategy:
+                        (position.component_calculation_strategy as ComponentCalculationStrategy | null) ??
+                        null,
                     total_spot_count: position.total_spot_count,
                     needs_spot_redistribution:
                         position.needs_spot_redistribution,
@@ -1452,7 +1489,18 @@ export default function CalculationWizard({
                           schema_fingerprint:
                               position.schema_fingerprint ?? null,
                           ...methodPayload,
-                          length_seconds: position.length_seconds,
+                          length_seconds:
+                              position.components.length > 0
+                                  ? totalComponentLength(position.components)
+                                  : position.length_seconds,
+                          components:
+                              position.components.length > 0
+                                  ? position.components
+                                  : [],
+                          component_calculation_strategy:
+                              position.components.length > 0
+                                  ? position.component_calculation_strategy
+                                  : null,
                           total_spot_count: timing.total_spot_count,
                           needs_spot_redistribution:
                               position.needs_spot_redistribution ?? false,
@@ -1635,86 +1683,29 @@ export default function CalculationWizard({
                 }
 
                 if (patch.inventory_id !== undefined) {
-                    const nextInventoryId = patch.inventory_id;
-                    const media = allowedMediaFor(nextInventoryId);
-                    const medium =
-                        media.find(
-                            (candidate) =>
-                                candidate.id === item.advertising_medium_id,
-                        ) ??
-                        media.find(
-                            (candidate) =>
-                                candidate.id === next.advertising_medium_id,
-                        ) ??
-                        media[0];
+                    const rebound = rebindPositionOnInventoryChange(
+                        item,
+                        patch.inventory_id,
+                        catalog,
+                        allowedMediaFor(patch.inventory_id),
+                    );
 
-                    if (!medium) {
+                    if (!rebound) {
                         return item;
                     }
 
-                    const rule = ruleFor(catalog, nextInventoryId, medium.id);
-                    const methodState = methodStateAfterMediumIdChange(
-                        item.advertising_medium_id,
-                        medium.id,
-                        {
-                            calculation_method_key: item.calculation_method_key,
-                            calculation_method_name:
-                                item.calculation_method_name,
-                            historical_calculation_method_key:
-                                item.historical_calculation_method_key,
-                            historical_calculation_method_name:
-                                item.historical_calculation_method_name,
-                        },
-                        medium.calculation_method_options,
-                    );
-
-                    const selectedInventory = catalog.inventories.find(
-                        (candidate) => candidate.id === nextInventoryId,
-                    );
-                    const resetYear = defaultPriceYear(
-                        catalog,
-                        nextInventoryId,
-                    );
-                    const resetOption = resolveDisplayedPriceYearOptions(
-                        catalog,
-                        nextInventoryId,
-                        resetYear,
-                    ).find((option) => option.year === resetYear);
+                    const {
+                        plan_rows: _ignoredPlanRows,
+                        position_discounts: _ignoredDiscounts,
+                        ...reboundFields
+                    } = rebound;
 
                     next = {
                         ...next,
-                        inventory_id: nextInventoryId,
-                        inventory_name: selectedInventory?.name ?? null,
-                        inventory_code: selectedInventory?.code ?? null,
-                        advertising_medium_id: medium.id,
-                        ...methodState,
-                        length_seconds:
-                            rule?.default_length_seconds ??
-                            medium.default_length_seconds,
-                        position_discount_percent: '0',
-                        ae_percent: '0',
+                        ...reboundFields,
                         plan_rows: [],
-                        ...initialTimingFieldsForMethod(
-                            methodState.calculation_method_key,
-                        ),
                         position_discounts: [],
-                        price_year: resetYear,
-                        original_price_year: resetYear,
-                        original_price_list_id: expectedPriceListIdForYear(
-                            catalog,
-                            nextInventoryId,
-                            resetYear,
-                        ),
-                        original_price_list_version:
-                            resetOption?.version ?? null,
-                        original_price_list_status: resetOption?.status ?? null,
-                        expected_price_list_id: expectedPriceListIdForYear(
-                            catalog,
-                            nextInventoryId,
-                            resetYear,
-                        ),
-                        price_list_version: resetOption?.version ?? null,
-                        price_list_status: resetOption?.status ?? null,
+                        field_schema: null,
                     };
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(
@@ -1748,6 +1739,14 @@ export default function CalculationWizard({
                         length_seconds:
                             rule?.default_length_seconds ??
                             medium.default_length_seconds,
+                        components: next.components.length
+                            ? next.components
+                            : [],
+                        component_calculation_strategy: next.components.length
+                            ? resolveStrategyFromRule(
+                                  rule?.component_calculation_strategy,
+                              )
+                            : null,
                         schema_fingerprint: null,
                         field_schema: null,
                     };
@@ -2076,6 +2075,8 @@ export default function CalculationWizard({
                         item.length_seconds ??
                         element?.spot_length_seconds ??
                         defaultSpotLength,
+                    components: [],
+                    component_calculation_strategy: null,
                     total_spot_count:
                         summedSpotCount > 0
                             ? summedSpotCount
@@ -2958,41 +2959,57 @@ export default function CalculationWizard({
                                                                     })()}
                                                                 </select>
                                                             </FormField>
-                                                            <FormField
-                                                                label="Länge (Sekunden)"
-                                                                htmlFor={`length-${index}`}
-                                                                hint={spotLengthSpt010Hint(
-                                                                    position.length_seconds,
-                                                                )}
-                                                            >
-                                                                <Input
-                                                                    id={`length-${index}`}
-                                                                    data-test={`position-length-seconds-${index}`}
-                                                                    type="number"
-                                                                    min={1}
-                                                                    value={
-                                                                        position.length_seconds
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                length_seconds:
-                                                                                    Number(
-                                                                                        event
-                                                                                            .target
-                                                                                            .value,
-                                                                                    ),
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </FormField>
+                                                            {position.components
+                                                                .length ===
+                                                            0 ? (
+                                                                <FormField
+                                                                    label="Länge (Sekunden)"
+                                                                    htmlFor={`length-${index}`}
+                                                                    hint={spotLengthSpt010Hint(
+                                                                        position.length_seconds,
+                                                                    )}
+                                                                >
+                                                                    <Input
+                                                                        id={`length-${index}`}
+                                                                        data-test={`position-length-seconds-${index}`}
+                                                                        type="number"
+                                                                        min={1}
+                                                                        value={
+                                                                            position.length_seconds
+                                                                        }
+                                                                        disabled={
+                                                                            !canEdit
+                                                                        }
+                                                                        onChange={(
+                                                                            event,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    length_seconds:
+                                                                                        Number(
+                                                                                            event
+                                                                                                .target
+                                                                                                .value,
+                                                                                        ),
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                </FormField>
+                                                            ) : (
+                                                                <p
+                                                                    className="text-muted-foreground text-sm"
+                                                                    data-test={`position-length-from-components-${index}`}
+                                                                >
+                                                                    Länge aus
+                                                                    Komponenten:{' '}
+                                                                    {totalComponentLength(
+                                                                        position.components,
+                                                                    )}
+                                                                    s
+                                                                </p>
+                                                            )}
                                                             <FormField
                                                                 label="Preisjahr"
                                                                 htmlFor={`price-year-${index}`}
@@ -3534,6 +3551,117 @@ export default function CalculationWizard({
                                                                         Entfernen
                                                                     </Button>
                                                                 </div>
+                                                            ) : null}
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            {position.components
+                                                                .length === 0 &&
+                                                            canEdit ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    data-test={`spot-components-activate-${index}`}
+                                                                    onClick={() => {
+                                                                        const rule =
+                                                                            ruleFor(
+                                                                                catalog,
+                                                                                position.inventory_id,
+                                                                                position.advertising_medium_id,
+                                                                            );
+                                                                        const next =
+                                                                            activateComponentsFromLength(
+                                                                                position.length_seconds,
+                                                                            );
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                components:
+                                                                                    next,
+                                                                                length_seconds:
+                                                                                    totalComponentLength(
+                                                                                        next,
+                                                                                    ),
+                                                                                component_calculation_strategy:
+                                                                                    position.component_calculation_strategy ??
+                                                                                    resolveStrategyFromRule(
+                                                                                        rule?.component_calculation_strategy,
+                                                                                    ),
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    Spot-Komponenten
+                                                                    aktivieren
+                                                                </Button>
+                                                            ) : null}
+                                                            {position.components
+                                                                .length > 0 ? (
+                                                                <SpotComponentsSection
+                                                                    positionIndex={
+                                                                        index
+                                                                    }
+                                                                    components={
+                                                                        position.components
+                                                                    }
+                                                                    strategy={
+                                                                        position.component_calculation_strategy ??
+                                                                        'shared_total_length'
+                                                                    }
+                                                                    canEdit={
+                                                                        canEdit
+                                                                    }
+                                                                    positionMediaGross={
+                                                                        displayTotals
+                                                                            ?.positions?.[
+                                                                            index
+                                                                        ]
+                                                                            ?.media_gross
+                                                                    }
+                                                                    componentResults={
+                                                                        displayTotals
+                                                                            ?.positions?.[
+                                                                            index
+                                                                        ]
+                                                                            ?.components
+                                                                    }
+                                                                    lengthIndex={
+                                                                        displayTotals
+                                                                            ?.positions?.[
+                                                                            index
+                                                                        ]
+                                                                            ?.length_index
+                                                                    }
+                                                                    errors={
+                                                                        fieldErrors
+                                                                    }
+                                                                    onChange={(
+                                                                        components,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                components,
+                                                                                length_seconds:
+                                                                                    totalComponentLength(
+                                                                                        components,
+                                                                                    ),
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                    onDeactivate={() =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                components:
+                                                                                    [],
+                                                                                component_calculation_strategy:
+                                                                                    null,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
                                                             ) : null}
                                                         </div>
 

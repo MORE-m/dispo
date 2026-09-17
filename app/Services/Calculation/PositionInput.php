@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\SpotCalculationMethod;
 
 final readonly class PositionInput
@@ -11,6 +12,7 @@ final readonly class PositionInput
      * @param  list<TimeRangeInput>  $timeRanges
      * @param  list<PlannerEntryInput>  $plannerEntries
      * @param  list<DiscountInput>  $positionDiscounts
+     * @param  list<ComponentInput>  $components
      */
     public function __construct(
         public int $inventoryId,
@@ -30,5 +32,12 @@ final readonly class PositionInput
         public array $plannerEntries = [],
         public array $positionDiscounts = [],
         public bool $needsSpotRedistribution = false,
+        public array $components = [],
+        public ?ComponentCalculationStrategy $componentCalculationStrategy = null,
     ) {}
+
+    public function hasComponents(): bool
+    {
+        return $this->components !== [];
+    }
 }

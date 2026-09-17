@@ -1,27 +1,45 @@
 # Fortschritt V1
 
-Stand: 16. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a` und **PR #57**
-Origin-Retention, Base SHA `0b6c2b7`; **`BL-P4-02b` umgesetzt (PR #58)** –
-Kalenderplaner/AT-02, Wochenmatrix-UX; `BL-P4-01` abgeschlossen)
+Stand: 17. September 2026 (`main`-Basis inkl. **PR #56** `BL-P4-02a`, **PR #57**
+Origin-Retention, **PR #58** `BL-P4-02b`, **PR #59** `BL-P4-02c`). **`BL-P4-02c` (AT-04)
+umgesetzt und manuell abgenommen**. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`** (Average-Abnahme + Pin bei
-Methodenwechsel) auf **`main`**. Teilblock **`BL-P4-02b` umgesetzt (PR #58)**
-(Kalenderplaner/AT-02, Registry `calendar` released/v1, echte Wochenmatrix Mo–So ×
-Preisstunden, Spotanzahl direkt je Datum-/Stundenzelle). Gesamtblock **`BL-P4-02`
-bleibt offen** (Komponenten/AT-04, Festpreis/`fixed_price` nicht begonnen).
-UX-GATE-D: bisherige Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`**, **`BL-P4-02b`** und
+**`BL-P4-02c`** auf **`main`**. Gesamtblock **`BL-P4-02` bleibt offen**
+(Festpreis/`fixed_price` nicht begonnen). UX-GATE-D: bisherige Teilfreigaben
+unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Nächste Teilblöcke von `BL-P4-02`: Komponenten/Allonge (AT-04), Festpreis-Engine –
-noch nicht begonnen. **SPT-008 Export** der Spotverteilung bleibt offen.
+Nächste offene Teile von `BL-P4-02`: Festpreis-Engine – noch nicht begonnen.
+**SPT-008 Export** der Spotverteilung bleibt offen. SPT-012 offen; SPT-013 nur teilweise.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-**BL-P4-02a** (PR #56 auf `main`): Average-Abnahme-Härtung + Preislisten-Pin bei
-Methodenwechsel ohne Inventar-/Jahrwechsel.
+**BL-P4-02c** (PR #59 auf `main`): Spot-Komponenten / AT-04 Hauptspot+Allonge,
+manuell abgenommen; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten.
+
+## BL-P4-02c – Spot-Komponenten / Hauptspot + Allonge / AT-04 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Hauptspot + Allonge sichtbar/editierbar/speicherbar | **umgesetzt** (PR #59) |
+| Strategien `shared_total_length` / `individual` | **umgesetzt** (PR #59) |
+| Admin-Strategie je Inventar-/Werbemedium-Regel + Positions-Freeze | **umgesetzt** (PR #59) |
+| Average + Calendar unterstützen beide Strategien | **umgesetzt** (PR #59) |
+| Dispo-Snapshot `components_snapshot` + Anzeige | **umgesetzt** (PR #59) |
+| Spotgewichteter `average_second_price` (kein Längen×Index-Rückrechnen) | **umgesetzt** (PR #59) |
+| Komponenten-Payload absent/`null`/`[]` + Strategie fail-closed | **umgesetzt** (PR #59) |
+| Kanonische Labels + Admin-`lock_version` | **umgesetzt** (PR #59) |
+| Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten | **umgesetzt** (PR #59) |
+| Manuelle UX-Abnahme AT-04 | **erfolgreich** |
+| Abbinder / Reminder / Tandem / Tridem | **nicht** vollständig (SPT-012 offen; SPT-013 teilweise) |
+| SPT-014 Hauptspot/Allonge | **umgesetzt** (PR #59) |
+| `fixed_price` | **planned** / nicht begonnen |
+| SPT-008 Export | **offen** |
+| `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
 
@@ -37,7 +55,7 @@ Methodenwechsel ohne Inventar-/Jahrwechsel.
 | Registry `spot_classic`/`calendar` | **released / v1** (PR #58) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (PR #58) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (PR #58) |
-| Komponenten / AT-04 / `fixed_price` | **nicht begonnen** (`fixed_price` planned) |
+| Komponenten / AT-04 | **umgesetzt** (PR #59); `fixed_price` planned / nicht begonnen |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
@@ -48,7 +66,7 @@ Methodenwechsel ohne Inventar-/Jahrwechsel.
 | Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (`main`, PR #56) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
 | AT-01/03/23/24 gezielte Härtung (ohne Kalender-/Komponenten-Scope von 02b) | **gehärtet** (`main`, PR #56) |
-| `BL-P4-02` insgesamt | **offen** (02b umgesetzt PR #58; AT-04/Festpreis folgen) |
+| `BL-P4-02` insgesamt | **offen** (02a–02c umgesetzt; Festpreis folgt) |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 

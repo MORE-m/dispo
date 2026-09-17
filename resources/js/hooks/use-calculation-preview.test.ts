@@ -213,31 +213,83 @@ describe('useCalculationPreview', () => {
         expect(result.current.fieldErrors.positions).toEqual(['Ungültig']);
     });
 
-    it('zeigt fehlende Preise als konkrete Fehlermeldung', async () => {
-        jsonPost.mockRejectedValue(
-            new JsonPostError(
-                'Für Radio Hamburg fehlen Preise für Mo–Fr in den Stunden 09:00.',
-                {
-                    positions: [
-                        'Für Radio Hamburg fehlen Preise für Mo–Fr in den Stunden 09:00.',
-                    ],
-                },
-            ),
-        );
+    it('blendet den alten Preis sofort aus, sobald sich die Payload ändert', async () => {
+        const first = deferred<{ totals: typeof totals }>();
+        const second = deferred<{ totals: typeof totals }>();
 
-        const { result } = renderHook(() =>
-            useCalculationPreview({
-                url: '/kalkulationen/vorschau',
-                payload,
-                enabled: true,
-                blocked: false,
-            }),
+        jsonPost
+            .mockImplementationOnce(() => first.promise)
+            .mockImplementationOnce(() => second.promise);
+
+        const { result, rerender } = renderHook(
+            ({ currentPayload }) =>
+                useCalculationPreview({
+                    url: '/kalkulationen/vorschau',
+                    payload: currentPayload,
+                    enabled: true,
+                    blocked: false,
+                }),
+            { initialProps: { currentPayload: { version: 1, ...payload } } },
         );
 
         await flushPreview();
+        await act(async () => {
+            first.resolve({ totals });
+            await Promise.resolve();
+        });
+        expect(result.current.totals).toEqual(totals);
 
+        rerender({ currentPayload: { version: 2, ...payload } });
+
+        expect(result.current.totals).toBeNull();
+        expect(result.current.previewLoading).toBe(true);
+
+        await flushPreview();
+        await act(async () => {
+            second.resolve({
+                totals: {
+                    media_gross: '640.00',
+                    nn_invest: '640.00',
+                    positions: [],
+                },
+            });
+            await Promise.resolve();
+        });
+
+        expect(result.current.totals).toEqual({
+            media_gross: '640.00',
+            nn_invest: '640.00',
+            positions: [],
+        });
         expect(result.current.previewLoading).toBe(false);
-        expect(result.current.error).toContain('Radio Hamburg');
-        expect(result.current.error).toContain('09:00');
+    });
+
+    it('zeigt bei Preview-Fehler keinen alten Preis', async () => {
+        jsonPost
+            .mockResolvedValueOnce({ totals })
+            .mockRejectedValueOnce(new JsonPostError('Fehlerhafte Eingabe', {}));
+
+        const { result, rerender } = renderHook(
+            ({ currentPayload }) =>
+                useCalculationPreview({
+                    url: '/kalkulationen/vorschau',
+                    payload: currentPayload,
+                    enabled: true,
+                    blocked: false,
+                }),
+            { initialProps: { currentPayload: { version: 1, ...payload } } },
+        );
+
+        await flushPreview();
+        expect(result.current.totals).toEqual(totals);
+
+        rerender({ currentPayload: { version: 2, ...payload } });
+        expect(result.current.totals).toBeNull();
+
+        await flushPreview();
+
+        expect(result.current.totals).toBeNull();
+        expect(result.current.error).toBe('Fehlerhafte Eingabe');
+        expect(result.current.previewLoading).toBe(false);
     });
 });

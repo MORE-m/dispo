@@ -12,7 +12,8 @@
         "types:check": "tsc --noEmit",
         "test:unit": "vitest run",
         "test:e2e": "playwright test",
-        "test:e2e:blp402b": "playwright test -c playwright.blp402b.config.ts"
+        "test:e2e:blp402b": "playwright test -c playwright.blp402b.config.ts",
+        "test:e2e:blp402c": "playwright test -c playwright.blp402c.config.ts"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",
