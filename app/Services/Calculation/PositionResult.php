@@ -39,6 +39,7 @@ final readonly class PositionResult
         public PricingSettlementMode $pricingSettlementMode = PricingSettlementMode::Normal,
         public ?string $fixedPriceNn = null,
         public ?string $effectivePayFactorPercent = null,
+        public ?string $effectiveDiscountBeforeAePercent = null,
     ) {}
 
     /**
@@ -70,6 +71,7 @@ final readonly class PositionResult
             'pricing_settlement_mode' => $this->pricingSettlementMode->value,
             'fixed_price_nn' => $this->fixedPriceNn,
             'effective_pay_factor_percent' => $this->effectivePayFactorPercent,
+            'effective_discount_before_ae_percent' => $this->effectiveDiscountBeforeAePercent,
         ];
     }
 }

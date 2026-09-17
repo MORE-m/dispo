@@ -728,15 +728,20 @@ final class CalculationEngine
             }
 
             $nnInvest = Decimal::roundMoney($fixedNnRaw);
+            $aeSettlement = $this->deriveFixedPriceAe($nnInvest, $position);
             $factors = $this->deriveSettlementFactors($mediaGrossInternal, $nnInvest);
+            $discountBeforeAe = $this->deriveSettlementFactors(
+                $mediaGrossInternal,
+                $aeSettlement['net_before_ae'],
+            )['effectiveDiscountPercent'];
 
             return new PositionResult(
                 mediaGross: $mediaGrossRounded,
                 positionDiscountAmount: '0.00',
                 afterPositionDiscount: $mediaGrossRounded,
                 orderDiscountAmount: '0.00',
-                afterOrderDiscount: $mediaGrossRounded,
-                aeAmount: '0.00',
+                afterOrderDiscount: $aeSettlement['net_before_ae'],
+                aeAmount: $aeSettlement['ae_amount'],
                 nnInvest: $nnInvest,
                 effectiveDiscountPercent: $factors['effectiveDiscountPercent'],
                 spotCount: $spotCount,
@@ -756,6 +761,7 @@ final class CalculationEngine
                 pricingSettlementMode: PricingSettlementMode::FixedPrice,
                 fixedPriceNn: $nnInvest,
                 effectivePayFactorPercent: $factors['effectivePayFactorPercent'],
+                effectiveDiscountBeforeAePercent: $discountBeforeAe,
             );
         }
 
@@ -851,6 +857,48 @@ final class CalculationEngine
             [],
             '0',
         );
+    }
+
+    /**
+     * BL-P4-02d: AE wird aus dem N/N-Festpreis rückwärts ausgewiesen, ohne ihn zu ändern.
+     *
+     * @return array{net_before_ae: string, ae_amount: string}
+     */
+    private function deriveFixedPriceAe(string $fixedNn, PositionInput $position): array
+    {
+        if (! $position->isAeEligible) {
+            return [
+                'net_before_ae' => $fixedNn,
+                'ae_amount' => '0.00',
+            ];
+        }
+
+        if (Decimal::cmp($position->aePercent, '0') < 0) {
+            throw new \InvalidArgumentException('AE-Satz darf nicht negativ sein.');
+        }
+
+        if (Decimal::cmp($position->aePercent, '0') === 0) {
+            return [
+                'net_before_ae' => $fixedNn,
+                'ae_amount' => '0.00',
+            ];
+        }
+
+        if (Decimal::cmp($position->aePercent, '100') >= 0) {
+            throw new \InvalidArgumentException(
+                'AE-Satz muss kleiner als 100 % sein (Festpreis-Rückrechnung).',
+            );
+        }
+
+        $netBeforeAe = Decimal::roundMoney(
+            Decimal::div($fixedNn, Decimal::oneMinusPercent($position->aePercent)),
+        );
+        $aeAmount = Decimal::roundMoney(Decimal::sub($netBeforeAe, $fixedNn));
+
+        return [
+            'net_before_ae' => $netBeforeAe,
+            'ae_amount' => $aeAmount,
+        ];
     }
 
     /**

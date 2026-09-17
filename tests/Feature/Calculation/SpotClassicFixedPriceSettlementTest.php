@@ -41,13 +41,16 @@ class SpotClassicFixedPriceSettlementTest extends TestCase
 
         $this->assertSame('300.00', $preview['media_gross']);
         $this->assertSame('250.00', $preview['nn_invest']);
+        $this->assertSame('0.00', $preview['ae_total']);
         $this->assertSame('fixed_price', $preview['positions'][0]['pricing_settlement_mode']);
         $this->assertSame('250.00', $preview['positions'][0]['fixed_price_nn']);
         $this->assertSame('0.00', $preview['positions'][0]['position_discount_amount']);
+        $this->assertSame('0.00', $preview['positions'][0]['ae_amount']);
         $this->assertSame('83.3333', $preview['positions'][0]['effective_pay_factor_percent']);
 
         $position = $calc->positions->firstOrFail();
         $this->assertSame('250.00', (string) $position->nn_invest);
+        $this->assertSame('0.00', (string) $position->ae_amount);
         $this->assertSame('fixed_price', $position->pricing_settlement_mode->value);
         $this->assertSame('250.00', (string) $position->fixed_price_nn);
 
@@ -55,6 +58,99 @@ class SpotClassicFixedPriceSettlementTest extends TestCase
         $this->assertSame('fixed_price', $roundtrip['positions'][0]['pricing_settlement_mode']);
         $this->assertSame('250.00', $roundtrip['positions'][0]['fixed_price_nn']);
         $this->assertSame('83.3333', $roundtrip['positions'][0]['effective_pay_factor_percent']);
+    }
+
+    public function test_fixed_price_with_ae_preview_matches_store_reload_and_snapshot(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->fixedAveragePayload($catalog, '10000.00');
+        $payload['ae_enabled'] = true;
+
+        $writer = app(CalculationWriter::class);
+        $preview = $writer->preview($payload, $user)->toArray();
+        $calc = $writer->create($payload, $user);
+
+        $this->assertSame('300.00', $preview['media_gross']);
+        $this->assertSame('10000.00', $preview['nn_invest']);
+        $this->assertSame('1764.71', $preview['ae_total']);
+        $this->assertSame('11764.71', $preview['positions'][0]['after_order_discount']);
+        $this->assertSame('1764.71', $preview['positions'][0]['ae_amount']);
+        $this->assertSame('10000.00', $preview['positions'][0]['nn_invest']);
+        $this->assertSame('10000.00', $preview['positions'][0]['fixed_price_nn']);
+
+        $position = $calc->positions->firstOrFail();
+        $this->assertSame('10000.00', (string) $position->nn_invest);
+        $this->assertSame('10000.00', (string) $position->fixed_price_nn);
+        $this->assertSame('1764.71', (string) $position->ae_amount);
+        $this->assertTrue((bool) $calc->ae_enabled);
+        $this->assertSame('1764.71', (string) $calc->ae_total);
+
+        $reloadPayload = $writer->payloadFromCalculation($calc->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'orderDiscounts',
+            'configurationSnapshot',
+            'fieldValues',
+        ]));
+        $reloadPreview = $writer->preview($reloadPayload, $user)->toArray();
+        $this->assertSame('1764.71', $reloadPreview['ae_total']);
+        $this->assertSame('10000.00', $reloadPreview['nn_invest']);
+        $this->assertSame($preview['positions'][0]['ae_amount'], $reloadPreview['positions'][0]['ae_amount']);
+        $this->assertSame(
+            $preview['positions'][0]['after_order_discount'],
+            $reloadPreview['positions'][0]['after_order_discount'],
+        );
+
+        $snapshot = app(DispoOrderSnapshotMapper::class)->positionFromCalculationPosition($position, 0);
+        $this->assertSame('1764.71', $snapshot['ae_amount']);
+        $this->assertSame('10000.00', $snapshot['nn_invest']);
+        $this->assertSame('10000.00', $snapshot['fixed_price_nn']);
+
+        $toggleOff = $reloadPayload;
+        $toggleOff['ae_enabled'] = false;
+        $toggleOff['lock_version'] = $calc->lock_version;
+        $writer->update($calc, $toggleOff, $user);
+        $calc = $calc->fresh(['positions']);
+        $this->assertSame('0.00', (string) $calc->ae_total);
+        $this->assertSame('0.00', (string) $calc->positions->firstOrFail()->ae_amount);
+        $this->assertSame('10000.00', (string) $calc->positions->firstOrFail()->nn_invest);
+
+        $toggleOn = $writer->payloadFromCalculation($calc);
+        $toggleOn['ae_enabled'] = true;
+        $toggleOn['lock_version'] = $calc->lock_version;
+        $writer->update($calc, $toggleOn, $user);
+        $calc = $calc->fresh(['positions']);
+        $this->assertSame('1764.71', (string) $calc->ae_total);
+        $this->assertSame('1764.71', (string) $calc->positions->firstOrFail()->ae_amount);
+        $this->assertSame('10000.00', (string) $calc->positions->firstOrFail()->nn_invest);
+    }
+
+    public function test_mixed_normal_and_fixed_with_ae(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $user = User::factory()->role(Role::Sales)->create();
+        $payload = $this->schemaPayload($catalog);
+        $payload['ae_enabled'] = true;
+        $payload['positions'][] = [
+            ...$payload['positions'][0],
+            'inventory_id' => $catalog['rock']->id,
+            'pricing_settlement_mode' => 'fixed_price',
+            'fixed_price_nn' => '10000.00',
+        ];
+
+        $preview = app(CalculationWriter::class)->preview($payload, $user)->toArray();
+
+        $this->assertSame('normal', $preview['positions'][0]['pricing_settlement_mode']);
+        $this->assertSame('45.00', $preview['positions'][0]['ae_amount']);
+        $this->assertSame('255.00', $preview['positions'][0]['nn_invest']);
+
+        $this->assertSame('fixed_price', $preview['positions'][1]['pricing_settlement_mode']);
+        $this->assertSame('1764.71', $preview['positions'][1]['ae_amount']);
+        $this->assertSame('10000.00', $preview['positions'][1]['nn_invest']);
+        $this->assertSame('11764.71', $preview['positions'][1]['after_order_discount']);
     }
 
     public function test_settlement_toggle_keeps_price_list_pin(): void
@@ -376,6 +472,7 @@ class SpotClassicFixedPriceSettlementTest extends TestCase
             'planning_mode' => 'manual',
             'customer_name' => 'Festpreis GmbH',
             'order_discount_percent' => '0',
+            'ae_enabled' => false,
             'schema_fingerprint' => app(ConfigurationSnapshotFreezeService::class)
                 ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'],
             'positions' => [[

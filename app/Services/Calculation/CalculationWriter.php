@@ -1049,6 +1049,13 @@ final class CalculationWriter
      */
     private function isHeaderOnlyChange(array $payload, Calculation $calculation): bool
     {
+        if (array_key_exists('ae_enabled', $payload)
+            && (bool) $payload['ae_enabled'] !== (bool) $calculation->ae_enabled
+        ) {
+            // AE ändert Positions-AE/N/N (inkl. Festpreis-Rückrechnung) → voller Persistenzpfad.
+            return false;
+        }
+
         if (! isset($payload['positions'])) {
             return true;
         }
