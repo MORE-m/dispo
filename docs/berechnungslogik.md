@@ -305,20 +305,26 @@ Der Registry-Eintrag **`fixed_price`** als eigene Kalkulationsmethode bleibt
 Live: Basis `average`|`calendar` + `pricing_settlement_mode=fixed_price`.
 
 Der Festpreis ist der vereinbarte **N/N-Endbetrag** der Medienleistung, kein
-neuer Listenpreis. Positions- und Auftragsrabatte sowie AE wirken im Modus
-`fixed_price` **nicht forward** auf diesen Betrag (Mediabrutto bleibt
-referenzbasiert aus der gewählten Basis).
+neuer Listenpreis. Positions- und Auftragsrabatte wirken im Modus `fixed_price`
+**nicht forward** auf diesen Betrag (Mediabrutto bleibt referenzbasiert aus der
+gewählten Basis). AE wird bei aktivierter Auftragskondition **rückwärts aus dem
+Festpreis ausgewiesen**, ohne den N/N-Festpreis zu verändern.
 
 ```text
 Mediabrutto     = Ergebnis aus average|calendar (unverändert zur Basis)
-nn_invest       = fixed_price_nn (bei fixed_price)
+nn_invest       = fixed_price_nn (bei fixed_price; immer verbindlicher N/N-Endbetrag)
+Ohne AE:
+  Netto vor AE  = fixed_price_nn
+  AE-Betrag     = 0
+Mit AE (bestehender AE-Satz, typisch 15 %; Satz < 100 %, fail-closed sonst):
+  Netto vor AE  = fixed_price_nn ÷ (1 − ae_rate)
+  AE-Betrag     = Netto vor AE − fixed_price_nn
 Payfaktor (%)   = nn_invest ÷ Mediabrutto × 100
-Positionsabschlag = Mediabrutto − nn_invest (Anzeige; kein Forward-Rabatt)
-Effektiver Nettofaktor = nn_invest ÷ Mediabrutto
-Effektiver Rabatt      = 1 − effektiver Nettofaktor
+Gesamtabschlag  = 1 − (nn_invest ÷ Mediabrutto)   # Mediabrutto → N/N
+Rabatt vor AE   = 1 − (Netto vor AE ÷ Mediabrutto) # Mediabrutto → Netto vor AE
 ```
 
-Bei `nn_invest = Mediabrutto`: Payfaktor 100 %, effektiver Rabatt 0.
+Bei `nn_invest = Mediabrutto`: Payfaktor 100 %, Gesamtabschlag 0.
 Wechsel zurück zu `normal`: `fixed_price_nn` entfällt; die übliche
 Rabatt-/AE-Pipeline gilt wieder.
 

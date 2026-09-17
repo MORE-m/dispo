@@ -2003,8 +2003,17 @@ export default function DispoOrderShow({
                                                         position.effective_pay_factor_percent,
                                                     )}
                                                     {position.effective_total_discount_percent
-                                                        ? ` · Gesamtabschlag ${formatPercent(position.effective_total_discount_percent)}`
+                                                        ? ` · Gesamtabschlag (→ N/N) ${formatPercent(position.effective_total_discount_percent)}`
                                                         : ''}
+                                                </p>
+                                            ) : null}
+                                            {Number(position.ae_amount) > 0 ? (
+                                                <p
+                                                    className="text-muted-foreground text-xs"
+                                                    data-test={`dispo-order-fixed-price-ae-${index}`}
+                                                >
+                                                    AE{' '}
+                                                    {money(position.ae_amount)}
                                                 </p>
                                             ) : null}
                                             {position.calculation_method_name ? (

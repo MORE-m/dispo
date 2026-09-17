@@ -1,7 +1,8 @@
 # Fortschritt V1
 
-Stand: 17. September 2026 (`main`-Basis inkl. **PR #56**–**#59**; **`BL-P4-02d`**
-Preisabschluss Festpreis **umgesetzt**, noch **nicht gemergt** / offener PR).
+Stand: 18. September 2026 (`main`-Basis inkl. **PR #56**–**#59**; **`BL-P4-02d`**
+Preisabschluss Festpreis **umgesetzt**, noch **nicht gemergt** / offener PR;
+AE bei Festpreis **rückwärts ausgewiesen**, N/N unverändert).
 **`BL-P4-02c` (AT-04) manuell abgenommen**. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
@@ -30,7 +31,7 @@ Spot Classic Average/Calendar; Pin-Vertrag; Dispo-Snapshot; isolierte E2E Port *
 | Berechnungsbasis bleibt `average`\|`calendar` (kein Registry-Wechsel auf `fixed_price`) | **umgesetzt** |
 | Registry `calculation_methods.fixed_price` | weiter **`planned`** / **nicht released** |
 | N/N-Festpreis; Mediabrutto aus gewählter Basis | **umgesetzt** |
-| Keine Forward-Rabatte/AE auf Festpreis-N/N; Payfaktor/Gesamtabschlag rückwärts | **umgesetzt** |
+| Keine Forward-Rabatte auf Festpreis-N/N; AE rückwärts ausweisen; Payfaktor/Gesamtabschlag | **umgesetzt** |
 | Pin-Vertrag 02a bei Abschluss-/Basiswechsel | **umgesetzt** |
 | Dispo-Snapshot `pricing_settlement_mode` + `fixed_price_nn` | **umgesetzt** |
 | Budget-Übernahme setzt Abschluss zurück auf `normal` | **umgesetzt** |

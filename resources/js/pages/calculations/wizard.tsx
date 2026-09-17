@@ -368,6 +368,9 @@ type Totals = {
         fixed_price_nn?: string | null;
         effective_pay_factor_percent?: string | null;
         effective_discount_percent?: string | null;
+        effective_discount_before_ae_percent?: string | null;
+        ae_amount?: string | null;
+        after_order_discount?: string | null;
     }[];
 };
 
@@ -3922,6 +3925,26 @@ export default function CalculationWizard({
                                                                     ]
                                                                         .effective_discount_percent
                                                                 }
+                                                                effectiveDiscountBeforeAePercent={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .effective_discount_before_ae_percent
+                                                                }
+                                                                aeAmount={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ].ae_amount
+                                                                }
+                                                                afterOrderDiscount={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .after_order_discount
+                                                                }
                                                             />
                                                         ) : previewLoading ? (
                                                             <LoadingState
@@ -4189,11 +4212,20 @@ export default function CalculationWizard({
                                                             berücksichtigen
                                                         </span>
                                                         <span className="text-muted-foreground mt-1 block text-xs">
-                                                            AE wird nach allen
+                                                            Bei Normalpositionen
+                                                            wird AE nach allen
                                                             Positions- und
                                                             Auftragsrabatten nur
                                                             auf den AE-fähigen
                                                             Anteil angewendet.
+                                                            Bei
+                                                            Festpreispositionen
+                                                            wird AE aus dem
+                                                            N/N-Festpreis
+                                                            rückwärts
+                                                            ausgewiesen, ohne
+                                                            den Festpreis zu
+                                                            ändern.
                                                             {displayTotals?.ae_eligible_base
                                                                 ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
                                                                 : ''}
@@ -4610,8 +4642,28 @@ export default function CalculationWizard({
                                                                                             result.effective_pay_factor_percent,
                                                                                         )}
                                                                                         {result.effective_discount_percent
-                                                                                            ? ` · Gesamtabschlag ${formatPercent(result.effective_discount_percent)}`
+                                                                                            ? ` · Gesamtabschlag (→ N/N) ${formatPercent(result.effective_discount_percent)}`
                                                                                             : ''}
+                                                                                    </p>
+                                                                                ) : null}
+                                                                                {result.ae_amount &&
+                                                                                Number(
+                                                                                    result.ae_amount,
+                                                                                ) >
+                                                                                    0 ? (
+                                                                                    <p className="text-muted-foreground">
+                                                                                        Netto
+                                                                                        vor
+                                                                                        AE{' '}
+                                                                                        {money(
+                                                                                            result.after_order_discount ??
+                                                                                                result.nn_invest,
+                                                                                        )}{' '}
+                                                                                        ·
+                                                                                        AE{' '}
+                                                                                        {money(
+                                                                                            result.ae_amount,
+                                                                                        )}
                                                                                     </p>
                                                                                 ) : null}
                                                                             </>

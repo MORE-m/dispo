@@ -283,4 +283,96 @@ test.describe.serial('BL-P4-02d Festpreis-Settlement', () => {
             'Festpreis erfordert',
         );
     });
+
+    test('Festpreis mit AE: positiver AE-Betrag, unverändertes Endinvest, Toggle', async ({
+        page,
+    }) => {
+        await login(page);
+        await openNewCalculationStepTwo(page);
+        await selectInventory(page, 'Radio Hamburg Shared');
+        await selectAverageBasis(page);
+
+        if ((await page.locator('[data-test="range-spots-0-0"]').count()) === 0) {
+            await page.locator('[data-test="range-add-0"]').click();
+        }
+        await page.locator('[data-test="range-start-0-0"]').selectOption('8');
+        await page.locator('[data-test="range-end-0-0"]').selectOption('9');
+        await page.locator('[data-test="range-day-0-0"]').selectOption('mo_fr');
+        await page.locator('[data-test="range-spots-0-0"]').fill('10');
+        await waitForCalculationPreview(page);
+
+        await switchToFixedPrice(page);
+        await enterFixedPrice(page, '10000,00');
+
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="ae-enabled"]').click();
+        await waitForCalculationPreview(page);
+
+        await expect(page.locator('[data-test="ae-deduction"]')).toContainText(
+            '1.764,71',
+        );
+        await expect(
+            page.locator(
+                '[data-test="step-3-totals"] [data-test="preview-net-total"]',
+            ),
+        ).toContainText('10.000,00');
+
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="fixed-price-nn-preview-0"]'),
+        ).toContainText('10.000,00');
+        await expect(
+            page.locator('[data-test="fixed-price-ae-amount-0"]'),
+        ).toContainText('1.764,71');
+        await expect(
+            page.locator('[data-test="fixed-price-net-before-ae-0"]'),
+        ).toContainText('11.764,71');
+
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await waitForCalculationPreview(page);
+        await expect(page.locator('[data-test="ae-enabled"]')).toBeChecked();
+        await expect(page.locator('[data-test="ae-deduction"]')).toContainText(
+            '1.764,71',
+        );
+        await expect(
+            page.locator(
+                '[data-test="step-3-totals"] [data-test="preview-net-total"]',
+            ),
+        ).toContainText('10.000,00');
+
+        await page.locator('[data-test="ae-enabled"]').click();
+        await waitForCalculationPreview(page);
+        await expect(page.locator('[data-test="ae-deduction"]')).toHaveCount(0);
+        await expect(
+            page.locator(
+                '[data-test="step-3-totals"] [data-test="preview-net-total"]',
+            ),
+        ).toContainText('10.000,00');
+
+        await page.locator('[data-test="ae-enabled"]').click();
+        await waitForCalculationPreview(page);
+        await expect(page.locator('[data-test="ae-deduction"]')).toContainText(
+            '1.764,71',
+        );
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="dispo-order-create-open"]').click();
+        await page.locator('[data-test="dispo-order-submit"]').click();
+        await expect(page).toHaveURL(/\/dispoauftraege\/\d+$/, {
+            timeout: 30_000,
+        });
+        await expect(
+            page.locator('[data-test="dispo-order-fixed-price-0"]'),
+        ).toContainText('10.000,00');
+        await expect(
+            page.locator('[data-test="dispo-order-fixed-price-ae-0"]'),
+        ).toContainText('1.764,71');
+    });
 });

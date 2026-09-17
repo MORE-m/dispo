@@ -13,6 +13,9 @@ export function PositionPriceSummary({
     pricingSettlementMode,
     effectivePayFactorPercent,
     effectiveDiscountPercent,
+    effectiveDiscountBeforeAePercent,
+    aeAmount,
+    afterOrderDiscount,
 }: {
     positionIndex: number;
     averageSecondPrice?: string | null;
@@ -21,8 +24,16 @@ export function PositionPriceSummary({
     pricingSettlementMode?: string | null;
     effectivePayFactorPercent?: string | null;
     effectiveDiscountPercent?: string | null;
+    effectiveDiscountBeforeAePercent?: string | null;
+    aeAmount?: string | null;
+    afterOrderDiscount?: string | null;
 }) {
     const fixedPrice = isFixedPriceSettlement(pricingSettlementMode);
+    const showAe =
+        fixedPrice &&
+        aeAmount !== null &&
+        aeAmount !== undefined &&
+        Number(aeAmount) > 0;
 
     return (
         <div className="bg-muted/20 border-border/60 flex flex-wrap gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-sm">
@@ -56,6 +67,40 @@ export function PositionPriceSummary({
                     {money(nnInvest)}
                 </span>
             </span>
+            {showAe ? (
+                <>
+                    <span
+                        aria-hidden="true"
+                        className="text-border hidden sm:inline"
+                    >
+                        ·
+                    </span>
+                    <span className="text-muted-foreground">
+                        Netto vor AE{' '}
+                        <span
+                            className="text-foreground font-medium"
+                            data-test={`fixed-price-net-before-ae-${positionIndex}`}
+                        >
+                            {money(afterOrderDiscount ?? nnInvest)}
+                        </span>
+                    </span>
+                    <span
+                        aria-hidden="true"
+                        className="text-border hidden sm:inline"
+                    >
+                        ·
+                    </span>
+                    <span className="text-muted-foreground">
+                        AE{' '}
+                        <span
+                            className="text-foreground font-medium"
+                            data-test={`fixed-price-ae-amount-${positionIndex}`}
+                        >
+                            {money(aeAmount)}
+                        </span>
+                    </span>
+                </>
+            ) : null}
             {fixedPrice && effectivePayFactorPercent ? (
                 <>
                     <span
@@ -84,12 +129,31 @@ export function PositionPriceSummary({
                         ·
                     </span>
                     <span className="text-muted-foreground">
-                        Gesamtabschlag{' '}
+                        Gesamtabschlag (→ N/N){' '}
                         <span
                             className="text-foreground font-medium"
                             data-test={`fixed-price-discount-${positionIndex}`}
                         >
                             {formatPercent(effectiveDiscountPercent)}
+                        </span>
+                    </span>
+                </>
+            ) : null}
+            {showAe && effectiveDiscountBeforeAePercent ? (
+                <>
+                    <span
+                        aria-hidden="true"
+                        className="text-border hidden sm:inline"
+                    >
+                        ·
+                    </span>
+                    <span className="text-muted-foreground">
+                        Rabatt vor AE{' '}
+                        <span
+                            className="text-foreground font-medium"
+                            data-test={`fixed-price-discount-before-ae-${positionIndex}`}
+                        >
+                            {formatPercent(effectiveDiscountBeforeAePercent)}
                         </span>
                     </span>
                 </>
