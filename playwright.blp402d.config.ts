@@ -17,6 +17,9 @@ const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 const e2eEnv = {
     APP_ENV: 'testing',
     E2E_SERVER: '1',
+    APP_KEY:
+        process.env.APP_KEY ??
+        'base64:2fl+Ktvkfl+Fuz4Qp/Ej30N8mK8nwZuqqjHadrQtdZg=',
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: e2eDb,
     DB_URL: '',
