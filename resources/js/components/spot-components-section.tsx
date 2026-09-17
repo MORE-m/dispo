@@ -1,4 +1,4 @@
-import { FormField } from '@/components/form-field';
+import { FormField, money } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -97,7 +97,7 @@ export function SpotComponentsSection({
                     ? ` · Index ${lengthIndex}`
                     : ''}
                 {!isIndividual && positionMediaGross
-                    ? ` · Brutto ${positionMediaGross}`
+                    ? ` · Brutto ${money(positionMediaGross)}`
                     : ''}
             </p>
 
@@ -147,7 +147,7 @@ export function SpotComponentsSection({
                                 >
                                     Index: {result?.length_index ?? '–'}
                                     {result?.media_gross
-                                        ? ` · Brutto ${result.media_gross}`
+                                        ? ` · Brutto ${money(result.media_gross)}`
                                         : ''}
                                 </p>
                             ) : null}
@@ -187,7 +187,7 @@ export function SpotComponentsSection({
                     className="text-sm font-medium"
                     data-test={`spot-components-position-gross-${positionIndex}`}
                 >
-                    Positionsbrutto: {positionMediaGross}
+                    Positionsbrutto: {money(positionMediaGross)}
                 </p>
             ) : null}
         </section>

@@ -37,6 +37,9 @@ describe('SpotComponentsSection', () => {
         expect(
             screen.getByTestId('spot-components-total-length-0').textContent,
         ).toContain('Gesamtlänge: 20s');
+        expect(
+            screen.getByTestId('spot-components-total-length-0').textContent,
+        ).toMatch(/Brutto\s+600,00\s*€/);
 
         fireEvent.click(screen.getByTestId('spot-components-add-allonge-0'));
         expect(onChange).toHaveBeenCalled();
@@ -86,8 +89,14 @@ describe('SpotComponentsSection', () => {
             screen.getByTestId('spot-components-strategy-hint-0').textContent,
         ).toContain('Komponenten einzeln berechnen');
         expect(
+            screen.getByTestId('spot-component-result-main_spot-0').textContent,
+        ).toMatch(/Brutto\s+420,00\s*€/);
+        expect(
+            screen.getByTestId('spot-component-result-allonge-0').textContent,
+        ).toMatch(/Brutto\s+220,00\s*€/);
+        expect(
             screen.getByTestId('spot-components-position-gross-0').textContent,
-        ).toContain('640.00');
+        ).toMatch(/Positionsbrutto:\s+640,00\s*€/);
 
         fireEvent.click(screen.getByTestId('spot-components-remove-allonge-0'));
         expect(onChange).toHaveBeenCalled();

@@ -77,7 +77,29 @@ async function setRuleStrategyIndividual(page: Page) {
         '[data-test^="inventory-medium-rule-strategy-"]',
     );
     await expect(strategySelect.first()).toBeVisible();
+
+    const responsePromise = page.waitForResponse((response) => {
+        const request = response.request();
+
+        return (
+            request.method() === 'PUT' &&
+            /\/administration\/inventare\/\d+\/werbemittel-regeln\/\d+/.test(
+                response.url(),
+            )
+        );
+    });
+
     await strategySelect.first().selectOption('individual');
+    const response = await responsePromise;
+    expect(response.status()).toBe(200);
+    const payload = (await response.json()) as {
+        rule?: { component_calculation_strategy?: string };
+        lock_version?: number;
+    };
+    expect(payload.rule?.component_calculation_strategy).toBe('individual');
+    expect(typeof payload.lock_version).toBe('number');
+    expect(payload.lock_version as number).toBeGreaterThanOrEqual(1);
+
     await expect(strategySelect.first()).toHaveValue('individual');
     await logout(page);
 }
@@ -230,16 +252,16 @@ test.describe.serial('BL-P4-02c Spot-Komponenten', () => {
         ).toContainText('Index: 105');
         await expect(
             page.locator('[data-test="spot-component-result-main_spot-0"]'),
-        ).toContainText('420.00');
+        ).toContainText('420,00');
         await expect(
             page.locator('[data-test="spot-component-result-allonge-0"]'),
         ).toContainText('Index: 110');
         await expect(
             page.locator('[data-test="spot-component-result-allonge-0"]'),
-        ).toContainText('220.00');
+        ).toContainText('220,00');
         await expect(
             page.locator('[data-test="spot-components-position-gross-0"]'),
-        ).toContainText('640.00');
+        ).toContainText('640,00');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.locator('[data-test="wizard-save"]').click();
