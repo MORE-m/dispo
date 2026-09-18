@@ -40,6 +40,9 @@ describe('SpotComponentsSection', () => {
         expect(
             screen.getByTestId('spot-components-total-length-0').textContent,
         ).toMatch(/Brutto\s+600,00\s*€/);
+        expect(
+            screen.getByTestId('spot-component-length-main_spot-0'),
+        ).toBeTruthy();
 
         fireEvent.click(screen.getByTestId('spot-components-add-allonge-0'));
         expect(onChange).toHaveBeenCalled();
@@ -99,6 +102,77 @@ describe('SpotComponentsSection', () => {
         ).toMatch(/Positionsbrutto:\s+640,00\s*€/);
 
         fireEvent.click(screen.getByTestId('spot-components-remove-allonge-0'));
+        expect(onChange).toHaveBeenCalled();
+    });
+
+    it('renders forced tandem profile without allonge or deactivate', () => {
+        const onChange = vi.fn();
+        const onDeactivate = vi.fn();
+
+        render(
+            <SpotComponentsSection
+                positionIndex={1}
+                profile="tandem"
+                profileLabel="Tandem / Reminder"
+                profileMeta={{
+                    unit_label: 'Tandem-Einheiten',
+                    unit_count: 2,
+                    slots: [
+                        {
+                            role: 'main_spot',
+                            label: 'Hauptspot',
+                            sort: 1,
+                        },
+                        { role: 'reminder', label: 'Reminder', sort: 2 },
+                    ],
+                }}
+                unitCount={4}
+                components={[
+                    {
+                        role: 'main_spot',
+                        label: 'Hauptspot',
+                        length_seconds: 20,
+                        sort: 1,
+                    },
+                    {
+                        role: 'reminder',
+                        label: 'Reminder',
+                        length_seconds: 10,
+                        sort: 2,
+                    },
+                ]}
+                strategy="shared_total_length"
+                canEdit
+                onChange={onChange}
+                onDeactivate={onDeactivate}
+            />,
+        );
+
+        expect(screen.getByText('Tandem / Reminder')).toBeTruthy();
+        expect(
+            screen.queryByTestId('spot-components-deactivate-1'),
+        ).toBeNull();
+        expect(
+            screen.queryByTestId('spot-components-add-allonge-1'),
+        ).toBeNull();
+        expect(
+            screen.getByTestId('spot-components-units-1').textContent,
+        ).toContain('Tandem-Einheiten: 4');
+        expect(
+            screen.getByTestId('spot-components-derived-airings-1')
+                .textContent,
+        ).toBe('8');
+        expect(
+            screen.getByTestId('spot-component-length-main_spot-1-1'),
+        ).toBeTruthy();
+        expect(
+            screen.getByTestId('spot-component-length-reminder-2-1'),
+        ).toBeTruthy();
+
+        fireEvent.change(
+            screen.getByTestId('spot-component-length-reminder-2-1'),
+            { target: { value: '12' } },
+        );
         expect(onChange).toHaveBeenCalled();
     });
 });
