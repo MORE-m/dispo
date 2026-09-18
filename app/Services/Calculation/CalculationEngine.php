@@ -12,7 +12,7 @@ use App\Enums\SpotCalculationMethod;
  * CAL-005, COM-001, COM-002, COM-007, COM-008.
  * BL-P4-02c / AT-04: Spot-Komponenten (Hauptspot + Allonge).
  * BL-P4-02d: Preisabschluss normal|fixed_price (Festpreis-N/N unabhängig von spot_method).
- * SPT-012 und Tandem/Tridem/Abbinder/Reminder sind nicht vollständig umgesetzt.
+ * BL-P4-02e / SPT-012: Tandem/Tridem über shared_total_length + component_profile (keine Formel-Duplikate).
  */
 final class CalculationEngine
 {

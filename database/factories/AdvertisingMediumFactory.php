@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\CalculationKind;
 use App\Enums\CalculationMethodMode;
+use App\Enums\SpotComponentProfile;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
@@ -30,7 +31,28 @@ class AdvertisingMediumFactory extends Factory
             'is_active' => true,
             'sort' => 0,
             'lock_version' => 1,
+            'component_profile' => null,
         ];
+    }
+
+    public function tandem(): static
+    {
+        return $this->state(fn (): array => [
+            'component_profile' => SpotComponentProfile::Tandem,
+            'kind' => CalculationKind::SpotClassic,
+            'name' => 'Spot Tandem',
+            'code' => 'spot_tandem',
+        ]);
+    }
+
+    public function tridem(): static
+    {
+        return $this->state(fn (): array => [
+            'component_profile' => SpotComponentProfile::Tridem,
+            'kind' => CalculationKind::SpotClassic,
+            'name' => 'Spot Tridem',
+            'code' => 'spot_tridem',
+        ]);
     }
 
     private function spotsCategoryId(): int

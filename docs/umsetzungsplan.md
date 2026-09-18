@@ -94,7 +94,9 @@ umgesetzt, Export Spot-Verteilung offen. **02c umgesetzt (PR #59)** – AT-04
 Hauptspot+Allonge manuell abgenommen. **02d umgesetzt (Worktree, offener PR):**
 Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis
 `average`|`calendar`; Registry-Methode **`fixed_price`** weiter **`planned`**.
-`BL-P4-02` insgesamt offen (SPT-008 Export, SPT-012, …).
+**02e umgesetzt (Worktree, offener PR):** Tandem/Tridem (`component_profile`),
+**SPT-012** über `shared_total_length` ohne ×2/×3; Reminder-Rollen; **`individual`**
+für Profile fail-closed. `BL-P4-02` insgesamt offen (SPT-008 Export, Abbinder/SPT-013, …).
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

@@ -56,6 +56,22 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `PriceListPinOnMethodChangeTest`, `SpotClassicAverageAcceptanceHardeningTest`
 - MySQL: `PriceListPinOnMethodChangeMysqlTest` (`phpunit.mysql.xml`)
 
+### BL-P4-02e (Tandem / Tridem / SPT-012)
+
+- Werbemittel mit **`component_profile`** `tandem` bzw. `tridem`; Positions-Freeze Calc + Dispo
+- Tandem: exakt Hauptspot + Reminder; Tridem: Hauptspot + zwei Reminder (`sort` 1–3; UI „Reminder 1/2“)
+- Strategie verbindlich **`shared_total_length`**; **`individual`** → 422
+- Rechenbeispiele (Average, Ø-Sekundenpreis 2,00): Tandem 10 Einheiten, 20+10 s, Index 100 → **600,00**;
+  Tridem 10 Einheiten, 20+10+10 s, Index 95 → **760,00**; **keine** ×2/×3 auf Spotanzahl
+- Buchungsmenge = Tandem-/Tridem-Einheiten; abgeleitete Ausstrahlungen (×2/×3) nur Anzeige
+- Average + Calendar + Festpreis-Abschluss (02d) kompatibel; Allonge-Regression ohne Profil unverändert
+- Unit: `TandemTridemCalculationTest`, `ComponentProfileValidatorTest`
+- Feature: `SpotClassicTandemTridemTest`; MySQL: `SpotClassicTandemTridemMysqlTest`
+- Vitest: `spot-components.test.ts`
+- E2E: `playwright.blp402e.config.ts` (Port **8028**, Seeder `E2ETandemTridemSeeder`)
+- **SPT-012 erledigt**; SPT-013 teilweise (Abbinder offen); `fixed_price` planned; SPT-008 Export offen;
+  `BL-P4-02` insgesamt offen
+
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
 - Positionsfeld **`pricing_settlement_mode`**: `normal` (Rabatt-/AE-Pipeline) oder
@@ -70,7 +86,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `SpotClassicFixedPriceSettlementTest`; MySQL: `SpotClassicFixedPriceSettlementMysqlTest`
 - Vitest: `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`
 - E2E: `playwright.blp402d.config.ts` (Port **8026**, Seeder `E2ESpotComponentsSeeder`)
-- `BL-P4-02` insgesamt weiter offen (SPT-008 Export, SPT-012, …)
+- `BL-P4-02` insgesamt weiter offen (SPT-008 Export, Abbinder; Tandem/Tridem siehe **02e**)
 
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 
@@ -80,7 +96,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   absent/`null`/`[]`; Strategie-Mismatch 422; kanonische Labels; Admin-`lock_version`/409;
   Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten
 - Unit-/Feature-/MySQL-/Vitest-/Playwright (`playwright.blp402c.config.ts`, Port 8025)
-- SPT-012 offen; SPT-013 nur teilweise; SPT-014 Hauptspot/Allonge umgesetzt;
+- SPT-012 siehe **BL-P4-02e**; SPT-013 nur teilweise (Abbinder offen); SPT-014 Hauptspot/Allonge umgesetzt;
   SPT-015 unverändert; `fixed_price` planned; SPT-008 Export offen; `BL-P4-02` insgesamt offen
 
 ### BL-P4-02b (Kalenderplaner / AT-02)

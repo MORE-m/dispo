@@ -105,6 +105,8 @@ type OrderPosition = {
     spot_method_label: string;
     length_seconds: number;
     component_calculation_strategy?: string | null;
+    component_profile?: 'tandem' | 'tridem' | null;
+    derived_component_airings?: number | null;
     components?: Array<{
         role: string;
         label: string;
@@ -153,6 +155,39 @@ type OrderPosition = {
         position_flight_period?: boolean;
     };
 };
+
+const COMPONENT_PROFILE_UI: Record<
+    'tandem' | 'tridem',
+    { label: string; unit_label: string }
+> = {
+    tandem: {
+        label: 'Tandem / Reminder',
+        unit_label: 'Tandem-Einheiten',
+    },
+    tridem: {
+        label: 'Tridem',
+        unit_label: 'Tridem-Einheiten',
+    },
+};
+
+function componentDisplayLabel(
+    position: OrderPosition,
+    component: NonNullable<OrderPosition['components']>[number],
+): string {
+    if (
+        position.component_profile === 'tridem' &&
+        component.role === 'reminder'
+    ) {
+        if (component.sort === 2) {
+            return 'Reminder 1';
+        }
+        if (component.sort === 3) {
+            return 'Reminder 2';
+        }
+    }
+
+    return component.label;
+}
 
 type OrderDetail = {
     id: number;
@@ -1643,6 +1678,42 @@ export default function DispoOrderShow({
                                             className="text-muted-foreground mt-2 space-y-1 text-xs"
                                             data-test={`dispo-order-position-components-${index}`}
                                         >
+                                            {position.component_profile &&
+                                            COMPONENT_PROFILE_UI[
+                                                position.component_profile
+                                            ] ? (
+                                                <p
+                                                    data-test={`dispo-order-position-profile-${index}`}
+                                                >
+                                                    Komponentenprofil:{' '}
+                                                    {
+                                                        COMPONENT_PROFILE_UI[
+                                                            position
+                                                                .component_profile
+                                                        ].label
+                                                    }
+                                                    {' · '}
+                                                    {
+                                                        COMPONENT_PROFILE_UI[
+                                                            position
+                                                                .component_profile
+                                                        ].unit_label
+                                                    }
+                                                    :{' '}
+                                                    {position.total_spot_count}
+                                                    {position.derived_component_airings !=
+                                                    null ? (
+                                                        <>
+                                                            {' '}
+                                                            · abgeleitete
+                                                            Sendungen:{' '}
+                                                            {
+                                                                position.derived_component_airings
+                                                            }
+                                                        </>
+                                                    ) : null}
+                                                </p>
+                                            ) : null}
                                             <p>
                                                 Spot-Komponenten ·{' '}
                                                 {position.component_calculation_strategy ===
@@ -1651,12 +1722,21 @@ export default function DispoOrderShow({
                                                     : 'Gemeinsame Gesamtlänge'}
                                             </p>
                                             <ul className="list-inside list-disc">
-                                                {position.components.map(
-                                                    (component) => (
+                                                {[...position.components]
+                                                    .sort(
+                                                        (a, b) =>
+                                                            (a.sort ?? 0) -
+                                                            (b.sort ?? 0),
+                                                    )
+                                                    .map((component) => (
                                                         <li
                                                             key={`${component.role}-${component.sort ?? 0}`}
                                                         >
-                                                            {component.label}:{' '}
+                                                            {componentDisplayLabel(
+                                                                position,
+                                                                component,
+                                                            )}
+                                                            :{' '}
                                                             {
                                                                 component.length_seconds
                                                             }
@@ -1667,8 +1747,7 @@ export default function DispoOrderShow({
                                                                 ? ` · ${component.media_gross}`
                                                                 : ''}
                                                         </li>
-                                                    ),
-                                                )}
+                                                    ))}
                                             </ul>
                                         </div>
                                     ) : null}

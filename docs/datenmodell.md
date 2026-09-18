@@ -271,12 +271,17 @@ geschrieben (`BUD-008`).
 Unterobjekte werden typbezogen normalisiert:
 
 - `CalculationPositionComponent` (`calculation_position_components`) für Spot-Komponenten
-  (BL-P4-02c / AT-04, PR #59): `role` (`main_spot`, `allonge`; erweiterbar),
+  (BL-P4-02c / AT-04, PR #59; **BL-P4-02e** / SPT-012): `role` (`main_spot`, `allonge`,
+  `reminder`; wiederholbare Rollen über `sort`, z. B. zwei `reminder` bei Tridem),
   `label`, `length_seconds`, `sort`, optionale Snapshot-Felder `length_index`/`media_gross`.
-  Position: nullable `component_calculation_strategy` (Freeze). Ohne Komponenten bleibt
+  Position: nullable `component_calculation_strategy` (Freeze) und nullable
+  `component_profile` (`tandem`|`tridem`; Freeze, Parität Dispo). Ohne Komponenten bleibt
   Legacy-`length_seconds`. Admin-Default auf `inventory_medium_rules.component_calculation_strategy`
-  (`shared_total_length`). Dispo: `components_snapshot` + eingefrorene Strategie.
-  SPT-012 offen; SPT-013 teilweise; SPT-014 Hauptspot/Allonge umgesetzt,
+  (`shared_total_length`; bei erzwungenem Profil immer `shared_total_length`). Dispo:
+  `components_snapshot`, eingefrorene Strategie und `component_profile`.
+  **`AdvertisingMedium.component_profile`:** `null` = optionales Hauptspot/Allonge (02c);
+  `tandem`/`tridem` erzwingen Slot-Schema und schließen `individual` aus.
+  **SPT-012 erledigt** (02e); SPT-013 teilweise (Abbinder offen); SPT-014 Hauptspot/Allonge umgesetzt,
 - `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
   Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme)
   – Methode `average`,
@@ -313,7 +318,8 @@ ist unzulässig.
 in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
 **BL-P4-02b** zusätzlich `planner_entries_snapshot` JSON für Kalenderplaner-Zellen,
 PR **#58**). Ab **BL-P4-02d** zusätzlich `pricing_settlement_mode` und
-`fixed_price_nn` im Positions-Snapshot (Parität zu `CalculationPosition`).
+`fixed_price_nn` im Positions-Snapshot (Parität zu `CalculationPosition`). Ab
+**BL-P4-02e** zusätzlich `component_profile` (Parität zu `CalculationPosition`).
 Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als

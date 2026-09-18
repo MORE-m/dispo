@@ -13,6 +13,7 @@ use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Exceptions\FieldSetAssignmentConflictException;
+use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
@@ -397,8 +398,20 @@ class CalculationPayloadRequest extends FormRequest
                 }
 
                 $method = SpotCalculationMethod::tryFrom($methodKey) ?? SpotCalculationMethod::Average;
+                $profile = null;
+                $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+                if ($mediumId > 0) {
+                    $medium = AdvertisingMedium::query()->find($mediumId);
+                    $profile = $medium?->component_profile;
+                }
                 try {
-                    app(ComponentValidator::class)->validateAndNormalize($position, (int) $index, $method);
+                    app(ComponentValidator::class)->validateAndNormalize(
+                        $position,
+                        (int) $index,
+                        $method,
+                        null,
+                        $profile,
+                    );
                 } catch (ValidationException $exception) {
                     foreach ($exception->errors() as $key => $messages) {
                         foreach ($messages as $message) {

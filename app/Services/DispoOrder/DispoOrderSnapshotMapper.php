@@ -13,6 +13,7 @@ use App\Models\CalculationPositionTimeRange;
 use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
+use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Inventory\InventoryIdentity;
 use Illuminate\Support\Collection;
@@ -101,6 +102,13 @@ final class DispoOrderSnapshotMapper
             'algorithm_version' => $freeze->algorithmVersion,
             'length_seconds' => $position->length_seconds,
             'component_calculation_strategy' => $position->component_calculation_strategy,
+            'component_profile' => $position->component_profile?->value,
+            'derived_component_airings' => $position->component_profile !== null
+                ? SpotComponentProfileContract::derivedAirings(
+                    $position->component_profile,
+                    (int) $position->total_spot_count,
+                )
+                : null,
             'total_spot_count' => $position->total_spot_count,
             'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
             'price_list_id' => $position->price_list_id,

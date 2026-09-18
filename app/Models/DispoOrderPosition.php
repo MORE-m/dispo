@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CalculationKind;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -30,6 +31,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $calculation_method_key
  * @property string|null $calculation_method_name
  * @property string|null $algorithm_version
+ * @property string|null $component_calculation_strategy
+ * @property SpotComponentProfile|null $component_profile
+ * @property int|null $derived_component_airings
+ * @property int $total_spot_count
+ * @property int $length_seconds
+ * @property array<int, array<string, mixed>>|null $components_snapshot
  */
 class DispoOrderPosition extends Model
 {
@@ -55,6 +62,8 @@ class DispoOrderPosition extends Model
         'algorithm_version',
         'length_seconds',
         'component_calculation_strategy',
+        'component_profile',
+        'derived_component_airings',
         'total_spot_count',
         'needs_spot_redistribution',
         'price_list_id',
@@ -91,6 +100,7 @@ class DispoOrderPosition extends Model
         return [
             'kind' => CalculationKind::class,
             'spot_method' => SpotCalculationMethod::class,
+            'component_profile' => SpotComponentProfile::class,
             'average_second_price' => 'decimal:4',
             'surcharge_percent' => 'decimal:4',
             'position_discount_percent' => 'decimal:4',
