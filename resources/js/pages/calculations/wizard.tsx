@@ -88,10 +88,13 @@ import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
 import { SpotComponentsSection } from '@/components/spot-components-section';
 import {
     activateComponentsFromLength,
+    buildProfileComponents,
+    isForcedProfile,
     resolveStrategyFromRule,
     totalComponentLength,
     type ComponentCalculationStrategy,
     type SpotComponentDraft,
+    type SpotComponentProfile,
 } from '@/lib/spot-components';
 import {
     EmptyState,
@@ -253,6 +256,27 @@ type PositionDraft = {
 
 type PeriodValue = { start: string | null; end: string | null } | null;
 
+type ComponentProfilesProp = Record<
+    SpotComponentProfile,
+    {
+        label: string;
+        unit_label: string;
+        unit_count: number;
+        required_strategy: string;
+        slots: Array<{
+            role: string;
+            label: string;
+            display_label?: string;
+            sort: number;
+        }>;
+    }
+>;
+
+type ComponentStashEntry = {
+    components: SpotComponentDraft[];
+    strategy: ComponentCalculationStrategy | null;
+};
+
 type Catalog = {
     inventories: {
         id: number;
@@ -273,6 +297,7 @@ type Catalog = {
         is_bookable_for_new_positions: boolean;
         unbookable_reason: string | null;
         calculation_method_options?: CalculationMethodOptions | null;
+        component_profile?: SpotComponentProfile | null;
     }[];
     rules: {
         id: number;
@@ -454,6 +479,7 @@ type SavedCalculation = {
         length_seconds: number;
         components?: SpotComponentDraft[];
         component_calculation_strategy?: string | null;
+        component_profile?: SpotComponentProfile | null;
         total_spot_count: number;
         needs_spot_redistribution?: boolean;
         price_year?: number | null;
@@ -584,6 +610,128 @@ function ruleFor(catalog: Catalog, inventoryId: number, mediumId: number) {
             item.inventory_id === inventoryId &&
             item.advertising_medium_id === mediumId,
     );
+}
+
+function profileForMedium(
+    catalog: Catalog,
+    mediumId: number,
+): SpotComponentProfile | null {
+    const profile = catalog.media.find(
+        (item) => item.id === mediumId,
+    )?.component_profile;
+
+    return profile === 'tandem' || profile === 'tridem' ? profile : null;
+}
+
+function componentStashKey(
+    clientKey: string,
+    profile: SpotComponentProfile | null,
+): string {
+    return `${clientKey}:${profile ?? 'optional'}`;
+}
+
+function positionUnitCount(position: PositionDraft): number {
+    if (isCalendarCalculationMethod(position.calculation_method_key)) {
+        return totalPlannerSpotCount(position.planner_entries);
+    }
+
+    if (position.time_ranges.length > 0) {
+        return totalSpotCount(position.time_ranges);
+    }
+
+    return position.total_spot_count;
+}
+
+function resolveComponentsAfterMediumChange(
+    item: PositionDraft,
+    newMediumId: number,
+    catalog: Catalog,
+    componentProfiles: ComponentProfilesProp,
+    stash: Map<string, ComponentStashEntry>,
+): {
+    components: SpotComponentDraft[];
+    strategy: ComponentCalculationStrategy | null;
+    length_seconds: number;
+} {
+    const medium = catalog.media.find(
+        (candidate) => candidate.id === newMediumId,
+    );
+    if (!medium) {
+        return {
+            components: item.components,
+            strategy: item.component_calculation_strategy,
+            length_seconds: item.length_seconds,
+        };
+    }
+
+    const oldProfile = profileForMedium(catalog, item.advertising_medium_id);
+    const newProfile = profileForMedium(catalog, newMediumId);
+    const rule = ruleFor(catalog, item.inventory_id, newMediumId);
+
+    if (item.components.length > 0 || item.component_calculation_strategy) {
+        stash.set(componentStashKey(item.client_key, oldProfile), {
+            components: item.components,
+            strategy: item.component_calculation_strategy,
+        });
+    }
+
+    let components: SpotComponentDraft[] = [];
+    let strategy: ComponentCalculationStrategy | null = null;
+
+    if (isForcedProfile(newProfile)) {
+        const meta = componentProfiles[newProfile];
+        const stashed = stash.get(
+            componentStashKey(item.client_key, newProfile),
+        );
+        const previous =
+            stashed && stashed.components.length > 0
+                ? stashed.components
+                : item.components;
+        components = buildProfileComponents(newProfile, meta.slots, previous);
+        strategy = 'shared_total_length';
+    } else if (isForcedProfile(oldProfile)) {
+        const stashed = stash.get(componentStashKey(item.client_key, null));
+        components = stashed?.components ?? [];
+        strategy = stashed?.strategy ?? null;
+    } else {
+        components = item.components.length > 0 ? item.components : [];
+        strategy = item.components.length
+            ? (item.component_calculation_strategy ??
+              resolveStrategyFromRule(rule?.component_calculation_strategy))
+            : null;
+    }
+
+    const length_seconds =
+        components.length > 0
+            ? totalComponentLength(components)
+            : (rule?.default_length_seconds ?? medium.default_length_seconds);
+
+    return { components, strategy, length_seconds };
+}
+
+function withForcedProfileComponentsIfNeeded(
+    position: PositionDraft,
+    catalog: Catalog,
+    componentProfiles: ComponentProfilesProp,
+): PositionDraft {
+    const profile = profileForMedium(catalog, position.advertising_medium_id);
+    if (!isForcedProfile(profile) || position.components.length > 0) {
+        return position;
+    }
+
+    const meta = componentProfiles[profile];
+    if (!meta) {
+        return position;
+    }
+
+    const components = buildProfileComponents(profile, meta.slots);
+
+    return {
+        ...position,
+        components,
+        component_calculation_strategy: 'shared_total_length',
+        length_seconds: totalComponentLength(components),
+    };
 }
 
 function catalogLabel(name: string, isActive: boolean): string {
@@ -799,6 +947,7 @@ function conflictMessage(
 
 export default function CalculationWizard({
     catalog,
+    component_profiles,
     dayGroups,
     discountTypes,
     fieldSchema,
@@ -812,6 +961,7 @@ export default function CalculationWizard({
     dispoOrderRevision = null,
 }: {
     catalog: Catalog;
+    component_profiles: ComponentProfilesProp;
     dayGroups: DayGroupOption[];
     discountTypes: DiscountTypeOption[];
     fieldSchema: FieldSchema;
@@ -1047,6 +1197,7 @@ export default function CalculationWizard({
     const [proposalError, setProposalError] = useState<string | null>(null);
     const [settlementValidationTouched, setSettlementValidationTouched] =
         useState<Record<number, true>>({});
+    const componentStashRef = useRef(new Map<string, ComponentStashEntry>());
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
             return calculation.positions.map((position) => {
@@ -1203,8 +1354,36 @@ export default function CalculationWizard({
         }
 
         const first = firstValidPosition(catalog);
-        return first ? [first] : [];
+        return first
+            ? [
+                  withForcedProfileComponentsIfNeeded(
+                      first,
+                      catalog,
+                      component_profiles,
+                  ),
+              ]
+            : [];
     });
+
+    useEffect(() => {
+        setPositions((current) => {
+            let changed = false;
+            const next = current.map((position) => {
+                const patched = withForcedProfileComponentsIfNeeded(
+                    position,
+                    catalog,
+                    component_profiles,
+                );
+                if (patched !== position) {
+                    changed = true;
+                }
+
+                return patched;
+            });
+
+            return changed ? next : current;
+        });
+    }, [catalog, component_profiles]);
 
     // DF-3.3a2β / C2: Positions-Fingerprints und -Schemas nachladen.
     // Generation pro client_key verhindert Out-of-order-Überschreiben.
@@ -1741,7 +1920,6 @@ export default function CalculationWizard({
                         return item;
                     }
 
-                    const rule = ruleFor(catalog, next.inventory_id, medium.id);
                     const methodState = methodStateAfterMediumIdChange(
                         item.advertising_medium_id,
                         medium.id,
@@ -1757,21 +1935,21 @@ export default function CalculationWizard({
                         medium.calculation_method_options,
                     );
 
+                    const componentState = resolveComponentsAfterMediumChange(
+                        item,
+                        medium.id,
+                        catalog,
+                        component_profiles,
+                        componentStashRef.current,
+                    );
+
                     next = {
                         ...next,
                         advertising_medium_id: medium.id,
                         ...methodState,
-                        length_seconds:
-                            rule?.default_length_seconds ??
-                            medium.default_length_seconds,
-                        components: next.components.length
-                            ? next.components
-                            : [],
-                        component_calculation_strategy: next.components.length
-                            ? resolveStrategyFromRule(
-                                  rule?.component_calculation_strategy,
-                              )
-                            : null,
+                        length_seconds: componentState.length_seconds,
+                        components: componentState.components,
+                        component_calculation_strategy: componentState.strategy,
                         schema_fingerprint: null,
                         field_schema: null,
                     };
@@ -2329,7 +2507,11 @@ export default function CalculationWizard({
                                                             );
                                                         if (first) {
                                                             setPositions([
-                                                                first,
+                                                                withForcedProfileComponentsIfNeeded(
+                                                                    first,
+                                                                    catalog,
+                                                                    component_profiles,
+                                                                ),
                                                             ]);
                                                         }
                                                     }
@@ -3659,116 +3841,198 @@ export default function CalculationWizard({
                                                             ) : null}
                                                         </div>
 
-                                                        <div className="space-y-2">
-                                                            {position.components
-                                                                .length === 0 &&
-                                                            canEdit ? (
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    data-test={`spot-components-activate-${index}`}
-                                                                    onClick={() => {
-                                                                        const rule =
-                                                                            ruleFor(
-                                                                                catalog,
-                                                                                position.inventory_id,
-                                                                                position.advertising_medium_id,
-                                                                            );
-                                                                        const next =
-                                                                            activateComponentsFromLength(
-                                                                                position.length_seconds,
-                                                                            );
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                components:
-                                                                                    next,
-                                                                                length_seconds:
-                                                                                    totalComponentLength(
-                                                                                        next,
-                                                                                    ),
-                                                                                component_calculation_strategy:
-                                                                                    position.component_calculation_strategy ??
-                                                                                    resolveStrategyFromRule(
-                                                                                        rule?.component_calculation_strategy,
-                                                                                    ),
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    Spot-Komponenten
-                                                                    aktivieren
-                                                                </Button>
-                                                            ) : null}
-                                                            {position.components
-                                                                .length > 0 ? (
-                                                                <SpotComponentsSection
-                                                                    positionIndex={
-                                                                        index
-                                                                    }
-                                                                    components={
-                                                                        position.components
-                                                                    }
-                                                                    strategy={
-                                                                        position.component_calculation_strategy ??
-                                                                        'shared_total_length'
-                                                                    }
-                                                                    canEdit={
-                                                                        canEdit
-                                                                    }
-                                                                    positionMediaGross={
-                                                                        displayTotals
-                                                                            ?.positions?.[
-                                                                            index
-                                                                        ]
-                                                                            ?.media_gross
-                                                                    }
-                                                                    componentResults={
-                                                                        displayTotals
-                                                                            ?.positions?.[
-                                                                            index
-                                                                        ]
-                                                                            ?.components
-                                                                    }
-                                                                    lengthIndex={
-                                                                        displayTotals
-                                                                            ?.positions?.[
-                                                                            index
-                                                                        ]
-                                                                            ?.length_index
-                                                                    }
-                                                                    errors={
-                                                                        fieldErrors
-                                                                    }
-                                                                    onChange={(
-                                                                        components,
-                                                                    ) =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
+                                                        {(() => {
+                                                            const positionProfile =
+                                                                profileForMedium(
+                                                                    catalog,
+                                                                    position.advertising_medium_id,
+                                                                );
+                                                            const forcedProfile =
+                                                                isForcedProfile(
+                                                                    positionProfile,
+                                                                );
+                                                            const profileMeta =
+                                                                positionProfile
+                                                                    ? component_profiles[
+                                                                          positionProfile
+                                                                      ]
+                                                                    : undefined;
+
+                                                            return (
+                                                                <div className="space-y-2">
+                                                                    {!forcedProfile &&
+                                                                    position
+                                                                        .components
+                                                                        .length ===
+                                                                        0 &&
+                                                                    canEdit ? (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            data-test={`spot-components-activate-${index}`}
+                                                                            onClick={() => {
+                                                                                const rule =
+                                                                                    ruleFor(
+                                                                                        catalog,
+                                                                                        position.inventory_id,
+                                                                                        position.advertising_medium_id,
+                                                                                    );
+                                                                                const next =
+                                                                                    activateComponentsFromLength(
+                                                                                        position.length_seconds,
+                                                                                    );
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        components:
+                                                                                            next,
+                                                                                        length_seconds:
+                                                                                            totalComponentLength(
+                                                                                                next,
+                                                                                            ),
+                                                                                        component_calculation_strategy:
+                                                                                            position.component_calculation_strategy ??
+                                                                                            resolveStrategyFromRule(
+                                                                                                rule?.component_calculation_strategy,
+                                                                                            ),
+                                                                                    },
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            Spot-Komponenten
+                                                                            aktivieren
+                                                                        </Button>
+                                                                    ) : null}
+                                                                    {forcedProfile ||
+                                                                    position
+                                                                        .components
+                                                                        .length >
+                                                                        0 ? (
+                                                                        <SpotComponentsSection
+                                                                            positionIndex={
+                                                                                index
+                                                                            }
+                                                                            profile={
+                                                                                positionProfile
+                                                                            }
+                                                                            profileLabel={
+                                                                                profileMeta?.label
+                                                                            }
+                                                                            profileMeta={
+                                                                                profileMeta
+                                                                                    ? {
+                                                                                          unit_label:
+                                                                                              profileMeta.unit_label,
+                                                                                          unit_count:
+                                                                                              profileMeta.unit_count,
+                                                                                          slots: profileMeta.slots,
+                                                                                      }
+                                                                                    : undefined
+                                                                            }
+                                                                            unitCount={positionUnitCount(
+                                                                                position,
+                                                                            )}
+                                                                            components={
+                                                                                position.components
+                                                                            }
+                                                                            strategy={
+                                                                                position.component_calculation_strategy ??
+                                                                                'shared_total_length'
+                                                                            }
+                                                                            canEdit={
+                                                                                canEdit
+                                                                            }
+                                                                            positionMediaGross={
+                                                                                displayTotals
+                                                                                    ?.positions?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.media_gross
+                                                                            }
+                                                                            componentResults={
+                                                                                displayTotals
+                                                                                    ?.positions?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.components
+                                                                            }
+                                                                            lengthIndex={
+                                                                                displayTotals
+                                                                                    ?.positions?.[
+                                                                                    index
+                                                                                ]
+                                                                                    ?.length_index
+                                                                            }
+                                                                            errors={
+                                                                                fieldErrors
+                                                                            }
+                                                                            onChange={(
                                                                                 components,
-                                                                                length_seconds:
-                                                                                    totalComponentLength(
+                                                                            ) =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
                                                                                         components,
-                                                                                    ),
-                                                                            },
-                                                                        )
+                                                                                        length_seconds:
+                                                                                            totalComponentLength(
+                                                                                                components,
+                                                                                            ),
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                            onDeactivate={() =>
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        components:
+                                                                                            [],
+                                                                                        component_calculation_strategy:
+                                                                                            null,
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    ) : null}
+                                                                </div>
+                                                            );
+                                                        })()}
+
+                                                        {(() => {
+                                                            const positionProfile =
+                                                                profileForMedium(
+                                                                    catalog,
+                                                                    position.advertising_medium_id,
+                                                                );
+                                                            const profileMeta =
+                                                                positionProfile
+                                                                    ? component_profiles[
+                                                                          positionProfile
+                                                                      ]
+                                                                    : undefined;
+
+                                                            if (!profileMeta) {
+                                                                return null;
+                                                            }
+
+                                                            return (
+                                                                <p
+                                                                    className="text-muted-foreground text-xs"
+                                                                    data-test={`spot-units-hint-${index}`}
+                                                                >
+                                                                    {
+                                                                        profileMeta.unit_label
+                                                                    }{' '}
+                                                                    (Spot-Anzahlen
+                                                                    unten
+                                                                    entsprechen{' '}
+                                                                    {
+                                                                        profileMeta.unit_label
                                                                     }
-                                                                    onDeactivate={() =>
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                components:
-                                                                                    [],
-                                                                                component_calculation_strategy:
-                                                                                    null,
-                                                                            },
-                                                                        )
-                                                                    }
-                                                                />
-                                                            ) : null}
-                                                        </div>
+                                                                    )
+                                                                </p>
+                                                            );
+                                                        })()}
 
                                                         {isCalendarCalculationMethod(
                                                             position.calculation_method_key,
@@ -3968,7 +4232,11 @@ export default function CalculationWizard({
                                                 if (next) {
                                                     setPositions([
                                                         ...positions,
-                                                        next,
+                                                        withForcedProfileComponentsIfNeeded(
+                                                            next,
+                                                            catalog,
+                                                            component_profiles,
+                                                        ),
                                                     ]);
                                                 }
                                             }}

@@ -3,21 +3,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
     COMPONENT_STRATEGY_LABELS,
+    derivedAirings,
     type ComponentCalculationStrategy,
     type SpotComponentDraft,
+    type SpotComponentProfile,
     addAllonge,
     hasAllonge,
+    isForcedProfile,
     removeAllonge,
     totalComponentLength,
     updateComponentLength,
+    updateComponentLengthBySort,
 } from '@/lib/spot-components';
 
 type ComponentResult = {
     role: string;
     label: string;
     length_seconds: number;
+    sort?: number;
     length_index?: number | null;
     media_gross?: string | null;
+};
+
+type ProfileMeta = {
+    unit_label: string;
+    unit_count: number;
+    slots: Array<{
+        role: string;
+        label: string;
+        display_label?: string;
+        sort: number;
+    }>;
 };
 
 type SpotComponentsSectionProps = {
@@ -25,6 +41,10 @@ type SpotComponentsSectionProps = {
     components: SpotComponentDraft[];
     strategy: ComponentCalculationStrategy;
     canEdit: boolean;
+    profile?: SpotComponentProfile | null;
+    profileLabel?: string;
+    profileMeta?: ProfileMeta;
+    unitCount?: number;
     positionMediaGross?: string | null;
     componentResults?: ComponentResult[];
     lengthIndex?: number | null;
@@ -33,11 +53,39 @@ type SpotComponentsSectionProps = {
     onDeactivate: () => void;
 };
 
+function lengthTestId(
+    component: SpotComponentDraft,
+    positionIndex: number,
+    forced: boolean,
+): string {
+    if (forced) {
+        return `spot-component-length-${component.role}-${component.sort}-${positionIndex}`;
+    }
+
+    return `spot-component-length-${component.role}-${positionIndex}`;
+}
+
+function componentTestId(
+    component: SpotComponentDraft,
+    positionIndex: number,
+    forced: boolean,
+): string {
+    if (forced) {
+        return `spot-component-${component.role}-${component.sort}-${positionIndex}`;
+    }
+
+    return `spot-component-${component.role}-${positionIndex}`;
+}
+
 export function SpotComponentsSection({
     positionIndex,
     components,
     strategy,
     canEdit,
+    profile = null,
+    profileLabel,
+    profileMeta,
+    unitCount = 0,
     positionMediaGross,
     componentResults = [],
     lengthIndex,
@@ -45,14 +93,26 @@ export function SpotComponentsSection({
     onChange,
     onDeactivate,
 }: SpotComponentsSectionProps) {
+    const forced = isForcedProfile(profile);
+    const sortedComponents = forced
+        ? [...components].sort((a, b) => a.sort - b.sort)
+        : components;
     const total = totalComponentLength(components);
     const allongePresent = hasAllonge(components);
     const strategyLabel = COMPONENT_STRATEGY_LABELS[strategy];
     const isIndividual = strategy === 'individual';
+    const sectionTitle = forced
+        ? (profileLabel ?? profileMeta?.unit_label ?? 'Spot-Komponenten')
+        : 'Spot-Komponenten';
 
     const resultByRole = Object.fromEntries(
         componentResults.map((row) => [row.role, row]),
     );
+
+    const derived =
+        forced && profileMeta
+            ? derivedAirings(unitCount, profileMeta.unit_count)
+            : null;
 
     return (
         <section
@@ -66,7 +126,7 @@ export function SpotComponentsSection({
                         id={`spot-components-heading-${positionIndex}`}
                         className="text-sm font-semibold"
                     >
-                        Spot-Komponenten
+                        {sectionTitle}
                     </h3>
                     <p
                         className="text-muted-foreground mt-1 text-xs"
@@ -74,8 +134,27 @@ export function SpotComponentsSection({
                     >
                         Strategie (administrativ vorgegeben): {strategyLabel}
                     </p>
+                    {forced && profileMeta ? (
+                        <p
+                            className="text-muted-foreground mt-1 text-xs"
+                            data-test={`spot-components-units-${positionIndex}`}
+                        >
+                            {profileMeta.unit_label}: {unitCount}
+                            {derived !== null ? (
+                                <>
+                                    {' '}
+                                    · abgeleitete Sendungen:{' '}
+                                    <span
+                                        data-test={`spot-components-derived-airings-${positionIndex}`}
+                                    >
+                                        {derived}
+                                    </span>
+                                </>
+                            ) : null}
+                        </p>
+                    ) : null}
                 </div>
-                {canEdit ? (
+                {canEdit && !forced ? (
                     <Button
                         type="button"
                         variant="outline"
@@ -102,19 +181,40 @@ export function SpotComponentsSection({
             </p>
 
             <div className="grid gap-3 sm:grid-cols-2">
-                {components.map((component) => {
-                    const result = resultByRole[component.role];
-                    const fieldId = `component-${component.role}-${positionIndex}`;
+                {sortedComponents.map((component) => {
+                    const result = forced
+                        ? componentResults.find(
+                              (row) =>
+                                  row.role === component.role &&
+                                  (row.sort ?? component.sort) ===
+                                      component.sort,
+                          )
+                        : resultByRole[component.role];
+                    const slot = profileMeta?.slots.find(
+                        (entry) => entry.sort === component.sort,
+                    );
+                    const displayLabel =
+                        slot?.display_label ?? slot?.label ?? component.label;
+                    const fieldId = forced
+                        ? `component-${component.role}-${component.sort}-${positionIndex}`
+                        : `component-${component.role}-${positionIndex}`;
                     const errorKey = `positions.${positionIndex}.components`;
+                    const resultTestId = forced
+                        ? `spot-component-result-${component.role}-${component.sort}-${positionIndex}`
+                        : `spot-component-result-${component.role}-${positionIndex}`;
 
                     return (
                         <div
-                            key={component.role}
+                            key={`${component.role}-${component.sort}-${positionIndex}`}
                             className="space-y-2 rounded-md border p-3"
-                            data-test={`spot-component-${component.role}-${positionIndex}`}
+                            data-test={componentTestId(
+                                component,
+                                positionIndex,
+                                forced,
+                            )}
                         >
                             <FormField
-                                label={`${component.label} (Sekunden)`}
+                                label={`${displayLabel} (Sekunden)`}
                                 htmlFor={fieldId}
                                 error={
                                     errors[`${errorKey}.${component.role}`]?.[0]
@@ -127,15 +227,29 @@ export function SpotComponentsSection({
                                     inputMode="numeric"
                                     disabled={!canEdit}
                                     value={component.length_seconds}
-                                    data-test={`spot-component-length-${component.role}-${positionIndex}`}
-                                    aria-label={`${component.label} Länge in Sekunden`}
+                                    data-test={lengthTestId(
+                                        component,
+                                        positionIndex,
+                                        forced,
+                                    )}
+                                    aria-label={`${displayLabel} Länge in Sekunden`}
                                     onChange={(event) =>
                                         onChange(
-                                            updateComponentLength(
-                                                components,
-                                                component.role,
-                                                Number(event.target.value),
-                                            ),
+                                            forced
+                                                ? updateComponentLengthBySort(
+                                                      components,
+                                                      component.sort,
+                                                      Number(
+                                                          event.target.value,
+                                                      ),
+                                                  )
+                                                : updateComponentLength(
+                                                      components,
+                                                      component.role,
+                                                      Number(
+                                                          event.target.value,
+                                                      ),
+                                                  ),
                                         )
                                     }
                                 />
@@ -143,7 +257,7 @@ export function SpotComponentsSection({
                             {isIndividual ? (
                                 <p
                                     className="text-muted-foreground text-xs"
-                                    data-test={`spot-component-result-${component.role}-${positionIndex}`}
+                                    data-test={resultTestId}
                                 >
                                     Index: {result?.length_index ?? '–'}
                                     {result?.media_gross
@@ -156,7 +270,7 @@ export function SpotComponentsSection({
                 })}
             </div>
 
-            {canEdit ? (
+            {canEdit && !forced ? (
                 <div className="flex flex-wrap gap-2">
                     {!allongePresent ? (
                         <Button
