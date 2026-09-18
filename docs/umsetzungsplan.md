@@ -91,8 +91,10 @@ ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a**
 echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
 Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
 umgesetzt, Export Spot-Verteilung offen. **02c umgesetzt (PR #59)** – AT-04
-Hauptspot+Allonge manuell abgenommen; Festpreis (`fixed_price` Registry `planned`)
-folgt; `BL-P4-02` insgesamt offen.
+Hauptspot+Allonge manuell abgenommen. **02d umgesetzt (Worktree, offener PR):**
+Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis
+`average`|`calendar`; Registry-Methode **`fixed_price`** weiter **`planned`**.
+`BL-P4-02` insgesamt offen (SPT-008 Export, SPT-012, …).
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

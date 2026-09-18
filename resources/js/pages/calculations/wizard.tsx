@@ -3,6 +3,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationMethodSelector } from '@/components/calculation-method-selector';
+import { PricingSettlementSection } from '@/components/pricing-settlement-section';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
 import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
@@ -62,6 +63,14 @@ import {
     type DayGroupOption,
     type TimeRangeDraft,
 } from '@/lib/pricing-time';
+import {
+    defaultPricingSettlementDraft,
+    isFixedPriceSettlement,
+    parseFixedPriceNnInput,
+    pricingSettlementDraftFromSaved,
+    settlementPayloadFields,
+    type PricingSettlementMode,
+} from '@/lib/pricing-settlement';
 import {
     calculationMethodPayloadFields,
     hasSubmittableCalculationMethodKey,
@@ -238,6 +247,8 @@ type PositionDraft = {
     expected_price_list_id: number | null;
     price_list_version: string | null;
     price_list_status: string | null;
+    pricing_settlement_mode: PricingSettlementMode;
+    fixed_price_nn_input: string;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -353,6 +364,13 @@ type Totals = {
             amount: string;
             remaining: string;
         }>;
+        pricing_settlement_mode?: string | null;
+        fixed_price_nn?: string | null;
+        effective_pay_factor_percent?: string | null;
+        effective_discount_percent?: string | null;
+        effective_discount_before_ae_percent?: string | null;
+        ae_amount?: string | null;
+        after_order_discount?: string | null;
     }[];
 };
 
@@ -461,6 +479,8 @@ type SavedCalculation = {
             custom_label: string | null;
             percent: string;
         }>;
+        pricing_settlement_mode?: string | null;
+        fixed_price_nn?: string | null;
         dynamic_field_values?: Record<string, unknown> & {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
@@ -685,6 +705,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                     inventory.id,
                     year,
                 ).find((option) => option.year === year)?.status ?? null,
+            ...defaultPricingSettlementDraft(),
         };
     }
 
@@ -1024,6 +1045,8 @@ export default function CalculationWizard({
     );
     const [proposalLoading, setProposalLoading] = useState(false);
     const [proposalError, setProposalError] = useState<string | null>(null);
+    const [settlementValidationTouched, setSettlementValidationTouched] =
+        useState<Record<number, true>>({});
     const [positions, setPositions] = useState<PositionDraft[]>(() => {
         if (calculation?.positions?.length) {
             return calculation.positions.map((position) => {
@@ -1170,6 +1193,7 @@ export default function CalculationWizard({
 
                         return meta;
                     })(),
+                    ...pricingSettlementDraftFromSaved(position),
                 };
             });
         }
@@ -1514,6 +1538,7 @@ export default function CalculationWizard({
                           position_discounts: payloadDiscounts(
                               position.position_discounts,
                           ),
+                          ...settlementPayloadFields(position),
                           dynamic_field_values: {
                               period_open: position.period_open,
                               position_flight_period:
@@ -1821,6 +1846,25 @@ export default function CalculationWizard({
             return;
         }
 
+        if (!isBudgetSetup) {
+            const invalidFixedIndex = positions.findIndex(
+                (position) =>
+                    isFixedPriceSettlement(position.pricing_settlement_mode) &&
+                    parseFixedPriceNnInput(position.fixed_price_nn_input) ===
+                        null,
+            );
+            if (invalidFixedIndex >= 0) {
+                setSettlementValidationTouched((current) => ({
+                    ...current,
+                    [invalidFixedIndex]: true,
+                }));
+                setSaveError(
+                    'Speichern nicht möglich: Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                );
+                return;
+            }
+        }
+
         if (!isBudgetSetup && positions.some(positionNeedsFieldSchema)) {
             const stillLoading =
                 Object.keys(schemaLoadingClientKeys).length > 0;
@@ -2124,6 +2168,7 @@ export default function CalculationWizard({
                     custom_choice_touched:
                         existing?.custom_choice_touched ?? {},
                     custom_choice_meta: existing?.custom_choice_meta ?? {},
+                    ...defaultPricingSettlementDraft(),
                 };
             }),
         );
@@ -3266,6 +3311,7 @@ export default function CalculationWizard({
                                                             positionIndex={
                                                                 index
                                                             }
+                                                            legendLabel="Berechnungsbasis für Mediabrutto"
                                                             options={methodOptionsForMedium(
                                                                 catalog,
                                                                 position.advertising_medium_id,
@@ -3332,6 +3378,65 @@ export default function CalculationWizard({
                                                                                 position.historical_calculation_method_name,
                                                                         },
                                                                     ),
+                                                                )
+                                                            }
+                                                        />
+
+                                                        <PricingSettlementSection
+                                                            positionIndex={
+                                                                index
+                                                            }
+                                                            mode={
+                                                                position.pricing_settlement_mode
+                                                            }
+                                                            fixedPriceNnInput={
+                                                                position.fixed_price_nn_input
+                                                            }
+                                                            disabled={!canEdit}
+                                                            showFixedPriceValidation={
+                                                                settlementValidationTouched[
+                                                                    index
+                                                                ] === true
+                                                            }
+                                                            fieldError={
+                                                                fieldErrors[
+                                                                    `positions.${index}.fixed_price_nn`
+                                                                ]?.[0] ??
+                                                                fieldErrors[
+                                                                    `positions.${index}.pricing_settlement_mode`
+                                                                ]?.[0]
+                                                            }
+                                                            onModeChange={(
+                                                                pricing_settlement_mode,
+                                                            ) => {
+                                                                if (
+                                                                    pricing_settlement_mode ===
+                                                                    'fixed_price'
+                                                                ) {
+                                                                    setSettlementValidationTouched(
+                                                                        (
+                                                                            current,
+                                                                        ) => ({
+                                                                            ...current,
+                                                                            [index]: true,
+                                                                        }),
+                                                                    );
+                                                                }
+                                                                updatePosition(
+                                                                    index,
+                                                                    {
+                                                                        pricing_settlement_mode,
+                                                                    },
+                                                                );
+                                                            }}
+                                                            onFixedPriceInputChange={(
+                                                                fixed_price_nn_input,
+                                                            ) =>
+                                                                updatePosition(
+                                                                    index,
+                                                                    {
+                                                                        fixed_price_nn_input,
+                                                                    },
                                                                 )
                                                             }
                                                         />
@@ -3776,6 +3881,9 @@ export default function CalculationWizard({
                                                             index
                                                         ] && !previewLoading ? (
                                                             <PositionPriceSummary
+                                                                positionIndex={
+                                                                    index
+                                                                }
                                                                 averageSecondPrice={
                                                                     displayTotals
                                                                         .positions[
@@ -3795,6 +3903,47 @@ export default function CalculationWizard({
                                                                         .positions[
                                                                         index
                                                                     ].nn_invest
+                                                                }
+                                                                pricingSettlementMode={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .pricing_settlement_mode
+                                                                }
+                                                                effectivePayFactorPercent={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .effective_pay_factor_percent
+                                                                }
+                                                                effectiveDiscountPercent={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .effective_discount_percent
+                                                                }
+                                                                effectiveDiscountBeforeAePercent={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .effective_discount_before_ae_percent
+                                                                }
+                                                                aeAmount={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ].ae_amount
+                                                                }
+                                                                afterOrderDiscount={
+                                                                    displayTotals
+                                                                        .positions[
+                                                                        index
+                                                                    ]
+                                                                        .after_order_discount
                                                                 }
                                                             />
                                                         ) : previewLoading ? (
@@ -3885,6 +4034,10 @@ export default function CalculationWizard({
                                             position.inventory_id,
                                             position.advertising_medium_id,
                                         );
+                                        const fixedSettlement =
+                                            isFixedPriceSettlement(
+                                                position.pricing_settlement_mode,
+                                            );
 
                                         return (
                                             <Card
@@ -3939,6 +4092,20 @@ export default function CalculationWizard({
                                                                   : '–'}
                                                         </span>
                                                     </p>
+                                                    {fixedSettlement ? (
+                                                        <p
+                                                            className="text-muted-foreground text-sm"
+                                                            data-test={`position-discounts-fixed-hint-${index}`}
+                                                        >
+                                                            Im Festpreismodus
+                                                            werden
+                                                            Positionsrabatte
+                                                            nicht angewendet
+                                                            (Eingaben bleiben
+                                                            für einen Wechsel
+                                                            zurück gespeichert).
+                                                        </p>
+                                                    ) : null}
                                                     <DiscountListEditor
                                                         title={`Rabatte für ${positionInventoryName(position, catalog)}`}
                                                         description="Diese Rabatte gelten nur für dieses Werbeelement und werden nacheinander gerechnet."
@@ -3949,7 +4116,8 @@ export default function CalculationWizard({
                                                         canEdit={canEdit}
                                                         disabled={
                                                             rule?.is_discountable ===
-                                                            false
+                                                                false ||
+                                                            fixedSettlement
                                                         }
                                                         fieldPrefix={`positions.${index}.position_discounts`}
                                                         fieldErrors={
@@ -4044,11 +4212,20 @@ export default function CalculationWizard({
                                                             berücksichtigen
                                                         </span>
                                                         <span className="text-muted-foreground mt-1 block text-xs">
-                                                            AE wird nach allen
+                                                            Bei Normalpositionen
+                                                            wird AE nach allen
                                                             Positions- und
                                                             Auftragsrabatten nur
                                                             auf den AE-fähigen
                                                             Anteil angewendet.
+                                                            Bei
+                                                            Festpreispositionen
+                                                            wird AE aus dem
+                                                            N/N-Festpreis
+                                                            rückwärts
+                                                            ausgewiesen, ohne
+                                                            den Festpreis zu
+                                                            ändern.
                                                             {displayTotals?.ae_eligible_base
                                                                 ? ` Berechnungsbasis ${money(displayTotals.ae_eligible_base)}.`
                                                                 : ''}
@@ -4439,16 +4616,71 @@ export default function CalculationWizard({
                                                                     ),
                                                                 )}
                                                                 {result?.media_gross ? (
-                                                                    <p className="mt-2">
-                                                                        {money(
-                                                                            result.media_gross,
-                                                                        )}{' '}
-                                                                        Brutto ·{' '}
-                                                                        {money(
-                                                                            result.nn_invest,
-                                                                        )}{' '}
-                                                                        N/N
-                                                                    </p>
+                                                                    <div className="mt-2 space-y-1 text-sm">
+                                                                        {isFixedPriceSettlement(
+                                                                            result.pricing_settlement_mode,
+                                                                        ) ? (
+                                                                            <>
+                                                                                <p>
+                                                                                    Festpreis
+                                                                                    (N/N):{' '}
+                                                                                    {money(
+                                                                                        result.fixed_price_nn ??
+                                                                                            result.nn_invest,
+                                                                                    )}
+                                                                                </p>
+                                                                                <p className="text-muted-foreground">
+                                                                                    Referenz-Mediabrutto{' '}
+                                                                                    {money(
+                                                                                        result.media_gross,
+                                                                                    )}
+                                                                                </p>
+                                                                                {result.effective_pay_factor_percent ? (
+                                                                                    <p className="text-muted-foreground">
+                                                                                        Payfaktor{' '}
+                                                                                        {formatPercent(
+                                                                                            result.effective_pay_factor_percent,
+                                                                                        )}
+                                                                                        {result.effective_discount_percent
+                                                                                            ? ` · Gesamtabschlag (→ N/N) ${formatPercent(result.effective_discount_percent)}`
+                                                                                            : ''}
+                                                                                    </p>
+                                                                                ) : null}
+                                                                                {result.ae_amount &&
+                                                                                Number(
+                                                                                    result.ae_amount,
+                                                                                ) >
+                                                                                    0 ? (
+                                                                                    <p className="text-muted-foreground">
+                                                                                        Netto
+                                                                                        vor
+                                                                                        AE{' '}
+                                                                                        {money(
+                                                                                            result.after_order_discount ??
+                                                                                                result.nn_invest,
+                                                                                        )}{' '}
+                                                                                        ·
+                                                                                        AE{' '}
+                                                                                        {money(
+                                                                                            result.ae_amount,
+                                                                                        )}
+                                                                                    </p>
+                                                                                ) : null}
+                                                                            </>
+                                                                        ) : (
+                                                                            <p>
+                                                                                {money(
+                                                                                    result.media_gross,
+                                                                                )}{' '}
+                                                                                Brutto
+                                                                                ·{' '}
+                                                                                {money(
+                                                                                    result.nn_invest,
+                                                                                )}{' '}
+                                                                                N/N
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
                                                                 ) : null}
                                                             </section>
                                                         );

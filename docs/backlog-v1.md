@@ -265,18 +265,20 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen (`BL-P4-02a`/`02b`/`02c` auf `main`; Festpreis offen)
+- **Status:** offen (`BL-P4-02a`/`02b`/`02c` auf `main`; **`BL-P4-02d` umgesetzt**, offener PR)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
 - **Ergebnis 02b (PR #58):** Kalenderplaner/AT-02 als echte **Wochenmatrix** Mo–So × Preisstunden; Spotanzahl direkt je Datum-/Stundenzelle; Jahresvertrag (ein Preisjahr je Position); Wochen-/Monatsnavigation mit State-Erhalt; Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot + Anzeige (`SPT-008` Snapshot/Anzeige umgesetzt, Export offen); Pin-Vertrag 02a unverändert kompatibel
 - **Ergebnis 02c (PR #59, manuell abgenommen):** Hauptspot+Allonge; Strategien `shared_total_length`/`individual` für Average+Calendar; Admin-Freeze; Dispo-Snapshot/Anzeige; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten; SPT-012 offen; SPT-013 teilweise; SPT-014 Hauptspot/Allonge umgesetzt
-- **Offen:** Festpreis-Engine (`fixed_price` Registry weiter `planned`), SPT-008 Export, Abbinder/Reminder/Tandem/Tridem
-- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; kein Festpreis-Claim)
+- **Ergebnis 02d (Worktree, offener PR):** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis `average`|`calendar`; N/N-Festpreis; rückwärts Payfaktor/Abschlag; Pin 02a; Dispo-Snapshot; Budget-Apply → `normal`. Registry-Methode **`fixed_price`** weiter **`planned`** (nicht der Live-Weg)
+- **Offen:** SPT-008 Export, Abbinder/Reminder/Tandem/Tridem (SPT-012/013)
+- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
 - **Tests 02c:** `SpotComponentCalculationTest`, `SpotClassicComponentsTest` (+ MySQL); Playwright `playwright.blp402c.config.ts` (Port 8025)
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Festpreis und SPT-012/013 offen.
+- **Tests 02d:** `SpotClassicFixedPriceSettlementTest` (+ MySQL); Vitest `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`; Playwright `playwright.blp402d.config.ts` (Port 8026)
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für SPT-012/013 und SPT-008 Export offen.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4

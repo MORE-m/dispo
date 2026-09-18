@@ -3,6 +3,7 @@
 namespace App\Services\Calculation;
 
 use App\Enums\ComponentCalculationStrategy;
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 
 final readonly class PositionInput
@@ -34,6 +35,8 @@ final readonly class PositionInput
         public bool $needsSpotRedistribution = false,
         public array $components = [],
         public ?ComponentCalculationStrategy $componentCalculationStrategy = null,
+        public PricingSettlementMode $pricingSettlementMode = PricingSettlementMode::Normal,
+        public ?string $fixedPriceNn = null,
     ) {}
 
     public function hasComponents(): bool

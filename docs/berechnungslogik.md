@@ -293,18 +293,46 @@ bleiben unverändert; die Berechnungsbasis ist der AE-fähige Restbetrag.
 Bestehende Kalkulationen mit explizitem AE-Wert größer 0 behalten ihre
 bisherige Wirkung. Neue Kalkulationen starten mit deaktiviertem AE.
 
-## Festpreis
+## Festpreis (Preisabschluss, BL-P4-02d)
 
-Der Festpreis ist der vereinbarte rabattierte N/N-Endpreis der Medienleistung,
-nicht ein neuer Listenpreis.
+**Zweiteilung:** Die **Berechnungsbasis** bleibt `average` oder `calendar`
+(Mediabrutto, Spotlogik, Pin-Vertrag wie 02a–02c). Der **Preisabschluss**
+(`pricing_settlement_mode`) steuert separat, ob der N/N-Endbetrag aus der
+Rabatt-/AE-Pipeline kommt (`normal`) oder vereinbart wird (`fixed_price`).
+
+Der Registry-Eintrag **`fixed_price`** als eigene Kalkulationsmethode bleibt
+**`planned`** und ist **nicht** der live wählbare Weg in Spot Classic v1.
+Live: Basis `average`|`calendar` + `pricing_settlement_mode=fixed_price`.
+
+Der Festpreis ist der vereinbarte **N/N-Endbetrag** der Medienleistung, kein
+neuer Listenpreis. Positions- und Auftragsrabatte wirken im Modus `fixed_price`
+**nicht forward** auf diesen Betrag (Mediabrutto bleibt referenzbasiert aus der
+gewählten Basis). AE wird bei aktivierter Auftragskondition **rückwärts aus dem
+Festpreis ausgewiesen**, ohne den N/N-Festpreis zu verändern.
 
 ```text
-Effektiver Nettofaktor = Festpreis ÷ zugehöriges Mediabrutto
-Effektiver Rabatt = 1 - effektiver Nettofaktor
+Mediabrutto     = Ergebnis aus average|calendar (unverändert zur Basis)
+nn_invest       = fixed_price_nn (bei fixed_price; immer verbindlicher N/N-Endbetrag)
+Ohne AE:
+  Netto vor AE  = fixed_price_nn
+  AE-Betrag     = 0
+Mit AE (bestehender AE-Satz, typisch 15 %; Satz < 100 %, fail-closed sonst):
+  Netto vor AE  = fixed_price_nn ÷ (1 − ae_rate)
+  AE-Betrag     = Netto vor AE − fixed_price_nn
+Payfaktor (%)   = nn_invest ÷ Mediabrutto × 100
+Gesamtabschlag  = 1 − (nn_invest ÷ Mediabrutto)   # Mediabrutto → N/N
+Rabatt vor AE   = 1 − (Netto vor AE ÷ Mediabrutto) # Mediabrutto → Netto vor AE
 ```
+
+Bei `nn_invest = Mediabrutto`: Payfaktor 100 %, Gesamtabschlag 0.
+Wechsel zurück zu `normal`: `fixed_price_nn` entfällt; die übliche
+Rabatt-/AE-Pipeline gilt wieder.
 
 Nicht rabattierbare Zusatzzeilen bleiben separat. Bei Mediabrutto null ist die
 Rückrechnung nicht zulässig und erfordert kaufmännische Prüfung.
+
+**Abgrenzung Phase 7:** SWF-/Online-Audio-Festpreis und Registry-Freigabe
+`fixed_price` als Methodenwechsel sind **nicht** Teil von BL-P4-02d.
 
 ## Payfaktor
 

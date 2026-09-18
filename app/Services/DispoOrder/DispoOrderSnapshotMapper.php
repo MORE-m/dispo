@@ -118,6 +118,14 @@ final class DispoOrderSnapshotMapper
             'order_discount_amount' => (string) $position->order_discount_amount,
             'ae_amount' => (string) $position->ae_amount,
             'nn_invest' => (string) $position->nn_invest,
+            'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+            'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
+            'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
+                ? null
+                : (string) $position->effective_pay_factor_percent,
+            'effective_total_discount_percent' => $position->effective_total_discount_percent === null
+                ? null
+                : (string) $position->effective_total_discount_percent,
             'plan_rows_snapshot' => $position->planRows->map(
                 fn (SpotClassicPlanRow $row): array => [
                     'hour' => $row->hour,

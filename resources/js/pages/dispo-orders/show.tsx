@@ -120,6 +120,11 @@ type OrderPosition = {
     order_discount_amount: string;
     ae_amount: string;
     nn_invest: string;
+    pricing_settlement_mode?: string | null;
+    fixed_price_nn?: string | null;
+    calculation_method_name?: string | null;
+    effective_pay_factor_percent?: string | null;
+    effective_total_discount_percent?: string | null;
     time_ranges: {
         start_hour: number;
         end_hour_exclusive: number;
@@ -1974,9 +1979,57 @@ export default function DispoOrderShow({
                                             )}
                                         </ul>
                                     ) : null}
-                                    <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
-                                        {money(position.nn_invest)} N/N
-                                    </p>
+                                    {position.pricing_settlement_mode ===
+                                    'fixed_price' ? (
+                                        <div
+                                            className="mt-3 space-y-1 text-sm"
+                                            data-test={`dispo-order-fixed-price-${index}`}
+                                        >
+                                            <p className="font-semibold tabular-nums">
+                                                Festpreis (N/N):{' '}
+                                                {money(
+                                                    position.fixed_price_nn ??
+                                                        position.nn_invest,
+                                                )}
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">
+                                                Referenz-Mediabrutto{' '}
+                                                {money(position.media_gross)}
+                                            </p>
+                                            {position.effective_pay_factor_percent ? (
+                                                <p className="text-muted-foreground text-xs">
+                                                    Payfaktor{' '}
+                                                    {formatPercent(
+                                                        position.effective_pay_factor_percent,
+                                                    )}
+                                                    {position.effective_total_discount_percent
+                                                        ? ` · Gesamtabschlag (→ N/N) ${formatPercent(position.effective_total_discount_percent)}`
+                                                        : ''}
+                                                </p>
+                                            ) : null}
+                                            {Number(position.ae_amount) > 0 ? (
+                                                <p
+                                                    className="text-muted-foreground text-xs"
+                                                    data-test={`dispo-order-fixed-price-ae-${index}`}
+                                                >
+                                                    AE{' '}
+                                                    {money(position.ae_amount)}
+                                                </p>
+                                            ) : null}
+                                            {position.calculation_method_name ? (
+                                                <p className="text-muted-foreground text-xs">
+                                                    Berechnungsbasis:{' '}
+                                                    {
+                                                        position.calculation_method_name
+                                                    }
+                                                </p>
+                                            ) : null}
+                                        </div>
+                                    ) : (
+                                        <p className="text-primary mt-2 text-sm font-semibold tabular-nums">
+                                            {money(position.nn_invest)} N/N
+                                        </p>
+                                    )}
                                 </section>
                             );
                         })}

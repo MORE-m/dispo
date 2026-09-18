@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CalculationKind;
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,6 +22,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $effective_configuration_snapshot_id
  * @property CalculationKind $kind
  * @property SpotCalculationMethod $spot_method
+ * @property PricingSettlementMode $pricing_settlement_mode
+ * @property string|null $fixed_price_nn
+ * @property string|null $effective_pay_factor_percent
+ * @property string|null $effective_total_discount_percent
  * @property string|null $engine_profile_key
  * @property string|null $calculation_method_key
  * @property string|null $calculation_method_name
@@ -67,6 +72,10 @@ class DispoOrderPosition extends Model
         'order_discount_amount',
         'ae_amount',
         'nn_invest',
+        'pricing_settlement_mode',
+        'fixed_price_nn',
+        'effective_pay_factor_percent',
+        'effective_total_discount_percent',
         'plan_rows_snapshot',
         'time_ranges_snapshot',
         'planner_entries_snapshot',
@@ -94,6 +103,10 @@ class DispoOrderPosition extends Model
             'order_discount_amount' => 'decimal:2',
             'ae_amount' => 'decimal:2',
             'nn_invest' => 'decimal:2',
+            'pricing_settlement_mode' => PricingSettlementMode::class,
+            'fixed_price_nn' => 'decimal:2',
+            'effective_pay_factor_percent' => 'decimal:4',
+            'effective_total_discount_percent' => 'decimal:4',
             'plan_rows_snapshot' => 'array',
             'time_ranges_snapshot' => 'array',
             'planner_entries_snapshot' => 'array',
