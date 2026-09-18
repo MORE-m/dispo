@@ -138,13 +138,17 @@ class SpotClassicTandemTridemMysqlTest extends TestCase
             ->load('positions');
 
         $this->assertSame('tandem', $order->positions->first()->component_profile?->value);
+        $this->assertSame(20, $order->positions->first()->derived_component_airings);
         $this->assertCount(2, $order->positions->first()->components_snapshot);
 
+        $calc->load('configurationSnapshot');
+        $base = $calc->configurationSnapshot;
         $payload = $writer->payloadFromCalculation($calc);
         $payload['lock_version'] = $calc->lock_version;
-        $payload['positions'][0]['advertising_medium_id'] = $catalog['medium']->id;
+        $classicMediumId = (int) $catalog['medium']->id;
+        $payload['positions'][0]['advertising_medium_id'] = $classicMediumId;
         $payload['positions'][0]['schema_fingerprint'] = app(ConfigurationSnapshotFreezeService::class)
-            ->resolveLivePositionSchema((int) $catalog['medium']->id)['schema_fingerprint'];
+            ->resolvePositionSchemaFromBase($base, $classicMediumId)['schema_fingerprint'];
         $payload['positions'][0]['components'] = [];
         $payload['positions'][0]['component_calculation_strategy'] = null;
         $payload['positions'][0]['length_seconds'] = 30;
@@ -152,6 +156,7 @@ class SpotClassicTandemTridemMysqlTest extends TestCase
 
         $order->refresh()->load('positions');
         $this->assertSame('tandem', $order->positions->first()->component_profile?->value);
+        $this->assertSame(20, $order->positions->first()->derived_component_airings);
         $this->assertCount(2, $order->positions->first()->components_snapshot);
     }
 
