@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CalculationKind;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
 use Database\Factories\CalculationPositionFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -42,6 +43,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, CalculationPositionDiscount> $discounts
  * @property int $length_seconds
  * @property string|null $component_calculation_strategy
+ * @property SpotComponentProfile|null $component_profile
  * @property string $position_discount_percent
  * @property string $ae_percent
  */
@@ -69,6 +71,7 @@ class CalculationPosition extends Model
         'spot_method',
         'length_seconds',
         'component_calculation_strategy',
+        'component_profile',
         'total_spot_count',
         'needs_spot_redistribution',
         'average_second_price',
@@ -99,6 +102,7 @@ class CalculationPosition extends Model
         return [
             'kind' => CalculationKind::class,
             'spot_method' => SpotCalculationMethod::class,
+            'component_profile' => SpotComponentProfile::class,
             'average_second_price' => 'decimal:4',
             'length_index' => 'integer',
             'surcharge_percent' => 'decimal:4',

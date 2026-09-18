@@ -20,6 +20,7 @@ use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
+use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -395,6 +396,13 @@ class DispoOrderController extends Controller
                 'spot_method_label' => $position->spot_method->label(),
                 'length_seconds' => $position->length_seconds,
                 'component_calculation_strategy' => $position->component_calculation_strategy,
+                'component_profile' => $position->component_profile?->value,
+                'derived_component_airings' => $position->component_profile !== null
+                    ? SpotComponentProfileContract::derivedAirings(
+                        $position->component_profile,
+                        (int) $position->total_spot_count,
+                    )
+                    : null,
                 'components' => $position->components_snapshot ?? [],
                 'total_spot_count' => $position->total_spot_count,
                 'price_list_version' => $position->price_list_version,

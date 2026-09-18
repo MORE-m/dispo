@@ -8,6 +8,7 @@ use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\FieldType;
 use App\Enums\PlanningMode;
+use App\Enums\SpotComponentProfile;
 use App\Http\Requests\Calculation\BudgetProposalPayloadRequest;
 use App\Http\Requests\Calculation\CalculationPayloadRequest;
 use App\Models\AdvertisingMedium;
@@ -35,6 +36,7 @@ use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
+use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use App\Support\Inventory\InventoryIdentity;
 use App\Support\PriceList\PriceListCalendar;
@@ -366,7 +368,7 @@ class CalculationController extends Controller
                 'calculationMethodAssignments.calculationMethod',
             ])
             ->where('is_active', true)
-            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id', 'component_profile']);
 
         $historicalMediumIds = $calculation !== null
             ? $calculation->positions->pluck('advertising_medium_id')->unique()->values()
@@ -381,7 +383,7 @@ class CalculationController extends Controller
             ])
             ->whereIn('id', $historicalMediumIds)
             ->where('is_active', false)
-            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id']);
+            ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id', 'component_profile']);
 
         $media = $activeMedia->concat($historicalMedia)->values()->map(
             function (AdvertisingMedium $medium): array {
@@ -401,6 +403,7 @@ class CalculationController extends Controller
                     'is_bookable_for_new_positions' => $bookability['is_bookable_for_new_positions'],
                     'unbookable_reason' => $bookability['unbookable_reason'],
                     'calculation_method_options' => $methodOptions,
+                    'component_profile' => $medium->component_profile?->value,
                 ];
             },
         )->values();
@@ -550,6 +553,7 @@ class CalculationController extends Controller
                 'current_price_year' => PriceListCalendar::currentYear(),
                 'next_price_year' => PriceListCalendar::nextYear(),
             ],
+            'component_profiles' => $this->componentProfilesProp(),
             'dayGroups' => DayGroup::options(),
             'discountTypes' => DiscountType::options(),
             'fieldSchema' => $this->fieldSchemaProp($calculation),
@@ -593,6 +597,7 @@ class CalculationController extends Controller
                         'calculation_method_name' => $position->calculation_method_name,
                         'length_seconds' => $position->length_seconds,
                         'component_calculation_strategy' => $position->component_calculation_strategy,
+                        'component_profile' => $position->component_profile?->value,
                         'components' => $position->components->map(fn ($component): array => [
                             'role' => $component->role->value,
                             'label' => $component->label,
@@ -1006,5 +1011,41 @@ class CalculationController extends Controller
             'rejection_reason' => $context['rejection_reason'],
             'return_url' => $context['return_url'],
         ];
+    }
+
+    /**
+     * @return array<string, array{
+     *     label: string,
+     *     unit_label: string,
+     *     unit_count: int,
+     *     required_strategy: string,
+     *     slots: list<array{role: string, label: string, sort: int}>
+     * }>
+     */
+    private function componentProfilesProp(): array
+    {
+        $profiles = [];
+
+        foreach (SpotComponentProfile::cases() as $profile) {
+            $slots = [];
+            foreach (SpotComponentProfileContract::slots($profile) as $slot) {
+                $slots[] = [
+                    'role' => $slot['role']->value,
+                    'label' => $slot['label'],
+                    'display_label' => SpotComponentProfileContract::displayLabel($profile, $slot['role'], $slot['sort']),
+                    'sort' => $slot['sort'],
+                ];
+            }
+
+            $profiles[$profile->value] = [
+                'label' => $profile->label(),
+                'unit_label' => $profile->unitLabel(),
+                'unit_count' => $profile->unitCount(),
+                'required_strategy' => $profile->requiredStrategy()->value,
+                'slots' => $slots,
+            ];
+        }
+
+        return $profiles;
     }
 }

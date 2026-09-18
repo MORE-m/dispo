@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CalculationKind;
 use App\Enums\CalculationMethodMode;
+use App\Enums\SpotComponentProfile;
 use Database\Factories\AdvertisingMediumFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property bool $is_active
  * @property int $sort
  * @property int $lock_version
+ * @property SpotComponentProfile|null $component_profile
  */
 class AdvertisingMedium extends Model
 {
@@ -36,6 +38,7 @@ class AdvertisingMedium extends Model
         'is_ae_eligible',
         'is_active',
         'sort',
+        'component_profile',
     ];
 
     /**
@@ -51,6 +54,7 @@ class AdvertisingMedium extends Model
             'is_active' => 'boolean',
             'sort' => 'integer',
             'lock_version' => 'integer',
+            'component_profile' => SpotComponentProfile::class,
         ];
     }
 
