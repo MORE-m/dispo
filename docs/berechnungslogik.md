@@ -165,8 +165,8 @@ historisch auf der Position eingefroren. Calendar-Einträge bleiben beim kompati
 Inventar-/Strategiewechsel erhalten und werden mit Zielpreisen neu berechnet. Der
 angezeigte `average_second_price` ist der **spotgewichtete Sekundenpreis** der
 bepreisten Buckets (Zeiträume/Kalenderzellen), unabhängig von Komponentenlängen und
--indizes. Abbinder/Reminder/Tandem/Tridem und Festpreis sowie Dispo-**Export** der
-Spot-Verteilung folgen in späteren Teilblöcken.
+-indizes. Abbinder und Dispo-**Export** der Spot-Verteilung folgen in späteren Teilblöcken.
+Tandem/Tridem (**BL-P4-02e**, **SPT-012**) sind umgesetzt (Worktree, offener PR).
 
 Für jede belegte Zelle aus Datum und Stunde:
 
@@ -193,7 +193,40 @@ sichtbar. Abhängig von der versionierten Kombination gilt eine von zwei Strateg
 2. **Einzelberechnung:** Jede Komponente wird mit eigener Länge berechnet; Ergebnisse werden addiert.
 
 Tandem/Reminder und Tridem verwenden verbindlich die gemeinsame Gesamtlänge
-(`SPT-012`). Die Allonge-Strategie ist administrierbar (`SPT-014`).
+(`SPT-012`, **BL-P4-02e**). Für diese Profile ist **`individual` unzulässig**
+(fail-closed). Die Allonge-Strategie ohne erzwungenes Profil bleibt
+administrierbar (`SPT-014`).
+
+**Profil am Werbemittel:** `component_profile` `tandem`|`tridem` (nullable =
+optionales Hauptspot/Allonge wie **BL-P4-02c**). Tandem: ein Hauptspot + ein
+Reminder; Tridem: ein Hauptspot + zwei Reminder (gleiche Rolle `reminder`,
+unterscheidbar über `sort` 2 und 3). Strategie und Profil werden an der Position
+eingefroren (Calc + Dispo).
+
+**Einheiten vs. Ausstrahlungen:** In der Kalkulation zählt die eingegebene
+**Tandem-/Tridem-Einheit** als Spotanzahl im Durchschnitts- bzw. Kalenderweg
+(wie bei Single-Spots). **Nicht** mit 2 oder 3 multiplizieren. Abgeleitete
+Ausstrahlungen (`Einheiten × 2` bzw. `× 3`) dienen nur der Anzeige, nicht der
+Preisformel.
+
+Rechenweg identisch zu „Gemeinsame Gesamtlänge“ oben: **tatsächliche
+Gesamtlänge** = Summe der Komponenten-Sekunden; ein Längenindex für die Summe;
+ein Längenfaktor; Spotanzahl = **Einheiten**.
+
+**Rechenbeispiele** (ein Preiszeitraum bzw. Kalenderzellen, Ø-Sekundenpreis
+**2,00**, Aufschlag 0 %):
+
+| Profil | Einheiten | Komponenten | Gesamtlänge | Index | Mediabrutto |
+|--------|----------:|-------------|------------:|------:|------------:|
+| Tandem | 10 | 20 s + 10 s | 30 s | 100 | **600,00** |
+| Tridem | 10 | 20 s + 10 s + 10 s | 40 s | 95 | **760,00** |
+
+```text
+Tandem:  10 × 2,00 × 30 × (100 ÷ 100) = 600,00
+Tridem:  10 × 2,00 × 40 × (95 ÷ 100)  = 760,00
+```
+
+Kein Faktor ×2 (Tandem) oder ×3 (Tridem) auf die Einheiten.
 
 ## SWF und Trailer
 

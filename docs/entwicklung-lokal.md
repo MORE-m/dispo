@@ -204,6 +204,18 @@ Isolierte Playwright-Suite: `npm run test:e2e:blp402c` (Port **8025**, DB
 `database/e2e-bl-p4-02c.sqlite`, Seeder `E2ESpotComponentsSeeder`). Keine Dev-DB
 `dispo` migrieren; Worktree-Migrationen nur in Pest/Feature-Tests.
 
+## BL-P4-02e – Tandem / Tridem
+
+Migration `component_profile` auf `advertising_media`, `calculation_positions` und
+`dispo_order_positions`. Tests: `TandemTridemCalculationTest`,
+`ComponentProfileValidatorTest`, `SpotClassicTandemTridemTest` (+ MySQL); Vitest
+`resources/js/lib/spot-components.test.ts`.
+
+E2E: `npm run test:e2e:blp402e` bzw.
+`npx playwright test -c playwright.blp402e.config.ts` (Port **8028**, DB
+`database/e2e-bl-p4-02e.sqlite`, Seeder `E2ETandemTridemSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`
