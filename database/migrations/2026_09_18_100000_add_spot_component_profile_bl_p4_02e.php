@@ -28,13 +28,16 @@ return new class extends Migration
             $table->string('component_profile', 32)
                 ->nullable()
                 ->after('component_calculation_strategy');
+            $table->unsignedInteger('derived_component_airings')
+                ->nullable()
+                ->after('component_profile');
         });
     }
 
     public function down(): void
     {
         Schema::table('dispo_order_positions', function (Blueprint $table) {
-            $table->dropColumn('component_profile');
+            $table->dropColumn(['component_profile', 'derived_component_airings']);
         });
 
         Schema::table('calculation_positions', function (Blueprint $table) {

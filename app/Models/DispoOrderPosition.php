@@ -33,6 +33,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $algorithm_version
  * @property string|null $component_calculation_strategy
  * @property SpotComponentProfile|null $component_profile
+ * @property int|null $derived_component_airings
  * @property int $total_spot_count
  * @property int $length_seconds
  * @property array<int, array<string, mixed>>|null $components_snapshot
@@ -62,6 +63,7 @@ class DispoOrderPosition extends Model
         'length_seconds',
         'component_calculation_strategy',
         'component_profile',
+        'derived_component_airings',
         'total_spot_count',
         'needs_spot_redistribution',
         'price_list_id',

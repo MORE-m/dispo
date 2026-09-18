@@ -397,12 +397,13 @@ class DispoOrderController extends Controller
                 'length_seconds' => $position->length_seconds,
                 'component_calculation_strategy' => $position->component_calculation_strategy,
                 'component_profile' => $position->component_profile?->value,
-                'derived_component_airings' => $position->component_profile !== null
-                    ? SpotComponentProfileContract::derivedAirings(
-                        $position->component_profile,
-                        (int) $position->total_spot_count,
-                    )
-                    : null,
+                'derived_component_airings' => $position->derived_component_airings
+                    ?? ($position->component_profile !== null
+                        ? SpotComponentProfileContract::derivedAirings(
+                            $position->component_profile,
+                            (int) $position->total_spot_count,
+                        )
+                        : null),
                 'components' => $position->components_snapshot ?? [],
                 'total_spot_count' => $position->total_spot_count,
                 'price_list_version' => $position->price_list_version,
