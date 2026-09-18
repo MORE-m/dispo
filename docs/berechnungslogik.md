@@ -166,7 +166,8 @@ Inventar-/Strategiewechsel erhalten und werden mit Zielpreisen neu berechnet. De
 angezeigte `average_second_price` ist der **spotgewichtete Sekundenpreis** der
 bepreisten Buckets (Zeiträume/Kalenderzellen), unabhängig von Komponentenlängen und
 -indizes. Abbinder und Dispo-**Export** der Spot-Verteilung folgen in späteren Teilblöcken.
-Tandem/Tridem (**BL-P4-02e**, **SPT-012**) sind umgesetzt (Worktree, offener PR).
+Tandem/Tridem (**BL-P4-02e**, **SPT-012**) sind auf **`main`** (PR **#61**),
+getestet und manuell abgenommen.
 
 Für jede belegte Zelle aus Datum und Stunde:
 

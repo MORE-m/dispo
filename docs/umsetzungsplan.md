@@ -91,12 +91,14 @@ ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a**
 echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
 Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
 umgesetzt, Export Spot-Verteilung offen. **02c umgesetzt (PR #59)** – AT-04
-Hauptspot+Allonge manuell abgenommen. **02d umgesetzt (Worktree, offener PR):**
-Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis
-`average`|`calendar`; Registry-Methode **`fixed_price`** weiter **`planned`**.
-**02e umgesetzt (Worktree, offener PR):** Tandem/Tridem (`component_profile`),
-**SPT-012** über `shared_total_length` ohne ×2/×3; Reminder-Rollen; **`individual`**
-für Profile fail-closed. `BL-P4-02` insgesamt offen (SPT-008 Export, Abbinder/SPT-013, …).
+Hauptspot+Allonge manuell abgenommen. **02d auf `main` (PR #60), manuell
+abgenommen:** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf
+Basis `average`|`calendar`; AE rückwärts; N/N unverändert; Registry-Methode
+**`fixed_price`** weiter **`planned`**. **02e auf `main` (PR #61), manuell
+abgenommen:** Tandem/Tridem (`component_profile`), **SPT-012** über
+`shared_total_length` ohne ×2/×3; Reminder-Rollen; **`individual`** für Profile
+fail-closed. `BL-P4-02` insgesamt offen (SPT-008 Dateiexport, Abbinder/SPT-013,
+operative Blockplanung, …).
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

@@ -1,34 +1,38 @@
 # Fortschritt V1
 
-Stand: 18. September 2026 (`main`-Basis inkl. **PR #56**–**#59**; **`BL-P4-02d`**
-und **`BL-P4-02e`** im Feature-Worktree **umgesetzt**, jeweils offener PR).
-**`BL-P4-02c` (AT-04) manuell abgenommen**. `BL-P4-01` abgeschlossen.
+Stand: 18. September 2026 (`main` inkl. **PR #56**–**#61**).
+**`BL-P4-02a`–`02e`** auf **`main`**. **`BL-P4-02c` (AT-04)**, Festpreis (**02d**) und
+Tandem/Tridem (**02e** / **SPT-012**) manuell abgenommen. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`–`02c`** auf **`main`**.
-**`BL-P4-02d`** (Festpreis-Abschluss) und **`BL-P4-02e`** (Tandem/Tridem, **SPT-012**)
-im Worktree umgesetzt. Gesamtblock **`BL-P4-02` bleibt offen** (SPT-008 Export,
-Abbinder, …). UX-GATE-D: bisherige Teilfreigaben unverändert;
-Kombinationstabellen-Admin gesperrt.
+Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`–`02e`** auf **`main`**
+(PR **#56**–**#61**). Gesamtblock **`BL-P4-02` bleibt offen** (SPT-008 Dateiexport,
+Abbinder/SPT-013, operative Blockplanung, …). UX-GATE-D: bisherige Teilfreigaben
+unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Offene PRs / Merge **`BL-P4-02d`** und **`BL-P4-02e`**. Danach weiter **`BL-P4-02`**:
-SPT-008 Export, Abbinder (SPT-013). Registry-Methode **`fixed_price`** bleibt
-**`planned`** (kein separater Live-Rechenweg).
+Weiter **`BL-P4-02`**: SPT-008 Dateiexport (nach PO-Entscheidung), Abbinder
+(SPT-013, bewusst zurückgestellt). Registry-Methode **`fixed_price`** bleibt
+**`planned`** (kein separater Live-Rechenweg). REP-007 Dispo-PDF bleibt Phase 10.
+
+**SPT-008 Readiness:** Vertrag analysiert (Dispo-Spotverteilung, interner XLSX-
+Verteilungsexport vorgesehen). Umsetzung, Tests und UI **offen** – nicht als
+Produktfeature erledigt markieren.
 
 ## Zuletzt abgeschlossene Aufgabe
 
-**BL-P4-02e** (Worktree, noch nicht gemergt): Tandem/Tridem über
-`component_profile` + **`shared_total_length`**; **SPT-012** umgesetzt;
-isolierte E2E Port **8028**.
+**BL-P4-02e** (PR **#61**, Merge `6913c358…`): Tandem/Tridem über
+`component_profile` + **`shared_total_length`**; **SPT-012** umgesetzt, getestet
+und manuell abgenommen; isolierte E2E Port **8028**. Zuvor **BL-P4-02d**
+(PR **#60**): Festpreis-Abschluss mit AE-Rückrechnung, manuell abgenommen.
 
 ## BL-P4-02e – Tandem / Tridem / SPT-012 (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Werbemittel-Feld `component_profile` (`tandem`\|`tridem`; `null` = optional Hauptspot/Allonge) | **umgesetzt** (Worktree, offener PR) |
+| Werbemittel-Feld `component_profile` (`tandem`\|`tridem`; `null` = optional Hauptspot/Allonge) | **umgesetzt** (`main`, PR #61) |
 | Positions-Freeze `component_profile` (Calc + Dispo) | **umgesetzt** |
 | Tandem: 1× Hauptspot + 1× Reminder; Tridem: 1× Hauptspot + 2× Reminder (`sort` 1–3) | **umgesetzt** |
 | Strategie verbindlich **`shared_total_length`**; **`individual`** fail-closed | **umgesetzt** |
@@ -36,25 +40,27 @@ isolierte E2E Port **8028**.
 | Tandem-/Tridem-**Einheiten** vs. abgeleitete Ausstrahlungen (×2/×3 nur Anzeige) | **umgesetzt** |
 | Average + Calendar + Festpreis-Abschluss (02d) kompatibel | **umgesetzt** |
 | Dispo-Snapshot `component_profile` + Komponenten | **umgesetzt** |
+| Manuelle UX-Abnahme | **erfolgreich** |
 | **SPT-012** | **erledigt** |
-| **SPT-013** Abbinder | **offen** (Hauptspot/Allonge + Reminder für Tandem/Tridem **teilweise**) |
-| SPT-008 Export, Registry `fixed_price` | **offen** bzw. **`planned`** |
+| **SPT-013** Abbinder | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder für Tandem/Tridem **teilweise**) |
+| SPT-008 Dateiexport, Registry `fixed_price` | **offen** bzw. **`planned`** |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02d – Preisabschluss Festpreis / N/N (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Positionsfeld `pricing_settlement_mode` `normal`\|`fixed_price` | **umgesetzt** (Worktree, offener PR) |
+| Positionsfeld `pricing_settlement_mode` `normal`\|`fixed_price` | **umgesetzt** (`main`, PR #60) |
 | Berechnungsbasis bleibt `average`\|`calendar` (kein Registry-Wechsel auf `fixed_price`) | **umgesetzt** |
 | Registry `calculation_methods.fixed_price` | weiter **`planned`** / **nicht released** |
-| N/N-Festpreis; Mediabrutto aus gewählter Basis | **umgesetzt** |
+| N/N-Festpreis; Mediabrutto aus gewählter Basis; N/N-Endinvest unverändert | **umgesetzt** |
 | Keine Forward-Rabatte auf Festpreis-N/N; AE rückwärts ausweisen; Payfaktor/Gesamtabschlag | **umgesetzt** |
 | Pin-Vertrag 02a bei Abschluss-/Basiswechsel | **umgesetzt** |
 | Dispo-Snapshot `pricing_settlement_mode` + `fixed_price_nn` | **umgesetzt** |
 | Budget-Übernahme setzt Abschluss zurück auf `normal` | **umgesetzt** |
 | E2E isoliert: `playwright.blp402d.config.ts` (Port **8026**) | **umgesetzt** |
-| SPT-008 Export, Abbinder (SPT-013) | **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
+| Manuelle UX-Abnahme | **erfolgreich** |
+| SPT-008 Dateiexport, Abbinder (SPT-013) | **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
 | `BL-P4-02` insgesamt | **offen** |
 
 **Hinweis:** Live wählbar ist **`pricing_settlement_mode=fixed_price`** zusammen mit
@@ -75,11 +81,11 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Kanonische Labels + Admin-`lock_version` | **umgesetzt** (PR #59) |
 | Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten | **umgesetzt** (PR #59) |
 | Manuelle UX-Abnahme AT-04 | **erfolgreich** |
-| Tandem / Tridem (**SPT-012**) | **umgesetzt** (**BL-P4-02e**, Worktree) |
-| Abbinder (**SPT-013**) | **offen** (Hauptspot/Allonge + Reminder teilweise) |
+| Tandem / Tridem (**SPT-012**) | **umgesetzt** (**BL-P4-02e**, `main`, PR #61) |
+| Abbinder (**SPT-013**) | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder teilweise) |
 | SPT-014 Hauptspot/Allonge | **umgesetzt** (PR #59) |
-| Festpreis-Abschluss (`BL-P4-02d`) | **umgesetzt** (Worktree; Registry `fixed_price` weiter planned) |
-| SPT-008 Export | **offen** |
+| Festpreis-Abschluss (`BL-P4-02d`) | **umgesetzt** (`main`, PR #60; Registry `fixed_price` weiter planned) |
+| SPT-008 Dateiexport | **offen** (Readiness analysiert; Umsetzung ausstehend) |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
@@ -107,7 +113,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (`main`, PR #56) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
 | AT-01/03/23/24 gezielte Härtung (ohne Kalender-/Komponenten-Scope von 02b) | **gehärtet** (`main`, PR #56) |
-| `BL-P4-02` insgesamt | **offen** (02a–02c umgesetzt; Festpreis folgt) |
+| `BL-P4-02` insgesamt | **offen** (02a–02e auf `main`; SPT-008 Export / Abbinder offen) |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 
