@@ -58,6 +58,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 
 ### BL-P4-02e (Tandem / Tridem / SPT-012)
 
+- **Auf `main` (PR #61), getestet und manuell abgenommen**
 - Werbemittel mit **`component_profile`** `tandem` bzw. `tridem`; Positions-Freeze Calc + Dispo
 - Tandem: exakt Hauptspot + Reminder; Tridem: Hauptspot + zwei Reminder (`sort` 1–3; UI „Reminder 1/2“)
 - Strategie verbindlich **`shared_total_length`**; **`individual`** → 422
@@ -69,16 +70,18 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `SpotClassicTandemTridemTest`; MySQL: `SpotClassicTandemTridemMysqlTest`
 - Vitest: `spot-components.test.ts`
 - E2E: `playwright.blp402e.config.ts` (Port **8028**, Seeder `E2ETandemTridemSeeder`)
-- **SPT-012 erledigt**; SPT-013 teilweise (Abbinder offen); `fixed_price` planned; SPT-008 Export offen;
-  `BL-P4-02` insgesamt offen
+- **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt); `fixed_price` planned;
+  SPT-008 Dateiexport offen (Readiness analysiert, Umsetzung ausstehend); `BL-P4-02` insgesamt offen
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
+- **Auf `main` (PR #60), getestet und manuell abgenommen**
 - Positionsfeld **`pricing_settlement_mode`**: `normal` (Rabatt-/AE-Pipeline) oder
   `fixed_price` (vereinbarter N/N-Endbetrag); Basis bleibt **`average`** oder **`calendar`**
 - Registry-Methode **`fixed_price`** weiter **`planned`** – **nicht** der live wählbare Weg
 - Festpreis: Mediabrutto aus gewählter Basis; kein Forward-Rabatt/AE auf den Fest-N/N;
-  effektiver Payfaktor und Positionsabschlag rückwärts; `fixed_price_nn` = `nn_invest`
+  AE rückwärts aus dem Festpreis; N/N-Endinvest unverändert; effektiver Payfaktor und
+  Positionsabschlag rückwärts; `fixed_price_nn` = `nn_invest`
 - Wechsel `fixed_price` → `normal`: `fixed_price_nn` wird geleert; Rabattpipeline greift wieder
 - Pin-Vertrag **02a** bei Abschluss-/Basiswechsel unverändert
 - Budget-Vorschlag übernehmen: Abschluss zurück auf **`normal`**
@@ -86,7 +89,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `SpotClassicFixedPriceSettlementTest`; MySQL: `SpotClassicFixedPriceSettlementMysqlTest`
 - Vitest: `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`
 - E2E: `playwright.blp402d.config.ts` (Port **8026**, Seeder `E2ESpotComponentsSeeder`)
-- `BL-P4-02` insgesamt weiter offen (SPT-008 Export, Abbinder; Tandem/Tridem siehe **02e**)
+- `BL-P4-02` insgesamt weiter offen (SPT-008 Dateiexport, Abbinder; Tandem/Tridem siehe **02e**)
 
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 

@@ -281,7 +281,7 @@ Unterobjekte werden typbezogen normalisiert:
   `components_snapshot`, eingefrorene Strategie und `component_profile`.
   **`AdvertisingMedium.component_profile`:** `null` = optionales Hauptspot/Allonge (02c);
   `tandem`/`tridem` erzwingen Slot-Schema und schließen `individual` aus.
-  **SPT-012 erledigt** (02e); SPT-013 teilweise (Abbinder offen); SPT-014 Hauptspot/Allonge umgesetzt,
+  **SPT-012 erledigt** (02e, PR #61 auf `main`); SPT-013 teilweise (Abbinder bewusst zurückgestellt); SPT-014 Hauptspot/Allonge umgesetzt,
 - `CalculationPositionTimeRange` für Preiszeitraum (Beginn, exklusives Ende,
   Tagesgruppe, Spotanzahl, Sortierung, Snapshot von Ø-Preis und Zeitraumssumme)
   – Methode `average`,
