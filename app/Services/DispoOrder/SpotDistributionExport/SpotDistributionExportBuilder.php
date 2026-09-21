@@ -227,7 +227,8 @@ final class SpotDistributionExportBuilder
 
     private function positionLabel(DispoOrderPosition $position): string
     {
-        return 'Position '.(int) $position->sort;
+        // Dispo speichert sort 0-basiert; Anzeige 1-basiert und lesbar.
+        return 'Position '.((int) $position->sort + 1);
     }
 
     private function quantityUnit(?SpotComponentProfile $profile): string

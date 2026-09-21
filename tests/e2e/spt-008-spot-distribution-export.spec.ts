@@ -16,6 +16,17 @@ type OrdersFixture = {
     tandem: { id: number; number: string };
     mixed: { id: number; number: string };
     average: { id: number; number: string };
+    multi: {
+        id: number;
+        number: string;
+        expected: {
+            total_positions: number;
+            calendar_positions: number;
+            average_positions: number;
+            xlsx_rows: number;
+            qty_by_position_label: Record<string, number>;
+        };
+    };
 };
 
 function loadOrders(): OrdersFixture {
@@ -147,7 +158,9 @@ test.describe('SPT-008 Spotverteilungs-Export', () => {
             page.locator(
                 '[data-test="dispo-spot-distribution-export-mixed-hint"]',
             ),
-        ).toHaveText('Der Export enthält nur kalendergeplante Positionen.');
+        ).toHaveText(
+            'Der Export enthält alle kalendergeplanten Positionen und deren belegte Zellen. Durchschnittspositionen (Average) sind bewusst nicht enthalten.',
+        );
 
         const downloadPromise = page.waitForEvent('download');
         await page
@@ -162,6 +175,63 @@ test.describe('SPT-008 Spotverteilungs-Export', () => {
         await download.saveAs(target);
         const workbook = readXlsx(target);
         expect(workbook.row_count).toBe(1);
+    });
+
+    test('multi-calendar order exports all calendar positions and excludes average', async ({
+        page,
+    }) => {
+        const orders = loadOrders();
+        await login(page, 'sales@example.com');
+        await page.goto(`/dispoauftraege/${orders.multi.id}`);
+
+        await expect(
+            page.locator(
+                '[data-test="dispo-spot-distribution-export-mixed-hint"]',
+            ),
+        ).toBeVisible();
+
+        const downloadPromise = page.waitForEvent('download');
+        await page
+            .locator('[data-test="dispo-spot-distribution-export-button"]')
+            .click();
+        const download = await downloadPromise;
+        const target = path.join(
+            root,
+            'database',
+            `e2e-spt008-multi-${Date.now()}.xlsx`,
+        );
+        await download.saveAs(target);
+        const workbook = readXlsx(target);
+
+        expect(workbook.row_count).toBe(orders.multi.expected.xlsx_rows);
+
+        const labels = workbook.rows.map((row) => row[2]);
+        expect(new Set(labels)).toEqual(
+            new Set(['Position 1', 'Position 2', 'Position 3']),
+        );
+        expect(labels).not.toContain('Position 4');
+
+        const qtyByLabel: Record<string, number> = {};
+        for (const row of workbook.rows) {
+            const label = row[2];
+            qtyByLabel[label] = (qtyByLabel[label] ?? 0) + Number(row[9]);
+        }
+        expect(qtyByLabel).toEqual(orders.multi.expected.qty_by_position_label);
+
+        const overlap = workbook.rows.filter(
+            (row) => row[5] !== '' && row[7] === '08:00',
+        );
+        expect(overlap.length).toBe(3);
+        expect(new Set(overlap.map((row) => row[2])).size).toBe(3);
+
+        const tandemRow = workbook.rows.find((row) => row[2] === 'Position 3');
+        expect(tandemRow?.[10]).toBe('Tandem-Einheiten');
+        expect(tandemRow?.[13]).toBe('6');
+
+        const joinedHeaders = workbook.headers.join('|').toLowerCase();
+        expect(joinedHeaders).not.toContain('preis');
+        expect(joinedHeaders).not.toContain('rabatt');
+        expect(joinedHeaders).not.toContain('festpreis');
     });
 
     test('average-only order disables export button', async ({ page }) => {

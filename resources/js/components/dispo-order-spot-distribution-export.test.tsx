@@ -86,7 +86,7 @@ describe('DispoOrderSpotDistributionExport', () => {
         expect(
             screen.getByTestId('dispo-spot-distribution-export-mixed-hint'),
         ).toHaveTextContent(
-            'Der Export enthält nur kalendergeplante Positionen.',
+            'Der Export enthält alle kalendergeplanten Positionen und deren belegte Zellen. Durchschnittspositionen (Average) sind bewusst nicht enthalten.',
         );
     });
 

@@ -32,7 +32,7 @@ class SpotDistributionExportBuilderTest extends TestCase
     {
         $order = $this->makeOrder();
         $this->addCalendarPosition($order, [
-            'sort' => 2,
+            'sort' => 1,
             'planner_entries_snapshot' => [
                 ['date' => '2026-09-16', 'hour' => 14, 'day_group' => 'mo_fr', 'spot_count' => 2],
                 ['date' => '2026-09-15', 'hour' => 10, 'day_group' => 'mo_fr', 'spot_count' => 1],
@@ -41,13 +41,13 @@ class SpotDistributionExportBuilderTest extends TestCase
             ],
         ]);
         $this->addCalendarPosition($order, [
-            'sort' => 1,
+            'sort' => 0,
             'inventory_name' => 'Sender A',
             'planner_entries_snapshot' => [
                 ['date' => '2026-09-20', 'hour' => 11, 'day_group' => 'so', 'spot_count' => 4],
             ],
         ]);
-        $this->addAveragePosition($order, ['sort' => 3]);
+        $this->addAveragePosition($order, ['sort' => 2]);
 
         $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
 
@@ -254,6 +254,89 @@ class SpotDistributionExportBuilderTest extends TestCase
         $emptyCapability = $builder->capability($empty->fresh(['positions']));
         $this->assertFalse($emptyCapability['enabled']);
         $this->assertNotNull($emptyCapability['disabled_reason']);
+    }
+
+    public function test_multiple_calendar_positions_keep_overlapping_date_hour_as_separate_rows(): void
+    {
+        $order = $this->makeOrder();
+        $first = $this->addCalendarPosition($order, [
+            'sort' => 0,
+            'inventory_name' => 'Sender Alpha',
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 2],
+                ['date' => '2026-09-14', 'hour' => 9, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+        $second = $this->addCalendarPosition($order, [
+            'sort' => 1,
+            'inventory_name' => 'Sender Beta',
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 5],
+            ],
+        ]);
+        $tandem = $this->addCalendarPosition($order, [
+            'sort' => 2,
+            'inventory_name' => 'Sender Gamma',
+            'component_profile' => SpotComponentProfile::Tandem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 3],
+            ],
+        ]);
+        $this->addAveragePosition($order, [
+            'sort' => 3,
+            'inventory_name' => 'Average Sender',
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+
+        $this->assertSame(3, $document->exportedPositionCount);
+        $this->assertCount(4, $document->rows);
+
+        $labels = array_map(
+            static fn ($row) => $row->positionLabel,
+            $document->rows,
+        );
+        $this->assertSame(
+            ['Position 1', 'Position 1', 'Position 2', 'Position 3'],
+            $labels,
+        );
+
+        $overlap = array_values(array_filter(
+            $document->rows,
+            static fn ($row) => $row->dateIso === '2026-09-14' && $row->hour === 8,
+        ));
+        $this->assertCount(3, $overlap);
+        $this->assertSame('Sender Alpha', $overlap[0]->inventoryName);
+        $this->assertSame(2, $overlap[0]->quantity);
+        $this->assertSame('Sender Beta', $overlap[1]->inventoryName);
+        $this->assertSame(5, $overlap[1]->quantity);
+        $this->assertSame('Sender Gamma', $overlap[2]->inventoryName);
+        $this->assertSame(3, $overlap[2]->quantity);
+        $this->assertSame('Tandem-Einheiten', $overlap[2]->quantityUnit);
+        $this->assertSame(6, $overlap[2]->componentAirings);
+
+        $qtyBySort = [];
+        foreach ($document->rows as $row) {
+            $qtyBySort[$row->positionLabel] = ($qtyBySort[$row->positionLabel] ?? 0) + $row->quantity;
+        }
+        $this->assertSame(3, $qtyBySort['Position 1']);
+        $this->assertSame(5, $qtyBySort['Position 2']);
+        $this->assertSame(3, $qtyBySort['Position 3']);
+
+        $this->assertNotContains('Average Sender', array_map(
+            static fn ($row) => $row->inventoryName,
+            $document->rows,
+        ));
+
+        // Keine stillen Key-Kollisionen: jede Positions-ID bleibt in der Menge.
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertNotSame($second->id, $tandem->id);
     }
 
     private function makeOrder(): DispoOrder

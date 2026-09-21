@@ -141,7 +141,9 @@ export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
                     className="text-muted-foreground text-sm"
                     data-test="dispo-spot-distribution-export-mixed-hint"
                 >
-                    Der Export enthält nur kalendergeplante Positionen.
+                    Der Export enthält alle kalendergeplanten Positionen und
+                    deren belegte Zellen. Durchschnittspositionen (Average)
+                    sind bewusst nicht enthalten.
                 </p>
             ) : null}
             {!config.enabled && config.disabled_reason ? (

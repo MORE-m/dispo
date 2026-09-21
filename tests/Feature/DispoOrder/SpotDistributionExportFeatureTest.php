@@ -231,6 +231,59 @@ class SpotDistributionExportFeatureTest extends TestCase
         $this->assertStringContainsString('Reminder', (string) $sheet->getCell('M2')->getValue());
     }
 
+    public function test_multi_calendar_download_keeps_overlapping_cells_per_position(): void
+    {
+        $order = $this->createMultiCalendarDispoOrder();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $sheet = $this->loadSheet(
+            $this->actingAs($user)
+                ->get(route('dispo-orders.export-spot-distribution', $order))
+                ->assertOk()
+                ->streamedContent(),
+        );
+
+        $this->assertSame(4, $this->dataRowCount($sheet));
+
+        $labels = [];
+        $qtyByLabel = [];
+        $overlapKeys = [];
+        for ($row = 2; $row <= 5; $row++) {
+            $label = (string) $sheet->getCell('C'.$row)->getValue();
+            $inventory = (string) $sheet->getCell('D'.$row)->getValue();
+            $date = (string) $sheet->getCell('F'.$row)->getValue();
+            $hour = (string) $sheet->getCell('H'.$row)->getValue();
+            $qty = (int) $sheet->getCell('J'.$row)->getCalculatedValue();
+
+            $labels[] = $label;
+            $qtyByLabel[$label] = ($qtyByLabel[$label] ?? 0) + $qty;
+            if ($hour === '08:00') {
+                $overlapKeys[] = $label.'|'.$inventory.'|'.$date.'|'.$hour;
+            }
+        }
+
+        $this->assertSame(
+            ['Position 1', 'Position 1', 'Position 2', 'Position 3'],
+            $labels,
+        );
+        $this->assertSame([
+            'Position 1' => 3,
+            'Position 2' => 5,
+            'Position 3' => 3,
+        ], $qtyByLabel);
+        $this->assertCount(3, $overlapKeys);
+        $this->assertCount(3, array_unique($overlapKeys));
+        $this->assertSame('Tandem-Einheiten', (string) $sheet->getCell('K5')->getValue());
+        $this->assertSame('6', (string) $sheet->getCell('N5')->getCalculatedValue());
+
+        $headerJoined = '';
+        for ($col = 1; $col <= 14; $col++) {
+            $headerJoined .= (string) $sheet->getCell(Coordinate::stringFromColumnIndex($col).'1')->getValue();
+        }
+        $this->assertStringNotContainsStringIgnoringCase('preis', $headerJoined);
+        $this->assertStringNotContainsStringIgnoringCase('rabatt', $headerJoined);
+    }
+
     public function test_formula_injection_is_exported_as_text(): void
     {
         $order = $this->createCalendarDispoOrder(customerName: '=1+1');
@@ -385,6 +438,108 @@ class SpotDistributionExportFeatureTest extends TestCase
 
         return app(DispoOrderWriter::class)
             ->createFromCalculation($calculation, [$position->id], $user)
+            ->order;
+    }
+
+    private function createMultiCalendarDispoOrder(): DispoOrder
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = AdvertisingMedium::factory()->tandem()->create(['code' => 'tandem_spt008_multi']);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'advertising_medium_id' => $tandem->id,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['rock']->id,
+            'advertising_medium_id' => $tandem->id,
+        ]);
+
+        $user = User::factory()->role(Role::Sales)->create();
+        $year = PriceListCalendar::currentYear();
+        $date = sprintf('%04d-09-14', $year);
+        $fingerprint = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
+        $classicFp = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLivePositionSchema((int) $catalog['medium']->id)['schema_fingerprint'];
+        $tandemFp = app(ConfigurationSnapshotFreezeService::class)
+            ->resolveLivePositionSchema((int) $tandem->id)['schema_fingerprint'];
+
+        $payload = [
+            'planning_mode' => 'manual',
+            'customer_name' => 'Multi Calendar GmbH',
+            'order_discount_percent' => '0',
+            'schema_fingerprint' => $fingerprint,
+            'positions' => [
+                [
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 2],
+                        ['date' => $date, 'hour' => 9, 'spot_count' => 1],
+                    ],
+                ],
+                [
+                    'inventory_id' => $catalog['rock']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 5],
+                    ],
+                ],
+                [
+                    'inventory_id' => $catalog['hamburg']->id,
+                    'advertising_medium_id' => $tandem->id,
+                    'schema_fingerprint' => $tandemFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'component_calculation_strategy' => 'shared_total_length',
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 3],
+                    ],
+                    'components' => [
+                        ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                        ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+                    ],
+                ],
+                [
+                    'inventory_id' => $catalog['rock']->id,
+                    'advertising_medium_id' => $catalog['medium']->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'average',
+                    'length_seconds' => 30,
+                    'total_spot_count' => 10,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                    'time_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 9,
+                        'day_group' => 'mo_fr',
+                        'spot_count' => 10,
+                    ]],
+                ],
+            ],
+        ];
+
+        $calculation = app(CalculationWriter::class)->create($payload, $user);
+        $ids = $calculation->positions()->pluck('id')->all();
+
+        return app(DispoOrderWriter::class)
+            ->createFromCalculation($calculation, $ids, $user)
             ->order;
     }
 

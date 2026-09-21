@@ -80,7 +80,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Daten nur aus eingefrorenen Snapshots (`planner_entries_snapshot`, Komponenten/Profil);
   keine Live-Neuberechnung, keine Preislisten, keine kaufmännischen Spalten
 - Nur Calendar-Positionen mit belegten Zellen (`spot_count ≥ 1`); Average ausgeschlossen;
-  gemischte Aufträge: Hinweis „nur kalendergeplante Positionen“
+  gemischte Aufträge: Hinweis, dass alle Calendar-Positionen enthalten und Average bewusst ausgeschlossen ist
 - Blatt `Spotverteilung`; Dateiname `<Dispoauftragsnummer>_Spotverteilung.xlsx`
 - Audit `dispo_order.spot_distribution.exported` nur bei erfolgreicher Auslieferung
 - Unit/Feature/MySQL: `SpotDistributionExport*`; Vitest: `dispo-order-spot-distribution-export.test.tsx`

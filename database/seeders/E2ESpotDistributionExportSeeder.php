@@ -259,11 +259,104 @@ class E2ESpotDistributionExportSeeder extends Seeder
             $sales,
         )->order;
 
+        $multiCalc = $writer->create([
+            'planning_mode' => 'manual',
+            'customer_name' => 'SPT008 Multi Calendar GmbH',
+            'order_discount_percent' => '0',
+            'schema_fingerprint' => $schemaFp,
+            'positions' => [
+                [
+                    'inventory_id' => $inventory->id,
+                    'advertising_medium_id' => $classic->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 2],
+                        ['date' => $date, 'hour' => 9, 'spot_count' => 1],
+                    ],
+                ],
+                [
+                    'inventory_id' => $inventoryB->id,
+                    'advertising_medium_id' => $classic->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 5],
+                    ],
+                ],
+                [
+                    'inventory_id' => $inventory->id,
+                    'advertising_medium_id' => $tandem->id,
+                    'schema_fingerprint' => $tandemFp,
+                    'spot_method' => 'calendar',
+                    'calculation_method_key' => 'calendar',
+                    'length_seconds' => 30,
+                    'component_calculation_strategy' => 'shared_total_length',
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'planner_entries' => [
+                        ['date' => $date, 'hour' => 8, 'spot_count' => 3],
+                    ],
+                    'components' => [
+                        ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                        ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+                    ],
+                ],
+                [
+                    'inventory_id' => $inventoryB->id,
+                    'advertising_medium_id' => $classic->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'average',
+                    'length_seconds' => 30,
+                    'total_spot_count' => 10,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                    'time_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 9,
+                        'day_group' => 'mo_fr',
+                        'spot_count' => 10,
+                    ]],
+                ],
+            ],
+        ], $sales);
+        /** @var list<int> $multiPositionIds */
+        $multiPositionIds = array_values($multiCalc->positions()->pluck('id')->all());
+        $multiOrder = $dispoWriter->createFromCalculation(
+            $multiCalc,
+            $multiPositionIds,
+            $sales,
+        )->order;
+
         File::put(database_path('e2e-spt008-orders.json'), json_encode([
             'calendar' => ['id' => $calendarOrder->id, 'number' => $calendarOrder->number],
             'tandem' => ['id' => $tandemOrder->id, 'number' => $tandemOrder->number],
             'mixed' => ['id' => $mixedOrder->id, 'number' => $mixedOrder->number],
             'average' => ['id' => $averageOrder->id, 'number' => $averageOrder->number],
+            'multi' => [
+                'id' => $multiOrder->id,
+                'number' => $multiOrder->number,
+                'expected' => [
+                    'total_positions' => 4,
+                    'calendar_positions' => 3,
+                    'average_positions' => 1,
+                    'xlsx_rows' => 4,
+                    'qty_by_position_label' => [
+                        'Position 1' => 3,
+                        'Position 2' => 5,
+                        'Position 3' => 3,
+                    ],
+                ],
+            ],
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }
