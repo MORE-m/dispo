@@ -51,8 +51,30 @@ npm run build
 npx playwright install chromium
 ```
 
-Entwicklungsserver: `php artisan serve` oder `composer run dev`.
+Entwicklungsserver: `php artisan serve`, `composer run dev` oder
+`Dispo starten.command` / `./scripts/start-dev.sh`.
 Anwendung: http://localhost:8000 – Health: `/health` und `/up`.
+
+### Sicherer lokaler Start (`Dispo starten.command` / `scripts/start-dev.sh`)
+
+Der normale Start prüft PHP/MySQL, führt `php artisan migrate --force` aus und
+startet den Dev-Server. **Keine automatischen Seeder** gegen die Dev-DB
+`dispo` – weder `DevUserSeeder` noch `E2ECalculationSeeder`.
+
+- Migrationsfehler beenden den Start (`set -e`).
+- Erfolgreicher Migrations-No-op erlaubt den Start.
+- Setup ohne Server: `DISPO_SETUP_ONLY=1 ./scripts/start-dev.sh`
+- Lokale Entwicklungsbenutzer **einmalig bewusst** anlegen:
+
+```bash
+php artisan db:seed --class=DevUserSeeder --force
+```
+
+`DevUserSeeder` setzt per `updateOrCreate` fest definierte `*@example.com`-Konten
+(Name, Rolle, Passwort `password`) – deshalb nicht bei jedem Start automatisch.
+E2E-Katalog-Seeder laufen **nur** über isolierte Playwright-Configs
+(`APP_ENV=testing`, `E2E_SERVER=1`, eigene SQLite-Datei – niemals `dispo`) und
+sind fail-closed gegen die Dev-DB abgesichert.
 
 Öffentliche Registrierung ist deaktiviert. Benutzer werden administrativ angelegt.
 Passwort-Reset nutzt lokal `MAIL_MAILER=log` (`storage/logs`).

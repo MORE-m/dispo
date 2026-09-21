@@ -8,6 +8,11 @@ use Illuminate\Database\Seeder;
 
 /**
  * Lokale Testbenutzer (idempotent). Passwort ist immer „password“.
+ *
+ * Nicht automatisch beim Dev-Start ausführen: updateOrCreate überschreibt
+ * Name, Rolle, Passwort und Rabattlimit bestehender Konten mit denselben
+ * E-Mail-Adressen. Einmalig bewusst:
+ * php artisan db:seed --class=DevUserSeeder --force
  */
 class DevUserSeeder extends Seeder
 {
