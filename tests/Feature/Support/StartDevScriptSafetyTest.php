@@ -18,6 +18,7 @@ class StartDevScriptSafetyTest extends TestCase
         $this->assertStringContainsString('artisan migrate --force', $script);
         $this->assertStringContainsString('DISPO_SETUP_ONLY', $script);
         $this->assertStringContainsString('DISPO_ENV_FILE', $script);
+        $this->assertStringContainsString('DISPO_SKIP_FRONTEND_BUILD', $script);
         $this->assertStringContainsString('Keine automatischen Seeder', $script);
         $this->assertStringContainsString('DevUserSeeder --force', $script);
 
@@ -88,6 +89,7 @@ class StartDevScriptSafetyTest extends TestCase
             array_merge($sharedEnv, [
                 'DISPO_ENV_FILE' => $envFile,
                 'DISPO_SETUP_ONLY' => '1',
+                'DISPO_SKIP_FRONTEND_BUILD' => '1',
                 'DISPO_PORT' => '18099',
                 'DISPO_HOST' => '127.0.0.1',
                 'PHP_BIN' => PHP_BINARY,

@@ -301,9 +301,11 @@ echo App\Models\User::query()->where("email", "test@example.com")->exists() ? "p
 
 print_dev_user_hint
 
-if [[ ! -d public/build ]] || [[ -z "$(ls -A public/build 2>/dev/null)" ]]; then
-    echo "Frontend-Build fehlt – npm run build …"
-    npm run build
+if [[ "${DISPO_SKIP_FRONTEND_BUILD:-}" != "1" ]]; then
+    if [[ ! -d public/build ]] || [[ -z "$(ls -A public/build 2>/dev/null)" ]]; then
+        echo "Frontend-Build fehlt – npm run build …"
+        npm run build
+    fi
 fi
 
 if [[ "${DISPO_SETUP_ONLY:-}" == "1" ]]; then
