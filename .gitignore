@@ -1,5 +1,7 @@
 /database/*.sqlite
 /database/*.sqlite-journal
+/database/e2e-spt008-orders.json
+/database/e2e-spt008-*.xlsx
 /playwright-report
 /test-results
 /blob-report
