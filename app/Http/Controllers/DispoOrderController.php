@@ -19,6 +19,7 @@ use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
+use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +27,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispoOrderController extends Controller
 {
@@ -35,6 +37,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderApprovalService $approvals,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
+        private readonly SpotDistributionExportService $spotDistributionExport,
     ) {}
 
     public function index(Request $request): Response
@@ -111,6 +114,8 @@ class DispoOrderController extends Controller
         $canSyncCalculationDynamicFields = $canUpdate
             && $dynamicValues['missing_calc_origin_keys'] !== [];
 
+        $spotDistributionCapability = $this->spotDistributionExport->capability($dispoOrder);
+
         return Inertia::render('dispo-orders/show', [
             'order' => $this->serializeOrder($dispoOrder, $dynamicValues),
             'fieldSchema' => $this->dynamicFields->fieldSchemaProp($dispoOrder),
@@ -123,7 +128,24 @@ class DispoOrderController extends Controller
             'canReject' => $canReject,
             'canRevise' => $canRevise,
             'isCreator' => $isCreator,
+            'spotDistributionExport' => [
+                'can_export' => true,
+                'enabled' => $spotDistributionCapability['enabled'],
+                'mixed_order' => $spotDistributionCapability['mixed_order'],
+                'disabled_reason' => $spotDistributionCapability['disabled_reason'],
+                'url' => route('dispo-orders.export-spot-distribution', $dispoOrder),
+            ],
         ]);
+    }
+
+    public function exportSpotDistribution(Request $request, DispoOrder $dispoOrder): StreamedResponse
+    {
+        $this->authorize('view', $dispoOrder);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        return $this->spotDistributionExport->download($dispoOrder, $user);
     }
 
     public function update(UpdateDispoOrderDraftRequest $request, DispoOrder $dispoOrder): JsonResponse|RedirectResponse

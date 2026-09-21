@@ -43,6 +43,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('standardangebote', UnavailableModuleController::class)->defaults('module', 'standard-offers')->name('standard-offers.index');
     Route::get('dispoauftraege', [DispoOrderController::class, 'index'])->name('dispo-orders.index');
     Route::get('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'show'])->name('dispo-orders.show');
+    Route::get('dispoauftraege/{dispoOrder}/spotverteilung.xlsx', [DispoOrderController::class, 'exportSpotDistribution'])
+        ->name('dispo-orders.export-spot-distribution');
     Route::patch('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'update'])->name('dispo-orders.update');
     Route::patch('dispoauftraege/{dispoOrder}/positions-angaben', [DispoOrderController::class, 'updatePositionCustoms'])
         ->name('dispo-orders.update-position-customs');
