@@ -18,15 +18,20 @@ use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
+use App\Support\E2E\E2EIsolatedEnvironmentGuard;
 use Illuminate\Database\Seeder;
 
 /**
  * Minimaler Katalog und Testbenutzer für Playwright-E2E (nur lokal/CI).
+ *
+ * Fail-closed: nur APP_ENV=testing + E2E_SERVER=1 + nicht Dev-DB „dispo“.
  */
 class E2ECalculationSeeder extends Seeder
 {
     public function run(): void
     {
+        E2EIsolatedEnvironmentGuard::assertSafeForE2ESeeding();
+
         foreach ([
             ['email' => 'sales@example.com', 'name' => 'E2E Vertrieb', 'role' => Role::Sales],
             ['email' => 'sales-b@example.com', 'name' => 'E2E Vertrieb B', 'role' => Role::Sales],

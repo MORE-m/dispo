@@ -2,6 +2,11 @@
 # Lokaler Entwicklungsserver für Dispo (XAMPP/MySQL).
 # Nutzung: ./scripts/start-dev.sh
 # Erzwungener Neustart: DISPO_RESTART=1 ./scripts/start-dev.sh
+# Nur Migrationen/Checks ohne Server: DISPO_SETUP_ONLY=1 ./scripts/start-dev.sh
+#
+# Keine automatischen Seeder gegen die Dev-DB. E2E-Seeder nur über isolierte
+# Playwright-Configs. Lokale Dev-Benutzer bewusst einmalig:
+#   php artisan db:seed --class=DevUserSeeder --force
 
 set -euo pipefail
 
@@ -174,10 +179,12 @@ echo "PHP:     $("$PHP_BIN" -r 'echo PHP_VERSION;')"
 echo "URL:     http://${HOST}:${PORT}"
 echo
 
-if [[ ! -f .env ]]; then
-    echo "FEHLER: .env fehlt. Einmalig: cp .env.example .env && php artisan key:generate"
+if [[ ! -f "${DISPO_ENV_FILE:-.env}" ]]; then
+    echo "FEHLER: ${DISPO_ENV_FILE:-.env} fehlt. Einmalig: cp .env.example .env && php artisan key:generate"
     exit 1
 fi
+
+ENV_FILE="${DISPO_ENV_FILE:-.env}"
 
 SKIP_SERVE=0
 EXISTING_PID=""
@@ -195,7 +202,7 @@ if listener_pids="$(port_listener_pids)"; then
             EXISTING_PID="$first_pid"
             SKIP_SERVE=1
             echo "Dispo-Server läuft bereits auf http://${HOST}:${PORT} (PID ${EXISTING_PID})"
-            echo "Nur Setup (Migrationen, Testbenutzer) – Server bleibt unverändert."
+            echo "Nur Setup (Migrationen) – Server bleibt unverändert."
             echo
         else
             echo "FEHLER: Dispo-Prozess auf Port ${PORT} (PID ${first_pid}) antwortet nicht auf /up."
@@ -209,10 +216,10 @@ elif [[ "${DISPO_RESTART:-}" == "1" ]]; then
     echo "Hinweis: DISPO_RESTART=1 gesetzt, Port ${PORT} ist frei – starte neuen Server."
 fi
 
-DB_CONNECTION="$(grep -E '^DB_CONNECTION=' .env | cut -d= -f2- | tr -d '\r' || true)"
-DB_DATABASE="$(grep -E '^DB_DATABASE=' .env | cut -d= -f2- | tr -d '\r' || true)"
-DB_USERNAME="$(grep -E '^DB_USERNAME=' .env | cut -d= -f2- | tr -d '\r' || true)"
-DB_PASSWORD="$(grep -E '^DB_PASSWORD=' .env | cut -d= -f2- | tr -d '\r' || true)"
+DB_CONNECTION="$(grep -E '^DB_CONNECTION=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r' || true)"
+DB_DATABASE="$(grep -E '^DB_DATABASE=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r' || true)"
+DB_USERNAME="$(grep -E '^DB_USERNAME=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r' || true)"
+DB_PASSWORD="$(grep -E '^DB_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r' || true)"
 
 if [[ "${DB_CONNECTION:-mysql}" == "mysql" ]]; then
     if [[ ! -x "$MYSQL_BIN" ]]; then
@@ -230,18 +237,81 @@ if [[ "${DB_CONNECTION:-mysql}" == "mysql" ]]; then
     fi
 fi
 
+# Bekannte Keys aus ENV_FILE exportieren, sofern die Shell sie noch nicht setzt.
+# Vorhandene Prozess-Env (z. B. isolierte Tests) gewinnt – kein Source der ganzen Datei.
+export_env_key_if_unset() {
+    local key="$1"
+    local line value
+
+    if printenv "$key" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    line="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 | tr -d '\r' || true)"
+    [[ -z "$line" ]] && return 0
+
+    value="${line#*=}"
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+        value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+        value="${value:1:${#value}-2}"
+    fi
+
+    export "${key}=${value}"
+}
+
+for __dispo_env_key in \
+    APP_ENV APP_KEY APP_URL APP_DEBUG \
+    DB_CONNECTION DB_HOST DB_PORT DB_DATABASE DB_USERNAME DB_PASSWORD DB_URL \
+    SESSION_DRIVER CACHE_STORE QUEUE_CONNECTION
+do
+    export_env_key_if_unset "$__dispo_env_key"
+done
+unset __dispo_env_key
+
 echo "Migrationen …"
 "$PHP_BIN" artisan migrate --force
 
-echo "Testbenutzer …"
-"$PHP_BIN" artisan db:seed --class=DevUserSeeder --force
+print_dev_user_hint() {
+    local status
 
-echo "Katalog (falls noch leer) …"
-"$PHP_BIN" artisan db:seed --class=E2ECalculationSeeder --force
+    status="$("$PHP_BIN" -r '
+require "vendor/autoload.php";
+$app = require "bootstrap/app.php";
+$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel->bootstrap();
+echo App\Models\User::query()->where("email", "test@example.com")->exists() ? "present" : "missing";
+' 2>/dev/null || echo "unknown")"
 
-if [[ ! -d public/build ]] || [[ -z "$(ls -A public/build 2>/dev/null)" ]]; then
-    echo "Frontend-Build fehlt – npm run build …"
-    npm run build
+    echo
+    echo "Keine automatischen Seeder (Dev-DB bleibt unverändert)."
+    if [[ "$status" == "missing" ]]; then
+        echo "Lokale Entwicklungsbenutzer fehlen."
+        echo "Einmalig bewusst anlegen:"
+        echo "  php artisan db:seed --class=DevUserSeeder --force"
+    elif [[ "$status" == "present" ]]; then
+        echo "Lokaler Entwicklungsbenutzer test@example.com ist vorhanden."
+    else
+        echo "Status der lokalen Entwicklungsbenutzer konnte nicht geprüft werden."
+        echo "Falls Login fehlt, einmalig:"
+        echo "  php artisan db:seed --class=DevUserSeeder --force"
+    fi
+    echo "E2E-Katalog nur über isolierte Playwright-Suites – niemals gegen Dev-DB „dispo“."
+}
+
+print_dev_user_hint
+
+if [[ "${DISPO_SKIP_FRONTEND_BUILD:-}" != "1" ]]; then
+    if [[ ! -d public/build ]] || [[ -z "$(ls -A public/build 2>/dev/null)" ]]; then
+        echo "Frontend-Build fehlt – npm run build …"
+        npm run build
+    fi
+fi
+
+if [[ "${DISPO_SETUP_ONLY:-}" == "1" ]]; then
+    echo
+    echo "DISPO_SETUP_ONLY=1 – Setup beendet, Server wird nicht gestartet."
+    exit 0
 fi
 
 if [[ "$SKIP_SERVE" == "1" ]]; then
@@ -259,7 +329,6 @@ if [[ "$SKIP_SERVE" == "1" ]]; then
 
     echo
     echo "Fertig. Browser: http://${HOST}:${PORT}"
-    echo "Login: test@example.com / password"
     echo "Server-Neustart erzwingen: DISPO_RESTART=1 ./scripts/start-dev.sh"
     exit 0
 fi
@@ -276,7 +345,6 @@ fi
 echo
 echo "Starte php artisan serve auf http://${HOST}:${PORT} …"
 echo "Terminal offen lassen – Abbruch mit Ctrl+C"
-echo "Login: test@example.com / password  (alternativ sales@example.com)"
 echo
 
 exec "$PHP_BIN" artisan serve --host="$HOST" --port="$PORT"

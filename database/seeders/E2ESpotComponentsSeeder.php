@@ -16,6 +16,7 @@ use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
+use App\Support\E2E\E2EIsolatedEnvironmentGuard;
 use Illuminate\Database\Seeder;
 
 /**
@@ -23,11 +24,15 @@ use Illuminate\Database\Seeder;
  *
  * Zwei Inventare mit gleichen Sekundenpreisen, aber unterschiedlichen Strategien,
  * damit Inventarwechsel Calendar-Retention und Strategiebeträge prüfbar sind.
+ *
+ * Fail-closed: nur APP_ENV=testing + E2E_SERVER=1 + nicht Dev-DB „dispo“.
  */
 class E2ESpotComponentsSeeder extends Seeder
 {
     public function run(): void
     {
+        E2EIsolatedEnvironmentGuard::assertSafeForE2ESeeding();
+
         foreach ([
             ['email' => 'sales@example.com', 'name' => 'E2E Vertrieb', 'role' => Role::Sales],
             ['email' => 'admin@example.com', 'name' => 'E2E Admin', 'role' => Role::Admin],
