@@ -90,15 +90,17 @@ ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a**
 `main`; **02b umgesetzt (PR #58)** – Kalenderplaner/AT-02, **`calendar` released/v1**,
 echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
 Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
-umgesetzt, Export Spot-Verteilung offen. **02c umgesetzt (PR #59)** – AT-04
+umgesetzt; Spotverteilungs-Export siehe SPT-008 unten. **02c umgesetzt (PR #59)** – AT-04
 Hauptspot+Allonge manuell abgenommen. **02d auf `main` (PR #60), manuell
 abgenommen:** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf
 Basis `average`|`calendar`; AE rückwärts; N/N unverändert; Registry-Methode
 **`fixed_price`** weiter **`planned`**. **02e auf `main` (PR #61), manuell
 abgenommen:** Tandem/Tridem (`component_profile`), **SPT-012** über
 `shared_total_length` ohne ×2/×3; Reminder-Rollen; **`individual`** für Profile
-fail-closed. `BL-P4-02` insgesamt offen (SPT-008 Dateiexport, Abbinder/SPT-013,
-operative Blockplanung, …).
+fail-closed. `BL-P4-02` insgesamt offen (Abbinder/SPT-013, operative
+Blockplanung, …). **SPT-008 Dateiexport** vertikal umgesetzt (XLSX aus Snapshots,
+nur Calendar; Average-Export bewusst nicht); automatisiert getestet, manuelle
+Abnahme offen. REP-007 Dispo-PDF bleibt Phase 10.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

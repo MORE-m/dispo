@@ -265,22 +265,24 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; SPT-008 Dateiexport und Abbinder offen)
+- **Status:** offen (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt/Abnahme offen; Abbinder offen)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
-- **Ergebnis 02b (PR #58):** Kalenderplaner/AT-02 als echte **Wochenmatrix** Mo–So × Preisstunden; Spotanzahl direkt je Datum-/Stundenzelle; Jahresvertrag (ein Preisjahr je Position); Wochen-/Monatsnavigation mit State-Erhalt; Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot + Anzeige (`SPT-008` Snapshot/Anzeige umgesetzt, Export offen); Pin-Vertrag 02a unverändert kompatibel
+- **Ergebnis 02b (PR #58):** Kalenderplaner/AT-02 als echte **Wochenmatrix** Mo–So × Preisstunden; Spotanzahl direkt je Datum-/Stundenzelle; Jahresvertrag (ein Preisjahr je Position); Wochen-/Monatsnavigation mit State-Erhalt; Registry `calendar` **released/v1**; Persistenz + Dispo-Snapshot + Anzeige (`SPT-008` Snapshot/Anzeige umgesetzt); Pin-Vertrag 02a unverändert kompatibel
 - **Ergebnis 02c (PR #59, manuell abgenommen):** Hauptspot+Allonge; Strategien `shared_total_length`/`individual` für Average+Calendar; Admin-Freeze; Dispo-Snapshot/Anzeige; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten; SPT-014 Hauptspot/Allonge umgesetzt
 - **Ergebnis 02d (`main`, PR #60, manuell abgenommen):** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis `average`|`calendar`; N/N-Festpreis (N/N unverändert); AE rückwärts; Payfaktor/Abschlag; Pin 02a; Dispo-Snapshot; Budget-Apply → `normal`. Registry-Methode **`fixed_price`** weiter **`planned`** (nicht der Live-Weg)
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
-- **Offen:** SPT-008 Dateiexport, Abbinder (SPT-013), operative Blockplanung; REP-007 Dispo-PDF in Phase 10
+- **Ergebnis SPT-008 Export:** interner XLSX-Spotverteilungs-Export aus Dispo-Snapshots (nur Calendar-Zellen); Blatt `Spotverteilung`; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**. Status: **umgesetzt / automatisiert getestet**, manuelle Abnahme offen. Average-Export bewusst **nicht** enthalten.
+- **Offen:** manuelle Abnahme SPT-008; Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
 - **Tests 02c:** `SpotComponentCalculationTest`, `SpotClassicComponentsTest` (+ MySQL); Playwright `playwright.blp402c.config.ts` (Port 8025)
 - **Tests 02d:** `SpotClassicFixedPriceSettlementTest` (+ MySQL); Vitest `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`; Playwright `playwright.blp402d.config.ts` (Port 8026)
 - **Tests 02e:** `TandemTridemCalculationTest`, `ComponentProfileValidatorTest`, `SpotClassicTandemTridemTest` (+ MySQL); Vitest `spot-components.test.ts`; Playwright `playwright.blp402e.config.ts` (Port 8028)
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und SPT-008 Export offen.
+- **Tests SPT-008:** `SpotDistributionExportBuilderTest`, `SpotDistributionExportFeatureTest` (+ MySQL), Vitest `dispo-order-spot-distribution-export.test.tsx`, Playwright `playwright.spt008.config.ts` / `test:e2e:spt008` (Port **8033**)
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und operative Blockplanung offen.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
