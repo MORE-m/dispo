@@ -5,6 +5,7 @@ namespace Tests\Feature\Support;
 use App\Models\Organization;
 use App\Models\User;
 use Database\Seeders\E2ECalculationSeeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use RuntimeException;
 use Tests\TestCase;
@@ -57,7 +58,7 @@ class E2ECalculationSeederGuardTest extends TestCase
 
             $this->assertSame(
                 0,
-                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]),
+                Artisan::call('migrate', ['--force' => true]),
             );
 
             (new E2ECalculationSeeder)->run();
