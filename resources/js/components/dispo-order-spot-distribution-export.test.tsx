@@ -126,7 +126,7 @@ describe('DispoOrderSpotDistributionExport', () => {
         expect(button).toHaveTextContent('Spotverteilung wird erstellt…');
 
         resolveFetch(
-            new Response(new Blob(['xlsx']), {
+            new Response(Uint8Array.from([0x50, 0x4b, 0x03, 0x04]), {
                 status: 200,
                 headers: {
                     'Content-Type':
