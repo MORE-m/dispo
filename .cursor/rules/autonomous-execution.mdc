@@ -29,9 +29,15 @@ treffen und im Entscheidungslog festhalten.
 Akzeptierte ADRs nicht stillschweigend ändern. Richtungswechsel: neues ADR.
 
 UX-GATE-A und UX-GATE-B sind freigegeben (App-Shell, Wizard, Spot Classic).
-UX-GATE-C und UX-GATE-D bleiben blockiert: keine Trailer/SWF-, Influencer-/Social-,
-Dispo-, Freigabe-, Standardangebots- oder Admin-Fachoberflächen. Gesperrte
-Bereiche nur als Sperr-/Leerzustand.
+UX-GATE-C bleibt blockiert: keine Trailer/SWF-, Influencer-/Social- oder weiteren
+Werbeelement-Fachoberflächen außerhalb Spot Classic.
+UX-GATE-D ist **teilweise freigegeben** laut [`docs/ux-ui-gate.md`](docs/ux-ui-gate.md):
+bereits freigegebene Slices (u. a. Dispoentwurf, Vier-Augen-Freigabe, Dyn-Feld-Admin,
+Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl)
+dürfen weiterentwickelt und gehärtet werden. Fail-closed nur für **nicht**
+freigegebene Teilbereiche (u. a. operative Disposition ab „In Bearbeitung“,
+Kombinationstabelle, Standardangebote, Uploads/Kommentare/Rückfragen, Auswertungen):
+dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
 
 ## Blocker
 

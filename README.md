@@ -8,7 +8,9 @@ Social-Media-, Event- und Sonderwerbeaufträgen an die Disposition.
 V1-Fachlichkeit und Technologie-ADRs sind verbindlich. Phase 0 (Projektbasis)
 ist **technisch endgültig abgenommen** (GitHub-Actions-Jobs `ci` und `mysql`).
 UX-GATE-A und UX-GATE-B sind freigegeben (App-Shell, Kalkulations-Wizard,
-Spot Classic). UX-GATE-C und UX-GATE-D bleiben blockiert
+Spot Classic). UX-GATE-C bleibt blockiert. UX-GATE-D ist **teilweise freigegeben**
+(Dispoentwurf, Vier-Augen-Freigabe, Dyn-Feld-/Katalog-/Inventar-/Preislisten-Admin,
+Excel-Import, Wizard-Jahreswahl); Restbereiche bleiben gesperrt
 ([`docs/ux-ui-gate.md`](docs/ux-ui-gate.md)).
 
 ## Start
