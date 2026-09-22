@@ -233,9 +233,6 @@ final class SpotDistributionExportBuilder
 
         $count = 0;
         foreach ($ranges as $range) {
-            if (! is_array($range)) {
-                continue;
-            }
             $spotCount = $range['spot_count'] ?? null;
             if (is_numeric($spotCount) && (int) $spotCount >= 1) {
                 $count++;
@@ -333,18 +330,8 @@ final class SpotDistributionExportBuilder
 
         $rows = [];
         foreach ($ranges as $index => $range) {
-            if (! is_array($range)) {
-                throw ValidationException::withMessages([
-                    'export' => "Average-Zeitraum {$index} der Position {$positionLabel} ist ungültig.",
-                ]);
-            }
-
             $spotCount = $this->requirePositiveSpotCount($range, $positionLabel, $index);
             if ($spotCount === null) {
-                // Menge 0 oder fehlend: fail-closed wenn key fehlt; 0 wird übersprungen nur wenn explizit 0?
-                // PO: Menge kleiner 1 fail-closed. requirePositiveSpotCount returns null for <1 after validating numeric.
-                // But missing spot_count throws. For spot_count=0, currently returns null (skip).
-                // PO says Menge kleiner 1 fail-closed - so we should fail, not skip!
                 if (array_key_exists('spot_count', $range) && is_numeric($range['spot_count']) && (int) $range['spot_count'] < 1) {
                     throw ValidationException::withMessages([
                         'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat eine ungültige Menge.",

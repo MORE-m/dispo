@@ -187,14 +187,10 @@ final class SpotPlanningExportSupport
             return null;
         }
 
-        $startIso = $start instanceof \DateTimeInterface
-            ? $start->format('Y-m-d')
-            : (string) $start;
-        $endIso = $end instanceof \DateTimeInterface
-            ? $end->format('Y-m-d')
-            : (string) $end;
+        $startIso = substr((string) $start, 0, 10);
+        $endIso = substr((string) $end, 0, 10);
 
-        if ($startIso === '' || $endIso === '') {
+        if ($startIso === '' || $endIso === '' || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $startIso) || ! preg_match('/^\d{4}-\d{2}-\d{2}$/', $endIso)) {
             return null;
         }
 
