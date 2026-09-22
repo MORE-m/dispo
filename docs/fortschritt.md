@@ -1,37 +1,49 @@
 # Fortschritt V1
 
-Stand: 21. September 2026 (Feature **SPT-008** Dateiexport, Branch
-`feat/spt-008-dispo-spot-distribution-xlsx`, Base `00b1b4ec…` inkl. PR #67).
-**`BL-P4-02a`–`02e`** auf **`main`**. **`BL-P4-02c` (AT-04)**, Festpreis (**02d**) und
-Tandem/Tridem (**02e** / **SPT-012**) manuell abgenommen. `BL-P4-01` abgeschlossen.
+Stand: 22. September 2026 (Feature **DSP-DCP-001** abgeleiteter Dispo-Kampagnenzeitraum,
+Branch `feat/derived-dispo-campaign-period`, Base `4d245a6a…` = PR #68).
+**`BL-P4-02a`–`02e`** und **SPT-008 Dateiexport** auf **`main`**. Abbinder (SPT-013)
+bewusst zurückgestellt. Kundenexport aus Kalkulation bleibt Folgeauftrag.
 
 ## Aktuelle Phase
 
-Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`–`02e`** auf **`main`**
-(PR **#56**–**#61**). Gesamtblock **`BL-P4-02` bleibt offen** (Abbinder/SPT-013,
-operative Blockplanung, …). **SPT-008 Dateiexport** vertikal umgesetzt und
-automatisiert getestet; **manuelle Abnahme ausstehend**. UX-GATE-D: bisherige
-Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
+Phase 4 / Dispo-Erweiterungen: **`BL-P4-02` bleibt offen** (Abbinder/SPT-013,
+operative Blockplanung). **SPT-008** manuelle Abnahme offen.
+**DSP-DCP-001** (abgeleiteter Kampagnenzeitraum am Dispoauftrag) in Umsetzung /
+Abnahme.
 
 ## Aktuelle Aufgabe
 
-**SPT-008** interner XLSX-Spotverteilungs-Export: **implementiert / automatisiert
-getestet**, manuelle Abnahme offen. Weiter **`BL-P4-02`**: Abbinder (SPT-013,
-bewusst zurückgestellt), operative Blockplanung. Registry-Methode **`fixed_price`**
-bleibt **`planned`**. REP-007 Dispo-PDF bleibt Phase 10. Average-Export ist
-**nicht** Bestandteil von SPT-008.
+**DSP-DCP-001** automatisch abgeleiteter globaler Kampagnenzeitraum am Dispoauftrag:
+additiv getrennt von Calc-Origin-`campaign_period`; Freeze bei Create/Revision;
+Status `complete|partial|open|legacy`; keine Live-Neuberechnung; kein Backfill;
+Rechnungslogik nur vorbereitet (`complete`); keine Rechnungsautomatik.
+E2E Port **8034** (`test:e2e:dspdcp001`).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**SPT-008 Dateiexport** (Branch `feat/spt-008-dispo-spot-distribution-xlsx`):
-interner synchroner XLSX-Download der konkreten Calendar-Spotverteilung aus
-eingefrorenen Dispo-Snapshots (`planner_entries_snapshot`); Blatt
-`Spotverteilung`; ohne kaufmännische Spalten; Audit
-`dispo_order.spot_distribution.exported` nur bei Erfolg; isolierte E2E
-`test:e2e:spt008` Port **8033**.
+**DSP-DCP-001** (Branch `feat/derived-dispo-campaign-period`): serverseitige Ableitung
+aus Frozen Dispo-Positionen (`planner_entries_snapshot` / `position_flight_period`),
+additive Spalten an `dispo_orders`, UI mit Konflikt-Hinweis, Unit/Feature/MySQL/Vitest/
+Playwright.
 
-Zuvor **BL-P4-02e** (PR **#61**, Merge `6913c358…`): Tandem/Tridem /
-**SPT-012** manuell abgenommen.
+Zuvor **SPT-008 Dateiexport** (PR **#68**, Merge `4d245a6a…`): interner XLSX-Export;
+manuelle Abnahme offen.
+
+## DSP-DCP-001 – Abgeleiteter Dispo-Kampagnenzeitraum (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Calc-Origin-`campaign_period` unverändert (read-only, kopiert) | **umgesetzt** |
+| Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
+| Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
+| Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
+| Freeze in Create-TX nach Snapshots + Dyn-Feld-Capture | **umgesetzt** |
+| Kein Backfill / Legacy ohne Datumswerte | **umgesetzt** |
+| UI getrennt + Konflikt-Hinweis (nicht blockierend) | **umgesetzt** |
+| Rechnung nur bei `complete` vorbereitet, Automatik **nicht** | **dokumentiert** |
+| Abbinder / Kunden-Calc-Export | **bewusst nicht** |
+| Manuelle Abnahme | **offen** |
 
 ## BL-P4-02e – Tandem / Tridem / SPT-012 (September 2026)
 

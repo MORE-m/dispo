@@ -38,6 +38,10 @@ import {
     type SchemaChoiceField,
 } from '@/lib/choice-field-values';
 import { formatDateOnly, formatDateTime } from '@/lib/date-time';
+import {
+    derivedCampaignPeriodSummary,
+    type DerivedCampaignPeriodProp,
+} from '@/lib/derived-campaign-period';
 import type { SnapshotFieldRule } from '@/lib/dynamic-field-rules';
 import {
     formatPlannerEntryLine,
@@ -251,6 +255,7 @@ type OrderDetail = {
     };
     missing_calc_origin_keys?: string[];
     historically_uncaptured?: boolean;
+    derived_campaign_period?: DerivedCampaignPeriodProp;
     positions: OrderPosition[];
 };
 
@@ -720,12 +725,10 @@ export default function DispoOrderShow({
             ? 'Entwurf – Rechnungs- und Dispohinweise bearbeitbar'
             : 'Dispoauftrag (Snapshot, schreibgeschützt)';
 
-    const campaignPeriodLabel = fieldLabel(
-        fieldSchema,
-        'campaign_period',
-        'Kampagnenzeitraum',
-    );
-    const campaignPeriodHelp = fieldHelp(fieldSchema, 'campaign_period');
+    const campaignPeriodLabel = 'Kampagnenzeitraum aus Kalkulation';
+    const campaignPeriodHelp =
+        fieldHelp(fieldSchema, 'campaign_period') ??
+        'Aus der Kalkulation übernommener Zeitraum (unverändert).';
     const billingLabel = fieldLabel(
         fieldSchema,
         'billing_special_features',
@@ -755,6 +758,11 @@ export default function DispoOrderShow({
         headerValues.campaign_period,
         headerCaptured.campaign_period === true,
     );
+
+    const derivedPeriod = order.derived_campaign_period;
+    const derivedSummary = derivedPeriod
+        ? derivedCampaignPeriodSummary(derivedPeriod, formatDateOnly)
+        : null;
 
     function applyLockConflict(response: HttpExceptionResponse): boolean {
         if (response.status !== 409) {
@@ -1183,7 +1191,117 @@ export default function DispoOrderShow({
                                 value={campaignPeriodDisplay}
                                 helpText={campaignPeriodHelp}
                             />
+                            <p className="text-muted-foreground mt-1 text-xs">
+                                Aus Kalkulation übernommen
+                            </p>
                         </div>
+                        {derivedPeriod && derivedSummary ? (
+                            <div
+                                className="space-y-2 sm:col-span-2"
+                                data-test="dispo-order-derived-campaign-period"
+                            >
+                                <Detail
+                                    label="Abgeleiteter Kampagnenzeitraum (Dispo)"
+                                    value={
+                                        derivedSummary.rangeText ??
+                                        (derivedPeriod.status === 'open' ||
+                                        derivedPeriod.status === 'legacy'
+                                            ? '–'
+                                            : '–')
+                                    }
+                                    helpText="Automatisch aus den eingefrorenen Positionen dieses Auftrags berechnet. Read-only."
+                                />
+                                <p
+                                    className="text-sm"
+                                    data-test="dispo-order-derived-campaign-period-status"
+                                >
+                                    Status: {derivedSummary.statusLabel}
+                                </p>
+                                {derivedSummary.explanation ? (
+                                    <p
+                                        className="text-muted-foreground text-xs"
+                                        data-test="dispo-order-derived-campaign-period-explanation"
+                                    >
+                                        {derivedSummary.explanation}
+                                    </p>
+                                ) : null}
+                                {derivedPeriod.status === 'partial' &&
+                                derivedPeriod.contributing_count != null &&
+                                derivedPeriod.unresolved_count != null ? (
+                                    <p
+                                        className="text-muted-foreground text-xs"
+                                        data-test="dispo-order-derived-campaign-period-counts"
+                                    >
+                                        Beitragend:{' '}
+                                        {derivedPeriod.contributing_count} ·
+                                        Ohne konkreten Zeitraum:{' '}
+                                        {derivedPeriod.unresolved_count}
+                                    </p>
+                                ) : null}
+                                {derivedSummary.showUnresolved &&
+                                derivedPeriod.unresolved_positions.length >
+                                    0 ? (
+                                    <ul
+                                        className="text-muted-foreground list-inside list-disc text-xs"
+                                        data-test="dispo-order-derived-campaign-period-unresolved"
+                                    >
+                                        {derivedPeriod.unresolved_positions.map(
+                                            (item) => (
+                                                <li
+                                                    key={
+                                                        item.dispo_order_position_id
+                                                    }
+                                                >
+                                                    {item.label}
+                                                    {item.unresolved_reason_label
+                                                        ? ` – ${item.unresolved_reason_label}`
+                                                        : ''}
+                                                </li>
+                                            ),
+                                        )}
+                                    </ul>
+                                ) : null}
+                                {derivedPeriod.conflict_with_calculation ? (
+                                    <p
+                                        className="text-xs text-amber-800 dark:text-amber-200"
+                                        data-test="dispo-order-derived-campaign-period-conflict"
+                                    >
+                                        Hinweis: Der Zeitraum aus der
+                                        Kalkulation weicht vom abgeleiteten
+                                        Dispo-Zeitraum ab. Beide Werte bleiben
+                                        getrennt sichtbar; die
+                                        Auftragserstellung wird dadurch nicht
+                                        blockiert.
+                                    </p>
+                                ) : null}
+                                {!derivedPeriod.conflict_with_calculation &&
+                                derivedPeriod.calculation_period_complete &&
+                                !derivedPeriod.derived_period_complete ? (
+                                    <p
+                                        className="text-muted-foreground text-xs"
+                                        data-test="dispo-order-derived-campaign-period-only-calc"
+                                    >
+                                        Es liegt nur ein Kalkulationszeitraum
+                                        vor; aus den Positionen konnte kein
+                                        vollständiger Dispo-Zeitraum abgeleitet
+                                        werden.
+                                    </p>
+                                ) : null}
+                                {!derivedPeriod.conflict_with_calculation &&
+                                !derivedPeriod.calculation_period_complete &&
+                                derivedPeriod.derived_period_complete ? (
+                                    <p
+                                        className="text-muted-foreground text-xs"
+                                        data-test="dispo-order-derived-campaign-period-only-derived"
+                                    >
+                                        Es liegt nur ein abgeleiteter
+                                        Dispo-Zeitraum vor; in der Kalkulation
+                                        war kein vollständiger Kampagnenzeitraum
+                                        erfasst.
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
                         {showHeaderCalcOrigin ? (
                             <div
                                 className="space-y-3 border-t pt-3 sm:col-span-2"

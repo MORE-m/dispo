@@ -91,6 +91,22 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Status: **umgesetzt / automatisiert getestet**; **manuelle Abnahme offen**;
   REP-007 Dispo-PDF und operative Blockplanung **nicht** enthalten
 
+### DSP-DCP-001 (Abgeleiteter Dispo-Kampagnenzeitraum)
+
+- Additiv getrennt von Calc-Origin-`campaign_period` (unverändert kopiert, read-only)
+- Spalten an `dispo_orders`: `derived_campaign_period_start|end|status|at|snapshot`
+- Quellen: Calendar=`planner_entries_snapshot` (`spot_count≥1`); Average/Nicht-Calendar=
+  `position_flight_period` nur bei `period_open=false` und vollständigem Zeitraum;
+  `time_ranges_snapshot` **nie** als Kalenderdaten
+- Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
+- Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
+- Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
+- Spätere Rechnungslogik nur bei `complete` vorbereitet – **keine** Rechnungsautomatik
+- Unit/Feature/MySQL: `*CampaignPeriod*`; Vitest: `derived-campaign-period.test.ts`
+- E2E: `npm run test:e2e:dspdcp001` (`playwright.dspdcp001.config.ts`, Port **8034**,
+  Seeder `E2EDerivedCampaignPeriodSeeder`)
+- Abbinder / Kundenexport aus Kalkulation: **bewusst nicht**
+
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
 - **Auf `main` (PR #60), getestet und manuell abgenommen**

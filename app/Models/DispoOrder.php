@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DerivedCampaignPeriodStatus;
 use App\Enums\DispoOrderApprovalKind;
 use App\Enums\DispoOrderStatus;
 use Illuminate\Database\Eloquent\Collection;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
@@ -24,6 +26,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property DispoOrderApprovalKind $approval_kind
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property int $configuration_snapshot_id
+ * @property string|null $derived_campaign_period_start
+ * @property string|null $derived_campaign_period_end
+ * @property DerivedCampaignPeriodStatus $derived_campaign_period_status
+ * @property Carbon|null $derived_campaign_period_at
+ * @property array<string, mixed>|null $derived_campaign_period_snapshot
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  * @property-read Collection<int, DispoOrderFieldValue> $fieldValues
@@ -65,6 +72,7 @@ class DispoOrder extends Model
         'source_calculation_totals_snapshot',
         'lock_version',
         'configuration_snapshot_id',
+        // derived_campaign_period_* bewusst nicht fillable (nur Deriver).
     ];
 
     /**
@@ -89,6 +97,11 @@ class DispoOrder extends Model
             'order_discounts_snapshot' => 'array',
             'source_calculation_totals_snapshot' => 'array',
             'lock_version' => 'integer',
+            'derived_campaign_period_start' => 'date:Y-m-d',
+            'derived_campaign_period_end' => 'date:Y-m-d',
+            'derived_campaign_period_status' => DerivedCampaignPeriodStatus::class,
+            'derived_campaign_period_at' => 'datetime',
+            'derived_campaign_period_snapshot' => 'array',
         ];
     }
 

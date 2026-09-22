@@ -47,6 +47,10 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
 - Missing-/Submit-Prüfung je Position; bewusst leere Capture-Zeilen sind vollständig.
 - Draft: Texte editierbar; Calc-origin read-only; Hilfetexte aus dem DA-Snapshot.
 - Revision (PO-DF2-1): Texte aus Vorgänger per Schlüssel, Calc-Werte frisch.
+- **DSP-DCP-001 (additiv, getrennt):** Am Dispoauftrag wird zusätzlich ein
+  operativer `derived_campaign_period_*` aus Frozen Positionen abgeleitet und
+  eingefroren. `campaign_period` bleibt Calc-Origin und wird dabei weder
+  überschrieben noch umgedeutet. Draft-Sync darf Derived nicht neu berechnen.
 
 ## Umsetzungsstand DF-3.1 (Admin Systemfelder / Kern-Feldsets)
 

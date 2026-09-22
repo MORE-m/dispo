@@ -150,6 +150,9 @@ jobs:
       - name: Browser SPT-008 isolated tests
         run: npx playwright test -c playwright.spt008.config.ts
 
+      - name: Browser DSP-DCP-001 isolated tests
+        run: npx playwright test -c playwright.dspdcp001.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

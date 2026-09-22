@@ -75,6 +75,22 @@ class UpdateDispoOrderDraftRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            foreach ([
+                'derived_campaign_period_start',
+                'derived_campaign_period_end',
+                'derived_campaign_period_status',
+                'derived_campaign_period_at',
+                'derived_campaign_period_snapshot',
+                'derived_campaign_period',
+            ] as $forbidden) {
+                if ($this->exists($forbidden)) {
+                    $validator->errors()->add(
+                        $forbidden,
+                        'Der abgeleitete Kampagnenzeitraum ist nicht bearbeitbar.',
+                    );
+                }
+            }
+
             $values = $this->input('dynamic_field_values');
             if (! is_array($values)) {
                 return;

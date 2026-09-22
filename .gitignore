@@ -2,6 +2,9 @@
 /database/*.sqlite-journal
 /database/e2e-spt008-orders.json
 /database/e2e-spt008-*.xlsx
+/database/e2e-derived-campaign-period-orders.json
+/database/e2e-derived-campaign-period.sqlite
+/database/e2e-derived-campaign-period.sqlite-journal
 /playwright-report
 /test-results
 /blob-report

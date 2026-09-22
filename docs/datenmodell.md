@@ -320,6 +320,10 @@ in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
 PR **#58**). Ab **BL-P4-02d** zusätzlich `pricing_settlement_mode` und
 `fixed_price_nn` im Positions-Snapshot (Parität zu `CalculationPosition`). Ab
 **BL-P4-02e** zusätzlich `component_profile` (Parität zu `CalculationPosition`).
+Ab **DSP-DCP-001** speichert `dispo_orders` additiv den eingefrorenen abgeleiteten
+Kampagnenzeitraum (`derived_campaign_period_start`/`end`/`status`/`at`/`snapshot`).
+Das Dyn-Feld `campaign_period` bleibt unverändert Calc-Origin und wird nicht
+umgedeutet. Bestehende Aufträge: Status `legacy` ohne Rückbefüllung.
 Freigabeanforderungen sind append-only
 nach Entscheidung; höchstens eine offene Anforderung pro Auftrag (`open_guard`).
 Dispoaufträge speichern `approval_kind` und `special_approval_reasons` als
