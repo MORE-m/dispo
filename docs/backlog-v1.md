@@ -393,6 +393,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe nur Admin/GF; Ersteller bessert abgelehnte Aufträge nach
 - **Tests:** Pest, Vitest, Playwright, MySQL-Concurrency
 
+### BL-P8-01c / DSP-DCP-001 – Abgeleiteter Kampagnenzeitraum (Dispo)
+
+- **Phase:** 8
+- **Status:** **umgesetzt / Abnahme offen** (September 2026, Branch `feat/derived-dispo-campaign-period`)
+- **Kennung:** neu eingeführt **`DSP-DCP-001`** (kein Ersatz für `campaign_period`)
+- **Anforderungen:** ergänzt `DSP-002`/`DSP-003` (Freeze aus gewählten Positionen); Calc-Origin `campaign_period` unverändert
+- **Abhängigkeiten:** BL-P8-01, DF-1/DF-2 Periodenfelder, BL-P4-02b Planner-Snapshot
+- **Ergebnis:** additiver Frozen Zeitraum am Dispoauftrag aus Calendar-Planner bzw. geschlossenem Flight-Period; Status `complete|partial|open|legacy`; Provenienz-JSON; UI getrennt inkl. Konflikt-Hinweis; Draft-Sync ändert Derived nicht; kein Backfill
+- **Akzeptanz:** Calc-`campaign_period` unverändert; Ableitung nur Frozen Dispo-Daten; Legacy ohne Rückbefüllung; Rechnung später nur bei `complete` (Automatik **nicht** umgesetzt); Abbinder/Kunden-Calc-Export **nicht**
+- **Tests:** Unit `DispoOrderCampaignPeriodDeriverTest`, Feature/MySQL `DerivedCampaignPeriod*`, Vitest `derived-campaign-period.test.ts`, E2E Port **8034**
+
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8

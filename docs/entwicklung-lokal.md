@@ -253,6 +253,20 @@ E2E: `npm run test:e2e:spt008` bzw.
 `database/e2e-spt-008.sqlite`, Seeder `E2ESpotDistributionExportSeeder` – niemals
 Dev-DB `dispo`).
 
+## DSP-DCP-001 – Abgeleiteter Dispo-Kampagnenzeitraum
+
+Additiver Frozen Zeitraum am Dispoauftrag, getrennt von Calc-Origin-`campaign_period`.
+Ableitung in Create/Revision aus Frozen Positionen; Status inkl. `legacy` für Bestand
+ohne Backfill. Spätere Rechnungslogik nur bei `complete` – keine Automatik hier.
+
+Tests: `DispoOrderCampaignPeriodDeriverTest`, `DerivedCampaignPeriodFeatureTest`
+(+ MySQL); Vitest `resources/js/lib/derived-campaign-period.test.ts`.
+
+E2E: `npm run test:e2e:dspdcp001` bzw.
+`npx playwright test -c playwright.dspdcp001.config.ts` (Port **8034**, DB
+`database/e2e-derived-campaign-period.sqlite`, Seeder `E2EDerivedCampaignPeriodSeeder`
+– niemals Dev-DB `dispo`).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`

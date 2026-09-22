@@ -177,9 +177,12 @@ Umfang:
 - Kundenbestätigung/Ausnahme,
 - Vier-Augen-Prozess,
 - vollständiges Statusmodell, Rückfrage und Sperren,
-- Priorität und Bearbeitungsdatum.
+- Priorität und Bearbeitungsdatum,
+- **DSP-DCP-001:** additiv abgeleiteter Kampagnenzeitraum aus Frozen Positionen
+  (getrennt von Calc-Origin-`campaign_period`; Status inkl. `legacy`; kein Backfill;
+  Rechnungsautomatik bewusst später und nur bei `complete`).
 
-Relevante Anforderungen: `DSP-*`, `STA-*`, `UPL-001` bis `UPL-003`, `TEC-*`.
+Relevante Anforderungen: `DSP-*`, `STA-*`, `UPL-001` bis `UPL-003`, `TEC-*`, `DSP-DCP-001`.
 
 Abnahme: `AT-12` bis `AT-19`, `AT-29`. Dispoaufträge nur aus Kundenkalkulationen.
 
