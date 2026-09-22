@@ -22,6 +22,7 @@ use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use App\Support\Advertising\SpotComponentProfileContract;
+use App\Support\DispoOrder\DerivedCampaignPeriodPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -405,6 +406,12 @@ class DispoOrderController extends Controller
             'dynamic_field_captured' => $dynamicValues['header_captured'],
             'missing_calc_origin_keys' => $dynamicValues['missing_calc_origin_keys'],
             'historically_uncaptured' => $dynamicValues['historically_uncaptured'],
+            'derived_campaign_period' => DerivedCampaignPeriodPresenter::forOrder(
+                $order,
+                is_array($dynamicValues['header']['campaign_period'] ?? null)
+                    ? $dynamicValues['header']['campaign_period']
+                    : null,
+            ),
             'approval_history' => $order->approvalRequests->map(
                 fn (DispoOrderApprovalRequest $request): array => $this->serializeApprovalRequest($request),
             )->all(),
