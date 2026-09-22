@@ -26,6 +26,7 @@ final class DispoOrderWriter
         private readonly DispoOrderSnapshotMapper $mapper,
         private readonly AuditLogger $audit,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
+        private readonly DispoOrderCampaignPeriodDeriver $campaignPeriodDeriver,
     ) {}
 
     /**
@@ -241,6 +242,9 @@ final class DispoOrderWriter
             $uniqueIds,
             $revises,
         );
+
+        // DSP-DCP-001: Ableitung erst nach Frozen Positions + kopierten Calc-Origin-Feldern.
+        $this->campaignPeriodDeriver->deriveAndPersist($order);
 
         $fresh = $this->reloadOrder($order);
         $result = new DispoOrderWriterResult($fresh, $uniqueIds);
