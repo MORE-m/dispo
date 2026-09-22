@@ -337,6 +337,42 @@ class E2ESpotDistributionExportSeeder extends Seeder
             $sales,
         )->order;
 
+        $emptyCalc = $writer->create([
+            'planning_mode' => 'manual',
+            'customer_name' => 'SPT008 Empty Export GmbH',
+            'order_discount_percent' => '0',
+            'schema_fingerprint' => $schemaFp,
+            'positions' => [[
+                'inventory_id' => $inventory->id,
+                'advertising_medium_id' => $classic->id,
+                'schema_fingerprint' => $classicFp,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 10,
+                'position_discount_percent' => '0',
+                'ae_percent' => '0',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                'time_ranges' => [[
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 9,
+                    'day_group' => 'mo_fr',
+                    'spot_count' => 10,
+                ]],
+            ]],
+        ], $sales);
+        /** @var list<int> $emptyPositionIds */
+        $emptyPositionIds = array_values($emptyCalc->positions()->pluck('id')->all());
+        $emptyOrder = $dispoWriter->createFromCalculation(
+            $emptyCalc,
+            $emptyPositionIds,
+            $sales,
+        )->order;
+        $emptyOrder->positions()->update([
+            'time_ranges_snapshot' => [],
+            'plan_rows_snapshot' => [],
+            'planner_entries_snapshot' => [],
+        ]);
+
         File::put(database_path('e2e-spt008-orders.json'), json_encode([
             'calendar' => ['id' => $calendarOrder->id, 'number' => $calendarOrder->number],
             'tandem' => ['id' => $tandemOrder->id, 'number' => $tandemOrder->number],
@@ -349,7 +385,8 @@ class E2ESpotDistributionExportSeeder extends Seeder
                     'total_positions' => 4,
                     'calendar_positions' => 3,
                     'average_positions' => 1,
-                    'xlsx_rows' => 4,
+                    'xlsx_calendar_rows' => 4,
+                    'xlsx_average_rows' => 1,
                     'qty_by_position_label' => [
                         'Position 1' => 3,
                         'Position 2' => 5,
@@ -357,6 +394,7 @@ class E2ESpotDistributionExportSeeder extends Seeder
                     ],
                 ],
             ],
+            'empty' => ['id' => $emptyOrder->id, 'number' => $emptyOrder->number],
         ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

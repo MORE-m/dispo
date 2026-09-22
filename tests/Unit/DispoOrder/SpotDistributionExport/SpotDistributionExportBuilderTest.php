@@ -14,8 +14,10 @@ use App\Models\DispoOrderPosition;
 use App\Models\User;
 use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportBuilder;
 use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportDocument;
+use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionXlsxRenderer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\Concerns\CreatesMinimalDispoConfigurationSnapshot;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -51,26 +53,29 @@ class SpotDistributionExportBuilderTest extends TestCase
 
         $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
 
-        $this->assertSame(SpotDistributionExportDocument::defaultHeaders(), $document->headers);
-        $this->assertSame(2, $document->exportedPositionCount);
-        $this->assertCount(4, $document->rows);
+        $this->assertSame(SpotDistributionExportDocument::defaultHeaders(), $document->calendarHeaders);
+        $this->assertSame(2, $document->exportedCalendarPositionCount);
+        $this->assertSame(1, $document->exportedAveragePositionCount);
+        $this->assertCount(4, $document->calendarRows);
+        $this->assertCount(1, $document->averageRows);
+        $this->assertSame('Vorschlag', $document->averageRows[0]->planningStatus);
 
-        $this->assertSame('Position 1', $document->rows[0]->positionLabel);
-        $this->assertSame('2026-09-20', $document->rows[0]->dateIso);
-        $this->assertSame('Sonntag', $document->rows[0]->weekdayLabel);
-        $this->assertSame('11:00', $document->rows[0]->hourLabel);
+        $this->assertSame('Position 1', $document->calendarRows[0]->positionLabel);
+        $this->assertSame('2026-09-20', $document->calendarRows[0]->dateIso);
+        $this->assertSame('Sonntag', $document->calendarRows[0]->weekdayLabel);
+        $this->assertSame('11:00', $document->calendarRows[0]->hourLabel);
 
-        $this->assertSame('Position 2', $document->rows[1]->positionLabel);
-        $this->assertSame('2026-09-15', $document->rows[1]->dateIso);
-        $this->assertSame(8, $document->rows[1]->hour);
-        $this->assertSame(3, $document->rows[1]->quantity);
-        $this->assertSame('Spots', $document->rows[1]->quantityUnit);
-        $this->assertSame(3, $document->rows[1]->componentAirings);
+        $this->assertSame('Position 2', $document->calendarRows[1]->positionLabel);
+        $this->assertSame('2026-09-15', $document->calendarRows[1]->dateIso);
+        $this->assertSame(8, $document->calendarRows[1]->hour);
+        $this->assertSame(3, $document->calendarRows[1]->quantity);
+        $this->assertSame('Spots', $document->calendarRows[1]->quantityUnit);
+        $this->assertSame(3, $document->calendarRows[1]->componentAirings);
 
-        $this->assertSame(10, $document->rows[2]->hour);
-        $this->assertSame(14, $document->rows[3]->hour);
+        $this->assertSame(10, $document->calendarRows[2]->hour);
+        $this->assertSame(14, $document->calendarRows[3]->hour);
 
-        foreach ($document->headers as $header) {
+        foreach ($document->calendarHeaders as $header) {
             $this->assertStringNotContainsStringIgnoringCase('preis', $header);
             $this->assertStringNotContainsStringIgnoringCase('rabatt', $header);
             $this->assertStringNotContainsStringIgnoringCase('ae', $header);
@@ -79,13 +84,133 @@ class SpotDistributionExportBuilderTest extends TestCase
         }
     }
 
-    public function test_average_only_order_fails_closed(): void
+    public function test_average_only_order_builds_proposal_rows(): void
     {
         $order = $this->makeOrder();
-        $this->addAveragePosition($order);
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [
+                [
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 10,
+                    'day_group' => 'mo_fr',
+                    'spot_count' => 12,
+                ],
+                [
+                    'start_hour' => 14,
+                    'end_hour_exclusive' => 15,
+                    'day_group' => 'sa',
+                    'spot_count' => 3,
+                ],
+            ],
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+
+        $this->assertSame(0, $document->exportedCalendarPositionCount);
+        $this->assertSame(1, $document->exportedAveragePositionCount);
+        $this->assertCount(0, $document->calendarRows);
+        $this->assertCount(2, $document->averageRows);
+        $this->assertSame('08:00–09:59', $document->averageRows[0]->hourConstraintLabel);
+        $this->assertSame('Mo–Fr', $document->averageRows[0]->dayGroupLabel);
+        $this->assertSame(12, $document->averageRows[0]->quantity);
+        $this->assertSame('Vorschlag', $document->averageRows[0]->planningStatus);
+        $this->assertSame('', $document->averageRows[0]->periodFromDisplay);
+        $this->assertSame('14:00–14:59', $document->averageRows[1]->hourConstraintLabel);
+        $this->assertSame(3, $document->averageRows[1]->quantity);
+    }
+
+    public function test_empty_order_fails_closed(): void
+    {
+        $order = $this->makeOrder();
 
         $this->expectException(ValidationException::class);
         (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_average_quantity_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 0,
+            ]],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_average_hour_range_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [[
+                'start_hour' => 10,
+                'end_hour_exclusive' => 8,
+                'day_group' => 'mo_fr',
+                'spot_count' => 5,
+            ]],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_average_tandem_units_and_airings(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'component_profile' => SpotComponentProfile::Tandem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 4,
+            ]],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->averageRows[0];
+        $this->assertSame(4, $row->quantity);
+        $this->assertSame('Tandem-Einheiten', $row->quantityUnit);
+        $this->assertSame(8, $row->componentAirings);
+        $this->assertSame('Vorschlag', $row->planningStatus);
+    }
+
+    public function test_formula_injection_neutralized_in_average_customer_name(): void
+    {
+        $order = $this->makeOrder();
+        $order->forceFill(['customer_name' => '=1+1'])->save();
+        $this->addAveragePosition($order, [
+            'inventory_name' => '+CMD()',
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 2,
+            ]],
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+        $binary = (new SpotDistributionXlsxRenderer)->render($document);
+        $path = tempnam(sys_get_temp_dir(), 'spt008avg');
+        file_put_contents($path, $binary);
+        try {
+            $sheet = IOFactory::load($path)->getSheetByName('Planungsvorschlag');
+            $this->assertNotNull($sheet);
+            $this->assertSame("'=1+1", (string) $sheet->getCell('B3')->getValue());
+            $this->assertSame("'+CMD()", (string) $sheet->getCell('D3')->getValue());
+        } finally {
+            @unlink($path);
+        }
     }
 
     public function test_tandem_units_and_airings_without_price_multiplication(): void
@@ -104,7 +229,7 @@ class SpotDistributionExportBuilderTest extends TestCase
             ],
         ]);
 
-        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->rows[0];
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
 
         $this->assertSame(5, $row->quantity);
         $this->assertSame('Tandem-Einheiten', $row->quantityUnit);
@@ -130,7 +255,7 @@ class SpotDistributionExportBuilderTest extends TestCase
             ],
         ]);
 
-        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->rows[0];
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
 
         $this->assertSame('Tridem-Einheiten', $row->quantityUnit);
         $this->assertSame(6, $row->componentAirings);
@@ -152,7 +277,7 @@ class SpotDistributionExportBuilderTest extends TestCase
             ],
         ]);
 
-        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->rows[0];
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
 
         $this->assertSame('Hauptspot 20 s | Allonge 10 s', $row->componentsLabel);
         $this->assertSame(3, $row->componentAirings);
@@ -170,7 +295,7 @@ class SpotDistributionExportBuilderTest extends TestCase
             ],
         ]);
 
-        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->rows[0];
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
         $this->assertSame('Spot 25 s', $row->componentsLabel);
         $this->assertSame(25, $row->totalLengthSeconds);
     }
@@ -227,8 +352,9 @@ class SpotDistributionExportBuilderTest extends TestCase
         $capability = $builder->capability($mixed->fresh(['positions']));
         $this->assertTrue($capability['enabled']);
         $this->assertTrue($capability['mixed_order']);
+        $this->assertSame('mixed', $capability['hint_kind']);
 
-        $empty = DispoOrder::query()->create([
+        $averageOnly = DispoOrder::query()->create([
             'calculation_id' => $mixed->calculation_id,
             'configuration_snapshot_id' => $mixed->configuration_snapshot_id,
             'number' => 'DO-2026-9-2',
@@ -250,7 +376,35 @@ class SpotDistributionExportBuilderTest extends TestCase
             'ae_enabled' => true,
             'lock_version' => 1,
         ]);
-        $this->addAveragePosition($empty);
+        $this->addAveragePosition($averageOnly);
+        $averageCapability = $builder->capability($averageOnly->fresh(['positions']));
+        $this->assertTrue($averageCapability['enabled']);
+        $this->assertSame('average_only', $averageCapability['hint_kind']);
+        $this->assertTrue($averageCapability['has_average_positions']);
+        $this->assertFalse($averageCapability['has_calendar_positions']);
+
+        $empty = DispoOrder::query()->create([
+            'calculation_id' => $mixed->calculation_id,
+            'configuration_snapshot_id' => $mixed->configuration_snapshot_id,
+            'number' => 'DO-2026-9-3',
+            'number_year' => 2026,
+            'number_org_seq' => 9,
+            'number_calc_seq' => 3,
+            'status' => DispoOrderStatus::Draft,
+            'created_by_id' => $mixed->created_by_id,
+            'source_calculation_number' => $mixed->source_calculation_number,
+            'customer_name' => 'Empty',
+            'approval_kind' => DispoOrderApprovalKind::Regular,
+            'requires_special_approval' => false,
+            'media_gross' => '0.00',
+            'position_discount_total' => '0.00',
+            'order_discount_total' => '0.00',
+            'ae_total' => '0.00',
+            'nn_invest' => '0.00',
+            'order_discount_percent' => '0',
+            'ae_enabled' => true,
+            'lock_version' => 1,
+        ]);
         $emptyCapability = $builder->capability($empty->fresh(['positions']));
         $this->assertFalse($emptyCapability['enabled']);
         $this->assertNotNull($emptyCapability['disabled_reason']);
@@ -295,12 +449,12 @@ class SpotDistributionExportBuilderTest extends TestCase
 
         $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
 
-        $this->assertSame(3, $document->exportedPositionCount);
-        $this->assertCount(4, $document->rows);
+        $this->assertSame(3, $document->exportedCalendarPositionCount);
+        $this->assertCount(4, $document->calendarRows);
 
         $labels = array_map(
             static fn ($row) => $row->positionLabel,
-            $document->rows,
+            $document->calendarRows,
         );
         $this->assertSame(
             ['Position 1', 'Position 1', 'Position 2', 'Position 3'],
@@ -308,7 +462,7 @@ class SpotDistributionExportBuilderTest extends TestCase
         );
 
         $overlap = array_values(array_filter(
-            $document->rows,
+            $document->calendarRows,
             static fn ($row) => $row->dateIso === '2026-09-14' && $row->hour === 8,
         ));
         $this->assertCount(3, $overlap);
@@ -322,7 +476,7 @@ class SpotDistributionExportBuilderTest extends TestCase
         $this->assertSame(6, $overlap[2]->componentAirings);
 
         $qtyBySort = [];
-        foreach ($document->rows as $row) {
+        foreach ($document->calendarRows as $row) {
             $qtyBySort[$row->positionLabel] = ($qtyBySort[$row->positionLabel] ?? 0) + $row->quantity;
         }
         $this->assertSame(3, $qtyBySort['Position 1']);
@@ -331,7 +485,7 @@ class SpotDistributionExportBuilderTest extends TestCase
 
         $this->assertNotContains('Average Sender', array_map(
             static fn ($row) => $row->inventoryName,
-            $document->rows,
+            $document->calendarRows,
         ));
 
         // Keine stillen Key-Kollisionen: jede Positions-ID bleibt in der Menge.

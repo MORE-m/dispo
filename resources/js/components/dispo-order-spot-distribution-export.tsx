@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 export type SpotDistributionExportProps = {
     can_export: boolean;
     enabled: boolean;
+    has_calendar_positions?: boolean;
+    has_average_positions?: boolean;
     mixed_order: boolean;
+    hint_kind?: 'calendar_only' | 'average_only' | 'mixed' | null;
     disabled_reason: string | null;
     url: string;
 };
@@ -51,10 +54,47 @@ function messageFromErrorBody(text: string, status: number): string {
     }
 
     if (status === 403) {
-        return 'Keine Berechtigung für den Spotverteilungs-Export.';
+        return 'Keine Berechtigung für den Spotplanungs-Export.';
     }
 
-    return 'Der Spotverteilungs-Export ist fehlgeschlagen.';
+    return 'Der Spotplanungs-Export ist fehlgeschlagen.';
+}
+
+function resolveHintKind(
+    config: SpotDistributionExportProps,
+): 'calendar_only' | 'average_only' | 'mixed' | null {
+    if (config.hint_kind) {
+        return config.hint_kind;
+    }
+    if (!config.enabled) {
+        return null;
+    }
+    if (config.mixed_order) {
+        return 'mixed';
+    }
+    if (config.has_average_positions && !config.has_calendar_positions) {
+        return 'average_only';
+    }
+    if (config.has_calendar_positions) {
+        return 'calendar_only';
+    }
+
+    return null;
+}
+
+function hintText(
+    kind: 'calendar_only' | 'average_only' | 'mixed' | null,
+): string | null {
+    switch (kind) {
+        case 'calendar_only':
+            return 'Der Export enthält die konkrete Spotverteilung.';
+        case 'average_only':
+            return 'Der Export enthält einen unverbindlichen Planungsvorschlag. Die konkrete Einplanung erfolgt durch die Disposition.';
+        case 'mixed':
+            return 'Der Export enthält die konkrete Spotverteilung und einen separaten Planungsvorschlag für Average-Positionen.';
+        default:
+            return null;
+    }
 }
 
 export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
@@ -67,6 +107,7 @@ export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
 
     const config = exportConfig;
     const disabled = !config.enabled || loading;
+    const enabledHint = hintText(resolveHintKind(config));
 
     async function handleExport() {
         if (disabled) {
@@ -98,7 +139,7 @@ export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
             anchor.download =
                 filenameFromDisposition(
                     response.headers.get('Content-Disposition'),
-                ) ?? 'Spotverteilung.xlsx';
+                ) ?? 'Spotplanung.xlsx';
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
@@ -107,7 +148,7 @@ export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
             setError(
                 caught instanceof Error
                     ? caught.message
-                    : 'Der Spotverteilungs-Export ist fehlgeschlagen.',
+                    : 'Der Spotplanungs-Export ist fehlgeschlagen.',
             );
         } finally {
             setLoading(false);
@@ -132,18 +173,16 @@ export function DispoOrderSpotDistributionExport({ exportConfig }: Props) {
                     data-test="dispo-spot-distribution-export-button"
                 >
                     {loading
-                        ? 'Spotverteilung wird erstellt…'
-                        : 'Spotverteilung exportieren (XLSX)'}
+                        ? 'Spotplanung wird erstellt…'
+                        : 'Spotplanung exportieren (XLSX)'}
                 </Button>
             </div>
-            {config.mixed_order ? (
+            {enabledHint ? (
                 <p
                     className="text-muted-foreground text-sm"
-                    data-test="dispo-spot-distribution-export-mixed-hint"
+                    data-test="dispo-spot-distribution-export-hint"
                 >
-                    Der Export enthält alle kalendergeplanten Positionen und
-                    deren belegte Zellen. Durchschnittspositionen (Average) sind
-                    bewusst nicht enthalten.
+                    {enabledHint}
                 </p>
             ) : null}
             {!config.enabled && config.disabled_reason ? (

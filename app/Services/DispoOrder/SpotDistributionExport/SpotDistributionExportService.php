@@ -14,7 +14,10 @@ use Throwable;
  */
 final class SpotDistributionExportService
 {
-    public const string AUDIT_ACTION = 'dispo_order.spot_distribution.exported';
+    public const string AUDIT_ACTION = 'dispo_order.spot_planning.exported';
+
+    /** @deprecated Legacy Alias */
+    public const string LEGACY_AUDIT_ACTION = 'dispo_order.spot_distribution.exported';
 
     public const string MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -32,6 +35,9 @@ final class SpotDistributionExportService
      *     has_calendar_positions: bool,
      *     has_average_positions: bool,
      *     mixed_order: bool,
+     *     hint_kind: 'calendar_only'|'average_only'|'mixed'|null,
+     *     exportable_calendar_row_count: int,
+     *     exportable_average_row_count: int,
      *     exportable_row_count: int,
      *     disabled_reason: string|null
      * }
@@ -54,7 +60,7 @@ final class SpotDistributionExportService
         }
 
         $filename = SafeDownloadFilename::make(
-            $document->dispoOrderNumber.'_Spotverteilung',
+            $document->dispoOrderNumber.'_Spotplanung',
             'xlsx',
         );
 
@@ -65,8 +71,10 @@ final class SpotDistributionExportService
             null,
             [
                 'dispo_order_id' => $document->dispoOrderId,
-                'exported_position_count' => $document->exportedPositionCount,
-                'exported_row_count' => $document->rowCount(),
+                'calendar_position_count' => $document->exportedCalendarPositionCount,
+                'calendar_row_count' => $document->calendarRowCount(),
+                'average_position_count' => $document->exportedAveragePositionCount,
+                'average_row_count' => $document->averageRowCount(),
                 'format' => 'xlsx',
             ],
         );

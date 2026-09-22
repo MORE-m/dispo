@@ -20,6 +20,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
@@ -44,14 +45,18 @@ class SpotDistributionExportFeatureTest extends TestCase
             (string) $response->headers->get('content-disposition'),
         );
         $this->assertStringContainsString(
-            '_Spotverteilung.xlsx',
+            '_Spotplanung.xlsx',
             (string) $response->headers->get('content-disposition'),
         );
 
         $binary = $response->streamedContent();
         $sheet = $this->loadSheet($binary);
-        $this->assertSame(SpotDistributionExportDocument::SHEET_TITLE, $sheet->getTitle());
-        $this->assertSame(1, $sheet->getParent()->getSheetCount());
+        $this->assertSame(SpotDistributionExportDocument::CALENDAR_SHEET_TITLE, $sheet->getTitle());
+        $this->assertSame(2, $sheet->getParent()->getSheetCount());
+        $this->assertSame(
+            SpotDistributionExportDocument::AVERAGE_SHEET_TITLE,
+            $sheet->getParent()->getSheet(1)->getTitle(),
+        );
         $this->assertSame('Dispoauftrag', $sheet->getCell('A1')->getValue());
         $this->assertSame('Bestandteilausstrahlungen', $sheet->getCell('N1')->getValue());
         $this->assertNotNull($sheet->getCell('A2')->getValue());
@@ -68,12 +73,20 @@ class SpotDistributionExportFeatureTest extends TestCase
         $this->assertStringNotContainsStringIgnoringCase('festpreis', $joined);
         $this->assertStringNotContainsStringIgnoringCase('ae-betrag', $joined);
 
+        $averageSheet = $sheet->getParent()->getSheetByName(SpotDistributionExportDocument::AVERAGE_SHEET_TITLE);
+        $this->assertNotNull($averageSheet);
+        $this->assertSame(
+            SpotDistributionExportDocument::AVERAGE_EMPTY_MESSAGE,
+            (string) $averageSheet->getCell('A1')->getValue(),
+        );
+
         $audit = AuditEvent::query()
             ->where('action', SpotDistributionExportService::AUDIT_ACTION)
             ->firstOrFail();
         $this->assertSame($order->id, $audit->auditable_id);
         $this->assertSame('xlsx', $audit->new_values['format'] ?? null);
-        $this->assertGreaterThan(0, $audit->new_values['exported_row_count'] ?? 0);
+        $this->assertGreaterThan(0, $audit->new_values['calendar_row_count'] ?? 0);
+        $this->assertSame(0, $audit->new_values['average_row_count'] ?? null);
 
         $this->assertFalse(Storage::disk('local')->exists('exports'));
     }
@@ -90,6 +103,7 @@ class SpotDistributionExportFeatureTest extends TestCase
                 ->component('dispo-orders/show')
                 ->where('spotDistributionExport.enabled', true)
                 ->where('spotDistributionExport.mixed_order', false)
+                ->where('spotDistributionExport.hint_kind', 'calendar_only')
                 ->where('spotDistributionExport.can_export', true)
                 ->has('spotDistributionExport.url'));
     }
@@ -122,9 +136,10 @@ class SpotDistributionExportFeatureTest extends TestCase
         );
     }
 
-    public function test_no_calendar_returns_422_without_audit(): void
+    public function test_empty_order_returns_422_without_audit(): void
     {
-        $order = $this->createAverageOnlyDispoOrder();
+        $order = $this->createCalendarDispoOrder();
+        $order->positions()->delete();
         $user = User::factory()->role(Role::Sales)->create();
 
         $this->actingAs($user)
@@ -138,7 +153,39 @@ class SpotDistributionExportFeatureTest extends TestCase
         );
     }
 
-    public function test_mixed_order_exports_only_calendar_rows(): void
+    public function test_average_only_exports_two_sheets_with_calendar_empty_hint(): void
+    {
+        $order = $this->createAverageOnlyDispoOrder();
+        $user = User::factory()->role(Role::Sales)->create();
+
+        $binary = $this->actingAs($user)
+            ->get(route('dispo-orders.export-spot-distribution', $order))
+            ->assertOk()
+            ->streamedContent();
+
+        $spreadsheet = $this->loadWorkbook($binary);
+        $this->assertSame(2, $spreadsheet->getSheetCount());
+        $calendar = $spreadsheet->getSheet(0);
+        $average = $spreadsheet->getSheet(1);
+        $this->assertSame(SpotDistributionExportDocument::CALENDAR_SHEET_TITLE, $calendar->getTitle());
+        $this->assertSame(SpotDistributionExportDocument::AVERAGE_SHEET_TITLE, $average->getTitle());
+        $this->assertSame(
+            SpotDistributionExportDocument::CALENDAR_EMPTY_MESSAGE,
+            (string) $calendar->getCell('A1')->getValue(),
+        );
+        $this->assertSame(
+            SpotDistributionExportDocument::AVERAGE_NOTICE,
+            (string) $average->getCell('A1')->getValue(),
+        );
+        $this->assertSame(1, max(0, (int) $average->getHighestDataRow() - 2));
+        $this->assertSame('Vorschlag', (string) $average->getCell('O3')->getValue());
+        $this->assertSame(
+            1,
+            AuditEvent::query()->where('action', SpotDistributionExportService::AUDIT_ACTION)->count(),
+        );
+    }
+
+    public function test_mixed_order_exports_calendar_and_average_sheets(): void
     {
         $order = $this->createMixedDispoOrder();
         $user = User::factory()->role(Role::Sales)->create();
@@ -148,9 +195,23 @@ class SpotDistributionExportFeatureTest extends TestCase
             ->assertOk()
             ->streamedContent();
 
-        $sheet = $this->loadSheet($binary);
-        $this->assertSame(1, $this->dataRowCount($sheet));
-        $this->assertSame('Spots', (string) $sheet->getCell('K2')->getValue());
+        $spreadsheet = $this->loadWorkbook($binary);
+        $calendar = $spreadsheet->getSheet(0);
+        $average = $spreadsheet->getSheet(1);
+        $this->assertSame(1, $this->dataRowCount($calendar));
+        $this->assertSame('Spots', (string) $calendar->getCell('K2')->getValue());
+        $this->assertSame(
+            SpotDistributionExportDocument::AVERAGE_NOTICE,
+            (string) $average->getCell('A1')->getValue(),
+        );
+        $this->assertSame(1, max(0, (int) $average->getHighestDataRow() - 2));
+        $this->assertSame('Vorschlag', (string) $average->getCell('O3')->getValue());
+
+        $audit = AuditEvent::query()
+            ->where('action', SpotDistributionExportService::AUDIT_ACTION)
+            ->firstOrFail();
+        $this->assertSame(1, $audit->new_values['calendar_position_count'] ?? null);
+        $this->assertSame(1, $audit->new_values['average_position_count'] ?? null);
     }
 
     public function test_snapshot_is_stable_after_catalog_and_calculation_change(): void
@@ -275,6 +336,15 @@ class SpotDistributionExportFeatureTest extends TestCase
         $this->assertCount(3, array_unique($overlapKeys));
         $this->assertSame('Tandem-Einheiten', (string) $sheet->getCell('K5')->getValue());
         $this->assertSame('6', (string) $sheet->getCell('N5')->getCalculatedValue());
+
+        $average = $sheet->getParent()->getSheetByName(SpotDistributionExportDocument::AVERAGE_SHEET_TITLE);
+        $this->assertNotNull($average);
+        $this->assertSame(
+            SpotDistributionExportDocument::AVERAGE_NOTICE,
+            (string) $average->getCell('A1')->getValue(),
+        );
+        $this->assertSame(1, max(0, (int) $average->getHighestDataRow() - 2));
+        $this->assertSame('Vorschlag', (string) $average->getCell('O3')->getValue());
 
         $headerJoined = '';
         for ($col = 1; $col <= 14; $col++) {
@@ -608,20 +678,26 @@ class SpotDistributionExportFeatureTest extends TestCase
         ];
     }
 
-    private function loadSheet(string $binary): Worksheet
+    private function loadWorkbook(string $binary): Spreadsheet
     {
         $path = tempnam(sys_get_temp_dir(), 'spt008');
         $this->assertNotFalse($path);
         file_put_contents($path, $binary);
         try {
-            $spreadsheet = IOFactory::load($path);
-            $sheet = $spreadsheet->getActiveSheet();
-            $this->assertSame(SpotDistributionExportDocument::SHEET_TITLE, $sheet->getTitle());
-
-            return $sheet;
+            return IOFactory::load($path);
         } finally {
             @unlink($path);
         }
+    }
+
+    private function loadSheet(string $binary): Worksheet
+    {
+        $spreadsheet = $this->loadWorkbook($binary);
+        $sheet = $spreadsheet->getActiveSheet();
+        $this->assertSame(SpotDistributionExportDocument::CALENDAR_SHEET_TITLE, $sheet->getTitle());
+        $this->assertSame(2, $spreadsheet->getSheetCount());
+
+        return $sheet;
     }
 
     private function dataRowCount(Worksheet $sheet): int

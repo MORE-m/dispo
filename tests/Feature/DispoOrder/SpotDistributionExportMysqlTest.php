@@ -77,9 +77,17 @@ class SpotDistributionExportMysqlTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'spt008m');
         file_put_contents($path, $binary);
         try {
-            $sheet = IOFactory::load($path)->getActiveSheet();
+            $workbook = IOFactory::load($path);
+            $this->assertSame(2, $workbook->getSheetCount());
+            $sheet = $workbook->getSheet(0);
             $this->assertSame('Spotverteilung', $sheet->getTitle());
             $this->assertSame(2, max(0, (int) $sheet->getHighestDataRow() - 1));
+            $average = $workbook->getSheet(1);
+            $this->assertSame('Planungsvorschlag', $average->getTitle());
+            $this->assertStringContainsString(
+                'keine Average-Planung',
+                (string) $average->getCell('A1')->getValue(),
+            );
         } finally {
             @unlink($path);
         }
@@ -205,7 +213,9 @@ class SpotDistributionExportMysqlTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'spt008mm');
         file_put_contents($path, $response->streamedContent());
         try {
-            $sheet = IOFactory::load($path)->getActiveSheet();
+            $workbook = IOFactory::load($path);
+            $this->assertSame(2, $workbook->getSheetCount());
+            $sheet = $workbook->getSheet(0);
             $this->assertSame(4, max(0, (int) $sheet->getHighestDataRow() - 1));
 
             $labels = [];
@@ -224,6 +234,12 @@ class SpotDistributionExportMysqlTest extends TestCase
                 'Position 3' => 3,
             ], $qtyByLabel);
             $this->assertSame('Tandem-Einheiten', (string) $sheet->getCell('K5')->getValue());
+
+            $average = $workbook->getSheet(1);
+            $this->assertSame('Planungsvorschlag', $average->getTitle());
+            $this->assertStringContainsString('Unverbindlicher Planungsvorschlag', (string) $average->getCell('A1')->getValue());
+            $this->assertSame(1, max(0, (int) $average->getHighestDataRow() - 2));
+            $this->assertSame('Vorschlag', (string) $average->getCell('O3')->getValue());
         } finally {
             @unlink($path);
         }

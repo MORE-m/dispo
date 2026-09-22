@@ -74,20 +74,22 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   **SPT-008 Dateiexport** umgesetzt/automatisiert getestet (manuelle Abnahme offen);
   `BL-P4-02` insgesamt offen
 
-### SPT-008 (Dispo Spotverteilungs-XLSX)
+### SPT-008 (Dispo Spotplanungs-XLSX)
 
 - Interner synchroner Download `GET …/spotverteilung.xlsx` (Autorisierung = Dispo-Leserecht)
-- Daten nur aus eingefrorenen Snapshots (`planner_entries_snapshot`, Komponenten/Profil);
-  keine Live-Neuberechnung, keine Preislisten, keine kaufmännischen Spalten
-- Nur Calendar-Positionen mit belegten Zellen (`spot_count ≥ 1`); Average ausgeschlossen;
-  gemischte Aufträge: Hinweis, dass alle Calendar-Positionen enthalten und Average bewusst ausgeschlossen ist
-- Blatt `Spotverteilung`; Dateiname `<Dispoauftragsnummer>_Spotverteilung.xlsx`
-- Audit `dispo_order.spot_distribution.exported` nur bei erfolgreicher Auslieferung
+- Workbook mit genau zwei Blättern: `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average)
+- Daten nur aus eingefrorenen Snapshots (`planner_entries_snapshot` / `time_ranges_snapshot`,
+  Komponenten/Profil); keine Live-Neuberechnung, keine Preislisten, keine kaufmännischen Spalten
+- Calendar: eine Zeile je belegter Zelle (`spot_count ≥ 1`); Average: eine Zeile je gespeichertem
+  Zeitraum; keine künstliche Datum-/Stundenverteilung; Unverbindlichkeitshinweis auf Blatt 2
+- Leere Blätter bleiben mit verständlichem Hinweis stehen; Export möglich wenn Calendar oder Average exportierbar
+- Dateiname `<Dispoauftragsnummer>_Spotplanung.xlsx`
+- Audit `dispo_order.spot_planning.exported` nur bei erfolgreicher Auslieferung (Counts je Blatt)
 - Unit/Feature/MySQL: `SpotDistributionExport*`; Vitest: `dispo-order-spot-distribution-export.test.tsx`
 - E2E: `npm run test:e2e:spt008` (`playwright.spt008.config.ts`, Port **8033**,
   Seeder `E2ESpotDistributionExportSeeder`)
 - Status: **umgesetzt / automatisiert getestet**; **manuelle Abnahme offen**;
-  Average-Export und REP-007 Dispo-PDF **nicht** enthalten
+  REP-007 Dispo-PDF und operative Blockplanung **nicht** enthalten
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 

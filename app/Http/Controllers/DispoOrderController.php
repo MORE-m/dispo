@@ -131,7 +131,10 @@ class DispoOrderController extends Controller
             'spotDistributionExport' => [
                 'can_export' => true,
                 'enabled' => $spotDistributionCapability['enabled'],
+                'has_calendar_positions' => $spotDistributionCapability['has_calendar_positions'],
+                'has_average_positions' => $spotDistributionCapability['has_average_positions'],
                 'mixed_order' => $spotDistributionCapability['mixed_order'],
+                'hint_kind' => $spotDistributionCapability['hint_kind'],
                 'disabled_reason' => $spotDistributionCapability['disabled_reason'],
                 'url' => route('dispo-orders.export-spot-distribution', $dispoOrder),
             ],

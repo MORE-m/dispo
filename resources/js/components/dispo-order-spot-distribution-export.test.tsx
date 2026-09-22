@@ -21,6 +21,7 @@ describe('DispoOrderSpotDistributionExport', () => {
                     can_export: false,
                     enabled: true,
                     mixed_order: false,
+                    hint_kind: 'calendar_only',
                     disabled_reason: null,
                     url: '/dispoauftraege/1/spotverteilung.xlsx',
                 }}
@@ -30,33 +31,68 @@ describe('DispoOrderSpotDistributionExport', () => {
         expect(container).toBeEmptyDOMElement();
     });
 
-    it('renders enabled button for calendar data', () => {
+    it('renders enabled button for calendar-only with hint', () => {
         render(
             <DispoOrderSpotDistributionExport
                 exportConfig={{
                     can_export: true,
                     enabled: true,
+                    has_calendar_positions: true,
+                    has_average_positions: false,
                     mixed_order: false,
+                    hint_kind: 'calendar_only',
                     disabled_reason: null,
                     url: '/dispoauftraege/1/spotverteilung.xlsx',
                 }}
             />,
         );
 
-        const button = screen.getByTestId('dispo-spot-distribution-export-button');
+        const button = screen.getByTestId(
+            'dispo-spot-distribution-export-button',
+        );
         expect(button).toBeEnabled();
-        expect(button).toHaveTextContent('Spotverteilung exportieren (XLSX)');
+        expect(button).toHaveTextContent('Spotplanung exportieren (XLSX)');
+        expect(
+            screen.getByTestId('dispo-spot-distribution-export-hint'),
+        ).toHaveTextContent('Der Export enthält die konkrete Spotverteilung.');
     });
 
-    it('disables button without calendar data and shows hint', () => {
+    it('enables button for average-only with proposal hint', () => {
+        render(
+            <DispoOrderSpotDistributionExport
+                exportConfig={{
+                    can_export: true,
+                    enabled: true,
+                    has_calendar_positions: false,
+                    has_average_positions: true,
+                    mixed_order: false,
+                    hint_kind: 'average_only',
+                    disabled_reason: null,
+                    url: '/dispoauftraege/4/spotverteilung.xlsx',
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-spot-distribution-export-button'),
+        ).toBeEnabled();
+        expect(
+            screen.getByTestId('dispo-spot-distribution-export-hint'),
+        ).toHaveTextContent(
+            'Der Export enthält einen unverbindlichen Planungsvorschlag. Die konkrete Einplanung erfolgt durch die Disposition.',
+        );
+    });
+
+    it('disables button only when neither calendar nor average is exportable', () => {
         render(
             <DispoOrderSpotDistributionExport
                 exportConfig={{
                     can_export: true,
                     enabled: false,
                     mixed_order: false,
+                    hint_kind: null,
                     disabled_reason:
-                        'Keine kalendergeplante Spotverteilung vorhanden.',
+                        'Keine exportierbare Spotplanung vorhanden (weder Calendar-Verteilung noch Average-Planungsvorschlag).',
                     url: '/dispoauftraege/2/spotverteilung.xlsx',
                 }}
             />,
@@ -67,7 +103,7 @@ describe('DispoOrderSpotDistributionExport', () => {
         ).toBeDisabled();
         expect(
             screen.getByTestId('dispo-spot-distribution-export-disabled-hint'),
-        ).toHaveTextContent('Keine kalendergeplante Spotverteilung vorhanden.');
+        ).toHaveTextContent('Keine exportierbare Spotplanung vorhanden');
     });
 
     it('shows mixed-order hint', () => {
@@ -77,6 +113,7 @@ describe('DispoOrderSpotDistributionExport', () => {
                     can_export: true,
                     enabled: true,
                     mixed_order: true,
+                    hint_kind: 'mixed',
                     disabled_reason: null,
                     url: '/dispoauftraege/3/spotverteilung.xlsx',
                 }}
@@ -84,9 +121,9 @@ describe('DispoOrderSpotDistributionExport', () => {
         );
 
         expect(
-            screen.getByTestId('dispo-spot-distribution-export-mixed-hint'),
+            screen.getByTestId('dispo-spot-distribution-export-hint'),
         ).toHaveTextContent(
-            'Der Export enthält alle kalendergeplanten Positionen und deren belegte Zellen. Durchschnittspositionen (Average) sind bewusst nicht enthalten.',
+            'Der Export enthält die konkrete Spotverteilung und einen separaten Planungsvorschlag für Average-Positionen.',
         );
     });
 
@@ -95,7 +132,9 @@ describe('DispoOrderSpotDistributionExport', () => {
         const fetchPromise = new Promise<Response>((resolve) => {
             resolveFetch = resolve;
         });
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mockReturnValue(fetchPromise);
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mockReturnValue(
+            fetchPromise,
+        );
 
         const createObjectURL = vi.fn(() => 'blob:mock');
         const revokeObjectURL = vi.fn();
@@ -111,19 +150,22 @@ describe('DispoOrderSpotDistributionExport', () => {
                     can_export: true,
                     enabled: true,
                     mixed_order: false,
+                    hint_kind: 'calendar_only',
                     disabled_reason: null,
                     url: '/dispoauftraege/4/spotverteilung.xlsx',
                 }}
             />,
         );
 
-        const button = screen.getByTestId('dispo-spot-distribution-export-button');
+        const button = screen.getByTestId(
+            'dispo-spot-distribution-export-button',
+        );
         fireEvent.click(button);
         fireEvent.click(button);
 
         expect(globalThis.fetch).toHaveBeenCalledTimes(1);
         expect(button).toBeDisabled();
-        expect(button).toHaveTextContent('Spotverteilung wird erstellt…');
+        expect(button).toHaveTextContent('Spotplanung wird erstellt…');
 
         resolveFetch(
             new Response(Uint8Array.from([0x50, 0x4b, 0x03, 0x04]), {
@@ -132,7 +174,7 @@ describe('DispoOrderSpotDistributionExport', () => {
                     'Content-Type':
                         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     'Content-Disposition':
-                        'attachment; filename="DO-1_Spotverteilung.xlsx"',
+                        'attachment; filename="DO-1_Spotplanung.xlsx"',
                 },
             }),
         );
@@ -150,11 +192,14 @@ describe('DispoOrderSpotDistributionExport', () => {
                     message: 'The given data was invalid.',
                     errors: {
                         export: [
-                            'Für diesen Dispoauftrag liegt keine exportierbare Kalender-Spotverteilung vor.',
+                            'Für diesen Dispoauftrag liegt keine exportierbare Spotplanung vor.',
                         ],
                     },
                 }),
-                { status: 422, headers: { 'Content-Type': 'application/json' } },
+                {
+                    status: 422,
+                    headers: { 'Content-Type': 'application/json' },
+                },
             ),
         );
 
@@ -164,19 +209,22 @@ describe('DispoOrderSpotDistributionExport', () => {
                     can_export: true,
                     enabled: true,
                     mixed_order: false,
+                    hint_kind: 'calendar_only',
                     disabled_reason: null,
                     url: '/dispoauftraege/5/spotverteilung.xlsx',
                 }}
             />,
         );
 
-        fireEvent.click(screen.getByTestId('dispo-spot-distribution-export-button'));
+        fireEvent.click(
+            screen.getByTestId('dispo-spot-distribution-export-button'),
+        );
 
         await waitFor(() => {
             expect(
                 screen.getByTestId('dispo-spot-distribution-export-error'),
             ).toHaveTextContent(
-                'Für diesen Dispoauftrag liegt keine exportierbare Kalender-Spotverteilung vor.',
+                'Für diesen Dispoauftrag liegt keine exportierbare Spotplanung vor.',
             );
         });
     });

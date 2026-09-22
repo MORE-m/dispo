@@ -4,18 +4,16 @@ namespace App\Services\DispoOrder\SpotDistributionExport;
 
 use App\Enums\DayGroup;
 use App\Enums\SpotCalculationMethod;
-use App\Enums\SpotComponentProfile;
-use App\Enums\SpotComponentRole;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderPosition;
 use App\Services\Calculation\DayGroupFromDate;
-use App\Support\Advertising\SpotComponentProfileContract;
+use App\Services\Calculation\TimeRangeHours;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Validation\ValidationException;
 
 /**
- * SPT-008: baut den Spotverteilungs-Export ausschließlich aus Dispo-Snapshots.
+ * SPT-008: baut Spotplanungs-Export aus Dispo-Snapshots (Calendar + Average).
  */
 final class SpotDistributionExportBuilder
 {
@@ -29,46 +27,60 @@ final class SpotDistributionExportBuilder
         7 => 'Sonntag',
     ];
 
+    public function __construct(
+        private readonly SpotPlanningExportSupport $support = new SpotPlanningExportSupport,
+    ) {}
+
     public function build(DispoOrder $order): SpotDistributionExportDocument
     {
-        $order->loadMissing(['positions']);
+        $order->loadMissing(['positions.fieldValues.snapshotFieldDefinition']);
 
-        $rows = [];
-        $exportedPositionIds = [];
+        $calendarRows = [];
+        $averageRows = [];
+        $exportedCalendarPositionIds = [];
+        $exportedAveragePositionIds = [];
 
         foreach ($order->positions as $position) {
-            if (! $this->isExportableCalendarPosition($position)) {
+            if ($position->spot_method === SpotCalculationMethod::Calendar) {
+                $positionRows = $this->calendarRowsForPosition($order, $position);
+                if ($positionRows === []) {
+                    continue;
+                }
+                $exportedCalendarPositionIds[$position->id] = true;
+                foreach ($positionRows as $row) {
+                    $calendarRows[] = $row;
+                }
+
                 continue;
             }
 
-            $positionRows = $this->rowsForPosition($order, $position);
-            if ($positionRows === []) {
-                continue;
-            }
-
-            $exportedPositionIds[$position->id] = true;
-            foreach ($positionRows as $row) {
-                $rows[] = $row;
+            if ($position->spot_method === SpotCalculationMethod::Average) {
+                $positionRows = $this->averageRowsForPosition($order, $position);
+                if ($positionRows === []) {
+                    continue;
+                }
+                $exportedAveragePositionIds[$position->id] = true;
+                foreach ($positionRows as $row) {
+                    $averageRows[] = $row;
+                }
             }
         }
 
-        if ($rows === []) {
+        if ($calendarRows === [] && $averageRows === []) {
             throw ValidationException::withMessages([
-                'export' => 'Für diesen Dispoauftrag liegt keine exportierbare Kalender-Spotverteilung vor.',
+                'export' => 'Für diesen Dispoauftrag liegt keine exportierbare Spotplanung vor.',
             ]);
         }
 
         usort(
-            $rows,
+            $calendarRows,
             static function (SpotDistributionExportRow $left, SpotDistributionExportRow $right): int {
                 if ($left->positionSort !== $right->positionSort) {
                     return $left->positionSort <=> $right->positionSort;
                 }
-
                 if ($left->positionId !== $right->positionId) {
                     return $left->positionId <=> $right->positionId;
                 }
-
                 $dateCompare = strcmp($left->dateIso, $right->dateIso);
                 if ($dateCompare !== 0) {
                     return $dateCompare;
@@ -78,12 +90,33 @@ final class SpotDistributionExportBuilder
             },
         );
 
+        usort(
+            $averageRows,
+            static function (SpotPlanningProposalExportRow $left, SpotPlanningProposalExportRow $right): int {
+                if ($left->positionSort !== $right->positionSort) {
+                    return $left->positionSort <=> $right->positionSort;
+                }
+                if ($left->positionId !== $right->positionId) {
+                    return $left->positionId <=> $right->positionId;
+                }
+                $dayCompare = strcmp($left->dayGroupLabel, $right->dayGroupLabel);
+                if ($dayCompare !== 0) {
+                    return $dayCompare;
+                }
+
+                return strcmp($left->hourConstraintLabel, $right->hourConstraintLabel);
+            },
+        );
+
         return new SpotDistributionExportDocument(
             dispoOrderId: (int) $order->id,
             dispoOrderNumber: (string) $order->number,
-            headers: SpotDistributionExportDocument::defaultHeaders(),
-            rows: $rows,
-            exportedPositionCount: count($exportedPositionIds),
+            calendarHeaders: SpotDistributionExportDocument::calendarHeaders(),
+            calendarRows: $calendarRows,
+            averageHeaders: SpotDistributionExportDocument::averageHeaders(),
+            averageRows: $averageRows,
+            exportedCalendarPositionCount: count($exportedCalendarPositionIds),
+            exportedAveragePositionCount: count($exportedAveragePositionIds),
         );
     }
 
@@ -95,6 +128,9 @@ final class SpotDistributionExportBuilder
      *     has_calendar_positions: bool,
      *     has_average_positions: bool,
      *     mixed_order: bool,
+     *     hint_kind: 'calendar_only'|'average_only'|'mixed'|null,
+     *     exportable_calendar_row_count: int,
+     *     exportable_average_row_count: int,
      *     exportable_row_count: int,
      *     disabled_reason: string|null
      * }
@@ -105,43 +141,67 @@ final class SpotDistributionExportBuilder
 
         $hasAverage = false;
         $hasCalendar = false;
-        $exportableRowCount = 0;
+        $calendarRows = 0;
+        $averageRows = 0;
 
         foreach ($order->positions as $position) {
             if ($position->spot_method === SpotCalculationMethod::Average) {
-                $hasAverage = true;
+                $count = $this->countExportableAverageEntries($position);
+                if ($count > 0) {
+                    $hasAverage = true;
+                    $averageRows += $count;
+                }
             }
 
-            if ($this->isExportableCalendarPosition($position)) {
-                $hasCalendar = true;
-                $exportableRowCount += $this->countExportableEntries($position);
+            if ($position->spot_method === SpotCalculationMethod::Calendar) {
+                $count = $this->countExportableCalendarEntries($position);
+                if ($count > 0) {
+                    $hasCalendar = true;
+                    $calendarRows += $count;
+                }
             }
         }
 
-        $enabled = $exportableRowCount > 0;
+        $enabled = $calendarRows > 0 || $averageRows > 0;
+        $hintKind = null;
+        if ($enabled) {
+            if ($hasCalendar && $hasAverage) {
+                $hintKind = 'mixed';
+            } elseif ($hasCalendar) {
+                $hintKind = 'calendar_only';
+            } else {
+                $hintKind = 'average_only';
+            }
+        }
 
         return [
             'enabled' => $enabled,
             'has_calendar_positions' => $hasCalendar,
             'has_average_positions' => $hasAverage,
             'mixed_order' => $hasCalendar && $hasAverage,
-            'exportable_row_count' => $exportableRowCount,
+            'hint_kind' => $hintKind,
+            'exportable_calendar_row_count' => $calendarRows,
+            'exportable_average_row_count' => $averageRows,
+            'exportable_row_count' => $calendarRows + $averageRows,
             'disabled_reason' => $enabled
                 ? null
-                : 'Keine kalendergeplante Spotverteilung vorhanden. Average-Positionen sind im Spotverteilungs-Export nicht enthalten.',
+                : 'Keine exportierbare Spotplanung vorhanden (weder Calendar-Verteilung noch Average-Planungsvorschlag).',
         ];
     }
 
     public function isExportableCalendarPosition(DispoOrderPosition $position): bool
     {
-        if ($position->spot_method !== SpotCalculationMethod::Calendar) {
-            return false;
-        }
-
-        return $this->countExportableEntries($position) > 0;
+        return $position->spot_method === SpotCalculationMethod::Calendar
+            && $this->countExportableCalendarEntries($position) > 0;
     }
 
-    private function countExportableEntries(DispoOrderPosition $position): int
+    public function isExportableAveragePosition(DispoOrderPosition $position): bool
+    {
+        return $position->spot_method === SpotCalculationMethod::Average
+            && $this->countExportableAverageEntries($position) > 0;
+    }
+
+    private function countExportableCalendarEntries(DispoOrderPosition $position): int
     {
         $entries = $position->planner_entries_snapshot ?? [];
         if ($entries === []) {
@@ -153,7 +213,6 @@ final class SpotDistributionExportBuilder
             if (! is_array($entry)) {
                 continue;
             }
-
             $spotCount = $entry['spot_count'] ?? null;
             if (is_int($spotCount) && $spotCount >= 1) {
                 $count++;
@@ -165,10 +224,31 @@ final class SpotDistributionExportBuilder
         return $count;
     }
 
+    private function countExportableAverageEntries(DispoOrderPosition $position): int
+    {
+        $ranges = $position->time_ranges_snapshot ?? [];
+        if ($ranges === []) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($ranges as $range) {
+            if (! is_array($range)) {
+                continue;
+            }
+            $spotCount = $range['spot_count'] ?? null;
+            if (is_numeric($spotCount) && (int) $spotCount >= 1) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
     /**
      * @return list<SpotDistributionExportRow>
      */
-    private function rowsForPosition(DispoOrder $order, DispoOrderPosition $position): array
+    private function calendarRowsForPosition(DispoOrder $order, DispoOrderPosition $position): array
     {
         $entries = $position->planner_entries_snapshot;
         if ($entries === null) {
@@ -178,10 +258,10 @@ final class SpotDistributionExportBuilder
         }
 
         $profile = $position->component_profile;
-        $componentsLabel = $this->formatComponents($position, $profile);
-        $totalLength = $this->resolveTotalLengthSeconds($position);
-        $quantityUnit = $this->quantityUnit($profile);
-        $positionLabel = $this->positionLabel($position);
+        $componentsLabel = $this->support->formatComponents($position, $profile);
+        $totalLength = $this->support->resolveTotalLengthSeconds($position);
+        $quantityUnit = $this->support->quantityUnit($profile);
+        $positionLabel = $this->support->positionLabel($position);
         $customerName = (string) ($order->customer_name ?? '');
 
         $rows = [];
@@ -218,165 +298,142 @@ final class SpotDistributionExportBuilder
                 quantityUnit: $quantityUnit,
                 totalLengthSeconds: $totalLength,
                 componentsLabel: $componentsLabel,
-                componentAirings: $this->componentAirings($profile, $spotCount),
+                componentAirings: $this->support->componentAirings($profile, $spotCount),
             );
         }
 
         return $rows;
     }
 
-    private function positionLabel(DispoOrderPosition $position): string
+    /**
+     * @return list<SpotPlanningProposalExportRow>
+     */
+    private function averageRowsForPosition(DispoOrder $order, DispoOrderPosition $position): array
     {
-        // Dispo speichert sort 0-basiert; Anzeige 1-basiert und lesbar.
-        return 'Position '.((int) $position->sort + 1);
-    }
-
-    private function quantityUnit(?SpotComponentProfile $profile): string
-    {
-        if ($profile === null) {
-            return 'Spots';
-        }
-
-        return $profile->unitLabel();
-    }
-
-    private function componentAirings(?SpotComponentProfile $profile, int $unitCount): int
-    {
-        if ($profile === null) {
-            return $unitCount;
-        }
-
-        return SpotComponentProfileContract::derivedAirings($profile, $unitCount);
-    }
-
-    private function resolveTotalLengthSeconds(DispoOrderPosition $position): int
-    {
-        $components = $position->components_snapshot ?? [];
-        if ($components !== []) {
-            $sum = 0;
-            foreach ($components as $component) {
-                if (! isset($component['length_seconds'])) {
-                    throw ValidationException::withMessages([
-                        'export' => 'Komponenten-Snapshot enthält ungültige Längenwerte.',
-                    ]);
-                }
-                $length = (int) $component['length_seconds'];
-                if ($length < 1) {
-                    throw ValidationException::withMessages([
-                        'export' => 'Komponenten-Snapshot enthält ungültige Längenwerte.',
-                    ]);
-                }
-                $sum += $length;
-            }
-
-            return $sum;
-        }
-
-        $length = (int) $position->length_seconds;
-        if ($length < 1) {
+        $ranges = $position->time_ranges_snapshot;
+        if ($ranges === null) {
             throw ValidationException::withMessages([
-                'export' => 'Die Spotlänge der Position ist ungültig.',
+                'export' => 'Der Average-Zeitraum-Snapshot der Position ist ungültig.',
             ]);
         }
 
-        return $length;
+        if ($ranges === []) {
+            return [];
+        }
+
+        $profile = $position->component_profile;
+        $componentsLabel = $this->support->formatComponents($position, $profile);
+        $totalLength = $this->support->resolveTotalLengthSeconds($position);
+        $quantityUnit = $this->support->quantityUnit($profile);
+        $positionLabel = $this->support->positionLabel($position);
+        $customerName = (string) ($order->customer_name ?? '');
+        $flightPeriod = $this->support->flightPeriodDisplay($position);
+        $periodFrom = $flightPeriod[0] ?? '';
+        $periodTo = $flightPeriod[1] ?? '';
+
+        $rows = [];
+        foreach ($ranges as $index => $range) {
+            if (! is_array($range)) {
+                throw ValidationException::withMessages([
+                    'export' => "Average-Zeitraum {$index} der Position {$positionLabel} ist ungültig.",
+                ]);
+            }
+
+            $spotCount = $this->requirePositiveSpotCount($range, $positionLabel, $index);
+            if ($spotCount === null) {
+                // Menge 0 oder fehlend: fail-closed wenn key fehlt; 0 wird übersprungen nur wenn explizit 0?
+                // PO: Menge kleiner 1 fail-closed. requirePositiveSpotCount returns null for <1 after validating numeric.
+                // But missing spot_count throws. For spot_count=0, currently returns null (skip).
+                // PO says Menge kleiner 1 fail-closed - so we should fail, not skip!
+                if (array_key_exists('spot_count', $range) && is_numeric($range['spot_count']) && (int) $range['spot_count'] < 1) {
+                    throw ValidationException::withMessages([
+                        'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat eine ungültige Menge.",
+                    ]);
+                }
+
+                continue;
+            }
+
+            [$startHour, $endExclusive] = $this->requireAverageHourBounds($range, $positionLabel, $index);
+            $dayGroupLabel = $this->requireStoredDayGroupLabel($range, $positionLabel, $index);
+            $hourLabel = $this->formatHourConstraint($startHour, $endExclusive);
+
+            $rows[] = new SpotPlanningProposalExportRow(
+                dispoOrderNumber: (string) $order->number,
+                customerName: $customerName,
+                positionLabel: $positionLabel,
+                positionSort: (int) $position->sort,
+                positionId: (int) $position->id,
+                inventoryName: (string) $position->inventory_name,
+                advertisingMediumName: (string) $position->advertising_medium_name,
+                periodFromDisplay: $periodFrom,
+                periodToDisplay: $periodTo,
+                dayGroupLabel: $dayGroupLabel,
+                hourConstraintLabel: $hourLabel,
+                quantity: $spotCount,
+                quantityUnit: $quantityUnit,
+                totalLengthSeconds: $totalLength,
+                componentsLabel: $componentsLabel,
+                componentAirings: $this->support->componentAirings($profile, $spotCount),
+            );
+        }
+
+        return $rows;
     }
 
     /**
-     * @return string lesbare Komponentenzeile
+     * @param  array<string, mixed>  $entry
+     * @return array{0: int, 1: int}
      */
-    private function formatComponents(DispoOrderPosition $position, ?SpotComponentProfile $profile): string
+    private function requireAverageHourBounds(array $entry, string $positionLabel, int $index): array
     {
-        $components = $position->components_snapshot ?? [];
-
-        if ($components === []) {
-            $length = (int) $position->length_seconds;
-            if ($length < 1) {
-                throw ValidationException::withMessages([
-                    'export' => 'Legacy-Position ohne Komponenten und ohne gültige Spotlänge.',
-                ]);
-            }
-
-            return 'Spot '.$length.' s';
-        }
-
-        $normalized = [];
-        foreach ($components as $index => $component) {
-            $roleValue = $component['role'] ?? null;
-            if (! is_string($roleValue) || $roleValue === '') {
-                throw ValidationException::withMessages([
-                    'export' => 'Komponenten-Snapshot ohne Rolle.',
-                ]);
-            }
-
-            $role = SpotComponentRole::tryFrom($roleValue);
-            if ($role === null) {
-                throw ValidationException::withMessages([
-                    'export' => "Unbekannte Komponentenrolle „{$roleValue}“.",
-                ]);
-            }
-
-            $sort = isset($component['sort']) ? (int) $component['sort'] : $index + 1;
-            $length = isset($component['length_seconds']) ? (int) $component['length_seconds'] : 0;
-            if ($length < 1) {
-                throw ValidationException::withMessages([
-                    'export' => 'Komponenten-Snapshot enthält ungültige Längenwerte.',
-                ]);
-            }
-
-            $label = $this->componentDisplayLabel($profile, $role, $sort, $component);
-
-            $normalized[] = [
-                'sort' => $sort,
-                'label' => $label,
-                'length_seconds' => $length,
-            ];
-        }
-
-        usort($normalized, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
-
-        if ($profile !== null) {
-            $this->assertForcedProfileStructure($profile, $normalized);
-        }
-
-        return implode(' | ', array_map(
-            static fn (array $part): string => $part['label'].' '.$part['length_seconds'].' s',
-            $normalized,
-        ));
-    }
-
-    /**
-     * @param  array<string, mixed>  $component
-     */
-    private function componentDisplayLabel(
-        ?SpotComponentProfile $profile,
-        SpotComponentRole $role,
-        int $sort,
-        array $component,
-    ): string {
-        if ($profile !== null) {
-            return SpotComponentProfileContract::displayLabel($profile, $role, $sort);
-        }
-
-        $label = $component['label'] ?? null;
-        if (is_string($label) && trim($label) !== '') {
-            return trim($label);
-        }
-
-        return $role->label();
-    }
-
-    /**
-     * @param  list<array{sort: int, label: string, length_seconds: int}>  $normalized
-     */
-    private function assertForcedProfileStructure(SpotComponentProfile $profile, array $normalized): void
-    {
-        $expected = SpotComponentProfileContract::slots($profile);
-        if (count($normalized) !== count($expected)) {
+        if (! array_key_exists('start_hour', $entry) || ! is_numeric($entry['start_hour'])) {
             throw ValidationException::withMessages([
-                'export' => 'Komponenten-Snapshot passt nicht zum gespeicherten Profil.',
+                'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat eine ungültige Startstunde.",
             ]);
         }
+        if (! array_key_exists('end_hour_exclusive', $entry) || ! is_numeric($entry['end_hour_exclusive'])) {
+            throw ValidationException::withMessages([
+                'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat eine ungültige Endstunde.",
+            ]);
+        }
+
+        $start = (int) $entry['start_hour'];
+        $end = (int) $entry['end_hour_exclusive'];
+        if ($start < 0 || $start > 23 || $end < 1 || $end > 24 || $end <= $start) {
+            throw ValidationException::withMessages([
+                'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat einen ungültigen Stundenbereich.",
+            ]);
+        }
+
+        return [$start, $end];
+    }
+
+    private function formatHourConstraint(int $startHour, int $endHourExclusive): string
+    {
+        return TimeRangeHours::formatHour($startHour).'–'.TimeRangeHours::formatInclusiveEnd($endHourExclusive);
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function requireStoredDayGroupLabel(array $entry, string $positionLabel, int $index): string
+    {
+        $raw = $entry['day_group'] ?? null;
+        if (! is_string($raw) || $raw === '') {
+            throw ValidationException::withMessages([
+                'export' => "Average-Zeitraum {$index} der Position {$positionLabel} ohne Tagesgruppe.",
+            ]);
+        }
+
+        $group = DayGroup::tryFrom($raw);
+        if ($group === null) {
+            throw ValidationException::withMessages([
+                'export' => "Average-Zeitraum {$index} der Position {$positionLabel} hat eine unbekannte Tagesgruppe.",
+            ]);
+        }
+
+        return $group->label();
     }
 
     /**
@@ -386,13 +443,13 @@ final class SpotDistributionExportBuilder
     {
         if (! array_key_exists('spot_count', $entry)) {
             throw ValidationException::withMessages([
-                'export' => "Planner-Eintrag {$index} der Position {$positionLabel} ohne Spotanzahl.",
+                'export' => "Eintrag {$index} der Position {$positionLabel} ohne Spotanzahl.",
             ]);
         }
 
         if (! is_numeric($entry['spot_count'])) {
             throw ValidationException::withMessages([
-                'export' => "Planner-Eintrag {$index} der Position {$positionLabel} hat eine ungültige Spotanzahl.",
+                'export' => "Eintrag {$index} der Position {$positionLabel} hat eine ungültige Spotanzahl.",
             ]);
         }
 

@@ -238,10 +238,12 @@ E2E: `npm run test:e2e:blp402e` bzw.
 `database/e2e-bl-p4-02e.sqlite`, Seeder `E2ETandemTridemSeeder` – niemals
 Dev-DB `dispo`).
 
-## SPT-008 – Dispo Spotverteilungs-XLSX
+## SPT-008 – Dispo Spotplanungs-XLSX
 
-Interner Export der Calendar-Spotverteilung aus Dispo-Snapshots (kein Average-Export,
-kein REP-007-PDF). Route: `GET /dispoauftraege/{id}/spotverteilung.xlsx`.
+Interner Export der Spotplanung aus Dispo-Snapshots: Blatt `Spotverteilung` (Calendar)
+und Blatt `Planungsvorschlag` (Average, unverbindlich). Keine künstliche
+Datum-/Stundenverteilung, keine kaufmännischen Spalten, kein REP-007-PDF.
+Route: `GET /dispoauftraege/{id}/spotverteilung.xlsx`.
 
 Tests: `SpotDistributionExportBuilderTest`, `SpotDistributionExportFeatureTest`
 (+ MySQL); Vitest `dispo-order-spot-distribution-export.test.tsx`.
