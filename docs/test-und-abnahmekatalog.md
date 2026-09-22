@@ -71,7 +71,25 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Vitest: `spot-components.test.ts`
 - E2E: `playwright.blp402e.config.ts` (Port **8028**, Seeder `E2ETandemTridemSeeder`)
 - **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt); `fixed_price` planned;
-  SPT-008 Dateiexport offen (Readiness analysiert, Umsetzung ausstehend); `BL-P4-02` insgesamt offen
+  **SPT-008 Dateiexport** umgesetzt/automatisiert getestet (manuelle Abnahme offen);
+  `BL-P4-02` insgesamt offen
+
+### SPT-008 (Dispo Spotplanungs-XLSX)
+
+- Interner synchroner Download `GET …/spotverteilung.xlsx` (Autorisierung = Dispo-Leserecht)
+- Workbook mit genau zwei Blättern: `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average)
+- Daten nur aus eingefrorenen Snapshots (`planner_entries_snapshot` / `time_ranges_snapshot`,
+  Komponenten/Profil); keine Live-Neuberechnung, keine Preislisten, keine kaufmännischen Spalten
+- Calendar: eine Zeile je belegter Zelle (`spot_count ≥ 1`); Average: eine Zeile je gespeichertem
+  Zeitraum; keine künstliche Datum-/Stundenverteilung; Unverbindlichkeitshinweis auf Blatt 2
+- Leere Blätter bleiben mit verständlichem Hinweis stehen; Export möglich wenn Calendar oder Average exportierbar
+- Dateiname `<Dispoauftragsnummer>_Spotplanung.xlsx`
+- Audit `dispo_order.spot_planning.exported` nur bei erfolgreicher Auslieferung (Counts je Blatt)
+- Unit/Feature/MySQL: `SpotDistributionExport*`; Vitest: `dispo-order-spot-distribution-export.test.tsx`
+- E2E: `npm run test:e2e:spt008` (`playwright.spt008.config.ts`, Port **8033**,
+  Seeder `E2ESpotDistributionExportSeeder`)
+- Status: **umgesetzt / automatisiert getestet**; **manuelle Abnahme offen**;
+  REP-007 Dispo-PDF und operative Blockplanung **nicht** enthalten
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
@@ -89,7 +107,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `SpotClassicFixedPriceSettlementTest`; MySQL: `SpotClassicFixedPriceSettlementMysqlTest`
 - Vitest: `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`
 - E2E: `playwright.blp402d.config.ts` (Port **8026**, Seeder `E2ESpotComponentsSeeder`)
-- `BL-P4-02` insgesamt weiter offen (SPT-008 Dateiexport, Abbinder; Tandem/Tridem siehe **02e**)
+- `BL-P4-02` insgesamt weiter offen (SPT-008 Abnahme offen, Abbinder; Tandem/Tridem siehe **02e**)
 
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 
@@ -100,7 +118,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten
 - Unit-/Feature-/MySQL-/Vitest-/Playwright (`playwright.blp402c.config.ts`, Port 8025)
 - SPT-012 siehe **BL-P4-02e**; SPT-013 nur teilweise (Abbinder offen); SPT-014 Hauptspot/Allonge umgesetzt;
-  SPT-015 unverändert; `fixed_price` planned; SPT-008 Export offen; `BL-P4-02` insgesamt offen
+  SPT-015 unverändert; `fixed_price` planned; SPT-008 Export umgesetzt (Abnahme offen); `BL-P4-02` insgesamt offen
 
 ### BL-P4-02b (Kalenderplaner / AT-02)
 
@@ -113,7 +131,8 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Methode `calendar`: keine parallelen Average-`time_ranges`; leere/0-Zellen entfernen den Eintrag
 - Registry-Freigabe `spot_classic`/`calendar` **released/v1** (`BL-P4-02b` umgesetzt, PR #58); `fixed_price` weiter `planned`
 - Persistenz/Roundtrip `planner_entries`; Dispo übernimmt `planner_entries_snapshot`; Show/Create-Dialog lesbare Anzeige (chronologisch unverändert)
-- Dispo-Export der Verteilung (`SPT-008` Export) **nicht** Teil dieses PR
+- Dispo-Export der Verteilung (`SPT-008` Export) in eigenem Slice umgesetzt (siehe Abschnitt SPT-008);
+  **nicht** Teil von PR #58
 - Kompatibel mit Origin-Retention (PR #57): kein AT-04-/Festpreis-Claim
 - Unit: `CalendarCalculationTest`
 - Feature: `SpotClassicCalendarCalculationTest` (inkl. `price_list_hours_by_id` in Wizard-Props), `SpotClassicCalendarYearContractMysqlTest`, `BlP402bWithOriginRetentionCompatTest`

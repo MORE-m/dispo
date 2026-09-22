@@ -5,6 +5,10 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
+import {
+    DispoOrderSpotDistributionExport,
+    type SpotDistributionExportProps,
+} from '@/components/dispo-order-spot-distribution-export';
 import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { SchemaChoiceFields } from '@/components/dynamic-fields/schema-choice-fields';
 import { SchemaChoiceReadonlyFields } from '@/components/dynamic-fields/schema-choice-readonly';
@@ -273,6 +277,7 @@ export default function DispoOrderShow({
     canReject = false,
     canRevise = false,
     isCreator = false,
+    spotDistributionExport = null,
 }: {
     order: OrderDetail;
     fieldSchema?: FieldSchema;
@@ -284,6 +289,7 @@ export default function DispoOrderShow({
     canReject?: boolean;
     canRevise?: boolean;
     isCreator?: boolean;
+    spotDistributionExport?: SpotDistributionExportProps | null;
 }) {
     const flash = usePage().props.flash;
     const current = order.current_approval;
@@ -1027,6 +1033,10 @@ export default function DispoOrderShow({
                     canReject={canReject}
                     isCreator={isCreator}
                     status={order.status}
+                />
+
+                <DispoOrderSpotDistributionExport
+                    exportConfig={spotDistributionExport}
                 />
 
                 {canRevise ? (

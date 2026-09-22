@@ -147,6 +147,9 @@ jobs:
       - name: Browser BL-P4-02e isolated tests
         run: npx playwright test -c playwright.blp402e.config.ts
 
+      - name: Browser SPT-008 isolated tests
+        run: npx playwright test -c playwright.spt008.config.ts
+
   mysql:
     runs-on: ubuntu-latest
 

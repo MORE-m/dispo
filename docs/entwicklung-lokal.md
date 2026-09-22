@@ -238,6 +238,21 @@ E2E: `npm run test:e2e:blp402e` bzw.
 `database/e2e-bl-p4-02e.sqlite`, Seeder `E2ETandemTridemSeeder` – niemals
 Dev-DB `dispo`).
 
+## SPT-008 – Dispo Spotplanungs-XLSX
+
+Interner Export der Spotplanung aus Dispo-Snapshots: Blatt `Spotverteilung` (Calendar)
+und Blatt `Planungsvorschlag` (Average, unverbindlich). Keine künstliche
+Datum-/Stundenverteilung, keine kaufmännischen Spalten, kein REP-007-PDF.
+Route: `GET /dispoauftraege/{id}/spotverteilung.xlsx`.
+
+Tests: `SpotDistributionExportBuilderTest`, `SpotDistributionExportFeatureTest`
+(+ MySQL); Vitest `dispo-order-spot-distribution-export.test.tsx`.
+
+E2E: `npm run test:e2e:spt008` bzw.
+`npx playwright test -c playwright.spt008.config.ts` (Port **8033**, DB
+`database/e2e-spt-008.sqlite`, Seeder `E2ESpotDistributionExportSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`

@@ -1,0 +1,571 @@
+<?php
+
+namespace Tests\Unit\DispoOrder\SpotDistributionExport;
+
+use App\Enums\CalculationKind;
+use App\Enums\DispoOrderApprovalKind;
+use App\Enums\DispoOrderStatus;
+use App\Enums\PricingSettlementMode;
+use App\Enums\Role;
+use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
+use App\Models\DispoOrder;
+use App\Models\DispoOrderPosition;
+use App\Models\User;
+use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportBuilder;
+use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportDocument;
+use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionXlsxRenderer;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use Tests\Concerns\CreatesMinimalDispoConfigurationSnapshot;
+use Tests\Concerns\CreatesSavedCalculation;
+use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\TestCase;
+
+class SpotDistributionExportBuilderTest extends TestCase
+{
+    use CreatesMinimalDispoConfigurationSnapshot;
+    use CreatesSavedCalculation;
+    use CreatesSpotClassicCatalog;
+    use RefreshDatabase;
+
+    public function test_builds_sorted_rows_from_calendar_snapshot_only(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'sort' => 1,
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-16', 'hour' => 14, 'day_group' => 'mo_fr', 'spot_count' => 2],
+                ['date' => '2026-09-15', 'hour' => 10, 'day_group' => 'mo_fr', 'spot_count' => 1],
+                ['date' => '2026-09-15', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 3],
+                ['date' => '2026-09-15', 'hour' => 9, 'day_group' => 'mo_fr', 'spot_count' => 0],
+            ],
+        ]);
+        $this->addCalendarPosition($order, [
+            'sort' => 0,
+            'inventory_name' => 'Sender A',
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-20', 'hour' => 11, 'day_group' => 'so', 'spot_count' => 4],
+            ],
+        ]);
+        $this->addAveragePosition($order, ['sort' => 2]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+
+        $this->assertSame(SpotDistributionExportDocument::defaultHeaders(), $document->calendarHeaders);
+        $this->assertSame(2, $document->exportedCalendarPositionCount);
+        $this->assertSame(1, $document->exportedAveragePositionCount);
+        $this->assertCount(4, $document->calendarRows);
+        $this->assertCount(1, $document->averageRows);
+        $this->assertSame('Vorschlag', $document->averageRows[0]->planningStatus);
+
+        $this->assertSame('Position 1', $document->calendarRows[0]->positionLabel);
+        $this->assertSame('2026-09-20', $document->calendarRows[0]->dateIso);
+        $this->assertSame('Sonntag', $document->calendarRows[0]->weekdayLabel);
+        $this->assertSame('11:00', $document->calendarRows[0]->hourLabel);
+
+        $this->assertSame('Position 2', $document->calendarRows[1]->positionLabel);
+        $this->assertSame('2026-09-15', $document->calendarRows[1]->dateIso);
+        $this->assertSame(8, $document->calendarRows[1]->hour);
+        $this->assertSame(3, $document->calendarRows[1]->quantity);
+        $this->assertSame('Spots', $document->calendarRows[1]->quantityUnit);
+        $this->assertSame(3, $document->calendarRows[1]->componentAirings);
+
+        $this->assertSame(10, $document->calendarRows[2]->hour);
+        $this->assertSame(14, $document->calendarRows[3]->hour);
+
+        foreach ($document->calendarHeaders as $header) {
+            $this->assertStringNotContainsStringIgnoringCase('preis', $header);
+            $this->assertStringNotContainsStringIgnoringCase('rabatt', $header);
+            $this->assertStringNotContainsStringIgnoringCase('ae', $header);
+            $this->assertStringNotContainsStringIgnoringCase('festpreis', $header);
+            $this->assertStringNotContainsStringIgnoringCase('netto', $header);
+        }
+    }
+
+    public function test_average_only_order_builds_proposal_rows(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [
+                [
+                    'start_hour' => 8,
+                    'end_hour_exclusive' => 10,
+                    'day_group' => 'mo_fr',
+                    'spot_count' => 12,
+                ],
+                [
+                    'start_hour' => 14,
+                    'end_hour_exclusive' => 15,
+                    'day_group' => 'sa',
+                    'spot_count' => 3,
+                ],
+            ],
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+
+        $this->assertSame(0, $document->exportedCalendarPositionCount);
+        $this->assertSame(1, $document->exportedAveragePositionCount);
+        $this->assertCount(0, $document->calendarRows);
+        $this->assertCount(2, $document->averageRows);
+        $this->assertSame('08:00–09:59', $document->averageRows[0]->hourConstraintLabel);
+        $this->assertSame('Mo–Fr', $document->averageRows[0]->dayGroupLabel);
+        $this->assertSame(12, $document->averageRows[0]->quantity);
+        $this->assertSame('Vorschlag', $document->averageRows[0]->planningStatus);
+        $this->assertSame('', $document->averageRows[0]->periodFromDisplay);
+        $this->assertSame('14:00–14:59', $document->averageRows[1]->hourConstraintLabel);
+        $this->assertSame(3, $document->averageRows[1]->quantity);
+    }
+
+    public function test_empty_order_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_average_quantity_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 0,
+            ]],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_average_hour_range_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'time_ranges_snapshot' => [[
+                'start_hour' => 10,
+                'end_hour_exclusive' => 8,
+                'day_group' => 'mo_fr',
+                'spot_count' => 5,
+            ]],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_average_tandem_units_and_airings(): void
+    {
+        $order = $this->makeOrder();
+        $this->addAveragePosition($order, [
+            'component_profile' => SpotComponentProfile::Tandem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 4,
+            ]],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->averageRows[0];
+        $this->assertSame(4, $row->quantity);
+        $this->assertSame('Tandem-Einheiten', $row->quantityUnit);
+        $this->assertSame(8, $row->componentAirings);
+        $this->assertSame('Vorschlag', $row->planningStatus);
+    }
+
+    public function test_formula_injection_neutralized_in_average_customer_name(): void
+    {
+        $order = $this->makeOrder();
+        $order->forceFill(['customer_name' => '=1+1'])->save();
+        $this->addAveragePosition($order, [
+            'inventory_name' => '+CMD()',
+            'time_ranges_snapshot' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 2,
+            ]],
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+        $binary = (new SpotDistributionXlsxRenderer)->render($document);
+        $path = tempnam(sys_get_temp_dir(), 'spt008avg');
+        file_put_contents($path, $binary);
+        try {
+            $sheet = IOFactory::load($path)->getSheetByName('Planungsvorschlag');
+            $this->assertNotNull($sheet);
+            $this->assertSame("'=1+1", (string) $sheet->getCell('B3')->getValue());
+            $this->assertSame("'+CMD()", (string) $sheet->getCell('D3')->getValue());
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    public function test_tandem_units_and_airings_without_price_multiplication(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'component_profile' => SpotComponentProfile::Tandem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 5],
+            ],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
+
+        $this->assertSame(5, $row->quantity);
+        $this->assertSame('Tandem-Einheiten', $row->quantityUnit);
+        $this->assertSame(10, $row->componentAirings);
+        $this->assertSame(30, $row->totalLengthSeconds);
+        $this->assertSame('Hauptspot 20 s | Reminder 10 s', $row->componentsLabel);
+    }
+
+    public function test_tridem_reminder_numbering(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'component_profile' => SpotComponentProfile::Tridem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 40,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 3],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 2],
+            ],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
+
+        $this->assertSame('Tridem-Einheiten', $row->quantityUnit);
+        $this->assertSame(6, $row->componentAirings);
+        $this->assertSame('Hauptspot 20 s | Reminder 1 10 s | Reminder 2 10 s', $row->componentsLabel);
+    }
+
+    public function test_hauptspot_allonge_components(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 3],
+            ],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
+
+        $this->assertSame('Hauptspot 20 s | Allonge 10 s', $row->componentsLabel);
+        $this->assertSame(3, $row->componentAirings);
+        $this->assertSame('Spots', $row->quantityUnit);
+    }
+
+    public function test_legacy_without_components_uses_spot_length(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'length_seconds' => 25,
+            'components_snapshot' => [],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+
+        $row = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']))->calendarRows[0];
+        $this->assertSame('Spot 25 s', $row->componentsLabel);
+        $this->assertSame(25, $row->totalLengthSeconds);
+    }
+
+    public function test_unknown_component_role_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'components_snapshot' => [
+                ['role' => 'abbinder', 'label' => 'Abbinder', 'length_seconds' => 5, 'sort' => 1],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_date_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'planner_entries_snapshot' => [
+                ['date' => '2026-02-30', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_invalid_hour_fails_closed(): void
+    {
+        $order = $this->makeOrder();
+        $this->addCalendarPosition($order, [
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 24, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+
+        $this->expectException(ValidationException::class);
+        (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+    }
+
+    public function test_capability_for_mixed_and_empty_orders(): void
+    {
+        $builder = new SpotDistributionExportBuilder;
+
+        $mixed = $this->makeOrder();
+        $this->addCalendarPosition($mixed);
+        $this->addAveragePosition($mixed);
+        $capability = $builder->capability($mixed->fresh(['positions']));
+        $this->assertTrue($capability['enabled']);
+        $this->assertTrue($capability['mixed_order']);
+        $this->assertSame('mixed', $capability['hint_kind']);
+
+        $averageOnly = DispoOrder::query()->create([
+            'calculation_id' => $mixed->calculation_id,
+            'configuration_snapshot_id' => $mixed->configuration_snapshot_id,
+            'number' => 'DO-2026-9-2',
+            'number_year' => 2026,
+            'number_org_seq' => 9,
+            'number_calc_seq' => 2,
+            'status' => DispoOrderStatus::Draft,
+            'created_by_id' => $mixed->created_by_id,
+            'source_calculation_number' => $mixed->source_calculation_number,
+            'customer_name' => 'Average only',
+            'approval_kind' => DispoOrderApprovalKind::Regular,
+            'requires_special_approval' => false,
+            'media_gross' => '0.00',
+            'position_discount_total' => '0.00',
+            'order_discount_total' => '0.00',
+            'ae_total' => '0.00',
+            'nn_invest' => '0.00',
+            'order_discount_percent' => '0',
+            'ae_enabled' => true,
+            'lock_version' => 1,
+        ]);
+        $this->addAveragePosition($averageOnly);
+        $averageCapability = $builder->capability($averageOnly->fresh(['positions']));
+        $this->assertTrue($averageCapability['enabled']);
+        $this->assertSame('average_only', $averageCapability['hint_kind']);
+        $this->assertTrue($averageCapability['has_average_positions']);
+        $this->assertFalse($averageCapability['has_calendar_positions']);
+
+        $empty = DispoOrder::query()->create([
+            'calculation_id' => $mixed->calculation_id,
+            'configuration_snapshot_id' => $mixed->configuration_snapshot_id,
+            'number' => 'DO-2026-9-3',
+            'number_year' => 2026,
+            'number_org_seq' => 9,
+            'number_calc_seq' => 3,
+            'status' => DispoOrderStatus::Draft,
+            'created_by_id' => $mixed->created_by_id,
+            'source_calculation_number' => $mixed->source_calculation_number,
+            'customer_name' => 'Empty',
+            'approval_kind' => DispoOrderApprovalKind::Regular,
+            'requires_special_approval' => false,
+            'media_gross' => '0.00',
+            'position_discount_total' => '0.00',
+            'order_discount_total' => '0.00',
+            'ae_total' => '0.00',
+            'nn_invest' => '0.00',
+            'order_discount_percent' => '0',
+            'ae_enabled' => true,
+            'lock_version' => 1,
+        ]);
+        $emptyCapability = $builder->capability($empty->fresh(['positions']));
+        $this->assertFalse($emptyCapability['enabled']);
+        $this->assertNotNull($emptyCapability['disabled_reason']);
+    }
+
+    public function test_multiple_calendar_positions_keep_overlapping_date_hour_as_separate_rows(): void
+    {
+        $order = $this->makeOrder();
+        $first = $this->addCalendarPosition($order, [
+            'sort' => 0,
+            'inventory_name' => 'Sender Alpha',
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 2],
+                ['date' => '2026-09-14', 'hour' => 9, 'day_group' => 'mo_fr', 'spot_count' => 1],
+            ],
+        ]);
+        $second = $this->addCalendarPosition($order, [
+            'sort' => 1,
+            'inventory_name' => 'Sender Beta',
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 5],
+            ],
+        ]);
+        $tandem = $this->addCalendarPosition($order, [
+            'sort' => 2,
+            'inventory_name' => 'Sender Gamma',
+            'component_profile' => SpotComponentProfile::Tandem,
+            'component_calculation_strategy' => 'shared_total_length',
+            'length_seconds' => 30,
+            'components_snapshot' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 2],
+            ],
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 3],
+            ],
+        ]);
+        $this->addAveragePosition($order, [
+            'sort' => 3,
+            'inventory_name' => 'Average Sender',
+        ]);
+
+        $document = (new SpotDistributionExportBuilder)->build($order->fresh(['positions']));
+
+        $this->assertSame(3, $document->exportedCalendarPositionCount);
+        $this->assertCount(4, $document->calendarRows);
+
+        $labels = array_map(
+            static fn ($row) => $row->positionLabel,
+            $document->calendarRows,
+        );
+        $this->assertSame(
+            ['Position 1', 'Position 1', 'Position 2', 'Position 3'],
+            $labels,
+        );
+
+        $overlap = array_values(array_filter(
+            $document->calendarRows,
+            static fn ($row) => $row->dateIso === '2026-09-14' && $row->hour === 8,
+        ));
+        $this->assertCount(3, $overlap);
+        $this->assertSame('Sender Alpha', $overlap[0]->inventoryName);
+        $this->assertSame(2, $overlap[0]->quantity);
+        $this->assertSame('Sender Beta', $overlap[1]->inventoryName);
+        $this->assertSame(5, $overlap[1]->quantity);
+        $this->assertSame('Sender Gamma', $overlap[2]->inventoryName);
+        $this->assertSame(3, $overlap[2]->quantity);
+        $this->assertSame('Tandem-Einheiten', $overlap[2]->quantityUnit);
+        $this->assertSame(6, $overlap[2]->componentAirings);
+
+        $qtyBySort = [];
+        foreach ($document->calendarRows as $row) {
+            $qtyBySort[$row->positionLabel] = ($qtyBySort[$row->positionLabel] ?? 0) + $row->quantity;
+        }
+        $this->assertSame(3, $qtyBySort['Position 1']);
+        $this->assertSame(5, $qtyBySort['Position 2']);
+        $this->assertSame(3, $qtyBySort['Position 3']);
+
+        $this->assertNotContains('Average Sender', array_map(
+            static fn ($row) => $row->inventoryName,
+            $document->calendarRows,
+        ));
+
+        // Keine stillen Key-Kollisionen: jede Positions-ID bleibt in der Menge.
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertNotSame($second->id, $tandem->id);
+    }
+
+    private function makeOrder(): DispoOrder
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $calculation = $this->createSavedCalculation($catalog, [
+            ['inventory_id' => $catalog['hamburg']->id],
+        ]);
+        $user = User::factory()->role(Role::Sales)->create();
+
+        return $this->createDispoOrderWithMinimalSnapshot($calculation, [
+            'calculation_id' => $calculation->id,
+            'number' => 'DO-2026-9-1',
+            'number_year' => 2026,
+            'number_org_seq' => 9,
+            'number_calc_seq' => 1,
+            'status' => DispoOrderStatus::Draft,
+            'created_by_id' => $user->id,
+            'source_calculation_number' => $calculation->number,
+            'customer_name' => 'Export Kunde',
+            'approval_kind' => DispoOrderApprovalKind::Regular,
+            'requires_special_approval' => false,
+            'media_gross' => '0.00',
+            'position_discount_total' => '0.00',
+            'order_discount_total' => '0.00',
+            'ae_total' => '0.00',
+            'nn_invest' => '0.00',
+            'order_discount_percent' => '0',
+            'ae_enabled' => true,
+            'lock_version' => 1,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function addCalendarPosition(DispoOrder $order, array $overrides = []): DispoOrderPosition
+    {
+        return DispoOrderPosition::query()->create(array_merge([
+            'dispo_order_id' => $order->id,
+            'sort' => 1,
+            'inventory_name' => 'Radio Hamburg',
+            'advertising_medium_name' => 'Spot Classic',
+            'kind' => CalculationKind::SpotClassic,
+            'spot_method' => SpotCalculationMethod::Calendar,
+            'length_seconds' => 30,
+            'total_spot_count' => 3,
+            'pricing_settlement_mode' => PricingSettlementMode::Normal,
+            'planner_entries_snapshot' => [
+                ['date' => '2026-09-14', 'hour' => 8, 'day_group' => 'mo_fr', 'spot_count' => 3],
+            ],
+            'components_snapshot' => [],
+        ], $overrides));
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function addAveragePosition(DispoOrder $order, array $overrides = []): DispoOrderPosition
+    {
+        return DispoOrderPosition::query()->create(array_merge([
+            'dispo_order_id' => $order->id,
+            'sort' => 2,
+            'inventory_name' => 'Average Sender',
+            'advertising_medium_name' => 'Spot Classic',
+            'kind' => CalculationKind::SpotClassic,
+            'spot_method' => SpotCalculationMethod::Average,
+            'length_seconds' => 30,
+            'total_spot_count' => 10,
+            'pricing_settlement_mode' => PricingSettlementMode::Normal,
+            'time_ranges_snapshot' => [
+                ['start_hour' => 8, 'end_hour_exclusive' => 9, 'day_group' => 'mo_fr', 'spot_count' => 10],
+            ],
+            'planner_entries_snapshot' => [],
+            'components_snapshot' => [],
+        ], $overrides));
+    }
+}

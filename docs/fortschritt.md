@@ -1,32 +1,37 @@
 # Fortschritt V1
 
-Stand: 18. September 2026 (`main` inkl. **PR #56**–**#61**).
+Stand: 21. September 2026 (Feature **SPT-008** Dateiexport, Branch
+`feat/spt-008-dispo-spot-distribution-xlsx`, Base `00b1b4ec…` inkl. PR #67).
 **`BL-P4-02a`–`02e`** auf **`main`**. **`BL-P4-02c` (AT-04)**, Festpreis (**02d**) und
 Tandem/Tridem (**02e** / **SPT-012**) manuell abgenommen. `BL-P4-01` abgeschlossen.
 
 ## Aktuelle Phase
 
 Phase 4: **`BL-P4-01` abgeschlossen**. **`BL-P4-02a`–`02e`** auf **`main`**
-(PR **#56**–**#61**). Gesamtblock **`BL-P4-02` bleibt offen** (SPT-008 Dateiexport,
-Abbinder/SPT-013, operative Blockplanung, …). UX-GATE-D: bisherige Teilfreigaben
-unverändert; Kombinationstabellen-Admin gesperrt.
+(PR **#56**–**#61**). Gesamtblock **`BL-P4-02` bleibt offen** (Abbinder/SPT-013,
+operative Blockplanung, …). **SPT-008 Dateiexport** vertikal umgesetzt und
+automatisiert getestet; **manuelle Abnahme ausstehend**. UX-GATE-D: bisherige
+Teilfreigaben unverändert; Kombinationstabellen-Admin gesperrt.
 
 ## Aktuelle Aufgabe
 
-Weiter **`BL-P4-02`**: SPT-008 Dateiexport (nach PO-Entscheidung), Abbinder
-(SPT-013, bewusst zurückgestellt). Registry-Methode **`fixed_price`** bleibt
-**`planned`** (kein separater Live-Rechenweg). REP-007 Dispo-PDF bleibt Phase 10.
+**SPT-008** interner XLSX-Spotverteilungs-Export: **implementiert / automatisiert
+getestet**, manuelle Abnahme offen. Weiter **`BL-P4-02`**: Abbinder (SPT-013,
+bewusst zurückgestellt), operative Blockplanung. Registry-Methode **`fixed_price`**
+bleibt **`planned`**. REP-007 Dispo-PDF bleibt Phase 10. Average-Export ist
+**nicht** Bestandteil von SPT-008.
 
-**SPT-008 Readiness:** Vertrag analysiert (Dispo-Spotverteilung, interner XLSX-
-Verteilungsexport vorgesehen). Umsetzung, Tests und UI **offen** – nicht als
-Produktfeature erledigt markieren.
+## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-## Zuletzt abgeschlossene Aufgabe
+**SPT-008 Dateiexport** (Branch `feat/spt-008-dispo-spot-distribution-xlsx`):
+interner synchroner XLSX-Download der konkreten Calendar-Spotverteilung aus
+eingefrorenen Dispo-Snapshots (`planner_entries_snapshot`); Blatt
+`Spotverteilung`; ohne kaufmännische Spalten; Audit
+`dispo_order.spot_distribution.exported` nur bei Erfolg; isolierte E2E
+`test:e2e:spt008` Port **8033**.
 
-**BL-P4-02e** (PR **#61**, Merge `6913c358…`): Tandem/Tridem über
-`component_profile` + **`shared_total_length`**; **SPT-012** umgesetzt, getestet
-und manuell abgenommen; isolierte E2E Port **8028**. Zuvor **BL-P4-02d**
-(PR **#60**): Festpreis-Abschluss mit AE-Rückrechnung, manuell abgenommen.
+Zuvor **BL-P4-02e** (PR **#61**, Merge `6913c358…`): Tandem/Tridem /
+**SPT-012** manuell abgenommen.
 
 ## BL-P4-02e – Tandem / Tridem / SPT-012 (September 2026)
 
@@ -43,7 +48,7 @@ und manuell abgenommen; isolierte E2E Port **8028**. Zuvor **BL-P4-02d**
 | Manuelle UX-Abnahme | **erfolgreich** |
 | **SPT-012** | **erledigt** |
 | **SPT-013** Abbinder | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder für Tandem/Tridem **teilweise**) |
-| SPT-008 Dateiexport, Registry `fixed_price` | **offen** bzw. **`planned`** |
+| SPT-008 Dateiexport, Registry `fixed_price` | **Export umgesetzt** (manuelle Abnahme offen) bzw. **`planned`** |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02d – Preisabschluss Festpreis / N/N (September 2026)
@@ -60,7 +65,7 @@ und manuell abgenommen; isolierte E2E Port **8028**. Zuvor **BL-P4-02d**
 | Budget-Übernahme setzt Abschluss zurück auf `normal` | **umgesetzt** |
 | E2E isoliert: `playwright.blp402d.config.ts` (Port **8026**) | **umgesetzt** |
 | Manuelle UX-Abnahme | **erfolgreich** |
-| SPT-008 Dateiexport, Abbinder (SPT-013) | **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
+| SPT-008 Dateiexport, Abbinder (SPT-013) | **Export umgesetzt** (manuelle Abnahme offen); Abbinder **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
 | `BL-P4-02` insgesamt | **offen** |
 
 **Hinweis:** Live wählbar ist **`pricing_settlement_mode=fixed_price`** zusammen mit
@@ -85,7 +90,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Abbinder (**SPT-013**) | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder teilweise) |
 | SPT-014 Hauptspot/Allonge | **umgesetzt** (PR #59) |
 | Festpreis-Abschluss (`BL-P4-02d`) | **umgesetzt** (`main`, PR #60; Registry `fixed_price` weiter planned) |
-| SPT-008 Dateiexport | **offen** (Readiness analysiert; Umsetzung ausstehend) |
+| SPT-008 Dateiexport | **umgesetzt** (automatisiert getestet; manuelle Abnahme offen; Average-Export bewusst nicht) |
 | `BL-P4-02` insgesamt | **offen** |
 
 ## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
@@ -98,7 +103,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb sichtbarer Woche bleiben im State | **umgesetzt** (PR #58) |
 | Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (PR #58) |
 | Dispo-Positions-Snapshot `planner_entries_snapshot` + lesbare Anzeige (`SPT-008` Anzeige) | **umgesetzt** (PR #58) |
-| Dispo-Export Spot-Verteilung (`SPT-008` Export) | **offen** |
+| Dispo-Export Spot-Verteilung (`SPT-008` Export) | **umgesetzt** (XLSX; automatisiert getestet; manuelle Abnahme offen) |
 | Registry `spot_classic`/`calendar` | **released / v1** (PR #58) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (PR #58) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (PR #58) |
@@ -113,7 +118,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (`main`, PR #56) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
 | AT-01/03/23/24 gezielte Härtung (ohne Kalender-/Komponenten-Scope von 02b) | **gehärtet** (`main`, PR #56) |
-| `BL-P4-02` insgesamt | **offen** (02a–02e auf `main`; SPT-008 Export / Abbinder offen) |
+| `BL-P4-02` insgesamt | **offen** (02a–02e auf `main`; SPT-008 Export umgesetzt/Abnahme offen; Abbinder offen) |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 

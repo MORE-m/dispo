@@ -36,7 +36,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $derived_component_airings
  * @property int $total_spot_count
  * @property int $length_seconds
+ * @property array<int, array<string, mixed>>|null $plan_rows_snapshot
+ * @property array<int, array<string, mixed>>|null $time_ranges_snapshot
+ * @property array<int, mixed>|null $planner_entries_snapshot
  * @property array<int, array<string, mixed>>|null $components_snapshot
+ * @property array<int, array<string, mixed>>|null $position_discounts_snapshot
  */
 class DispoOrderPosition extends Model
 {
