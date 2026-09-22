@@ -71,8 +71,8 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Vitest: `spot-components.test.ts`
 - E2E: `playwright.blp402e.config.ts` (Port **8028**, Seeder `E2ETandemTridemSeeder`)
 - **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt); `fixed_price` planned;
-  **SPT-008 Dateiexport** umgesetzt/automatisiert getestet (manuelle Abnahme offen);
-  `BL-P4-02` insgesamt offen
+  **SPT-008 Dateiexport** umgesetzt + manuell abgenommen (PR #68);
+  `BL-P4-02` insgesamt teilweise (Rest: Abbinder, operative Blockplanung)
 
 ### SPT-008 (Dispo Spotplanungs-XLSX)
 
@@ -88,7 +88,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Unit/Feature/MySQL: `SpotDistributionExport*`; Vitest: `dispo-order-spot-distribution-export.test.tsx`
 - E2E: `npm run test:e2e:spt008` (`playwright.spt008.config.ts`, Port **8033**,
   Seeder `E2ESpotDistributionExportSeeder`)
-- Status: **umgesetzt / automatisiert getestet**; **manuelle Abnahme offen**;
+- Status: **umgesetzt / automatisiert getestet / manuell abgenommen** (PR #68);
   REP-007 Dispo-PDF und operative Blockplanung **nicht** enthalten
 
 ### DSP-DCP-001 (Abgeleiteter Dispo-Kampagnenzeitraum)
@@ -105,7 +105,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Unit/Feature/MySQL: `*CampaignPeriod*`; Vitest: `derived-campaign-period.test.ts`
 - E2E: `npm run test:e2e:dspdcp001` (`playwright.dspdcp001.config.ts`, Port **8034**,
   Seeder `E2EDerivedCampaignPeriodSeeder`)
+- Merge: PR **#69** auf `main` (`7f0ea7b…`)
 - Abbinder / Kundenexport aus Kalkulation: **bewusst nicht**
+- Manuelle Abnahme: laut PR #69-Body und verfügbarer Repo-Dokumentation **noch offen**
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
@@ -123,7 +125,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature: `SpotClassicFixedPriceSettlementTest`; MySQL: `SpotClassicFixedPriceSettlementMysqlTest`
 - Vitest: `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`
 - E2E: `playwright.blp402d.config.ts` (Port **8026**, Seeder `E2ESpotComponentsSeeder`)
-- `BL-P4-02` insgesamt weiter offen (SPT-008 Abnahme offen, Abbinder; Tandem/Tridem siehe **02e**)
+- `BL-P4-02` insgesamt weiter teilweise offen (Abbinder SPT-013, operative Blockplanung; SPT-008 abgenommen; Tandem/Tridem siehe **02e**)
 
 ### BL-P4-02c (Spot-Komponenten / AT-04)
 
@@ -134,7 +136,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten
 - Unit-/Feature-/MySQL-/Vitest-/Playwright (`playwright.blp402c.config.ts`, Port 8025)
 - SPT-012 siehe **BL-P4-02e**; SPT-013 nur teilweise (Abbinder offen); SPT-014 Hauptspot/Allonge umgesetzt;
-  SPT-015 unverändert; `fixed_price` planned; SPT-008 Export umgesetzt (Abnahme offen); `BL-P4-02` insgesamt offen
+  SPT-015 unverändert; `fixed_price` planned; SPT-008 Export umgesetzt + manuell abgenommen (PR #68); `BL-P4-02` insgesamt teilweise
 
 ### BL-P4-02b (Kalenderplaner / AT-02)
 

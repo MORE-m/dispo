@@ -1,40 +1,41 @@
 # Fortschritt V1
 
-Stand: 22. September 2026 (Feature **DSP-DCP-001** abgeleiteter Dispo-Kampagnenzeitraum,
-Branch `feat/derived-dispo-campaign-period`, Base `4d245a6a…` = PR #68).
-**`BL-P4-02a`–`02e`** und **SPT-008 Dateiexport** auf **`main`**. Abbinder (SPT-013)
-bewusst zurückgestellt. Kundenexport aus Kalkulation bleibt Folgeauftrag.
+Stand: 22. September 2026 – Docs-Sync nach Merge **PR #68** (SPT-008) und
+**PR #69** (DSP-DCP-001) auf `main` (`7f0ea7b52ab79e990d819afd246925c57478094c`).
+**`BL-P4-02a`–`02e`** und **SPT-008 Dateiexport** auf **`main`** (SPT-008 manuell
+abgenommen). Abbinder (SPT-013) bewusst zurückgestellt. Kundenexport aus
+Kalkulation bleibt Folgeauftrag.
 
 ## Aktuelle Phase
 
-Phase 4 / Dispo-Erweiterungen: **`BL-P4-02` bleibt offen** (Abbinder/SPT-013,
-operative Blockplanung). **SPT-008** manuelle Abnahme offen.
-**DSP-DCP-001** (abgeleiteter Kampagnenzeitraum am Dispoauftrag) in Umsetzung /
-Abnahme.
+Phase 4 / Dispo-Erweiterungen: **`BL-P4-02` teilweise** – `02a`–`02e` und SPT-008
+erledigt; Rest **offen**: Abbinder/SPT-013, operative Blockplanung.
+**DSP-DCP-001** auf `main` gemergt (PR #69); manuelle Abnahme laut PR-Body und
+verfügbarer Repo-Dokumentation **noch offen** (nicht erfinden).
+**`BL-P8-02`** (operativer Status ab `at_disposition`) bleibt **offen** und ist
+in diesem Docs-Sync **nicht** begonnen.
 
 ## Aktuelle Aufgabe
 
-**DSP-DCP-001** automatisch abgeleiteter globaler Kampagnenzeitraum am Dispoauftrag:
-additiv getrennt von Calc-Origin-`campaign_period`; Freeze bei Create/Revision;
-Status `complete|partial|open|legacy`; keine Live-Neuberechnung; kein Backfill;
-Rechnungslogik nur vorbereitet (`complete`); keine Rechnungsautomatik.
-E2E Port **8034** (`test:e2e:dspdcp001`).
+Dokumentarischer Status-Sync nach PR #68/#69 (kein Fachcode). Nächster fachlicher
+Kandidat bleibt dem Backlog überlassen; **kein** Start von `BL-P8-02` hier.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**DSP-DCP-001** (Branch `feat/derived-dispo-campaign-period`): serverseitige Ableitung
+**DSP-DCP-001** (PR **#69**, Merge `7f0ea7b…` auf `main`): serverseitige Ableitung
 aus Frozen Dispo-Positionen (`planner_entries_snapshot` / `position_flight_period`),
 additive Spalten an `dispo_orders`, UI mit Konflikt-Hinweis, Unit/Feature/MySQL/Vitest/
-Playwright.
+Playwright. Manuelle Abnahme: laut PR #69-Body zum Mergezeitpunkt **offen**.
 
-Zuvor **SPT-008 Dateiexport** (PR **#68**, Merge `4d245a6a…`): interner XLSX-Export;
-manuelle Abnahme offen.
+Zuvor **SPT-008 Dateiexport** (PR **#68**, Merge `4d245a6a…`): interner XLSX-Export
+mit Blättern `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average,
+unverbindlich); **manuelle Abnahme erfolgreich** (PR-Body Testplan).
 
 ## DSP-DCP-001 – Abgeleiteter Dispo-Kampagnenzeitraum (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Calc-Origin-`campaign_period` unverändert (read-only, kopiert) | **umgesetzt** |
+| Calc-Origin-`campaign_period` unverändert (read-only, kopiert) | **umgesetzt** (`main`, PR #69) |
 | Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
 | Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
 | Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
@@ -43,7 +44,20 @@ manuelle Abnahme offen.
 | UI getrennt + Konflikt-Hinweis (nicht blockierend) | **umgesetzt** |
 | Rechnung nur bei `complete` vorbereitet, Automatik **nicht** | **dokumentiert** |
 | Abbinder / Kunden-Calc-Export | **bewusst nicht** |
-| Manuelle Abnahme | **offen** |
+| Manuelle Abnahme | **offen** (laut PR #69 / Repo-Doku; nicht als abgenommen geführt) |
+
+## SPT-008 – Dispo Spotplanungs-XLSX (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Interner XLSX aus Dispo-Snapshots (kein Live-Rebind) | **umgesetzt** (`main`, PR #68) |
+| Blatt `Spotverteilung` = Calendar aus `planner_entries_snapshot` | **umgesetzt** |
+| Blatt `Planungsvorschlag` = Average aus `time_ranges_snapshot` (unverbindlich) | **umgesetzt** |
+| Keine erfundenen Datum-/Stunden-Sendetermine; keine kaufmännischen Werte | **umgesetzt** |
+| Audit nur bei erfolgreichem Export | **umgesetzt** |
+| Automatisierte Tests (Unit/Feature/MySQL/Vitest/Playwright Port 8033) | **umgesetzt** |
+| Manuelle Abnahme | **erfolgreich** (PR #68) |
+| REP-007 PDF / Abbinder / operative Blockplanung | **bewusst nicht** |
 
 ## BL-P4-02e – Tandem / Tridem / SPT-012 (September 2026)
 
@@ -60,8 +74,8 @@ manuelle Abnahme offen.
 | Manuelle UX-Abnahme | **erfolgreich** |
 | **SPT-012** | **erledigt** |
 | **SPT-013** Abbinder | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder für Tandem/Tridem **teilweise**) |
-| SPT-008 Dateiexport, Registry `fixed_price` | **Export umgesetzt** (manuelle Abnahme offen) bzw. **`planned`** |
-| `BL-P4-02` insgesamt | **offen** |
+| SPT-008 Dateiexport, Registry `fixed_price` | **Export umgesetzt + manuell abgenommen** (PR #68) bzw. Registry **`planned`** |
+| `BL-P4-02` insgesamt | **teilweise** (Rest: SPT-013, operative Blockplanung) |
 
 ## BL-P4-02d – Preisabschluss Festpreis / N/N (September 2026)
 
@@ -77,8 +91,8 @@ manuelle Abnahme offen.
 | Budget-Übernahme setzt Abschluss zurück auf `normal` | **umgesetzt** |
 | E2E isoliert: `playwright.blp402d.config.ts` (Port **8026**) | **umgesetzt** |
 | Manuelle UX-Abnahme | **erfolgreich** |
-| SPT-008 Dateiexport, Abbinder (SPT-013) | **Export umgesetzt** (manuelle Abnahme offen); Abbinder **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
-| `BL-P4-02` insgesamt | **offen** |
+| SPT-008 Dateiexport, Abbinder (SPT-013) | **Export umgesetzt + manuell abgenommen** (PR #68); Abbinder **offen** (Tandem/Tridem siehe **BL-P4-02e**) |
+| `BL-P4-02` insgesamt | **teilweise** (Rest: SPT-013, operative Blockplanung) |
 
 **Hinweis:** Live wählbar ist **`pricing_settlement_mode=fixed_price`** zusammen mit
 Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** ist
@@ -102,8 +116,8 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Abbinder (**SPT-013**) | **offen** (bewusst zurückgestellt; Hauptspot/Allonge + Reminder teilweise) |
 | SPT-014 Hauptspot/Allonge | **umgesetzt** (PR #59) |
 | Festpreis-Abschluss (`BL-P4-02d`) | **umgesetzt** (`main`, PR #60; Registry `fixed_price` weiter planned) |
-| SPT-008 Dateiexport | **umgesetzt** (automatisiert getestet; manuelle Abnahme offen; Average-Export bewusst nicht) |
-| `BL-P4-02` insgesamt | **offen** |
+| SPT-008 Dateiexport | **umgesetzt + manuell abgenommen** (PR #68; zwei Blätter Calendar + Average-Planungsvorschlag) |
+| `BL-P4-02` insgesamt | **teilweise** (Rest: SPT-013, operative Blockplanung) |
 
 ## BL-P4-02b – Kalenderplaner / AT-02 (September 2026)
 
@@ -115,12 +129,12 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Wochen-/Monatsnavigation + „Aktuelle Woche“; Einträge außerhalb sichtbarer Woche bleiben im State | **umgesetzt** (PR #58) |
 | Persistenz `calculation_position_planner_entries` + Payload/Roundtrip | **umgesetzt** (PR #58) |
 | Dispo-Positions-Snapshot `planner_entries_snapshot` + lesbare Anzeige (`SPT-008` Anzeige) | **umgesetzt** (PR #58) |
-| Dispo-Export Spot-Verteilung (`SPT-008` Export) | **umgesetzt** (XLSX; automatisiert getestet; manuelle Abnahme offen) |
+| Dispo-Export Spot-Verteilung (`SPT-008` Export) | **umgesetzt + manuell abgenommen** (PR #68; XLSX Calendar + Average-Planungsvorschlag) |
 | Registry `spot_classic`/`calendar` | **released / v1** (PR #58) |
 | Wizard-Kalender-UI + Validierung (keine Average-Zeiträume parallel) | **umgesetzt** (PR #58) |
 | E2E isoliert: `playwright.blp402b.config.ts` (Port 8022) | **umgesetzt** (PR #58) |
 | Komponenten / AT-04 | **umgesetzt** (PR #59); Festpreis-Abschluss siehe **BL-P4-02d** |
-| `BL-P4-02` insgesamt | **offen** |
+| `BL-P4-02` insgesamt | **teilweise** (Rest: SPT-013, operative Blockplanung) |
 
 ## BL-P4-02a – Average-Abnahme + Preislisten-Pin (September 2026)
 
@@ -130,7 +144,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Kein stilles Live-Rebind über `resolveActivePosition` bei reinem Methodenwechsel | **umgesetzt** (`main`, PR #56) |
 | Neubindung nur neu / Inventarwechsel / expliziter Jahrwechsel (01c unverändert) | **unverändert gültig** |
 | AT-01/03/23/24 gezielte Härtung (ohne Kalender-/Komponenten-Scope von 02b) | **gehärtet** (`main`, PR #56) |
-| `BL-P4-02` insgesamt | **offen** (02a–02e auf `main`; SPT-008 Export umgesetzt/Abnahme offen; Abbinder offen) |
+| `BL-P4-02` insgesamt | **teilweise** (02a–02e + SPT-008 auf `main`/abgenommen; Rest: Abbinder SPT-013, operative Blockplanung) |
 
 ## BL-P4-01c – Wizard-Preisjahrwahl (September 2026)
 

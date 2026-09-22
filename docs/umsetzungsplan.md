@@ -21,22 +21,25 @@ Smoke-Test ausführen. Technisch endgültig abgenommen, sobald GitHub Actions
 
 Visuelles Designsystem, App-Shell und UI-Muster liegen in den gestuften
 UX/UI-Gates ([`ux-ui-gate.md`](ux-ui-gate.md)). `UX-GATE-A` und `UX-GATE-B`
-sind freigegeben. `UX-GATE-C` und `UX-GATE-D` bleiben blockiert.
+sind freigegeben. `UX-GATE-C` bleibt blockiert. `UX-GATE-D` ist **teilweise
+freigegeben** (Details und Restblocker nur in `ux-ui-gate.md` / `backlog-v1.md`;
+dieser Plan führt **keinen** konkurrierenden Gate-Status).
 
 ## UX/UI-Gates
 
-Vier Teil-Gates ersetzen das frühere `BL-GATE-UXUI`. Details:
-[`ux-ui-gate.md`](ux-ui-gate.md).
+Vier Teil-Gates ersetzen das frühere `BL-GATE-UXUI`. Verbindlicher Status:
+[`ux-ui-gate.md`](ux-ui-gate.md). Paketstatus: [`backlog-v1.md`](backlog-v1.md).
 
-| Gate | Inhalt | Status |
+| Gate | Inhalt | Status (Kurz, kanonisch in ux-ui-gate.md) |
 |---|---|---|
 | UX-GATE-A | Designsystem, App-Shell, Navigation, gemeinsame Komponenten | freigegeben |
 | UX-GATE-B | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic | freigegeben |
 | UX-GATE-C | Trailer/SWF, Influencer, Social, weitere Werbeelemente | blockiert |
-| UX-GATE-D | Dispo, Freigaben, Standardangebote, Administration, Abschluss-UI | blockiert |
+| UX-GATE-D | Dispo, Freigaben, Standardangebote, Administration, Abschluss-UI | teilweise freigegeben · Rest blockiert |
 
-Freigegebene Gates werden als vertikale Pakete umgesetzt, nicht als komplette
-Phasen 1–11 auf einmal. Blockierte Gates erzeugen nur Sperrzustände.
+Freigegebene Gates bzw. Teilfreigaben werden als vertikale Pakete umgesetzt, nicht
+als komplette Phasen 1–11 auf einmal. Nicht freigegebene Teilbereiche erzeugen nur
+Sperrzustände.
 
 ## Phase 1 – Anmeldung, Benutzer und Auditfundament
 
@@ -86,21 +89,13 @@ Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
 abgeschlossen**. Preislisten-Admin-Lifecycle: **BL-P4-01a** (gemergt).
 Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswahl:
 **BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. Offen außerhalb:
-ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02** offen; **02a** auf
-`main`; **02b umgesetzt (PR #58)** – Kalenderplaner/AT-02, **`calendar` released/v1**,
-echte Wochenmatrix Mo–So × Preisstunden, Spotanzahl direkt je Zelle,
-Wochen-/Monatsnavigation, Jahresvertrag je Position; `SPT-008` Snapshot/Anzeige
-umgesetzt; Spotverteilungs-Export siehe SPT-008 unten. **02c umgesetzt (PR #59)** – AT-04
-Hauptspot+Allonge manuell abgenommen. **02d auf `main` (PR #60), manuell
-abgenommen:** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf
-Basis `average`|`calendar`; AE rückwärts; N/N unverändert; Registry-Methode
-**`fixed_price`** weiter **`planned`**. **02e auf `main` (PR #61), manuell
-abgenommen:** Tandem/Tridem (`component_profile`), **SPT-012** über
-`shared_total_length` ohne ×2/×3; Reminder-Rollen; **`individual`** für Profile
-fail-closed. `BL-P4-02` insgesamt offen (Abbinder/SPT-013, operative
-Blockplanung, …). **SPT-008 Dateiexport** vertikal umgesetzt (XLSX aus Snapshots,
-nur Calendar; Average-Export bewusst nicht); automatisiert getestet, manuelle
-Abnahme offen. REP-007 Dispo-PDF bleibt Phase 10.
+ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02 teilweise**
+(`02a`–`02e` auf `main`; Rest: Abbinder/SPT-013, operative Blockplanung):
+**02a–02e** und **SPT-008** siehe [`backlog-v1.md`](backlog-v1.md) /
+[`fortschritt.md`](fortschritt.md). **SPT-008 Dateiexport** (PR **#68**): XLSX mit
+zwei Blättern `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average,
+unverbindlich); manuell abgenommen. **DSP-DCP-001** (PR **#69**) auf `main`
+gemergt. REP-007 Dispo-PDF bleibt Phase 10.
 
 Diese Phase muss vor der produktiven Kalkulation abgeschlossen sein; Snapshots
 dürfen nicht nachträglich „angeflanscht“ werden.

@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle ohne Excel-Import); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -265,7 +265,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** offen (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt/Abnahme offen; Abbinder offen)
+- **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; Rest offen: Abbinder/SPT-013, operative Blockplanung)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
@@ -273,16 +273,16 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 02c (PR #59, manuell abgenommen):** Hauptspot+Allonge; Strategien `shared_total_length`/`individual` für Average+Calendar; Admin-Freeze; Dispo-Snapshot/Anzeige; Calendar-Einträge bleiben beim kompatiblen Inventar-/Strategiewechsel erhalten; SPT-014 Hauptspot/Allonge umgesetzt
 - **Ergebnis 02d (`main`, PR #60, manuell abgenommen):** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis `average`|`calendar`; N/N-Festpreis (N/N unverändert); AE rückwärts; Payfaktor/Abschlag; Pin 02a; Dispo-Snapshot; Budget-Apply → `normal`. Registry-Methode **`fixed_price`** weiter **`planned`** (nicht der Live-Weg)
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
-- **Ergebnis SPT-008 Export:** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar, `Planungsvorschlag` = unverbindliche Average-Vorgaben); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**. Status: **umgesetzt / automatisiert getestet**, manuelle Abnahme offen.
-- **Offen:** manuelle Abnahme SPT-008; Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10
-- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic)
+- **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
+- **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10
+- **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
 - **Tests 02c:** `SpotComponentCalculationTest`, `SpotClassicComponentsTest` (+ MySQL); Playwright `playwright.blp402c.config.ts` (Port 8025)
 - **Tests 02d:** `SpotClassicFixedPriceSettlementTest` (+ MySQL); Vitest `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`; Playwright `playwright.blp402d.config.ts` (Port 8026)
 - **Tests 02e:** `TandemTridemCalculationTest`, `ComponentProfileValidatorTest`, `SpotClassicTandemTridemTest` (+ MySQL); Vitest `spot-components.test.ts`; Playwright `playwright.blp402e.config.ts` (Port 8028)
 - **Tests SPT-008:** `SpotDistributionExportBuilderTest`, `SpotDistributionExportFeatureTest` (+ MySQL), Vitest `dispo-order-spot-distribution-export.test.tsx`, Playwright `playwright.spt008.config.ts` / `test:e2e:spt008` (Port **8033**)
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und operative Blockplanung offen.
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und operative Blockplanung teilweise offen.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
@@ -396,8 +396,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-01c / DSP-DCP-001 – Abgeleiteter Kampagnenzeitraum (Dispo)
 
 - **Phase:** 8
-- **Status:** **umgesetzt / Abnahme offen** (September 2026, Branch `feat/derived-dispo-campaign-period`)
-- **Kennung:** neu eingeführt **`DSP-DCP-001`** (kein Ersatz für `campaign_period`)
+- **Status:** **umgesetzt / gemergt** (September 2026, PR **#69**, Merge `7f0ea7b…` auf `main`); **manuelle Abnahme laut PR-Body und verfügbarer Repo-Dokumentation noch offen**
+- **Kennung:** **`DSP-DCP-001`** (kein Ersatz für `campaign_period`)
 - **Anforderungen:** ergänzt `DSP-002`/`DSP-003` (Freeze aus gewählten Positionen); Calc-Origin `campaign_period` unverändert
 - **Abhängigkeiten:** BL-P8-01, DF-1/DF-2 Periodenfelder, BL-P4-02b Planner-Snapshot
 - **Ergebnis:** additiver Frozen Zeitraum am Dispoauftrag aus Calendar-Planner bzw. geschlossenem Flight-Period; Status `complete|partial|open|legacy`; Provenienz-JSON; UI getrennt inkl. Konflikt-Hinweis; Draft-Sync ändert Derived nicht; kein Backfill
@@ -407,12 +407,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** offen (Freigabe-Kanten teilweise über BL-P8-01b erledigt)
+- **Status:** offen (Freigabe-Kanten Entwurf → Vertriebsfreigabe → Disposition/Ablehnung über BL-P8-01b erledigt; **operative Transitionen ab `at_disposition` fehlen** – Enum-Labels allein zählen nicht als Umsetzung)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
 - **Akzeptanz:** `AT-12` bis `AT-19`
 - **Tests:** Pest erlaubte/verbotene Kanten, Pflichtbegründungen
+- **Hinweis:** In diesem Docs-Sync **nicht** implementiert.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen
 

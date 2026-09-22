@@ -1,6 +1,6 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 14. September 2026
+- **Stand:** 22. September 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
@@ -8,6 +8,10 @@
   + Wizard-Jahreswahl BL-P4-01c / PO-PRI-YEAR-1)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
+- **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
+  DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
+  bereits freigegebenen Dispoentwurf-/Show-Fläche; sie erweitern **nicht** die
+  Freigabe für operative Disposition (`BL-P8-02`).
 
 Das frühere Einzelgate `BL-GATE-UXUI` ist durch vier Teil-Gates ersetzt.
 [`ui-ux-konzept.md`](ui-ux-konzept.md) bleibt die fachliche Navigations- und

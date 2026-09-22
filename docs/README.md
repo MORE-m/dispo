@@ -25,12 +25,12 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`dynamisches-feldsystem.md`](dynamisches-feldsystem.md) | Felddefinitionen, Regeln, Versionen und Snapshots |
 | [`datenmodell.md`](datenmodell.md) | Konzeptuelles Datenmodell und technische Leitplanken |
 | [`ui-ux-konzept.md`](ui-ux-konzept.md) | Navigation, zentrale Ansichten und Interaktionsprinzipien |
-| [`ux-ui-gate.md`](ux-ui-gate.md) | Gestufte UX/UI-Gates A–D; A/B freigegeben, C/D blockiert |
+| [`ux-ui-gate.md`](ux-ui-gate.md) | Gate-/PO-Freigaben (A/B freigegeben; C blockiert; D teilweise freigegeben) |
 | [`test-und-abnahmekatalog.md`](test-und-abnahmekatalog.md) | Fachliche Mindestabnahme und Teststrategie |
 | [`initialdaten.md`](initialdaten.md) | Startkataloge und noch bereitzustellende Daten |
-| [`umsetzungsplan.md`](umsetzungsplan.md) | Empfohlene vertikale Umsetzungsschritte |
-| [`backlog-v1.md`](backlog-v1.md) | Ausführbare Arbeitspakete mit Status (`BL-P4-03` Standardangebote, `BL-P7-03` Budget-Assistent) |
-| [`fortschritt.md`](fortschritt.md) | Aktueller Umsetzungsstand |
+| [`umsetzungsplan.md`](umsetzungsplan.md) | Phasen-/Reihenfolgeübersicht (kein konkurrierender Paketstatus) |
+| [`backlog-v1.md`](backlog-v1.md) | Paket-/Slice-Status (`offen` / `erledigt` / `teilweise` / `blockiert`) |
+| [`fortschritt.md`](fortschritt.md) | Aktueller Arbeits-/Umsetzungsstand |
 | [`entwicklung-lokal.md`](entwicklung-lokal.md) | Lokales Setup, Prüfungen, Produktionshinweise |
 | [`blocker-und-entscheidungslog.md`](blocker-und-entscheidungslog.md) | Blocker und technische Detailentscheidungen |
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |

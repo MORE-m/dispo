@@ -26,7 +26,8 @@ Die Arbeitsfläche nutzt die verfügbare Breite (`UX-GATE-A`).
 7. **Administration** – nur berechtigte Rollen
 
 Menüpunkte sind rollenabhängig sichtbar (`AUTH-001`, `STD-003`, `AUTH-006`,
-`AUTH-007`). Solange `UX-GATE-C` oder `UX-GATE-D` blockiert sind, führen die
+`AUTH-007`). Solange betroffene Teilbereiche von `UX-GATE-C` oder `UX-GATE-D`
+nicht freigegeben sind (Details: [`ux-ui-gate.md`](ux-ui-gate.md)), führen die
 betroffenen Punkte auf einen Sperr-/Leerzustand, nicht auf eine Schein-Fachseite.
 
 **Standardangebote** bleibt ein eigener linker Navigationspunkt (`STD-003`). Die
