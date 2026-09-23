@@ -36,6 +36,10 @@ export async function setCustomerConfirmationException(
     await expect(reasonField).toBeVisible();
     const current = await reasonField.inputValue();
     if (current.trim() === reason.trim()) {
+        // Bereits gesetzt und UI stabil (kein offenes Speichern nötig).
+        await expect(
+            page.locator('[data-test="customer-confirmation-save"]'),
+        ).toBeDisabled({ timeout: 15_000 });
         return;
     }
 
@@ -46,16 +50,25 @@ export async function setCustomerConfirmationException(
         page.waitForResponse(
             (response) =>
                 response.url().includes('/kundenbestaetigung') &&
+                response.request().method() === 'PUT' &&
                 response.ok(),
+            { timeout: 15_000 },
         ),
         save.click(),
     ]);
+
+    // Speichern löst router.visit aus — erst nach stabilem Reload fortfahren,
+    // sonst remountet Inertia den Submit-Dialog (unstable/detached).
+    await page.reload();
     await expect(
         page.locator('[data-test="dispo-order-customer-confirmation"]'),
     ).toBeVisible({ timeout: 15_000 });
     await expect(
         page.locator('[data-test="customer-confirmation-exception-reason"]'),
     ).toHaveValue(reason, { timeout: 15_000 });
+    await expect(
+        page.locator('[data-test="customer-confirmation-save"]'),
+    ).toBeDisabled({ timeout: 15_000 });
 }
 
 export async function approveWithExceptionAcknowledgement(page: Page) {
