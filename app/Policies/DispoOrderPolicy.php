@@ -113,6 +113,15 @@ class DispoOrderPolicy
             : $this->rejectRegular($user, $dispoOrder);
     }
 
+    /**
+     * Operative Statusübergänge (BL-P8-02a / PO-BLP802A-1).
+     * Unabhängig vom Draft-Update-Vertrag {@see update()}.
+     */
+    public function transitionOperationalStatus(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
     private function isNotCreator(User $user, DispoOrder $dispoOrder): bool
     {
         return (int) $user->id !== (int) $dispoOrder->created_by_id;

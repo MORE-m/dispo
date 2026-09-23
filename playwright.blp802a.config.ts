@@ -3,15 +3,15 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * SPT-008 isolierte E2E-Suite: Spotverteilungs-XLSX-Export.
- * Eigene SQLite-DB, Port 8033.
+ * BL-P8-02a isolierte E2E-Suite: Operativer Statuskern.
+ * Eigene SQLite-DB, Port 8035.
  */
 const e2eDb = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
-    'database/e2e-spt-008.sqlite',
+    'database/e2e-bl-p8-02a.sqlite',
 );
 
-const e2ePort = process.env.E2E_SPT008_PORT ?? '8033';
+const e2ePort = process.env.E2E_BLP802A_PORT ?? '8035';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
 const e2eEnv = {
@@ -31,30 +31,24 @@ const prepareAssets = process.env.CI
 
 export default defineConfig({
     testDir: 'tests/e2e',
-    testMatch: '**/spt-008-*.spec.ts',
+    testMatch: '**/bl-p8-02a-*.spec.ts',
     fullyParallel: false,
     workers: 1,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
-    timeout: 120_000,
-    expect: {
-        timeout: 30_000,
-    },
+    timeout: 90_000,
     use: {
         baseURL: e2eBaseUrl,
         trace: 'on-first-retry',
-        actionTimeout: 60_000,
-        navigationTimeout: 60_000,
-        acceptDownloads: true,
     },
     projects: [
         {
-            name: 'chromium-spt-008',
+            name: 'chromium-blp802a',
             use: { ...devices['Desktop Chrome'] },
         },
     ],
     webServer: {
-        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php -d memory_limit=512M artisan migrate --force && php -d memory_limit=512M artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php -d memory_limit=512M artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2EOperationalStatusSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
         url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 300_000,

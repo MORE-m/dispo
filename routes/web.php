@@ -56,6 +56,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.approve');
     Route::post('dispoauftraege/{dispoOrder}/ablehnen', [DispoOrderController::class, 'reject'])
         ->name('dispo-orders.reject');
+    Route::post('dispoauftraege/{dispoOrder}/status', [DispoOrderController::class, 'transitionOperationalStatus'])
+        ->name('dispo-orders.transition-status');
     Route::post('dispoauftraege/{dispoOrder}/nachbessern', [DispoOrderController::class, 'startRevision'])
         ->name('dispo-orders.revise');
     Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])

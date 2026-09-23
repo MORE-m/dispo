@@ -109,6 +109,19 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Abbinder / Kundenexport aus Kalkulation: **bewusst nicht**
 - Manuelle Abnahme: laut PR #69-Body und verfügbarer Repo-Dokumentation **noch offen**
 
+### BL-P8-02a (Operativer Statuskern / PO-BLP802A-1)
+
+- Erlaubte Kanten: `at_disposition`→`in_progress`; `in_progress`↔Material fehlt/erhalten;
+  `in_progress`/`material_received`→`disposed`; Wiederöffnung `disposed`→`in_progress`
+  mit Pflichtbegründung
+- Rollen: Disposition/Admin/Management JA; Vertrieb/Produktmanagement NEIN
+- `lock_version` + 409; append-only `dispo_order_status_events` + Audit
+- Vier-Augen / Draft-Edit / SPT-008 / DSP-DCP unverändert
+- **Nicht** enthalten: sales_inquiry, Uploads, Completed, Cancelled, Notifications
+- Unit: Transition-Matrix; Feature: Rechte/Lock/Reopen; MySQL-Concurrency;
+  Vitest Actions; E2E `npm run test:e2e:blp802a` (Port **8035**)
+- `BL-P8-02` insgesamt **teilweise**
+
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
 - **Auf `main` (PR #60), getestet und manuell abgenommen**

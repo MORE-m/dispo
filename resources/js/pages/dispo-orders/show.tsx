@@ -4,6 +4,14 @@ import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
+import {
+    DispoOrderOperationalStatusActions,
+    type OperationalStatusTarget,
+} from '@/components/dispo-order-operational-status-actions';
+import {
+    DispoOrderStatusHistory,
+    type StatusHistoryEntry,
+} from '@/components/dispo-order-status-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import {
     DispoOrderSpotDistributionExport,
@@ -242,6 +250,7 @@ type OrderDetail = {
     revises: DispoOrderRevisionLink | null;
     revision: DispoOrderRevisionLink | null;
     approval_history: ApprovalHistoryEntry[];
+    status_history?: StatusHistoryEntry[];
     current_approval: ApprovalHistoryEntry | null;
     dynamic_field_values?: Record<string, unknown> & {
         billing_special_features?: string | null;
@@ -281,6 +290,8 @@ export default function DispoOrderShow({
     canApprove = false,
     canReject = false,
     canRevise = false,
+    canTransitionOperationalStatus = false,
+    operationalStatusTargets = [],
     isCreator = false,
     spotDistributionExport = null,
 }: {
@@ -293,6 +304,8 @@ export default function DispoOrderShow({
     canApprove?: boolean;
     canReject?: boolean;
     canRevise?: boolean;
+    canTransitionOperationalStatus?: boolean;
+    operationalStatusTargets?: OperationalStatusTarget[];
     isCreator?: boolean;
     spotDistributionExport?: SpotDistributionExportProps | null;
 }) {
@@ -1043,6 +1056,14 @@ export default function DispoOrderShow({
                     status={order.status}
                 />
 
+                <DispoOrderOperationalStatusActions
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    status={order.status}
+                    canTransition={canTransitionOperationalStatus}
+                    targets={operationalStatusTargets}
+                />
+
                 <DispoOrderSpotDistributionExport
                     exportConfig={spotDistributionExport}
                 />
@@ -1744,6 +1765,8 @@ export default function DispoOrderShow({
                 </Card>
 
                 <DispoOrderApprovalHistory entries={order.approval_history} />
+
+                <DispoOrderStatusHistory entries={order.status_history ?? []} />
 
                 <Card className="border-border/70 rounded-xl shadow-xs">
                     <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">

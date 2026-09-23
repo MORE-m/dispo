@@ -8,14 +8,17 @@ use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
 use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
+use App\Http\Requests\DispoOrder\TransitionOperationalStatusRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
 use App\Models\DispoOrderPosition;
+use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderWriter;
@@ -36,6 +39,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderWriter $writer,
         private readonly DispoOrderPositionAdoptionService $adoptions,
         private readonly DispoOrderApprovalService $approvals,
+        private readonly DispoOrderOperationalStatusService $operationalStatus,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
         private readonly SpotDistributionExportService $spotDistributionExport,
@@ -91,6 +95,7 @@ class DispoOrderController extends Controller
             'approvalRequests',
             'pendingApprovalRequest',
             'latestApprovalRequest',
+            'statusEvents',
             'revises',
             'revision',
         ]);
@@ -111,6 +116,10 @@ class DispoOrderController extends Controller
         $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
         $canReject = ($user?->can('reject', $dispoOrder) ?? false) && $awaiting;
         $canRevise = $user?->can('revise', $dispoOrder) ?? false;
+        $canTransitionOperationalStatus = $user?->can('transitionOperationalStatus', $dispoOrder) ?? false;
+        $operationalTargets = $canTransitionOperationalStatus
+            ? $this->operationalStatus->allowedTargetsProp($dispoOrder)
+            : [];
         $dynamicValues = $this->dynamicFields->valuesProp($dispoOrder);
         $canSyncCalculationDynamicFields = $canUpdate
             && $dynamicValues['missing_calc_origin_keys'] !== [];
@@ -128,6 +137,8 @@ class DispoOrderController extends Controller
             'canApprove' => $canApprove,
             'canReject' => $canReject,
             'canRevise' => $canRevise,
+            'canTransitionOperationalStatus' => $canTransitionOperationalStatus,
+            'operationalStatusTargets' => $operationalTargets,
             'isCreator' => $isCreator,
             'spotDistributionExport' => [
                 'can_export' => true,
@@ -264,6 +275,28 @@ class DispoOrderController extends Controller
         );
 
         return $this->respondSuccess($request, $order, 'Dispoauftrag abgelehnt.');
+    }
+
+    public function transitionOperationalStatus(
+        TransitionOperationalStatusRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->operationalStatus->transition(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->targetStatus(),
+            $request->reason(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            sprintf('Status aktualisiert: %s.', $order->status->label()),
+        );
     }
 
     public function positions(Request $request, Calculation $calculation): JsonResponse
@@ -415,6 +448,12 @@ class DispoOrderController extends Controller
             'approval_history' => $order->approvalRequests->map(
                 fn (DispoOrderApprovalRequest $request): array => $this->serializeApprovalRequest($request),
             )->all(),
+            'status_history' => ($order->relationLoaded('statusEvents')
+                ? $order->statusEvents
+                : $order->statusEvents()->get()
+            )->map(
+                fn (DispoOrderStatusEvent $event): array => $this->serializeStatusEvent($event),
+            )->all(),
             'current_approval' => $order->pendingApprovalRequest instanceof DispoOrderApprovalRequest
                 ? $this->serializeApprovalRequest($order->pendingApprovalRequest)
                 : ($order->approvalRequests->last() instanceof DispoOrderApprovalRequest
@@ -498,6 +537,25 @@ class DispoOrderController extends Controller
             'decided_at' => $request->decided_at?->toIso8601String(),
             'rejection_reason' => $request->rejection_reason,
             'decision_note' => $request->decision_note,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeStatusEvent(DispoOrderStatusEvent $event): array
+    {
+        return [
+            'id' => $event->id,
+            'from_status' => $event->from_status->value,
+            'from_status_label' => $event->from_status->label(),
+            'to_status' => $event->to_status->value,
+            'to_status_label' => $event->to_status->label(),
+            'changed_by_name' => $event->changed_by_name,
+            'changed_at' => $event->changed_at->toIso8601String(),
+            'reason' => $event->reason,
+            'is_reopen' => $event->is_reopen,
+            'lock_version_after' => $event->lock_version_after,
         ];
     }
 }

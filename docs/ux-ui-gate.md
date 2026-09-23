@@ -1,17 +1,19 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 22. September 2026
+- **Stand:** 23. September 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
   + Preislisten-Admin-Lifecycle BL-P4-01a + Excel-Import BL-P4-01b ohne Auto-Aktivierung
-  + Wizard-Jahreswahl BL-P4-01c / PO-PRI-YEAR-1)
+  + Wizard-Jahreswahl BL-P4-01c / PO-PRI-YEAR-1
+  + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
-  bereits freigegebenen Dispoentwurf-/Show-Fläche; sie erweitern **nicht** die
-  Freigabe für operative Disposition (`BL-P8-02`).
+  bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 23.09.2026:** PO-BLP802A-1 gibt **nur** den operativen Statuskern
+  bis Disponiert inkl. Wiederöffnung frei – **nicht** die gesamte operative Disposition.
 
 Das frühere Einzelgate `BL-GATE-UXUI` ist durch vier Teil-Gates ersetzt.
 [`ui-ux-konzept.md`](ui-ux-konzept.md) bleibt die fachliche Navigations- und
@@ -25,7 +27,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -273,11 +275,35 @@ und bewusstem Speichern; historische Pins stabil; Budget denselben Jahresvertrag
 `expected_price_list_id` mit HTTP 409 bei Active-Drift. `BL-P4-01` ist damit
 abgeschlossen. MORE-Produktiv-Workbook-Mapping bleibt Lieferdaten-/Adapterpunkt.
 
+**Product-Owner-Teilfreigabe (23. September 2026, UX-GATE-D / BL-P8-02a / PO-BLP802A-1):**
+Ausschließlich der **operative Statuskern** freigegeben:
+
+- bewusste Statusübergänge Disposition/Admin/Geschäftsführung:
+  `at_disposition` → `in_progress`;
+  `in_progress` ↔ `material_missing` / `material_received`;
+  `in_progress` / `material_received` → `disposed`;
+  Wiederöffnung `disposed` → `in_progress` mit Pflichtbegründung
+- Statushistorie (append-only) und Anzeige auf der Dispo-Detailseite
+- bestehende Vier-Augen-Freigabe unverändert
+
+Diese Entscheidung gibt **nicht** die gesamte operative Disposition frei.
+
+Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
+
+- Rückfrage Vertrieb (`sales_inquiry`) / Antwortprozess
+- Kommentare, Benachrichtigungen, Mail
+- Material-Uploads / Audio
+- Kundenbestätigung / Ausnahme
+- Status `completed` / `cancelled`
+- Rechnung-per-Ende / Abschlussprüfungen
+- neue operative Fach-/Textfelder, Priorität, Bearbeitungsdatum
+- Kombinationstabelle, Standardangebote, Reporting, SWF/OA/Social
+
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
-- operative Bearbeitung durch die Disposition
+- operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a
 - Material, Uploads, Kommentare, Rückfragen
-- vollständiger Statusworkflow ab `In Bearbeitung`
+- vollständiger Statusworkflow inkl. Completed/Cancelled
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
 - Administration der übrigen Initialkataloge (Kombinationstabelle) –
@@ -291,8 +317,9 @@ abgeschlossen. MORE-Produktiv-Workbook-Mapping bleibt Lieferdaten-/Adapterpunkt.
 Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
 technisch und fachlich umgesetzt. Der abgelehnte Dispoauftrag bleibt als
 unveränderbarer, terminaler Snapshot erhalten; der Ersteller kann die Kalkulation
-nachbessern und einen neuen verknüpften Entwurf erzeugen. Weitere Statuswerte
-bleiben definiert, aber noch nicht erreichbar.
+nachbessern und einen neuen verknüpften Entwurf erzeugen. Operative Statuswerte
+bis Disponiert sind über BL-P8-02a erreichbar; Completed/Cancelled/Rückfrage bleiben
+definiert, aber unerreichbar.
 
 ## Erlaubt / nicht erlaubt
 
@@ -300,7 +327,7 @@ bleiben definiert, aber noch nicht erreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1); operative Disposition und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1); Uploads/Kommentare/Rückfrage/Completed/Cancelled und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

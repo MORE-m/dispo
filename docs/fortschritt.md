@@ -1,35 +1,39 @@
 # Fortschritt V1
 
-Stand: 22. September 2026 – Docs-Sync nach Merge **PR #68** (SPT-008) und
-**PR #69** (DSP-DCP-001) auf `main` (`7f0ea7b52ab79e990d819afd246925c57478094c`).
-**`BL-P4-02a`–`02e`** und **SPT-008 Dateiexport** auf **`main`** (SPT-008 manuell
-abgenommen). Abbinder (SPT-013) bewusst zurückgestellt. Kundenexport aus
-Kalkulation bleibt Folgeauftrag.
+Stand: 23. September 2026 – Feature **BL-P8-02a** operativer Statuskern
+(PO-BLP802A-1) auf Branch `feat/bl-p8-02a-operational-status-core`, Base
+`10f43a531ccf2c8d237564a43461be99d41f0c36` (Merge PR #70).
 
 ## Aktuelle Phase
 
-Phase 4 / Dispo-Erweiterungen: **`BL-P4-02` teilweise** – `02a`–`02e` und SPT-008
-erledigt; Rest **offen**: Abbinder/SPT-013, operative Blockplanung.
-**DSP-DCP-001** auf `main` gemergt (PR #69); manuelle Abnahme laut PR-Body und
-verfügbarer Repo-Dokumentation **noch offen** (nicht erfinden).
-**`BL-P8-02`** (operativer Status ab `at_disposition`) bleibt **offen** und ist
-in diesem Docs-Sync **nicht** begonnen.
+Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a` (operativer Statuskern bis
+Disponiert inkl. Wiederöffnung) in Umsetzung/Abnahme. Rest von BL-P8-02
+(Rückfrage, Uploads, Completed/Cancelled, …) **offen**.
 
 ## Aktuelle Aufgabe
 
-Dokumentarischer Status-Sync nach PR #68/#69 (kein Fachcode). Nächster fachlicher
-Kandidat bleibt dem Backlog überlassen; **kein** Start von `BL-P8-02` hier.
+**BL-P8-02a:** serverseitige Transition-Matrix, OperationalStatusService,
+append-only Statushistorie, Policy Disposition/Admin/GF, Detail-UI mit
+Capabilities, Unit/Feature/MySQL/Vitest/Playwright Port **8035**.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**DSP-DCP-001** (PR **#69**, Merge `7f0ea7b…` auf `main`): serverseitige Ableitung
-aus Frozen Dispo-Positionen (`planner_entries_snapshot` / `position_flight_period`),
-additive Spalten an `dispo_orders`, UI mit Konflikt-Hinweis, Unit/Feature/MySQL/Vitest/
-Playwright. Manuelle Abnahme: laut PR #69-Body zum Mergezeitpunkt **offen**.
+Docs-Sync PR **#70** (Merge `10f43a5…`): SPT-008 Abnahme, DSP-DCP Merge-Stand,
+UX-GATE-D Teilfreigabe konsistent.
 
-Zuvor **SPT-008 Dateiexport** (PR **#68**, Merge `4d245a6a…`): interner XLSX-Export
-mit Blättern `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average,
-unverbindlich); **manuelle Abnahme erfolgreich** (PR-Body Testplan).
+## BL-P8-02a – Operativer Statuskern / PO-BLP802A-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP802A-1 (nur Statuskern) | **freigegeben** |
+| Transition-Matrix operative Kanten in `DispoOrderStatusTransition` | **umgesetzt** |
+| `DispoOrderOperationalStatusService` + Locking/`lock_version` | **umgesetzt** |
+| Append-only `dispo_order_status_events` + Audit | **umgesetzt** |
+| Policy Disposition/Admin/Management; Sales/PM verboten | **umgesetzt** |
+| Detail-UI Capabilities + Reopen-Dialog + Statushistorie | **umgesetzt** |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8035** | **umgesetzt** |
+| SalesInquiry / Uploads / Completed / Cancelled / Notifications | **bewusst nicht** |
+| `BL-P8-02` insgesamt | **teilweise** |
 
 ## DSP-DCP-001 – Abgeleiteter Dispo-Kampagnenzeitraum (September 2026)
 

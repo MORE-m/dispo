@@ -122,11 +122,11 @@ Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 | Wartet auf Vertriebsfreigabe | Vertrieb | Pflichtfelder und Kundenbestätigung/Ausnahme vorhanden |
 | Freigabe abgelehnt | Freigeber | Begründung Pflicht; Ersteller darf überarbeiten |
 | Liegt bei Disposition | System nach Freigabe | vollständige erforderliche Freigaben |
-| In Bearbeitung | Disposition | aktive operative Bearbeitung |
-| Rückfrage Vertrieb | Disposition | Pflichtnotiz; adressiert relevante Vertriebsnutzer |
-| Material fehlt | Disposition | aktiv gesetzt, nicht automatisch |
-| Material erhalten | Disposition | aktiv gesetzt, nicht automatisch |
-| Disponiert | Disposition | fachliche/kaufmännische Daten gesperrt |
+| In Bearbeitung | Disposition / Admin / GF (BL-P8-02a) | bewusste Aktion; keine Automatik |
+| Rückfrage Vertrieb | Disposition | Pflichtnotiz; adressiert relevante Vertriebsnutzer (**noch nicht in BL-P8-02a**) |
+| Material fehlt | Disposition / Admin / GF (BL-P8-02a) | aktiv gesetzt, nicht automatisch |
+| Material erhalten | Disposition / Admin / GF (BL-P8-02a) | aktiv gesetzt, nicht automatisch |
+| Disponiert | Disposition / Admin / GF (BL-P8-02a) | fachliche/kaufmännische Daten gesperrt; Wiederöffnung mit Pflichtbegründung |
 | Abgeschlossen | Disposition/Admin/GF | Abschlussprüfungen erfolgreich oder begründeter Admin-Override |
 | Storniert | berechtigte Rolle | Begründung Pflicht; auch nach Abschluss möglich |
 
@@ -143,10 +143,21 @@ V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 ## Sperren und Wiederöffnen
 
 - Ab `Disponiert` sind fachliche und kaufmännische Daten gesperrt.
-- Disposition, Admin oder Geschäftsführung dürfen mit Pflichtbegründung wieder öffnen.
-- Kaufmännische Änderungen lösen die erforderlichen Freigaben erneut aus.
-- Nach `Abgeschlossen` dürfen nur Admin oder Geschäftsführung wieder öffnen.
-- Storno ist auch nach `Abgeschlossen` möglich und benötigt immer eine Begründung.
+- Disposition, Admin oder Geschäftsführung dürfen mit Pflichtbegründung wieder öffnen
+  (`disposed` → `in_progress`, BL-P8-02a).
+- Kaufmännische Änderungen lösen die erforderlichen Freigaben erneut aus
+  (**Freigabeinvalidierung noch nicht umgesetzt**).
+- Nach `Abgeschlossen` dürfen nur Admin oder Geschäftsführung wieder öffnen
+  (**Completed nicht Teil von BL-P8-02a**).
+- Storno ist auch nach `Abgeschlossen` möglich und benötigt immer eine Begründung
+  (**Cancelled nicht Teil von BL-P8-02a**).
+
+## Ist-Stand BL-P8-02a (PO-BLP802A-1)
+
+Umgesetzt: bewusste operative Statusübergänge bis Disponiert inkl. Wiederöffnung,
+Statushistorie, Rollen Disposition/Admin/GF. Nicht umgesetzt in diesem Slice:
+Rückfrageprozess, Kommentare, Uploads, Completed/Cancelled, Notifications,
+Rechnung-per-Ende.
 
 ## Abschlussbedingungen
 
