@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $derived_campaign_period_snapshot
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
+ * @property-read Collection<int, DispoOrderStatusEvent> $statusEvents
  * @property-read Collection<int, DispoOrderFieldValue> $fieldValues
  * @property-read ConfigurationSnapshot $configurationSnapshot
  * @property-read DispoOrder|null $revises
@@ -159,6 +160,14 @@ class DispoOrder extends Model
     public function approvalRequests(): HasMany
     {
         return $this->hasMany(DispoOrderApprovalRequest::class)->orderBy('cycle_number')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<DispoOrderStatusEvent, $this>
+     */
+    public function statusEvents(): HasMany
+    {
+        return $this->hasMany(DispoOrderStatusEvent::class)->orderBy('id');
     }
 
     /**

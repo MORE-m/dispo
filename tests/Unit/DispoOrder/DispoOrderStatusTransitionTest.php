@@ -5,6 +5,7 @@ namespace Tests\Unit\DispoOrder;
 use App\Enums\DispoOrderStatus;
 use App\Exceptions\DispoOrderConflictException;
 use App\Services\DispoOrder\DispoOrderStatusTransition;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DispoOrderStatusTransitionTest extends TestCase
@@ -25,29 +26,99 @@ class DispoOrderStatusTransitionTest extends TestCase
         ));
     }
 
-    public function test_forbidden_transitions_are_rejected(): void
+    /**
+     * @return list<array{0: DispoOrderStatus, 1: DispoOrderStatus}>
+     */
+    public static function allowedOperationalProvider(): array
+    {
+        return [
+            [DispoOrderStatus::AtDisposition, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::MaterialMissing],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::MaterialReceived],
+            [DispoOrderStatus::MaterialMissing, DispoOrderStatus::MaterialReceived],
+            [DispoOrderStatus::MaterialMissing, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::MaterialReceived, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::MaterialReceived, DispoOrderStatus::MaterialMissing],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::Disposed],
+            [DispoOrderStatus::MaterialReceived, DispoOrderStatus::Disposed],
+            [DispoOrderStatus::Disposed, DispoOrderStatus::InProgress],
+        ];
+    }
+
+    #[DataProvider('allowedOperationalProvider')]
+    public function test_allowed_operational_transitions(
+        DispoOrderStatus $from,
+        DispoOrderStatus $to,
+    ): void {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition($from, $to));
+        $this->assertTrue(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    /**
+     * @return list<array{0: DispoOrderStatus, 1: DispoOrderStatus}>
+     */
+    public static function forbiddenOperationalProvider(): array
+    {
+        return [
+            [DispoOrderStatus::AtDisposition, DispoOrderStatus::Disposed],
+            [DispoOrderStatus::AtDisposition, DispoOrderStatus::Completed],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::Completed],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::Cancelled],
+            [DispoOrderStatus::MaterialMissing, DispoOrderStatus::Disposed],
+            [DispoOrderStatus::Disposed, DispoOrderStatus::Completed],
+            [DispoOrderStatus::Disposed, DispoOrderStatus::Cancelled],
+            [DispoOrderStatus::Completed, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::ApprovalRejected, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::Draft, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::AwaitingSalesApproval, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::InProgress],
+        ];
+    }
+
+    #[DataProvider('forbiddenOperationalProvider')]
+    public function test_forbidden_operational_transitions(
+        DispoOrderStatus $from,
+        DispoOrderStatus $to,
+    ): void {
+        $this->assertFalse(DispoOrderStatusTransition::canTransition($from, $to));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    public function test_reopen_requires_reason_flag(): void
+    {
+        $this->assertTrue(DispoOrderStatusTransition::requiresReason(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isReopen(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::requiresReason(
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::InProgress,
+        ));
+    }
+
+    public function test_assert_throws_on_forbidden(): void
+    {
+        $this->expectException(DispoOrderConflictException::class);
+        DispoOrderStatusTransition::assertCanTransition(
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::Disposed,
+        );
+    }
+
+    public function test_approval_slice_forbidden_still_hold(): void
     {
         $this->assertFalse(DispoOrderStatusTransition::canTransition(
             DispoOrderStatus::Draft,
             DispoOrderStatus::AtDisposition,
         ));
         $this->assertFalse(DispoOrderStatusTransition::canTransition(
-            DispoOrderStatus::Draft,
-            DispoOrderStatus::ApprovalRejected,
-        ));
-        $this->assertFalse(DispoOrderStatusTransition::canTransition(
             DispoOrderStatus::ApprovalRejected,
             DispoOrderStatus::Draft,
         ));
-        $this->assertFalse(DispoOrderStatusTransition::canTransition(
-            DispoOrderStatus::AtDisposition,
-            DispoOrderStatus::Draft,
-        ));
-
-        $this->expectException(DispoOrderConflictException::class);
-        DispoOrderStatusTransition::assertCanTransition(
-            DispoOrderStatus::Draft,
-            DispoOrderStatus::AtDisposition,
-        );
     }
 }
