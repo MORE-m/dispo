@@ -122,6 +122,22 @@ class DispoOrderPolicy
         return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
     }
 
+    /**
+     * Rückfrage an Vertrieb stellen (BL-P8-02b / PO-BLP802B-1).
+     */
+    public function askSalesInquiry(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
+    /**
+     * Rückfrage beantworten (BL-P8-02b / PO-BLP802B-1).
+     */
+    public function answerSalesInquiry(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Sales, Role::Admin, Role::Management);
+    }
+
     private function isNotCreator(User $user, DispoOrder $dispoOrder): bool
     {
         return (int) $user->id !== (int) $dispoOrder->created_by_id;

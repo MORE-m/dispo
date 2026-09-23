@@ -6,7 +6,7 @@ use App\Enums\DispoOrderStatus;
 use App\Exceptions\DispoOrderConflictException;
 
 /**
- * Erlaubte Statusübergänge: Freigabe-Slice + operativer Kern (BL-P8-02a).
+ * Erlaubte Statusübergänge: Freigabe + operativer Kern (BL-P8-02a) + Rückfrage (BL-P8-02b).
  */
 final class DispoOrderStatusTransition
 {
@@ -23,30 +23,37 @@ final class DispoOrderStatusTransition
             ],
             DispoOrderStatus::AtDisposition => [
                 DispoOrderStatus::InProgress,
+                DispoOrderStatus::SalesInquiry,
             ],
             DispoOrderStatus::InProgress => [
                 DispoOrderStatus::MaterialMissing,
                 DispoOrderStatus::MaterialReceived,
                 DispoOrderStatus::Disposed,
+                DispoOrderStatus::SalesInquiry,
             ],
             DispoOrderStatus::MaterialMissing => [
                 DispoOrderStatus::MaterialReceived,
                 DispoOrderStatus::InProgress,
+                DispoOrderStatus::SalesInquiry,
             ],
             DispoOrderStatus::MaterialReceived => [
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::MaterialMissing,
                 DispoOrderStatus::Disposed,
+                DispoOrderStatus::SalesInquiry,
             ],
             DispoOrderStatus::Disposed => [
                 DispoOrderStatus::InProgress,
+            ],
+            DispoOrderStatus::SalesInquiry => [
+                DispoOrderStatus::AtDisposition,
             ],
             default => [],
         };
     }
 
     /**
-     * Operative Ziele (ohne Freigabe-Kanten) für den aktuellen Status.
+     * Operative Ziele (ohne Freigabe- und ohne Rückfrage-Kanten) für UI-Buttons.
      *
      * @return list<DispoOrderStatus>
      */
@@ -77,9 +84,42 @@ final class DispoOrderStatusTransition
         };
     }
 
+    /**
+     * Ausgangsstatus, aus denen eine Rückfrage an den Vertrieb gestellt werden darf.
+     *
+     * @return list<DispoOrderStatus>
+     */
+    public static function salesInquiryAskSources(): array
+    {
+        return [
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::MaterialMissing,
+            DispoOrderStatus::MaterialReceived,
+        ];
+    }
+
     public static function isOperationalTransition(DispoOrderStatus $from, DispoOrderStatus $to): bool
     {
         return in_array($to, self::allowedOperationalTargets($from), true);
+    }
+
+    public static function isSalesInquiryAsk(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return $to === DispoOrderStatus::SalesInquiry
+            && in_array($from, self::salesInquiryAskSources(), true);
+    }
+
+    public static function isSalesInquiryAnswer(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return $from === DispoOrderStatus::SalesInquiry
+            && $to === DispoOrderStatus::AtDisposition;
+    }
+
+    public static function isSalesInquiryTransition(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return self::isSalesInquiryAsk($from, $to)
+            || self::isSalesInquiryAnswer($from, $to);
     }
 
     public static function requiresReason(DispoOrderStatus $from, DispoOrderStatus $to): bool

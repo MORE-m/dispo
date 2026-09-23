@@ -117,9 +117,24 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Rollen: Disposition/Admin/Management JA; Vertrieb/Produktmanagement NEIN
 - `lock_version` + 409; append-only `dispo_order_status_events` + Audit
 - Vier-Augen / Draft-Edit / SPT-008 / DSP-DCP unverändert
-- **Nicht** enthalten: sales_inquiry, Uploads, Completed, Cancelled, Notifications
 - Unit: Transition-Matrix; Feature: Rechte/Lock/Reopen; MySQL-Concurrency;
   Vitest Actions; E2E `npm run test:e2e:blp802a` (Port **8035**)
+- Manuelle Abnahme: **erfolgreich** (PR #71)
+- `BL-P8-02` insgesamt **teilweise**
+
+### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
+
+- Ask-Kanten: `at_disposition|in_progress|material_missing|material_received` → `sales_inquiry`
+- Answer-Kante: `sales_inquiry` → `at_disposition` (aktiv; kein Auto-Restore)
+- Rollen Ask: Disposition/Admin/Management; Answer: Sales/Admin/Management;
+  PM weder Ask noch Answer; Disposition nicht Answer; Sales nicht Ask
+- Pflichtnotiz `question`/`answer` (trim, max 2000); stale lock 409
+- Append-only `dispo_order_comments` (CMT-003; CMT-002 für diese Typen);
+  StatusEvents + Audit atomar; ein offener Zyklus
+- UI: Ask/Answer-Dialoge + Kommunikationshistorie; keine allgemeine Comment-UI
+- **Nicht** enthalten: CMT-001, NOT-001/NOT-002, Uploads, Completed/Cancelled
+- Unit/Feature/MySQL/Vitest; E2E `npm run test:e2e:blp802b` (Port **8036**)
+- Manuelle Abnahme: **noch offen** (separater Browsertest)
 - `BL-P8-02` insgesamt **teilweise**
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)

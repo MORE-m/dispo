@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  * @property-read Collection<int, DispoOrderStatusEvent> $statusEvents
+ * @property-read Collection<int, DispoOrderComment> $comments
  * @property-read Collection<int, DispoOrderFieldValue> $fieldValues
  * @property-read ConfigurationSnapshot $configurationSnapshot
  * @property-read DispoOrder|null $revises
@@ -168,6 +169,16 @@ class DispoOrder extends Model
     public function statusEvents(): HasMany
     {
         return $this->hasMany(DispoOrderStatusEvent::class)->orderBy('id');
+    }
+
+    /**
+     * Append-only Kommunikationshistorie (Rückfragen/Antworten; CMT-001 später).
+     *
+     * @return HasMany<DispoOrderComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(DispoOrderComment::class)->orderBy('id');
     }
 
     /**

@@ -1,25 +1,40 @@
 # Fortschritt V1
 
-Stand: 23. September 2026 – Feature **BL-P8-02a** operativer Statuskern
-(PO-BLP802A-1) auf Branch `feat/bl-p8-02a-operational-status-core`, Base
-`10f43a531ccf2c8d237564a43461be99d41f0c36` (Merge PR #70).
+Stand: 23. September 2026 – Feature **BL-P8-02b** Rückfrage Vertrieb
+(PO-BLP802B-1) auf Branch `feat/bl-p8-02b-sales-inquiry`, Base
+`d2e8c8b0987a3a1a1807b5b790c402f34a68c8c7` (Merge PR #71 / BL-P8-02a).
 
 ## Aktuelle Phase
 
-Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a` (operativer Statuskern bis
-Disponiert inkl. Wiederöffnung) in Umsetzung/Abnahme. Rest von BL-P8-02
-(Rückfrage, Uploads, Completed/Cancelled, …) **offen**.
+Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a` umgesetzt + manuell abgenommen;
+`BL-P8-02b` (Rückfrage Vertrieb / STA-002 / CMT-003) in diesem PR umgesetzt.
+Rest von BL-P8-02 (Uploads, Completed/Cancelled, …) **offen**.
 
 ## Aktuelle Aufgabe
 
-**BL-P8-02a:** serverseitige Transition-Matrix, OperationalStatusService,
-append-only Statushistorie, Policy Disposition/Admin/GF, Detail-UI mit
-Capabilities, Unit/Feature/MySQL/Vitest/Playwright Port **8035**.
+**BL-P8-02b:** SalesInquiryService Ask/Answer, append-only `dispo_order_comments`,
+eigene Endpunkte, Policy Ask/Answer, Kommunikationshistorie-UI, Unit/Feature/
+MySQL/Vitest/Playwright Port **8036**.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-Docs-Sync PR **#70** (Merge `10f43a5…`): SPT-008 Abnahme, DSP-DCP Merge-Stand,
-UX-GATE-D Teilfreigabe konsistent.
+PR **#71** BL-P8-02a (Merge `d2e8c8b…`): operativer Statuskern bis Disponiert
+inkl. Wiederöffnung, manuell abgenommen.
+
+## BL-P8-02b – Rückfrage Vertrieb / PO-BLP802B-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP802B-1 (nur Rückfrage/Antwort) | **freigegeben** |
+| Kanten Ask → `sales_inquiry`, Answer → `at_disposition` | **umgesetzt** |
+| `DispoOrderSalesInquiryService` + Locking/`lock_version` | **umgesetzt** |
+| Append-only `dispo_order_comments` (CMT-003; CMT-002 für diese Typen) | **umgesetzt** |
+| Policy Ask: Disposition/Admin/GF; Answer: Sales/Admin/GF | **umgesetzt** |
+| Detail-UI Ask/Answer-Dialoge + Kommunikation | **umgesetzt** |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8036** | **umgesetzt** |
+| Allgemeine Kommentare CMT-001 / BL-P9-02 UI | **bewusst nicht** |
+| Notifications NOT-001/NOT-002 | **bewusst nicht** |
+| `BL-P8-02` insgesamt | **teilweise** |
 
 ## BL-P8-02a – Operativer Statuskern / PO-BLP802A-1 (September 2026)
 
@@ -32,7 +47,8 @@ UX-GATE-D Teilfreigabe konsistent.
 | Policy Disposition/Admin/Management; Sales/PM verboten | **umgesetzt** |
 | Detail-UI Capabilities + Reopen-Dialog + Statushistorie | **umgesetzt** |
 | Unit/Feature/MySQL/Vitest/Playwright Port **8035** | **umgesetzt** |
-| SalesInquiry / Uploads / Completed / Cancelled / Notifications | **bewusst nicht** |
+| Manuelle UI-Abnahme | **erfolgreich** (PR #71) |
+| Uploads / Completed / Cancelled | **bewusst nicht** |
 | `BL-P8-02` insgesamt | **teilweise** |
 
 ## DSP-DCP-001 – Abgeleiteter Dispo-Kampagnenzeitraum (September 2026)

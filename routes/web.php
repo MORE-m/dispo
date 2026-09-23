@@ -58,6 +58,11 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.reject');
     Route::post('dispoauftraege/{dispoOrder}/status', [DispoOrderController::class, 'transitionOperationalStatus'])
         ->name('dispo-orders.transition-status');
+    Route::post('dispoauftraege/{dispoOrder}/rueckfragen', [DispoOrderController::class, 'askSalesInquiry'])
+        ->name('dispo-orders.sales-inquiry.ask');
+    Route::post('dispoauftraege/{dispoOrder}/rueckfragen/{comment}/antwort', [DispoOrderController::class, 'answerSalesInquiry'])
+        ->scopeBindings()
+        ->name('dispo-orders.sales-inquiry.answer');
     Route::post('dispoauftraege/{dispoOrder}/nachbessern', [DispoOrderController::class, 'startRevision'])
         ->name('dispo-orders.revise');
     Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])

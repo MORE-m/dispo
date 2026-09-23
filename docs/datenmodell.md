@@ -362,11 +362,22 @@ Append-only Historie: `dispo_order_status_events` (`from_status`, `to_status`,
 `changed_by_*`, `changed_at`, optionale `reason`, `is_reopen`,
 `lock_version_after`). Parallel AuditEvent ohne zweite Wahrheit.
 
+**BL-P8-02b / PO-BLP802B-1 (September 2026):** Zusätzlich erreichbar:
+
+- `Rückfrage Vertrieb` (`sales_inquiry`) über Ask-Endpunkt
+- Rückkehr ausschließlich → `Liegt bei Disposition` über Answer-Endpunkt
+
+Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
+`created_by_*`, optional `parent_id` Antwort→Frage). Typen jetzt:
+`sales_inquiry`, `sales_inquiry_response`. Allgemeine freie Kommentare
+(`CMT-001`) sind modellseitig vorbereitet, aber **nicht** freigeschaltet
+(keine allgemeine Comment-UI/API).
+
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- Ausnahmebestätigungen, zentrale Dateien, Kommentare und weitere Status
-  (`sales_inquiry`, `completed`, `cancelled`).
+- Ausnahmebestätigungen, zentrale Dateien, allgemeine Kommentare und weitere Status
+  (`completed`, `cancelled`).
 
 ## Dynamische Daten
 

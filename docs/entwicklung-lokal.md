@@ -282,6 +282,21 @@ E2E: `npm run test:e2e:blp802a` bzw.
 `database/e2e-bl-p8-02a.sqlite`, Seeder `E2EOperationalStatusSeeder` – niemals
 Dev-DB `dispo`).
 
+## BL-P8-02b – Rückfrage Vertrieb
+
+Migration `dispo_order_comments` (append-only). Service
+`DispoOrderSalesInquiryService` (Ask/Answer). Endpunkte
+`POST …/rueckfragen` und `POST …/rueckfragen/{comment}/antwort`.
+
+Tests: `DispoOrderStatusTransitionTest` (SalesInquiry-Kanten),
+`DispoOrderSalesInquiryTest`, `DispoOrderSalesInquiryConcurrencyTest` (MySQL);
+Vitest `dispo-order-sales-inquiry-actions.test.tsx`.
+
+E2E: `npm run test:e2e:blp802b` bzw.
+`npx playwright test -c playwright.blp802b.config.ts` (Port **8036**, DB
+`database/e2e-bl-p8-02b.sqlite`, Seeder `E2ESalesInquirySeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`

@@ -154,10 +154,23 @@ V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
-Umgesetzt: bewusste operative Statusübergänge bis Disponiert inkl. Wiederöffnung,
-Statushistorie, Rollen Disposition/Admin/GF. Nicht umgesetzt in diesem Slice:
-Rückfrageprozess, Kommentare, Uploads, Completed/Cancelled, Notifications,
-Rechnung-per-Ende.
+Umgesetzt + manuell abgenommen: bewusste operative Statusübergänge bis Disponiert
+inkl. Wiederöffnung, Statushistorie, Rollen Disposition/Admin/GF.
+
+## Ist-Stand BL-P8-02b (PO-BLP802B-1)
+
+Umgesetzt: strukturierter Rückfrage-/Antwortprozess.
+
+- Ask: Disposition/Admin/GF aus erlaubten operativen Status → `sales_inquiry`
+  mit Pflichtnotiz `question`
+- Answer: Sales/Admin/GF → aktiv `at_disposition` mit Pflichtnotiz `answer`
+- Append-only `dispo_order_comments` (Typen `sales_inquiry` /
+  `sales_inquiry_response`); Statuswechsel weiter über `dispo_order_status_events`
+- Keine automatische Wiederherstellung des vorherigen Status
+- Kein Empfänger-Picker
+
+Bewusst **nicht** in 02b: allgemeine Kommentare (`CMT-001`), Notifications
+(`NOT-001`/`NOT-002`), Uploads, Completed/Cancelled, Rechnung-per-Ende.
 
 ## Abschlussbedingungen
 
