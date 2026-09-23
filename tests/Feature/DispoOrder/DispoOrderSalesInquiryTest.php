@@ -221,6 +221,7 @@ class DispoOrderSalesInquiryTest extends TestCase
         );
         $inquiry2 = DispoOrderComment::query()
             ->where('dispo_order_id', $askedAgain->id)
+            ->where('type', DispoOrderCommentType::SalesInquiry)
             ->whereDoesntHave('response')
             ->firstOrFail();
 
@@ -241,6 +242,7 @@ class DispoOrderSalesInquiryTest extends TestCase
         );
         $inquiry3 = DispoOrderComment::query()
             ->where('dispo_order_id', $asked3->id)
+            ->where('type', DispoOrderCommentType::SalesInquiry)
             ->whereDoesntHave('response')
             ->firstOrFail();
 
@@ -261,6 +263,7 @@ class DispoOrderSalesInquiryTest extends TestCase
         );
         $inquiry4 = DispoOrderComment::query()
             ->where('dispo_order_id', $asked4->id)
+            ->where('type', DispoOrderCommentType::SalesInquiry)
             ->whereDoesntHave('response')
             ->firstOrFail();
 
