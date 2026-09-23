@@ -37,7 +37,10 @@ const ACTION_LABELS: Record<string, string> = {
     disposed: 'Disponiert',
 };
 
-function actionLabel(target: OperationalStatusTarget, currentStatus: string): string {
+function actionLabel(
+    target: OperationalStatusTarget,
+    currentStatus: string,
+): string {
     if (target.value === 'in_progress') {
         if (currentStatus === 'at_disposition') {
             return 'Bearbeitung starten';
@@ -64,9 +67,8 @@ export function DispoOrderOperationalStatusActions({
     canTransition: boolean;
     targets: OperationalStatusTarget[];
 }) {
-    const [reopenTarget, setReopenTarget] = useState<OperationalStatusTarget | null>(
-        null,
-    );
+    const [reopenTarget, setReopenTarget] =
+        useState<OperationalStatusTarget | null>(null);
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);

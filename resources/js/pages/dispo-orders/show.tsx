@@ -8,7 +8,10 @@ import {
     DispoOrderOperationalStatusActions,
     type OperationalStatusTarget,
 } from '@/components/dispo-order-operational-status-actions';
-import { DispoOrderStatusHistory, type StatusHistoryEntry } from '@/components/dispo-order-status-history';
+import {
+    DispoOrderStatusHistory,
+    type StatusHistoryEntry,
+} from '@/components/dispo-order-status-history';
 import { DispoOrderReviseAction } from '@/components/dispo-order-revise-action';
 import {
     DispoOrderSpotDistributionExport,
@@ -1763,9 +1766,7 @@ export default function DispoOrderShow({
 
                 <DispoOrderApprovalHistory entries={order.approval_history} />
 
-                <DispoOrderStatusHistory
-                    entries={order.status_history ?? []}
-                />
+                <DispoOrderStatusHistory entries={order.status_history ?? []} />
 
                 <Card className="border-border/70 rounded-xl shadow-xs">
                     <CardHeader className="border-border/60 bg-muted/20 border-b px-5 py-4">
