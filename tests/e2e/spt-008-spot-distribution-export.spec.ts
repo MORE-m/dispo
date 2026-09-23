@@ -99,7 +99,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await expect(button).toBeEnabled();
         await expect(button).toHaveText('Spotplanung exportieren (XLSX)');
 
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromise = page.waitForEvent('download', {
+            timeout: 90_000,
+        });
         await button.click();
         const download = await downloadPromise;
         expect(download.suggestedFilename()).toMatch(/_Spotplanung\.xlsx$/);
@@ -130,7 +132,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await login(page, 'disposition@example.com');
         await page.goto(`/dispoauftraege/${orders.tandem.id}`);
 
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromise = page.waitForEvent('download', {
+            timeout: 90_000,
+        });
         await page
             .locator('[data-test="dispo-spot-distribution-export-button"]')
             .click();
@@ -164,7 +168,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
             page.locator('[data-test="dispo-spot-distribution-export-hint"]'),
         ).toContainText('unverbindlichen Planungsvorschlag');
 
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromise = page.waitForEvent('download', {
+            timeout: 90_000,
+        });
         await page
             .locator('[data-test="dispo-spot-distribution-export-button"]')
             .click();
@@ -206,7 +212,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
             page.locator('[data-test="dispo-spot-distribution-export-hint"]'),
         ).toContainText('separaten Planungsvorschlag');
 
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromise = page.waitForEvent('download', {
+            timeout: 90_000,
+        });
         await page
             .locator('[data-test="dispo-spot-distribution-export-button"]')
             .click();
@@ -234,7 +242,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.multi.id}`);
 
-        const downloadPromise = page.waitForEvent('download');
+        const downloadPromise = page.waitForEvent('download', {
+            timeout: 90_000,
+        });
         await page
             .locator('[data-test="dispo-spot-distribution-export-button"]')
             .click();

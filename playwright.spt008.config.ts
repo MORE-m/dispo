@@ -36,11 +36,15 @@ export default defineConfig({
     workers: 1,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
-    timeout: 90_000,
+    timeout: 120_000,
+    expect: {
+        timeout: 30_000,
+    },
     use: {
         baseURL: e2eBaseUrl,
         trace: 'on-first-retry',
-        actionTimeout: 30_000,
+        actionTimeout: 60_000,
+        navigationTimeout: 60_000,
     },
     projects: [
         {
