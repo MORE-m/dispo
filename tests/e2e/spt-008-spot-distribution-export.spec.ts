@@ -74,8 +74,8 @@ async function login(page: Page, email: string) {
 }
 
 /**
- * UI-Export auslösen und XLSX anschließend mit Session-Cookies laden.
- * Vermeidet flaky Chromium-Download-Events bei fetch+Blob.
+ * UI-Export auslösen und XLSX dabei per Route-Intercept speichern.
+ * Vermeidet flaky Download-Events und doppelte Export-Requests.
  */
 async function exportViaUi(
     page: Page,
@@ -89,35 +89,34 @@ async function exportViaUi(
     );
     await expect(button).toBeEnabled();
 
-    const orderId = page.url().match(/dispoauftraege\/(\d+)/)?.[1];
-    expect(orderId).toBeTruthy();
-
-    await button.click();
-    await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
-        timeout: 90_000,
-    });
-    await expect(
-        page.locator('[data-test="dispo-spot-distribution-export-error"]'),
-    ).toHaveCount(0);
-
-    const response = await page.request.get(
-        `/dispoauftraege/${orderId}/spotverteilung.xlsx`,
-        {
-            headers: {
-                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            },
-            timeout: 90_000,
-        },
-    );
-    expect(response.ok(), `Export HTTP ${response.status()}`).toBeTruthy();
-
     const target = path.join(root, 'database', targetName);
-    writeFileSync(target, await response.body());
+    let contentDisposition: string | null = null;
+    let sawExport = false;
 
-    return {
-        target,
-        contentDisposition: response.headers()['content-disposition'] ?? null,
-    };
+    await page.route('**/spotverteilung.xlsx', async (route) => {
+        const response = await route.fetch();
+        contentDisposition =
+            response.headers()['content-disposition'] ?? null;
+        const body = await response.body();
+        writeFileSync(target, body);
+        sawExport = true;
+        await route.fulfill({ response });
+    });
+
+    try {
+        await button.click();
+        await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
+            timeout: 90_000,
+        });
+        await expect(
+            page.locator('[data-test="dispo-spot-distribution-export-error"]'),
+        ).toHaveCount(0);
+        expect(sawExport).toBe(true);
+    } finally {
+        await page.unroute('**/spotverteilung.xlsx');
+    }
+
+    return { target, contentDisposition };
 }
 
 function assertNoCommercial(headers: string[]) {

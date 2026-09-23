@@ -45,6 +45,7 @@ export default defineConfig({
         trace: 'on-first-retry',
         actionTimeout: 60_000,
         navigationTimeout: 60_000,
+        acceptDownloads: true,
     },
     projects: [
         {
@@ -53,7 +54,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php -d memory_limit=512M artisan migrate --force && php -d memory_limit=512M artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php -d memory_limit=512M artisan serve --host=127.0.0.1 --port=${e2ePort}`,
         url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 300_000,
