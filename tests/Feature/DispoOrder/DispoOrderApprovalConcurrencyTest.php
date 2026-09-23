@@ -150,6 +150,7 @@ class DispoOrderApprovalConcurrencyTest extends TestCase
         ])->assertRedirect();
 
         $order = DispoOrder::query()->firstOrFail();
+        $order = $this->seedCustomerConfirmationException($order, $creator);
 
         $results = $this->runParallelWorkers(
             (string) $order->id,
