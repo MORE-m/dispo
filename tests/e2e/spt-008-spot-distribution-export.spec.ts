@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -73,6 +73,53 @@ async function login(page: Page, email: string) {
     );
 }
 
+/**
+ * UI-Export auslösen und XLSX anschließend mit Session-Cookies laden.
+ * Vermeidet flaky Chromium-Download-Events bei fetch+Blob.
+ */
+async function exportViaUi(
+    page: Page,
+    targetName: string,
+): Promise<{
+    target: string;
+    contentDisposition: string | null;
+}> {
+    const button = page.locator(
+        '[data-test="dispo-spot-distribution-export-button"]',
+    );
+    await expect(button).toBeEnabled();
+
+    const orderId = page.url().match(/dispoauftraege\/(\d+)/)?.[1];
+    expect(orderId).toBeTruthy();
+
+    await button.click();
+    await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
+        timeout: 90_000,
+    });
+    await expect(
+        page.locator('[data-test="dispo-spot-distribution-export-error"]'),
+    ).toHaveCount(0);
+
+    const response = await page.request.get(
+        `/dispoauftraege/${orderId}/spotverteilung.xlsx`,
+        {
+            headers: {
+                Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            },
+            timeout: 90_000,
+        },
+    );
+    expect(response.ok(), `Export HTTP ${response.status()}`).toBeTruthy();
+
+    const target = path.join(root, 'database', targetName);
+    writeFileSync(target, await response.body());
+
+    return {
+        target,
+        contentDisposition: response.headers()['content-disposition'] ?? null,
+    };
+}
+
 function assertNoCommercial(headers: string[]) {
     const joined = headers.join('|').toLowerCase();
     expect(joined).not.toContain('preis');
@@ -99,19 +146,11 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await expect(button).toBeEnabled();
         await expect(button).toHaveText('Spotplanung exportieren (XLSX)');
 
-        const downloadPromise = page.waitForEvent('download', {
-            timeout: 90_000,
-        });
-        await button.click();
-        const download = await downloadPromise;
-        expect(download.suggestedFilename()).toMatch(/_Spotplanung\.xlsx$/);
-
-        const target = path.join(
-            root,
-            'database',
+        const { target, contentDisposition } = await exportViaUi(
+            page,
             `e2e-spt008-download-${Date.now()}.xlsx`,
         );
-        await download.saveAs(target);
+        expect(contentDisposition ?? '').toMatch(/_Spotplanung\.xlsx/);
         const workbook = readXlsx(target);
 
         expect(workbook.sheet_names).toEqual([
@@ -132,19 +171,10 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await login(page, 'disposition@example.com');
         await page.goto(`/dispoauftraege/${orders.tandem.id}`);
 
-        const downloadPromise = page.waitForEvent('download', {
-            timeout: 90_000,
-        });
-        await page
-            .locator('[data-test="dispo-spot-distribution-export-button"]')
-            .click();
-        const download = await downloadPromise;
-        const target = path.join(
-            root,
-            'database',
+        const { target } = await exportViaUi(
+            page,
             `e2e-spt008-tandem-${Date.now()}.xlsx`,
         );
-        await download.saveAs(target);
         const workbook = readXlsx(target);
         const calendar = workbook.sheets[0];
 
@@ -168,19 +198,10 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
             page.locator('[data-test="dispo-spot-distribution-export-hint"]'),
         ).toContainText('unverbindlichen Planungsvorschlag');
 
-        const downloadPromise = page.waitForEvent('download', {
-            timeout: 90_000,
-        });
-        await page
-            .locator('[data-test="dispo-spot-distribution-export-button"]')
-            .click();
-        const download = await downloadPromise;
-        const target = path.join(
-            root,
-            'database',
+        const { target } = await exportViaUi(
+            page,
             `e2e-spt008-average-${Date.now()}.xlsx`,
         );
-        await download.saveAs(target);
         const workbook = readXlsx(target);
 
         expect(workbook.sheet_names).toEqual([
@@ -212,19 +233,10 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
             page.locator('[data-test="dispo-spot-distribution-export-hint"]'),
         ).toContainText('separaten Planungsvorschlag');
 
-        const downloadPromise = page.waitForEvent('download', {
-            timeout: 90_000,
-        });
-        await page
-            .locator('[data-test="dispo-spot-distribution-export-button"]')
-            .click();
-        const download = await downloadPromise;
-        const target = path.join(
-            root,
-            'database',
+        const { target } = await exportViaUi(
+            page,
             `e2e-spt008-mixed-${Date.now()}.xlsx`,
         );
-        await download.saveAs(target);
         const workbook = readXlsx(target);
 
         expect(workbook.sheets[0].row_count).toBe(1);
@@ -242,19 +254,10 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.multi.id}`);
 
-        const downloadPromise = page.waitForEvent('download', {
-            timeout: 90_000,
-        });
-        await page
-            .locator('[data-test="dispo-spot-distribution-export-button"]')
-            .click();
-        const download = await downloadPromise;
-        const target = path.join(
-            root,
-            'database',
+        const { target } = await exportViaUi(
+            page,
             `e2e-spt008-multi-${Date.now()}.xlsx`,
         );
-        await download.saveAs(target);
         const workbook = readXlsx(target);
         const calendar = workbook.sheets[0];
         const proposal = workbook.sheets[1];
@@ -275,7 +278,9 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         for (const row of calendar.rows) {
             qtyByLabel[row[2]] = (qtyByLabel[row[2]] ?? 0) + Number(row[9]);
         }
-        expect(qtyByLabel).toEqual(orders.multi.expected.qty_by_position_label);
+        expect(qtyByLabel).toEqual(
+            orders.multi.expected.qty_by_position_label,
+        );
 
         const overlap = calendar.rows.filter((row) => row[7] === '08:00');
         expect(overlap.length).toBe(3);
