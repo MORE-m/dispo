@@ -34,11 +34,12 @@ Werbeelement-Fachoberflächen außerhalb Spot Classic.
 UX-GATE-D ist **teilweise freigegeben** laut [`docs/ux-ui-gate.md`](docs/ux-ui-gate.md):
 bereits freigegebene Slices (u. a. Dispoentwurf, Vier-Augen-Freigabe, Dyn-Feld-Admin,
 Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl,
-**operativer Statuskern BL-P8-02a / PO-BLP802A-1**) dürfen weiterentwickelt und
+**operativer Statuskern BL-P8-02a / PO-BLP802A-1** und
+**Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1**) dürfen weiterentwickelt und
 gehärtet werden. Fail-closed nur für **nicht** freigegebene Teilbereiche
-(u. a. Rückfrage/Kommentare, Uploads, Completed/Cancelled, Kombinationstabelle,
-Standardangebote, Auswertungen, allgemeine operative Disposition außerhalb
-BL-P8-02a): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
+(u. a. allgemeine Kommentare, Uploads, Completed/Cancelled, Kombinationstabelle,
+Standardangebote, Auswertungen, Notifications, allgemeine operative Disposition
+außerhalb BL-P8-02a/02b): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
 
 ## Blocker
 

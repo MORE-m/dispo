@@ -6,7 +6,8 @@
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
   + Preislisten-Admin-Lifecycle BL-P4-01a + Excel-Import BL-P4-01b ohne Auto-Aktivierung
   + Wizard-Jahreswahl BL-P4-01c / PO-PRI-YEAR-1
-  + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**)
+  + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**
+  + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
@@ -14,6 +15,9 @@
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
 - **Hinweis Stand 23.09.2026:** PO-BLP802A-1 gibt **nur** den operativen Statuskern
   bis Disponiert inkl. Wiederöffnung frei – **nicht** die gesamte operative Disposition.
+- **Hinweis Stand 23.09.2026 (PO-BLP802B-1):** zusätzlich freigegeben ist ausschließlich
+  der strukturierte Rückfrage-/Antwortprozess (`STA-002` / `CMT-003` / `AT-17`) –
+  **nicht** allgemeine Kommentare, Notifications oder weitere operative Module.
 
 Das frühere Einzelgate `BL-GATE-UXUI` ist durch vier Teil-Gates ersetzt.
 [`ui-ux-konzept.md`](ui-ux-konzept.md) bleibt die fachliche Navigations- und
@@ -27,7 +31,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -288,10 +292,22 @@ Ausschließlich der **operative Statuskern** freigegeben:
 
 Diese Entscheidung gibt **nicht** die gesamte operative Disposition frei.
 
+**Product-Owner-Teilfreigabe (23. September 2026, UX-GATE-D / BL-P8-02b / PO-BLP802B-1):**
+Ausschließlich der **strukturierte Rückfrage-/Antwortprozess** freigegeben
+(`STA-002`, `CMT-003`, `AT-17`):
+
+- Ask: Disposition/Admin/GF aus `at_disposition` / `in_progress` /
+  `material_missing` / `material_received` → `sales_inquiry` mit Pflichtnotiz
+- Answer: Vertrieb/Admin/GF → aktiv zurück `at_disposition` mit Pflichtnotiz
+- append-only Kommunikationsfundament (`dispo_order_comments`, Typen
+  `sales_inquiry` / `sales_inquiry_response`); CMT-002 für diese Einträge
+- keine automatische Wiederherstellung des vorherigen Status
+- kein Empfänger-Picker; keine Notifications in diesem Slice
+
 Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
 
-- Rückfrage Vertrieb (`sales_inquiry`) / Antwortprozess
-- Kommentare, Benachrichtigungen, Mail
+- allgemeine freie Kommentare (`CMT-001`) / vollständiges Kommentar-Modul BL-P9-02
+- Benachrichtigungen / Mail (`NOT-001` / `NOT-002`)
 - Material-Uploads / Audio
 - Kundenbestätigung / Ausnahme
 - Status `completed` / `cancelled`
@@ -301,8 +317,8 @@ Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
-- operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a
-- Material, Uploads, Kommentare, Rückfragen
+- operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a/02b
+- Material, Uploads, allgemeine Kommentare
 - vollständiger Statusworkflow inkl. Completed/Cancelled
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
@@ -318,8 +334,8 @@ Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
 technisch und fachlich umgesetzt. Der abgelehnte Dispoauftrag bleibt als
 unveränderbarer, terminaler Snapshot erhalten; der Ersteller kann die Kalkulation
 nachbessern und einen neuen verknüpften Entwurf erzeugen. Operative Statuswerte
-bis Disponiert sind über BL-P8-02a erreichbar; Completed/Cancelled/Rückfrage bleiben
-definiert, aber unerreichbar.
+bis Disponiert sind über BL-P8-02a erreichbar; Rückfrage Vertrieb über BL-P8-02b.
+Completed/Cancelled bleiben definiert, aber unerreichbar.
 
 ## Erlaubt / nicht erlaubt
 
@@ -327,7 +343,7 @@ definiert, aber unerreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1); Uploads/Kommentare/Rückfrage/Completed/Cancelled und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1); Uploads/allgemeine Kommentare/Completed/Cancelled/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

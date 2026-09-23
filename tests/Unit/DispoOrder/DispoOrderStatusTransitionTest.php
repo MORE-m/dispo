@@ -63,7 +63,6 @@ class DispoOrderStatusTransitionTest extends TestCase
             [DispoOrderStatus::AtDisposition, DispoOrderStatus::Disposed],
             [DispoOrderStatus::AtDisposition, DispoOrderStatus::Completed],
             [DispoOrderStatus::InProgress, DispoOrderStatus::Completed],
-            [DispoOrderStatus::InProgress, DispoOrderStatus::SalesInquiry],
             [DispoOrderStatus::InProgress, DispoOrderStatus::Cancelled],
             [DispoOrderStatus::MaterialMissing, DispoOrderStatus::Disposed],
             [DispoOrderStatus::Disposed, DispoOrderStatus::Completed],
@@ -83,6 +82,60 @@ class DispoOrderStatusTransitionTest extends TestCase
     ): void {
         $this->assertFalse(DispoOrderStatusTransition::canTransition($from, $to));
         $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    /**
+     * @return list<array{0: DispoOrderStatus, 1: DispoOrderStatus}>
+     */
+    public static function allowedSalesInquiryProvider(): array
+    {
+        return [
+            [DispoOrderStatus::AtDisposition, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::InProgress, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::MaterialMissing, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::MaterialReceived, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::AtDisposition],
+        ];
+    }
+
+    #[DataProvider('allowedSalesInquiryProvider')]
+    public function test_allowed_sales_inquiry_transitions(
+        DispoOrderStatus $from,
+        DispoOrderStatus $to,
+    ): void {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition($from, $to));
+        $this->assertTrue(DispoOrderStatusTransition::isSalesInquiryTransition($from, $to));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    /**
+     * @return list<array{0: DispoOrderStatus, 1: DispoOrderStatus}>
+     */
+    public static function forbiddenSalesInquiryProvider(): array
+    {
+        return [
+            [DispoOrderStatus::Draft, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::AwaitingSalesApproval, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::ApprovalRejected, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::Disposed, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::Completed, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::Cancelled, DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::InProgress],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::MaterialMissing],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::MaterialReceived],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Disposed],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Completed],
+            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Cancelled],
+        ];
+    }
+
+    #[DataProvider('forbiddenSalesInquiryProvider')]
+    public function test_forbidden_sales_inquiry_transitions(
+        DispoOrderStatus $from,
+        DispoOrderStatus $to,
+    ): void {
+        $this->assertFalse(DispoOrderStatusTransition::canTransition($from, $to));
+        $this->assertFalse(DispoOrderStatusTransition::isSalesInquiryTransition($from, $to));
     }
 
     public function test_reopen_requires_reason_flag(): void

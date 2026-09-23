@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DispoOrderStatus;
+use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
+use App\Http\Requests\DispoOrder\AskSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
 use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
@@ -14,6 +16,7 @@ use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
+use App\Models\DispoOrderComment;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
@@ -21,6 +24,8 @@ use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
+use App\Services\DispoOrder\DispoOrderSalesInquiryService;
+use App\Services\DispoOrder\DispoOrderStatusTransition;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
@@ -40,6 +45,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderPositionAdoptionService $adoptions,
         private readonly DispoOrderApprovalService $approvals,
         private readonly DispoOrderOperationalStatusService $operationalStatus,
+        private readonly DispoOrderSalesInquiryService $salesInquiry,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
         private readonly SpotDistributionExportService $spotDistributionExport,
@@ -96,6 +102,7 @@ class DispoOrderController extends Controller
             'pendingApprovalRequest',
             'latestApprovalRequest',
             'statusEvents',
+            'comments',
             'revises',
             'revision',
         ]);
@@ -120,6 +127,16 @@ class DispoOrderController extends Controller
         $operationalTargets = $canTransitionOperationalStatus
             ? $this->operationalStatus->allowedTargetsProp($dispoOrder)
             : [];
+        $canAskSalesInquiry = ($user?->can('askSalesInquiry', $dispoOrder) ?? false)
+            && in_array(
+                $dispoOrder->status,
+                DispoOrderStatusTransition::salesInquiryAskSources(),
+                true,
+            );
+        $openSalesInquiry = $this->salesInquiry->findOpenSalesInquiry($dispoOrder);
+        $canAnswerSalesInquiry = ($user?->can('answerSalesInquiry', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::SalesInquiry
+            && $openSalesInquiry !== null;
         $dynamicValues = $this->dynamicFields->valuesProp($dispoOrder);
         $canSyncCalculationDynamicFields = $canUpdate
             && $dynamicValues['missing_calc_origin_keys'] !== [];
@@ -139,6 +156,11 @@ class DispoOrderController extends Controller
             'canRevise' => $canRevise,
             'canTransitionOperationalStatus' => $canTransitionOperationalStatus,
             'operationalStatusTargets' => $operationalTargets,
+            'canAskSalesInquiry' => $canAskSalesInquiry,
+            'canAnswerSalesInquiry' => $canAnswerSalesInquiry,
+            'openSalesInquiry' => $openSalesInquiry !== null
+                ? $this->serializeComment($openSalesInquiry)
+                : null,
             'isCreator' => $isCreator,
             'spotDistributionExport' => [
                 'can_export' => true,
@@ -299,6 +321,50 @@ class DispoOrderController extends Controller
         );
     }
 
+    public function askSalesInquiry(
+        AskSalesInquiryRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->salesInquiry->ask(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->question(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            'Rückfrage an den Vertrieb gestellt.',
+        );
+    }
+
+    public function answerSalesInquiry(
+        AnswerSalesInquiryRequest $request,
+        DispoOrder $dispoOrder,
+        DispoOrderComment $comment,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->salesInquiry->answer(
+            $dispoOrder,
+            $comment,
+            $user,
+            $request->expectedLockVersion(),
+            $request->answer(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            'Rückfrage beantwortet. Status: Liegt bei Disposition.',
+        );
+    }
+
     public function positions(Request $request, Calculation $calculation): JsonResponse
     {
         $this->authorize('create', [DispoOrder::class, $calculation]);
@@ -454,6 +520,7 @@ class DispoOrderController extends Controller
             )->map(
                 fn (DispoOrderStatusEvent $event): array => $this->serializeStatusEvent($event),
             )->all(),
+            'communication' => $this->salesInquiry->communicationProp($order),
             'current_approval' => $order->pendingApprovalRequest instanceof DispoOrderApprovalRequest
                 ? $this->serializeApprovalRequest($order->pendingApprovalRequest)
                 : ($order->approvalRequests->last() instanceof DispoOrderApprovalRequest
@@ -556,6 +623,22 @@ class DispoOrderController extends Controller
             'reason' => $event->reason,
             'is_reopen' => $event->is_reopen,
             'lock_version_after' => $event->lock_version_after,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeComment(DispoOrderComment $comment): array
+    {
+        return [
+            'id' => $comment->id,
+            'type' => $comment->type->value,
+            'type_label' => $comment->type->label(),
+            'body' => $comment->body,
+            'created_by_name' => $comment->created_by_name,
+            'created_at' => $comment->created_at?->toIso8601String(),
+            'parent_id' => $comment->parent_id,
         ];
     }
 }
