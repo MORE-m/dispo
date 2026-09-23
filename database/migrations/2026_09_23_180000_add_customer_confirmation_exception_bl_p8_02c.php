@@ -61,7 +61,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('dispo_order_approval_requests', function (Blueprint $table) {
-            $table->dropForeign('doar_cc_exc_ack_by_fk');
+            // Spalten-Array: MySQL + SQLite (kein dropForeign-by-name auf SQLite).
+            $table->dropForeign(['customer_confirmation_exception_acknowledged_by_id']);
             $table->dropColumn([
                 'customer_confirmation_without_upload',
                 'customer_confirmation_exception_reason',
@@ -76,7 +77,7 @@ return new class extends Migration
         });
 
         Schema::table('dispo_orders', function (Blueprint $table) {
-            $table->dropForeign('do_cc_exc_set_by_fk');
+            $table->dropForeign(['customer_confirmation_exception_set_by_id']);
             $table->dropColumn([
                 'customer_confirmation_without_upload',
                 'customer_confirmation_exception_reason',
