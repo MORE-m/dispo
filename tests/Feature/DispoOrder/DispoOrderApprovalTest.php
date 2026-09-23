@@ -17,12 +17,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DispoOrderApprovalTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     /**
@@ -69,9 +71,14 @@ class DispoOrderApprovalTest extends TestCase
             'position_ids' => $positionIds,
         ])->assertRedirect();
 
+        $order = DispoOrder::query()->latest('id')->firstOrFail();
+        if (! ($options['without_confirmation'] ?? false)) {
+            $order = $this->seedCustomerConfirmationException($order, $creator);
+        }
+
         return [
             'calculation' => $calculation->fresh(),
-            'order' => DispoOrder::query()->latest('id')->firstOrFail(),
+            'order' => $order,
             'creator' => $creator,
             'catalog' => $catalog,
         ];
@@ -80,7 +87,6 @@ class DispoOrderApprovalTest extends TestCase
     public function test_sales_can_submit_own_draft(): void
     {
         ['order' => $order, 'creator' => $creator] = $this->draftOrder();
-
         $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertOk();
@@ -149,6 +155,7 @@ class DispoOrderApprovalTest extends TestCase
         $order->refresh();
 
         $this->actingAs($other)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
             'note' => 'passt',
         ])->assertOk();
@@ -196,6 +203,7 @@ class DispoOrderApprovalTest extends TestCase
 
         $otherSales = User::factory()->role(Role::Sales)->create();
         $this->actingAs($otherSales)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
         ])->assertForbidden();
         $this->actingAs($otherSales)->postJson(route('dispo-orders.reject', $order), [
@@ -205,6 +213,7 @@ class DispoOrderApprovalTest extends TestCase
 
         $admin = User::factory()->role(Role::Admin)->create();
         $this->actingAs($admin)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
         ])->assertOk();
         $this->assertSame(DispoOrderStatus::AtDisposition, $order->fresh()->status);
@@ -220,6 +229,7 @@ class DispoOrderApprovalTest extends TestCase
 
         $management = User::factory()->role(Role::Management)->create();
         $this->actingAs($management)->postJson(route('dispo-orders.approve', $special2), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $special2->lock_version,
         ])->assertOk();
     }
@@ -235,6 +245,7 @@ class DispoOrderApprovalTest extends TestCase
         $order->refresh();
 
         $this->actingAs($creator)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
         ])->assertForbidden();
         $this->actingAs($creator)->postJson(route('dispo-orders.reject', $order), [
@@ -261,6 +272,7 @@ class DispoOrderApprovalTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-09-03 19:20:00', 'UTC'));
 
         $this->actingAs($other)->postJson(route('dispo-orders.approve', $order->fresh()), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->fresh()->lock_version,
         ])->assertOk();
 
@@ -308,6 +320,7 @@ class DispoOrderApprovalTest extends TestCase
         $this->assertSame(DispoOrderStatus::ApprovalRejected, $order->fresh()->status);
 
         $this->actingAs($other)->postJson(route('dispo-orders.approve', $order->fresh()), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->fresh()->lock_version,
         ])->assertStatus(409);
 
@@ -404,6 +417,7 @@ class DispoOrderApprovalTest extends TestCase
                 ->where('isCreator', false));
 
         $this->actingAs($other)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
         ]);
 
@@ -428,6 +442,7 @@ class DispoOrderApprovalTest extends TestCase
         ]);
         $order->refresh();
         $this->actingAs($other)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
             'lock_version' => $order->lock_version,
         ]);
 
@@ -445,7 +460,7 @@ class DispoOrderApprovalTest extends TestCase
         $service = app(DispoOrderApprovalService::class);
 
         $submitted = $service->submit($order, $creator, $order->lock_version);
-        $approved = $service->approve($submitted, $other, $submitted->lock_version, null);
+        $approved = $service->approve($submitted, $other, $submitted->lock_version, null, true);
 
         $this->assertSame(3, $approved->lock_version);
         $this->assertSame(DispoOrderStatus::AtDisposition, $approved->status);

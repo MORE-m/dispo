@@ -23,6 +23,7 @@ class ApproveDispoOrderRequest extends FormRequest
         return [
             'lock_version' => ['required', 'integer', 'min:1'],
             'note' => ['nullable', 'string', 'max:500'],
+            'customer_confirmation_exception_acknowledged' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -34,6 +35,7 @@ class ApproveDispoOrderRequest extends FormRequest
         return [
             'lock_version' => 'Version',
             'note' => 'Notiz',
+            'customer_confirmation_exception_acknowledged' => 'Ausnahme-Mitfreigabe',
         ];
     }
 
@@ -43,6 +45,19 @@ class ApproveDispoOrderRequest extends FormRequest
             $this->merge([
                 'note' => trim((string) $this->input('note')),
             ]);
+        }
+
+        if ($this->has('customer_confirmation_exception_acknowledged')) {
+            $raw = $this->input('customer_confirmation_exception_acknowledged');
+            if (is_string($raw)) {
+                $this->merge([
+                    'customer_confirmation_exception_acknowledged' => filter_var(
+                        $raw,
+                        FILTER_VALIDATE_BOOLEAN,
+                        FILTER_NULL_ON_FAILURE,
+                    ) ?? $raw,
+                ]);
+            }
         }
     }
 
@@ -60,5 +75,10 @@ class ApproveDispoOrderRequest extends FormRequest
         }
 
         return $note;
+    }
+
+    public function customerConfirmationExceptionAcknowledged(): bool
+    {
+        return (bool) ($this->validated('customer_confirmation_exception_acknowledged') ?? false);
     }
 }

@@ -36,6 +36,15 @@ class DispoOrderPolicy
     }
 
     /**
+     * Kundenbestätigungs-Ausnahme ohne Upload (BL-P8-02c / PO-BLP802C-1).
+     * Gleiche Draft-Rollen wie {@see update()}; Disposition/PM ohne Extra-Recht.
+     */
+    public function updateCustomerConfirmation(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $this->update($user, $dispoOrder);
+    }
+
+    /**
      * Nachbesserung: nur Ersteller, abgelehnter Auftrag, ohne Nachfolger.
      * Admin/GF erhalten dies nicht automatisch für fremde Aufträge.
      */

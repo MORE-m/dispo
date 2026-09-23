@@ -1,25 +1,41 @@
 # Fortschritt V1
 
-Stand: 23. September 2026 – Feature **BL-P8-02b** Rückfrage Vertrieb
-(PO-BLP802B-1) auf Branch `feat/bl-p8-02b-sales-inquiry`, Base
-`d2e8c8b0987a3a1a1807b5b790c402f34a68c8c7` (Merge PR #71 / BL-P8-02a).
+Stand: 23. September 2026 – Feature **BL-P8-02c** Kundenbestätigung Ausnahmeweg
+(PO-BLP802C-1) auf Branch `feat/bl-p8-02c-customer-confirmation-exception`, Base
+`c9911e52b69ce6f94301e3a30ee8d128c8cd156f` (Merge PR #72 / BL-P8-02b).
 
 ## Aktuelle Phase
 
 Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a` umgesetzt + manuell abgenommen;
-`BL-P8-02b` (Rückfrage Vertrieb / STA-002 / CMT-003) in diesem PR umgesetzt.
-Rest von BL-P8-02 (Uploads, Completed/Cancelled, …) **offen**.
+`BL-P8-02b` umgesetzt + manuell abgenommen; `BL-P8-02c` (Ausnahmeweg ohne Upload /
+UPL-001 B + UPL-002) in diesem PR umgesetzt. Uploadweg / BL-P9-01 **offen**.
 
 ## Aktuelle Aufgabe
 
-**BL-P8-02b:** SalesInquiryService Ask/Answer, append-only `dispo_order_comments`,
-eigene Endpunkte, Policy Ask/Answer, Kommunikationshistorie-UI, Unit/Feature/
-MySQL/Vitest/Playwright Port **8036**.
+**BL-P8-02c:** Draft-Ausnahme Kundenbestätigung ohne Upload, Submit-Gate,
+Approval-Snapshot + explizite Mitfreigabe, Detail-/Historie-UI, Unit/Feature/
+MySQL/Vitest/Playwright Port **8037**.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#71** BL-P8-02a (Merge `d2e8c8b…`): operativer Statuskern bis Disponiert
-inkl. Wiederöffnung, manuell abgenommen.
+PR **#72** BL-P8-02b (Merge `c9911e5…`): Rückfrage Vertrieb, manuell abgenommen.
+
+## BL-P8-02c – Kundenbestätigung Ausnahmeweg / PO-BLP802C-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP802C-1 (nur Ausnahmeweg ohne Upload) | **freigegeben** |
+| Draft-Felder + `DispoOrderCustomerConfirmationService` | **umgesetzt** |
+| Submit-Gate UPL-001 Variante B (kein Fake-Upload) | **umgesetzt** |
+| Approval-Snapshot + UPL-002 Acknowledgement | **umgesetzt** |
+| Revision erbt Ausnahme **nicht** | **umgesetzt** |
+| Detail-UI Sektion + Genehmigen-Dialog + Historie | **umgesetzt** |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8037** | **umgesetzt** |
+| Kundenbestätigungs-Dateiupload / BL-P9-01 | **bewusst nicht** |
+| UPL-001 | **teilweise** (Ausnahmeweg ja, Uploadweg offen) |
+| UPL-002 | **umgesetzt** |
+| UPL-003 | über BL-P8-02b umgesetzt |
+| `BL-P8-02` insgesamt | **teilweise** |
 
 ## BL-P8-02b – Rückfrage Vertrieb / PO-BLP802B-1 (September 2026)
 

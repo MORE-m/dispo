@@ -15,6 +15,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DispoOrderOperationalStatusConcurrencyTest extends TestCase
@@ -22,6 +23,7 @@ class DispoOrderOperationalStatusConcurrencyTest extends TestCase
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
     use DatabaseMigrations;
+    use EnsuresCustomerConfirmationException;
 
     public function test_mysql_parallel_status_transitions_yield_exactly_one_winner(): void
     {
@@ -45,8 +47,9 @@ class DispoOrderOperationalStatusConcurrencyTest extends TestCase
 
         $order = DispoOrder::query()->firstOrFail();
         $approvals = app(DispoOrderApprovalService::class);
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $submitted = $approvals->submit($order, $creator, $order->lock_version);
-        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version);
+        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version, null, true);
 
         $results = $this->runParallelWorkers(
             (string) $approved->id,

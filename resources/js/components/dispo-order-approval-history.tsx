@@ -49,6 +49,36 @@ export function DispoOrderApprovalHistory({
                         <SpecialApprovalReasonsList
                             reasons={entry.special_approval_reasons}
                         />
+                        {entry.customer_confirmation_without_upload ? (
+                            <div
+                                className="mt-2 space-y-1 text-sm"
+                                data-test="approval-history-customer-confirmation"
+                            >
+                                <p>Kundenbestätigung: Ausnahme ohne Upload</p>
+                                {entry.customer_confirmation_exception_reason ? (
+                                    <p data-test="approval-history-exception-reason">
+                                        Ausnahmegrund:{' '}
+                                        {
+                                            entry.customer_confirmation_exception_reason
+                                        }
+                                    </p>
+                                ) : null}
+                                {entry.status === 'approved' &&
+                                entry.customer_confirmation_exception_acknowledged &&
+                                entry.customer_confirmation_exception_acknowledged_by_name ? (
+                                    <p data-test="approval-history-exception-ack">
+                                        Ausnahme mitfreigegeben von{' '}
+                                        {
+                                            entry.customer_confirmation_exception_acknowledged_by_name
+                                        }{' '}
+                                        am{' '}
+                                        {formatDateTime(
+                                            entry.customer_confirmation_exception_acknowledged_at,
+                                        )}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
                         {entry.decision_note ? (
                             <p
                                 className="mt-2 text-sm"

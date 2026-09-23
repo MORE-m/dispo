@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -24,6 +25,7 @@ use Tests\TestCase;
 class DerivedCampaignPeriodFeatureTest extends TestCase
 {
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_create_calendar_persists_derived_columns(): void
@@ -317,6 +319,7 @@ class DerivedCampaignPeriodFeatureTest extends TestCase
         $order = DispoOrder::query()->latest('id')->firstOrFail();
         $this->assertSame($firstDate, $order->derived_campaign_period_start?->toDateString());
 
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertOk();

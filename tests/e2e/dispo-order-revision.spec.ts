@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+    setCustomerConfirmationException,
+} from './helpers/customer-confirmation';
 
 async function login(page: Page, email: string) {
     await page.goto('/login');
@@ -31,6 +34,7 @@ async function createDraftDispoOrder(page: Page) {
 }
 
 async function submitForApproval(page: Page) {
+    await setCustomerConfirmationException(page);
     await page.locator('[data-test="dispo-order-submit-open"]').click();
     await page.locator('[data-test="dispo-order-submit-confirm"]').click();
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
@@ -117,6 +121,7 @@ test('Nachbesserung abgelehnter Dispoauftrag als neuer Entwurf', async ({
     await expect(page.locator('[data-test="dispo-order-revise-open"]')).toHaveCount(0);
 
     await page.goto(revisionUrl);
+    await setCustomerConfirmationException(page);
     await page.locator('[data-test="dispo-order-submit-open"]').click();
     await page.locator('[data-test="dispo-order-submit-confirm"]').click();
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(

@@ -50,7 +50,7 @@ try {
 
     $result = match ($action) {
         'submit' => $service->submit($order, $user, $lockVersion),
-        'approve' => $service->approve($order, $user, $lockVersion, null),
+        'approve' => $service->approve($order, $user, $lockVersion, null, true),
         'reject' => $service->reject($order, $user, $lockVersion, 'Parallele Ablehnung'),
         default => throw new InvalidArgumentException('Unknown action'),
     };

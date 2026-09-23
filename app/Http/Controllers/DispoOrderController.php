@@ -11,6 +11,7 @@ use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
 use App\Http\Requests\DispoOrder\TransitionOperationalStatusRequest;
+use App\Http\Requests\DispoOrder\UpdateCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Models\Calculation;
@@ -21,6 +22,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
@@ -46,6 +48,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderApprovalService $approvals,
         private readonly DispoOrderOperationalStatusService $operationalStatus,
         private readonly DispoOrderSalesInquiryService $salesInquiry,
+        private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
         private readonly SpotDistributionExportService $spotDistributionExport,
@@ -118,6 +121,8 @@ class DispoOrderController extends Controller
             && $dispoOrder->status === DispoOrderStatus::Draft;
         $canUpdate = ($user?->can('update', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Draft;
+        $canUpdateCustomerConfirmation = ($user?->can('updateCustomerConfirmation', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Draft;
         $awaiting = $dispoOrder->status === DispoOrderStatus::AwaitingSalesApproval
             && $dispoOrder->pendingApprovalRequest !== null;
         $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
@@ -150,6 +155,7 @@ class DispoOrderController extends Controller
             'canCreate' => false,
             'canSubmit' => $canSubmit,
             'canUpdate' => $canUpdate,
+            'canUpdateCustomerConfirmation' => $canUpdateCustomerConfirmation,
             'canSyncCalculationDynamicFields' => $canSyncCalculationDynamicFields,
             'canApprove' => $canApprove,
             'canReject' => $canReject,
@@ -198,6 +204,30 @@ class DispoOrderController extends Controller
         );
 
         return $this->respondSuccess($request, $order, 'Dispoauftrag gespeichert.');
+    }
+
+    public function updateCustomerConfirmation(
+        UpdateCustomerConfirmationRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->customerConfirmation->update(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->confirmationWithoutUpload(),
+            $request->exceptionReason(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            $request->confirmationWithoutUpload()
+                ? 'Kundenbestätigungs-Ausnahme gespeichert.'
+                : 'Kundenbestätigungs-Ausnahme entfernt.',
+        );
     }
 
     public function updatePositionCustoms(
@@ -279,6 +309,7 @@ class DispoOrderController extends Controller
             $user,
             $request->expectedLockVersion(),
             $request->note(),
+            $request->customerConfirmationExceptionAcknowledged(),
         );
 
         return $this->respondSuccess($request, $order, 'Dispoauftrag genehmigt. Status: Liegt bei Disposition.');
@@ -472,6 +503,10 @@ class DispoOrderController extends Controller
             'status' => $order->status->value,
             'status_label' => $order->status->label(),
             'lock_version' => $order->lock_version,
+            'customer_confirmation_without_upload' => (bool) $order->customer_confirmation_without_upload,
+            'customer_confirmation_exception_reason' => $order->customer_confirmation_exception_reason,
+            'customer_confirmation_exception_set_by_name' => $order->customer_confirmation_exception_set_by_name,
+            'customer_confirmation_exception_set_at' => $order->customer_confirmation_exception_set_at?->toIso8601String(),
             'configuration_snapshot_id' => $order->configuration_snapshot_id,
             'source_calculation_number' => $order->source_calculation_number,
             'calculation_id' => $order->calculation_id,
@@ -604,6 +639,13 @@ class DispoOrderController extends Controller
             'decided_at' => $request->decided_at?->toIso8601String(),
             'rejection_reason' => $request->rejection_reason,
             'decision_note' => $request->decision_note,
+            'customer_confirmation_without_upload' => (bool) $request->customer_confirmation_without_upload,
+            'customer_confirmation_exception_reason' => $request->customer_confirmation_exception_reason,
+            'customer_confirmation_exception_set_by_name' => $request->customer_confirmation_exception_set_by_name,
+            'customer_confirmation_exception_set_at' => $request->customer_confirmation_exception_set_at?->toIso8601String(),
+            'customer_confirmation_exception_acknowledged' => (bool) $request->customer_confirmation_exception_acknowledged,
+            'customer_confirmation_exception_acknowledged_by_name' => $request->customer_confirmation_exception_acknowledged_by_name,
+            'customer_confirmation_exception_acknowledged_at' => $request->customer_confirmation_exception_acknowledged_at?->toIso8601String(),
         ];
     }
 

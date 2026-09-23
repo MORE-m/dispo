@@ -14,12 +14,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DispoOrderOperationalStatusTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     /**
@@ -42,8 +44,9 @@ class DispoOrderOperationalStatusTest extends TestCase
 
         $order = DispoOrder::query()->latest('id')->firstOrFail();
         $service = app(DispoOrderApprovalService::class);
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $submitted = $service->submit($order, $creator, $order->lock_version);
-        $approved = $service->approve($submitted, $approver, $submitted->lock_version);
+        $approved = $service->approve($submitted, $approver, $submitted->lock_version, null, true);
 
         $this->assertSame(DispoOrderStatus::AtDisposition, $approved->status);
 

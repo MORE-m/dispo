@@ -29,12 +29,14 @@ use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DynamicFieldDispoOrderTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     private function savedCalculation(): Calculation
@@ -258,6 +260,7 @@ class DynamicFieldDispoOrderTest extends TestCase
         ])->assertRedirect();
         $predecessor->refresh();
 
+        $predecessor = $this->seedCustomerConfirmationException($predecessor, $creator);
         $approvals->submit($predecessor, $creator, $predecessor->lock_version);
         $predecessor->refresh();
         $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');
@@ -467,6 +470,7 @@ class DynamicFieldDispoOrderTest extends TestCase
             $position->fieldValues()->delete();
         }
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)->post(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertSessionHasErrors('dynamic_field_values');
@@ -499,6 +503,7 @@ class DynamicFieldDispoOrderTest extends TestCase
         $this->assertSame([], $values['missing_calc_origin_keys']);
         $this->assertTrue($values['header_captured']['campaign_period']);
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)->post(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertRedirect();
@@ -681,6 +686,7 @@ class DynamicFieldDispoOrderTest extends TestCase
             $creator,
         )->order;
 
+        $predecessor = $this->seedCustomerConfirmationException($predecessor, $creator);
         $approvals->submit($predecessor, $creator, $predecessor->lock_version);
         $predecessor->refresh();
         $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');
@@ -889,6 +895,7 @@ class DynamicFieldDispoOrderTest extends TestCase
         $values = app(DispoOrderDynamicFieldWriter::class)->valuesProp($order);
         $this->assertSame([], $values['missing_calc_origin_keys']);
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)->post(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertRedirect();
@@ -920,6 +927,7 @@ class DynamicFieldDispoOrderTest extends TestCase
         ])->assertRedirect();
         $predecessor->refresh();
 
+        $predecessor = $this->seedCustomerConfirmationException($predecessor, $creator);
         $approvals->submit($predecessor, $creator, $predecessor->lock_version);
         $predecessor->refresh();
         $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');

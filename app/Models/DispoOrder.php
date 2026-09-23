@@ -31,6 +31,11 @@ use Illuminate\Support\Carbon;
  * @property DerivedCampaignPeriodStatus $derived_campaign_period_status
  * @property Carbon|null $derived_campaign_period_at
  * @property array<string, mixed>|null $derived_campaign_period_snapshot
+ * @property bool $customer_confirmation_without_upload
+ * @property string|null $customer_confirmation_exception_reason
+ * @property int|null $customer_confirmation_exception_set_by_id
+ * @property string|null $customer_confirmation_exception_set_by_name
+ * @property Carbon|null $customer_confirmation_exception_set_at
  * @property-read Collection<int, DispoOrderPosition> $positions
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  * @property-read Collection<int, DispoOrderStatusEvent> $statusEvents
@@ -104,6 +109,9 @@ class DispoOrder extends Model
             'derived_campaign_period_status' => DerivedCampaignPeriodStatus::class,
             'derived_campaign_period_at' => 'datetime',
             'derived_campaign_period_snapshot' => 'array',
+            'customer_confirmation_without_upload' => 'boolean',
+            'customer_confirmation_exception_set_by_id' => 'integer',
+            'customer_confirmation_exception_set_at' => 'datetime',
         ];
     }
 

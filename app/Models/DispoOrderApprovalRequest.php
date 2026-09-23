@@ -24,6 +24,15 @@ use LogicException;
  * @property CarbonImmutable|null $decided_at
  * @property string|null $rejection_reason
  * @property string|null $decision_note
+ * @property bool $customer_confirmation_without_upload
+ * @property string|null $customer_confirmation_exception_reason
+ * @property int|null $customer_confirmation_exception_set_by_id
+ * @property string|null $customer_confirmation_exception_set_by_name
+ * @property CarbonImmutable|null $customer_confirmation_exception_set_at
+ * @property bool $customer_confirmation_exception_acknowledged
+ * @property int|null $customer_confirmation_exception_acknowledged_by_id
+ * @property string|null $customer_confirmation_exception_acknowledged_by_name
+ * @property CarbonImmutable|null $customer_confirmation_exception_acknowledged_at
  * @property int $submitted_lock_version
  * @property int|null $open_guard
  */
@@ -58,10 +67,27 @@ class DispoOrderApprovalRequest extends Model
             'special_approval_reasons' => 'array',
             'submitted_at' => 'datetime',
             'decided_at' => 'datetime',
+            'customer_confirmation_without_upload' => 'boolean',
+            'customer_confirmation_exception_set_by_id' => 'integer',
+            'customer_confirmation_exception_set_at' => 'datetime',
+            'customer_confirmation_exception_acknowledged' => 'boolean',
+            'customer_confirmation_exception_acknowledged_by_id' => 'integer',
+            'customer_confirmation_exception_acknowledged_at' => 'datetime',
             'submitted_lock_version' => 'integer',
             'cycle_number' => 'integer',
             'open_guard' => 'integer',
         ];
+    }
+
+    public function hasCustomerConfirmationExceptionSnapshot(): bool
+    {
+        if (! (bool) $this->customer_confirmation_without_upload) {
+            return false;
+        }
+
+        $reason = $this->customer_confirmation_exception_reason;
+
+        return is_string($reason) && trim($reason) !== '';
     }
 
     protected static function booted(): void

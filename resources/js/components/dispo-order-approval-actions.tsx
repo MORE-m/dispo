@@ -3,6 +3,7 @@ import { useId, useState } from 'react';
 import { ErrorState } from '@/components/feedback/states';
 import { formTextareaClass } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -32,6 +33,7 @@ export function DispoOrderApprovalActions({
     canReject,
     isCreator,
     status,
+    requiresExceptionAcknowledgement = false,
 }: {
     orderId: number;
     lockVersion: number;
@@ -40,16 +42,19 @@ export function DispoOrderApprovalActions({
     canReject: boolean;
     isCreator: boolean;
     status: string;
+    requiresExceptionAcknowledgement?: boolean;
 }) {
     const [submitOpen, setSubmitOpen] = useState(false);
     const [approveOpen, setApproveOpen] = useState(false);
     const [rejectOpen, setRejectOpen] = useState(false);
     const [note, setNote] = useState('');
     const [reason, setReason] = useState('');
+    const [exceptionAck, setExceptionAck] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const reasonId = useId();
     const noteId = useId();
+    const ackId = useId();
 
     const showCreatorHint =
         isCreator && status === 'awaiting_sales_approval' && !canApprove;
@@ -135,6 +140,7 @@ export function DispoOrderApprovalActions({
                             data-test="dispo-order-approve-open"
                             onClick={() => {
                                 setError(null);
+                                setExceptionAck(false);
                                 setApproveOpen(true);
                             }}
                         >
@@ -223,6 +229,26 @@ export function DispoOrderApprovalActions({
                             disabled={submitting}
                         />
                     </div>
+                    {requiresExceptionAcknowledgement ? (
+                        <div className="flex items-start gap-3">
+                            <Checkbox
+                                id={ackId}
+                                checked={exceptionAck}
+                                disabled={submitting}
+                                data-test="customer-confirmation-exception-ack"
+                                onCheckedChange={(value) =>
+                                    setExceptionAck(value === true)
+                                }
+                            />
+                            <Label
+                                htmlFor={ackId}
+                                className="text-sm leading-snug font-normal"
+                            >
+                                Ausnahme ohne Kundenbestätigungs-Upload
+                                ausdrücklich mitfreigeben
+                            </Label>
+                        </div>
+                    ) : null}
                     {error ? (
                         <ErrorState
                             message={error}
@@ -241,11 +267,23 @@ export function DispoOrderApprovalActions({
                         <Button
                             type="button"
                             data-test="dispo-order-approve-confirm"
-                            disabled={submitting}
+                            disabled={
+                                submitting ||
+                                (requiresExceptionAcknowledgement &&
+                                    !exceptionAck)
+                            }
                             onClick={() =>
                                 void runAction(
                                     `/dispoauftraege/${orderId}/genehmigen`,
-                                    { note },
+                                    {
+                                        note,
+                                        ...(requiresExceptionAcknowledgement
+                                            ? {
+                                                  customer_confirmation_exception_acknowledged:
+                                                      exceptionAck,
+                                              }
+                                            : {}),
+                                    },
                                     () => setApproveOpen(false),
                                 )
                             }

@@ -122,6 +122,16 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Manuelle Abnahme: **erfolgreich** (PR #71)
 - `BL-P8-02` insgesamt **teilweise**
 
+### BL-P8-02c (Kundenbestätigung Ausnahmeweg / PO-BLP802C-1)
+
+- Draft: Checkbox + Pflichtgrund; Clear entfernt Grund; Rollen Sales/Admin/GF
+- Submit ohne Ausnahme → 422; mit Ausnahme → Snapshot im ApprovalRequest
+- Approve ohne Acknowledgement → 422; mit Acknowledgement → `at_disposition`
+- Reject ohne Acknowledgement möglich; Special Approval ebenfalls Ack-Pflicht
+- Revision erbt Ausnahme nicht; Locking 409
+- Unit/Feature/MySQL/Vitest; E2E `npm run test:e2e:blp802c` (Port **8037**)
+- AT-16 nach manueller Abnahme erfüllbar; UPL-001 weiterhin teilweise (Upload offen)
+
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 
 - Ask-Kanten: `at_disposition|in_progress|material_missing|material_received` → `sales_inquiry`
@@ -204,7 +214,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-13 | APR-004 | Preis nach Freigabe ändern | Freigaben werden zurückgesetzt; Ursache vollständig auditiert |
 | AT-14 | VER-001–VER-007 | Admin ändert Feldname und Preis | Alter Vorgang unverändert; neuer Vorgang verwendet neue Version |
 | AT-15 | DSP-001–DSP-003 | Position zweimal in getrennte Dispoaufträge übernehmen | Kennzeichnung, erneute Auswahl und unabhängige Snapshots |
-| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben |
+| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben (BL-P8-02c; manuelle Abnahme offen) |
 | AT-17 | STA-002, CMT-003 | Dispo stellt Rückfrage, Vertrieb antwortet | Pflichtnotizen, Historie und aktive Rückkehr zu Liegt bei Disposition |
 | AT-18 | STA-006, INV-003 | Rechnungsmonat fehlt | Abschluss blockiert; Admin-Override nur mit Begründung und Audit |
 | AT-19 | STA-004, STA-005 | Storno nach Abschluss | Nur berechtigt und mit Begründung; Historie vollständig |

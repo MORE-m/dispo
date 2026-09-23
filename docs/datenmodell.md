@@ -362,6 +362,12 @@ Append-only Historie: `dispo_order_status_events` (`from_status`, `to_status`,
 `changed_by_*`, `changed_at`, optionale `reason`, `is_reopen`,
 `lock_version_after`). Parallel AuditEvent ohne zweite Wahrheit.
 
+**BL-P8-02c / PO-BLP802C-1 (September 2026):** An `dispo_orders` additiv:
+`customer_confirmation_without_upload`, `customer_confirmation_exception_reason`,
+`customer_confirmation_exception_set_by_*`, `customer_confirmation_exception_set_at`
+(Default false/null, kein Backfill). Am ApprovalRequest Frozen Snapshot derselben
+Felder plus Acknowledgement-Felder bei erfolgreicher Genehmigung.
+
 **BL-P8-02b / PO-BLP802B-1 (September 2026):** Zusätzlich erreichbar:
 
 - `Rückfrage Vertrieb` (`sales_inquiry`) über Ask-Endpunkt

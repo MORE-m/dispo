@@ -282,6 +282,17 @@ E2E: `npm run test:e2e:blp802a` bzw.
 `database/e2e-bl-p8-02a.sqlite`, Seeder `E2EOperationalStatusSeeder` – niemals
 Dev-DB `dispo`).
 
+## BL-P8-02c – Kundenbestätigung Ausnahmeweg
+
+Feature-Tests: `DispoOrderCustomerConfirmationExceptionTest` u. a.
+Vitest `dispo-order-customer-confirmation-section.test.tsx`,
+`dispo-order-approval-actions.test.tsx`, `dispo-order-approval-history.test.tsx`.
+
+E2E: `npm run test:e2e:blp802c` bzw.
+`npx playwright test -c playwright.blp802c.config.ts` (Port **8037**, DB
+`database/e2e-bl-p8-02c.sqlite`, Seeder `E2ECustomerConfirmationExceptionSeeder` – niemals
+gegen die Entwicklungs-DB).
+
 ## BL-P8-02b – Rückfrage Vertrieb
 
 Migration `dispo_order_comments` (append-only). Service

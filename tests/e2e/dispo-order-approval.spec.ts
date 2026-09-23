@@ -1,4 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+    approveWithExceptionAcknowledgement,
+    setCustomerConfirmationException,
+} from './helpers/customer-confirmation';
 
 async function login(page: Page, email: string) {
     await page.goto('/login');
@@ -37,6 +41,7 @@ async function createDraftDispoOrder(page: Page) {
 }
 
 async function submitForApproval(page: Page) {
+    await setCustomerConfirmationException(page);
     await page.locator('[data-test="dispo-order-submit-open"]').click();
     await expect(page.locator('[data-test="dispo-order-submit-dialog"]')).toBeVisible();
     await page.locator('[data-test="dispo-order-submit-confirm"]').click();
@@ -89,8 +94,7 @@ test('Liste zeigt nach Genehmigen aktuellen Status ohne Reload', async ({ page }
     await page.goto('/dispoauftraege');
     await expect(page.locator(`[data-test="dispo-order-row-${orderId}"]`)).toBeVisible();
     await page.goto(detailUrl);
-    await page.locator('[data-test="dispo-order-approve-open"]').click();
-    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await approveWithExceptionAcknowledgement(page);
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Liegt bei Disposition',
         { timeout: 15_000 },
@@ -142,8 +146,7 @@ test('Reguläre Freigabe mit Vier-Augen-Prinzip', async ({ page }) => {
     await page.context().clearCookies();
     await login(page, 'sales-b@example.com');
     await page.goto(detailUrl);
-    await page.locator('[data-test="dispo-order-approve-open"]').click();
-    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await approveWithExceptionAcknowledgement(page);
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Liegt bei Disposition',
         { timeout: 15_000 },
@@ -189,8 +192,7 @@ test('Sonderfreigabe nur durch Admin', async ({ page }) => {
         .getByRole('link')
         .first()
         .click();
-    await page.locator('[data-test="dispo-order-approve-open"]').click();
-    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await approveWithExceptionAcknowledgement(page);
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Liegt bei Disposition',
         { timeout: 15_000 },
@@ -233,8 +235,7 @@ test('Mobiler Freigabeablauf', async ({ page }) => {
     await page.context().clearCookies();
     await login(page, 'sales-b@example.com');
     await page.goto(detailUrl);
-    await page.locator('[data-test="dispo-order-approve-open"]').click();
-    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await approveWithExceptionAcknowledgement(page);
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Liegt bei Disposition',
         { timeout: 15_000 },

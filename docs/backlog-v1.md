@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1**); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -407,7 +407,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** teilweise (`BL-P8-02a` + `BL-P8-02b` umgesetzt; Rest offen)
+- **Status:** teilweise (`BL-P8-02a` + `BL-P8-02b` + `BL-P8-02c` Ausnahmeweg umgesetzt; Uploadweg/Rest offen)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
@@ -436,7 +436,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02b – Rückfrage Vertrieb (PO-BLP802B-1)
 
 - **Phase:** 8
-- **Status:** **umgesetzt** in Feature-PR (September 2026; manuelle Abnahme separat)
+- **Status:** **umgesetzt + manuell abgenommen** (September 2026, PR #72)
 - **Kennung:** PO-BLP802B-1 / UX-GATE-D Teilfreigabe
 - **Anforderungen:** `STA-002`, `CMT-003`, `AT-17` (CMT-002 für strukturierte Einträge)
 - **Abhängigkeiten:** BL-P8-02a
@@ -449,11 +449,29 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** Unit Matrix; Feature Ask/Answer; MySQL-Concurrency; Vitest;
   Playwright Port **8036** (`test:e2e:blp802b`)
 
-### BL-P8-02 – Rest nach 02a/02b
 
-- **Weiter offen:** allgemeine Kommentare; Kundenbestätigung/Ausnahme;
+### BL-P8-02c – Kundenbestätigung Ausnahmeweg ohne Upload (PO-BLP802C-1)
+
+- **Phase:** 8
+- **Status:** **umgesetzt** in Feature-PR (September 2026; manuelle Abnahme separat)
+- **Kennung:** PO-BLP802C-1 / UX-GATE-D Teilfreigabe
+- **Anforderungen:** `UPL-001` (Variante B), `UPL-002`, `AT-16`
+- **Abhängigkeiten:** BL-P8-02b (UPL-003 über SalesInquiry)
+- **Ergebnis:** Draft-Checkbox „Bestätigung liegt vor, ist aber nicht als Datei hinterlegt“
+  + Pflicht-Ausnahmegrund; Submit-Gate; Frozen Snapshot im ApprovalRequest;
+  explizite Mitfreigabe durch zweiten Freigeber; Revision erbt Ausnahme nicht
+- **Rollen Draft:** Sales/Admin/Management; Disposition/PM NEIN
+- **UPL-001:** teilweise (Ausnahmeweg ja, Datei-Upload offen)
+- **Bewusst nicht:** File-Upload, BL-P9-01, UPL-004–UPL-007, Freigabeinvalidierung
+- **Tests:** Feature Confirmation/Approval; MySQL-Concurrency; Vitest;
+  Playwright Port **8037** (`test:e2e:blp802c`)
+
+### BL-P8-02 – Rest nach 02a/02b/02c
+
+- **Weiter offen:** allgemeine Kommentare; Kundenbestätigungs-**Dateiupload**;
   Completion-Prüfungen; Completed; Cancelled; Rechnung-per-Ende;
-  weitergehende operative Bearbeitung; Upload-/Materialdateien; Notifications
+  weitergehende operative Bearbeitung; allgemeine Uploads; Notifications;
+  Freigabeinvalidierung
 - **Hinweis:** Enum-Labels allein zählen nicht als Umsetzung.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen
