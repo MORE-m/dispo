@@ -25,6 +25,10 @@ const e2eEnv = {
     DB_URL: '',
 };
 
+const prepareAssets = process.env.CI
+    ? 'test -d public/build/assets || npm run build'
+    : 'npm run build';
+
 export default defineConfig({
     testDir: 'tests/e2e',
     testMatch: '**/spt-008-*.spec.ts',
@@ -32,9 +36,11 @@ export default defineConfig({
     workers: 1,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 1 : 0,
+    timeout: 90_000,
     use: {
         baseURL: e2eBaseUrl,
         trace: 'on-first-retry',
+        actionTimeout: 30_000,
     },
     projects: [
         {
@@ -43,7 +49,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `npm run build && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
         url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 300_000,
