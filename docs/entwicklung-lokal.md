@@ -267,6 +267,21 @@ E2E: `npm run test:e2e:dspdcp001` bzw.
 `database/e2e-derived-campaign-period.sqlite`, Seeder `E2EDerivedCampaignPeriodSeeder`
 – niemals Dev-DB `dispo`).
 
+## BL-P8-02a – Operativer Statuskern
+
+Operative Statusübergänge bis Disponiert inkl. Wiederöffnung mit Pflichtbegründung.
+Append-only Statushistorie `dispo_order_status_events`. Rollen:
+Disposition/Admin/Management.
+
+Tests: `DispoOrderStatusTransitionTest`, `DispoOrderOperationalStatusTest`,
+`DispoOrderOperationalStatusConcurrencyTest` (MySQL); Vitest
+`dispo-order-operational-status-actions.test.tsx`.
+
+E2E: `npm run test:e2e:blp802a` bzw.
+`npx playwright test -c playwright.blp802a.config.ts` (Port **8035**, DB
+`database/e2e-bl-p8-02a.sqlite`, Seeder `E2EOperationalStatusSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`

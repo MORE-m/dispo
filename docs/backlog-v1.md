@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -407,13 +407,38 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** offen (Freigabe-Kanten Entwurf → Vertriebsfreigabe → Disposition/Ablehnung über BL-P8-01b erledigt; **operative Transitionen ab `at_disposition` fehlen** – Enum-Labels allein zählen nicht als Umsetzung)
+- **Status:** teilweise (`BL-P8-02a` umgesetzt; Rest offen)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
 - **Akzeptanz:** `AT-12` bis `AT-19`
 - **Tests:** Pest erlaubte/verbotene Kanten, Pflichtbegründungen
-- **Hinweis:** In diesem Docs-Sync **nicht** implementiert.
+
+### BL-P8-02a – Operativer Statuskern (PO-BLP802A-1)
+
+- **Phase:** 8
+- **Status:** **umgesetzt** (September 2026)
+- **Kennung:** PO-BLP802A-1 / UX-GATE-D Teilfreigabe
+- **Anforderungen:** `STA-001` (Teil: operative Kanten bis Disponiert)
+- **Abhängigkeiten:** BL-P8-01b
+- **Ergebnis:** bewusste Übergänge Disposition/Admin/GF:
+  `at_disposition` → `in_progress`;
+  `in_progress` ↔ Material fehlt/erhalten;
+  `in_progress`/`material_received` → `disposed`;
+  Wiederöffnung `disposed` → `in_progress` mit Pflichtbegründung;
+  append-only Statushistorie; Detail-UI; Locking/Audit
+- **Rollen:** Disposition/Admin/Management JA; Vertrieb/Produktmanagement NEIN
+- **Offen (nicht 02a):** `sales_inquiry`, Kommentare, Uploads, Kundenbestätigung,
+  `completed`, `cancelled`, Rechnung-per-Ende, Notifications
+- **Tests:** Unit Transition-Matrix; Feature Rechte/Lock/Reopen; MySQL-Concurrency;
+  Vitest; Playwright Port **8035** (`test:e2e:blp802a`)
+
+### BL-P8-02 – Rest nach 02a
+
+- **Weiter offen:** sales_inquiry / Rückfrageprozess; Kommentare/Antwort;
+  Kundenbestätigung/Ausnahme; Completion-Prüfungen; Completed; Cancelled;
+  Rechnung-per-Ende; weitergehende operative Bearbeitung; Upload-/Materialdateien
+- **Hinweis:** Enum-Labels allein zählen nicht als Umsetzung.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen
 

@@ -349,10 +349,24 @@ Erreichbare Status in diesem Slice:
 - `Freigabe abgelehnt` (unveränderbarer, terminaler Snapshot; Nachbesserung nur
   über neuen verknüpften Entwurf)
 
+**BL-P8-02a / PO-BLP802A-1 (September 2026):** Zusätzlich erreichbar über bewusste
+operative Nutzeraktionen (Disposition/Admin/GF, kein Auto-Status):
+
+- `In Bearbeitung`
+- `Material fehlt`
+- `Material erhalten`
+- `Disponiert` (fachlich/kaufmännisch gesperrt; Wiederöffnung → `In Bearbeitung`
+  mit Pflichtbegründung)
+
+Append-only Historie: `dispo_order_status_events` (`from_status`, `to_status`,
+`changed_by_*`, `changed_at`, optionale `reason`, `is_reopen`,
+`lock_version_after`). Parallel AuditEvent ohne zweite Wahrheit.
+
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- Ausnahmebestätigungen, zentrale Dateien, Kommentare und weitere Status.
+- Ausnahmebestätigungen, zentrale Dateien, Kommentare und weitere Status
+  (`sales_inquiry`, `completed`, `cancelled`).
 
 ## Dynamische Daten
 
@@ -560,11 +574,14 @@ Kundenkalkulationen oder Dispoaufträge (`AUTH-007`).
 ## Workflow und Historie
 
 - `Approval`: Typ, Status, Anforderer, Entscheider, Zeitpunkt, Begründung und Grundlage.
-- `StatusEvent`: alter/neuer Status, Person, Zeit und Pflichtnotiz.
-- `Comment`: append-only, Autor und Zeit.
-- `QuestionThread` oder strukturierte Ereignisverknüpfung für Rückfrage/Antwort.
+- `StatusEvent` (**BL-P8-02a umgesetzt** als `dispo_order_status_events`): alter/neuer
+  Status, Person, Zeit, optionale Begründung; Wiederöffnung markiert (`is_reopen`).
+- `Comment`: append-only, Autor und Zeit (**noch nicht umgesetzt**).
+- `QuestionThread` oder strukturierte Ereignisverknüpfung für Rückfrage/Antwort
+  (**noch nicht umgesetzt**).
 - `AuditEvent`: Objekt, Aktion, alte/neue Werte, Benutzer, Kontext und Korrelations-ID.
-- `Notification`: Kanal, Empfänger, Status, Wiederholungen und Fehler.
+- `Notification`: Kanal, Empfänger, Status, Wiederholungen und Fehler
+  (**noch nicht umgesetzt**).
 
 ## Dateien
 
