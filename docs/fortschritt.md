@@ -1,24 +1,42 @@
 # Fortschritt V1
 
-Stand: 23. September 2026 – Feature **BL-P8-02c** Kundenbestätigung Ausnahmeweg
-(PO-BLP802C-1) auf Branch `feat/bl-p8-02c-customer-confirmation-exception`, Base
-`c9911e52b69ce6f94301e3a30ee8d128c8cd156f` (Merge PR #72 / BL-P8-02b).
+Stand: 24. September 2026 – Feature **BL-P8-02d** Rechnung per Ende + Completion
+(PO-BLP802D-1) auf Branch `feat/bl-p8-02d-invoice-completion`, Base
+`afae8576bddccd8edd31ba9310dfb65cc52b39f1`.
 
 ## Aktuelle Phase
 
-Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a` umgesetzt + manuell abgenommen;
-`BL-P8-02b` umgesetzt + manuell abgenommen; `BL-P8-02c` (Ausnahmeweg ohne Upload /
-UPL-001 B + UPL-002) in diesem PR umgesetzt. Uploadweg / BL-P9-01 **offen**.
+Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a`/`02b`/`02c` umgesetzt + manuell
+abgenommen; `BL-P8-02d` (Rechnung-per-Ende + Completion/Completed + Admin-Override /
+AT-18) in diesem PR umgesetzt, **manuelle Abnahme noch separat**. Storno /
+Completed-Reopen (`BL-P8-02e`) und Uploadweg / BL-P9-01 **offen**.
 
 ## Aktuelle Aufgabe
 
-**BL-P8-02c:** Draft-Ausnahme Kundenbestätigung ohne Upload, Submit-Gate,
-Approval-Snapshot + explizite Mitfreigabe, Detail-/Historie-UI, Unit/Feature/
-MySQL/Vitest/Playwright Port **8037**.
+**BL-P8-02d:** Positions-Rechnung-per-Ende, Completion-Readiness (5 Checks),
+`disposed → completed`, Admin-Override STA-006, Unit/Feature/MySQL/Vitest/
+Playwright Port **8038**.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#72** BL-P8-02b (Merge `c9911e5…`): Rückfrage Vertrieb, manuell abgenommen.
+PR **#75** u. a. Preislisten-Concurrency-Cleanup auf `main` (`afae857…`).
+BL-P8-02c manuell abgenommen.
+
+## BL-P8-02d – Rechnung per Ende + Completion / PO-BLP802D-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP802D-1 | **freigegeben** (nur 02d-Scope) |
+| `invoice_end_months` JSON nullable je Position | **umgesetzt** |
+| `DispoOrderInvoiceEndService` + PUT Endpoint | **umgesetzt** |
+| Completion-Readiness A–E + `DispoOrderCompletionService` | **umgesetzt** |
+| `disposed → completed` + Admin-Override STA-006 | **umgesetzt** |
+| AT-18 automatisiert (Feature + Playwright) | **umgesetzt** / manuelle Abnahme offen |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8038** | **umgesetzt** |
+| Completed-Reopen / Cancelled / Storno (02e) | **bewusst nicht** |
+| Kundenbestätigungs-Dateiupload / BL-P9-01 | **bewusst nicht** |
+| UPL-001 | **teilweise** (Ausnahmeweg ja, Uploadweg offen) |
+| `BL-P8-02` insgesamt | **teilweise** |
 
 ## BL-P8-02c – Kundenbestätigung Ausnahmeweg / PO-BLP802C-1 (September 2026)
 

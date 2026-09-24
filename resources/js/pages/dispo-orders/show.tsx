@@ -4,11 +4,17 @@ import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
+import {
+    DispoOrderCompletionSection,
+    type CompletionReadiness,
+    type CompletionSummary,
+} from '@/components/dispo-order-completion-section';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
 import {
     DispoOrderCommunicationHistory,
     type CommunicationEntry,
 } from '@/components/dispo-order-communication-history';
+import { DispoOrderInvoiceEndMonths } from '@/components/dispo-order-invoice-end-months';
 import {
     DispoOrderOperationalStatusActions,
     type OperationalStatusTarget,
@@ -171,6 +177,9 @@ type OrderPosition = {
         custom_label?: string | null;
         percent?: string;
     }[];
+    invoice_end_months?: number[] | null;
+    invoice_end_month_labels?: string[];
+    invoice_end_period_state?: 'open' | 'concrete' | 'invalid';
     dynamic_field_values?: Record<string, unknown> & {
         period_open?: boolean | null;
         position_flight_period?: PeriodValue;
@@ -310,6 +319,11 @@ export default function DispoOrderShow({
     canAskSalesInquiry = false,
     canAnswerSalesInquiry = false,
     openSalesInquiry = null,
+    canUpdateInvoiceEndMonths = false,
+    canComplete = false,
+    canForceComplete = false,
+    completionReadiness = null,
+    completionSummary = null,
     isCreator = false,
     spotDistributionExport = null,
 }: {
@@ -328,6 +342,11 @@ export default function DispoOrderShow({
     canAskSalesInquiry?: boolean;
     canAnswerSalesInquiry?: boolean;
     openSalesInquiry?: OpenSalesInquiry | null;
+    canUpdateInvoiceEndMonths?: boolean;
+    canComplete?: boolean;
+    canForceComplete?: boolean;
+    completionReadiness?: CompletionReadiness | null;
+    completionSummary?: CompletionSummary | null;
     isCreator?: boolean;
     spotDistributionExport?: SpotDistributionExportProps | null;
 }) {
@@ -1111,6 +1130,16 @@ export default function DispoOrderShow({
                     targets={operationalStatusTargets}
                 />
 
+                <DispoOrderCompletionSection
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    status={order.status}
+                    canComplete={canComplete}
+                    canForceComplete={canForceComplete}
+                    readiness={completionReadiness}
+                    summary={completionSummary}
+                />
+
                 <DispoOrderSalesInquiryActions
                     orderId={order.id}
                     lockVersion={order.lock_version}
@@ -1882,6 +1911,22 @@ export default function DispoOrderShow({
                                             ? ` · Preisliste ${position.price_list_version}`
                                             : ''}
                                     </p>
+                                    <DispoOrderInvoiceEndMonths
+                                        orderId={order.id}
+                                        positionId={position.id}
+                                        lockVersion={order.lock_version}
+                                        months={
+                                            position.invoice_end_months ?? null
+                                        }
+                                        monthLabels={
+                                            position.invoice_end_month_labels
+                                        }
+                                        periodState={
+                                            position.invoice_end_period_state ??
+                                            'invalid'
+                                        }
+                                        canEdit={canUpdateInvoiceEndMonths}
+                                    />
                                     {position.components &&
                                     position.components.length > 0 ? (
                                         <div

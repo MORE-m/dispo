@@ -132,6 +132,30 @@ class DispoOrderPolicy
     }
 
     /**
+     * Rechnung per Ende je Position (BL-P8-02d / PO-BLP802D-1).
+     */
+    public function updateInvoiceEndMonths(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
+    /**
+     * Abschluss disposed → completed (BL-P8-02d / PO-BLP802D-1).
+     */
+    public function complete(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
+    /**
+     * Admin-Override trotz verletzter Abschlussprüfungen (STA-006).
+     */
+    public function forceComplete(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasRole(Role::Admin);
+    }
+
+    /**
      * Rückfrage an Vertrieb stellen (BL-P8-02b / PO-BLP802B-1).
      */
     public function askSalesInquiry(User $user, DispoOrder $dispoOrder): bool

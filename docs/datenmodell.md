@@ -360,7 +360,14 @@ operative Nutzeraktionen (Disposition/Admin/GF, kein Auto-Status):
 
 Append-only Historie: `dispo_order_status_events` (`from_status`, `to_status`,
 `changed_by_*`, `changed_at`, optionale `reason`, `is_reopen`,
+`is_completion_override`, `completion_override_violations`,
 `lock_version_after`). Parallel AuditEvent ohne zweite Wahrheit.
+
+**BL-P8-02d / PO-BLP802D-1 (September 2026):** An `dispo_order_positions` additiv
+nullable JSON `invoice_end_months` (kanonisch sortierte Monate 1–12 oder null).
+Status `Abgeschlossen` über bewussten Abschluss `disposed → completed`
+(Disposition/Admin/GF); Admin-Override bei verletzten Checks mit Begründung.
+Kein Backfill. Completed ist in diesem Slice terminal (kein Reopen/Storno).
 
 **BL-P8-02c / PO-BLP802C-1 (September 2026):** An `dispo_orders` additiv:
 `customer_confirmation_without_upload`, `customer_confirmation_exception_reason`,
@@ -382,8 +389,8 @@ Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- Ausnahmebestätigungen, zentrale Dateien, allgemeine Kommentare und weitere Status
-  (`completed`, `cancelled`).
+- zentrale Dateien, allgemeine Kommentare und Status `cancelled` /
+  Reopen nach `completed` (BL-P8-02e).
 
 ## Dynamische Daten
 

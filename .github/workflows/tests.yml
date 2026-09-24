@@ -91,6 +91,9 @@ jobs:
       - name: Browser BL-P8-02c isolated tests
         run: npx playwright test -c playwright.blp802c.config.ts
 
+      - name: Browser BL-P8-02d isolated tests
+        run: npx playwright test -c playwright.blp802d.config.ts
+
       - name: Browser DSP-DCP-001 isolated tests
         run: npx playwright test -c playwright.dspdcp001.config.ts
 

@@ -7,12 +7,17 @@
   + Preislisten-Admin-Lifecycle BL-P4-01a + Excel-Import BL-P4-01b ohne Auto-Aktivierung
   + Wizard-Jahreswahl BL-P4-01c / PO-PRI-YEAR-1
   + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**
-  + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**)
+  + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**
+  + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 24.09.2026 (PO-BLP802D-1):** zusätzlich freigegeben sind
+  Rechnung-per-Ende je Position, Completion-Readiness, `disposed → completed`
+  und Admin-Completion-Override (STA-006 / AT-18). **Nicht** freigegeben:
+  Completed-Reopen, Cancelled/Storno, Datei-Upload, BL-P9-01.
 - **Hinweis Stand 23.09.2026:** PO-BLP802A-1 gibt **nur** den operativen Statuskern
   bis Disponiert inkl. Wiederöffnung frei – **nicht** die gesamte operative Disposition.
 - **Hinweis Stand 23.09.2026 (PO-BLP802C-1):** zusätzlich freigegeben ist ausschließlich der Kundenbestätigungs-**Ausnahmeweg ohne Upload** (UPL-001 Variante B + UPL-002), inkl. Mitfreigabe zweiter Freigeber. **Nicht** freigegeben: Datei-Upload, BL-P9-01, UPL-004–UPL-007.
@@ -32,7 +37,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -310,11 +315,21 @@ Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
 - allgemeine freie Kommentare (`CMT-001`) / vollständiges Kommentar-Modul BL-P9-02
 - Benachrichtigungen / Mail (`NOT-001` / `NOT-002`)
 - Material-Uploads / Audio
-- Kundenbestätigung **Datei-Upload** (Ausnahmeweg ohne Upload: PO-BLP802C-1)
-- Status `completed` / `cancelled`
-- Rechnung-per-Ende / Abschlussprüfungen
+- Kundenbestätigung **Datei-Upload** (Ausnahmeweg ohne Upload: PO-BLP802C-1;
+  Completion nutzt genehmigte Ausnahme; Upload folgt BL-P9-01)
+- Status `cancelled` / Reopen nach `completed` (BL-P8-02e)
 - neue operative Fach-/Textfelder, Priorität, Bearbeitungsdatum
 - Kombinationstabelle, Standardangebote, Reporting, SWF/OA/Social
+
+**Product-Owner-Teilfreigabe (24. September 2026, UX-GATE-D / BL-P8-02d / PO-BLP802D-1):**
+Ausschließlich freigegeben:
+
+- „Rechnung per Ende“ je Dispo-Werbemittelposition (Monate 1–12, keine Beträge)
+- Completion-Readiness (Pflichtfelder, offene Rückfrage, Rechnung-per-Ende,
+  Kundenbestätigungs-Ausnahme mit Approval-Ack, gültige Freigaben)
+- Statusübergang `disposed → completed` (Disposition/Admin/GF)
+- Admin-Override bei verletzten Checks mit Pflichtbegründung + Audit (STA-006)
+- AT-18 automatisiert testbar
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
@@ -344,7 +359,7 @@ Completed/Cancelled bleiben definiert, aber unerreichbar.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1); Datei-Uploads/allgemeine Kommentare/Completed/Cancelled/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1); Datei-Uploads/allgemeine Kommentare/Cancelled/Completed-Reopen/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

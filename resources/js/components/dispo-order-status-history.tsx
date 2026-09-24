@@ -11,6 +11,12 @@ export type StatusHistoryEntry = {
     changed_at: string;
     reason: string | null;
     is_reopen: boolean;
+    is_completion_override?: boolean;
+    completion_override_violations?: {
+        key?: string;
+        label?: string;
+        violations?: { message: string }[];
+    }[];
     lock_version_after: number;
 };
 
@@ -43,6 +49,9 @@ export function DispoOrderStatusHistory({
                         <p className="font-medium">
                             {entry.from_status_label} → {entry.to_status_label}
                             {entry.is_reopen ? ' (Wiederöffnung)' : ''}
+                            {entry.is_completion_override
+                                ? ' (Admin-Override)'
+                                : ''}
                         </p>
                         <p className="text-muted-foreground mt-1">
                             {entry.changed_by_name} ·{' '}

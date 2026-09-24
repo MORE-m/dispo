@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<int, mixed>|null $planner_entries_snapshot
  * @property array<int, array<string, mixed>>|null $components_snapshot
  * @property array<int, array<string, mixed>>|null $position_discounts_snapshot
+ * @property list<int>|null $invoice_end_months
  */
 class DispoOrderPosition extends Model
 {
@@ -126,6 +127,7 @@ class DispoOrderPosition extends Model
             'planner_entries_snapshot' => 'array',
             'components_snapshot' => 'array',
             'position_discounts_snapshot' => 'array',
+            'invoice_end_months' => 'array',
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Enums\DispoOrderStatus;
 use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
 use App\Http\Requests\DispoOrder\AskSalesInquiryRequest;
+use App\Http\Requests\DispoOrder\CompleteDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
 use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
@@ -14,6 +15,7 @@ use App\Http\Requests\DispoOrder\TransitionOperationalStatusRequest;
 use App\Http\Requests\DispoOrder\UpdateCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
+use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
@@ -22,7 +24,10 @@ use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use App\Services\DispoOrder\DispoOrderCompletionReadiness;
+use App\Services\DispoOrder\DispoOrderCompletionService;
 use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
+use App\Services\DispoOrder\DispoOrderInvoiceEndService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
@@ -33,6 +38,7 @@ use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\DispoOrder\DerivedCampaignPeriodPresenter;
+use App\Support\DispoOrder\InvoiceEndMonthsContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -49,6 +55,9 @@ class DispoOrderController extends Controller
         private readonly DispoOrderOperationalStatusService $operationalStatus,
         private readonly DispoOrderSalesInquiryService $salesInquiry,
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
+        private readonly DispoOrderInvoiceEndService $invoiceEnd,
+        private readonly DispoOrderCompletionService $completion,
+        private readonly DispoOrderCompletionReadiness $completionReadiness,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
         private readonly SpotDistributionExportService $spotDistributionExport,
@@ -142,6 +151,20 @@ class DispoOrderController extends Controller
         $canAnswerSalesInquiry = ($user?->can('answerSalesInquiry', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::SalesInquiry
             && $openSalesInquiry !== null;
+        $canUpdateInvoiceEndMonths = ($user?->can('updateInvoiceEndMonths', $dispoOrder) ?? false)
+            && DispoOrderStatusTransition::isInvoiceEndEditable($dispoOrder->status);
+        $canComplete = ($user?->can('complete', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Disposed;
+        $canForceComplete = ($user?->can('forceComplete', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Disposed;
+        $completionReadiness = in_array(
+            $dispoOrder->status,
+            [DispoOrderStatus::Disposed, DispoOrderStatus::Completed],
+            true,
+        )
+            ? $this->completion->readinessProp($dispoOrder)
+            : null;
+        $completionSummary = $this->completion->completionSummaryProp($dispoOrder);
         $dynamicValues = $this->dynamicFields->valuesProp($dispoOrder);
         $canSyncCalculationDynamicFields = $canUpdate
             && $dynamicValues['missing_calc_origin_keys'] !== [];
@@ -167,6 +190,11 @@ class DispoOrderController extends Controller
             'openSalesInquiry' => $openSalesInquiry !== null
                 ? $this->serializeComment($openSalesInquiry)
                 : null,
+            'canUpdateInvoiceEndMonths' => $canUpdateInvoiceEndMonths,
+            'canComplete' => $canComplete,
+            'canForceComplete' => $canForceComplete,
+            'completionReadiness' => $completionReadiness,
+            'completionSummary' => $completionSummary,
             'isCreator' => $isCreator,
             'spotDistributionExport' => [
                 'can_export' => true,
@@ -343,6 +371,46 @@ class DispoOrderController extends Controller
             $request->expectedLockVersion(),
             $request->targetStatus(),
             $request->reason(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            sprintf('Status aktualisiert: %s.', $order->status->label()),
+        );
+    }
+
+    public function updateInvoiceEndMonths(
+        UpdateInvoiceEndMonthsRequest $request,
+        DispoOrder $dispoOrder,
+        DispoOrderPosition $position,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->invoiceEnd->update(
+            $dispoOrder,
+            $position,
+            $user,
+            $request->expectedLockVersion(),
+            $request->months(),
+        );
+
+        return $this->respondSuccess($request, $order, 'Rechnung per Ende gespeichert.');
+    }
+
+    public function complete(
+        CompleteDispoOrderRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->completion->complete(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->overrideReason(),
         );
 
         return $this->respondSuccess(
@@ -561,45 +629,55 @@ class DispoOrderController extends Controller
                 : ($order->approvalRequests->last() instanceof DispoOrderApprovalRequest
                     ? $this->serializeApprovalRequest($order->approvalRequests->last())
                     : null),
-            'positions' => $order->positions->map(fn (DispoOrderPosition $position): array => [
-                'id' => $position->id,
-                'inventory_name' => $position->inventory_name,
-                'advertising_medium_name' => $position->advertising_medium_name,
-                'spot_method' => $position->spot_method->value,
-                'spot_method_label' => $position->spot_method->label(),
-                'length_seconds' => $position->length_seconds,
-                'component_calculation_strategy' => $position->component_calculation_strategy,
-                'component_profile' => $position->component_profile?->value,
-                'derived_component_airings' => $position->derived_component_airings
-                    ?? ($position->component_profile !== null
-                        ? SpotComponentProfileContract::derivedAirings(
-                            $position->component_profile,
-                            (int) $position->total_spot_count,
-                        )
-                        : null),
-                'components' => $position->components_snapshot ?? [],
-                'total_spot_count' => $position->total_spot_count,
-                'price_list_version' => $position->price_list_version,
-                'media_gross' => (string) $position->media_gross,
-                'position_discount_amount' => (string) $position->position_discount_amount,
-                'order_discount_amount' => (string) $position->order_discount_amount,
-                'ae_amount' => (string) $position->ae_amount,
-                'nn_invest' => (string) $position->nn_invest,
-                'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
-                'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
-                'calculation_method_name' => $position->calculation_method_name,
-                'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
-                    ? null
-                    : (string) $position->effective_pay_factor_percent,
-                'effective_total_discount_percent' => $position->effective_total_discount_percent === null
-                    ? null
-                    : (string) $position->effective_total_discount_percent,
-                'time_ranges' => $position->time_ranges_snapshot ?? [],
-                'planner_entries' => $position->planner_entries_snapshot ?? [],
-                'position_discounts' => $position->position_discounts_snapshot ?? [],
-                'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
-                'dynamic_field_captured' => $dynamicValues['positions_captured'][(int) $position->id] ?? [],
-            ])->all(),
+            'positions' => $order->positions->map(function (DispoOrderPosition $position) use ($order, $dynamicValues): array {
+                $months = InvoiceEndMonthsContract::canonicalize(
+                    is_array($position->invoice_end_months) ? $position->invoice_end_months : [],
+                );
+                $periodState = $this->completionReadiness->periodStateForPosition($order, $position);
+
+                return [
+                    'id' => $position->id,
+                    'inventory_name' => $position->inventory_name,
+                    'advertising_medium_name' => $position->advertising_medium_name,
+                    'spot_method' => $position->spot_method->value,
+                    'spot_method_label' => $position->spot_method->label(),
+                    'length_seconds' => $position->length_seconds,
+                    'component_calculation_strategy' => $position->component_calculation_strategy,
+                    'component_profile' => $position->component_profile?->value,
+                    'derived_component_airings' => $position->derived_component_airings
+                        ?? ($position->component_profile !== null
+                            ? SpotComponentProfileContract::derivedAirings(
+                                $position->component_profile,
+                                (int) $position->total_spot_count,
+                            )
+                            : null),
+                    'components' => $position->components_snapshot ?? [],
+                    'total_spot_count' => $position->total_spot_count,
+                    'price_list_version' => $position->price_list_version,
+                    'media_gross' => (string) $position->media_gross,
+                    'position_discount_amount' => (string) $position->position_discount_amount,
+                    'order_discount_amount' => (string) $position->order_discount_amount,
+                    'ae_amount' => (string) $position->ae_amount,
+                    'nn_invest' => (string) $position->nn_invest,
+                    'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+                    'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
+                    'calculation_method_name' => $position->calculation_method_name,
+                    'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
+                        ? null
+                        : (string) $position->effective_pay_factor_percent,
+                    'effective_total_discount_percent' => $position->effective_total_discount_percent === null
+                        ? null
+                        : (string) $position->effective_total_discount_percent,
+                    'time_ranges' => $position->time_ranges_snapshot ?? [],
+                    'planner_entries' => $position->planner_entries_snapshot ?? [],
+                    'position_discounts' => $position->position_discounts_snapshot ?? [],
+                    'invoice_end_months' => $months,
+                    'invoice_end_month_labels' => InvoiceEndMonthsContract::labelsFor($months),
+                    'invoice_end_period_state' => $periodState,
+                    'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
+                    'dynamic_field_captured' => $dynamicValues['positions_captured'][(int) $position->id] ?? [],
+                ];
+            })->all(),
         ];
     }
 
@@ -664,6 +742,8 @@ class DispoOrderController extends Controller
             'changed_at' => $event->changed_at->toIso8601String(),
             'reason' => $event->reason,
             'is_reopen' => $event->is_reopen,
+            'is_completion_override' => (bool) $event->is_completion_override,
+            'completion_override_violations' => $event->completion_override_violations ?? [],
             'lock_version_after' => $event->lock_version_after,
         ];
     }
