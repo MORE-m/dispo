@@ -207,76 +207,12 @@ jobs:
       - name: Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: SPT-008 diagnose host snapshot
-        run: |
-          set -euxo pipefail
-          php -v
-          php -r 'echo "memory_limit=".ini_get("memory_limit").PHP_EOL;'
-          free -m
-          ulimit -a
-          nproc
-          mkdir -p storage/logs/spt008
-          echo "artisan serve options:" 
-          php artisan serve --help | sed -n '1,40p'
+      - name: Browser SPT-008 isolated tests
+        run: npx playwright test -c playwright.spt008.config.ts
 
-      # Phase A: Multi alone on fresh DB + fresh PHP server (port 8033)
-      - name: Browser SPT-008 Phase A Multi-only (fresh server)
-        id: spt008_multi_only
-        continue-on-error: true
-        env:
-          E2E_SPT008_PHASE: multi-only
-          E2E_SPT008_PORT: '8033'
-          E2E_SPT008_DB: database/e2e-spt-008-multi-only.sqlite
-          E2E_SPT008_LOG_DIR: storage/logs/spt008
-        run: |
-          set -euxo pipefail
-          npx playwright test -c playwright.spt008.config.ts --grep "multi-calendar order keeps all calendar positions and average proposal"
-          echo "PHASE_A_EXIT=$?"
-
-      - name: SPT-008 Phase A server log (always)
-        if: always()
-        run: |
-          set -euxo pipefail
-          ls -la storage/logs/spt008 || true
-          for f in storage/logs/spt008/server-multi-only-*; do
-            echo "===== $f ====="
-            tail -n 120 "$f" || true
-          done
-
-      # Phase B: full suite on fresh DB + fresh PHP server (port 8034)
-      - name: Browser SPT-008 Phase B full suite (fresh server)
-        id: spt008_full
-        continue-on-error: true
-        env:
-          E2E_SPT008_PHASE: full-suite
-          E2E_SPT008_PORT: '8034'
-          E2E_SPT008_DB: database/e2e-spt-008-full.sqlite
-          E2E_SPT008_LOG_DIR: storage/logs/spt008
-        run: |
-          set -euxo pipefail
-          npx playwright test -c playwright.spt008.config.ts
-          echo "PHASE_B_EXIT=$?"
-
-      - name: SPT-008 Phase B server log (always)
-        if: always()
-        run: |
-          set -euxo pipefail
-          for f in storage/logs/spt008/server-full-suite-*; do
-            echo "===== $f ====="
-            tail -n 160 "$f" || true
-          done
-          echo "PHASE_A_OUTCOME=${{ steps.spt008_multi_only.outcome }}"
-          echo "PHASE_B_OUTCOME=${{ steps.spt008_full.outcome }}"
-
-      - name: Fail job if SPT-008 diagnose phases failed
-        if: always()
-        run: |
-          set -euxo pipefail
-          echo "multi_only=${{ steps.spt008_multi_only.outcome }}"
-          echo "full=${{ steps.spt008_full.outcome }}"
-          if [ "${{ steps.spt008_multi_only.outcome }}" != "success" ] || [ "${{ steps.spt008_full.outcome }}" != "success" ]; then
-            exit 1
-          fi
+      - name: SPT-008 server log on failure
+        if: failure()
+        run: tail -n 200 storage/logs/spt008-server.log || true
 
   mysql:
     runs-on: ubuntu-latest

@@ -4,19 +4,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 /**
  * SPT-008 isolierte E2E-Suite: Spotverteilungs-XLSX-Export.
- * Eigene SQLite-DB, Port 8033 (überschreibbar via E2E_SPT008_*).
+ * Eigene SQLite-DB, Port 8033.
  */
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
-const e2eDb = path.resolve(
-    root,
-    process.env.E2E_SPT008_DB ?? 'database/e2e-spt-008.sqlite',
-);
+const e2eDb = path.resolve(root, 'database/e2e-spt-008.sqlite');
 const e2ePort = process.env.E2E_SPT008_PORT ?? '8033';
-const e2ePhase = process.env.E2E_SPT008_PHASE ?? 'default';
-const e2eLogDir = path.resolve(
-    root,
-    process.env.E2E_SPT008_LOG_DIR ?? 'storage/logs/spt008',
-);
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 const serverWrapper = path.join(root, 'tests/e2e/helpers/run-spt008-server.sh');
 
@@ -31,8 +23,6 @@ const e2eEnv = {
     DB_URL: '',
     E2E_SPT008_PORT: e2ePort,
     E2E_SPT008_DB: e2eDb,
-    E2E_SPT008_PHASE: e2ePhase,
-    E2E_SPT008_LOG_DIR: e2eLogDir,
 };
 
 const prepareAssets = process.env.CI

@@ -3,15 +3,6 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import {
-    diagSnapshot,
-    lastServerLogLines,
-    logExportFile,
-    logFixtureMatrix,
-    portOpen,
-    readServerExit,
-    spt008Port,
-} from './helpers/spt008-diag';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ordersPath = path.join(root, 'database/e2e-spt008-orders.json');
@@ -86,14 +77,11 @@ async function login(page: Page, email: string) {
  * UI-Export auslösen und XLSX über den echten Browser-Download speichern.
  *
  * Produkt-UI: fetch() → Blob → object-URL → <a download>.
- * Kein page.route()/route.fetch()-Proxy (CI-Crash auf streamDownload).
- * Content-Disposition kommt aus dem beobachteten Netzwerk-Response;
- * Dateiinhalt aus dem Download-Event (Blob-Downloads mit acceptDownloads).
+ * Kein page.route()/route.fetch()-Proxy.
  */
 async function exportViaUi(
     page: Page,
     targetName: string,
-    label: string,
 ): Promise<{
     target: string;
     contentDisposition: string | null;
@@ -105,9 +93,6 @@ async function exportViaUi(
 
     const target = path.join(root, 'database', targetName);
 
-    console.log(`START EXPORT: ${label}`);
-    diagSnapshot(`before-export:${label}`);
-
     const responsePromise = page.waitForResponse(
         (response) =>
             response.url().includes('/spotverteilung.xlsx') &&
@@ -118,42 +103,18 @@ async function exportViaUi(
         timeout: 90_000,
     });
 
-    const clickAt = new Date().toISOString();
-    console.log(`SPT008_EXPORT_CLICK label=${label} at=${clickAt}`);
     await button.click();
 
-    let response;
-    let download;
-    try {
-        response = await responsePromise;
-        console.log(
-            `SPT008_EXPORT_RESPONSE label=${label} status=${response.status()} at=${new Date().toISOString()}`,
-        );
-        download = await downloadPromise;
-        console.log(
-            `SPT008_EXPORT_DOWNLOAD label=${label} at=${new Date().toISOString()}`,
-        );
-    } catch (error) {
-        console.log(
-            `SPT008_EXPORT_TIMEOUT_OR_ERROR label=${label} at=${new Date().toISOString()} error=${String(error)}`,
-        );
-        diagSnapshot(`after-export-fail:${label}`);
-        console.log(
-            `SPT008_PORT_AFTER_FAIL open=${portOpen(spt008Port())} port=${spt008Port()}`,
-        );
-        console.log(
-            `SPT008_SERVER_EXIT_FILE value=${readServerExit() ?? 'none'}`,
-        );
-        console.log('SPT008_SERVER_LOG_TAIL\n' + lastServerLogLines(60));
-        throw error;
-    }
+    const [response, download] = await Promise.all([
+        responsePromise,
+        downloadPromise,
+    ]);
 
     expect(response.ok()).toBe(true);
 
     const contentDisposition =
         response.headers()['content-disposition'] ?? null;
     await download.saveAs(target);
-    logExportFile(label, target);
 
     await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
         timeout: 90_000,
@@ -161,9 +122,6 @@ async function exportViaUi(
     await expect(
         page.locator('[data-test="dispo-spot-distribution-export-error"]'),
     ).toHaveCount(0);
-
-    diagSnapshot(`after-export:${label}`);
-    console.log(`END EXPORT: ${label}`);
 
     return { target, contentDisposition };
 }
@@ -177,12 +135,6 @@ function assertNoCommercial(headers: string[]) {
 }
 
 test.describe('SPT-008 Spotplanungs-Export', () => {
-    test.beforeAll(() => {
-        const orders = loadOrders();
-        logFixtureMatrix(orders);
-        diagSnapshot('suite-start');
-    });
-
     test('calendar-only download has two sheets and average empty hint', async ({
         page,
     }) => {
@@ -203,7 +155,6 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         const { target, contentDisposition } = await exportViaUi(
             page,
             `e2e-spt008-download-${Date.now()}.xlsx`,
-            'calendar',
         );
         expect(contentDisposition ?? '').toMatch(/_Spotplanung\.xlsx/);
         const workbook = readXlsx(target);
@@ -229,7 +180,6 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         const { target } = await exportViaUi(
             page,
             `e2e-spt008-tandem-${Date.now()}.xlsx`,
-            'tandem',
         );
         const workbook = readXlsx(target);
         const calendar = workbook.sheets[0];
@@ -257,7 +207,6 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         const { target } = await exportViaUi(
             page,
             `e2e-spt008-average-${Date.now()}.xlsx`,
-            'average',
         );
         const workbook = readXlsx(target);
 
@@ -293,7 +242,6 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         const { target } = await exportViaUi(
             page,
             `e2e-spt008-mixed-${Date.now()}.xlsx`,
-            'mixed',
         );
         const workbook = readXlsx(target);
 
@@ -315,7 +263,6 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         const { target } = await exportViaUi(
             page,
             `e2e-spt008-multi-${Date.now()}.xlsx`,
-            'multi',
         );
         const workbook = readXlsx(target);
         const calendar = workbook.sheets[0];
