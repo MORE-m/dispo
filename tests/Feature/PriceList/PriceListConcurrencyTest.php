@@ -31,12 +31,24 @@ class PriceListConcurrencyTest extends TestCase
     protected function tearDown(): void
     {
         // Writer-Entwürfe haben year + valid_from=null; migrate:rollback darf daran
-        // nicht scheitern. Leere Tabellen sind für den Migrations-down unproblematisch.
-        if (Schema::hasTable('price_list_items')) {
-            DB::table('price_list_items')->delete();
-        }
-        if (Schema::hasTable('price_lists')) {
-            DB::table('price_lists')->delete();
+        // nicht scheitern. Abhängige Calculation-Zeilen müssen wegen FK RESTRICT
+        // (calculation_positions.price_list_id) zuerst entfernt werden.
+        foreach ([
+            'spot_classic_plan_rows',
+            'calculation_position_time_ranges',
+            'calculation_position_discounts',
+            'calculation_position_field_values',
+            'calculation_positions',
+            'calculation_field_values',
+            'calculation_order_discounts',
+            'budget_proposals',
+            'calculations',
+            'price_list_items',
+            'price_lists',
+        ] as $table) {
+            if (Schema::hasTable($table)) {
+                DB::table($table)->delete();
+            }
         }
 
         parent::tearDown();
