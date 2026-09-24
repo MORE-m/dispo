@@ -17,12 +17,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DispoOrderRevisionTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     /**
@@ -69,6 +71,7 @@ class DispoOrderRevisionTest extends TestCase
 
         $order = DispoOrder::query()->latest('id')->firstOrFail();
 
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertOk();
@@ -151,6 +154,7 @@ class DispoOrderRevisionTest extends TestCase
 
         $this->actingAs($creator)->post(route('dispo-orders.revise', $draft))->assertForbidden();
 
+        $draft = $this->seedCustomerConfirmationException($draft, $creator);
         $this->actingAs($creator)->postJson(route('dispo-orders.submit', $draft), [
             'lock_version' => $draft->lock_version,
         ]);

@@ -169,34 +169,71 @@ describe('DispoOrderApprovalActions', () => {
         });
     });
 
-    it('blocks double submit while request is pending', async () => {
-        let resolvePost: (value: unknown) => void = () => undefined;
-        mockJsonPost.mockImplementation(
-            () =>
-                new Promise((resolve) => {
-                    resolvePost = resolve;
-                }),
-        );
+    it('requires exception acknowledgement before approve confirm', async () => {
+        mockJsonPost.mockResolvedValue({
+            message: 'ok',
+            redirect: '/dispoauftraege/1',
+        });
 
         render(
             <DispoOrderApprovalActions
                 orderId={1}
-                lockVersion={1}
-                canSubmit
-                canApprove={false}
-                canReject={false}
-                isCreator
-                status="draft"
+                lockVersion={2}
+                canSubmit={false}
+                canApprove
+                canReject
+                isCreator={false}
+                status="awaiting_sales_approval"
+                requiresExceptionAcknowledgement
             />,
         );
 
-        fireEvent.click(screen.getByTestId('dispo-order-submit-open'));
-        const confirm = screen.getByTestId('dispo-order-submit-confirm');
-        fireEvent.click(confirm);
-        fireEvent.click(confirm);
+        fireEvent.click(screen.getByTestId('dispo-order-approve-open'));
+        expect(
+            screen.getByTestId('customer-confirmation-exception-ack'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId('dispo-order-approve-confirm'),
+        ).toBeDisabled();
 
-        expect(mockJsonPost).toHaveBeenCalledTimes(1);
-        resolvePost({ message: 'ok', redirect: '/dispoauftraege/1' });
-        await waitFor(() => expect(mockVisit).toHaveBeenCalled());
+        fireEvent.click(
+            screen.getByTestId('customer-confirmation-exception-ack'),
+        );
+        expect(
+            screen.getByTestId('dispo-order-approve-confirm'),
+        ).not.toBeDisabled();
+
+        fireEvent.click(screen.getByTestId('dispo-order-approve-confirm'));
+        await waitFor(() => {
+            expect(mockJsonPost).toHaveBeenCalledWith(
+                '/dispoauftraege/1/genehmigen',
+                expect.objectContaining({
+                    customer_confirmation_exception_acknowledged: true,
+                }),
+            );
+        });
+    });
+
+    it('keeps reject available without acknowledgement', () => {
+        render(
+            <DispoOrderApprovalActions
+                orderId={1}
+                lockVersion={2}
+                canSubmit={false}
+                canApprove
+                canReject
+                isCreator={false}
+                status="awaiting_sales_approval"
+                requiresExceptionAcknowledgement
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('dispo-order-reject-open'));
+        expect(
+            screen.getByTestId('dispo-order-reject-confirm'),
+        ).not.toBeDisabled();
+        expect(
+            screen.queryByTestId('customer-confirmation-exception-ack'),
+        ).not.toBeInTheDocument();
     });
 });

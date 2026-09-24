@@ -17,6 +17,7 @@ use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
@@ -138,8 +139,16 @@ class E2ESalesInquirySeeder extends Seeder
             ->order;
 
         $approvals = app(DispoOrderApprovalService::class);
+        $confirmations = app(DispoOrderCustomerConfirmationService::class);
+        $order = $confirmations->update(
+            $order,
+            $sales,
+            $order->lock_version,
+            true,
+            'Kundenfreigabe liegt per E-Mail vor; Upload wird nachgereicht.',
+        );
         $submitted = $approvals->submit($order, $sales, $order->lock_version);
-        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version);
+        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version, null, true);
         app(DispoOrderOperationalStatusService::class)->transition(
             $approved,
             $disposition,

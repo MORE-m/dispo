@@ -29,6 +29,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,7 @@ class ChoiceValueDispoUiC3Test extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_position_field_schemas_include_native_choice_options(): void
@@ -710,6 +712,7 @@ class ChoiceValueDispoUiC3Test extends TestCase
             ->assertRedirect();
 
         $order->refresh();
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,
@@ -870,6 +873,7 @@ class ChoiceValueDispoUiC3Test extends TestCase
         $order = $this->createDispoOrder();
         $user = User::factory()->role(Role::Sales)->create();
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,
@@ -886,6 +890,7 @@ class ChoiceValueDispoUiC3Test extends TestCase
             ->assertRedirect();
 
         $order->refresh();
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,

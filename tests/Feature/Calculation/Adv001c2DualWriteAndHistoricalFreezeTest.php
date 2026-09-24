@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -29,6 +30,7 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_create_writes_freeze_fields_matching_legacy(): void
@@ -335,6 +337,7 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
         ])->assertRedirect();
 
         $order = DispoOrder::query()->latest('id')->firstOrFail();
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
             'lock_version' => $order->lock_version,
         ])->assertOk();

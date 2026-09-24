@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Schema;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -39,6 +40,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_migration_adds_not_null_format_version_and_keeps_legacy_snapshots_on_generation_one(): void
@@ -324,6 +326,7 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
             $creator,
         )->order;
 
+        $predecessor = $this->seedCustomerConfirmationException($predecessor, $creator);
         $approvals->submit($predecessor, $creator, $predecessor->lock_version);
         $predecessor->refresh();
         $approvals->reject($predecessor, $approver, $predecessor->lock_version, 'Bitte nachbessern');

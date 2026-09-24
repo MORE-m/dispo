@@ -16,12 +16,14 @@ use Inertia\Testing\AssertableInertia as Assert;
 use LogicException;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 class DispoOrderSalesInquiryTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     /**
@@ -44,8 +46,9 @@ class DispoOrderSalesInquiryTest extends TestCase
 
         $order = DispoOrder::query()->latest('id')->firstOrFail();
         $approvals = app(DispoOrderApprovalService::class);
+        $order = $this->seedCustomerConfirmationException($order, $creator);
         $submitted = $approvals->submit($order, $creator, $order->lock_version);
-        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version);
+        $approved = $approvals->approve($submitted, $approver, $submitted->lock_version, null, true);
         $inProgress = app(DispoOrderOperationalStatusService::class)->transition(
             $approved,
             $disposition,

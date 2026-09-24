@@ -119,7 +119,7 @@ Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 | Status | Verantwortlicher Übergang | Bedingungen / Wirkung |
 |---|---|---|
 | Entwurf | Vertrieb | frei bearbeitbar; noch nicht eingereicht |
-| Wartet auf Vertriebsfreigabe | Vertrieb | Pflichtfelder und Kundenbestätigung/Ausnahme vorhanden |
+| Wartet auf Vertriebsfreigabe | Vertrieb | Pflichtfelder und Kundenbestätigung/Ausnahme vorhanden (BL-P8-02c: Ausnahmeweg ohne Upload) |
 | Freigabe abgelehnt | Freigeber | Begründung Pflicht; Ersteller darf überarbeiten |
 | Liegt bei Disposition | System nach Freigabe | vollständige erforderliche Freigaben |
 | In Bearbeitung | Disposition / Admin / GF (BL-P8-02a) | bewusste Aktion; keine Automatik |
@@ -156,6 +156,16 @@ V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 
 Umgesetzt + manuell abgenommen: bewusste operative Statusübergänge bis Disponiert
 inkl. Wiederöffnung, Statushistorie, Rollen Disposition/Admin/GF.
+
+## Ist-Stand BL-P8-02c (PO-BLP802C-1)
+
+Vor Einreichen Draft → `awaiting_sales_approval` muss die Kundenbestätigung
+über den Ausnahmeweg gesetzt sein (Checkbox + Pflichtgrund; kein Fake-Upload).
+Beim Submit wird der Ausnahmezustand in `dispo_order_approval_requests`
+eingefroren. Genehmigen (regular/special) erfordert bei Ausnahme-Snapshot die
+explizite Mitfreigabe; Ablehnen nicht. Revision nach Ablehnung erbt die Ausnahme
+nicht. Datei-Upload bleibt offen (UPL-001 teilweise). UPL-003 über SalesInquiry
+(BL-P8-02b).
 
 ## Ist-Stand BL-P8-02b (PO-BLP802B-1)
 

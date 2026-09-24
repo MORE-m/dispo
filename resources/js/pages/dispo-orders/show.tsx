@@ -4,6 +4,7 @@ import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { DispoOrderApprovalActions } from '@/components/dispo-order-approval-actions';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
+import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
 import {
     DispoOrderCommunicationHistory,
     type CommunicationEntry,
@@ -219,6 +220,10 @@ type OrderDetail = {
     status: string;
     status_label: string;
     lock_version: number;
+    customer_confirmation_without_upload?: boolean;
+    customer_confirmation_exception_reason?: string | null;
+    customer_confirmation_exception_set_by_name?: string | null;
+    customer_confirmation_exception_set_at?: string | null;
     source_calculation_number: string;
     calculation_id: number;
     customer_name: string | null;
@@ -295,6 +300,7 @@ export default function DispoOrderShow({
     canViewCalculation,
     canSubmit = false,
     canUpdate = false,
+    canUpdateCustomerConfirmation = false,
     canSyncCalculationDynamicFields = false,
     canApprove = false,
     canReject = false,
@@ -312,6 +318,7 @@ export default function DispoOrderShow({
     canViewCalculation: boolean;
     canSubmit?: boolean;
     canUpdate?: boolean;
+    canUpdateCustomerConfirmation?: boolean;
     canSyncCalculationDynamicFields?: boolean;
     canApprove?: boolean;
     canReject?: boolean;
@@ -326,6 +333,10 @@ export default function DispoOrderShow({
 }) {
     const flash = usePage().props.flash;
     const current = order.current_approval;
+    const requiresExceptionAcknowledgement = Boolean(
+        current?.customer_confirmation_without_upload &&
+        current.customer_confirmation_exception_reason,
+    );
     const headerValues = order.dynamic_field_values ?? {};
     const headerCaptured = order.dynamic_field_captured ?? {};
 
@@ -1069,6 +1080,27 @@ export default function DispoOrderShow({
                     canReject={canReject}
                     isCreator={isCreator}
                     status={order.status}
+                    requiresExceptionAcknowledgement={
+                        requiresExceptionAcknowledgement
+                    }
+                />
+
+                <DispoOrderCustomerConfirmationSection
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    status={order.status}
+                    canEdit={canUpdateCustomerConfirmation}
+                    withoutUpload={Boolean(
+                        order.customer_confirmation_without_upload,
+                    )}
+                    exceptionReason={
+                        order.customer_confirmation_exception_reason ?? null
+                    }
+                    setByName={
+                        order.customer_confirmation_exception_set_by_name ??
+                        null
+                    }
+                    setAt={order.customer_confirmation_exception_set_at ?? null}
                 />
 
                 <DispoOrderOperationalStatusActions

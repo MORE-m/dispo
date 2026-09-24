@@ -1,4 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+    approveWithExceptionAcknowledgement,
+    setCustomerConfirmationException,
+} from './helpers/customer-confirmation';
 
 async function login(page: Page, email: string) {
     await page.goto('/login');
@@ -26,6 +30,7 @@ async function createAndApprove(page: Page): Promise<void> {
     await page.locator('[data-test="dispo-order-submit"]').click();
     await expect(page).toHaveURL(/dispoauftraege\/\d+/, { timeout: 15_000 });
 
+    await setCustomerConfirmationException(page);
     await page.locator('[data-test="dispo-order-submit-open"]').click();
     await page.locator('[data-test="dispo-order-submit-confirm"]').click();
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
@@ -37,8 +42,7 @@ async function createAndApprove(page: Page): Promise<void> {
     await page.context().clearCookies();
     await login(page, 'sales-b@example.com');
     await page.goto(detailUrl);
-    await page.locator('[data-test="dispo-order-approve-open"]').click();
-    await page.locator('[data-test="dispo-order-approve-confirm"]').click();
+    await approveWithExceptionAcknowledgement(page);
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Liegt bei Disposition',
         { timeout: 15_000 },

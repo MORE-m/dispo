@@ -15,8 +15,6 @@ use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
-use App\Services\DispoOrder\DispoOrderApprovalService;
-use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
@@ -25,9 +23,10 @@ use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Database\Seeder;
 
 /**
- * E2E-Seeder BL-P8-02a operativer Statuskern (Port 8035).
+ * E2E-Seeder BL-P8-02c Kundenbestätigungs-Ausnahme (Port 8037).
+ * Liefert Draft ohne Ausnahme – Happy Path setzt sie im Browser.
  */
-class E2EOperationalStatusSeeder extends Seeder
+class E2ECustomerConfirmationExceptionSeeder extends Seeder
 {
     public function run(): void
     {
@@ -54,7 +53,7 @@ class E2EOperationalStatusSeeder extends Seeder
             return;
         }
 
-        $organization = Organization::factory()->create(['name' => 'E2E BL-P8-02a']);
+        $organization = Organization::factory()->create(['name' => 'E2E BL-P8-02c']);
         $spotsCategoryId = (int) AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPOTS)
             ->value('id');
@@ -69,7 +68,7 @@ class E2EOperationalStatusSeeder extends Seeder
         $inventory = Inventory::factory()->create([
             'organization_id' => $organization->id,
             'name' => 'Radio Hamburg',
-            'code' => 'RH802A',
+            'code' => 'RH802C',
             'sort' => 1,
             'logo_path' => null,
         ]);
@@ -84,7 +83,7 @@ class E2EOperationalStatusSeeder extends Seeder
             'inventory_id' => $inventory->id,
             'status' => PriceListStatus::Active,
             'year' => $year,
-            'version' => 'e2e-blp802a-'.$inventory->code,
+            'version' => 'e2e-blp802c-'.$inventory->code,
             'valid_from' => now()->toDateString(),
         ]);
         foreach (range(0, 23) as $hour) {
@@ -99,52 +98,44 @@ class E2EOperationalStatusSeeder extends Seeder
         }
 
         $sales = User::query()->where('email', 'sales@example.com')->firstOrFail();
-        $approver = User::query()->where('email', 'sales-b@example.com')->firstOrFail();
         $freeze = app(ConfigurationSnapshotFreezeService::class);
         $schemaFp = $freeze->resolveLiveSchemaForCalculationV3()['schema_fingerprint'];
         $classicFp = $freeze->resolveLivePositionSchema((int) $classic->id)['schema_fingerprint'];
 
         $writer = app(CalculationWriter::class);
-        $calc = $writer->create([
-            'planning_mode' => 'manual',
-            'customer_name' => 'BLP802A Operativ GmbH',
-            'order_discount_percent' => '0',
-            'schema_fingerprint' => $schemaFp,
-            'positions' => [[
-                'inventory_id' => $inventory->id,
-                'advertising_medium_id' => $classic->id,
-                'schema_fingerprint' => $classicFp,
-                'spot_method' => 'average',
-                'length_seconds' => 30,
-                'total_spot_count' => 10,
-                'position_discount_percent' => '0',
-                'ae_percent' => '0',
-                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
-                'time_ranges' => [[
-                    'start_hour' => 8,
-                    'end_hour_exclusive' => 9,
-                    'day_group' => 'mo_fr',
-                    'spot_count' => 10,
+        $dispoWriter = app(DispoOrderWriter::class);
+
+        foreach ([
+            'BLP802C Happy Path GmbH',
+            'BLP802C Disposition Negativ GmbH',
+        ] as $customerName) {
+            $calc = $writer->create([
+                'planning_mode' => 'manual',
+                'customer_name' => $customerName,
+                'order_discount_percent' => '0',
+                'schema_fingerprint' => $schemaFp,
+                'positions' => [[
+                    'inventory_id' => $inventory->id,
+                    'advertising_medium_id' => $classic->id,
+                    'schema_fingerprint' => $classicFp,
+                    'spot_method' => 'average',
+                    'length_seconds' => 30,
+                    'total_spot_count' => 10,
+                    'position_discount_percent' => '0',
+                    'ae_percent' => '0',
+                    'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+                    'time_ranges' => [[
+                        'start_hour' => 8,
+                        'end_hour_exclusive' => 9,
+                        'day_group' => 'mo_fr',
+                        'spot_count' => 10,
+                    ]],
                 ]],
-            ]],
-        ], $sales);
+            ], $sales);
 
-        /** @var list<int> $positionIds */
-        $positionIds = array_values($calc->positions()->pluck('id')->all());
-        $order = app(DispoOrderWriter::class)
-            ->createFromCalculation($calc, $positionIds, $sales)
-            ->order;
-
-        $approvals = app(DispoOrderApprovalService::class);
-        $confirmations = app(DispoOrderCustomerConfirmationService::class);
-        $order = $confirmations->update(
-            $order,
-            $sales,
-            $order->lock_version,
-            true,
-            'Kundenfreigabe liegt per E-Mail vor; Upload wird nachgereicht.',
-        );
-        $submitted = $approvals->submit($order, $sales, $order->lock_version);
-        $approvals->approve($submitted, $approver, $submitted->lock_version, null, true);
+            /** @var list<int> $positionIds */
+            $positionIds = array_values($calc->positions()->pluck('id')->all());
+            $dispoWriter->createFromCalculation($calc, $positionIds, $sales);
+        }
     }
 }

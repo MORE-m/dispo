@@ -23,6 +23,13 @@ export type ApprovalHistoryEntry = {
     decided_at: string | null;
     rejection_reason: string | null;
     decision_note: string | null;
+    customer_confirmation_without_upload?: boolean;
+    customer_confirmation_exception_reason?: string | null;
+    customer_confirmation_exception_set_by_name?: string | null;
+    customer_confirmation_exception_set_at?: string | null;
+    customer_confirmation_exception_acknowledged?: boolean;
+    customer_confirmation_exception_acknowledged_by_name?: string | null;
+    customer_confirmation_exception_acknowledged_at?: string | null;
 };
 
 export type DispoOrderRevisionLink = {

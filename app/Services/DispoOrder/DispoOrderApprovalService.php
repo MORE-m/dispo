@@ -11,6 +11,7 @@ use App\Models\DispoOrderApprovalRequest;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +21,7 @@ final class DispoOrderApprovalService
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
+        private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
     ) {}
 
     public function submit(DispoOrder $order, User $user, int $expectedLockVersion): DispoOrder
@@ -40,6 +42,7 @@ final class DispoOrderApprovalService
                 }
 
                 $this->dynamicFields->assertReadyForSubmit($locked);
+                $this->customerConfirmation->assertReadyForSubmit($locked);
 
                 if ($locked->pendingApprovalRequest()->exists()) {
                     throw new DispoOrderConflictException(
@@ -60,6 +63,13 @@ final class DispoOrderApprovalService
                 $request->status = DispoOrderApprovalStatus::Pending;
                 $request->kind = $kind;
                 $request->special_approval_reasons = $reasons;
+                $request->customer_confirmation_without_upload = (bool) $locked->customer_confirmation_without_upload;
+                $request->customer_confirmation_exception_reason = $locked->customer_confirmation_exception_reason;
+                $request->customer_confirmation_exception_set_by_id = $locked->customer_confirmation_exception_set_by_id;
+                $request->customer_confirmation_exception_set_by_name = $locked->customer_confirmation_exception_set_by_name;
+                $request->customer_confirmation_exception_set_at = $locked->customer_confirmation_exception_set_at
+                    ? CarbonImmutable::instance($locked->customer_confirmation_exception_set_at)
+                    : null;
                 $request->submitted_by_id = $user->id;
                 $request->submitted_by_name = $user->name;
                 $request->submitted_at = now();
@@ -91,6 +101,8 @@ final class DispoOrderApprovalService
                         'approval_request_id' => $request->id,
                         'cycle_number' => $request->cycle_number,
                         'submitted_at' => $request->submitted_at->toIso8601String(),
+                        'customer_confirmation_without_upload' => (bool) $request->customer_confirmation_without_upload,
+                        'customer_confirmation_exception_reason' => $request->customer_confirmation_exception_reason,
                     ],
                 );
 
@@ -103,9 +115,20 @@ final class DispoOrderApprovalService
         }
     }
 
-    public function approve(DispoOrder $order, User $user, int $expectedLockVersion, ?string $note = null): DispoOrder
-    {
-        return DB::transaction(function () use ($order, $user, $expectedLockVersion, $note): DispoOrder {
+    public function approve(
+        DispoOrder $order,
+        User $user,
+        int $expectedLockVersion,
+        ?string $note = null,
+        bool $customerConfirmationExceptionAcknowledged = false,
+    ): DispoOrder {
+        return DB::transaction(function () use (
+            $order,
+            $user,
+            $expectedLockVersion,
+            $note,
+            $customerConfirmationExceptionAcknowledged,
+        ): DispoOrder {
             $locked = $this->lockOrder($order);
             $this->assertLockVersion($locked, $expectedLockVersion);
             DispoOrderStatusTransition::assertCanTransition(
@@ -118,6 +141,19 @@ final class DispoOrderApprovalService
             $trimmedNote = $note === null ? null : trim($note);
             if ($trimmedNote === '') {
                 $trimmedNote = null;
+            }
+
+            if ($request->hasCustomerConfirmationExceptionSnapshot()) {
+                if (! $customerConfirmationExceptionAcknowledged) {
+                    throw ValidationException::withMessages([
+                        'customer_confirmation_exception_acknowledged' => 'Die Ausnahme ohne Kundenbestätigungs-Upload muss ausdrücklich mitfreigegeben werden.',
+                    ]);
+                }
+
+                $request->customer_confirmation_exception_acknowledged = true;
+                $request->customer_confirmation_exception_acknowledged_by_id = $user->id;
+                $request->customer_confirmation_exception_acknowledged_by_name = $user->name;
+                $request->customer_confirmation_exception_acknowledged_at = CarbonImmutable::now();
             }
 
             $request->status = DispoOrderApprovalStatus::Approved;
@@ -134,6 +170,23 @@ final class DispoOrderApprovalService
 
             $fresh = $this->reload($locked);
 
+            $newValues = [
+                'status' => $fresh->status->value,
+                'lock_version' => $fresh->lock_version,
+                'approval_kind' => $request->kind->value,
+                'approval_request_id' => $request->id,
+                'decision_note' => $trimmedNote,
+                'decided_at' => $request->decided_at->toIso8601String(),
+            ];
+
+            if ($request->customer_confirmation_exception_acknowledged) {
+                $newValues['customer_confirmation_exception_acknowledged'] = true;
+                $newValues['customer_confirmation_exception_acknowledged_by_id'] = $request->customer_confirmation_exception_acknowledged_by_id;
+                $newValues['customer_confirmation_exception_acknowledged_by_name'] = $request->customer_confirmation_exception_acknowledged_by_name;
+                $newValues['customer_confirmation_exception_acknowledged_at'] = $request->customer_confirmation_exception_acknowledged_at?->toIso8601String();
+                $newValues['customer_confirmation_exception_reason'] = $request->customer_confirmation_exception_reason;
+            }
+
             $this->audit->record(
                 $fresh,
                 'dispo_order.approved',
@@ -143,14 +196,7 @@ final class DispoOrderApprovalService
                     'lock_version' => $expectedLockVersion,
                     'approval_request_id' => $request->id,
                 ],
-                [
-                    'status' => $fresh->status->value,
-                    'lock_version' => $fresh->lock_version,
-                    'approval_kind' => $request->kind->value,
-                    'approval_request_id' => $request->id,
-                    'decision_note' => $trimmedNote,
-                    'decided_at' => $request->decided_at->toIso8601String(),
-                ],
+                $newValues,
             );
 
             return $fresh;

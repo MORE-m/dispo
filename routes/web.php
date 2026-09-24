@@ -46,6 +46,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dispoauftraege/{dispoOrder}/spotverteilung.xlsx', [DispoOrderController::class, 'exportSpotDistribution'])
         ->name('dispo-orders.export-spot-distribution');
     Route::patch('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'update'])->name('dispo-orders.update');
+    Route::put('dispoauftraege/{dispoOrder}/kundenbestaetigung', [DispoOrderController::class, 'updateCustomerConfirmation'])
+        ->name('dispo-orders.customer-confirmation.update');
     Route::patch('dispoauftraege/{dispoOrder}/positions-angaben', [DispoOrderController::class, 'updatePositionCustoms'])
         ->name('dispo-orders.update-position-customs');
     Route::post('dispoauftraege/{dispoOrder}/sync-calculation-dynamic-fields', [DispoOrderController::class, 'syncCalculationDynamicFields'])

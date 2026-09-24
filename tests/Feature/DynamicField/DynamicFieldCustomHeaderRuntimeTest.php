@@ -28,6 +28,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -37,6 +38,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_both_only_calc_does_not_appear_in_dispo_snapshot(): void
@@ -315,6 +317,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
             ->assertRedirect();
 
         $first->refresh();
+        $first = $this->seedCustomerConfirmationException($first, $creator);
         $approvals->submit($first, $creator, $first->lock_version);
         $first->refresh();
         $approvals->reject($first, $approver, $first->lock_version, 'Bitte nachbessern');
@@ -573,6 +576,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
             ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
             ->order;
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,
@@ -589,6 +593,7 @@ class DynamicFieldCustomHeaderRuntimeTest extends TestCase
             ->assertRedirect();
 
         $order->refresh();
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,

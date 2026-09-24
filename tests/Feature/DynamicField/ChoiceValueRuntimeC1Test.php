@@ -25,6 +25,7 @@ use App\Services\DynamicField\ConfigurationSnapshotMaterializer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -34,6 +35,7 @@ class ChoiceValueRuntimeC1Test extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_calc_header_select_persist_export_reload_and_missing_key_keeps_value(): void
@@ -424,6 +426,7 @@ class ChoiceValueRuntimeC1Test extends TestCase
             ->createFromCalculation($calculation, $calculation->positions()->pluck('id')->all(), $user)
             ->order;
 
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,
@@ -450,6 +453,7 @@ class ChoiceValueRuntimeC1Test extends TestCase
         $this->assertSame(['opt_a', 'opt_b'], $row->value_json);
 
         $order->refresh();
+        $order = $this->seedCustomerConfirmationException($order, $user);
         $this->actingAs($user)
             ->post(route('dispo-orders.submit', $order), [
                 'lock_version' => $order->lock_version,

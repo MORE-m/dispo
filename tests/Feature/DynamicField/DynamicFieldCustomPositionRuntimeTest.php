@@ -33,6 +33,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
+use Tests\Concerns\EnsuresCustomerConfirmationException;
 use Tests\TestCase;
 
 /**
@@ -42,6 +43,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
 {
     use CreatesSavedCalculation;
     use CreatesSpotClassicCatalog;
+    use EnsuresCustomerConfirmationException;
     use RefreshDatabase;
 
     public function test_reorder_positions_keeps_values_by_client_key(): void
@@ -692,6 +694,7 @@ class DynamicFieldCustomPositionRuntimeTest extends TestCase
             ->assertRedirect();
 
         $first->refresh();
+        $first = $this->seedCustomerConfirmationException($first, $creator);
         $approvals->submit($first, $creator, $first->lock_version);
         $first->refresh();
         $approvals->reject($first, $approver, $first->lock_version, 'Bitte nachbessern');
