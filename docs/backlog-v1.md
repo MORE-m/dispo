@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -407,7 +407,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** teilweise (`BL-P8-02a` + `BL-P8-02b` + `BL-P8-02c` Ausnahmeweg umgesetzt; Uploadweg/Rest offen)
+- **Status:** teilweise (`BL-P8-02a` + `BL-P8-02b` + `BL-P8-02c` Ausnahmeweg + `BL-P8-02d` Invoice/Completion umgesetzt; Uploadweg/Storno/Reopen offen)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
@@ -466,10 +466,23 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** Feature Confirmation/Approval; MySQL-Concurrency; Vitest;
   Playwright Port **8037** (`test:e2e:blp802c`)
 
-### BL-P8-02 – Rest nach 02a/02b/02c
+### BL-P8-02d – Rechnung per Ende + Completion (PO-BLP802D-1)
+
+- **Phase:** 8
+- **Status:** umgesetzt (manuelle Abnahme separat)
+- **Anforderungen:** `INV-001`–`INV-003`, `STA-006`, Abschlussbedingungen, `AT-18`
+- **Abhängigkeiten:** BL-P8-02c
+- **Ergebnis:** `invoice_end_months` je Position; Completion-Readiness A–E;
+  `disposed → completed`; Admin-Override mit Pflichtbegründung + Audit
+- **Bewusst nicht:** Completed-Reopen, Cancelled/Storno (02e), File-Upload,
+  Notifications, Freigabeinvalidierung, Betragsaufteilung
+- **Tests:** Feature Invoice/Completion; MySQL-Concurrency; Vitest;
+  Playwright Port **8038** (`test:e2e:blp802d`)
+
+### BL-P8-02 – Rest nach 02a/02b/02c/02d
 
 - **Weiter offen:** allgemeine Kommentare; Kundenbestätigungs-**Dateiupload**;
-  Completion-Prüfungen; Completed; Cancelled; Rechnung-per-Ende;
+  Cancelled/Storno; Reopen nach Completed (`BL-P8-02e` / AT-19);
   weitergehende operative Bearbeitung; allgemeine Uploads; Notifications;
   Freigabeinvalidierung
 - **Hinweis:** Enum-Labels allein zählen nicht als Umsetzung.

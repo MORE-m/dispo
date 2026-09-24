@@ -757,17 +757,58 @@ final class DispoOrderDynamicFieldWriter
 
     public function assertReadyForSubmit(DispoOrder $order): void
     {
+        $missing = $this->collectMissingRequiredFields($order);
+        if ($missing['errors'] !== []) {
+            throw ValidationException::withMessages($missing['errors']);
+        }
+
+        $snapshot = $this->requireSnapshot($order);
+        $order->loadMissing(['positions.fieldValues.snapshotFieldDefinition', 'fieldValues.snapshotFieldDefinition']);
+        $headerValues = $this->headerValuesForValidation($order, $snapshot);
+
+        $positionContexts = [];
+        foreach ($order->positions->values() as $index => $position) {
+            $positionContexts[] = [
+                'index' => $index,
+                'position' => $position,
+                'values' => $this->positionValuesForValidation($position, $snapshot),
+            ];
+        }
+
+        $this->validateRules($snapshot, $headerValues, $positionContexts);
+    }
+
+    /**
+     * Sichtbare Pflichtfelder laut Frozen Snapshot (Completion / Submit).
+     *
+     * @return array{
+     *     errors: array<string, string>,
+     *     violations: list<array{message: string, field_label: string, scope: string}>
+     * }
+     */
+    public function collectMissingRequiredFields(DispoOrder $order): array
+    {
         $snapshot = $this->requireSnapshot($order);
         $order->loadMissing(['positions.fieldValues.snapshotFieldDefinition', 'fieldValues.snapshotFieldDefinition']);
 
         $gaps = $this->calcOriginCaptureGaps($order, $snapshot);
         if ($gaps !== []) {
-            throw ValidationException::withMessages([
-                'dynamic_field_values' => 'Dynamische Zeitraumfelder fehlen. Bitte „Dynamische Zeitraumfelder aus Kalkulation übernehmen“ ausführen oder einen neuen Dispoauftrag anlegen.',
-            ]);
+            $message = 'Dynamische Zeitraumfelder fehlen. Bitte „Dynamische Zeitraumfelder aus Kalkulation übernehmen“ ausführen oder einen neuen Dispoauftrag anlegen.';
+
+            return [
+                'errors' => [
+                    'dynamic_field_values' => $message,
+                ],
+                'violations' => [[
+                    'message' => $message,
+                    'field_label' => 'Dynamische Zeitraumfelder',
+                    'scope' => 'header',
+                ]],
+            ];
         }
 
         $errors = [];
+        $violations = [];
         $headerValues = $this->headerValuesForValidation($order, $snapshot);
         foreach ($snapshot->fieldDefinitions->where('scope', FieldScope::Header) as $def) {
             if (! $def->required) {
@@ -785,7 +826,13 @@ final class DispoOrderDynamicFieldWriter
 
             $raw = $this->readHeaderValue($order, $def);
             if ($this->isRequiredCustomEmpty($def, $raw)) {
-                $errors["dynamic_field_values.{$def->key}"] = $def->label.' ist erforderlich.';
+                $message = $def->label.' ist erforderlich.';
+                $errors["dynamic_field_values.{$def->key}"] = $message;
+                $violations[] = [
+                    'message' => $message,
+                    'field_label' => $def->label,
+                    'scope' => 'header',
+                ];
             }
         }
         foreach ($order->positions as $position) {
@@ -813,25 +860,21 @@ final class DispoOrderDynamicFieldWriter
 
                 $raw = $this->readPositionValue($position, $def);
                 if ($this->isRequiredCustomEmpty($def, $raw)) {
-                    $errors["position_dynamic_field_values.{$position->id}.{$def->key}"] =
-                        $def->label.' ist erforderlich.';
+                    $message = $def->label.' ist erforderlich.';
+                    $errors["position_dynamic_field_values.{$position->id}.{$def->key}"] = $message;
+                    $violations[] = [
+                        'message' => $message,
+                        'field_label' => $def->label,
+                        'scope' => 'position',
+                    ];
                 }
             }
         }
-        if ($errors !== []) {
-            throw ValidationException::withMessages($errors);
-        }
 
-        $positionContexts = [];
-        foreach ($order->positions->values() as $index => $position) {
-            $positionContexts[] = [
-                'index' => $index,
-                'position' => $position,
-                'values' => $this->positionValuesForValidation($position, $snapshot),
-            ];
-        }
-
-        $this->validateRules($snapshot, $headerValues, $positionContexts);
+        return [
+            'errors' => $errors,
+            'violations' => $violations,
+        ];
     }
 
     /**

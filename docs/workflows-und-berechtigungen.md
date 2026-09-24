@@ -192,8 +192,13 @@ Ein Abschluss ist nur zulässig, wenn:
 - Kundenbestätigung oder freigegebene Ausnahme vorliegt,
 - alle erforderlichen Freigaben gültig sind.
 
+**BL-P8-02d / PO-BLP802D-1:** Serverseitige Completion-Readiness prüft genau diese
+fünf Punkte (Frozen Dyn-Felder, offene SalesInquiry, Frozen Period +
+`invoice_end_months`, genehmigte 02c-Ausnahme mit Ack, gültige Approved-Freigabe).
+Übergang nur bewusst `disposed → completed` (Disposition/Admin/GF).
 Admin darf den Abschluss mit Pflichtbegründung erzwingen. Verletzte Prüfungen,
-Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`).
+Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed ist in
+02d terminal (kein Reopen/Storno – folgt in 02e).
 
 ## Dispositionsrechte
 

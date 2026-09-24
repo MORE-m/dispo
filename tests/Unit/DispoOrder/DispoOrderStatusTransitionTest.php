@@ -65,7 +65,6 @@ class DispoOrderStatusTransitionTest extends TestCase
             [DispoOrderStatus::InProgress, DispoOrderStatus::Completed],
             [DispoOrderStatus::InProgress, DispoOrderStatus::Cancelled],
             [DispoOrderStatus::MaterialMissing, DispoOrderStatus::Disposed],
-            [DispoOrderStatus::Disposed, DispoOrderStatus::Completed],
             [DispoOrderStatus::Disposed, DispoOrderStatus::Cancelled],
             [DispoOrderStatus::Completed, DispoOrderStatus::InProgress],
             [DispoOrderStatus::ApprovalRejected, DispoOrderStatus::InProgress],
@@ -82,6 +81,22 @@ class DispoOrderStatusTransitionTest extends TestCase
     ): void {
         $this->assertFalse(DispoOrderStatusTransition::canTransition($from, $to));
         $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    public function test_disposed_to_completed_is_completion_not_operational(): void
+    {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Completed,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCompletionTransition(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Completed,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Completed,
+        ));
     }
 
     /**

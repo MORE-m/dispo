@@ -293,6 +293,27 @@ E2E: `npm run test:e2e:blp802c` bzw.
 `database/e2e-bl-p8-02c.sqlite`, Seeder `E2ECustomerConfirmationExceptionSeeder` – niemals
 gegen die Entwicklungs-DB).
 
+## BL-P8-02d – Rechnung per Ende + Completion
+
+Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;
+`is_completion_override` + `completion_override_violations` auf
+`dispo_order_status_events`.
+
+Services: `DispoOrderInvoiceEndService`, `DispoOrderCompletionReadiness`,
+`DispoOrderCompletionService`. Endpunkte
+`PUT …/positionen/{position}/rechnung-per-ende` und
+`POST …/abschliessen`.
+
+Tests: `DispoOrderInvoiceEndMonthsTest`, `DispoOrderCompletionTest`,
+`DispoOrderCompletionConcurrencyTest` (MySQL); Vitest
+`dispo-order-invoice-end-months.test.tsx`,
+`dispo-order-completion-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp802d` bzw.
+`npx playwright test -c playwright.blp802d.config.ts` (Port **8038**, DB
+`database/e2e-bl-p8-02d.sqlite`, Seeder `E2EInvoiceCompletionSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P8-02b – Rückfrage Vertrieb
 
 Migration `dispo_order_comments` (append-only). Service

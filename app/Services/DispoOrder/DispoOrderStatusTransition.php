@@ -6,7 +6,8 @@ use App\Enums\DispoOrderStatus;
 use App\Exceptions\DispoOrderConflictException;
 
 /**
- * Erlaubte Statusübergänge: Freigabe + operativer Kern (BL-P8-02a) + Rückfrage (BL-P8-02b).
+ * Erlaubte Statusübergänge: Freigabe + operativer Kern (BL-P8-02a) + Rückfrage (BL-P8-02b)
+ * + Abschluss (BL-P8-02d).
  */
 final class DispoOrderStatusTransition
 {
@@ -44,6 +45,7 @@ final class DispoOrderStatusTransition
             ],
             DispoOrderStatus::Disposed => [
                 DispoOrderStatus::InProgress,
+                DispoOrderStatus::Completed,
             ],
             DispoOrderStatus::SalesInquiry => [
                 DispoOrderStatus::AtDisposition,
@@ -120,6 +122,32 @@ final class DispoOrderStatusTransition
     {
         return self::isSalesInquiryAsk($from, $to)
             || self::isSalesInquiryAnswer($from, $to);
+    }
+
+    public static function isCompletionTransition(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return $from === DispoOrderStatus::Disposed
+            && $to === DispoOrderStatus::Completed;
+    }
+
+    /**
+     * Status, in denen „Rechnung per Ende“ operativ gepflegt werden darf (BL-P8-02d).
+     *
+     * @return list<DispoOrderStatus>
+     */
+    public static function invoiceEndEditableStatuses(): array
+    {
+        return [
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::MaterialMissing,
+            DispoOrderStatus::MaterialReceived,
+        ];
+    }
+
+    public static function isInvoiceEndEditable(DispoOrderStatus $status): bool
+    {
+        return in_array($status, self::invoiceEndEditableStatuses(), true);
     }
 
     public static function requiresReason(DispoOrderStatus $from, DispoOrderStatus $to): bool

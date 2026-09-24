@@ -20,6 +20,8 @@ use LogicException;
  * @property CarbonImmutable $changed_at
  * @property string|null $reason
  * @property bool $is_reopen
+ * @property bool $is_completion_override
+ * @property list<array<string, mixed>>|null $completion_override_violations
  * @property int $lock_version_after
  */
 class DispoOrderStatusEvent extends Model
@@ -33,6 +35,8 @@ class DispoOrderStatusEvent extends Model
         'changed_at',
         'reason',
         'is_reopen',
+        'is_completion_override',
+        'completion_override_violations',
         'lock_version_after',
     ];
 
@@ -46,6 +50,8 @@ class DispoOrderStatusEvent extends Model
             'to_status' => DispoOrderStatus::class,
             'changed_at' => 'datetime',
             'is_reopen' => 'boolean',
+            'is_completion_override' => 'boolean',
+            'completion_override_violations' => 'array',
             'lock_version_after' => 'integer',
         ];
     }

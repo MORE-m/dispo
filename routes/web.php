@@ -60,6 +60,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.reject');
     Route::post('dispoauftraege/{dispoOrder}/status', [DispoOrderController::class, 'transitionOperationalStatus'])
         ->name('dispo-orders.transition-status');
+    Route::put('dispoauftraege/{dispoOrder}/positionen/{position}/rechnung-per-ende', [DispoOrderController::class, 'updateInvoiceEndMonths'])
+        ->name('dispo-orders.positions.invoice-end');
+    Route::post('dispoauftraege/{dispoOrder}/abschliessen', [DispoOrderController::class, 'complete'])
+        ->name('dispo-orders.complete');
     Route::post('dispoauftraege/{dispoOrder}/rueckfragen', [DispoOrderController::class, 'askSalesInquiry'])
         ->name('dispo-orders.sales-inquiry.ask');
     Route::post('dispoauftraege/{dispoOrder}/rueckfragen/{comment}/antwort', [DispoOrderController::class, 'answerSalesInquiry'])
