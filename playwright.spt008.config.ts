@@ -18,10 +18,7 @@ const e2eLogDir = path.resolve(
     process.env.E2E_SPT008_LOG_DIR ?? 'storage/logs/spt008',
 );
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
-const serverWrapper = path.join(
-    root,
-    'tests/e2e/helpers/run-spt008-server.sh',
-);
+const serverWrapper = path.join(root, 'tests/e2e/helpers/run-spt008-server.sh');
 
 const e2eEnv = {
     APP_ENV: 'testing',
