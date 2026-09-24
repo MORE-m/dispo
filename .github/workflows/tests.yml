@@ -210,6 +210,10 @@ jobs:
       - name: Browser SPT-008 isolated tests
         run: npx playwright test -c playwright.spt008.config.ts
 
+      - name: SPT-008 server log on failure
+        if: failure()
+        run: tail -n 200 storage/logs/spt008-server.log || true
+
   mysql:
     runs-on: ubuntu-latest
 

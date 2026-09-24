@@ -6,13 +6,11 @@ import { defineConfig, devices } from '@playwright/test';
  * SPT-008 isolierte E2E-Suite: Spotverteilungs-XLSX-Export.
  * Eigene SQLite-DB, Port 8033.
  */
-const e2eDb = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    'database/e2e-spt-008.sqlite',
-);
-
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+const e2eDb = path.resolve(root, 'database/e2e-spt-008.sqlite');
 const e2ePort = process.env.E2E_SPT008_PORT ?? '8033';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
+const serverWrapper = path.join(root, 'tests/e2e/helpers/run-spt008-server.sh');
 
 const e2eEnv = {
     APP_ENV: 'testing',
@@ -23,6 +21,8 @@ const e2eEnv = {
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: e2eDb,
     DB_URL: '',
+    E2E_SPT008_PORT: e2ePort,
+    E2E_SPT008_DB: e2eDb,
 };
 
 const prepareAssets = process.env.CI
@@ -54,7 +54,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php -d memory_limit=512M artisan migrate --force && php -d memory_limit=512M artisan db:seed --class=E2ESpotDistributionExportSeeder --force && php -d memory_limit=512M artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        command: `${prepareAssets} && chmod +x "${serverWrapper}" && "${serverWrapper}"`,
         url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 300_000,
