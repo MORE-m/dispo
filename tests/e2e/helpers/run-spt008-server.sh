@@ -30,15 +30,15 @@ touch "$DB"
 php -d memory_limit=512M artisan migrate --force >>"$LOG" 2>&1
 php -d memory_limit=512M artisan db:seed --class=E2ESpotDistributionExportSeeder --force >>"$LOG" 2>&1
 
-# --no-reload: avoid artisan supervisor restarts on .env touches during diagnose
+# Foreground serve (no --no-reload here: diagnose must not change serve mode yet)
 php -d memory_limit=512M artisan serve \
   --host=127.0.0.1 \
   --port="${PORT}" \
-  --no-reload \
   >>"$LOG" 2>&1 &
 PARENT_PID=$!
 echo "${PARENT_PID}" >"$PID_FILE"
 echo "SPT008_SERVER_PARENT_PID=${PARENT_PID}" | tee -a "$LOG"
+echo "SPT008_SERVER_OPTS=default (no --no-reload)" | tee -a "$LOG"
 
 # artisan serve typically spawns a PHP built-in server child
 sleep 0.5
