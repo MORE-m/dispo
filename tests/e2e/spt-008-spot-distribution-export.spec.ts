@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -74,8 +74,12 @@ async function login(page: Page, email: string) {
 }
 
 /**
- * UI-Export auslösen und XLSX dabei per Route-Intercept speichern.
- * Vermeidet flaky Download-Events und doppelte Export-Requests.
+ * UI-Export auslösen und XLSX über den echten Browser-Download speichern.
+ *
+ * Produkt-UI: fetch() → Blob → object-URL → <a download>.
+ * Kein page.route()/route.fetch()-Proxy (CI-Crash auf streamDownload).
+ * Content-Disposition kommt aus dem beobachteten Netzwerk-Response;
+ * Dateiinhalt aus dem Download-Event (Blob-Downloads mit acceptDownloads).
  */
 async function exportViaUi(
     page: Page,
@@ -90,31 +94,36 @@ async function exportViaUi(
     await expect(button).toBeEnabled();
 
     const target = path.join(root, 'database', targetName);
-    let contentDisposition: string | null = null;
-    let sawExport = false;
 
-    await page.route('**/spotverteilung.xlsx', async (route) => {
-        const response = await route.fetch();
-        contentDisposition =
-            response.headers()['content-disposition'] ?? null;
-        const body = await response.body();
-        writeFileSync(target, body);
-        sawExport = true;
-        await route.fulfill({ response });
+    const responsePromise = page.waitForResponse(
+        (response) =>
+            response.url().includes('/spotverteilung.xlsx') &&
+            response.request().method() === 'GET',
+        { timeout: 90_000 },
+    );
+    const downloadPromise = page.waitForEvent('download', {
+        timeout: 90_000,
     });
 
-    try {
-        await button.click();
-        await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
-            timeout: 90_000,
-        });
-        await expect(
-            page.locator('[data-test="dispo-spot-distribution-export-error"]'),
-        ).toHaveCount(0);
-        expect(sawExport).toBe(true);
-    } finally {
-        await page.unroute('**/spotverteilung.xlsx');
-    }
+    await button.click();
+
+    const [response, download] = await Promise.all([
+        responsePromise,
+        downloadPromise,
+    ]);
+
+    expect(response.ok()).toBe(true);
+
+    const contentDisposition =
+        response.headers()['content-disposition'] ?? null;
+    await download.saveAs(target);
+
+    await expect(button).toHaveText('Spotplanung exportieren (XLSX)', {
+        timeout: 90_000,
+    });
+    await expect(
+        page.locator('[data-test="dispo-spot-distribution-export-error"]'),
+    ).toHaveCount(0);
 
     return { target, contentDisposition };
 }

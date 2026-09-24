@@ -59,5 +59,9 @@ export default defineConfig({
         reuseExistingServer: false,
         timeout: 300_000,
         env: e2eEnv,
+        // Artisan-serve-Ausgaben bei Crash/Hang im CI-Log sichtbar lassen
+        // (kein Retry-Ersatz — nur Diagnostik).
+        stdout: 'pipe',
+        stderr: 'pipe',
     },
 });
