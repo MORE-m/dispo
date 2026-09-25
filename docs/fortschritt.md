@@ -1,9 +1,9 @@
 # Fortschritt V1
 
 Stand: 25. September 2026 – **BL-P9-01b** feste Materialuploads + Audio / UPL-007
-(PO-BLP901B-1). Base: `main` `c64518dcc53ad154b973f3a99649f4ab075f09d8`
-(inkl. PR **#80** BL-P9-01a). Umsetzung auf Feature-Branch; Merge/manuelle
-Abnahme ausstehend.
+(PO-BLP901B-1) **manuell abgenommen** (Feature-HEAD `0adacb3…`). Base: `main`
+`c64518dcc53ad154b973f3a99649f4ab075f09d8` (inkl. PR **#80** BL-P9-01a). Merge
+PR **#82** folgt nach Abschluss-Gates.
 
 ## Aktuelle Phase
 
@@ -14,14 +14,15 @@ Uploadliste (UPL-004 Rest → **BL-P9-01c**).
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01b** umgesetzt (PO-BLP901B-1). Nächster Slice nur nach expliziter
+**BL-P9-01b** manuell abgenommen (PO-BLP901B-1). Nächster Slice nur nach expliziter
 PO-Teilfreigabe: **BL-P9-01c** Dyn-Feld-Dateien in zentraler Uploadliste.
 Kein automatisches BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01b** Material- + Audio-Uploads (dieser PR). Davor: PR **#80** BL-P9-01a
-auf `main` (Merge `3ba505735…`), manuell abgenommen.
+**BL-P9-01b** Material- + Audio-Uploads (PR **#82**, Feature-HEAD `0adacb3…`,
+manuell abgenommen inkl. Smoke/MP3-Nachtest Port **8041**). Davor: PR **#80**
+BL-P9-01a auf `main` (Merge `3ba505735…`), manuell abgenommen.
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
 
@@ -39,7 +40,10 @@ auf `main` (Merge `3ba505735…`), manuell abgenommen.
 | UPL-007 | **ERFÜLLT** |
 | UPL-005 feste Kategorien | **ERFÜLLT** |
 | UPL-004 / `BL-P9-01` | **weiter teilweise** (Dyn-Feld-Dateien offen → 01c) |
-| Manuelle Abnahme | **offen** (separat nach CI) |
+| Feature-HEAD | `0adacb3c4a83f8b763a83b51916c4e5342a68623` |
+| CI Feature-HEAD | Run `36182337813` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Manuelle Abnahme | **ERFOLGREICH** (Port **8041** / `e2e-bl-p9-01b.sqlite`; Smoke + echte MP3) |
+| Merge `main` | **PR #82** (Abschluss-Merge) |
 | Dyn-Feld-Dateien / Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01a – Upload-Fundament + Kundenbestätigung / PO-BLP901A-1 (September 2026)

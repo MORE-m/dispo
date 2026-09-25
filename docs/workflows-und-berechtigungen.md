@@ -191,8 +191,8 @@ Post-Merge CI `36152091905` SUCCESS): Upload-Fundament + Kundenbestätigung.
 
 ## Ist-Stand BL-P9-01b (PO-BLP901B-1)
 
-**UMGESETZT** (Feature-PR; Merge/manuelle Abnahme ausstehend): feste
-Materialuploads + Audio.
+**umgesetzt + manuell abgenommen** (PR **#82**, Feature-HEAD `0adacb3…`;
+Port **8041** Smoke + echte MP3): feste Materialuploads + Audio.
 
 - Generischer Endpoint `POST …/uploads` für Materialkategorien; `customer_confirmation`
   dort abgewiesen (Sonderpfad bleibt)

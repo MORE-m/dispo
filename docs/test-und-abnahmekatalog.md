@@ -160,7 +160,10 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Rollen Upload: Sales/Disposition/Admin/Management; PM NEIN; Archiv: Admin
 - Statusmatrix laut PO-BLP901B-1; keine Freigabeinvalidierung; kein Status-Automatismus
 - Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901b` (Port **8041**)
-- Manuelle Abnahme: **offen** (separat nach CI)
+- PR **#82**; Feature-HEAD `0adacb3c4a83f8b763a83b51916c4e5342a68623`;
+  CI Run `36182337813` SUCCESS
+- Manuelle Abnahme: **SUCCESS** (Port **8041** / `e2e-bl-p9-01b.sqlite`;
+  Smoke + echte abspielbare MP3 filesamples sample1, play/seek)
 - UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
   UPL-004 teilweise (Dyn-Feld-Dateien → BL-P9-01c); `BL-P9-01` teilweise
 

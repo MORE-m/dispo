@@ -531,7 +531,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01b – Materialuploads + Audio (PO-BLP901B-1)
 
 - **Phase:** 9
-- **Status:** **UMGESETZT** (Feature-PR; Merge/manuelle Abnahme ausstehend)
+- **Status:** **umgesetzt + manuell abgenommen** (PR **#82**, Feature-HEAD `0adacb3…`)
 - **Kennung:** PO-BLP901B-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01b
 - **Anforderungen:** `UPL-007` (vollständig), `UPL-005` (feste Kategorien),
   `UPL-006` (unverändert), `UPL-004` (weiter teilweise)
@@ -556,6 +556,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** `DispoOrderMaterialUploadTest`, `DispoOrderAudioPlaybackTest`,
   `DispoOrderMaterialUploadMysqlTest`; Vitest Material-Sektion; Playwright Port
   **8041** (`test:e2e:blp901b`)
+- **Manuelle Abnahme:** **SUCCESS** – Port **8041** / `e2e-bl-p9-01b.sqlite`,
+  HEAD `0adacb3…`; Smoke (Briefing/Audio/Mixed/Archiv/Status-CC) + echte MP3
+  (filesamples sample1, play/seek)
 
 ### BL-P9-01 – Uploads und Audio
 
