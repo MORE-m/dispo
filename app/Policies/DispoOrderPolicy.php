@@ -45,6 +45,31 @@ class DispoOrderPolicy
     }
 
     /**
+     * Kundenbestätigungs-Upload (BL-P9-01a / PO-BLP901A-1).
+     * Gleiche Draft-Rollen wie {@see updateCustomerConfirmation()}.
+     */
+    public function uploadCustomerConfirmation(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $this->updateCustomerConfirmation($user, $dispoOrder);
+    }
+
+    /**
+     * Upload archivieren – nur Admin (UPL-005).
+     */
+    public function archiveUpload(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasRole(Role::Admin);
+    }
+
+    /**
+     * Autorisierter Download privater Uploads – gleiches View-Recht.
+     */
+    public function downloadUpload(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $this->view($user, $dispoOrder);
+    }
+
+    /**
      * Nachbesserung: nur Ersteller, abgelehnter Auftrag, ohne Nachfolger.
      * Admin/GF erhalten dies nicht automatisch für fremde Aufträge.
      */

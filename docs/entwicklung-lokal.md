@@ -311,6 +311,21 @@ E2E: `npm run test:e2e:blp802e` bzw.
 `database/e2e-bl-p8-02e.sqlite`, Seeder `E2ECompletedReopenCancellationSeeder` –
 niemals Dev-DB `dispo`).
 
+## BL-P9-01a – Upload-Fundament + Kundenbestätigung
+
+Migration `dispo_order_uploads` + Approval-Snapshot-Felder an
+`dispo_order_approval_requests`. Service `DispoOrderUploadService`
+(Upload/Archiv/Download). Kategorie produktiv: `customer_confirmation`.
+
+Tests: `DispoOrderCustomerConfirmationUploadTest`,
+`DispoOrderCustomerConfirmationUploadMysqlTest`; Vitest
+`dispo-order-uploads-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp901a` bzw.
+`npx playwright test -c playwright.blp901a.config.ts` (Port **8040**, DB
+`database/e2e-bl-p9-01a.sqlite`, Seeder `E2ECustomerConfirmationUploadSeeder` –
+niemals Dev-DB `dispo`).
+
 ## BL-P8-02d – Rechnung per Ende + Completion
 
 Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;

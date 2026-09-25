@@ -1,26 +1,45 @@
 # Fortschritt V1
 
-Stand: 25. September 2026 – Feature **BL-P8-02e** Completed-Reopen + Storno
-(PO-BLP802E-1) auf Branch `feat/bl-p8-02e-completed-reopen-cancellation`, Base
-`01d36b5277ad675ea93f6f7d884dcab58cad7b3a` (PR #76 auf `main`).
+Stand: 25. September 2026 – Feature **BL-P9-01a** Upload-Fundament +
+Kundenbestätigung (PO-BLP901A-1) in Umsetzung (dieser PR, noch nicht gemergt).
+Base: `main` inkl. PR **#77** (BL-P8-02e) und PR **#79** (SPT-008 Hardening).
 
 ## Aktuelle Phase
 
-Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a`/`02b`/`02c`/`02d` umgesetzt + manuell
-abgenommen (02d: PR **#76**, AT-18 erfüllt); `BL-P8-02e` (Completed-Reopen +
-Cancelled/Storno / AT-19) in diesem PR umgesetzt, **manuelle Abnahme noch separat**.
-Uploadweg / BL-P9-01 **offen**.
+Phase 9: **`BL-P9-01` teilweise** – Slice **`BL-P9-01a`** (Upload-Fundament +
+Kategorie `customer_confirmation` / UPL-001 A∨B). Phase 8: **`BL-P8-02` ERLEDIGT**
+(`02a`–`02e` auf `main` + manuell abgenommen; UPL-001 über 9-01a geschlossen;
+UPL-002/003 bereits über 02c/02b).
 
 ## Aktuelle Aufgabe
 
-**BL-P8-02e:** Completed-Reopen (`completed → in_progress`, Admin/GF), Storno
-(Disposition/Admin/GF) mit Pflichtbegründung, AT-19, Unit/Feature/MySQL/Vitest/
-Playwright Port **8039**.
+**BL-P9-01a / PO-BLP901A-1:** privates Upload-Fundament, Kundenbestätigungs-Upload,
+Submit A∨B, zentrale Dateiliste (nur implementierte Kategorie), Archiv (Admin),
+autorisierter Download; E2E Port **8040**. Manuelle Abnahme nach Merge separat.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#76** BL-P8-02d Rechnung per Ende + Completion auf `main` (`01d36b5…`),
-manuell abgenommen; AT-18 erfüllt.
+PR **#77** BL-P8-02e Completed-Reopen + Storno auf `main` (Merge `5a8543dc…`),
+manuell abgenommen; AT-19 / STA-004 / STA-005 erfüllt. SPT-008 Hardening PR **#79**
+auf `main` (`781ac3bf…`); Diagnose PR **#78** geschlossen ohne Merge.
+
+## BL-P9-01a – Upload-Fundament + Kundenbestätigung / PO-BLP901A-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP901A-1 | **freigegeben** (nur 9-01a-Scope) |
+| Tabelle `dispo_order_uploads` + privater Storage | **umgesetzt** (dieser PR) |
+| Kategorie `customer_confirmation` Upload + Submit A∨B (UPL-001) | **umgesetzt** (dieser PR) |
+| Approval-Snapshot Upload-Felder | **umgesetzt** (dieser PR) |
+| Zentrale Uploadliste (implementierter Pfad) | **umgesetzt** (dieser PR) |
+| Archiv statt Löschen (Admin, UPL-005) | **umgesetzt** (dieser PR) |
+| 50 MB + MIME-Infrastruktur / Blockliste (UPL-006) | **umgesetzt** (dieser PR) |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8040** | **umgesetzt** |
+| Manuelle Abnahme | **offen** (PR noch nicht gemergt) |
+| Audio / weitere Kategorien / UPL-007 | **bewusst nicht** |
+| Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest) | **offen** |
+| `BL-P9-01` insgesamt | **teilweise** |
+| `BL-P8-02` insgesamt | **ERLEDIGT** (UPL-001 via 9-01a) |
 
 ## BL-P8-02e – Completed-Reopen + Storno / PO-BLP802E-1 (September 2026)
 
@@ -30,10 +49,11 @@ manuell abgenommen; AT-18 erfüllt.
 | Completed-Reopen `completed → in_progress` (Admin/GF) | **umgesetzt** |
 | Storno → `cancelled` (Disp/Admin/GF, erlaubte Quellen) | **umgesetzt** |
 | Pflichtbegründungen + Audit + Historie | **umgesetzt** |
-| AT-19 automatisiert (Feature + Playwright) | **umgesetzt** / manuelle Abnahme offen |
+| AT-19 automatisiert (Feature + Playwright) | **umgesetzt** / **manuell abgenommen** (PR #77) |
 | Unit/Feature/MySQL/Vitest/Playwright Port **8039** | **umgesetzt** |
-| File-Upload / BL-P9-01 / Freigabeinvalidierung | **bewusst nicht** |
-| `BL-P8-02` insgesamt | **teilweise** (Uploadweg offen) |
+| Merge `main` | **PR #77** (`5a8543dc…`) |
+| File-Upload / BL-P9-01 / Freigabeinvalidierung | **bewusst nicht** (Upload folgt 9-01a) |
+| `BL-P8-02` insgesamt | **ERLEDIGT** (nach UPL-001 via 9-01a) |
 
 ## BL-P8-02d – Rechnung per Ende + Completion / PO-BLP802D-1 (September 2026)
 
@@ -125,6 +145,7 @@ manuell abgenommen; AT-18 erfüllt.
 | Audit nur bei erfolgreichem Export | **umgesetzt** |
 | Automatisierte Tests (Unit/Feature/MySQL/Vitest/Playwright Port 8033) | **umgesetzt** |
 | Manuelle Abnahme | **erfolgreich** (PR #68) |
+| Harness-Härtung (Post-Merge) | **PR #79** gemergt (`781ac3bf…`); Diagnose PR **#78** closed unmerged; Post-Merge CI `36125623121` SUCCESS |
 | REP-007 PDF / Abbinder / operative Blockplanung | **bewusst nicht** |
 
 ## BL-P4-02e – Tandem / Tridem / SPT-012 (September 2026)

@@ -42,7 +42,7 @@ final class DispoOrderApprovalService
                 }
 
                 $this->dynamicFields->assertReadyForSubmit($locked);
-                $this->customerConfirmation->assertReadyForSubmit($locked);
+                $evidence = $this->customerConfirmation->resolveSubmitEvidence($locked);
 
                 if ($locked->pendingApprovalRequest()->exists()) {
                     throw new DispoOrderConflictException(
@@ -63,13 +63,36 @@ final class DispoOrderApprovalService
                 $request->status = DispoOrderApprovalStatus::Pending;
                 $request->kind = $kind;
                 $request->special_approval_reasons = $reasons;
-                $request->customer_confirmation_without_upload = (bool) $locked->customer_confirmation_without_upload;
-                $request->customer_confirmation_exception_reason = $locked->customer_confirmation_exception_reason;
-                $request->customer_confirmation_exception_set_by_id = $locked->customer_confirmation_exception_set_by_id;
-                $request->customer_confirmation_exception_set_by_name = $locked->customer_confirmation_exception_set_by_name;
-                $request->customer_confirmation_exception_set_at = $locked->customer_confirmation_exception_set_at
-                    ? CarbonImmutable::instance($locked->customer_confirmation_exception_set_at)
-                    : null;
+
+                if ($evidence['mode'] === 'upload') {
+                    $upload = $evidence['upload'];
+                    $request->customer_confirmation_mode = 'upload';
+                    $request->customer_confirmation_upload_id = $upload->id;
+                    $request->customer_confirmation_upload_category = $upload->category->value;
+                    $request->customer_confirmation_upload_original_filename = $upload->original_filename;
+                    $request->customer_confirmation_upload_mime_type = $upload->mime_type;
+                    $request->customer_confirmation_upload_size_bytes = $upload->size_bytes;
+                    $request->customer_confirmation_upload_sha256 = $upload->sha256;
+                    $request->customer_confirmation_upload_uploaded_at = CarbonImmutable::instance($upload->uploaded_at);
+                    $request->customer_confirmation_upload_uploaded_by_id = $upload->uploaded_by_user_id;
+                    $request->customer_confirmation_upload_uploaded_by_name = $upload->uploaded_by_name_snapshot;
+                    // Upload-Modus: keine Ausnahme-Mitfreigabe, Snapshot-Ausnahmeflagge klar aus.
+                    $request->customer_confirmation_without_upload = false;
+                    $request->customer_confirmation_exception_reason = null;
+                    $request->customer_confirmation_exception_set_by_id = null;
+                    $request->customer_confirmation_exception_set_by_name = null;
+                    $request->customer_confirmation_exception_set_at = null;
+                } else {
+                    $request->customer_confirmation_mode = 'exception';
+                    $request->customer_confirmation_without_upload = (bool) $locked->customer_confirmation_without_upload;
+                    $request->customer_confirmation_exception_reason = $locked->customer_confirmation_exception_reason;
+                    $request->customer_confirmation_exception_set_by_id = $locked->customer_confirmation_exception_set_by_id;
+                    $request->customer_confirmation_exception_set_by_name = $locked->customer_confirmation_exception_set_by_name;
+                    $request->customer_confirmation_exception_set_at = $locked->customer_confirmation_exception_set_at
+                        ? CarbonImmutable::instance($locked->customer_confirmation_exception_set_at)
+                        : null;
+                }
+
                 $request->submitted_by_id = $user->id;
                 $request->submitted_by_name = $user->name;
                 $request->submitted_at = now();
@@ -85,6 +108,24 @@ final class DispoOrderApprovalService
 
                 $fresh = $this->reload($locked);
 
+                $auditNew = [
+                    'status' => $fresh->status->value,
+                    'lock_version' => $fresh->lock_version,
+                    'approval_kind' => $kind->value,
+                    'special_approval_reasons' => $reasons,
+                    'approval_request_id' => $request->id,
+                    'cycle_number' => $request->cycle_number,
+                    'submitted_at' => $request->submitted_at->toIso8601String(),
+                    'customer_confirmation_mode' => $request->customer_confirmation_mode,
+                    'customer_confirmation_without_upload' => (bool) $request->customer_confirmation_without_upload,
+                    'customer_confirmation_exception_reason' => $request->customer_confirmation_exception_reason,
+                ];
+                if ($request->customer_confirmation_mode === 'upload') {
+                    $auditNew['customer_confirmation_upload_id'] = $request->customer_confirmation_upload_id;
+                    $auditNew['customer_confirmation_upload_original_filename'] = $request->customer_confirmation_upload_original_filename;
+                    $auditNew['customer_confirmation_upload_sha256'] = $request->customer_confirmation_upload_sha256;
+                }
+
                 $this->audit->record(
                     $fresh,
                     'dispo_order.submitted_for_approval',
@@ -93,17 +134,7 @@ final class DispoOrderApprovalService
                         'status' => $previousStatus->value,
                         'lock_version' => $expectedLockVersion,
                     ],
-                    [
-                        'status' => $fresh->status->value,
-                        'lock_version' => $fresh->lock_version,
-                        'approval_kind' => $kind->value,
-                        'special_approval_reasons' => $reasons,
-                        'approval_request_id' => $request->id,
-                        'cycle_number' => $request->cycle_number,
-                        'submitted_at' => $request->submitted_at->toIso8601String(),
-                        'customer_confirmation_without_upload' => (bool) $request->customer_confirmation_without_upload,
-                        'customer_confirmation_exception_reason' => $request->customer_confirmation_exception_reason,
-                    ],
+                    $auditNew,
                 );
 
                 return $fresh;
@@ -143,7 +174,7 @@ final class DispoOrderApprovalService
                 $trimmedNote = null;
             }
 
-            if ($request->hasCustomerConfirmationExceptionSnapshot()) {
+            if ($request->requiresCustomerConfirmationExceptionAcknowledgement()) {
                 if (! $customerConfirmationExceptionAcknowledged) {
                     throw ValidationException::withMessages([
                         'customer_confirmation_exception_acknowledged' => 'Die Ausnahme ohne Kundenbestätigungs-Upload muss ausdrücklich mitfreigegeben werden.',

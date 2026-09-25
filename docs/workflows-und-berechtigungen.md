@@ -119,7 +119,7 @@ Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 | Status | Verantwortlicher Übergang | Bedingungen / Wirkung |
 |---|---|---|
 | Entwurf | Vertrieb | frei bearbeitbar; noch nicht eingereicht |
-| Wartet auf Vertriebsfreigabe | Vertrieb | Pflichtfelder und Kundenbestätigung/Ausnahme vorhanden (BL-P8-02c: Ausnahmeweg ohne Upload) |
+| Wartet auf Vertriebsfreigabe | Vertrieb | Pflichtfelder und Kundenbestätigung vorhanden: Upload **oder** Ausnahme (UPL-001 A∨B; BL-P9-01a / BL-P8-02c) |
 | Freigabe abgelehnt | Freigeber | Begründung Pflicht; Ersteller darf überarbeiten |
 | Liegt bei Disposition | System nach Freigabe | vollständige erforderliche Freigaben |
 | In Bearbeitung | Disposition / Admin / GF (BL-P8-02a) | bewusste Aktion; keine Automatik |
@@ -159,7 +159,8 @@ V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 
 ## Ist-Stand BL-P8-02e (PO-BLP802E-1)
 
-Umgesetzt (manuelle Abnahme separat): Completed-Reopen und Storno/Cancelled.
+Umgesetzt + manuell abgenommen (PR **#77**, Merge `5a8543dc…`; AT-19 / STA-004 /
+STA-005 erfüllt): Completed-Reopen und Storno/Cancelled.
 
 - Completed-Reopen: nur Admin/Management, `completed → in_progress`, Pflichtgrund,
   Audit `dispo_order.status_reopened`, `is_reopen=true`
@@ -171,8 +172,20 @@ Umgesetzt (manuelle Abnahme separat): Completed-Reopen und Storno/Cancelled.
 - Generischer Operational-Endpoint führt diese Kanten **nicht** aus
 - AT-19 automatisiert testbar (Feature + Playwright Port **8039**)
 
-Bewusst **nicht** in 02e: File-Upload, BL-P9-01, allgemeine Kommentare,
+Bewusst **nicht** in 02e: File-Upload (folgt BL-P9-01a), allgemeine Kommentare,
 Notifications, Freigabeinvalidierung, Storno rückgängig.
+
+## Ist-Stand BL-P9-01a (PO-BLP901A-1)
+
+In Umsetzung (dieser PR; Merge/Abnahme offen): Upload-Fundament + Kundenbestätigung.
+
+- Submit Draft → `awaiting_sales_approval`: **A∨B** – aktiver
+  `customer_confirmation`-Upload **oder** Ausnahmeweg (Checkbox + Pflichtgrund)
+- Upload-Rollen: Draft Sales/Admin/Management (wie Ausnahme); Disposition/PM NEIN
+- Archiv: nur Admin (UPL-005); Download: Dispo-Leserecht (`view`)
+- Zentrale Liste am Dispoauftrag (nur implementierte Kategorie produktiv)
+- Approval-Snapshot friert Upload-Metadaten bzw. Ausnahme ein
+- UPL-001 **vollständig**; UPL-004/005/006 teilweise bzw. Fundament; UPL-007 offen
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
@@ -182,12 +195,12 @@ inkl. Wiederöffnung, Statushistorie, Rollen Disposition/Admin/GF.
 ## Ist-Stand BL-P8-02c (PO-BLP802C-1)
 
 Vor Einreichen Draft → `awaiting_sales_approval` muss die Kundenbestätigung
-über den Ausnahmeweg gesetzt sein (Checkbox + Pflichtgrund; kein Fake-Upload).
-Beim Submit wird der Ausnahmezustand in `dispo_order_approval_requests`
-eingefroren. Genehmigen (regular/special) erfordert bei Ausnahme-Snapshot die
-explizite Mitfreigabe; Ablehnen nicht. Revision nach Ablehnung erbt die Ausnahme
-nicht. Datei-Upload bleibt offen (UPL-001 teilweise). UPL-003 über SalesInquiry
-(BL-P8-02b).
+über Ausnahmeweg **oder** Upload (BL-P9-01a) erfüllt sein. Ausnahme: Checkbox +
+Pflichtgrund; kein Fake-Upload. Beim Submit wird der Zustand in
+`dispo_order_approval_requests` eingefroren. Genehmigen (regular/special) erfordert
+bei Ausnahme-Snapshot die explizite Mitfreigabe; Ablehnen nicht. Revision nach
+Ablehnung erbt die Ausnahme nicht. UPL-001 über 9-01a **vollständig** (A∨B).
+UPL-003 über SalesInquiry (BL-P8-02b).
 
 ## Ist-Stand BL-P8-02b (PO-BLP802B-1)
 

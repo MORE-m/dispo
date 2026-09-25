@@ -382,6 +382,15 @@ Completion-Events bleiben unverändert (keine Freigabeinvalidierung).
 (Default false/null, kein Backfill). Am ApprovalRequest Frozen Snapshot derselben
 Felder plus Acknowledgement-Felder bei erfolgreicher Genehmigung.
 
+**BL-P9-01a / PO-BLP901A-1 (September 2026):** Neue Tabelle `dispo_order_uploads`:
+`dispo_order_id`, `category`, `original_filename`, `storage_path`, `mime_type`,
+`size_bytes`, `sha256`, `uploaded_by_*`, `uploaded_at`, `archived_at`,
+`archived_by_*` (kein Hard-Delete). Kategorie-Enum inkl. `customer_confirmation`
+(produktiv); weitere Kategorien modellseitig vorbereitet. Am ApprovalRequest
+additiv Frozen Upload-Snapshot: `customer_confirmation_mode` (`upload`|Ausnahme),
+`customer_confirmation_upload_id`, Filename/MIME/Größe/SHA256/`uploaded_at`/
+`uploaded_by_*`. Privater Storage-Pfad `dispo-orders/{id}/uploads/{uuid}`.
+
 **BL-P8-02b / PO-BLP802B-1 (September 2026):** Zusätzlich erreichbar:
 
 - `Rückfrage Vertrieb` (`sales_inquiry`) über Ask-Endpunkt
@@ -396,7 +405,8 @@ Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- zentrale Dateien, allgemeine Kommentare.
+- weitere Upload-Kategorien / Audio (UPL-007), Dyn-Feld-Dateien in Uploadliste,
+- allgemeine Kommentare.
 
 ## Dynamische Daten
 

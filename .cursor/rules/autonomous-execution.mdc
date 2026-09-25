@@ -37,11 +37,14 @@ Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl,
 **operativer Statuskern BL-P8-02a / PO-BLP802A-1** und
 **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**
 + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**
-+ **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**) dürfen weiterentwickelt und
++ **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
++ **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**) dürfen weiterentwickelt und
 gehärtet werden. Fail-closed nur für **nicht** freigegebene Teilbereiche
-(u. a. allgemeine Kommentare, Uploads, Kombinationstabelle,
+(u. a. allgemeine Kommentare, Audio/weitere Upload-Kategorien, Kombinationstabelle,
 Standardangebote, Auswertungen, Notifications, allgemeine operative Disposition
 außerhalb BL-P8-02a–02e): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
+
+**Aktuelle Phase:** BL-P9-01a (PO-BLP901A-1) – siehe `docs/fortschritt.md`.
 
 ## Blocker
 

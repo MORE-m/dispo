@@ -1,8 +1,12 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import { DispoOrderApprovalHistory } from '@/components/dispo-order-approval-history';
 
 describe('DispoOrderApprovalHistory', () => {
+    afterEach(() => {
+        cleanup();
+    });
+
     it('renders submission, special reasons and rejection', () => {
         render(
             <DispoOrderApprovalHistory
@@ -113,5 +117,55 @@ describe('DispoOrderApprovalHistory', () => {
         expect(
             screen.queryAllByTestId('approval-history-exception-ack'),
         ).toHaveLength(1);
+    });
+
+    it('shows frozen upload evidence instead of exception', () => {
+        render(
+            <DispoOrderApprovalHistory
+                entries={[
+                    {
+                        id: 31,
+                        cycle_number: 1,
+                        status: 'approved',
+                        status_label: 'Genehmigt',
+                        kind: 'regular',
+                        kind_label: 'Reguläre Freigabe',
+                        special_approval_reasons: [],
+                        submitted_by_name: 'Vertrieb A',
+                        submitted_at: '2026-09-25T08:00:00+00:00',
+                        decided_by_name: 'Vertrieb B',
+                        decided_at: '2026-09-25T09:00:00+00:00',
+                        rejection_reason: null,
+                        decision_note: null,
+                        customer_confirmation_mode: 'upload',
+                        customer_confirmation_without_upload: false,
+                        customer_confirmation_upload: {
+                            upload_id: 9,
+                            category: 'customer_confirmation',
+                            original_filename: 'freigabe.pdf',
+                            mime_type: 'application/pdf',
+                            size_bytes: 2048,
+                            sha256: 'abc',
+                            uploaded_at: '2026-09-25T07:30:00+00:00',
+                            uploaded_by_name: 'Vertrieb A',
+                            download_url:
+                                '/dispoauftraege/1/uploads/9/download',
+                        },
+                    },
+                ]}
+            />,
+        );
+
+        expect(
+            screen.getByTestId(
+                'approval-history-customer-confirmation-upload',
+            ),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId('approval-history-upload-filename'),
+        ).toHaveTextContent('freigabe.pdf');
+        expect(
+            screen.queryByTestId('approval-history-customer-confirmation'),
+        ).not.toBeInTheDocument();
     });
 });

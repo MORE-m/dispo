@@ -214,6 +214,47 @@ describe('DispoOrderApprovalActions', () => {
         });
     });
 
+    it('shows upload evidence without exception ack in upload mode', () => {
+        render(
+            <DispoOrderApprovalActions
+                orderId={1}
+                lockVersion={2}
+                canSubmit={false}
+                canApprove
+                canReject
+                isCreator={false}
+                status="awaiting_sales_approval"
+                requiresExceptionAcknowledgement={false}
+                customerConfirmationMode="upload"
+                customerConfirmationUpload={{
+                    upload_id: 9,
+                    category: 'customer_confirmation',
+                    original_filename: 'freigabe.pdf',
+                    mime_type: 'application/pdf',
+                    size_bytes: 2048,
+                    sha256: 'abc',
+                    uploaded_at: '2026-09-25T10:00:00+00:00',
+                    uploaded_by_name: 'Sales',
+                    download_url: '/dispoauftraege/1/uploads/9/download',
+                }}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('dispo-order-approve-open'));
+        expect(
+            screen.getByTestId('approval-customer-confirmation-upload'),
+        ).toHaveTextContent('freigabe.pdf');
+        expect(
+            screen.getByTestId('approval-customer-confirmation-download'),
+        ).toHaveAttribute('href', '/dispoauftraege/1/uploads/9/download');
+        expect(
+            screen.queryByTestId('customer-confirmation-exception-ack'),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByTestId('dispo-order-approve-confirm'),
+        ).not.toBeDisabled();
+    });
+
     it('keeps reject available without acknowledgement', () => {
         render(
             <DispoOrderApprovalActions

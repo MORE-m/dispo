@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**); Rest blockiert (u. a. Audio/weitere Upload-Kategorien)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -407,12 +407,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** teilweise (`BL-P8-02a`–`02d` umgesetzt + manuell abgenommen; `BL-P8-02e` Completed-Reopen/Storno in Umsetzung; Uploadweg / BL-P9-01 offen)
+- **Status:** **ERLEDIGT** (`02a`–`02e` auf `main` + manuell abgenommen; UPL-001 A∨B geschlossen über **BL-P9-01a**; UPL-002/003 über 02c/02b)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
-- **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
+- **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme + Uploadweg
 - **Akzeptanz:** `AT-12` bis `AT-19`
 - **Tests:** Pest erlaubte/verbotene Kanten, Pflichtbegründungen
+- **Hinweis:** Allgemeine Uploads/Audio bleiben Phase-9-Rest (`BL-P9-01` teilweise).
 
 ### BL-P8-02a – Operativer Statuskern (PO-BLP802A-1)
 
@@ -461,8 +462,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   + Pflicht-Ausnahmegrund; Submit-Gate; Frozen Snapshot im ApprovalRequest;
   explizite Mitfreigabe durch zweiten Freigeber; Revision erbt Ausnahme nicht
 - **Rollen Draft:** Sales/Admin/Management; Disposition/PM NEIN
-- **UPL-001:** teilweise (Ausnahmeweg ja, Datei-Upload offen)
-- **Bewusst nicht:** File-Upload, BL-P9-01, UPL-004–UPL-007, Freigabeinvalidierung
+- **UPL-001:** Ausnahmeweg B in 02c; Uploadweg A geschlossen über **BL-P9-01a** → UPL-001 **vollständig**
+- **Bewusst nicht (damals):** File-Upload, BL-P9-01, UPL-004–UPL-007, Freigabeinvalidierung
 - **Tests:** Feature Confirmation/Approval; MySQL-Concurrency; Vitest;
   Playwright Port **8037** (`test:e2e:blp802c`)
 
@@ -482,7 +483,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02e – Completed-Reopen + Storno (PO-BLP802E-1)
 
 - **Phase:** 8
-- **Status:** umgesetzt (manuelle Abnahme separat)
+- **Status:** **umgesetzt + manuell abgenommen** (PR **#77**, Merge `5a8543dc…`; AT-19 / STA-004 / STA-005 erfüllt)
 - **Anforderungen:** `STA-004`, `STA-005`, `AT-19`
 - **Abhängigkeiten:** BL-P8-02d
 - **Ergebnis:** `completed → in_progress` (Admin/Management, Pflichtgrund);
@@ -495,23 +496,47 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 ### BL-P8-02 – Rest nach 02a–02e
 
-- **Weiter offen:** allgemeine Kommentare; Kundenbestätigungs-**Dateiupload** /
-  UPL-001 Rest / BL-P9-01; weitergehende operative Bearbeitung; allgemeine
-  Uploads; Notifications; Freigabeinvalidierung
-- **Hinweis:** `BL-P8-02` insgesamt weiterhin **teilweise** (Uploadweg offen).
+- **Erledigt für BL-P8-02:** Statusmodell `02a`–`02e` + UPL-001/002/003
+  (UPL-001 Uploadweg über **BL-P9-01a**).
+- **Außerhalb BL-P8-02 weiter offen:** allgemeine Kommentare; weitere Upload-Kategorien /
+  Audio (`BL-P9-01` Rest); weitergehende operative Bearbeitung; Notifications;
+  Freigabeinvalidierung
+- **Hinweis:** `BL-P8-02` **ERLEDIGT** (UPL-001 via 9-01a geschlossen).
 - **Hinweis:** Enum-Labels allein zählen nicht als Umsetzung.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen
 
+### BL-P9-01a – Upload-Fundament + Kundenbestätigung (PO-BLP901A-1)
+
+- **Phase:** 9
+- **Status:** **in Umsetzung** (dieser PR, noch nicht gemergt; manuelle Abnahme offen)
+- **Kennung:** PO-BLP901A-1 / UX-GATE-D Teilfreigabe
+- **Anforderungen:** `UPL-001` (vollständig A∨B), `UPL-004` (Teil/Fundament),
+  `UPL-005` (implementierter Pfad), `UPL-006` (50 MB + kategorie-fähige MIME-Infrastruktur)
+- **Abhängigkeiten:** BL-P8-02e (Statuskern abgeschlossen)
+- **Ergebnis:** `dispo_order_uploads`; privater Storage; Kategorie
+  `customer_confirmation`; Submit-Gate A∨B; Approval-Snapshot Upload-Felder;
+  zentrale Liste; Admin-Archiv; autorisierter Download; kein Hard-Delete
+- **Rollen Upload:** Draft Sales/Admin/Management (wie Ausnahmeweg); Disposition/PM NEIN
+- **Rollen Archiv:** nur Admin; **Download:** Dispo-Leserecht
+- **UPL-Status nach Slice:** UPL-001 **vollständig**; UPL-004 **teilweise**;
+  UPL-005 **für implementierten Pfad**; UPL-006 **Fundament** (keine enge PDF-Whitelist;
+  Blockliste gefährlicher MIME); UPL-007 **offen**
+- **Bewusst nicht:** Audio-Upload/-Wiedergabe; weitere Kategorien produktiv;
+  Dyn-Feld-Dateien in Liste; Freigabeinvalidierung bei Replace/Archiv
+- **Tests:** Feature/MySQL Upload; Vitest Upload-Sektion; Playwright Port **8040**
+  (`test:e2e:blp901a`)
+
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** offen
-- **Anforderungen:** `UPL-004` bis `UPL-007`
+- **Status:** **teilweise** (`BL-P9-01a` in Umsetzung; Rest offen)
+- **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
-- **Ergebnis:** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
+- **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
 - **Akzeptanz:** keine öffentlichen URLs; max. 50 MB Default
-- **Tests:** Pest MIME/Größe, Archiv, Download-Audit
+- **Offen:** weitere Kategorien, Dyn-Feld-Dateien (UPL-004 Rest), Audio (UPL-007)
+- **Tests:** Pest MIME/Größe, Archiv, Download-Audit; E2E Port **8040** (9-01a)
 
 ### BL-P9-02 – Kommentare und Nachrichten
 

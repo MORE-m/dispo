@@ -89,6 +89,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - E2E: `npm run test:e2e:spt008` (`playwright.spt008.config.ts`, Port **8033**,
   Seeder `E2ESpotDistributionExportSeeder`)
 - Status: **umgesetzt / automatisiert getestet / manuell abgenommen** (PR #68);
+  Harness-Härtung PR **#79** (`781ac3bf…`, CI `36125623121` SUCCESS); Diagnose PR **#78** closed unmerged;
   REP-007 Dispo-PDF und operative Blockplanung **nicht** enthalten
 
 ### DSP-DCP-001 (Abgeleiteter Dispo-Kampagnenzeitraum)
@@ -130,7 +131,25 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Reject ohne Acknowledgement möglich; Special Approval ebenfalls Ack-Pflicht
 - Revision erbt Ausnahme nicht; Locking 409
 - Unit/Feature/MySQL/Vitest; E2E `npm run test:e2e:blp802c` (Port **8037**)
-- AT-16 nach manueller Abnahme erfüllbar; UPL-001 weiterhin teilweise (Upload offen)
+- AT-16 nach manueller Abnahme erfüllbar; UPL-001 **vollständig** über BL-P9-01a (A∨B)
+
+### BL-P8-02e (Completed-Reopen + Storno / PO-BLP802E-1)
+
+- Completed-Reopen: nur Admin/Management, `completed → in_progress`, Pflichtgrund
+- Storno → `cancelled`: Disposition/Admin/Management; erlaubte Quellen; terminal
+- Feature/MySQL/Vitest; E2E `npm run test:e2e:blp802e` (Port **8039**)
+- Merge PR **#77** (`5a8543dc…`); manuelle Abnahme **SUCCESS**; AT-19 / STA-004 / STA-005 erfüllt
+- `BL-P8-02` **ERLEDIGT** (UPL-001 via BL-P9-01a)
+
+### BL-P9-01a (Upload-Fundament + Kundenbestätigung / PO-BLP901A-1)
+
+- Upload `customer_confirmation` im Draft; Submit A∨B (Upload oder Ausnahme)
+- Rollen Upload: Sales/Admin/Management; Archiv: Admin; Download: Dispo-Leserecht
+- Kein Hard-Delete; 50 MB; MIME-Blockliste (keine enge PDF-Whitelist)
+- Approval-Snapshot Upload-Metadaten; zentrale Liste
+- Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901a` (Port **8040**)
+- Manuelle Abnahme: **offen** (PR noch nicht gemergt)
+- UPL-001 vollständig; UPL-004/005/006 teilweise; UPL-007 offen; `BL-P9-01` teilweise
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 
@@ -214,10 +233,10 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-13 | APR-004 | Preis nach Freigabe ändern | Freigaben werden zurückgesetzt; Ursache vollständig auditiert |
 | AT-14 | VER-001–VER-007 | Admin ändert Feldname und Preis | Alter Vorgang unverändert; neuer Vorgang verwendet neue Version |
 | AT-15 | DSP-001–DSP-003 | Position zweimal in getrennte Dispoaufträge übernehmen | Kennzeichnung, erneute Auswahl und unabhängige Snapshots |
-| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben (BL-P8-02c; automatisiert + manuell abgenommen) |
+| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben (BL-P8-02c; automatisiert + manuell abgenommen). Uploadweg A: BL-P9-01a (Abnahme offen) |
 | AT-17 | STA-002, CMT-003 | Dispo stellt Rückfrage, Vertrieb antwortet | Pflichtnotizen, Historie und aktive Rückkehr zu Liegt bei Disposition |
 | AT-18 | STA-006, INV-003 | Rechnungsmonat fehlt | Abschluss blockiert; Admin-Override nur mit Begründung und Audit (BL-P8-02d; automatisiert + manuell abgenommen, PR #76) |
-| AT-19 | STA-004, STA-005 | Storno nach Abschluss | Nur berechtigt und mit Begründung; Historie vollständig (BL-P8-02e automatisiert testbar; manuelle Abnahme offen) |
+| AT-19 | STA-004, STA-005 | Storno nach Abschluss | Nur berechtigt und mit Begründung; Historie vollständig (BL-P8-02e; automatisiert + manuell abgenommen, PR #77) |
 | AT-20 | AUD-001–AUD-004 | Änderung, Download, Export und Kommentar | Aktionen protokolliert; reine Ansicht nicht protokolliert |
 | AT-21 | PRI-001–PRI-006 | Fehlerhafte Preisimportdatei | Vorschau und Fehlerbericht; keine Teilaktivierung |
 | AT-22 | AUTH-001, STA-003 | Disposition versucht Rabatt zu ändern | Server blockiert; Rückfrage an Vertrieb bleibt möglich |
