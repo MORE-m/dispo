@@ -386,10 +386,16 @@ Felder plus Acknowledgement-Felder bei erfolgreicher Genehmigung.
 `dispo_order_id`, `category`, `original_filename`, `storage_path`, `mime_type`,
 `size_bytes`, `sha256`, `uploaded_by_*`, `uploaded_at`, `archived_at`,
 `archived_by_*` (kein Hard-Delete). Kategorie-Enum inkl. `customer_confirmation`
-(produktiv); weitere Kategorien modellseitig vorbereitet. Am ApprovalRequest
-additiv Frozen Upload-Snapshot: `customer_confirmation_mode` (`upload`|Ausnahme),
+(produktiv in 9-01a). Am ApprovalRequest additiv Frozen Upload-Snapshot:
+`customer_confirmation_mode` (`upload`|Ausnahme),
 `customer_confirmation_upload_id`, Filename/MIME/Größe/SHA256/`uploaded_at`/
 `uploaded_by_*`. Privater Storage-Pfad `dispo-orders/{id}/uploads/{uuid}`.
+
+**BL-P9-01b / PO-BLP901B-1 (September 2026):** Dieselbe Upload-Tabelle produktiv
+für feste Materialkategorien `audio_motif`, `briefing`, `script_text`,
+`layout_graphics`, `event_documents`, `other`. Keine Schemaänderung; keine
+Audio-Längen-/Motiv-/Positions-Spalten. Autorisierter Stream-Endpoint nur für
+`audio_motif`. Dyn-Feld-Dateien bleiben außerhalb (BL-P9-01c).
 
 **BL-P8-02b / PO-BLP802B-1 (September 2026):** Zusätzlich erreichbar:
 
@@ -405,7 +411,7 @@ Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- weitere Upload-Kategorien / Audio (UPL-007), Dyn-Feld-Dateien in Uploadliste,
+- Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest),
 - allgemeine Kommentare.
 
 ## Dynamische Daten

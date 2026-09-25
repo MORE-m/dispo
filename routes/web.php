@@ -50,10 +50,14 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.customer-confirmation.update');
     Route::post('dispoauftraege/{dispoOrder}/uploads/kundenbestaetigung', [DispoOrderController::class, 'uploadCustomerConfirmation'])
         ->name('dispo-orders.uploads.customer-confirmation');
+    Route::post('dispoauftraege/{dispoOrder}/uploads', [DispoOrderController::class, 'uploadMaterial'])
+        ->name('dispo-orders.uploads.store');
     Route::post('dispoauftraege/{dispoOrder}/uploads/{upload}/archivieren', [DispoOrderController::class, 'archiveUpload'])
         ->name('dispo-orders.uploads.archive');
     Route::get('dispoauftraege/{dispoOrder}/uploads/{upload}/download', [DispoOrderController::class, 'downloadUpload'])
         ->name('dispo-orders.uploads.download');
+    Route::get('dispoauftraege/{dispoOrder}/uploads/{upload}/stream', [DispoOrderController::class, 'streamUpload'])
+        ->name('dispo-orders.uploads.stream');
     Route::patch('dispoauftraege/{dispoOrder}/positions-angaben', [DispoOrderController::class, 'updatePositionCustoms'])
         ->name('dispo-orders.update-position-customs');
     Route::post('dispoauftraege/{dispoOrder}/sync-calculation-dynamic-fields', [DispoOrderController::class, 'syncCalculationDynamicFields'])

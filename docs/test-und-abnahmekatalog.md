@@ -152,7 +152,17 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Manuelle Abnahme: **SUCCESS** (Feature-HEAD `7674a401…`)
 - UPL-001 **ERFÜLLT**; UPL-005 Kundenbestätigungs-Pfad **ERFÜLLT**; UPL-006 **ERFÜLLT**
   (echter 50-MB-HTTP-Nachweis; MySQL-Concurrency)
-- UPL-004 teilweise (Dyn-Feld-Dateien offen); UPL-007 offen; `BL-P9-01` teilweise
+- UPL-004 teilweise (Dyn-Feld-Dateien offen); UPL-007 folgt BL-P9-01b; `BL-P9-01` teilweise
+
+### BL-P9-01b (Materialuploads + Audio / PO-BLP901B-1)
+
+- Generischer Materialupload für feste Kategorien; Audio MP3/WAV + Stream/Range
+- Rollen Upload: Sales/Disposition/Admin/Management; PM NEIN; Archiv: Admin
+- Statusmatrix laut PO-BLP901B-1; keine Freigabeinvalidierung; kein Status-Automatismus
+- Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901b` (Port **8041**)
+- Manuelle Abnahme: **offen** (separat nach CI)
+- UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
+  UPL-004 teilweise (Dyn-Feld-Dateien → BL-P9-01c); `BL-P9-01` teilweise
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 

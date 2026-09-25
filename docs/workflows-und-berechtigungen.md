@@ -187,7 +187,26 @@ Post-Merge CI `36152091905` SUCCESS): Upload-Fundament + Kundenbestätigung.
 - Zentrale Liste am Dispoauftrag (nur implementierte Kategorie produktiv)
 - Approval-Snapshot friert Upload-Metadaten bzw. Ausnahme ein
 - UPL-001 **ERFÜLLT**; UPL-005 CC-Pfad **ERFÜLLT**; UPL-006 **ERFÜLLT**;
-  UPL-004 teilweise; UPL-007 **OFFEN**; `BL-P9-01` weiter teilweise
+  UPL-004 teilweise; UPL-007 folgt **BL-P9-01b**; `BL-P9-01` weiter teilweise
+
+## Ist-Stand BL-P9-01b (PO-BLP901B-1)
+
+**UMGESETZT** (Feature-PR; Merge/manuelle Abnahme ausstehend): feste
+Materialuploads + Audio.
+
+- Generischer Endpoint `POST …/uploads` für Materialkategorien; `customer_confirmation`
+  dort abgewiesen (Sonderpfad bleibt)
+- Upload-Rollen: Sales, Disposition, Admin, Management; ProductManagement NEIN
+- Status erlaubt: draft, at_disposition, in_progress, sales_inquiry,
+  material_missing, material_received
+- Status gesperrt: awaiting_sales_approval, approval_rejected, disposed,
+  completed, cancelled
+- Audio: MP3/WAV, mehrere Dateien, autorisierter Stream inkl. Range, kein
+  Playback-Audit; Länge manuell; kein Motivname/Materialstatus/Positionsbezug
+- Uploads ändern weder Freigabe noch Status
+- Archiv: nur Admin; Download/Stream: Dispo-Leserecht
+- UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
+  UPL-004 teilweise (Dyn-Feld-Dateien → BL-P9-01c); `BL-P9-01` weiter teilweise
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 

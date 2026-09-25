@@ -131,13 +131,16 @@ Inventar-Werbemittel-Kombinationstabelle geliefert.
 
 ### Upload-Kategorien
 
-- Kundenbestätigung
-- Audio-Motiv
+- Kundenbestätigung (Sonderpfad BL-P9-01a)
+- Audio-Motiv (BL-P9-01b / UPL-007; MP3/WAV)
 - Briefing
 - Skript/Text
 - Layout/Grafik
 - Event-Unterlagen
 - Sonstiges
+
+Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
+`script_text`, `layout_graphics`, `event_documents`, `other`.
 
 ### Produktionstypen
 

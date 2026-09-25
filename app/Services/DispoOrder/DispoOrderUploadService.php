@@ -14,14 +14,17 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 /**
- * Privates Dispo-Upload-Fundament (BL-P9-01a / PO-BLP901A-1).
- * Produktiv freigegeben: Kundenbestätigung. Kein Hard-Delete (UPL-005).
+ * Privates Dispo-Upload-Fundament (BL-P9-01a / BL-P9-01b).
+ * Produktiv: Kundenbestätigung + feste Materialkategorien (PO-BLP901B-1).
+ * Kein Hard-Delete (UPL-005). Keine Freigabeinvalidierung. Kein Status-Automatismus.
  */
 final class DispoOrderUploadService
 {
@@ -30,7 +33,34 @@ final class DispoOrderUploadService
     public const STORAGE_PREFIX = 'dispo-orders/';
 
     /**
-     * MIME-Baseline: keine erfundene PDF-only-Whitelist für Kundenbestätigung.
+     * Status, in denen Materialuploads erlaubt sind (PO-BLP901B-1).
+     *
+     * @var list<DispoOrderStatus>
+     */
+    public const MATERIAL_UPLOAD_STATUSES = [
+        DispoOrderStatus::Draft,
+        DispoOrderStatus::AtDisposition,
+        DispoOrderStatus::InProgress,
+        DispoOrderStatus::SalesInquiry,
+        DispoOrderStatus::MaterialMissing,
+        DispoOrderStatus::MaterialReceived,
+    ];
+
+    /**
+     * Zulässige reale MIME-Typen für audio_motif (UPL-007).
+     *
+     * @var list<string>
+     */
+    public const AUDIO_MIME_TYPES = [
+        'audio/mpeg',
+        'audio/mp3',
+        'audio/wav',
+        'audio/x-wav',
+        'audio/vnd.wave',
+    ];
+
+    /**
+     * MIME-Baseline: keine erfundene Whitelist für allgemeine Materialkategorien.
      * Ablehnen bekannter ausführbarer/gefährlicher Typen.
      *
      * @var list<string>
@@ -64,64 +94,13 @@ final class DispoOrderUploadService
 
         $this->assertUploadFile($file);
 
-        $orderId = (int) $order->id;
-        $uuid = Str::uuid()->toString();
-        $storagePath = self::STORAGE_PREFIX.$orderId.'/uploads/'.$uuid;
-        $this->assertSafeStoragePath($storagePath);
-
-        $absolute = $file->getRealPath();
-        if ($absolute === false || $absolute === '' || ! is_file($absolute)) {
-            throw ValidationException::withMessages([
-                'file' => 'Die Datei konnte nicht gelesen werden.',
-            ]);
-        }
-
-        $sha256 = hash_file('sha256', $absolute);
-        if ($sha256 === false) {
-            throw ValidationException::withMessages([
-                'file' => 'Die Datei konnte nicht gehasht werden.',
-            ]);
-        }
-
-        $sizeBytes = (int) $file->getSize();
-        $mime = $this->normalizeMime($file);
-        $originalFilename = $this->sanitizeOriginalFilename($file->getClientOriginalName());
-
-        $stream = fopen($absolute, 'rb');
-        if ($stream === false) {
-            throw ValidationException::withMessages([
-                'file' => 'Die Datei konnte nicht gelesen werden.',
-            ]);
-        }
-
-        try {
-            $written = $this->files->disk()->writeStream($storagePath, $stream);
-        } finally {
-            if (is_resource($stream)) {
-                fclose($stream);
-            }
-        }
-
-        if ($written !== true) {
-            throw ValidationException::withMessages([
-                'file' => 'Die Datei konnte nicht gespeichert werden.',
-            ]);
-        }
-
-        try {
-            return DB::transaction(function () use (
-                $order,
-                $user,
-                $expectedLockVersion,
-                $storagePath,
-                $originalFilename,
-                $mime,
-                $sizeBytes,
-                $sha256,
-            ): DispoOrderUpload {
-                $locked = $this->lockOrder($order);
-                $this->assertLockVersion($locked, $expectedLockVersion);
-
+        return $this->persistUpload(
+            $order,
+            $user,
+            $expectedLockVersion,
+            $file,
+            DispoOrderUploadCategory::CustomerConfirmation,
+            function (DispoOrder $locked) use ($user): void {
                 if ($locked->status !== DispoOrderStatus::Draft) {
                     throw ValidationException::withMessages([
                         'order' => 'Kundenbestätigungs-Uploads sind nur im Entwurf möglich.',
@@ -131,52 +110,47 @@ final class DispoOrderUploadService
                 if (! Gate::forUser($user)->allows('uploadCustomerConfirmation', $locked)) {
                     abort(403);
                 }
+            },
+        );
+    }
 
-                $upload = DispoOrderUpload::query()->create([
-                    'dispo_order_id' => $locked->id,
-                    'category' => DispoOrderUploadCategory::CustomerConfirmation,
-                    'original_filename' => $originalFilename,
-                    'storage_path' => $storagePath,
-                    'mime_type' => $mime,
-                    'size_bytes' => $sizeBytes,
-                    'sha256' => $sha256,
-                    'uploaded_by_user_id' => $user->id,
-                    'uploaded_by_name_snapshot' => $user->name,
-                    'uploaded_at' => Carbon::now(),
-                ]);
-
-                $locked->lock_version = $locked->lock_version + 1;
-                $locked->save();
-
-                $this->audit->record(
-                    $locked,
-                    'dispo_order.upload.created',
-                    $user,
-                    null,
-                    [
-                        'upload_id' => $upload->id,
-                        'category' => $upload->category->value,
-                        'original_filename' => $upload->original_filename,
-                        'mime_type' => $upload->mime_type,
-                        'size_bytes' => $upload->size_bytes,
-                        'sha256' => $upload->sha256,
-                        'lock_version' => $locked->lock_version,
-                    ],
-                );
-
-                return $upload->fresh() ?? $upload;
-            });
-        } catch (Throwable $exception) {
-            if ($this->files->exists($storagePath)) {
-                try {
-                    $this->files->disk()->delete($storagePath);
-                } catch (Throwable) {
-                    // Best effort: orphan cleanup failure must not mask original error.
-                }
-            }
-
-            throw $exception;
+    public function uploadMaterial(
+        DispoOrder $order,
+        User $user,
+        int $expectedLockVersion,
+        DispoOrderUploadCategory $category,
+        UploadedFile $file,
+    ): DispoOrderUpload {
+        if (! $category->isMaterialCategory()) {
+            throw ValidationException::withMessages([
+                'category' => 'Diese Upload-Kategorie ist über den Material-Endpoint nicht zulässig.',
+            ]);
         }
+
+        if (! Gate::forUser($user)->allows('uploadMaterial', $order)) {
+            abort(403);
+        }
+
+        $this->assertUploadFile($file, $category);
+
+        return $this->persistUpload(
+            $order,
+            $user,
+            $expectedLockVersion,
+            $file,
+            $category,
+            function (DispoOrder $locked) use ($user): void {
+                if (! $this->statusAllowsMaterialUpload($locked->status)) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Materialuploads sind in diesem Status nicht erlaubt.',
+                    ]);
+                }
+
+                if (! Gate::forUser($user)->allows('uploadMaterial', $locked)) {
+                    abort(403);
+                }
+            },
+        );
     }
 
     public function archive(
@@ -289,6 +263,51 @@ final class DispoOrderUploadService
         ]);
     }
 
+    /**
+     * Autorisierte Inline-Wiedergabe für audio_motif (UPL-007).
+     * Kein Audit (kein View-Logging / Range-Spam).
+     */
+    public function stream(
+        DispoOrder $order,
+        DispoOrderUpload $upload,
+        User $user,
+    ): BinaryFileResponse {
+        if (! Gate::forUser($user)->allows('streamUpload', $order)) {
+            abort(403);
+        }
+
+        $this->assertUploadBelongsToOrder($order, $upload);
+
+        if (! $upload->category->isAudioMotif()) {
+            abort(404);
+        }
+
+        $this->assertSafeStoragePath($upload->storage_path);
+
+        if (! $this->files->exists($upload->storage_path)) {
+            abort(404, 'Die Datei ist nicht verfügbar.');
+        }
+
+        $diskName = (string) config('dispo.files_disk');
+        $absolute = Storage::disk($diskName)->path($upload->storage_path);
+        if (! is_file($absolute)) {
+            abort(404, 'Die Datei ist nicht verfügbar.');
+        }
+
+        $filename = $this->sanitizeOriginalFilename($upload->original_filename);
+        $mime = $upload->mime_type ?: 'application/octet-stream';
+
+        $response = response()->file($absolute, [
+            'Content-Type' => $mime,
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
+
+        $response->setContentDisposition('inline', $filename);
+
+        return $response;
+    }
+
     public function activeCustomerConfirmation(DispoOrder $order): ?DispoOrderUpload
     {
         return DispoOrderUpload::query()
@@ -317,6 +336,35 @@ final class DispoOrderUploadService
     }
 
     /**
+     * @return list<array{value: string, label: string}>
+     */
+    public function materialCategoryOptionsProp(): array
+    {
+        return array_map(
+            static fn (DispoOrderUploadCategory $category): array => [
+                'value' => $category->value,
+                'label' => $category->label(),
+            ],
+            DispoOrderUploadCategory::materialCategories(),
+        );
+    }
+
+    public function canUploadMaterialFor(DispoOrder $order, ?User $user): bool
+    {
+        if ($user === null) {
+            return false;
+        }
+
+        return Gate::forUser($user)->allows('uploadMaterial', $order)
+            && $this->statusAllowsMaterialUpload($order->status);
+    }
+
+    public function statusAllowsMaterialUpload(DispoOrderStatus $status): bool
+    {
+        return in_array($status, self::MATERIAL_UPLOAD_STATUSES, true);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function serializeUpload(
@@ -336,7 +384,7 @@ final class DispoOrderUploadService
             && $activeCustomerConfirmationId !== null
             && $activeCustomerConfirmationId === $upload->id;
 
-        return [
+        $payload = [
             'id' => $upload->id,
             'category' => $upload->category->value,
             'category_label' => $upload->category->label(),
@@ -354,7 +402,17 @@ final class DispoOrderUploadService
                 'dispoOrder' => $order->id,
                 'upload' => $upload->id,
             ]),
+            'stream_url' => null,
         ];
+
+        if ($upload->category->isAudioMotif()) {
+            $payload['stream_url'] = route('dispo-orders.uploads.stream', [
+                'dispoOrder' => $order->id,
+                'upload' => $upload->id,
+            ]);
+        }
+
+        return $payload;
     }
 
     public function hasActiveCustomerConfirmation(DispoOrder $order): bool
@@ -362,8 +420,129 @@ final class DispoOrderUploadService
         return $this->activeCustomerConfirmation($order) !== null;
     }
 
-    private function assertUploadFile(UploadedFile $file): void
-    {
+    /**
+     * @param  callable(DispoOrder): void  $assertWithinTransaction
+     */
+    private function persistUpload(
+        DispoOrder $order,
+        User $user,
+        int $expectedLockVersion,
+        UploadedFile $file,
+        DispoOrderUploadCategory $category,
+        callable $assertWithinTransaction,
+    ): DispoOrderUpload {
+        $orderId = (int) $order->id;
+        $uuid = Str::uuid()->toString();
+        $storagePath = self::STORAGE_PREFIX.$orderId.'/uploads/'.$uuid;
+        $this->assertSafeStoragePath($storagePath);
+
+        $absolute = $file->getRealPath();
+        if ($absolute === false || $absolute === '' || ! is_file($absolute)) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gelesen werden.',
+            ]);
+        }
+
+        $sha256 = hash_file('sha256', $absolute);
+        if ($sha256 === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gehasht werden.',
+            ]);
+        }
+
+        $sizeBytes = (int) $file->getSize();
+        $mime = $this->normalizeMime($file);
+        $originalFilename = $this->sanitizeOriginalFilename($file->getClientOriginalName());
+
+        $stream = fopen($absolute, 'rb');
+        if ($stream === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gelesen werden.',
+            ]);
+        }
+
+        try {
+            $written = $this->files->disk()->writeStream($storagePath, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        if ($written !== true) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gespeichert werden.',
+            ]);
+        }
+
+        try {
+            return DB::transaction(function () use (
+                $order,
+                $user,
+                $expectedLockVersion,
+                $storagePath,
+                $originalFilename,
+                $mime,
+                $sizeBytes,
+                $sha256,
+                $category,
+                $assertWithinTransaction,
+            ): DispoOrderUpload {
+                $locked = $this->lockOrder($order);
+                $this->assertLockVersion($locked, $expectedLockVersion);
+                $assertWithinTransaction($locked);
+
+                $upload = DispoOrderUpload::query()->create([
+                    'dispo_order_id' => $locked->id,
+                    'category' => $category,
+                    'original_filename' => $originalFilename,
+                    'storage_path' => $storagePath,
+                    'mime_type' => $mime,
+                    'size_bytes' => $sizeBytes,
+                    'sha256' => $sha256,
+                    'uploaded_by_user_id' => $user->id,
+                    'uploaded_by_name_snapshot' => $user->name,
+                    'uploaded_at' => Carbon::now(),
+                ]);
+
+                $locked->lock_version = $locked->lock_version + 1;
+                $locked->save();
+
+                $this->audit->record(
+                    $locked,
+                    'dispo_order.upload.created',
+                    $user,
+                    null,
+                    [
+                        'upload_id' => $upload->id,
+                        'category' => $upload->category->value,
+                        'original_filename' => $upload->original_filename,
+                        'mime_type' => $upload->mime_type,
+                        'size_bytes' => $upload->size_bytes,
+                        'sha256' => $upload->sha256,
+                        'lock_version' => $locked->lock_version,
+                    ],
+                );
+
+                return $upload->fresh() ?? $upload;
+            });
+        } catch (Throwable $exception) {
+            if ($this->files->exists($storagePath)) {
+                try {
+                    $this->files->disk()->delete($storagePath);
+                } catch (Throwable) {
+                    // Best effort: orphan cleanup failure must not mask original error.
+                }
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function assertUploadFile(
+        UploadedFile $file,
+        ?DispoOrderUploadCategory $category = null,
+    ): void {
         if (! $file->isValid()) {
             throw ValidationException::withMessages([
                 'file' => 'Die Datei ist ungültig oder der Upload ist fehlgeschlagen.',
@@ -384,6 +563,17 @@ final class DispoOrderUploadService
         }
 
         $mime = $this->normalizeMime($file);
+
+        if ($category?->isAudioMotif()) {
+            if ($mime === null || ! in_array($mime, self::AUDIO_MIME_TYPES, true)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Audio-Motive sind nur als MP3 oder WAV zulässig.',
+                ]);
+            }
+
+            return;
+        }
+
         foreach (self::BLOCKED_MIME_PREFIXES as $blocked) {
             if ($mime !== null && str_starts_with($mime, $blocked)) {
                 throw ValidationException::withMessages([

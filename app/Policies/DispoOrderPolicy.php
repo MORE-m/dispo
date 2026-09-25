@@ -54,6 +54,21 @@ class DispoOrderPolicy
     }
 
     /**
+     * Feste Materialuploads (BL-P9-01b / PO-BLP901B-1).
+     * Sales, Disposition, Admin, Management – ohne ProductManagement.
+     * Statusmatrix wird im Service geprüft (nicht hier).
+     */
+    public function uploadMaterial(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Disposition,
+            Role::Management,
+        );
+    }
+
+    /**
      * Upload archivieren – nur Admin (UPL-005).
      */
     public function archiveUpload(User $user, DispoOrder $dispoOrder): bool
@@ -67,6 +82,14 @@ class DispoOrderPolicy
     public function downloadUpload(User $user, DispoOrder $dispoOrder): bool
     {
         return $this->view($user, $dispoOrder);
+    }
+
+    /**
+     * Autorisierte Audio-Wiedergabe – gleiches View-Recht wie Download.
+     */
+    public function streamUpload(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $this->downloadUpload($user, $dispoOrder);
     }
 
     /**

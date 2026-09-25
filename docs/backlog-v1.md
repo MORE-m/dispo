@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**); Rest blockiert (u. a. Audio/weitere Upload-Kategorien)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**); Rest blockiert (u. a. Dyn-Feld-Dateien in Uploadliste)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -522,25 +522,54 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Rollen Archiv:** nur Admin; **Download:** Dispo-Leserecht
 - **UPL-Status nach Slice:** UPL-001 **ERFÜLLT**; UPL-004 **teilweise**;
   UPL-005 **für implementierten Kundenbestätigungs-Pfad ERFÜLLT**; UPL-006 **ERFÜLLT**
-  (keine enge PDF-Whitelist; Blockliste gefährlicher MIME); UPL-007 **OFFEN**
-- **Bewusst nicht:** Audio-Upload/-Wiedergabe; weitere Kategorien produktiv;
+  (keine enge PDF-Whitelist; Blockliste gefährlicher MIME); UPL-007 folgt **BL-P9-01b**
+- **Bewusst nicht (9-01a):** Audio-Upload/-Wiedergabe; weitere Kategorien produktiv;
   Dyn-Feld-Dateien in Liste; Freigabeinvalidierung bei Replace/Archiv
 - **Tests:** Feature/MySQL Upload; Vitest Upload-Sektion; Playwright Port **8040**
   (`test:e2e:blp901a`); echter 50-MB-HTTP-Nachweis
 
+### BL-P9-01b – Materialuploads + Audio (PO-BLP901B-1)
+
+- **Phase:** 9
+- **Status:** **UMGESETZT** (Feature-PR; Merge/manuelle Abnahme ausstehend)
+- **Kennung:** PO-BLP901B-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01b
+- **Anforderungen:** `UPL-007` (vollständig), `UPL-005` (feste Kategorien),
+  `UPL-006` (unverändert), `UPL-004` (weiter teilweise)
+- **Abhängigkeiten:** BL-P9-01a
+- **Ergebnis:** generischer Materialupload `POST /dispoauftraege/{order}/uploads`;
+  Kategorien `audio_motif`, `briefing`, `script_text`, `layout_graphics`,
+  `event_documents`, `other`; Audio-Stream inkl. Range; zentrale Liste + Player;
+  Admin-Archiv; kein Hard-Delete
+- **Rollen Upload:** Sales, Disposition, Admin, Management; **ProductManagement NEIN**
+- **Status Upload erlaubt:** draft, at_disposition, in_progress, sales_inquiry,
+  material_missing, material_received
+- **Status Upload gesperrt:** awaiting_sales_approval, approval_rejected, disposed,
+  completed, cancelled
+- **Audio:** nur MP3/WAV (echte MIME); mehrere Dateien; kein Motivname; kein
+  Materialstatus; kein Positionsbezug; Länge nur manuell; kein Playback-Audit
+- **Fachvertrag:** Uploads invalidieren Freigabe nicht; kein Status-Automatismus
+  (`material_missing` bleibt); `customer_confirmation` nur über Sonderpfad
+- **UPL-Status nach Slice:** UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**;
+  UPL-006 **weiter ERFÜLLT**; UPL-004 **teilweise** (Dyn-Feld-Dateien → BL-P9-01c)
+- **Bewusst nicht:** Dyn-Feld-Dateien; CMT-001; Notifications; E-Mail;
+  Freigabeinvalidierung; Auto-Länge; Wellenform; Transcoding; Virenscanner
+- **Tests:** `DispoOrderMaterialUploadTest`, `DispoOrderAudioPlaybackTest`,
+  `DispoOrderMaterialUploadMysqlTest`; Vitest Material-Sektion; Playwright Port
+  **8041** (`test:e2e:blp901b`)
+
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **TEILWEISE** (`BL-P9-01a` **ERLEDIGT**; Rest offen)
+- **Status:** **TEILWEISE** (`BL-P9-01a` + `BL-P9-01b` umgesetzt; Dyn-Feld-Rest offen)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
 - **Akzeptanz:** keine öffentlichen URLs; max. 50 MB Default
 - **Offen explizit:**
-  - A) weitere feste Uploadkategorien
-  - B) Audio-Motiv / UPL-007
-  - C) Dyn-Feld-Dateien in zentraler Uploadliste (UPL-004 Rest)
-- **Tests:** Pest MIME/Größe, Archiv, Download-Audit; E2E Port **8040** (9-01a)
+  - C) Dyn-Feld-Dateien in zentraler Uploadliste (UPL-004 Rest → **BL-P9-01c**)
+- **Erledigt in 9-01b:** feste Materialkategorien + Audio / UPL-007
+- **Tests:** Pest MIME/Größe, Archiv, Download/Stream; E2E Port **8040** (9-01a),
+  **8041** (9-01b)
 
 ### BL-P9-02 – Kommentare und Nachrichten
 

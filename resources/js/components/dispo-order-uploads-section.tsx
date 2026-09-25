@@ -95,30 +95,45 @@ export function DispoOrderUploadsSection({
                                 className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between"
                                 data-test={`dispo-order-upload-${upload.id}`}
                             >
-                                <div className="min-w-0 space-y-1 text-sm">
-                                    <p className="font-medium">
-                                        {upload.category_label}
-                                    </p>
-                                    <p className="truncate">
-                                        {upload.original_filename}
-                                    </p>
-                                    <p className="text-muted-foreground">
-                                        {formatFileSize(upload.size_bytes)}
-                                        {upload.uploaded_by_name
-                                            ? ` · ${upload.uploaded_by_name}`
-                                            : ''}
-                                        {upload.uploaded_at
-                                            ? ` · ${formatDateTime(upload.uploaded_at)}`
-                                            : ''}
-                                    </p>
-                                    <p
-                                        className="text-muted-foreground"
-                                        data-test={`dispo-order-upload-status-${upload.id}`}
-                                    >
-                                        {upload.archived
-                                            ? 'Archiviert'
-                                            : 'Aktiv'}
-                                    </p>
+                                <div className="min-w-0 flex-1 space-y-2 text-sm">
+                                    <div className="space-y-1">
+                                        <p className="font-medium">
+                                            {upload.category_label}
+                                        </p>
+                                        <p className="truncate">
+                                            {upload.original_filename}
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            {formatFileSize(upload.size_bytes)}
+                                            {upload.uploaded_by_name
+                                                ? ` · ${upload.uploaded_by_name}`
+                                                : ''}
+                                            {upload.uploaded_at
+                                                ? ` · ${formatDateTime(upload.uploaded_at)}`
+                                                : ''}
+                                        </p>
+                                        <p
+                                            className="text-muted-foreground"
+                                            data-test={`dispo-order-upload-status-${upload.id}`}
+                                        >
+                                            {upload.archived
+                                                ? 'Archiviert'
+                                                : 'Aktiv'}
+                                        </p>
+                                    </div>
+                                    {upload.category === 'audio_motif' &&
+                                    upload.stream_url ? (
+                                        <audio
+                                            controls
+                                            preload="metadata"
+                                            src={upload.stream_url}
+                                            className="max-w-full"
+                                            data-test={`dispo-order-upload-audio-${upload.id}`}
+                                        >
+                                            Ihr Browser unterstützt die
+                                            Audio-Wiedergabe nicht.
+                                        </audio>
+                                    ) : null}
                                 </div>
                                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                                     <a
