@@ -21,7 +21,8 @@
         "test:e2e:blp802a": "playwright test -c playwright.blp802a.config.ts",
         "test:e2e:blp802b": "playwright test -c playwright.blp802b.config.ts",
         "test:e2e:blp802c": "playwright test -c playwright.blp802c.config.ts",
-        "test:e2e:blp802d": "playwright test -c playwright.blp802d.config.ts"
+        "test:e2e:blp802d": "playwright test -c playwright.blp802d.config.ts",
+        "test:e2e:blp802e": "playwright test -c playwright.blp802e.config.ts"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",

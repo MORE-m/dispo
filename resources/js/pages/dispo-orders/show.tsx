@@ -9,6 +9,11 @@ import {
     type CompletionReadiness,
     type CompletionSummary,
 } from '@/components/dispo-order-completion-section';
+import { DispoOrderCompletedReopenSection } from '@/components/dispo-order-completed-reopen-section';
+import {
+    DispoOrderCancellationSection,
+    type CancellationSummary,
+} from '@/components/dispo-order-cancellation-section';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
 import {
     DispoOrderCommunicationHistory,
@@ -322,8 +327,11 @@ export default function DispoOrderShow({
     canUpdateInvoiceEndMonths = false,
     canComplete = false,
     canForceComplete = false,
+    canReopenCompleted = false,
+    canCancel = false,
     completionReadiness = null,
     completionSummary = null,
+    cancellationSummary = null,
     isCreator = false,
     spotDistributionExport = null,
 }: {
@@ -345,8 +353,11 @@ export default function DispoOrderShow({
     canUpdateInvoiceEndMonths?: boolean;
     canComplete?: boolean;
     canForceComplete?: boolean;
+    canReopenCompleted?: boolean;
+    canCancel?: boolean;
     completionReadiness?: CompletionReadiness | null;
     completionSummary?: CompletionSummary | null;
+    cancellationSummary?: CancellationSummary | null;
     isCreator?: boolean;
     spotDistributionExport?: SpotDistributionExportProps | null;
 }) {
@@ -1138,6 +1149,20 @@ export default function DispoOrderShow({
                     canForceComplete={canForceComplete}
                     readiness={completionReadiness}
                     summary={completionSummary}
+                />
+
+                <DispoOrderCompletedReopenSection
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    canReopenCompleted={canReopenCompleted}
+                />
+
+                <DispoOrderCancellationSection
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    status={order.status}
+                    canCancel={canCancel}
+                    summary={cancellationSummary}
                 />
 
                 <DispoOrderSalesInquiryActions

@@ -6,9 +6,11 @@ use App\Enums\DispoOrderStatus;
 use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
 use App\Http\Requests\DispoOrder\AskSalesInquiryRequest;
+use App\Http\Requests\DispoOrder\CancelDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CompleteDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CreateDispoOrderFromCalculationRequest;
 use App\Http\Requests\DispoOrder\RejectDispoOrderRequest;
+use App\Http\Requests\DispoOrder\ReopenCompletedDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SubmitDispoOrderRequest;
 use App\Http\Requests\DispoOrder\SyncDispoOrderCalculationDynamicFieldsRequest;
 use App\Http\Requests\DispoOrder\TransitionOperationalStatusRequest;
@@ -24,6 +26,8 @@ use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
+use App\Services\DispoOrder\DispoOrderCancellationService;
+use App\Services\DispoOrder\DispoOrderCompletedReopenService;
 use App\Services\DispoOrder\DispoOrderCompletionReadiness;
 use App\Services\DispoOrder\DispoOrderCompletionService;
 use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
@@ -57,6 +61,8 @@ class DispoOrderController extends Controller
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
         private readonly DispoOrderInvoiceEndService $invoiceEnd,
         private readonly DispoOrderCompletionService $completion,
+        private readonly DispoOrderCompletedReopenService $completedReopen,
+        private readonly DispoOrderCancellationService $cancellation,
         private readonly DispoOrderCompletionReadiness $completionReadiness,
         private readonly DispoOrderRevisionContext $revisionContext,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
@@ -157,6 +163,10 @@ class DispoOrderController extends Controller
             && $dispoOrder->status === DispoOrderStatus::Disposed;
         $canForceComplete = ($user?->can('forceComplete', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Disposed;
+        $canReopenCompleted = ($user?->can('reopenCompleted', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Completed;
+        $canCancel = ($user?->can('cancel', $dispoOrder) ?? false)
+            && DispoOrderStatusTransition::isCancellationSource($dispoOrder->status);
         $completionReadiness = in_array(
             $dispoOrder->status,
             [DispoOrderStatus::Disposed, DispoOrderStatus::Completed],
@@ -165,6 +175,7 @@ class DispoOrderController extends Controller
             ? $this->completion->readinessProp($dispoOrder)
             : null;
         $completionSummary = $this->completion->completionSummaryProp($dispoOrder);
+        $cancellationSummary = $this->cancellation->cancellationSummaryProp($dispoOrder);
         $dynamicValues = $this->dynamicFields->valuesProp($dispoOrder);
         $canSyncCalculationDynamicFields = $canUpdate
             && $dynamicValues['missing_calc_origin_keys'] !== [];
@@ -193,8 +204,11 @@ class DispoOrderController extends Controller
             'canUpdateInvoiceEndMonths' => $canUpdateInvoiceEndMonths,
             'canComplete' => $canComplete,
             'canForceComplete' => $canForceComplete,
+            'canReopenCompleted' => $canReopenCompleted,
+            'canCancel' => $canCancel,
             'completionReadiness' => $completionReadiness,
             'completionSummary' => $completionSummary,
+            'cancellationSummary' => $cancellationSummary,
             'isCreator' => $isCreator,
             'spotDistributionExport' => [
                 'can_export' => true,
@@ -411,6 +425,48 @@ class DispoOrderController extends Controller
             $user,
             $request->expectedLockVersion(),
             $request->overrideReason(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            sprintf('Status aktualisiert: %s.', $order->status->label()),
+        );
+    }
+
+    public function reopenCompleted(
+        ReopenCompletedDispoOrderRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->completedReopen->reopen(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->reason(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            sprintf('Status aktualisiert: %s.', $order->status->label()),
+        );
+    }
+
+    public function cancel(
+        CancelDispoOrderRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->cancellation->cancel(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->reason(),
         );
 
         return $this->respondSuccess(

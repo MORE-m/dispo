@@ -367,7 +367,14 @@ Append-only Historie: `dispo_order_status_events` (`from_status`, `to_status`,
 nullable JSON `invoice_end_months` (kanonisch sortierte Monate 1–12 oder null).
 Status `Abgeschlossen` über bewussten Abschluss `disposed → completed`
 (Disposition/Admin/GF); Admin-Override bei verletzten Checks mit Begründung.
-Kein Backfill. Completed ist in diesem Slice terminal (kein Reopen/Storno).
+Kein Backfill. Completed war in diesem Slice terminal (kein Reopen/Storno);
+folgt in BL-P8-02e.
+
+**BL-P8-02e / PO-BLP802E-1 (September 2026):** Keine neue Tabelle. Storno und
+Completed-Reopen nutzen bestehende `dispo_order_status_events` (`reason`,
+`is_reopen`, Actor, from/to, `lock_version_after`). Cancel-Summary aus letztem
+Event mit `to_status=cancelled` (fail-closed ohne Event). Freigaben und
+Completion-Events bleiben unverändert (keine Freigabeinvalidierung).
 
 **BL-P8-02c / PO-BLP802C-1 (September 2026):** An `dispo_orders` additiv:
 `customer_confirmation_without_upload`, `customer_confirmation_exception_reason`,
@@ -389,8 +396,7 @@ Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- zentrale Dateien, allgemeine Kommentare und Status `cancelled` /
-  Reopen nach `completed` (BL-P8-02e).
+- zentrale Dateien, allgemeine Kommentare.
 
 ## Dynamische Daten
 

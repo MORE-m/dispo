@@ -7,7 +7,7 @@ use App\Exceptions\DispoOrderConflictException;
 
 /**
  * Erlaubte Statusübergänge: Freigabe + operativer Kern (BL-P8-02a) + Rückfrage (BL-P8-02b)
- * + Abschluss (BL-P8-02d).
+ * + Abschluss (BL-P8-02d) + Completed-Reopen/Storno (BL-P8-02e).
  */
 final class DispoOrderStatusTransition
 {
@@ -25,37 +25,48 @@ final class DispoOrderStatusTransition
             DispoOrderStatus::AtDisposition => [
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::SalesInquiry,
+                DispoOrderStatus::Cancelled,
             ],
             DispoOrderStatus::InProgress => [
                 DispoOrderStatus::MaterialMissing,
                 DispoOrderStatus::MaterialReceived,
                 DispoOrderStatus::Disposed,
                 DispoOrderStatus::SalesInquiry,
+                DispoOrderStatus::Cancelled,
             ],
             DispoOrderStatus::MaterialMissing => [
                 DispoOrderStatus::MaterialReceived,
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::SalesInquiry,
+                DispoOrderStatus::Cancelled,
             ],
             DispoOrderStatus::MaterialReceived => [
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::MaterialMissing,
                 DispoOrderStatus::Disposed,
                 DispoOrderStatus::SalesInquiry,
+                DispoOrderStatus::Cancelled,
             ],
             DispoOrderStatus::Disposed => [
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::Completed,
+                DispoOrderStatus::Cancelled,
             ],
             DispoOrderStatus::SalesInquiry => [
                 DispoOrderStatus::AtDisposition,
+                DispoOrderStatus::Cancelled,
+            ],
+            DispoOrderStatus::Completed => [
+                DispoOrderStatus::InProgress,
+                DispoOrderStatus::Cancelled,
             ],
             default => [],
         };
     }
 
     /**
-     * Operative Ziele (ohne Freigabe- und ohne Rückfrage-Kanten) für UI-Buttons.
+     * Operative Ziele (ohne Freigabe-, Rückfrage-, Completion-, Reopen- und Storno-Kanten)
+     * für UI-Buttons.
      *
      * @return list<DispoOrderStatus>
      */
@@ -84,6 +95,42 @@ final class DispoOrderStatusTransition
             ],
             default => [],
         };
+    }
+
+    /**
+     * Stornoquellen (PO-BLP802E-1): operative/fachlich relevante Statusen.
+     * Nicht: draft, awaiting_sales_approval, approval_rejected, cancelled.
+     *
+     * @return list<DispoOrderStatus>
+     */
+    public static function cancellationSources(): array
+    {
+        return [
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::SalesInquiry,
+            DispoOrderStatus::MaterialMissing,
+            DispoOrderStatus::MaterialReceived,
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Completed,
+        ];
+    }
+
+    public static function isCancellationSource(DispoOrderStatus $from): bool
+    {
+        return in_array($from, self::cancellationSources(), true);
+    }
+
+    public static function isCancellationTransition(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return $to === DispoOrderStatus::Cancelled
+            && self::isCancellationSource($from);
+    }
+
+    public static function isCompletedReopen(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
+        return $from === DispoOrderStatus::Completed
+            && $to === DispoOrderStatus::InProgress;
     }
 
     /**
@@ -152,13 +199,21 @@ final class DispoOrderStatusTransition
 
     public static function requiresReason(DispoOrderStatus $from, DispoOrderStatus $to): bool
     {
+        return self::isDisposedReopen($from, $to)
+            || self::isCompletedReopen($from, $to)
+            || self::isCancellationTransition($from, $to);
+    }
+
+    public static function isDisposedReopen(DispoOrderStatus $from, DispoOrderStatus $to): bool
+    {
         return $from === DispoOrderStatus::Disposed
             && $to === DispoOrderStatus::InProgress;
     }
 
     public static function isReopen(DispoOrderStatus $from, DispoOrderStatus $to): bool
     {
-        return self::requiresReason($from, $to);
+        return self::isDisposedReopen($from, $to)
+            || self::isCompletedReopen($from, $to);
     }
 
     public static function canTransition(DispoOrderStatus $from, DispoOrderStatus $to): bool

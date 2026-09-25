@@ -748,7 +748,7 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 | Material erhalten            | Disposition          | Manuell gesetzt; kein Automatismus.                                                         |
 | Disponiert                   | Disposition          | Manuell in Meridian eingebucht; fachliche Felder gesperrt.                                  |
 | Abgeschlossen                | Disposition/Admin/GF | Nur bei erfüllten Abschlussbedingungen; Admin-Override mit Begründung.                      |
-| Storniert                    | Berechtigte Rollen   | Jederzeit, auch nach Disponiert/Abgeschlossen; Begründung Pflicht.                          |
+| Storniert                    | Disposition / Admin / GF (PO-BLP802E-1) | Aus erlaubten Quellstatusen (nicht Draft/Freigabe-Zwischenstatus); auch nach Disponiert/Abgeschlossen; Begründung Pflicht; terminal. |
 
 **STA-001** Ein Dispoauftrag besitzt nur einen Gesamtstatus; V1 führt keine eigenen operativen Positionsstatus.
 
@@ -756,9 +756,9 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 
 **STA-003** Ab 'Disponiert' sind fachliche und kaufmännische Daten gesperrt. Disposition, Admin oder Geschäftsführung können mit Pflichtbegründung wieder öffnen; kaufmännische Änderungen lösen Freigaben erneut aus.
 
-**STA-004** Nach 'Abgeschlossen' dürfen nur Admin oder Geschäftsführung mit Begründung wieder öffnen.
+**STA-004** Nach 'Abgeschlossen' dürfen nur Admin oder Geschäftsführung / Management mit Begründung wieder öffnen (`completed` → `in_progress`; Disposition/Sales/PM nein; PO-BLP802E-1).
 
-**STA-005** Storno nach 'Abgeschlossen' ist zulässig und wird vollständig protokolliert.
+**STA-005** Storno nach 'Abgeschlossen' ist zulässig (Disposition/Admin/Management) und wird vollständig protokolliert (PO-BLP802E-1 / AT-19).
 
 ## 17.1 Abschlussbedingungen
 

@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**); Rest blockiert
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**); Rest blockiert
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -407,7 +407,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02 – Statusmodell und Kundenbestätigung
 
 - **Phase:** 8
-- **Status:** teilweise (`BL-P8-02a` + `BL-P8-02b` + `BL-P8-02c` Ausnahmeweg + `BL-P8-02d` Invoice/Completion umgesetzt; Uploadweg/Storno/Reopen offen)
+- **Status:** teilweise (`BL-P8-02a`–`02d` umgesetzt + manuell abgenommen; `BL-P8-02e` Completed-Reopen/Storno in Umsetzung; Uploadweg / BL-P9-01 offen)
 - **Anforderungen:** `STA-001` bis `STA-006`, `UPL-001` bis `UPL-003`
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** vollständiges Statusmodell, Rückfrage, Sperren, Bestätigung/Ausnahme
@@ -469,22 +469,36 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-02d – Rechnung per Ende + Completion (PO-BLP802D-1)
 
 - **Phase:** 8
-- **Status:** umgesetzt (manuelle Abnahme separat)
+- **Status:** **umgesetzt / gemergt** (PR **#76** auf `main`); **manuell abgenommen**; AT-18 erfüllt
 - **Anforderungen:** `INV-001`–`INV-003`, `STA-006`, Abschlussbedingungen, `AT-18`
 - **Abhängigkeiten:** BL-P8-02c
 - **Ergebnis:** `invoice_end_months` je Position; Completion-Readiness A–E;
   `disposed → completed`; Admin-Override mit Pflichtbegründung + Audit
-- **Bewusst nicht:** Completed-Reopen, Cancelled/Storno (02e), File-Upload,
-  Notifications, Freigabeinvalidierung, Betragsaufteilung
+- **Bewusst nicht (folgt 02e / Rest):** Completed-Reopen, Cancelled/Storno,
+  File-Upload, Notifications, Freigabeinvalidierung, Betragsaufteilung
 - **Tests:** Feature Invoice/Completion; MySQL-Concurrency; Vitest;
   Playwright Port **8038** (`test:e2e:blp802d`)
 
-### BL-P8-02 – Rest nach 02a/02b/02c/02d
+### BL-P8-02e – Completed-Reopen + Storno (PO-BLP802E-1)
 
-- **Weiter offen:** allgemeine Kommentare; Kundenbestätigungs-**Dateiupload**;
-  Cancelled/Storno; Reopen nach Completed (`BL-P8-02e` / AT-19);
-  weitergehende operative Bearbeitung; allgemeine Uploads; Notifications;
-  Freigabeinvalidierung
+- **Phase:** 8
+- **Status:** umgesetzt (manuelle Abnahme separat)
+- **Anforderungen:** `STA-004`, `STA-005`, `AT-19`
+- **Abhängigkeiten:** BL-P8-02d
+- **Ergebnis:** `completed → in_progress` (Admin/Management, Pflichtgrund);
+  Storno → `cancelled` (Disposition/Admin/Management) aus erlaubten Quellen;
+  dedizierte Services/Endpoints; Locking/Audit; Cancelled Summary; AT-19
+- **Bewusst nicht:** File-Upload, BL-P9-01, allgemeine Kommentare, Notifications,
+  Freigabeinvalidierung, Storno rückgängig, Reopen aus cancelled
+- **Tests:** Feature Reopen/Cancel; MySQL-Concurrency; Vitest;
+  Playwright Port **8039** (`test:e2e:blp802e`)
+
+### BL-P8-02 – Rest nach 02a–02e
+
+- **Weiter offen:** allgemeine Kommentare; Kundenbestätigungs-**Dateiupload** /
+  UPL-001 Rest / BL-P9-01; weitergehende operative Bearbeitung; allgemeine
+  Uploads; Notifications; Freigabeinvalidierung
+- **Hinweis:** `BL-P8-02` insgesamt weiterhin **teilweise** (Uploadweg offen).
 - **Hinweis:** Enum-Labels allein zählen nicht als Umsetzung.
 
 ## Phase 9 – Dateien, Kommentare und Benachrichtigungen

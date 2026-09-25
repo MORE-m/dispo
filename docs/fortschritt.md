@@ -1,26 +1,39 @@
 # Fortschritt V1
 
-Stand: 24. September 2026 – Feature **BL-P8-02d** Rechnung per Ende + Completion
-(PO-BLP802D-1) auf Branch `feat/bl-p8-02d-invoice-completion`, Base
-`afae8576bddccd8edd31ba9310dfb65cc52b39f1`.
+Stand: 25. September 2026 – Feature **BL-P8-02e** Completed-Reopen + Storno
+(PO-BLP802E-1) auf Branch `feat/bl-p8-02e-completed-reopen-cancellation`, Base
+`01d36b5277ad675ea93f6f7d884dcab58cad7b3a` (PR #76 auf `main`).
 
 ## Aktuelle Phase
 
-Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a`/`02b`/`02c` umgesetzt + manuell
-abgenommen; `BL-P8-02d` (Rechnung-per-Ende + Completion/Completed + Admin-Override /
-AT-18) in diesem PR umgesetzt, **manuelle Abnahme noch separat**. Storno /
-Completed-Reopen (`BL-P8-02e`) und Uploadweg / BL-P9-01 **offen**.
+Phase 8: **`BL-P8-02` teilweise** – `BL-P8-02a`/`02b`/`02c`/`02d` umgesetzt + manuell
+abgenommen (02d: PR **#76**, AT-18 erfüllt); `BL-P8-02e` (Completed-Reopen +
+Cancelled/Storno / AT-19) in diesem PR umgesetzt, **manuelle Abnahme noch separat**.
+Uploadweg / BL-P9-01 **offen**.
 
 ## Aktuelle Aufgabe
 
-**BL-P8-02d:** Positions-Rechnung-per-Ende, Completion-Readiness (5 Checks),
-`disposed → completed`, Admin-Override STA-006, Unit/Feature/MySQL/Vitest/
-Playwright Port **8038**.
+**BL-P8-02e:** Completed-Reopen (`completed → in_progress`, Admin/GF), Storno
+(Disposition/Admin/GF) mit Pflichtbegründung, AT-19, Unit/Feature/MySQL/Vitest/
+Playwright Port **8039**.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#75** u. a. Preislisten-Concurrency-Cleanup auf `main` (`afae857…`).
-BL-P8-02c manuell abgenommen.
+PR **#76** BL-P8-02d Rechnung per Ende + Completion auf `main` (`01d36b5…`),
+manuell abgenommen; AT-18 erfüllt.
+
+## BL-P8-02e – Completed-Reopen + Storno / PO-BLP802E-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP802E-1 | **freigegeben** (nur 02e-Scope) |
+| Completed-Reopen `completed → in_progress` (Admin/GF) | **umgesetzt** |
+| Storno → `cancelled` (Disp/Admin/GF, erlaubte Quellen) | **umgesetzt** |
+| Pflichtbegründungen + Audit + Historie | **umgesetzt** |
+| AT-19 automatisiert (Feature + Playwright) | **umgesetzt** / manuelle Abnahme offen |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8039** | **umgesetzt** |
+| File-Upload / BL-P9-01 / Freigabeinvalidierung | **bewusst nicht** |
+| `BL-P8-02` insgesamt | **teilweise** (Uploadweg offen) |
 
 ## BL-P8-02d – Rechnung per Ende + Completion / PO-BLP802D-1 (September 2026)
 
@@ -31,10 +44,11 @@ BL-P8-02c manuell abgenommen.
 | `DispoOrderInvoiceEndService` + PUT Endpoint | **umgesetzt** |
 | Completion-Readiness A–E + `DispoOrderCompletionService` | **umgesetzt** |
 | `disposed → completed` + Admin-Override STA-006 | **umgesetzt** |
-| AT-18 automatisiert (Feature + Playwright) | **umgesetzt** / manuelle Abnahme offen |
+| AT-18 automatisiert (Feature + Playwright) | **umgesetzt** / **manuell abgenommen** (PR #76) |
 | Unit/Feature/MySQL/Vitest/Playwright Port **8038** | **umgesetzt** |
-| Completed-Reopen / Cancelled / Storno (02e) | **bewusst nicht** |
-| Kundenbestätigungs-Dateiupload / BL-P9-01 | **bewusst nicht** |
+| Manuelle UI-Abnahme | **erfolgreich** (PR #76) |
+| Completed-Reopen / Cancelled / Storno (02e) | folgt in **BL-P8-02e** |
+| Kundenbestätigungs-Dateiupload / BL-P9-01 | **bewusst nicht** (weiterhin offen) |
 | UPL-001 | **teilweise** (Ausnahmeweg ja, Uploadweg offen) |
 | `BL-P8-02` insgesamt | **teilweise** |
 

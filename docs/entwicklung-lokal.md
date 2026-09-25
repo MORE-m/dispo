@@ -293,6 +293,24 @@ E2E: `npm run test:e2e:blp802c` bzw.
 `database/e2e-bl-p8-02c.sqlite`, Seeder `E2ECustomerConfirmationExceptionSeeder` – niemals
 gegen die Entwicklungs-DB).
 
+## BL-P8-02e – Completed-Reopen + Storno
+
+Keine neue Tabelle; nutzt `dispo_order_status_events` (`reason`, `is_reopen`).
+
+Services: `DispoOrderCompletedReopenService`, `DispoOrderCancellationService`.
+Endpunkte `POST …/wieder-oeffnen` und `POST …/stornieren`.
+
+Tests: `DispoOrderStatusTransitionTest` (02e-Kanten),
+`DispoOrderCompletedReopenCancellationTest`,
+`DispoOrderCompletedReopenCancellationConcurrencyTest` (MySQL); Vitest
+`dispo-order-completed-reopen-section.test.tsx`,
+`dispo-order-cancellation-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp802e` bzw.
+`npx playwright test -c playwright.blp802e.config.ts` (Port **8039**, DB
+`database/e2e-bl-p8-02e.sqlite`, Seeder `E2ECompletedReopenCancellationSeeder` –
+niemals Dev-DB `dispo`).
+
 ## BL-P8-02d – Rechnung per Ende + Completion
 
 Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;
