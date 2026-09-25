@@ -1,0 +1,150 @@
+name: spt008-diag
+
+# Diagnose-only: recurring PHP server SIGSEGV (exit 139) in SPT-008 harness.
+# No product changes. Do not merge as a feature.
+
+on:
+  pull_request:
+    paths:
+      - 'tests/e2e/helpers/spt008-diag-*'
+      - 'tests/e2e/helpers/run-spt008-server.sh'
+      - '.github/workflows/spt008-diag.yml'
+      - 'playwright.spt008.config.ts'
+      - 'tests/e2e/spt-008-spot-distribution-export.spec.ts'
+  workflow_dispatch:
+
+concurrency:
+  group: spt008-diag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spt008-diag-matrix:
+    name: spt008-diag-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+          extensions: mbstring, bcmath, pdo_sqlite, zip, xml, dom, xmlwriter
+
+      - name: Optional gdb
+        run: |
+          if ! command -v gdb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y gdb
+          fi
+          command -v gdb
+          gdb --version | head -n 1
+
+      - name: Enable core dumps (best effort)
+        run: |
+          ulimit -c unlimited || true
+          ulimit -c || true
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare SQLite environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p database storage/logs/spt008-diag
+          touch database/database.sqlite
+          php -r "
+            \$env = file_get_contents('.env');
+            \$env = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=sqlite', \$env);
+            \$env = preg_replace('/^DB_DATABASE=.*/m', 'DB_DATABASE=database/database.sqlite', \$env);
+            file_put_contents('.env', \$env);
+          "
+
+      - name: Run SPT-008 diagnose matrix
+        env:
+          SPT008_DIAG_PORT: '8133'
+        run: |
+          chmod +x tests/e2e/helpers/spt008-diag-*.sh tests/e2e/helpers/run-spt008-server.sh
+          bash tests/e2e/helpers/spt008-diag-matrix.sh
+
+      - name: Upload diagnose artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spt008-diag-logs
+          path: |
+            storage/logs/spt008-diag/**
+            storage/logs/spt008-server.log
+          if-no-files-found: warn
+
+  spt008-original-suite:
+    name: spt008-original-suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+          extensions: mbstring, bcmath, pdo_sqlite
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare SQLite environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          mkdir -p database
+          touch database/database.sqlite
+          php -r "
+            \$env = file_get_contents('.env');
+            \$env = preg_replace('/^DB_CONNECTION=.*/m', 'DB_CONNECTION=sqlite', \$env);
+            \$env = preg_replace('/^DB_DATABASE=.*/m', 'DB_DATABASE=database/database.sqlite', \$env);
+            file_put_contents('.env', \$env);
+          "
+
+      - name: Install NPM dependencies
+        run: npm ci
+
+      - name: Production build
+        run: npm run build
+
+      - name: Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser SPT-008 isolated tests (reproduce)
+        run: npx playwright test -c playwright.spt008.config.ts
+
+      - name: SPT-008 server log on failure
+        if: failure()
+        run: |
+          echo "=== spt008-server.log ==="
+          tail -n 300 storage/logs/spt008-server.log || true
+          echo "=== dmesg (best effort) ==="
+          dmesg | tail -n 40 || true
+
+      - name: Upload SPT-008 server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spt008-original-suite-logs
+          path: storage/logs/spt008-server.log
+          if-no-files-found: warn
