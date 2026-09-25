@@ -289,7 +289,11 @@ test.describe('BL-P9-01b Material- und Audio-Uploads', () => {
         await page
             .locator('[data-test="dispo-order-material-upload-file"]')
             .setInputFiles([
-                sampleMp3,
+                {
+                    name: 'audio-motif-sample.mp3',
+                    mimeType: 'audio/mpeg',
+                    buffer: readFileSync(sampleMp3),
+                },
                 {
                     name: 'spoof.mp3',
                     mimeType: 'audio/mpeg',
