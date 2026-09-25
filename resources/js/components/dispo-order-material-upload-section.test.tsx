@@ -4,11 +4,13 @@ import { DispoOrderMaterialUploadSection } from '@/components/dispo-order-materi
 import { JsonPostError } from '@/lib/json-post';
 
 const mockVisit = vi.fn();
+const mockReload = vi.fn();
 const mockFormDataPost = vi.fn();
 
 vi.mock('@inertiajs/react', () => ({
     router: {
         visit: (...args: unknown[]) => mockVisit(...args),
+        reload: (...args: unknown[]) => mockReload(...args),
         flushByCacheTags: vi.fn(),
         flush: vi.fn(),
     },
@@ -50,6 +52,7 @@ describe('DispoOrderMaterialUploadSection', () => {
 
     beforeEach(() => {
         mockVisit.mockReset();
+        mockReload.mockReset();
         mockFormDataPost.mockReset();
     });
 
@@ -162,17 +165,29 @@ describe('DispoOrderMaterialUploadSection', () => {
         expect(body.get('lock_version')).toBe('7');
     });
 
-    it('keeps successful uploads and reports partial failures', async () => {
+    it('keeps mixed report visible and retries only failed files with new lock_version', async () => {
         mockFormDataPost
             .mockResolvedValueOnce({
                 message: 'ok',
                 redirect: '/dispoauftraege/1',
             })
             .mockRejectedValueOnce(
-                new JsonPostError('Ungültiger Typ', { file: ['Ungültiger Typ'] }, 422),
-            );
+                new JsonPostError(
+                    'Audio-Motive sind nur als MP3 oder WAV zulässig.',
+                    {
+                        file: [
+                            'Audio-Motive sind nur als MP3 oder WAV zulässig.',
+                        ],
+                    },
+                    422,
+                ),
+            )
+            .mockResolvedValueOnce({
+                message: 'ok',
+                redirect: '/dispoauftraege/1',
+            });
 
-        render(
+        const { rerender } = render(
             <DispoOrderMaterialUploadSection
                 orderId={1}
                 lockVersion={4}
@@ -180,8 +195,10 @@ describe('DispoOrderMaterialUploadSection', () => {
             />,
         );
 
-        const good = new File(['a'], 'a.mp3', { type: 'audio/mpeg' });
-        const bad = new File(['b'], 'b.mp3', { type: 'application/pdf' });
+        const good = new File(['a'], 'valid.mp3', { type: 'audio/mpeg' });
+        const bad = new File(['%PDF'], 'spoof.mp3', {
+            type: 'application/pdf',
+        });
         fireEvent.change(screen.getByTestId('dispo-order-material-upload-file'), {
             target: { files: [good, bad] },
         });
@@ -189,10 +206,60 @@ describe('DispoOrderMaterialUploadSection', () => {
 
         await waitFor(() => {
             expect(mockFormDataPost).toHaveBeenCalledTimes(2);
-            expect(mockVisit).toHaveBeenCalled();
+            expect(mockReload).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    only: expect.arrayContaining(['uploads', 'order']),
+                }),
+            );
+            expect(mockVisit).not.toHaveBeenCalled();
         });
+
+        expect(
+            screen.getByTestId('dispo-order-material-upload-mixed-report'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId('dispo-order-material-upload-successes'),
+        ).toHaveTextContent('valid.mp3');
+        expect(
+            screen.getByTestId('dispo-order-material-upload-partial-failures'),
+        ).toHaveTextContent('spoof.mp3');
+        expect(
+            screen.getByTestId('dispo-order-material-upload-partial-failures'),
+        ).toHaveTextContent('Audio-Motive sind nur als MP3 oder WAV zulässig.');
+        expect(
+            screen.getByTestId('dispo-order-material-upload-pending-files'),
+        ).toHaveTextContent('spoof.mp3');
+        expect(
+            screen.getByTestId('dispo-order-material-upload-pending-files'),
+        ).not.toHaveTextContent('valid.mp3');
 
         const second = mockFormDataPost.mock.calls[1][1] as FormData;
         expect(second.get('lock_version')).toBe('5');
+
+        // Nach Reload liefert die Seite die fortgeschriebene lock_version.
+        rerender(
+            <DispoOrderMaterialUploadSection
+                orderId={1}
+                lockVersion={5}
+                categories={categories}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('dispo-order-material-upload-submit'));
+
+        await waitFor(() => {
+            expect(mockFormDataPost).toHaveBeenCalledTimes(3);
+        });
+
+        const retry = mockFormDataPost.mock.calls[2][1] as FormData;
+        expect(retry.get('lock_version')).toBe('5');
+        expect((retry.get('file') as File).name).toBe('spoof.mp3');
+
+        // Erneuter Versuch nur für die fehlgeschlagene Datei – kein zweites valid.mp3.
+        expect(
+            mockFormDataPost.mock.calls.map(
+                (call) => (call[1] as FormData).get('file') as File,
+            ).map((file) => file.name),
+        ).toEqual(['valid.mp3', 'spoof.mp3', 'spoof.mp3']);
     });
 });

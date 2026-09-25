@@ -273,6 +273,82 @@ test.describe('BL-P9-01b Material- und Audio-Uploads', () => {
         ).not.toContainText('aktive Audio');
     });
 
+    test('C2) Mixed Audio: gültige MP3 + Fake, Bericht bleibt sichtbar', async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        const orders = loadOrders();
+        const before = uploadCount(orders.audioMulti.id);
+
+        await login(page, 'disposition@example.com');
+        await openOrder(page, orders.audioMulti.id);
+
+        await page
+            .locator('[data-test="dispo-order-material-upload-category"]')
+            .selectOption('audio_motif');
+        await page
+            .locator('[data-test="dispo-order-material-upload-file"]')
+            .setInputFiles([
+                sampleMp3,
+                {
+                    name: 'spoof.mp3',
+                    mimeType: 'audio/mpeg',
+                    buffer: Buffer.from('%PDF-1.4\nfake\n'),
+                },
+            ]);
+
+        await Promise.all([
+            page.waitForResponse(
+                (response) =>
+                    /\/dispoauftraege\/\d+\/uploads$/.test(
+                        new URL(response.url()).pathname,
+                    ) &&
+                    response.request().method() === 'POST' &&
+                    response.ok(),
+                { timeout: 30_000 },
+            ),
+            page.waitForResponse(
+                (response) =>
+                    /\/dispoauftraege\/\d+\/uploads$/.test(
+                        new URL(response.url()).pathname,
+                    ) &&
+                    response.request().method() === 'POST' &&
+                    response.status() === 422,
+                { timeout: 30_000 },
+            ),
+            page
+                .locator('[data-test="dispo-order-material-upload-submit"]')
+                .click(),
+        ]);
+
+        await expect(
+            page.locator('[data-test="dispo-order-material-upload-mixed-report"]'),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(
+            page.locator('[data-test="dispo-order-material-upload-successes"]'),
+        ).toContainText('audio-motif-sample.mp3');
+        await expect(
+            page.locator(
+                '[data-test="dispo-order-material-upload-partial-failures"]',
+            ),
+        ).toContainText('spoof.mp3');
+        await expect(
+            page.locator(
+                '[data-test="dispo-order-material-upload-pending-files"]',
+            ),
+        ).toContainText('spoof.mp3');
+        await expect(
+            page.locator(
+                '[data-test="dispo-order-material-upload-pending-files"]',
+            ),
+        ).not.toContainText('audio-motif-sample.mp3');
+
+        expect(uploadCount(orders.audioMulti.id)).toBe(before + 1);
+        await expect(
+            page.locator('[data-test="dispo-order-uploads"]'),
+        ).toContainText('audio-motif-sample.mp3');
+    });
+
     test('D) Fake MP3 wird abgelehnt ohne Upload-Zeile', async ({ page }) => {
         test.setTimeout(120_000);
         const orders = loadOrders();
