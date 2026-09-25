@@ -214,11 +214,16 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Browser SPT-008 isolated tests
-        run: npx playwright test -c playwright.spt008.config.ts
+        run: npm run test:e2e:spt008
 
-      - name: SPT-008 server log on failure
+      - name: SPT-008 case logs on failure
         if: failure()
-        run: tail -n 200 storage/logs/spt008-server.log || true
+        run: |
+          shopt -s nullglob
+          for log in storage/logs/spt008-*.log; do
+            echo "======== ${log} ========"
+            tail -n 200 "${log}" || true
+          done
 
   mysql:
     runs-on: ubuntu-latest

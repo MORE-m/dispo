@@ -135,9 +135,10 @@ function assertNoCommercial(headers: string[]) {
 }
 
 test.describe('SPT-008 Spotplanungs-Export', () => {
-    test('calendar-only download has two sheets and average empty hint', async ({
-        page,
-    }) => {
+    test(
+        'calendar-only download has two sheets and average empty hint',
+        { tag: '@spt008-calendar' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.calendar.id}`);
@@ -168,11 +169,13 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         expect(workbook.sheets[1].empty_message).toContain(
             'keine Average-Planung',
         );
-    });
+    },
+    );
 
-    test('tandem calendar sheet keeps units without price multiplication', async ({
-        page,
-    }) => {
+    test(
+        'tandem calendar sheet keeps units without price multiplication',
+        { tag: '@spt008-tandem' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'disposition@example.com');
         await page.goto(`/dispoauftraege/${orders.tandem.id}`);
@@ -188,11 +191,13 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         expect(calendar.rows[0][10]).toBe('Tandem-Einheiten');
         expect(calendar.rows[0][9]).toBe('4');
         expect(calendar.rows[0][13]).toBe('8');
-    });
+    },
+    );
 
-    test('average-only download shows proposal notice and rows', async ({
-        page,
-    }) => {
+    test(
+        'average-only download shows proposal notice and rows',
+        { tag: '@spt008-average' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.average.id}`);
@@ -226,11 +231,13 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         // keine erfundenen Kalenderzeilen
         expect(proposal.headers).not.toContain('Datum');
         expect(proposal.headers).not.toContain('Wochentag');
-    });
+    },
+    );
 
-    test('mixed order exports calendar and average separately', async ({
-        page,
-    }) => {
+    test(
+        'mixed order exports calendar and average separately',
+        { tag: '@spt008-mixed' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.mixed.id}`);
@@ -251,11 +258,13 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
             'Unverbindlicher Planungsvorschlag',
         );
         expect(workbook.sheets[1].rows[0][14]).toBe('Vorschlag');
-    });
+    },
+    );
 
-    test('multi-calendar order keeps all calendar positions and average proposal', async ({
-        page,
-    }) => {
+    test(
+        'multi-calendar order keeps all calendar positions and average proposal',
+        { tag: '@spt008-multi' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.multi.id}`);
@@ -293,9 +302,13 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
         expect(proposal.rows[0][14]).toBe('Vorschlag');
         assertNoCommercial(calendar.headers);
         assertNoCommercial(proposal.headers);
-    });
+    },
+    );
 
-    test('fully empty order disables export button', async ({ page }) => {
+    test(
+        'fully empty order disables export button',
+        { tag: '@spt008-empty' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'sales@example.com');
         await page.goto(`/dispoauftraege/${orders.empty.id}`);
@@ -308,14 +321,19 @@ test.describe('SPT-008 Spotplanungs-Export', () => {
                 '[data-test="dispo-spot-distribution-export-disabled-hint"]',
             ),
         ).toBeVisible();
-    });
+    },
+    );
 
-    test('product management has no access', async ({ page }) => {
+    test(
+        'product management has no access',
+        { tag: '@spt008-pm-denied' },
+        async ({ page }) => {
         const orders = loadOrders();
         await login(page, 'pm@example.com');
         const response = await page.goto(
             `/dispoauftraege/${orders.calendar.id}`,
         );
         expect(response?.status()).toBe(403);
-    });
+    },
+    );
 });
