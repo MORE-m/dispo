@@ -63,9 +63,10 @@ echo urldecode($m[1]);
 
 HTTP_CODE="$(curl -sS -o "$OUT_XLSX" -w '%{http_code}' \
   -c "$JAR" -b "$JAR" \
-  -H "Accept: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" \
+  -H "Accept: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*" \
+  -H "X-Requested-With: XMLHttpRequest" \
   -H "X-XSRF-TOKEN: ${XSRF}" \
-  "${BASE}/dispoauftraege/${ORDER_ID}/spotverteilung.xlsx")"
+  "${BASE}/dispoauftraege/${ORDER_ID}/spotverteilung.xlsx" || true)"
 
 BYTES=0
 if [[ -f "$OUT_XLSX" ]]; then
@@ -75,6 +76,11 @@ fi
 echo "http=${HTTP_CODE} bytes=${BYTES} file=${OUT_XLSX} order_id=${ORDER_ID} key=${KEY}"
 
 if [[ "$HTTP_CODE" != "200" ]]; then
+  echo "download_body_head=$(head -c 400 "$OUT_XLSX" | tr '\n' ' ')" >&2
+  if [[ -f "${SPT008_DIAG_ROOT}/storage/logs/laravel.log" ]]; then
+    echo "laravel_log_tail:" >&2
+    tail -n 40 "${SPT008_DIAG_ROOT}/storage/logs/laravel.log" >&2 || true
+  fi
   exit 4
 fi
 if [[ "$BYTES" -lt 100 ]]; then

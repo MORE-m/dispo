@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stoppt Diagnose-Server und reportet Exit-Code falls bekannt.
+# Stoppt Diagnose-Server inkl. Process-Group (Child php -S).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -8,37 +8,39 @@ source "${SCRIPT_DIR}/spt008-diag-env.sh"
 
 MODE="${1:-artisan}"
 PID_FILE="${SPT008_DIAG_LOG_DIR}/server-${MODE}.pid"
+PGID_FILE="${SPT008_DIAG_LOG_DIR}/server-${MODE}.pgid"
 LOG_FILE="${SPT008_DIAG_LOG_DIR}/server-${MODE}.log"
 
-if [[ ! -f "$PID_FILE" ]]; then
-  echo "no_pid_file"
-  exit 0
+stop_pgid() {
+  local pgid="$1"
+  [[ -z "$pgid" ]] && return 0
+  kill -- "-${pgid}" 2>/dev/null || true
+  sleep 0.2
+  kill -9 -- "-${pgid}" 2>/dev/null || true
+}
+
+if [[ -f "$PGID_FILE" ]]; then
+  pgid="$(cat "$PGID_FILE" || true)"
+  stop_pgid "$pgid"
+  echo "SPT008_DIAG_SERVER_STOPPED pgid=${pgid} at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$LOG_FILE"
+  rm -f "$PGID_FILE"
 fi
 
-PID="$(cat "$PID_FILE")"
-if [[ -z "$PID" ]]; then
-  rm -f "$PID_FILE"
-  echo "empty_pid"
-  exit 0
-fi
-
-if kill -0 "$PID" 2>/dev/null; then
-  kill "$PID" 2>/dev/null || true
-  # Wait up to 5s
-  for _ in $(seq 1 50); do
-    if ! kill -0 "$PID" 2>/dev/null; then
-      break
-    fi
-    sleep 0.1
-  done
-  if kill -0 "$PID" 2>/dev/null; then
-    kill -9 "$PID" 2>/dev/null || true
+if [[ -f "$PID_FILE" ]]; then
+  pid="$(cat "$PID_FILE" || true)"
+  if [[ -n "$pid" ]]; then
+    kill "$pid" 2>/dev/null || true
+    kill -9 "$pid" 2>/dev/null || true
   fi
-  echo "SPT008_DIAG_SERVER_STOPPED pid=${PID} at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$LOG_FILE"
-  echo "stopped"
-else
-  echo "SPT008_DIAG_SERVER_ALREADY_DEAD pid=${PID} at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"$LOG_FILE"
-  echo "already_dead"
+  rm -f "$PID_FILE"
 fi
 
-rm -f "$PID_FILE"
+# Port freimachen falls Zombie Listener
+if command -v lsof >/dev/null 2>&1; then
+  for p in $(lsof -t -nP -iTCP:"${SPT008_DIAG_PORT}" -sTCP:LISTEN 2>/dev/null || true); do
+    kill "$p" 2>/dev/null || true
+    kill -9 "$p" 2>/dev/null || true
+  done
+fi
+
+echo "stopped"

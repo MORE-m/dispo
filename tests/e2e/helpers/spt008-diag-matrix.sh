@@ -130,161 +130,122 @@ run_http_sequence() {
   return 0
 }
 
-# ---------- Diagnose 1: mixed fresh ×5 (own server each) ----------
-diag_section "5) Diagnose 1 – mixed fresh ×5 (fresh DB+server each)"
-MIXED_PASS=0
-MIXED_FAIL=0
-for run in 1 2 3 4 5; do
-  bash "${SCRIPT_DIR}/spt008-diag-prepare-db.sh" >/dev/null
-  set +e
-  bash "${SCRIPT_DIR}/spt008-diag-start-server.sh" artisan >/dev/null
-  start_ec=$?
-  set -e
-  if [[ "$start_ec" -ne 0 ]]; then
-    MIXED_FAIL=$((MIXED_FAIL + 1))
-    diag_log "mixed_fresh run=${run} SERVER_BOOT_FAIL exit=$(interpret_exit "$start_ec")"
-    continue
-  fi
-  started_at=$(date +%s)
-  set +e
-  out="$(bash "${SCRIPT_DIR}/spt008-diag-http-download.sh" mixed 2>&1)"
-  dl_ec=$?
-  set -e
-  elapsed=$(( $(date +%s) - started_at ))
-  alive="no"
-  if server_alive artisan; then alive="yes"; fi
-  if [[ "$dl_ec" -eq 0 && "$alive" == "yes" ]]; then
-    MIXED_PASS=$((MIXED_PASS + 1))
-    diag_log "mixed_fresh run=${run} PASS ${out} elapsed_s=${elapsed} server_alive=${alive}"
-  else
-    MIXED_FAIL=$((MIXED_FAIL + 1))
-    diag_log "mixed_fresh run=${run} FAIL exit=${dl_ec} ${out} elapsed_s=${elapsed} server_alive=${alive}"
-  fi
-  bash "${SCRIPT_DIR}/spt008-diag-stop-server.sh" artisan >/dev/null || true
-done
-diag_log "mixed_fresh summary PASS=${MIXED_PASS}/5 FAIL=${MIXED_FAIL}/5"
-
-# ---------- Diagnose 2: repeated calendar export on one server ----------
-diag_section "6) Diagnose 2 – repeated calendar export ×10 (one artisan server)"
-bash "${SCRIPT_DIR}/spt008-diag-prepare-db.sh" >/dev/null
+# ---------- Diagnose 1/2/3 via official SPT harness (HTTP, no browser) ----------
+diag_section "5) Diagnose – HTTP via official harness artisan ×5 sequences"
 set +e
-bash "${SCRIPT_DIR}/spt008-diag-start-server.sh" artisan >/dev/null
+bash "${SCRIPT_DIR}/spt008-diag-http-via-harness.sh" artisan 5
+HARNESS_ART_EC=$?
 set -e
+diag_log "harness_artisan_seq exit=$(interpret_exit "$HARNESS_ART_EC")"
+tail -n 40 "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" | tee -a "$SPT008_DIAG_REPORT" || true
+
+diag_section "6) Diagnose – repeated calendar via harness (10 exports, one server)"
+# One long-lived harness: start once, hit calendar 10 times
+export APP_ENV=testing E2E_SERVER=1
+export APP_KEY="${APP_KEY:-base64:2fl+Ktvkfl+Fuz4Qp/Ej30N8mK8nwZuqqjHadrQtdZg=}"
+export DB_CONNECTION=sqlite
+export DB_DATABASE="${SPT008_DIAG_ROOT}/database/e2e-spt-008.sqlite"
+export DB_URL=""
+export E2E_SPT008_PORT=8033
+export E2E_SPT008_DB="${DB_DATABASE}"
+export SPT008_SERVER_MODE=artisan
+REP_LOG="${SPT008_DIAG_LOG_DIR}/repeat-calendar-harness.log"
+: >"$REP_LOG"
+if command -v lsof >/dev/null 2>&1; then
+  for p in $(lsof -t -nP -iTCP:8033 -sTCP:LISTEN 2>/dev/null || true); do kill -9 "$p" 2>/dev/null || true; done
+fi
+if command -v setsid >/dev/null 2>&1; then
+  setsid bash "${SCRIPT_DIR}/run-spt008-server.sh" >>"$REP_LOG" 2>&1 &
+else
+  bash "${SCRIPT_DIR}/run-spt008-server.sh" >>"$REP_LOG" 2>&1 &
+fi
+WRAP_PID=$!
+for _ in $(seq 1 90); do
+  curl -fsS "http://127.0.0.1:8033/health" >/dev/null 2>&1 && break
+  kill -0 "$WRAP_PID" 2>/dev/null || break
+  sleep 0.5
+done
 REP_PASS=0
 REP_CRASH_AT="none"
+ORDERS="${SPT008_DIAG_ROOT}/database/e2e-spt008-orders.json"
 for i in $(seq 1 10); do
-  if ! server_alive artisan; then
+  if ! kill -0 "$WRAP_PID" 2>/dev/null; then
     REP_CRASH_AT="$i"
     diag_log "repeat_calendar CRASH before iteration=${i}"
     break
   fi
-  echo "SPT008_STRESS iteration=${i} route=calendar before" >>"${SPT008_DIAG_LOG_DIR}/repeat-calendar.log"
-  set +e
-  out="$(bash "${SCRIPT_DIR}/spt008-diag-http-download.sh" calendar 2>&1)"
-  dl_ec=$?
-  set -e
-  echo "SPT008_STRESS iteration=${i} after exit=${dl_ec} ${out}" >>"${SPT008_DIAG_LOG_DIR}/repeat-calendar.log"
-  if [[ "$dl_ec" -ne 0 ]] || ! server_alive artisan; then
+  ORDER_ID="$(php -r '$f=json_decode(file_get_contents($argv[1]),true); echo (int)$f["calendar"]["id"];' "$ORDERS")"
+  JAR="${SPT008_DIAG_LOG_DIR}/rep-cookies.txt"
+  rm -f "$JAR"
+  curl -fsS -c "$JAR" -b "$JAR" "http://127.0.0.1:8033/login" -o /dev/null
+  XSRF="$(JAR="$JAR" php -r '$jar=file_get_contents(getenv("JAR")); preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m); echo urldecode($m[1]);')"
+  curl -sS -o /dev/null -c "$JAR" -b "$JAR" -X POST "http://127.0.0.1:8033/login" \
+    -H "Content-Type: application/json" -H "Accept: application/json" \
+    -H "X-Requested-With: XMLHttpRequest" -H "X-XSRF-TOKEN: ${XSRF}" \
+    --data '{"email":"sales@example.com","password":"password"}' >/dev/null
+  XSRF="$(JAR="$JAR" php -r '$jar=file_get_contents(getenv("JAR")); preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m); echo urldecode($m[1]);')"
+  OUT_X="${SPT008_DIAG_LOG_DIR}/rep-cal-${i}.xlsx"
+  echo "SPT008_STRESS iteration=${i} before" >>"$REP_LOG"
+  CODE="$(curl -sS -o "$OUT_X" -w '%{http_code}' -c "$JAR" -b "$JAR" -H "X-XSRF-TOKEN: ${XSRF}" \
+    "http://127.0.0.1:8033/dispoauftraege/${ORDER_ID}/spotverteilung.xlsx" || echo 000)"
+  BYTES=0; [[ -f "$OUT_X" ]] && BYTES="$(wc -c <"$OUT_X" | tr -d ' ')"
+  echo "SPT008_STRESS iteration=${i} after http=${CODE} bytes=${BYTES}" >>"$REP_LOG"
+  if [[ "$CODE" != "200" ]] || ! kill -0 "$WRAP_PID" 2>/dev/null; then
     REP_CRASH_AT="$i"
-    diag_log "repeat_calendar FAIL iteration=${i} exit=${dl_ec} server_alive=$(server_alive artisan && echo yes || echo no) ${out}"
+    diag_log "repeat_calendar FAIL iteration=${i} http=${CODE} alive=$(kill -0 "$WRAP_PID" 2>/dev/null && echo yes || echo no)"
     break
   fi
   REP_PASS=$((REP_PASS + 1))
-  diag_log "repeat_calendar iteration=${i} PASS ${out}"
+  diag_log "repeat_calendar iteration=${i} PASS http=${CODE} bytes=${BYTES}"
 done
 if [[ "$REP_CRASH_AT" == "none" ]]; then
   diag_log "repeat_calendar summary PASS=${REP_PASS}/10"
 else
   diag_log "repeat_calendar summary PASS=${REP_PASS}/10 crash_at=${REP_CRASH_AT}"
 fi
-bash "${SCRIPT_DIR}/spt008-diag-stop-server.sh" artisan >/dev/null || true
+kill -- "-${WRAP_PID}" 2>/dev/null || true
+wait "$WRAP_PID" 2>/dev/null || true
 
-# ---------- Diagnose 3: original sequence ×5 artisan ----------
-diag_section "7) Diagnose 3 – original sequence ×5 (artisan serve)"
+diag_section "7) Diagnose – HTTP via official harness raw php -S ×5 sequences"
+set +e
+bash "${SCRIPT_DIR}/spt008-diag-http-via-harness.sh" raw 5
+HARNESS_RAW_EC=$?
+set -e
+diag_log "harness_raw_seq exit=$(interpret_exit "$HARNESS_RAW_EC")"
+tail -n 40 "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" | tee -a "$SPT008_DIAG_REPORT" || true
+
+# Keep legacy labels for summary compatibility
 ART_SEQ_PASS=0
-ART_SEQ_FAIL=0
-declare -a ART_CRASH_POS=()
-for run in 1 2 3 4 5; do
-  set +e
-  run_http_sequence artisan "artisan_seq run=${run}"
-  ec=$?
-  set -e
-  if [[ "$ec" -eq 0 ]]; then
-    ART_SEQ_PASS=$((ART_SEQ_PASS + 1))
-  else
-    ART_SEQ_FAIL=$((ART_SEQ_FAIL + 1))
-    # Extract crash key from last log lines if present
-    ART_CRASH_POS+=("run${run}")
-  fi
-done
-diag_log "artisan_sequence summary PASS=${ART_SEQ_PASS}/5 FAIL=${ART_SEQ_FAIL}/5 positions=${ART_CRASH_POS[*]-none}"
-
-# ---------- Diagnose 6: raw php -S sequence ×5 ----------
-diag_section "8) Diagnose 6 – original sequence ×5 (raw php -S)"
+ART_SEQ_FAIL=5
 RAW_SEQ_PASS=0
-RAW_SEQ_FAIL=0
-declare -a RAW_CRASH_POS=()
-for run in 1 2 3 4 5; do
-  set +e
-  run_http_sequence raw "raw_seq run=${run}"
-  ec=$?
-  set -e
-  if [[ "$ec" -eq 0 ]]; then
-    RAW_SEQ_PASS=$((RAW_SEQ_PASS + 1))
-  else
-    RAW_SEQ_FAIL=$((RAW_SEQ_FAIL + 1))
-    RAW_CRASH_POS+=("run${run}")
-  fi
-done
-diag_log "raw_sequence summary PASS=${RAW_SEQ_PASS}/5 FAIL=${RAW_SEQ_FAIL}/5 positions=${RAW_CRASH_POS[*]-none}"
+RAW_SEQ_FAIL=5
+if [[ "${HARNESS_ART_EC:-1}" -eq 0 ]]; then ART_SEQ_PASS=5; ART_SEQ_FAIL=0; fi
+if [[ "${HARNESS_RAW_EC:-1}" -eq 0 ]]; then RAW_SEQ_PASS=5; RAW_SEQ_FAIL=0; fi
+if rg -q 'SUMMARY mode=artisan PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" 2>/dev/null; then
+  ART_LINE="$(rg 'SUMMARY mode=artisan' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" | tail -1)"
+  diag_log "$ART_LINE"
+  ART_SEQ_PASS="$(echo "$ART_LINE" | sed -n 's/.*PASS=\([0-9]*\)\/.*/\1/p')"
+  ART_SEQ_FAIL="$(echo "$ART_LINE" | sed -n 's/.*FAIL=\([0-9]*\)\/.*/\1/p')"
+  ART_SEQ_PASS="${ART_SEQ_PASS:-0}"
+  ART_SEQ_FAIL="${ART_SEQ_FAIL:-5}"
+fi
+if rg -q 'SUMMARY mode=raw PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" 2>/dev/null; then
+  RAW_LINE="$(rg 'SUMMARY mode=raw' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" | tail -1)"
+  diag_log "$RAW_LINE"
+  RAW_SEQ_PASS="$(echo "$RAW_LINE" | sed -n 's/.*PASS=\([0-9]*\)\/.*/\1/p')"
+  RAW_SEQ_FAIL="$(echo "$RAW_LINE" | sed -n 's/.*FAIL=\([0-9]*\)\/.*/\1/p')"
+  RAW_SEQ_PASS="${RAW_SEQ_PASS:-0}"
+  RAW_SEQ_FAIL="${RAW_SEQ_FAIL:-5}"
+fi
 
-# ---------- Optional GDB on artisan/raw if crash reproducible ----------
-diag_section "9) GDB attempt (best effort)"
+# Skip fragile custom-server GDB HTTP path; original suite already captures SIGSEGV.
+# Optional: attach note only.
+diag_section "9) GDB note"
 if command -v gdb >/dev/null 2>&1; then
-  # Catch-on-crash pattern: start raw php -S under gdb in background via
-  # a wrapper that dumps bt when the inferior receives SIGSEGV.
-  bash "${SCRIPT_DIR}/spt008-diag-prepare-db.sh" >/dev/null
-  GDB_LOG="${SPT008_DIAG_LOG_DIR}/gdb-raw.log"
-  ROUTER="${SPT008_DIAG_ROOT}/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php"
-  : >"$GDB_LOG"
-  (
-    cd "${SPT008_DIAG_ROOT}/public"
-    gdb -q -nx \
-      -ex "set pagination off" \
-      -ex "set confirm off" \
-      -ex "handle SIGPIPE nostop noprint pass" \
-      -ex "run" \
-      -ex "echo \\n=== GDB BACKTRACE AFTER STOP ===\\n" \
-      -ex "bt" \
-      -ex "info sharedlibrary" \
-      -ex "quit" \
-      --args php -d memory_limit=512M -S "127.0.0.1:${SPT008_DIAG_PORT}" "$ROUTER" \
-      >"$GDB_LOG" 2>&1 &
-    echo $! >"${SPT008_DIAG_LOG_DIR}/gdb.pid"
-  )
-  # Wait for listen (gdb overhead)
-  for _ in $(seq 1 60); do
-    if curl -fsS "http://127.0.0.1:${SPT008_DIAG_PORT}/health" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 0.5
-  done
-  for key in calendar tandem average mixed multi calendar tandem average mixed multi; do
-    bash "${SCRIPT_DIR}/spt008-diag-http-download.sh" "$key" >>"${SPT008_DIAG_LOG_DIR}/gdb-hits.log" 2>&1 || true
-    if [[ -f "${SPT008_DIAG_LOG_DIR}/gdb.pid" ]] && ! kill -0 "$(cat "${SPT008_DIAG_LOG_DIR}/gdb.pid")" 2>/dev/null; then
-      diag_log "gdb inferior stopped during key=${key}"
-      break
-    fi
-  done
-  if [[ -f "${SPT008_DIAG_LOG_DIR}/gdb.pid" ]]; then
-    kill "$(cat "${SPT008_DIAG_LOG_DIR}/gdb.pid")" 2>/dev/null || true
-    wait "$(cat "${SPT008_DIAG_LOG_DIR}/gdb.pid")" 2>/dev/null || true
-    rm -f "${SPT008_DIAG_LOG_DIR}/gdb.pid"
-  fi
-  diag_log "gdb log: ${GDB_LOG}"
-  tail -n 100 "$GDB_LOG" | tee -a "$SPT008_DIAG_REPORT" || true
+  diag_log "gdb available: $(gdb --version | head -n 1)"
+  diag_log "Native bt intentionally deferred to follow-up once HTTP harness stress isolates crash under gdb."
 else
-  diag_log "gdb not installed – skip native backtrace"
+  diag_log "gdb not installed"
 fi
 
 try_dmesg
@@ -293,10 +254,11 @@ try_dmesg
 diag_section "10) Classification summary"
 diag_log "CLI_SAME_EC=$(interpret_exit "$CLI_SAME_EC")"
 diag_log "CLI_ONE_EC=$(interpret_exit "$CLI_ONE_EC")"
-diag_log "MIXED_FRESH=${MIXED_PASS}/5"
+diag_log "HARNESS_ART_EC=$(interpret_exit "${HARNESS_ART_EC:-1}")"
+diag_log "HARNESS_RAW_EC=$(interpret_exit "${HARNESS_RAW_EC:-1}")"
 diag_log "REPEAT_CALENDAR=${REP_PASS}/10 crash_at=${REP_CRASH_AT}"
-diag_log "ARTISAN_SEQ=${ART_SEQ_PASS}/5"
-diag_log "RAW_SEQ=${RAW_SEQ_PASS}/5"
+diag_log "ARTISAN_SEQ=${ART_SEQ_PASS}/5 fail=${ART_SEQ_FAIL}"
+diag_log "RAW_SEQ=${RAW_SEQ_PASS}/5 fail=${RAW_SEQ_FAIL}"
 
 # Derive A/B/C
 CLASS_A="PASS"
