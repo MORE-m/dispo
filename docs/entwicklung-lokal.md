@@ -317,9 +317,22 @@ Migration `dispo_order_uploads` + Approval-Snapshot-Felder an
 `dispo_order_approval_requests`. Service `DispoOrderUploadService`
 (Upload/Archiv/Download). Kategorie produktiv: `customer_confirmation`.
 
-Tests: `DispoOrderCustomerConfirmationUploadTest`,
-`DispoOrderCustomerConfirmationUploadMysqlTest`; Vitest
-`dispo-order-uploads-section.test.tsx`.
+Fachliches Limit (UPL-006): **50 MB** pro Datei
+(`DispoOrderUploadService::MAX_BYTES`). Die Anwendung setzt `php.ini`
+**nicht** selbst; echte Browser-/multipart-Uploads benötigen in der
+Runtime/Deployment:
+
+- `upload_max_filesize >= 50M`
+- `post_max_size > 50M` (Multipart-Overhead; empfohlen mind. `55M`,
+  nicht exakt `50M`)
+
+Ohne diese PHP-Grenzen kann der Upload bereits vor Laravel abgeschnitten
+werden, obwohl der Service 50 MB akzeptiert.
+
+Tests: `DispoOrderCustomerConfirmationUploadTest` (inkl. exakt 50 MB /
+`MAX_BYTES + 1`), `DispoOrderCustomerConfirmationUploadMysqlTest`
+(stale-lock sequentiell + echte parallele Process-Worker Upload-vs-Upload
+und Upload-vs-Ausnahme); Vitest `dispo-order-uploads-section.test.tsx`.
 
 E2E: `npm run test:e2e:blp901a` bzw.
 `npx playwright test -c playwright.blp901a.config.ts` (Port **8040**, DB

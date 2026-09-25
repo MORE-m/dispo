@@ -118,6 +118,9 @@ describe('DispoOrderCustomerConfirmationSection', () => {
         expect(
             screen.getByTestId('customer-confirmation-upload-button'),
         ).toBeDisabled();
+        expect(
+            screen.getByTestId('customer-confirmation-upload-max-size-hint'),
+        ).toHaveTextContent('Maximal 50 MB pro Datei');
     });
 
     it('uploads selected file via formDataPost', async () => {

@@ -201,6 +201,12 @@ export function DispoOrderCustomerConfirmationSection({
                                     setError(null);
                                 }}
                             />
+                            <p
+                                className="text-muted-foreground text-xs"
+                                data-test="customer-confirmation-upload-max-size-hint"
+                            >
+                                Maximal 50 MB pro Datei
+                            </p>
                         </div>
                         <Button
                             type="button"

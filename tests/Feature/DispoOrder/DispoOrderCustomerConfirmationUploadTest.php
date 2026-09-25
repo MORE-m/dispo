@@ -16,6 +16,7 @@ use App\Services\DispoOrder\DispoOrderWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\Concerns\EnsuresCustomerConfirmationException;
@@ -106,13 +107,65 @@ class DispoOrderCustomerConfirmationUploadTest extends TestCase
             ['lock_version' => $order->lock_version],
         )->assertStatus(422)->assertJsonValidationErrors('file');
 
-        $tooBig = UploadedFile::fake()->create('huge.bin', (DispoOrderUploadService::MAX_BYTES / 1024) + 1);
+        $tooBig = UploadedFile::fake()->create(
+            'huge.bin',
+            (int) ((DispoOrderUploadService::MAX_BYTES + 1) / 1024) + 1,
+        );
         $this->postUpload($creator, $order,
             [
                 'lock_version' => $order->lock_version,
                 'file' => $tooBig,
             ],
         )->assertStatus(422)->assertJsonValidationErrors('file');
+    }
+
+    public function test_upload_service_accepts_exact_max_bytes_and_rejects_one_over(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        ['order' => $order, 'creator' => $creator] = $this->draftWithoutConfirmation();
+        $service = app(DispoOrderUploadService::class);
+
+        $exactPath = $this->createTemporarySizedFile(DispoOrderUploadService::MAX_BYTES);
+        $overPath = $this->createTemporarySizedFile(DispoOrderUploadService::MAX_BYTES + 1);
+
+        try {
+            $upload = $service->uploadCustomerConfirmation(
+                $order,
+                $creator,
+                $order->lock_version,
+                new UploadedFile($exactPath, 'exact-50mb.bin', 'application/octet-stream', null, true),
+            );
+
+            $this->assertSame(DispoOrderUploadService::MAX_BYTES, $upload->size_bytes);
+            $this->assertSame(64, strlen($upload->sha256));
+            Storage::disk((string) config('dispo.files_disk'))->assertExists($upload->storage_path);
+
+            $this->expectException(ValidationException::class);
+            $service->uploadCustomerConfirmation(
+                $order->fresh(),
+                $creator,
+                $order->fresh()->lock_version,
+                new UploadedFile($overPath, 'over-50mb.bin', 'application/octet-stream', null, true),
+            );
+        } finally {
+            @unlink($exactPath);
+            @unlink($overPath);
+        }
+    }
+
+    private function createTemporarySizedFile(int $bytes): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'dispo-cc-size-');
+        $this->assertNotFalse($path);
+
+        $handle = fopen($path, 'wb');
+        $this->assertNotFalse($handle);
+        $this->assertTrue(ftruncate($handle, $bytes));
+        fclose($handle);
+        clearstatcache(true, $path);
+        $this->assertSame($bytes, filesize($path));
+
+        return $path;
     }
 
     public function test_upload_policy_roles_and_draft_only(): void
