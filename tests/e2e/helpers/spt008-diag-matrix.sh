@@ -139,6 +139,16 @@ set -e
 diag_log "harness_artisan_seq exit=$(interpret_exit "$HARNESS_ART_EC")"
 tail -n 40 "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" | tee -a "$SPT008_DIAG_REPORT" || true
 
+# Force port cleanup before repeat/raw sections
+if command -v lsof >/dev/null 2>&1; then
+  for p in $(lsof -t -nP -iTCP:8033 -sTCP:LISTEN 2>/dev/null || true); do
+    kill -9 "$p" 2>/dev/null || true
+  done
+fi
+pkill -f "artisan serve --host=127.0.0.1 --port=8033" 2>/dev/null || true
+pkill -f "127.0.0.1:8033" 2>/dev/null || true
+sleep 1
+
 diag_section "6) Diagnose – repeated calendar via harness (10 exports, one server)"
 # One long-lived harness: start once, hit calendar 10 times
 export APP_ENV=testing E2E_SERVER=1
@@ -161,7 +171,10 @@ else
 fi
 WRAP_PID=$!
 for _ in $(seq 1 90); do
-  curl -fsS "http://127.0.0.1:8033/health" >/dev/null 2>&1 && break
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:8033/health" || echo 000)"
+  if [[ "$code" == "200" ]]; then
+    break
+  fi
   kill -0 "$WRAP_PID" 2>/dev/null || break
   sleep 0.5
 done
@@ -177,13 +190,13 @@ for i in $(seq 1 10); do
   ORDER_ID="$(php -r '$f=json_decode(file_get_contents($argv[1]),true); echo (int)$f["calendar"]["id"];' "$ORDERS")"
   JAR="${SPT008_DIAG_LOG_DIR}/rep-cookies.txt"
   rm -f "$JAR"
-  curl -fsS -c "$JAR" -b "$JAR" "http://127.0.0.1:8033/login" -o /dev/null
-  XSRF="$(JAR="$JAR" php -r '$jar=file_get_contents(getenv("JAR")); preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m); echo urldecode($m[1]);')"
+  curl -sS -c "$JAR" -b "$JAR" "http://127.0.0.1:8033/login" -o /dev/null || true
+  XSRF="$(JAR="$JAR" php -r '$jar=@file_get_contents(getenv("JAR")); if (!preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m)) {echo ""; exit(0);} echo urldecode($m[1]);')"
   curl -sS -o /dev/null -c "$JAR" -b "$JAR" -X POST "http://127.0.0.1:8033/login" \
     -H "Content-Type: application/json" -H "Accept: application/json" \
     -H "X-Requested-With: XMLHttpRequest" -H "X-XSRF-TOKEN: ${XSRF}" \
-    --data '{"email":"sales@example.com","password":"password"}' >/dev/null
-  XSRF="$(JAR="$JAR" php -r '$jar=file_get_contents(getenv("JAR")); preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m); echo urldecode($m[1]);')"
+    --data '{"email":"sales@example.com","password":"password"}' >/dev/null || true
+  XSRF="$(JAR="$JAR" php -r '$jar=@file_get_contents(getenv("JAR")); if (!preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/",$jar,$m)) {echo ""; exit(0);} echo urldecode($m[1]);')"
   OUT_X="${SPT008_DIAG_LOG_DIR}/rep-cal-${i}.xlsx"
   echo "SPT008_STRESS iteration=${i} before" >>"$REP_LOG"
   CODE="$(curl -sS -o "$OUT_X" -w '%{http_code}' -c "$JAR" -b "$JAR" -H "X-XSRF-TOKEN: ${XSRF}" \
@@ -193,6 +206,8 @@ for i in $(seq 1 10); do
   if [[ "$CODE" != "200" ]] || ! kill -0 "$WRAP_PID" 2>/dev/null; then
     REP_CRASH_AT="$i"
     diag_log "repeat_calendar FAIL iteration=${i} http=${CODE} alive=$(kill -0 "$WRAP_PID" 2>/dev/null && echo yes || echo no)"
+    # Capture server exit line if any
+    grep -n 'SPT008_SERVER_EXIT' "${SPT008_DIAG_ROOT}/storage/logs/spt008-server.log" | tee -a "$SPT008_DIAG_REPORT" || true
     break
   fi
   REP_PASS=$((REP_PASS + 1))
@@ -221,16 +236,17 @@ RAW_SEQ_PASS=0
 RAW_SEQ_FAIL=5
 if [[ "${HARNESS_ART_EC:-1}" -eq 0 ]]; then ART_SEQ_PASS=5; ART_SEQ_FAIL=0; fi
 if [[ "${HARNESS_RAW_EC:-1}" -eq 0 ]]; then RAW_SEQ_PASS=5; RAW_SEQ_FAIL=0; fi
-if rg -q 'SUMMARY mode=artisan PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" 2>/dev/null; then
-  ART_LINE="$(rg 'SUMMARY mode=artisan' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" | tail -1)"
+# Replace rg with grep -E for portability in classification parsing
+if grep -Eq 'SUMMARY mode=artisan PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" 2>/dev/null; then
+  ART_LINE="$(grep 'SUMMARY mode=artisan' "${SPT008_DIAG_LOG_DIR}/http-via-harness-artisan.log" | tail -1)"
   diag_log "$ART_LINE"
   ART_SEQ_PASS="$(echo "$ART_LINE" | sed -n 's/.*PASS=\([0-9]*\)\/.*/\1/p')"
   ART_SEQ_FAIL="$(echo "$ART_LINE" | sed -n 's/.*FAIL=\([0-9]*\)\/.*/\1/p')"
   ART_SEQ_PASS="${ART_SEQ_PASS:-0}"
   ART_SEQ_FAIL="${ART_SEQ_FAIL:-5}"
 fi
-if rg -q 'SUMMARY mode=raw PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" 2>/dev/null; then
-  RAW_LINE="$(rg 'SUMMARY mode=raw' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" | tail -1)"
+if grep -Eq 'SUMMARY mode=raw PASS=' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" 2>/dev/null; then
+  RAW_LINE="$(grep 'SUMMARY mode=raw' "${SPT008_DIAG_LOG_DIR}/http-via-harness-raw.log" | tail -1)"
   diag_log "$RAW_LINE"
   RAW_SEQ_PASS="$(echo "$RAW_LINE" | sed -n 's/.*PASS=\([0-9]*\)\/.*/\1/p')"
   RAW_SEQ_FAIL="$(echo "$RAW_LINE" | sed -n 's/.*FAIL=\([0-9]*\)\/.*/\1/p')"

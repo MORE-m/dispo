@@ -59,7 +59,7 @@ for round in $(seq 1 "$ROUNDS"); do
       echo "round=${round} wrapper died during boot" | tee -a "$OUT"
       break
     fi
-    if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+    if curl -sS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
       ok=1
       break
     fi
@@ -87,7 +87,7 @@ for round in $(seq 1 "$ROUNDS"); do
 
     ORDER_ID="$(php -r '$f=json_decode(file_get_contents($argv[1]),true); echo (int)$f[$argv[2]]["id"];' "$ORDERS" "$key")"
     rm -f "$JAR"
-    curl -fsS -c "$JAR" -b "$JAR" "http://127.0.0.1:${PORT}/login" -o /dev/null
+    curl -sS -c "$JAR" -b "$JAR" "http://127.0.0.1:${PORT}/login" -o /dev/null
     XSRF="$(php -r '
 $jar=file_get_contents(getenv("JAR"));
 if (!preg_match("/\tXSRF-TOKEN\t([^\t\r\n]+)/", $jar, $m)) {fwrite(STDERR,"no xsrf\n"); exit(3);}
