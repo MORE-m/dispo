@@ -509,7 +509,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01a – Upload-Fundament + Kundenbestätigung (PO-BLP901A-1)
 
 - **Phase:** 9
-- **Status:** **in Umsetzung** (dieser PR, noch nicht gemergt; manuelle Abnahme offen)
+- **Status:** **ERLEDIGT** (PR **#80** MERGED `3ba505735…`; manuelle Abnahme
+  SUCCESS; Post-Merge CI Run `36152091905` SUCCESS)
 - **Kennung:** PO-BLP901A-1 / UX-GATE-D Teilfreigabe
 - **Anforderungen:** `UPL-001` (vollständig A∨B), `UPL-004` (Teil/Fundament),
   `UPL-005` (implementierter Pfad), `UPL-006` (50 MB + kategorie-fähige MIME-Infrastruktur)
@@ -519,23 +520,26 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   zentrale Liste; Admin-Archiv; autorisierter Download; kein Hard-Delete
 - **Rollen Upload:** Draft Sales/Admin/Management (wie Ausnahmeweg); Disposition/PM NEIN
 - **Rollen Archiv:** nur Admin; **Download:** Dispo-Leserecht
-- **UPL-Status nach Slice:** UPL-001 **vollständig**; UPL-004 **teilweise**;
-  UPL-005 **für implementierten Pfad**; UPL-006 **Fundament** (keine enge PDF-Whitelist;
-  Blockliste gefährlicher MIME); UPL-007 **offen**
+- **UPL-Status nach Slice:** UPL-001 **ERFÜLLT**; UPL-004 **teilweise**;
+  UPL-005 **für implementierten Kundenbestätigungs-Pfad ERFÜLLT**; UPL-006 **ERFÜLLT**
+  (keine enge PDF-Whitelist; Blockliste gefährlicher MIME); UPL-007 **OFFEN**
 - **Bewusst nicht:** Audio-Upload/-Wiedergabe; weitere Kategorien produktiv;
   Dyn-Feld-Dateien in Liste; Freigabeinvalidierung bei Replace/Archiv
 - **Tests:** Feature/MySQL Upload; Vitest Upload-Sektion; Playwright Port **8040**
-  (`test:e2e:blp901a`)
+  (`test:e2e:blp901a`); echter 50-MB-HTTP-Nachweis
 
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **teilweise** (`BL-P9-01a` in Umsetzung; Rest offen)
+- **Status:** **TEILWEISE** (`BL-P9-01a` **ERLEDIGT**; Rest offen)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
 - **Akzeptanz:** keine öffentlichen URLs; max. 50 MB Default
-- **Offen:** weitere Kategorien, Dyn-Feld-Dateien (UPL-004 Rest), Audio (UPL-007)
+- **Offen explizit:**
+  - A) weitere feste Uploadkategorien
+  - B) Audio-Motiv / UPL-007
+  - C) Dyn-Feld-Dateien in zentraler Uploadliste (UPL-004 Rest)
 - **Tests:** Pest MIME/Größe, Archiv, Download-Audit; E2E Port **8040** (9-01a)
 
 ### BL-P9-02 – Kommentare und Nachrichten

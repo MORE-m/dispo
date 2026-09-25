@@ -148,8 +148,11 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Kein Hard-Delete; 50 MB; MIME-Blockliste (keine enge PDF-Whitelist)
 - Approval-Snapshot Upload-Metadaten; zentrale Liste
 - Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901a` (Port **8040**)
-- Manuelle Abnahme: **offen** (PR noch nicht gemergt)
-- UPL-001 vollständig; UPL-004/005/006 teilweise; UPL-007 offen; `BL-P9-01` teilweise
+- PR **#80** MERGED (`3ba505735…`); Post-Merge CI `36152091905` SUCCESS
+- Manuelle Abnahme: **SUCCESS** (Feature-HEAD `7674a401…`)
+- UPL-001 **ERFÜLLT**; UPL-005 Kundenbestätigungs-Pfad **ERFÜLLT**; UPL-006 **ERFÜLLT**
+  (echter 50-MB-HTTP-Nachweis; MySQL-Concurrency)
+- UPL-004 teilweise (Dyn-Feld-Dateien offen); UPL-007 offen; `BL-P9-01` teilweise
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 
@@ -233,7 +236,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-13 | APR-004 | Preis nach Freigabe ändern | Freigaben werden zurückgesetzt; Ursache vollständig auditiert |
 | AT-14 | VER-001–VER-007 | Admin ändert Feldname und Preis | Alter Vorgang unverändert; neuer Vorgang verwendet neue Version |
 | AT-15 | DSP-001–DSP-003 | Position zweimal in getrennte Dispoaufträge übernehmen | Kennzeichnung, erneute Auswahl und unabhängige Snapshots |
-| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben (BL-P8-02c; automatisiert + manuell abgenommen). Uploadweg A: BL-P9-01a (Abnahme offen) |
+| AT-16 | UPL-001–UPL-003 | Kein Upload, aber Ausnahme | Ausnahmegrund Pflicht und ausdrücklich mitfreigegeben (BL-P8-02c; automatisiert + manuell abgenommen). Uploadweg A über BL-P9-01a umgesetzt und manuell abgenommen (PR #80) |
 | AT-17 | STA-002, CMT-003 | Dispo stellt Rückfrage, Vertrieb antwortet | Pflichtnotizen, Historie und aktive Rückkehr zu Liegt bei Disposition |
 | AT-18 | STA-006, INV-003 | Rechnungsmonat fehlt | Abschluss blockiert; Admin-Override nur mit Begründung und Audit (BL-P8-02d; automatisiert + manuell abgenommen, PR #76) |
 | AT-19 | STA-004, STA-005 | Storno nach Abschluss | Nur berechtigt und mit Begründung; Historie vollständig (BL-P8-02e; automatisiert + manuell abgenommen, PR #77) |

@@ -1,42 +1,47 @@
 # Fortschritt V1
 
-Stand: 25. September 2026 – Feature **BL-P9-01a** Upload-Fundament +
-Kundenbestätigung (PO-BLP901A-1) in Umsetzung (dieser PR, noch nicht gemergt).
-Base: `main` inkl. PR **#77** (BL-P8-02e) und PR **#79** (SPT-008 Hardening).
+Stand: 25. September 2026 – **BL-P9-01a** Upload-Fundament + Kundenbestätigung
+MERGED + manuell abgenommen (PR **#80**, Merge `3ba505735…`, Post-Merge CI
+`36152091905` SUCCESS). Base: `main` inkl. PR **#77** (BL-P8-02e), PR **#79**
+(SPT-008 Hardening) und PR **#80** (BL-P9-01a).
 
 ## Aktuelle Phase
 
-Phase 9: **`BL-P9-01` teilweise** – Slice **`BL-P9-01a`** (Upload-Fundament +
-Kategorie `customer_confirmation` / UPL-001 A∨B). Phase 8: **`BL-P8-02` ERLEDIGT**
-(`02a`–`02e` auf `main` + manuell abgenommen; UPL-001 über 9-01a geschlossen;
-UPL-002/003 bereits über 02c/02b).
+Phase 9 / **`BL-P9-01` Rest** nach abgeschlossenem **`BL-P9-01a`**.
+`BL-P9-01` insgesamt **teilweise**; `BL-P8-02` **ERLEDIGT** (`02a`–`02e` auf
+`main` + manuell abgenommen; UPL-001 über 9-01a geschlossen; UPL-002/003 über
+02c/02b). Offen u. a.: UPL-007, weitere feste Uploadkategorien, Dyn-Feld-Dateien
+in zentraler Uploadliste.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01a / PO-BLP901A-1:** privates Upload-Fundament, Kundenbestätigungs-Upload,
-Submit A∨B, zentrale Dateiliste (nur implementierte Kategorie), Archiv (Admin),
-autorisierter Download; E2E Port **8040**. Manuelle Abnahme nach Merge separat.
+**BL-P9-01 Rest** – nächste Facharbeit nur nach expliziter PO-Teilfreigabe des
+nächsten Slices. Nicht automatisch Audio (UPL-007), weitere Kategorien oder
+Dyn-Feld-Dateien umsetzen.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#77** BL-P8-02e Completed-Reopen + Storno auf `main` (Merge `5a8543dc…`),
-manuell abgenommen; AT-19 / STA-004 / STA-005 erfüllt. SPT-008 Hardening PR **#79**
-auf `main` (`781ac3bf…`); Diagnose PR **#78** geschlossen ohne Merge.
+PR **#80** BL-P9-01a Upload-Fundament + Kundenbestätigung auf `main` (Merge
+`3ba505735…`), manuell abgenommen (Feature-HEAD `7674a401…`); Post-Merge CI
+`36152091905` SUCCESS. UPL-001 erfüllt; UPL-005 Kundenbestätigungs-Pfad erfüllt;
+UPL-006 erfüllt. Davor: PR **#77** BL-P8-02e; SPT-008 Hardening PR **#79**.
 
 ## BL-P9-01a – Upload-Fundament + Kundenbestätigung / PO-BLP901A-1 (September 2026)
 
 | Teil | Status |
 |------|--------|
 | UX-GATE-D Teilfreigabe PO-BLP901A-1 | **freigegeben** (nur 9-01a-Scope) |
-| Tabelle `dispo_order_uploads` + privater Storage | **umgesetzt** (dieser PR) |
-| Kategorie `customer_confirmation` Upload + Submit A∨B (UPL-001) | **umgesetzt** (dieser PR) |
-| Approval-Snapshot Upload-Felder | **umgesetzt** (dieser PR) |
-| Zentrale Uploadliste (implementierter Pfad) | **umgesetzt** (dieser PR) |
-| Archiv statt Löschen (Admin, UPL-005) | **umgesetzt** (dieser PR) |
-| 50 MB + MIME-Infrastruktur / Blockliste (UPL-006) | **umgesetzt** (dieser PR) |
+| Tabelle `dispo_order_uploads` + privater Storage | **umgesetzt** (PR #80) |
+| Kategorie `customer_confirmation` Upload + Submit A∨B (UPL-001) | **umgesetzt** (PR #80) |
+| Approval-Snapshot Upload-Felder | **umgesetzt** (PR #80) |
+| Zentrale Uploadliste (implementierter Pfad) | **umgesetzt** (PR #80) |
+| Archiv statt Löschen (Admin, UPL-005) | **umgesetzt** (PR #80) |
+| 50 MB + MIME-Infrastruktur / Blockliste (UPL-006) | **umgesetzt** (PR #80) |
 | Unit/Feature/MySQL/Vitest/Playwright Port **8040** | **umgesetzt** |
-| Manuelle Abnahme | **offen** (PR noch nicht gemergt) |
-| Audio / weitere Kategorien / UPL-007 | **bewusst nicht** |
+| Merge `main` | **PR #80** (`3ba505735…`) |
+| Post-Merge CI | **`36152091905` SUCCESS** |
+| Manuelle Abnahme | **ERFOLGREICH** (Feature-HEAD `7674a401…`) |
+| Audio / weitere Kategorien / UPL-007 | **bewusst nicht** / **offen** |
 | Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest) | **offen** |
 | `BL-P9-01` insgesamt | **teilweise** |
 | `BL-P8-02` insgesamt | **ERLEDIGT** (UPL-001 via 9-01a) |

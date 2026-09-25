@@ -44,7 +44,10 @@ gehärtet werden. Fail-closed nur für **nicht** freigegebene Teilbereiche
 Standardangebote, Auswertungen, Notifications, allgemeine operative Disposition
 außerhalb BL-P8-02a–02e): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
 
-**Aktuelle Phase:** BL-P9-01a (PO-BLP901A-1) – siehe `docs/fortschritt.md`.
+**Aktuelle Phase:** Phase 9 – BL-P9-01 Rest nach abgeschlossenem BL-P9-01a
+(PR #80). Nächste Facharbeit nur nach expliziter PO-Teilfreigabe des nächsten
+Slices; nicht automatisch Audio (UPL-007) implementieren. Fail-closed für
+nicht freigegebenen Gate-D-Rest – siehe `docs/fortschritt.md`.
 
 ## Blocker
 
