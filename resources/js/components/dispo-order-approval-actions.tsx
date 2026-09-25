@@ -17,8 +17,11 @@ import {
     DISPO_ORDERS_CACHE_TAG,
     flushDispoOrderInertiaCache,
 } from '@/lib/dispo-order-inertia-cache';
+import { formatDateTime } from '@/lib/date-time';
+import { formatFileSize } from '@/lib/format-file-size';
 import { JsonPostError, jsonPost } from '@/lib/json-post';
 import { firstValidationMessage } from '@/lib/validation-errors';
+import type { CustomerConfirmationUploadSnapshot } from '@/types/dispo-order';
 
 type ActionResponse = {
     message: string;
@@ -34,6 +37,8 @@ export function DispoOrderApprovalActions({
     isCreator,
     status,
     requiresExceptionAcknowledgement = false,
+    customerConfirmationMode = null,
+    customerConfirmationUpload = null,
 }: {
     orderId: number;
     lockVersion: number;
@@ -43,6 +48,8 @@ export function DispoOrderApprovalActions({
     isCreator: boolean;
     status: string;
     requiresExceptionAcknowledgement?: boolean;
+    customerConfirmationMode?: 'upload' | 'exception' | null;
+    customerConfirmationUpload?: CustomerConfirmationUploadSnapshot | null;
 }) {
     const [submitOpen, setSubmitOpen] = useState(false);
     const [approveOpen, setApproveOpen] = useState(false);
@@ -58,6 +65,13 @@ export function DispoOrderApprovalActions({
 
     const showCreatorHint =
         isCreator && status === 'awaiting_sales_approval' && !canApprove;
+
+    const showUploadEvidence =
+        customerConfirmationMode === 'upload' ||
+        customerConfirmationUpload !== null;
+
+    const showExceptionAck =
+        requiresExceptionAcknowledgement && !showUploadEvidence;
 
     async function runAction(
         path: string,
@@ -229,7 +243,42 @@ export function DispoOrderApprovalActions({
                             disabled={submitting}
                         />
                     </div>
-                    {requiresExceptionAcknowledgement ? (
+                    {showUploadEvidence && customerConfirmationUpload ? (
+                        <div
+                            className="space-y-1 text-sm"
+                            data-test="approval-customer-confirmation-upload"
+                        >
+                            <p className="font-medium">
+                                Kundenbestätigung (Upload)
+                            </p>
+                            <p>
+                                {customerConfirmationUpload.original_filename}
+                            </p>
+                            <p className="text-muted-foreground">
+                                {formatFileSize(
+                                    customerConfirmationUpload.size_bytes,
+                                )}
+                                {customerConfirmationUpload.uploaded_by_name
+                                    ? ` · ${customerConfirmationUpload.uploaded_by_name}`
+                                    : ''}
+                                {customerConfirmationUpload.uploaded_at
+                                    ? ` · ${formatDateTime(customerConfirmationUpload.uploaded_at)}`
+                                    : ''}
+                            </p>
+                            {customerConfirmationUpload.download_url ? (
+                                <a
+                                    href={
+                                        customerConfirmationUpload.download_url
+                                    }
+                                    className="text-primary underline-offset-4 hover:underline"
+                                    data-test="approval-customer-confirmation-download"
+                                >
+                                    Herunterladen
+                                </a>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {showExceptionAck ? (
                         <div className="flex items-start gap-3">
                             <Checkbox
                                 id={ackId}
@@ -269,15 +318,14 @@ export function DispoOrderApprovalActions({
                             data-test="dispo-order-approve-confirm"
                             disabled={
                                 submitting ||
-                                (requiresExceptionAcknowledgement &&
-                                    !exceptionAck)
+                                (showExceptionAck && !exceptionAck)
                             }
                             onClick={() =>
                                 void runAction(
                                     `/dispoauftraege/${orderId}/genehmigen`,
                                     {
                                         note,
-                                        ...(requiresExceptionAcknowledgement
+                                        ...(showExceptionAck
                                             ? {
                                                   customer_confirmation_exception_acknowledged:
                                                       exceptionAck,

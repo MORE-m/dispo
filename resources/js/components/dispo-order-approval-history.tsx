@@ -1,7 +1,26 @@
 import { SpecialApprovalReasonsList } from '@/components/special-approval-reasons-list';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/date-time';
+import { formatFileSize } from '@/lib/format-file-size';
 import type { ApprovalHistoryEntry } from '@/types/dispo-order';
+
+function hasUploadEvidence(entry: ApprovalHistoryEntry): boolean {
+    return (
+        entry.customer_confirmation_mode === 'upload' ||
+        entry.customer_confirmation_upload != null
+    );
+}
+
+function hasExceptionEvidence(entry: ApprovalHistoryEntry): boolean {
+    if (hasUploadEvidence(entry)) {
+        return false;
+    }
+
+    return Boolean(
+        entry.customer_confirmation_mode === 'exception' ||
+        entry.customer_confirmation_without_upload,
+    );
+}
 
 export function DispoOrderApprovalHistory({
     entries,
@@ -49,7 +68,49 @@ export function DispoOrderApprovalHistory({
                         <SpecialApprovalReasonsList
                             reasons={entry.special_approval_reasons}
                         />
-                        {entry.customer_confirmation_without_upload ? (
+                        {hasUploadEvidence(entry) &&
+                        entry.customer_confirmation_upload ? (
+                            <div
+                                className="mt-2 space-y-1 text-sm"
+                                data-test="approval-history-customer-confirmation-upload"
+                            >
+                                <p>Kundenbestätigung: Upload</p>
+                                <p data-test="approval-history-upload-filename">
+                                    {
+                                        entry.customer_confirmation_upload
+                                            .original_filename
+                                    }
+                                </p>
+                                <p className="text-muted-foreground">
+                                    {formatFileSize(
+                                        entry.customer_confirmation_upload
+                                            .size_bytes,
+                                    )}
+                                    {entry.customer_confirmation_upload
+                                        .uploaded_by_name
+                                        ? ` · ${entry.customer_confirmation_upload.uploaded_by_name}`
+                                        : ''}
+                                    {entry.customer_confirmation_upload
+                                        .uploaded_at
+                                        ? ` · ${formatDateTime(entry.customer_confirmation_upload.uploaded_at)}`
+                                        : ''}
+                                </p>
+                                {entry.customer_confirmation_upload
+                                    .download_url ? (
+                                    <a
+                                        href={
+                                            entry.customer_confirmation_upload
+                                                .download_url
+                                        }
+                                        className="text-primary underline-offset-4 hover:underline"
+                                        data-test="approval-history-upload-download"
+                                    >
+                                        Herunterladen
+                                    </a>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        {hasExceptionEvidence(entry) ? (
                             <div
                                 className="mt-2 space-y-1 text-sm"
                                 data-test="approval-history-customer-confirmation"

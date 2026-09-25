@@ -2,9 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
 import { JsonPostError } from '@/lib/json-post';
+import type { DispoOrderUpload } from '@/types/dispo-order';
 
 const mockVisit = vi.fn();
 const mockJsonPut = vi.fn();
+const mockFormDataPost = vi.fn();
 
 vi.mock('@inertiajs/react', () => ({
     router: {
@@ -30,9 +32,27 @@ vi.mock('@/lib/json-post', async (importOriginal) => {
     return {
         ...actual,
         jsonPut: (...args: unknown[]) => mockJsonPut(...args),
+        formDataPost: (...args: unknown[]) => mockFormDataPost(...args),
         JsonPostError: actual.JsonPostError,
     };
 });
+
+const activeUpload: DispoOrderUpload = {
+    id: 9,
+    category: 'customer_confirmation',
+    category_label: 'Kundenbestätigung',
+    original_filename: 'freigabe.pdf',
+    mime_type: 'application/pdf',
+    size_bytes: 2048,
+    sha256: 'abc',
+    uploaded_by_name: 'Sales',
+    uploaded_at: '2026-09-25T10:00:00+00:00',
+    archived: false,
+    archived_at: null,
+    archived_by_name: null,
+    is_active_customer_confirmation: true,
+    download_url: '/dispoauftraege/1/uploads/9/download',
+};
 
 describe('DispoOrderCustomerConfirmationSection', () => {
     afterEach(() => {
@@ -42,6 +62,7 @@ describe('DispoOrderCustomerConfirmationSection', () => {
     beforeEach(() => {
         mockVisit.mockReset();
         mockJsonPut.mockReset();
+        mockFormDataPost.mockReset();
     });
 
     it('shows section, checkbox and reason on activate in draft', () => {
@@ -74,6 +95,102 @@ describe('DispoOrderCustomerConfirmationSection', () => {
         expect(
             screen.getByTestId('customer-confirmation-save'),
         ).toBeDisabled();
+    });
+
+    it('shows upload CTA when canUpload in draft', () => {
+        render(
+            <DispoOrderCustomerConfirmationSection
+                orderId={1}
+                lockVersion={1}
+                status="draft"
+                canEdit
+                canUpload
+                withoutUpload={false}
+                exceptionReason={null}
+                setByName={null}
+                setAt={null}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('customer-confirmation-upload-input'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByTestId('customer-confirmation-upload-button'),
+        ).toBeDisabled();
+        expect(
+            screen.getByTestId('customer-confirmation-upload-max-size-hint'),
+        ).toHaveTextContent('Maximal 50 MB pro Datei');
+    });
+
+    it('uploads selected file via formDataPost', async () => {
+        mockFormDataPost.mockResolvedValue({
+            message: 'ok',
+            redirect: '/dispoauftraege/1',
+        });
+
+        render(
+            <DispoOrderCustomerConfirmationSection
+                orderId={1}
+                lockVersion={4}
+                status="draft"
+                canEdit
+                canUpload
+                withoutUpload={false}
+                exceptionReason={null}
+                setByName={null}
+                setAt={null}
+            />,
+        );
+
+        const file = new File(['pdf'], 'freigabe.pdf', {
+            type: 'application/pdf',
+        });
+        fireEvent.change(
+            screen.getByTestId('customer-confirmation-upload-input'),
+            { target: { files: [file] } },
+        );
+        fireEvent.click(
+            screen.getByTestId('customer-confirmation-upload-button'),
+        );
+
+        await waitFor(() => {
+            expect(mockFormDataPost).toHaveBeenCalledWith(
+                '/dispoauftraege/1/uploads/kundenbestaetigung',
+                expect.any(FormData),
+            );
+        });
+
+        const body = mockFormDataPost.mock.calls[0][1] as FormData;
+        expect(body.get('file')).toBeInstanceOf(File);
+        expect(body.get('lock_version')).toBe('4');
+    });
+
+    it('shows active file and precedence hint', () => {
+        render(
+            <DispoOrderCustomerConfirmationSection
+                orderId={1}
+                lockVersion={1}
+                status="draft"
+                canEdit
+                canUpload
+                withoutUpload={false}
+                exceptionReason={null}
+                setByName={null}
+                setAt={null}
+                activeUpload={activeUpload}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('customer-confirmation-active-file'),
+        ).toHaveTextContent('freigabe.pdf');
+        expect(
+            screen.getByTestId('customer-confirmation-upload-precedence-hint'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByTestId('customer-confirmation-status'),
+        ).not.toBeInTheDocument();
     });
 
     it('blocks empty/whitespace reason and saves valid reason', async () => {

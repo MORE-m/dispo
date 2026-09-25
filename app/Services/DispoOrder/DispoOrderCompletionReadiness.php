@@ -250,23 +250,29 @@ final class DispoOrderCompletionReadiness
      */
     private function checkCustomerConfirmation(DispoOrder $order): array
     {
-        $approvedWithAck = $order->approvalRequests
-            ->filter(function (DispoOrderApprovalRequest $request): bool {
-                return $request->status === DispoOrderApprovalStatus::Approved
-                    && $request->hasCustomerConfirmationExceptionSnapshot()
-                    && (bool) $request->customer_confirmation_exception_acknowledged;
-            })
+        $approved = $order->approvalRequests
+            ->filter(fn (DispoOrderApprovalRequest $request): bool => $request->status === DispoOrderApprovalStatus::Approved)
             ->sortByDesc(fn (DispoOrderApprovalRequest $request): int => (int) $request->cycle_number)
             ->first();
 
-        $passed = $approvedWithAck !== null;
+        $passed = false;
+        if ($approved !== null) {
+            if ($approved->hasCustomerConfirmationUploadSnapshot()) {
+                $passed = true;
+            } elseif (
+                $approved->hasCustomerConfirmationExceptionSnapshot()
+                && (bool) $approved->customer_confirmation_exception_acknowledged
+            ) {
+                $passed = true;
+            }
+        }
 
         return [
             'key' => self::CHECK_CUSTOMER_CONFIRMATION,
             'label' => 'Kundenbestätigung',
             'passed' => $passed,
             'violations' => $passed ? [] : [[
-                'message' => 'Es fehlt eine freigegebene Kundenbestätigungs-Ausnahme (Upload folgt später).',
+                'message' => 'Es fehlt eine freigegebene Kundenbestätigung (Datei-Upload oder genehmigte Ausnahme).',
             ]],
         ];
     }

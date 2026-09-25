@@ -24,6 +24,16 @@ use LogicException;
  * @property CarbonImmutable|null $decided_at
  * @property string|null $rejection_reason
  * @property string|null $decision_note
+ * @property string|null $customer_confirmation_mode
+ * @property int|null $customer_confirmation_upload_id
+ * @property string|null $customer_confirmation_upload_category
+ * @property string|null $customer_confirmation_upload_original_filename
+ * @property string|null $customer_confirmation_upload_mime_type
+ * @property int|null $customer_confirmation_upload_size_bytes
+ * @property string|null $customer_confirmation_upload_sha256
+ * @property CarbonImmutable|null $customer_confirmation_upload_uploaded_at
+ * @property int|null $customer_confirmation_upload_uploaded_by_id
+ * @property string|null $customer_confirmation_upload_uploaded_by_name
  * @property bool $customer_confirmation_without_upload
  * @property string|null $customer_confirmation_exception_reason
  * @property int|null $customer_confirmation_exception_set_by_id
@@ -73,6 +83,10 @@ class DispoOrderApprovalRequest extends Model
             'customer_confirmation_exception_acknowledged' => 'boolean',
             'customer_confirmation_exception_acknowledged_by_id' => 'integer',
             'customer_confirmation_exception_acknowledged_at' => 'datetime',
+            'customer_confirmation_upload_id' => 'integer',
+            'customer_confirmation_upload_size_bytes' => 'integer',
+            'customer_confirmation_upload_uploaded_at' => 'datetime',
+            'customer_confirmation_upload_uploaded_by_id' => 'integer',
             'submitted_lock_version' => 'integer',
             'cycle_number' => 'integer',
             'open_guard' => 'integer',
@@ -81,6 +95,10 @@ class DispoOrderApprovalRequest extends Model
 
     public function hasCustomerConfirmationExceptionSnapshot(): bool
     {
+        if ($this->customer_confirmation_mode === 'upload') {
+            return false;
+        }
+
         if (! (bool) $this->customer_confirmation_without_upload) {
             return false;
         }
@@ -88,6 +106,26 @@ class DispoOrderApprovalRequest extends Model
         $reason = $this->customer_confirmation_exception_reason;
 
         return is_string($reason) && trim($reason) !== '';
+    }
+
+    public function hasCustomerConfirmationUploadSnapshot(): bool
+    {
+        if ($this->customer_confirmation_mode === 'upload') {
+            return $this->customer_confirmation_upload_id !== null
+                && is_string($this->customer_confirmation_upload_sha256)
+                && $this->customer_confirmation_upload_sha256 !== '';
+        }
+
+        // Legacy / defensive: upload fields without mode still count as upload evidence.
+        return $this->customer_confirmation_upload_id !== null
+            && is_string($this->customer_confirmation_upload_sha256)
+            && $this->customer_confirmation_upload_sha256 !== '';
+    }
+
+    public function requiresCustomerConfirmationExceptionAcknowledgement(): bool
+    {
+        return $this->hasCustomerConfirmationExceptionSnapshot()
+            && ! $this->hasCustomerConfirmationUploadSnapshot();
     }
 
     protected static function booted(): void

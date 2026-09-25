@@ -15,6 +15,7 @@ import {
     type CancellationSummary,
 } from '@/components/dispo-order-cancellation-section';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
+import { DispoOrderUploadsSection } from '@/components/dispo-order-uploads-section';
 import {
     DispoOrderCommunicationHistory,
     type CommunicationEntry,
@@ -84,6 +85,7 @@ import {
 import type {
     ApprovalHistoryEntry,
     DispoOrderRevisionLink,
+    DispoOrderUpload,
     SpecialApprovalReason,
 } from '@/types/dispo-order';
 
@@ -315,6 +317,10 @@ export default function DispoOrderShow({
     canSubmit = false,
     canUpdate = false,
     canUpdateCustomerConfirmation = false,
+    canUploadCustomerConfirmation = false,
+    canArchiveUpload = false,
+    uploads = [],
+    activeCustomerConfirmationUpload = null,
     canSyncCalculationDynamicFields = false,
     canApprove = false,
     canReject = false,
@@ -341,6 +347,10 @@ export default function DispoOrderShow({
     canSubmit?: boolean;
     canUpdate?: boolean;
     canUpdateCustomerConfirmation?: boolean;
+    canUploadCustomerConfirmation?: boolean;
+    canArchiveUpload?: boolean;
+    uploads?: DispoOrderUpload[];
+    activeCustomerConfirmationUpload?: DispoOrderUpload | null;
     canSyncCalculationDynamicFields?: boolean;
     canApprove?: boolean;
     canReject?: boolean;
@@ -364,8 +374,9 @@ export default function DispoOrderShow({
     const flash = usePage().props.flash;
     const current = order.current_approval;
     const requiresExceptionAcknowledgement = Boolean(
-        current?.customer_confirmation_without_upload &&
-        current.customer_confirmation_exception_reason,
+        current?.requires_customer_confirmation_exception_ack ??
+        (current?.customer_confirmation_without_upload &&
+            current.customer_confirmation_exception_reason),
     );
     const headerValues = order.dynamic_field_values ?? {};
     const headerCaptured = order.dynamic_field_captured ?? {};
@@ -1113,6 +1124,12 @@ export default function DispoOrderShow({
                     requiresExceptionAcknowledgement={
                         requiresExceptionAcknowledgement
                     }
+                    customerConfirmationMode={
+                        current?.customer_confirmation_mode ?? null
+                    }
+                    customerConfirmationUpload={
+                        current?.customer_confirmation_upload ?? null
+                    }
                 />
 
                 <DispoOrderCustomerConfirmationSection
@@ -1120,6 +1137,7 @@ export default function DispoOrderShow({
                     lockVersion={order.lock_version}
                     status={order.status}
                     canEdit={canUpdateCustomerConfirmation}
+                    canUpload={canUploadCustomerConfirmation}
                     withoutUpload={Boolean(
                         order.customer_confirmation_without_upload,
                     )}
@@ -1131,8 +1149,15 @@ export default function DispoOrderShow({
                         null
                     }
                     setAt={order.customer_confirmation_exception_set_at ?? null}
+                    activeUpload={activeCustomerConfirmationUpload}
                 />
 
+                <DispoOrderUploadsSection
+                    orderId={order.id}
+                    lockVersion={order.lock_version}
+                    uploads={uploads}
+                    canArchive={canArchiveUpload}
+                />
                 <DispoOrderOperationalStatusActions
                     orderId={order.id}
                     lockVersion={order.lock_version}

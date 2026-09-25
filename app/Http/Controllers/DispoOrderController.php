@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\DispoOrderStatus;
 use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
+use App\Http\Requests\DispoOrder\ArchiveDispoOrderUploadRequest;
 use App\Http\Requests\DispoOrder\AskSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\CancelDispoOrderRequest;
 use App\Http\Requests\DispoOrder\CompleteDispoOrderRequest;
@@ -18,12 +19,14 @@ use App\Http\Requests\DispoOrder\UpdateCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
+use App\Http\Requests\DispoOrder\UploadCustomerConfirmationRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
 use App\Models\DispoOrderComment;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
+use App\Models\DispoOrderUpload;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderCancellationService;
@@ -37,6 +40,7 @@ use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DispoOrder\DispoOrderSalesInquiryService;
 use App\Services\DispoOrder\DispoOrderStatusTransition;
+use App\Services\DispoOrder\DispoOrderUploadService;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
@@ -59,6 +63,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderOperationalStatusService $operationalStatus,
         private readonly DispoOrderSalesInquiryService $salesInquiry,
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
+        private readonly DispoOrderUploadService $uploads,
         private readonly DispoOrderInvoiceEndService $invoiceEnd,
         private readonly DispoOrderCompletionService $completion,
         private readonly DispoOrderCompletedReopenService $completedReopen,
@@ -138,6 +143,9 @@ class DispoOrderController extends Controller
             && $dispoOrder->status === DispoOrderStatus::Draft;
         $canUpdateCustomerConfirmation = ($user?->can('updateCustomerConfirmation', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Draft;
+        $canUploadCustomerConfirmation = ($user?->can('uploadCustomerConfirmation', $dispoOrder) ?? false)
+            && $dispoOrder->status === DispoOrderStatus::Draft;
+        $canArchiveUpload = $user?->can('archiveUpload', $dispoOrder) ?? false;
         $awaiting = $dispoOrder->status === DispoOrderStatus::AwaitingSalesApproval
             && $dispoOrder->pendingApprovalRequest !== null;
         $canApprove = ($user?->can('approve', $dispoOrder) ?? false) && $awaiting;
@@ -190,6 +198,12 @@ class DispoOrderController extends Controller
             'canSubmit' => $canSubmit,
             'canUpdate' => $canUpdate,
             'canUpdateCustomerConfirmation' => $canUpdateCustomerConfirmation,
+            'canUploadCustomerConfirmation' => $canUploadCustomerConfirmation,
+            'canArchiveUpload' => $canArchiveUpload,
+            'uploads' => $this->uploads->listProp($dispoOrder),
+            'activeCustomerConfirmationUpload' => ($active = $this->uploads->activeCustomerConfirmation($dispoOrder))
+                ? $this->uploads->serializeUpload($active, $dispoOrder)
+                : null,
             'canSyncCalculationDynamicFields' => $canSyncCalculationDynamicFields,
             'canApprove' => $canApprove,
             'canReject' => $canReject,
@@ -270,6 +284,68 @@ class DispoOrderController extends Controller
                 ? 'Kundenbestätigungs-Ausnahme gespeichert.'
                 : 'Kundenbestätigungs-Ausnahme entfernt.',
         );
+    }
+
+    public function uploadCustomerConfirmation(
+        UploadCustomerConfirmationRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->uploads->uploadCustomerConfirmation(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->file('file'),
+        );
+
+        $order = $dispoOrder->fresh([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+        ]) ?? $dispoOrder;
+
+        return $this->respondSuccess($request, $order, 'Kundenbestätigung hochgeladen.');
+    }
+
+    public function archiveUpload(
+        ArchiveDispoOrderUploadRequest $request,
+        DispoOrder $dispoOrder,
+        DispoOrderUpload $upload,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->uploads->archive(
+            $dispoOrder,
+            $upload,
+            $user,
+            $request->expectedLockVersion(),
+        );
+
+        $order = $dispoOrder->fresh([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+        ]) ?? $dispoOrder;
+
+        return $this->respondSuccess($request, $order, 'Datei archiviert.');
+    }
+
+    public function downloadUpload(
+        Request $request,
+        DispoOrder $dispoOrder,
+        DispoOrderUpload $upload,
+    ): StreamedResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $this->uploads->download($dispoOrder, $upload, $user);
     }
 
     public function updatePositionCustoms(
@@ -780,6 +856,26 @@ class DispoOrderController extends Controller
             'customer_confirmation_exception_acknowledged' => (bool) $request->customer_confirmation_exception_acknowledged,
             'customer_confirmation_exception_acknowledged_by_name' => $request->customer_confirmation_exception_acknowledged_by_name,
             'customer_confirmation_exception_acknowledged_at' => $request->customer_confirmation_exception_acknowledged_at?->toIso8601String(),
+            'customer_confirmation_mode' => $request->customer_confirmation_mode,
+            'customer_confirmation_upload' => $request->hasCustomerConfirmationUploadSnapshot()
+                ? [
+                    'upload_id' => $request->customer_confirmation_upload_id,
+                    'category' => $request->customer_confirmation_upload_category,
+                    'original_filename' => $request->customer_confirmation_upload_original_filename,
+                    'mime_type' => $request->customer_confirmation_upload_mime_type,
+                    'size_bytes' => $request->customer_confirmation_upload_size_bytes,
+                    'sha256' => $request->customer_confirmation_upload_sha256,
+                    'uploaded_at' => $request->customer_confirmation_upload_uploaded_at?->toIso8601String(),
+                    'uploaded_by_name' => $request->customer_confirmation_upload_uploaded_by_name,
+                    'download_url' => $request->customer_confirmation_upload_id
+                        ? route('dispo-orders.uploads.download', [
+                            'dispoOrder' => $request->dispo_order_id,
+                            'upload' => $request->customer_confirmation_upload_id,
+                        ])
+                        : null,
+                ]
+                : null,
+            'requires_customer_confirmation_exception_ack' => $request->requiresCustomerConfirmationExceptionAcknowledgement(),
         ];
     }
 

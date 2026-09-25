@@ -190,6 +190,14 @@ class DispoOrder extends Model
     }
 
     /**
+     * @return HasMany<DispoOrderUpload, $this>
+     */
+    public function uploads(): HasMany
+    {
+        return $this->hasMany(DispoOrderUpload::class)->orderByDesc('uploaded_at')->orderByDesc('id');
+    }
+
+    /**
      * @return HasOne<DispoOrderApprovalRequest, $this>
      */
     public function latestApprovalRequest(): HasOne

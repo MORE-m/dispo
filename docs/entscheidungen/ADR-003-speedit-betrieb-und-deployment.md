@@ -70,6 +70,13 @@ Vorbereiteter Prozess über **GitHub Actions und SSH**:
 7. Queue-Worker bzw. nächster `queue:work`-Lauf verwendet den neuen Code.
 8. Health-Check der Anwendung.
 
+PHP-Runtime für Dispo-Uploads (UPL-006 / BL-P9-01): fachlich **50 MB**
+pro Datei. Die Anwendung setzt `php.ini` nicht selbst. Für echte
+multipart-Uploads auf dem Host:
+
+- `upload_max_filesize >= 50M`
+- `post_max_size > 50M` (empfohlen mind. `55M` wegen Multipart-Overhead)
+
 Rollback:
 
 1. Vor jedem produktiven Release Datenbank- und Datei-Backup.

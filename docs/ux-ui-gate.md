@@ -9,22 +9,27 @@
   + **operativer Statuskern BL-P8-02a / PO-BLP802A-1**
   + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**
   + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**
-  + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**)
+  + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
+  + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 25.09.2026 (PO-BLP802E-1):** zusätzlich freigegeben sind
-  Completed-Reopen (`completed → in_progress`, Admin/GF) und Storno/Cancelled
-  (Disposition/Admin/GF, erlaubte Quellen, AT-19). **Nicht** freigegeben:
-  Datei-Upload, BL-P9-01, Freigabeinvalidierung, Notifications, allgemeine Kommentare.
+- **Hinweis Stand 25.09.2026 (PO-BLP901A-1):** zusätzlich freigegeben sind
+  Upload-Fundament und Kundenbestätigungs-Upload inkl. Dateiliste (UPL-001 A∨B,
+  UPL-004 Teil, UPL-005 Pfad, UPL-006 Fundament). **Nicht** freigegeben: Audio /
+  weitere Kategorien (UPL-007), Dyn-Feld-Dateien in Liste, Freigabeinvalidierung.
+- **Hinweis Stand 25.09.2026 (PO-BLP802E-1):** Completed-Reopen und Storno/Cancelled
+  (AT-19); PR **#77** gemergt + manuell abgenommen. **Nicht** freigegeben damals:
+  Datei-Upload (folgt PO-BLP901A-1), Freigabeinvalidierung, Notifications,
+  allgemeine Kommentare.
 - **Hinweis Stand 24.09.2026 (PO-BLP802D-1):** zusätzlich freigegeben sind
   Rechnung-per-Ende je Position, Completion-Readiness, `disposed → completed`
   und Admin-Completion-Override (STA-006 / AT-18; PR #76 manuell abgenommen).
 - **Hinweis Stand 23.09.2026:** PO-BLP802A-1 gibt **nur** den operativen Statuskern
   bis Disponiert inkl. Wiederöffnung frei – **nicht** die gesamte operative Disposition.
-- **Hinweis Stand 23.09.2026 (PO-BLP802C-1):** zusätzlich freigegeben ist ausschließlich der Kundenbestätigungs-**Ausnahmeweg ohne Upload** (UPL-001 Variante B + UPL-002), inkl. Mitfreigabe zweiter Freigeber. **Nicht** freigegeben: Datei-Upload, BL-P9-01, UPL-004–UPL-007.
+- **Hinweis Stand 23.09.2026 (PO-BLP802C-1):** zusätzlich freigegeben ist ausschließlich der Kundenbestätigungs-**Ausnahmeweg ohne Upload** (UPL-001 Variante B + UPL-002), inkl. Mitfreigabe zweiter Freigeber. Uploadweg: PO-BLP901A-1.
 - **Hinweis Stand 23.09.2026 (PO-BLP802B-1):** zusätzlich freigegeben ist ausschließlich
   der strukturierte Rückfrage-/Antwortprozess (`STA-002` / `CMT-003` / `AT-17`) –
   **nicht** allgemeine Kommentare, Notifications oder weitere operative Module.
@@ -41,7 +46,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -330,14 +335,24 @@ Ausschließlich freigegeben:
 - Completed-Reopen `completed → in_progress` (nur Admin/Management, Pflichtgrund)
 - Storno → `cancelled` (Disposition/Admin/Management) aus erlaubten Quellstatusen
   (nicht Draft/Freigabe-Zwischenstatus); terminal
-- AT-19 automatisiert testbar
+- AT-19 automatisiert testbar; **Nachzug:** PR **#77** gemergt + manuell abgenommen
 - Keine Freigabeinvalidierung; historische Completion/Approval/Confirmation bleiben
+
+**Product-Owner-Teilfreigabe (25. September 2026, UX-GATE-D / BL-P9-01a / PO-BLP901A-1):**
+Ausschließlich freigegeben:
+
+- Upload-Fundament (`dispo_order_uploads`, privater Storage, zentrale Liste)
+- Kundenbestätigungs-Upload (Kategorie `customer_confirmation`) + Submit A∨B (UPL-001)
+- Archivierung durch Admin (UPL-005, kein Hard-Delete)
+- 50 MB Default + MIME-Infrastruktur / Blockliste (UPL-006 Fundament)
+- Autorisierter Download (Dispo-Leserecht)
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
-- Material-Uploads, allgemeine Kommentare, Notifications
-- Kundenbestätigungs-Dateiupload / BL-P9-01
+- Audio-Upload/-Wiedergabe und weitere Upload-Kategorien (UPL-007 / BL-P9-01 Rest)
+- Dyn-Feld-Dateien in der Uploadliste (UPL-004 Rest)
+- allgemeine Kommentare, Notifications
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
@@ -355,7 +370,7 @@ unveränderbarer, terminaler Snapshot erhalten; der Ersteller kann die Kalkulati
 nachbessern und einen neuen verknüpften Entwurf erzeugen. Operative Statuswerte
 bis Disponiert sind über BL-P8-02a erreichbar; Rückfrage Vertrieb über BL-P8-02b;
 Ausnahmeweg Kundenbestätigung über BL-P8-02c; Completion über BL-P8-02d;
-Completed-Reopen und Storno über BL-P8-02e.
+Completed-Reopen und Storno über BL-P8-02e; Kundenbestätigungs-Upload über BL-P9-01a.
 
 ## Erlaubt / nicht erlaubt
 
@@ -363,7 +378,7 @@ Completed-Reopen und Storno über BL-P8-02e.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1); Datei-Uploads/allgemeine Kommentare/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1); Audio/weitere Upload-Kategorien/allgemeine Kommentare/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

@@ -5,6 +5,7 @@ namespace App\Services\DispoOrder;
 use App\Enums\DispoOrderStatus;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderUpload;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,7 @@ final class DispoOrderCustomerConfirmationService
 
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly DispoOrderUploadService $uploads,
     ) {}
 
     public function update(
@@ -156,17 +158,44 @@ final class DispoOrderCustomerConfirmationService
     }
 
     /**
-     * Submit-Gate UPL-001 Variante B (Upload folgt später als OR).
+     * Submit-Gate UPL-001: aktiver Upload ODER gültiger Ausnahmeweg.
+     * Upload hat Priorität für den Nachweis; Ausnahme bleibt optional parallel existent.
      */
     public function assertReadyForSubmit(DispoOrder $order): void
     {
+        if ($this->uploads->hasActiveCustomerConfirmation($order)) {
+            return;
+        }
+
         if ($this->isExceptionActive($order)) {
             return;
         }
 
         throw ValidationException::withMessages([
-            'customer_confirmation' => 'Vor der Einreichung muss eine Kundenbestätigung vorliegen. '
-                .'Wenn aktuell kein Upload hinterlegt ist, bestätige dies mit einem Ausnahmegrund.',
+            'customer_confirmation' => 'Vor der Einreichung muss eine Kundenbestätigung vorliegen: '
+                .'entweder als Datei-Upload oder als Ausnahme mit Begründung.',
+        ]);
+    }
+
+    /**
+     * Aktive Grundlage für Submit/Snapshot: Upload hat Vorrang vor Ausnahme.
+     *
+     * @return array{mode: 'upload'|'exception', upload: ?DispoOrderUpload}
+     */
+    public function resolveSubmitEvidence(DispoOrder $order): array
+    {
+        $upload = $this->uploads->activeCustomerConfirmation($order);
+        if ($upload !== null) {
+            return ['mode' => 'upload', 'upload' => $upload];
+        }
+
+        if ($this->isExceptionActive($order)) {
+            return ['mode' => 'exception', 'upload' => null];
+        }
+
+        throw ValidationException::withMessages([
+            'customer_confirmation' => 'Vor der Einreichung muss eine Kundenbestätigung vorliegen: '
+                .'entweder als Datei-Upload oder als Ausnahme mit Begründung.',
         ]);
     }
 
