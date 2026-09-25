@@ -20,6 +20,7 @@ use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
 use App\Http\Requests\DispoOrder\UploadCustomerConfirmationRequest;
+use App\Http\Requests\DispoOrder\UploadDispoOrderMaterialRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
@@ -52,6 +53,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DispoOrderController extends Controller
@@ -145,6 +147,7 @@ class DispoOrderController extends Controller
             && $dispoOrder->status === DispoOrderStatus::Draft;
         $canUploadCustomerConfirmation = ($user?->can('uploadCustomerConfirmation', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Draft;
+        $canUploadMaterial = $this->uploads->canUploadMaterialFor($dispoOrder, $user);
         $canArchiveUpload = $user?->can('archiveUpload', $dispoOrder) ?? false;
         $awaiting = $dispoOrder->status === DispoOrderStatus::AwaitingSalesApproval
             && $dispoOrder->pendingApprovalRequest !== null;
@@ -199,6 +202,10 @@ class DispoOrderController extends Controller
             'canUpdate' => $canUpdate,
             'canUpdateCustomerConfirmation' => $canUpdateCustomerConfirmation,
             'canUploadCustomerConfirmation' => $canUploadCustomerConfirmation,
+            'canUploadMaterial' => $canUploadMaterial,
+            'materialUploadCategories' => $canUploadMaterial
+                ? $this->uploads->materialCategoryOptionsProp()
+                : [],
             'canArchiveUpload' => $canArchiveUpload,
             'uploads' => $this->uploads->listProp($dispoOrder),
             'activeCustomerConfirmationUpload' => ($active = $this->uploads->activeCustomerConfirmation($dispoOrder))
@@ -311,6 +318,32 @@ class DispoOrderController extends Controller
         return $this->respondSuccess($request, $order, 'Kundenbestätigung hochgeladen.');
     }
 
+    public function uploadMaterial(
+        UploadDispoOrderMaterialRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->uploads->uploadMaterial(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->category(),
+            $request->file('file'),
+        );
+
+        $order = $dispoOrder->fresh([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+        ]) ?? $dispoOrder;
+
+        return $this->respondSuccess($request, $order, 'Material hochgeladen.');
+    }
+
     public function archiveUpload(
         ArchiveDispoOrderUploadRequest $request,
         DispoOrder $dispoOrder,
@@ -346,6 +379,17 @@ class DispoOrderController extends Controller
         $user = $request->user();
 
         return $this->uploads->download($dispoOrder, $upload, $user);
+    }
+
+    public function streamUpload(
+        Request $request,
+        DispoOrder $dispoOrder,
+        DispoOrderUpload $upload,
+    ): BinaryFileResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $this->uploads->stream($dispoOrder, $upload, $user);
     }
 
     public function updatePositionCustoms(

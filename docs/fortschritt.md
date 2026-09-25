@@ -1,30 +1,50 @@
 # Fortschritt V1
 
-Stand: 25. September 2026 – **BL-P9-01a** Upload-Fundament + Kundenbestätigung
-MERGED + manuell abgenommen (PR **#80**, Merge `3ba505735…`, Post-Merge CI
-`36152091905` SUCCESS). Base: `main` inkl. PR **#77** (BL-P8-02e), PR **#79**
-(SPT-008 Hardening) und PR **#80** (BL-P9-01a).
+Stand: 25. September 2026 – **BL-P9-01b** feste Materialuploads + Audio / UPL-007
+(PO-BLP901B-1) **manuell abgenommen** (Feature-HEAD `0adacb3…`). Base: `main`
+`c64518dcc53ad154b973f3a99649f4ab075f09d8` (inkl. PR **#80** BL-P9-01a). Merge
+PR **#82** folgt nach Abschluss-Gates.
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01` Rest** nach abgeschlossenem **`BL-P9-01a`**.
-`BL-P9-01` insgesamt **teilweise**; `BL-P8-02` **ERLEDIGT** (`02a`–`02e` auf
-`main` + manuell abgenommen; UPL-001 über 9-01a geschlossen; UPL-002/003 über
-02c/02b). Offen u. a.: UPL-007, weitere feste Uploadkategorien, Dyn-Feld-Dateien
-in zentraler Uploadliste.
+Phase 9 / **`BL-P9-01` teilweise** nach **`BL-P9-01a`** + **`BL-P9-01b`**.
+`BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005 für feste Uploadkategorien
+**ERFÜLLT**; UPL-006 weiter erfüllt. Offen u. a.: Dyn-Feld-Dateien in zentraler
+Uploadliste (UPL-004 Rest → **BL-P9-01c**).
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01 Rest** – nächste Facharbeit nur nach expliziter PO-Teilfreigabe des
-nächsten Slices. Nicht automatisch Audio (UPL-007), weitere Kategorien oder
-Dyn-Feld-Dateien umsetzen.
+**BL-P9-01b** manuell abgenommen (PO-BLP901B-1). Nächster Slice nur nach expliziter
+PO-Teilfreigabe: **BL-P9-01c** Dyn-Feld-Dateien in zentraler Uploadliste.
+Kein automatisches BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-PR **#80** BL-P9-01a Upload-Fundament + Kundenbestätigung auf `main` (Merge
-`3ba505735…`), manuell abgenommen (Feature-HEAD `7674a401…`); Post-Merge CI
-`36152091905` SUCCESS. UPL-001 erfüllt; UPL-005 Kundenbestätigungs-Pfad erfüllt;
-UPL-006 erfüllt. Davor: PR **#77** BL-P8-02e; SPT-008 Hardening PR **#79**.
+**BL-P9-01b** Material- + Audio-Uploads (PR **#82**, Feature-HEAD `0adacb3…`,
+manuell abgenommen inkl. Smoke/MP3-Nachtest Port **8041**). Davor: PR **#80**
+BL-P9-01a auf `main` (Merge `3ba505735…`), manuell abgenommen.
+
+## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP901B-1 | **freigegeben** (nur 9-01b-Scope) |
+| Feste Kategorien: audio_motif, briefing, script_text, layout_graphics, event_documents, other | **umgesetzt** |
+| Generischer POST `/uploads` (ohne customer_confirmation) | **umgesetzt** |
+| Rollen: Sales/Disposition/Admin/Management; PM NEIN | **umgesetzt** |
+| Statusmatrix Upload (Draft + operativ; Terminal/Freigabe-Zwischenstatus NEIN) | **umgesetzt** |
+| Audio MP3/WAV, mehrere Dateien, Stream+Range, kein Motivname/Materialstatus/Position | **umgesetzt** |
+| Keine Freigabeinvalidierung; kein Status-Automatismus | **umgesetzt** |
+| Archiv Admin; kein Hard-Delete (UPL-005 fest) | **umgesetzt** |
+| Unit/Feature/MySQL/Vitest/Playwright Port **8041** | **umgesetzt** |
+| UPL-007 | **ERFÜLLT** |
+| UPL-005 feste Kategorien | **ERFÜLLT** |
+| UPL-004 / `BL-P9-01` | **weiter teilweise** (Dyn-Feld-Dateien offen → 01c) |
+| Feature-HEAD | `0adacb3c4a83f8b763a83b51916c4e5342a68623` |
+| CI Feature-HEAD | Run `36182337813` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Manuelle Abnahme | **ERFOLGREICH** (Port **8041** / `e2e-bl-p9-01b.sqlite`; Smoke + echte MP3) |
+| Merge `main` | **PR #82** (Abschluss-Merge) |
+| Dyn-Feld-Dateien / Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01a – Upload-Fundament + Kundenbestätigung / PO-BLP901A-1 (September 2026)
 
@@ -41,8 +61,8 @@ UPL-006 erfüllt. Davor: PR **#77** BL-P8-02e; SPT-008 Hardening PR **#79**.
 | Merge `main` | **PR #80** (`3ba505735…`) |
 | Post-Merge CI | **`36152091905` SUCCESS** |
 | Manuelle Abnahme | **ERFOLGREICH** (Feature-HEAD `7674a401…`) |
-| Audio / weitere Kategorien / UPL-007 | **bewusst nicht** / **offen** |
-| Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest) | **offen** |
+| Audio / weitere Kategorien / UPL-007 | **folgt BL-P9-01b** |
+| Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest) | **offen** (→ BL-P9-01c) |
 | `BL-P9-01` insgesamt | **teilweise** |
 | `BL-P8-02` insgesamt | **ERLEDIGT** (UPL-001 via 9-01a) |
 

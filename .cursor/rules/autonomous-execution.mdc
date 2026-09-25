@@ -38,16 +38,16 @@ Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl,
 **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**
 + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**
 + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
-+ **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**) dürfen weiterentwickelt und
++ **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**
++ **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**) dürfen weiterentwickelt und
 gehärtet werden. Fail-closed nur für **nicht** freigegebene Teilbereiche
-(u. a. allgemeine Kommentare, Audio/weitere Upload-Kategorien, Kombinationstabelle,
+(u. a. allgemeine Kommentare, Dyn-Feld-Dateien in Uploadliste, Kombinationstabelle,
 Standardangebote, Auswertungen, Notifications, allgemeine operative Disposition
 außerhalb BL-P8-02a–02e): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
 
-**Aktuelle Phase:** Phase 9 – BL-P9-01 Rest nach abgeschlossenem BL-P9-01a
-(PR #80). Nächste Facharbeit nur nach expliziter PO-Teilfreigabe des nächsten
-Slices; nicht automatisch Audio (UPL-007) implementieren. Fail-closed für
-nicht freigegebenen Gate-D-Rest – siehe `docs/fortschritt.md`.
+**Aktuelle Phase:** Phase 9 – BL-P9-01 teilweise nach BL-P9-01a + BL-P9-01b.
+Nächste Facharbeit nur nach expliziter PO-Teilfreigabe: BL-P9-01c Dyn-Feld-Dateien.
+Fail-closed für nicht freigegebenen Gate-D-Rest – siehe `docs/fortschritt.md`.
 
 ## Blocker
 

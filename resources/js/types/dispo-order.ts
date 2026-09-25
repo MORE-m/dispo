@@ -36,6 +36,7 @@ export type DispoOrderUpload = {
     archived_by_name: string | null;
     is_active_customer_confirmation: boolean;
     download_url: string;
+    stream_url?: string | null;
 };
 
 export type ApprovalHistoryEntry = {

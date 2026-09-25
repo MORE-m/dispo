@@ -15,6 +15,10 @@ import {
     type CancellationSummary,
 } from '@/components/dispo-order-cancellation-section';
 import { DispoOrderCustomerConfirmationSection } from '@/components/dispo-order-customer-confirmation-section';
+import {
+    DispoOrderMaterialUploadSection,
+    type MaterialUploadCategoryOption,
+} from '@/components/dispo-order-material-upload-section';
 import { DispoOrderUploadsSection } from '@/components/dispo-order-uploads-section';
 import {
     DispoOrderCommunicationHistory,
@@ -318,6 +322,8 @@ export default function DispoOrderShow({
     canUpdate = false,
     canUpdateCustomerConfirmation = false,
     canUploadCustomerConfirmation = false,
+    canUploadMaterial = false,
+    materialUploadCategories = [],
     canArchiveUpload = false,
     uploads = [],
     activeCustomerConfirmationUpload = null,
@@ -348,6 +354,8 @@ export default function DispoOrderShow({
     canUpdate?: boolean;
     canUpdateCustomerConfirmation?: boolean;
     canUploadCustomerConfirmation?: boolean;
+    canUploadMaterial?: boolean;
+    materialUploadCategories?: MaterialUploadCategoryOption[];
     canArchiveUpload?: boolean;
     uploads?: DispoOrderUpload[];
     activeCustomerConfirmationUpload?: DispoOrderUpload | null;
@@ -1151,6 +1159,14 @@ export default function DispoOrderShow({
                     setAt={order.customer_confirmation_exception_set_at ?? null}
                     activeUpload={activeCustomerConfirmationUpload}
                 />
+
+                {canUploadMaterial ? (
+                    <DispoOrderMaterialUploadSection
+                        orderId={order.id}
+                        lockVersion={order.lock_version}
+                        categories={materialUploadCategories}
+                    />
+                ) : null}
 
                 <DispoOrderUploadsSection
                     orderId={order.id}

@@ -138,4 +138,31 @@ describe('DispoOrderUploadsSection', () => {
             screen.queryByTestId('dispo-order-upload-archive'),
         ).not.toBeInTheDocument();
     });
+
+    it('renders audio player for audio_motif uploads', () => {
+        const audioUpload: DispoOrderUpload = {
+            ...activeUpload,
+            id: 9,
+            category: 'audio_motif',
+            category_label: 'Audio-Motiv',
+            original_filename: 'motif.mp3',
+            mime_type: 'audio/mpeg',
+            is_active_customer_confirmation: false,
+            download_url: '/dispoauftraege/1/uploads/9/download',
+            stream_url: '/dispoauftraege/1/uploads/9/stream',
+        };
+
+        render(
+            <DispoOrderUploadsSection
+                orderId={1}
+                lockVersion={1}
+                uploads={[audioUpload]}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-order-upload-audio-9'),
+        ).toHaveAttribute('src', audioUpload.stream_url);
+        expect(screen.getByText('Audio-Motiv')).toBeInTheDocument();
+    });
 });

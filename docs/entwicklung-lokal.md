@@ -347,6 +347,23 @@ multipart-HTTP-Grenze getestet wird. `php -d … artisan serve` reicht dafür
 weitergibt. Port **8000** / normales `artisan serve` bleibt lokal unverändert
 von der Entwickler-`php.ini` abhängig.
 
+## BL-P9-01b – Materialuploads + Audio
+
+Erweiterung `DispoOrderUploadService` um Materialupload + Audio-Stream.
+Generischer Endpoint `POST /dispoauftraege/{order}/uploads`; Stream
+`GET …/uploads/{upload}/stream` (nur `audio_motif`, inline, Range/206).
+`customer_confirmation` bleibt Sonderpfad.
+
+Tests: `DispoOrderMaterialUploadTest`, `DispoOrderAudioPlaybackTest`,
+`DispoOrderMaterialUploadMysqlTest`; Vitest
+`dispo-order-material-upload-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp901b` bzw.
+`npx playwright test -c playwright.blp901b.config.ts` (Port **8041**, DB
+`database/e2e-bl-p9-01b.sqlite`, Seeder `E2EMaterialAudioUploadSeeder` –
+niemals Dev-DB `dispo`). Server-Helper
+`tests/e2e/helpers/run-blp901b-server.sh` (gleiche 50M/55M-Runtime wie 9-01a).
+
 ## BL-P8-02d – Rechnung per Ende + Completion
 
 Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;
