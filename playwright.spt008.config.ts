@@ -23,11 +23,14 @@ const e2eEnv = {
     DB_URL: '',
     E2E_SPT008_PORT: e2ePort,
     E2E_SPT008_DB: e2eDb,
+    // Optional per-case log path (set by run-spt008-isolated-cases.sh).
+    ...(process.env.E2E_SPT008_LOG
+        ? { E2E_SPT008_LOG: process.env.E2E_SPT008_LOG }
+        : {}),
 };
 
-const prepareAssets = process.env.CI
-    ? 'test -d public/build/assets || npm run build'
-    : 'npm run build';
+// Skip rebuild when assets already exist (suite runs 7 isolated invocations).
+const prepareAssets = 'test -d public/build/assets || npm run build';
 
 export default defineConfig({
     testDir: 'tests/e2e',

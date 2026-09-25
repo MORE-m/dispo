@@ -16,7 +16,7 @@
         "test:e2e:blp402c": "playwright test -c playwright.blp402c.config.ts",
         "test:e2e:blp402d": "playwright test -c playwright.blp402d.config.ts",
         "test:e2e:blp402e": "playwright test -c playwright.blp402e.config.ts",
-        "test:e2e:spt008": "playwright test -c playwright.spt008.config.ts",
+        "test:e2e:spt008": "bash tests/e2e/helpers/run-spt008-isolated-cases.sh",
         "test:e2e:dspdcp001": "playwright test -c playwright.dspdcp001.config.ts",
         "test:e2e:blp802a": "playwright test -c playwright.blp802a.config.ts",
         "test:e2e:blp802b": "playwright test -c playwright.blp802b.config.ts",
