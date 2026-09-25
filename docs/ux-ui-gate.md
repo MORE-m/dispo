@@ -16,10 +16,12 @@
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 25.09.2026 (PO-BLP901A-1):** zusätzlich freigegeben sind
-  Upload-Fundament und Kundenbestätigungs-Upload inkl. Dateiliste (UPL-001 A∨B,
-  UPL-004 Teil, UPL-005 Pfad, UPL-006 Fundament). **Nicht** freigegeben: Audio /
-  weitere Kategorien (UPL-007), Dyn-Feld-Dateien in Liste, Freigabeinvalidierung.
+- **Hinweis Stand 25.09.2026 (PO-BLP901A-1):** zusätzlich freigegeben und
+  abgeschlossen (PR **#80** MERGED + manuell abgenommen) sind Upload-Fundament
+  und Kundenbestätigungs-Upload inkl. Dateiliste (UPL-001 A∨B, UPL-004 Teil,
+  UPL-005 Pfad, UPL-006). **Nicht** freigegeben: Audio / weitere Kategorien
+  (UPL-007), Dyn-Feld-Dateien in Liste, allgemeine Kommentare, Notifications,
+  Freigabeinvalidierung, sonstiger Gate-D-Rest. Keine PO-Freigabe für BL-P9-01b.
 - **Hinweis Stand 25.09.2026 (PO-BLP802E-1):** Completed-Reopen und Storno/Cancelled
   (AT-19); PR **#77** gemergt + manuell abgenommen. **Nicht** freigegeben damals:
   Datei-Upload (folgt PO-BLP901A-1), Freigabeinvalidierung, Notifications,
@@ -339,15 +341,17 @@ Ausschließlich freigegeben:
 - Keine Freigabeinvalidierung; historische Completion/Approval/Confirmation bleiben
 
 **Product-Owner-Teilfreigabe (25. September 2026, UX-GATE-D / BL-P9-01a / PO-BLP901A-1):**
-Ausschließlich freigegeben:
+Ausschließlich freigegeben (jetzt abgeschlossener Teilumfang; **Nachzug:**
+PR **#80** MERGED + manuell abgenommen):
 
 - Upload-Fundament (`dispo_order_uploads`, privater Storage, zentrale Liste)
 - Kundenbestätigungs-Upload (Kategorie `customer_confirmation`) + Submit A∨B (UPL-001)
 - Archivierung durch Admin (UPL-005, kein Hard-Delete)
-- 50 MB Default + MIME-Infrastruktur / Blockliste (UPL-006 Fundament)
+- 50 MB Default + MIME-Infrastruktur / Blockliste (UPL-006)
 - Autorisierter Download (Dispo-Leserecht)
 
-**Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
+**Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe; keine
+BL-P9-01b-Freigabe in diesem Stand):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
 - Audio-Upload/-Wiedergabe und weitere Upload-Kategorien (UPL-007 / BL-P9-01 Rest)

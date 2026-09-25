@@ -177,15 +177,17 @@ Notifications, Freigabeinvalidierung, Storno rückgängig.
 
 ## Ist-Stand BL-P9-01a (PO-BLP901A-1)
 
-In Umsetzung (dieser PR; Merge/Abnahme offen): Upload-Fundament + Kundenbestätigung.
+**ERLEDIGT** (PR **#80** MERGED `3ba505735…`; manuelle Abnahme SUCCESS;
+Post-Merge CI `36152091905` SUCCESS): Upload-Fundament + Kundenbestätigung.
 
 - Submit Draft → `awaiting_sales_approval`: **A∨B** – aktiver
   `customer_confirmation`-Upload **oder** Ausnahmeweg (Checkbox + Pflichtgrund)
 - Upload-Rollen: Draft Sales/Admin/Management (wie Ausnahme); Disposition/PM NEIN
-- Archiv: nur Admin (UPL-005); Download: Dispo-Leserecht (`view`)
+- Archiv: nur Admin (UPL-005 Kundenbestätigungs-Pfad); Download: Dispo-Leserecht (`view`)
 - Zentrale Liste am Dispoauftrag (nur implementierte Kategorie produktiv)
 - Approval-Snapshot friert Upload-Metadaten bzw. Ausnahme ein
-- UPL-001 **vollständig**; UPL-004/005/006 teilweise bzw. Fundament; UPL-007 offen
+- UPL-001 **ERFÜLLT**; UPL-005 CC-Pfad **ERFÜLLT**; UPL-006 **ERFÜLLT**;
+  UPL-004 teilweise; UPL-007 **OFFEN**; `BL-P9-01` weiter teilweise
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
