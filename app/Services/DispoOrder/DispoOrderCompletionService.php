@@ -174,16 +174,14 @@ final class DispoOrderCompletionService
      */
     public function completionSummaryProp(DispoOrder $order): ?array
     {
-        if ($order->status !== DispoOrderStatus::Completed) {
-            return null;
-        }
-
+        // Historische Completion-Daten bleiben nach Reopen/Storno sichtbar (BL-P8-02e).
         $event = ($order->relationLoaded('statusEvents')
             ? $order->statusEvents
             : $order->statusEvents()->get()
-        )->first(
-            fn (DispoOrderStatusEvent $item): bool => $item->to_status === DispoOrderStatus::Completed,
-        );
+        )->sortByDesc('id')
+            ->first(
+                fn (DispoOrderStatusEvent $item): bool => $item->to_status === DispoOrderStatus::Completed,
+            );
 
         if ($event === null) {
             $event = DispoOrderStatusEvent::query()

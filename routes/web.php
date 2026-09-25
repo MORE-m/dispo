@@ -64,6 +64,10 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.positions.invoice-end');
     Route::post('dispoauftraege/{dispoOrder}/abschliessen', [DispoOrderController::class, 'complete'])
         ->name('dispo-orders.complete');
+    Route::post('dispoauftraege/{dispoOrder}/wieder-oeffnen', [DispoOrderController::class, 'reopenCompleted'])
+        ->name('dispo-orders.reopen-completed');
+    Route::post('dispoauftraege/{dispoOrder}/stornieren', [DispoOrderController::class, 'cancel'])
+        ->name('dispo-orders.cancel');
     Route::post('dispoauftraege/{dispoOrder}/rueckfragen', [DispoOrderController::class, 'askSalesInquiry'])
         ->name('dispo-orders.sales-inquiry.ask');
     Route::post('dispoauftraege/{dispoOrder}/rueckfragen/{comment}/antwort', [DispoOrderController::class, 'answerSalesInquiry'])

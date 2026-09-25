@@ -36,11 +36,12 @@ bereits freigegebene Slices (u. a. Dispoentwurf, Vier-Augen-Freigabe, Dyn-Feld-A
 Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl,
 **operativer Statuskern BL-P8-02a / PO-BLP802A-1** und
 **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1**
-+ **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**) dürfen weiterentwickelt und
++ **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**
++ **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**) dürfen weiterentwickelt und
 gehärtet werden. Fail-closed nur für **nicht** freigegebene Teilbereiche
-(u. a. allgemeine Kommentare, Uploads, Cancelled/Completed-Reopen, Kombinationstabelle,
+(u. a. allgemeine Kommentare, Uploads, Kombinationstabelle,
 Standardangebote, Auswertungen, Notifications, allgemeine operative Disposition
-außerhalb BL-P8-02a–02d): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
+außerhalb BL-P8-02a–02e): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
 
 ## Blocker
 

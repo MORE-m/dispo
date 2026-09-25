@@ -127,8 +127,8 @@ Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 | Material fehlt | Disposition / Admin / GF (BL-P8-02a) | aktiv gesetzt, nicht automatisch |
 | Material erhalten | Disposition / Admin / GF (BL-P8-02a) | aktiv gesetzt, nicht automatisch |
 | Disponiert | Disposition / Admin / GF (BL-P8-02a) | fachliche/kaufmännische Daten gesperrt; Wiederöffnung mit Pflichtbegründung |
-| Abgeschlossen | Disposition/Admin/GF | Abschlussprüfungen erfolgreich oder begründeter Admin-Override |
-| Storniert | berechtigte Rolle | Begründung Pflicht; auch nach Abschluss möglich |
+| Abgeschlossen | Disposition/Admin/GF (Abschluss); Reopen nur Admin/GF (BL-P8-02e) | Abschlussprüfungen oder Admin-Override; Wiederöffnung mit Pflichtbegründung |
+| Storniert | Disposition / Admin / GF (PO-BLP802E-1) | Begründung Pflicht; auch nach Disponiert/Abgeschlossen; terminal |
 
 V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 
@@ -145,12 +145,34 @@ V1 führt nur diesen Gesamtstatus und keine Positionsstatus (`STA-001`).
 - Ab `Disponiert` sind fachliche und kaufmännische Daten gesperrt.
 - Disposition, Admin oder Geschäftsführung dürfen mit Pflichtbegründung wieder öffnen
   (`disposed` → `in_progress`, BL-P8-02a).
-- Kaufmännische Änderungen lösen die erforderlichen Freigaben erneut aus
-  (**Freigabeinvalidierung noch nicht umgesetzt**).
-- Nach `Abgeschlossen` dürfen nur Admin oder Geschäftsführung wieder öffnen
-  (**Completed nicht Teil von BL-P8-02a**).
-- Storno ist auch nach `Abgeschlossen` möglich und benötigt immer eine Begründung
-  (**Cancelled nicht Teil von BL-P8-02a**).
+- Kaufmännische Änderungen würden laut STA-003 die erforderlichen Freigaben erneut
+  auslösen (**allgemeine Freigabeinvalidierung bleibt separater offener Scope**).
+- Nach `Abgeschlossen` dürfen nur Admin oder Geschäftsführung / Management mit
+  Pflichtbegründung wieder öffnen (`completed` → `in_progress`, BL-P8-02e /
+  PO-BLP802E-1 / STA-004). Disposition/Sales/PM: nein.
+- Completed-Reopen invalidiert oder löscht **keine** Freigaben und keine
+  Completion-/Approval-/Confirmation-Historie.
+- Storno (`→ cancelled`) ist für Disposition/Admin/Management mit Pflichtbegründung
+  aus den erlaubten Quellstatusen möglich (inkl. nach Disponiert/Abgeschlossen;
+  BL-P8-02e / STA-005 / AT-19). Sales und ProductManagement: nein.
+- `cancelled` ist terminal: kein Reopen, kein erneutes Storno.
+
+## Ist-Stand BL-P8-02e (PO-BLP802E-1)
+
+Umgesetzt (manuelle Abnahme separat): Completed-Reopen und Storno/Cancelled.
+
+- Completed-Reopen: nur Admin/Management, `completed → in_progress`, Pflichtgrund,
+  Audit `dispo_order.status_reopened`, `is_reopen=true`
+- Storno: Disposition/Admin/Management; Quellen: `at_disposition`, `in_progress`,
+  `sales_inquiry`, `material_missing`, `material_received`, `disposed`, `completed`
+- Nicht aus: `draft`, `awaiting_sales_approval`, `approval_rejected`, `cancelled`
+- Dedizierte Services/Endpoints: `DispoOrderCompletedReopenService` /
+  `POST …/wieder-oeffnen`, `DispoOrderCancellationService` / `POST …/stornieren`
+- Generischer Operational-Endpoint führt diese Kanten **nicht** aus
+- AT-19 automatisiert testbar (Feature + Playwright Port **8039**)
+
+Bewusst **nicht** in 02e: File-Upload, BL-P9-01, allgemeine Kommentare,
+Notifications, Freigabeinvalidierung, Storno rückgängig.
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
@@ -197,8 +219,8 @@ fünf Punkte (Frozen Dyn-Felder, offene SalesInquiry, Frozen Period +
 `invoice_end_months`, genehmigte 02c-Ausnahme mit Ack, gültige Approved-Freigabe).
 Übergang nur bewusst `disposed → completed` (Disposition/Admin/GF).
 Admin darf den Abschluss mit Pflichtbegründung erzwingen. Verletzte Prüfungen,
-Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed ist in
-02d terminal (kein Reopen/Storno – folgt in 02e).
+Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed war in
+02d terminal; Reopen/Storno folgen in **BL-P8-02e**.
 
 ## Dispositionsrechte
 

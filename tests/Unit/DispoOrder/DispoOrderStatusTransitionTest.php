@@ -63,10 +63,7 @@ class DispoOrderStatusTransitionTest extends TestCase
             [DispoOrderStatus::AtDisposition, DispoOrderStatus::Disposed],
             [DispoOrderStatus::AtDisposition, DispoOrderStatus::Completed],
             [DispoOrderStatus::InProgress, DispoOrderStatus::Completed],
-            [DispoOrderStatus::InProgress, DispoOrderStatus::Cancelled],
             [DispoOrderStatus::MaterialMissing, DispoOrderStatus::Disposed],
-            [DispoOrderStatus::Disposed, DispoOrderStatus::Cancelled],
-            [DispoOrderStatus::Completed, DispoOrderStatus::InProgress],
             [DispoOrderStatus::ApprovalRejected, DispoOrderStatus::InProgress],
             [DispoOrderStatus::Draft, DispoOrderStatus::InProgress],
             [DispoOrderStatus::AwaitingSalesApproval, DispoOrderStatus::InProgress],
@@ -81,6 +78,97 @@ class DispoOrderStatusTransitionTest extends TestCase
     ): void {
         $this->assertFalse(DispoOrderStatusTransition::canTransition($from, $to));
         $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition($from, $to));
+    }
+
+    public function test_cancellation_and_completed_reopen_are_not_operational(): void
+    {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::Cancelled,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCancellationTransition(
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::Cancelled,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition(
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::Cancelled,
+        ));
+
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Cancelled,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::Cancelled,
+        ));
+
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::Completed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCompletedReopen(
+            DispoOrderStatus::Completed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition(
+            DispoOrderStatus::Completed,
+            DispoOrderStatus::InProgress,
+        ));
+    }
+
+    /**
+     * @return list<array{0: DispoOrderStatus}>
+     */
+    public static function allowedCancellationSourceProvider(): array
+    {
+        return [
+            [DispoOrderStatus::AtDisposition],
+            [DispoOrderStatus::InProgress],
+            [DispoOrderStatus::SalesInquiry],
+            [DispoOrderStatus::MaterialMissing],
+            [DispoOrderStatus::MaterialReceived],
+            [DispoOrderStatus::Disposed],
+            [DispoOrderStatus::Completed],
+        ];
+    }
+
+    #[DataProvider('allowedCancellationSourceProvider')]
+    public function test_allowed_cancellation_sources(DispoOrderStatus $from): void
+    {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            $from,
+            DispoOrderStatus::Cancelled,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCancellationSource($from));
+        $this->assertTrue(DispoOrderStatusTransition::requiresReason(
+            $from,
+            DispoOrderStatus::Cancelled,
+        ));
+    }
+
+    /**
+     * @return list<array{0: DispoOrderStatus}>
+     */
+    public static function forbiddenCancellationSourceProvider(): array
+    {
+        return [
+            [DispoOrderStatus::Draft],
+            [DispoOrderStatus::AwaitingSalesApproval],
+            [DispoOrderStatus::ApprovalRejected],
+            [DispoOrderStatus::Cancelled],
+        ];
+    }
+
+    #[DataProvider('forbiddenCancellationSourceProvider')]
+    public function test_forbidden_cancellation_sources(DispoOrderStatus $from): void
+    {
+        $this->assertFalse(DispoOrderStatusTransition::canTransition(
+            $from,
+            DispoOrderStatus::Cancelled,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isCancellationSource($from));
     }
 
     public function test_disposed_to_completed_is_completion_not_operational(): void
@@ -140,7 +228,6 @@ class DispoOrderStatusTransitionTest extends TestCase
             [DispoOrderStatus::SalesInquiry, DispoOrderStatus::MaterialReceived],
             [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Disposed],
             [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Completed],
-            [DispoOrderStatus::SalesInquiry, DispoOrderStatus::Cancelled],
         ];
     }
 
@@ -161,6 +248,18 @@ class DispoOrderStatusTransitionTest extends TestCase
         ));
         $this->assertTrue(DispoOrderStatusTransition::isReopen(
             DispoOrderStatus::Disposed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isDisposedReopen(
+            DispoOrderStatus::Disposed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::requiresReason(
+            DispoOrderStatus::Completed,
+            DispoOrderStatus::InProgress,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCompletedReopen(
+            DispoOrderStatus::Completed,
             DispoOrderStatus::InProgress,
         ));
         $this->assertFalse(DispoOrderStatusTransition::requiresReason(

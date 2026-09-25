@@ -156,6 +156,24 @@ class DispoOrderPolicy
     }
 
     /**
+     * Completed-Reopen completed → in_progress (BL-P8-02e / STA-004).
+     * Nur Admin/Management – Disposition ausdrücklich nicht.
+     */
+    public function reopenCompleted(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Admin, Role::Management);
+    }
+
+    /**
+     * Storno → cancelled (BL-P8-02e / PO-BLP802E-1).
+     * Disposition/Admin/Management; Sales und ProductManagement nein.
+     */
+    public function cancel(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
+    /**
      * Rückfrage an Vertrieb stellen (BL-P8-02b / PO-BLP802B-1).
      */
     public function askSalesInquiry(User $user, DispoOrder $dispoOrder): bool

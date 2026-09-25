@@ -170,6 +170,37 @@ export function DispoOrderCompletionSection({
         );
     }
 
+    // Historische Abschlussdaten nach Wiederöffnung / Storno weiter anzeigen.
+    if (summary && status !== 'disposed') {
+        return (
+            <section
+                className="border-border/70 space-y-2 rounded-xl border p-4 shadow-xs"
+                data-test="dispo-order-completion-summary"
+            >
+                <h2 className="text-sm font-semibold">
+                    Abschluss (historisch)
+                </h2>
+                <p className="text-sm" data-test="dispo-order-completed-by">
+                    Abgeschlossen von {summary.completed_by_name}
+                </p>
+                <p
+                    className="text-muted-foreground text-xs"
+                    data-test="dispo-order-completed-at"
+                >
+                    {formatTimestamp(summary.completed_at)}
+                </p>
+                {summary.is_completion_override && summary.override_reason ? (
+                    <p
+                        className="text-sm"
+                        data-test="dispo-order-completion-override-reason"
+                    >
+                        Override-Begründung: {summary.override_reason}
+                    </p>
+                ) : null}
+            </section>
+        );
+    }
+
     if (status !== 'disposed' || readiness === null) {
         return null;
     }
