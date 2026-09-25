@@ -5,10 +5,15 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * BL-P9-01a isolierte E2E-Suite: Kundenbestätigungs-Upload.
  * Eigene SQLite-DB, Port 8040.
+ *
+ * Webserver: PHP Built-in Server mit -d upload_max_filesize/post_max_size
+ * (nicht `artisan serve` — ServeCommand gibt -d nicht an den Child-`php -S` weiter).
  */
-const e2eDb = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    'database/e2e-bl-p9-01a.sqlite',
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const e2eDb = path.resolve(rootDir, 'database/e2e-bl-p9-01a.sqlite');
+const serverHelper = path.resolve(
+    rootDir,
+    'tests/e2e/helpers/run-blp901a-server.sh',
 );
 
 const e2ePort = process.env.E2E_BLP901A_PORT ?? '8040';
@@ -23,6 +28,10 @@ const e2eEnv = {
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: e2eDb,
     DB_URL: '',
+    E2E_BLP901A_PORT: e2ePort,
+    E2E_BLP901A_HOST: '127.0.0.1',
+    E2E_BLP901A_UPLOAD_MAX_FILESIZE: '50M',
+    E2E_BLP901A_POST_MAX_SIZE: '55M',
 };
 
 const prepareAssets = process.env.CI
@@ -48,7 +57,7 @@ export default defineConfig({
         },
     ],
     webServer: {
-        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECustomerConfirmationUploadSeeder --force && php artisan serve --host=127.0.0.1 --port=${e2ePort}`,
+        command: `${prepareAssets} && mkdir -p database && rm -f "${e2eDb}" && touch "${e2eDb}" && php artisan migrate --force && php artisan db:seed --class=E2ECustomerConfirmationUploadSeeder --force && bash "${serverHelper}"`,
         url: `${e2eBaseUrl}/health`,
         reuseExistingServer: false,
         timeout: 300_000,

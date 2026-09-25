@@ -339,6 +339,14 @@ E2E: `npm run test:e2e:blp901a` bzw.
 `database/e2e-bl-p9-01a.sqlite`, Seeder `E2ECustomerConfirmationUploadSeeder` –
 niemals Dev-DB `dispo`).
 
+Die isolierte 8040-Suite startet den PHP-Built-in-Server direkt mit
+`-d upload_max_filesize=50M` und `-d post_max_size=55M` (Helper
+`tests/e2e/helpers/run-blp901a-server.sh`), damit UPL-006 bis zur echten
+multipart-HTTP-Grenze getestet wird. `php -d … artisan serve` reicht dafür
+**nicht**, weil `ServeCommand` die `-d`-Werte nicht an den Child-`php -S`
+weitergibt. Port **8000** / normales `artisan serve` bleibt lokal unverändert
+von der Entwickler-`php.ini` abhängig.
+
 ## BL-P8-02d – Rechnung per Ende + Completion
 
 Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;

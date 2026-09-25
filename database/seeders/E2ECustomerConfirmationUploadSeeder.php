@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\File;
 
 /**
  * E2E-Seeder BL-P9-01a Kundenbestätigungs-Upload (Port 8040).
- * Liefert zwei Drafts ohne Bestätigung: Upload-Happy-Path und Ausnahmeweg.
+ * Drafts ohne Bestätigung: Upload-Happy-Path, Ausnahmeweg, HTTP-50-MB-Grenze.
  */
 class E2ECustomerConfirmationUploadSeeder extends Seeder
 {
@@ -110,6 +110,7 @@ class E2ECustomerConfirmationUploadSeeder extends Seeder
         foreach ([
             'draftUpload' => 'BLP901A Upload GmbH',
             'draftException' => 'BLP901A Ausnahme GmbH',
+            'draftMaxBytes' => 'BLP901A MaxBytes GmbH',
         ] as $key => $customerName) {
             $calc = $writer->create([
                 'planning_mode' => 'manual',

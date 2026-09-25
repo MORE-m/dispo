@@ -1,4 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+    closeSync,
+    ftruncateSync,
+    mkdirSync,
+    openSync,
+    readFileSync,
+    rmSync,
+    statSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
@@ -9,10 +19,14 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ordersPath = path.join(root, 'database/e2e-bl-p9-01a-orders.json');
+const e2eDb = path.join(root, 'database/e2e-bl-p9-01a.sqlite');
 const samplePdf = path.join(
     root,
     'tests/fixtures/customer-confirmation-sample.pdf',
 );
+
+/** Matches DispoOrderUploadService::MAX_BYTES (UPL-006). */
+const MAX_BYTES = 50 * 1024 * 1024;
 
 type OrderRef = { id: number; number: string };
 
@@ -20,10 +34,37 @@ type OrdersFixture = {
     draft: OrderRef;
     draftUpload: OrderRef;
     draftException: OrderRef;
+    draftMaxBytes: OrderRef;
 };
 
 function loadOrders(): OrdersFixture {
     return JSON.parse(readFileSync(ordersPath, 'utf8')) as OrdersFixture;
+}
+
+function activeUploadSizeBytes(orderId: number): number {
+    const raw = execFileSync(
+        'php',
+        [
+            '-r',
+            [
+                '$pdo = new PDO("sqlite:" . getenv("BLP901A_E2E_DB"));',
+                '$orderId = (int) getenv("BLP901A_E2E_ORDER_ID");',
+                '$st = $pdo->prepare("select size_bytes from dispo_order_uploads where dispo_order_id=? and archived_at is null order by id desc limit 1");',
+                '$st->execute([$orderId]);',
+                'echo (string) $st->fetchColumn();',
+            ].join(''),
+        ],
+        {
+            encoding: 'utf8',
+            env: {
+                ...process.env,
+                BLP901A_E2E_DB: e2eDb,
+                BLP901A_E2E_ORDER_ID: String(orderId),
+            },
+        },
+    ).trim();
+
+    return Number(raw);
 }
 
 async function login(page: Page, email: string) {
@@ -256,5 +297,73 @@ test.describe('BL-P9-01a Kundenbestätigungs-Upload', () => {
                 '[data-test="customer-confirmation-exception-reason-readonly"]',
             ),
         ).toContainText(CUSTOMER_CONFIRMATION_REASON);
+    });
+
+    test('UPL-006) echter multipart HTTP-Upload exakt 50 MB', async ({
+        page,
+    }) => {
+        test.setTimeout(300_000);
+        const orders = loadOrders();
+        expect(orders.draftMaxBytes?.id).toBeTruthy();
+
+        const tempDir = path.join(
+            tmpdir(),
+            `blp901a-50mb-${Date.now()}-${process.pid}`,
+        );
+        mkdirSync(tempDir, { recursive: true });
+        const tempPath = path.join(tempDir, 'exact-50mb.bin');
+        const fd = openSync(tempPath, 'w');
+        try {
+            ftruncateSync(fd, MAX_BYTES);
+        } finally {
+            closeSync(fd);
+        }
+
+        try {
+            expect(statSync(tempPath).size).toBe(MAX_BYTES);
+
+            await login(page, 'sales@example.com');
+            await openOrder(page, orders.draftMaxBytes.id);
+
+            // Real filesystem path → Playwright streams multipart (no 50MB Buffer).
+            await page
+                .locator('[data-test="customer-confirmation-upload-input"]')
+                .setInputFiles(tempPath);
+
+            const uploadResponsePromise = page.waitForResponse(
+                (response) =>
+                    response.url().includes('/uploads/kundenbestaetigung') &&
+                    response.request().method() === 'POST',
+                { timeout: 180_000 },
+            );
+
+            await page
+                .locator('[data-test="customer-confirmation-upload-button"]')
+                .click();
+
+            const uploadResponse = await uploadResponsePromise;
+            const bodyPreview = await uploadResponse.text().catch(() => '');
+            expect(
+                uploadResponse.status(),
+                `HTTP upload failed: ${uploadResponse.status()} ${bodyPreview.slice(0, 500)}`,
+            ).toBeGreaterThanOrEqual(200);
+            expect(uploadResponse.status()).toBeLessThan(300);
+
+            await expect(
+                page.locator('[data-test="customer-confirmation-active-file"]'),
+            ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                page.locator('[data-test="customer-confirmation-active-file"]'),
+            ).toContainText('exact-50mb.bin');
+            await expect(
+                page.locator('[data-test="customer-confirmation-active-file"]'),
+            ).toContainText('50.0 MB');
+
+            expect(activeUploadSizeBytes(orders.draftMaxBytes.id)).toBe(
+                MAX_BYTES,
+            );
+        } finally {
+            rmSync(tempDir, { recursive: true, force: true });
+        }
     });
 });
