@@ -2187,6 +2187,9 @@ final class DispoOrderDynamicFieldWriter
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
                 'Unerreichbarer Choice-Zweig in readPositionValue.',
             ),
+            FieldType::File => throw new RuntimeException(
+                'Unerreichbarer File-Zweig in readPositionValue.',
+            ),
         };
     }
 

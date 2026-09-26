@@ -202,6 +202,7 @@ final class FieldSetVersionPreviewService
             FieldType::LongText => 'Beispieltext für die Admin-Vorschau.',
             FieldType::Select => 'option_a',
             FieldType::MultiSelect => ['option_a'],
+            FieldType::File => null,
         };
     }
 

@@ -43,7 +43,8 @@ final class FieldDefinitionCustomWriter
      *     group_key?: string|null,
      *     sort_default?: int,
      *     reportable?: bool,
-     *     max_length?: int|null
+     *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null
      * }  $payload
      */
     public function create(array $payload, User $actor): FieldDefinition
@@ -135,6 +136,7 @@ final class FieldDefinitionCustomWriter
      *     sort_default?: int,
      *     reportable?: bool,
      *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null,
      *     lock_version: int
      * }  $payload
      */
@@ -259,6 +261,7 @@ final class FieldDefinitionCustomWriter
      *     sort_default: int,
      *     reportable: bool,
      *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null,
      *     lock_version: int
      * }  $payload
      */
@@ -555,6 +558,7 @@ final class FieldDefinitionCustomWriter
     }
 
     /**
+     * @param  list<string>|null  $allowedMimeTypes
      * @return array{allowed_mime_types: list<string>}|null
      */
     private function validationJsonFromAllowedMimeTypes(?array $allowedMimeTypes): ?array

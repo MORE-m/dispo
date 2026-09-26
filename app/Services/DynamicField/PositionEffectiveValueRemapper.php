@@ -10,6 +10,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
 use App\Models\SnapshotFieldDefinition;
 use App\Support\DynamicField\ChoiceFieldValueContract;
+use App\Support\DynamicField\FileFieldValueContract;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 
@@ -166,12 +167,19 @@ final class PositionEffectiveValueRemapper
             );
         }
 
+        if ($definition->field_type->isFile()) {
+            return FileFieldValueContract::isEmpty(
+                FileFieldValueContract::readStored($definition, $row),
+            );
+        }
+
         return match ($definition->field_type) {
             FieldType::Boolean => $row->value_boolean === null,
             FieldType::Period => $row->value_period_start === null && $row->value_period_end === null,
             FieldType::ShortText => $this->isBlank($row->value_string),
             FieldType::LongText => $this->isBlank($row->value_text),
             FieldType::Select, FieldType::MultiSelect => true,
+            FieldType::File => true,
         };
     }
 
