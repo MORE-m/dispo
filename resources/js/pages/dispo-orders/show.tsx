@@ -722,11 +722,7 @@ export default function DispoOrderShow({
         [editableCustomChoiceFields, headerRuntime],
     );
     const visibleEditableHeaderFileFields = useMemo(
-        () =>
-            filterByEffectiveVisible(
-                editableCustomFileFields,
-                headerRuntime,
-            ),
+        () => filterByEffectiveVisible(editableCustomFileFields, headerRuntime),
         [editableCustomFileFields, headerRuntime],
     );
     const visibleCalcOriginHeaderTextFields = useMemo(
@@ -744,10 +740,7 @@ export default function DispoOrderShow({
     );
     const visibleCalcOriginHeaderFileFields = useMemo(
         () =>
-            filterByEffectiveVisible(
-                calcOriginCustomFileFields,
-                headerRuntime,
-            ),
+            filterByEffectiveVisible(calcOriginCustomFileFields, headerRuntime),
         [calcOriginCustomFileFields, headerRuntime],
     );
 
@@ -1157,8 +1150,7 @@ export default function DispoOrderShow({
         visibleEditableHeaderTextFields.length > 0 ||
         visibleEditableHeaderChoiceFields.length > 0 ||
         visibleEditableHeaderFileFields.some(
-            (field) =>
-                canUploadMaterial || field.current_upload !== null,
+            (field) => canUploadMaterial || field.current_upload !== null,
         );
     const showHeaderCalcOrigin =
         visibleCalcOriginHeaderTextFields.length > 0 ||

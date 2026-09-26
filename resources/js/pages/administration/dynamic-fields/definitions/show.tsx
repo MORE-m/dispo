@@ -181,8 +181,7 @@ export default function DefinitionShow({
                     .split('\n')
                     .map((line) => line.trim())
                     .filter((line) => line !== '');
-                payload.allowed_mime_types =
-                    lines.length > 0 ? lines : null;
+                payload.allowed_mime_types = lines.length > 0 ? lines : null;
             } else if (!isChoiceType(structural.field_type)) {
                 payload.max_length =
                     structural.max_length === ''
@@ -231,8 +230,7 @@ export default function DefinitionShow({
                     .split('\n')
                     .map((line) => line.trim())
                     .filter((line) => line !== '');
-                payload.allowed_mime_types =
-                    lines.length > 0 ? lines : null;
+                payload.allowed_mime_types = lines.length > 0 ? lines : null;
             } else if (!isChoiceType(definition.field_type)) {
                 payload.max_length =
                     revision.max_length === ''
