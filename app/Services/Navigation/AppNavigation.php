@@ -30,7 +30,7 @@ final class AppNavigation
                 'key' => 'standard-offers',
                 'title' => 'Standardangebote',
                 'href' => '/standardangebote',
-                'available' => false,
+                'available' => true,
                 'visible' => $user->canViewStandardOffers(),
             ],
             [
