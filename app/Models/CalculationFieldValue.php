@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * @property bool|null $value_boolean
  * @property Carbon|null $value_period_start
  * @property Carbon|null $value_period_end
- * @property string|list<string>|null $value_json
+ * @property string|list<string>|array{upload_id: int}|null $value_json
  */
 class CalculationFieldValue extends Model
 {

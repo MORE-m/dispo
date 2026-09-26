@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool|null $value_boolean
  * @property string|null $value_period_start
  * @property string|null $value_period_end
- * @property string|list<string>|null $value_json
+ * @property string|list<string>|array{upload_id: int}|null $value_json
  */
 class DispoOrderPositionFieldValue extends Model
 {

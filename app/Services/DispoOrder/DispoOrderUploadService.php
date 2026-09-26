@@ -177,8 +177,6 @@ final class DispoOrderUploadService
         $resolved = $this->resolveDynamicFieldUploadTarget($order, $fieldKey, $positionId);
         /** @var SnapshotFieldDefinition $def */
         $def = $resolved['definition'];
-        /** @var ConfigurationSnapshot $ownerSnapshot */
-        $ownerSnapshot = $resolved['owner_snapshot'];
         /** @var DispoOrderPosition|null $position */
         $position = $resolved['position'];
 
@@ -199,7 +197,6 @@ final class DispoOrderUploadService
                 $expectedLockVersion,
                 $fieldKey,
                 $def,
-                $ownerSnapshot,
                 $position,
                 $prepared,
             ): DispoOrderUpload {
@@ -822,12 +819,7 @@ final class DispoOrderUploadService
 
         $order->loadMissing(['configurationSnapshot', 'positions']);
         $baseSnapshot = $order->configurationSnapshot;
-        $baseSnapshot?->loadMissing('fieldDefinitions');
-        if ($baseSnapshot === null) {
-            throw ValidationException::withMessages([
-                'field_key' => 'Der Auftrag hat keinen Konfigurationssnapshot.',
-            ]);
-        }
+        $baseSnapshot->loadMissing('fieldDefinitions');
 
         $position = null;
         $ownerSnapshot = $baseSnapshot;
