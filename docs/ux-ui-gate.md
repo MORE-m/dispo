@@ -19,10 +19,15 @@
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 26.09.2026 (BL-P1-05a):** technisches **Outbox-Fundament**
+  (Schema/Writer/Zustände/Reclaimer) umgesetzt. Das ist **keine** UX-GATE-D-
+  Freigabe für Mailversand, Fachereignis-Verdrahtung, Admin-Fehleransicht oder
+  In-App. `NOT-001`/`NOT-002` bleiben unerfüllt bis Folgeslice.
 - **Hinweis Stand 26.09.2026 (PO-BLP902A-1):** zusätzlich freigegeben (dieser
   Slice) sind **allgemeine Kommentare** (`CMT-001`/`CMT-002`, Typ `general`,
-  Extra-Recht `can_view_dispo_orders` für PM). **Nicht** freigegeben:
-  Notifications, Outbox, Freigabeinvalidierung, sonstiger Gate-D-Rest.
+  Extra-Recht `can_view_dispo_orders` für PM). **Nicht** freigegeben damals:
+  Notifications/Mailversand, Empfängerwahl, Freigabeinvalidierung, sonstiger
+  Gate-D-Rest (Outbox-Fundament nachgezogen als BL-P1-05a ohne Mail-Freigabe).
 - **Hinweis Stand 26.09.2026 (PO-BLP901C-1):** zusätzlich freigegeben (dieser
   Slice) sind **optionale** Dispo-Datei-Dynamikfelder (`applies_to=dispo_order`,
   Header/Position) in zentraler Uploadliste (UPL-004 **ERFÜLLT**). PR **#86**
