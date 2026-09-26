@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1**); Rest blockiert (u. a. Kommentare, Notifications)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**); Rest blockiert (u. a. Notifications)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -606,15 +606,31 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** Pest MIME/Größe, Archiv, Download/Stream; E2E Port **8040** (9-01a),
   **8041** (9-01b), **8042** (9-01c)
 
+### BL-P9-02a – Allgemeine Kommentare (PO-BLP902A-1)
+
+- **Phase:** 9
+- **Status:** **umgesetzt** in Feature-PR (September 2026; manuelle Abnahme separat)
+- **Kennung:** PO-BLP902A-1 / UX-GATE-D Teilfreigabe ausschließlich für allgemeine Kommentare
+- **Anforderungen:** `CMT-001`, `CMT-002` (für Typ `general`); Historie gemeinsam mit `CMT-003` (02b)
+- **Abhängigkeiten:** BL-P8-02b (Kommunikationsfundament)
+- **Ergebnis:** Typ `general` in `dispo_order_comments`; Create-API; Historie+Formular; Extra-Recht `can_view_dispo_orders` für PM; Audit `dispo_order.comment.created`
+- **Rollen:** alle mit Dispo-View (Admin/Sales/Disposition/Management; PM nur mit Extra-Recht)
+- **Status:** Schreiben in allen 11 Statusen; kein Status-/Lock-/Freigabe-Effekt
+- **Textlimit:** 2000 Zeichen (wie Rückfrage/Antwort; CMT-001 ohne eigenes Limit)
+- **Bewusst nicht:** NOT-001/NOT-002, Outbox, E-Mail, In-App, Empfängerwahl, BL-P1-05
+- **Tests:** `DispoOrderGeneralCommentTest`; Vitest Historie/Formular; Playwright Port **8043** (`test:e2e:blp902a`)
+
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** offen
+- **Status:** teilweise (02a allgemeine Kommentare); Notifications **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
-- **Abhängigkeiten:** BL-P1-05, BL-P8-02
-- **Ergebnis:** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
-- **Akzeptanz:** Mailfehler rollt Status nicht zurück
-- **Tests:** Pest Unveränderbarkeit Kommentare; Mail-Retry ohne Status-Rollback
+- **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
+- **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
+- **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
+- **Offen:** NOT-001/NOT-002, Outbox, In-App-Fundament (BL-P1-05)
+- **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück
+- **Tests:** Pest Unveränderbarkeit Kommentare (02a); Mail-Retry ohne Status-Rollback (folgt)
 
 ## Phase 10 – Listen, Reports und Exporte
 

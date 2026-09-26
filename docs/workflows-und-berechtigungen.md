@@ -253,6 +253,20 @@ Umgesetzt: strukturierter Rückfrage-/Antwortprozess.
 Bewusst **nicht** in 02b: allgemeine Kommentare (`CMT-001`), Notifications
 (`NOT-001`/`NOT-002`), Uploads, Completed/Cancelled, Rechnung-per-Ende.
 
+## Ist-Stand BL-P9-02a (PO-BLP902A-1)
+
+Umgesetzt: allgemeine Kommentare auf dem bestehenden Kommunikationsfundament.
+
+- Typ `general` in `dispo_order_comments`; Create `POST …/kommentare`
+- Schreiben/Lesen: alle mit Dispo-View; Produktmanagement nur mit Extra-Recht
+  `users.can_view_dispo_orders` (kein Kalkulationszugang)
+- Erlaubt in allen 11 Statusen; kein Status-/Lock-Effekt; keine Freigabeinvalidierung
+- Textlimit 2000 Zeichen; append-only (CMT-002); Audit `dispo_order.comment.created`
+- Historie zeigt `general` zusammen mit Rückfrage/Antwort (CMT-003 unverändert)
+
+Bewusst **nicht** in 02a: Notifications/Mail/Outbox (`NOT-001`/`NOT-002`),
+Empfängerwahl, In-App-Fundament (BL-P1-05).
+
 ## Abschlussbedingungen
 
 Ein Abschluss ist nur zulässig, wenn:

@@ -12,17 +12,22 @@
   + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
   + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**
   + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**
-  + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – ERLEDIGT, PR **#86** MERGED)
+  + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – ERLEDIGT, PR **#86** MERGED
+  + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 26.09.2026 (PO-BLP902A-1):** zusätzlich freigegeben (dieser
+  Slice) sind **allgemeine Kommentare** (`CMT-001`/`CMT-002`, Typ `general`,
+  Extra-Recht `can_view_dispo_orders` für PM). **Nicht** freigegeben:
+  Notifications, Outbox, Freigabeinvalidierung, sonstiger Gate-D-Rest.
 - **Hinweis Stand 26.09.2026 (PO-BLP901C-1):** zusätzlich freigegeben (dieser
   Slice) sind **optionale** Dispo-Datei-Dynamikfelder (`applies_to=dispo_order`,
   Header/Position) in zentraler Uploadliste (UPL-004 **ERFÜLLT**). PR **#86**
   MERGED (`68cc875…`); manuell abgenommen; Post-Merge-CI Run `36249359170`
-  SUCCESS. **Nicht** freigegeben: allgemeine Kommentare,
+  SUCCESS. **Nicht** freigegeben damals: allgemeine Kommentare (→ 02a),
   Notifications, Freigabeinvalidierung, sonstiger Gate-D-Rest.
 - **Hinweis Stand 25.09.2026 (PO-BLP901B-1):** feste Materialuploads + Audio
   (UPL-007, UPL-005 fest, zentrale Liste erweitert); manuell abgenommen PR **#82**.
@@ -317,6 +322,24 @@ Ausschließlich der **operative Statuskern** freigegeben:
 
 Diese Entscheidung gibt **nicht** die gesamte operative Disposition frei.
 
+**Product-Owner-Teilfreigabe (26. September 2026, UX-GATE-D / BL-P9-02a / PO-BLP902A-1):**
+Ausschließlich **allgemeine Kommentare** freigegeben (`CMT-001` Auslegung mit
+`AUTH-007`, `CMT-002` für Typ `general`):
+
+- Typ `general` in bestehender `dispo_order_comments`-Historie (gemeinsam mit 02b)
+- Schreiben/Lesen für alle Nutzer mit Dispo-Zugang; PM nur mit Extra-Recht
+  `can_view_dispo_orders` (kein automatischer Kalkulationszugang)
+- Schreiben in allen 11 Dispo-Statusen inkl. `completed`/`cancelled`
+- kein Statuswechsel, kein Reopen, keine Freigabeinvalidierung
+- Textlimit 2000 Zeichen; Audit `dispo_order.comment.created`
+- **keine** E-Mail, **keine** In-App, **keine** Outbox in diesem Slice
+
+Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
+
+- Benachrichtigungen / Mail / Outbox (`NOT-001` / `NOT-002`, BL-P1-05)
+- Empfängerwahl
+- Kombinationstabelle, Standardangebote, Reporting, SWF/OA/Social
+
 **Product-Owner-Teilfreigabe (23. September 2026, UX-GATE-D / BL-P8-02b / PO-BLP802B-1):**
 Ausschließlich der **strukturierte Rückfrage-/Antwortprozess** freigegeben
 (`STA-002`, `CMT-003`, `AT-17`):
@@ -329,9 +352,10 @@ Ausschließlich der **strukturierte Rückfrage-/Antwortprozess** freigegeben
 - keine automatische Wiederherstellung des vorherigen Status
 - kein Empfänger-Picker; keine Notifications in diesem Slice
 
-Ausdrücklich **nicht** freigegeben bleiben weiterhin u. a.:
+Ausdrücklich **nicht** freigegeben blieben damals u. a.:
 
 - allgemeine freie Kommentare (`CMT-001`) / vollständiges Kommentar-Modul BL-P9-02
+  → **nachgezogen** in PO-BLP902A-1 (nur Kommentare, ohne Notifications)
 - Benachrichtigungen / Mail (`NOT-001` / `NOT-002`)
 - Material-Uploads / Audio
 - Kundenbestätigung **Datei-Upload** (Ausnahmeweg ohne Upload: PO-BLP802C-1;
@@ -391,7 +415,7 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
-- allgemeine Kommentare, Notifications
+- Notifications (allgemeine Kommentare: PO-BLP902A-1)
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen
@@ -419,7 +443,7 @@ BL-P9-01c.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1); allgemeine Kommentare/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1); Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

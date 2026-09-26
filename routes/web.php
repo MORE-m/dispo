@@ -85,6 +85,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('dispoauftraege/{dispoOrder}/rueckfragen/{comment}/antwort', [DispoOrderController::class, 'answerSalesInquiry'])
         ->scopeBindings()
         ->name('dispo-orders.sales-inquiry.answer');
+    Route::post('dispoauftraege/{dispoOrder}/kommentare', [DispoOrderController::class, 'addComment'])
+        ->name('dispo-orders.comments.store');
     Route::post('dispoauftraege/{dispoOrder}/nachbessern', [DispoOrderController::class, 'startRevision'])
         ->name('dispo-orders.revise');
     Route::get('kalkulationen/{calculation}/dispoauftraege/positionen', [DispoOrderController::class, 'positions'])

@@ -26,6 +26,7 @@ class UserFactory extends Factory
             'role' => Role::Sales,
             'discount_limit_percent' => null,
             'can_special_approve' => false,
+            'can_view_dispo_orders' => false,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];

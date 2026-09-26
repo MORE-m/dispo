@@ -1,26 +1,36 @@
 # Fortschritt V1
 
-Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
-(PO-BLP901C-1) **ERLEDIGT** (PR **#86** MERGED `68cc875…`; manuell
-abgenommen; Post-Merge-CI Run `36249359170` SUCCESS). UPL-004 **ERFÜLLT**;
-**`BL-P9-01` ERLEDIGT**. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen
-(historischer Feature-HEAD `0adacb3…`, PR **#82**).
+Stand: 26. September 2026 – **BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1)
+in Feature-Umsetzung; Base `main` @ `da9db1f…`. **BL-P9-01** ERLEDIGT.
+Notifications (`NOT-001`/`NOT-002`) und Outbox **weiter offen**.
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01` ERLEDIGT** (`BL-P9-01a` + `BL-P9-01b` + `BL-P9-01c`
-auf `main`, manuell abgenommen). `BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**;
-UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter; UPL-004 **ERFÜLLT**.
+Phase 9 / **`BL-P9-01` ERLEDIGT**. **BL-P9-02a** (allgemeine Kommentare)
+umgesetzt im Feature-Branch; Notifications-Teil von BL-P9-02 offen.
 
 ## Aktuelle Aufgabe
 
-Nächster Fachblock **offen** bis zur PO-Priorisierung. Kein automatisches
-BL-P9-02/03.
+**BL-P9-02a** – Feature-PR / manuelle Abnahme. Keine Notification-Implementierung
+in diesem Slice.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01c** gemergt und manuell abgenommen (PR **#86**, Merge `68cc875…`,
-Port **8042**). Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
+**BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1): Typ `general`, Extra-Recht
+`can_view_dispo_orders`, Historie+Formular, Port **8043**. Davor: **BL-P9-01c**
+gemergt und manuell abgenommen (PR **#86**, Port **8042**).
+
+## BL-P9-02a – Allgemeine Kommentare / PO-BLP902A-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP902A-1 (nur Kommentare) | **freigegeben** (dieser Scope) |
+| Typ `general` in `dispo_order_comments`; CMT-002 | **umgesetzt** |
+| Schreiben/Lesen: Dispo-View-Rollen; PM nur mit Extra-Recht | **umgesetzt** |
+| Alle 11 Status; kein Status-/Freigabe-Effekt; keine Mail/In-App | **umgesetzt** |
+| Textlimit 2000 (wie Inquiry) | **umgesetzt** |
+| Unit/Feature/Vitest/Playwright Port **8043** | **umgesetzt** |
+| Notifications / Outbox / BL-P1-05 | **bewusst nicht** |
 
 ## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
 

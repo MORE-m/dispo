@@ -201,6 +201,8 @@ Eine Sonderfreigabe ist ein eigener Freigabetyp und nicht mit der allgemeinen Vi
 
 **AUTH-007** Produktmanagement erhält nicht automatisch Zugriff auf Kundenkalkulationen oder Dispoaufträge. Solche Rechte müssen gesondert über die vorhandene Berechtigungslogik erteilt werden.
 
+**Umsetzung Extra-Recht Dispo (BL-P9-02a):** Boolean `users.can_view_dispo_orders` (Default `false`). Greift nur für Rolle Produktmanagement in `User::canViewDispoOrders()`; Kernrollen Admin/Vertrieb/Disposition/Geschäftsführung bleiben rollenbasiert berechtigt. Das Flag ändert `canAccessCalculations()` nicht.
+
 # 5. Organisation, Sender, Kombis und Inventare
 
 Das System bildet genau eine Organisation ab. Sender, Kombis und digitale/eventbezogene Inventare werden mandantenähnlich als eigenständige Buchungsdimension geführt, ohne organisatorische Datentrennung. Auswertungen müssen je Inventar und übergreifend möglich sein.
@@ -825,6 +827,8 @@ Reine Kommentare sowie zusätzliche, nicht ersetzende Materialien/Uploads setzen
 ## 18.5 Kommentare
 
 **CMT-001** Alle Rollen dürfen allgemeine Kommentare schreiben; alle Rollen dürfen die vollständige Kommentarhistorie sehen.
+
+**Auslegung BL-P9-02a / PO-BLP902A-1:** „Alle Rollen“ bezieht sich auf Rollen **mit Zugang zum jeweiligen Dispoauftrag**. Produktmanagement erhält **keinen automatischen** Dispo-Zugang (`AUTH-007`). Ein ausdrücklich erteilbares Extra-Recht `users.can_view_dispo_orders` ermöglicht Dispo-Ansicht und damit Kommentar-Schreiben/-Lesen; es öffnet **keinen** Zugang zu Kundenkalkulationen. Allgemeine Kommentare sind in **allen 11 Statusen** erlaubt (inkl. `completed`/`cancelled`), ändern den Status nicht, öffnen keinen Auftrag erneut und invalidieren keine Freigabe. In diesem Slice **keine** E-Mail-/In-App-Benachrichtigung (Outbox folgt später).
 
 **CMT-002** Kommentare dürfen nicht nachträglich bearbeitet oder gelöscht werden. Korrekturen erfolgen als neuer Kommentar.
 
