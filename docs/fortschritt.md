@@ -1,24 +1,35 @@
 # Fortschritt V1
 
-Stand: 26. September 2026 – **BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1)
-in Feature-Umsetzung; Base `main` @ `da9db1f…`. **BL-P9-01** ERLEDIGT.
-Notifications (`NOT-001`/`NOT-002`) und Outbox **weiter offen**.
+Stand: 26. September 2026 – **BL-P1-05a** persistiertes Outbox-Fundament
+(Feature-Branch; Base `main` @ `3d0789be…`). **BL-P9-02a** auf `main` gemergt
+(PR #89). Fachliche Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01` ERLEDIGT**. **BL-P9-02a** (allgemeine Kommentare)
-umgesetzt im Feature-Branch; Notifications-Teil von BL-P9-02 offen.
+Phase 1 / **BL-P1-05a** Outbox-Fundament in Feature-Umsetzung. Phase 9:
+**BL-P9-01** ERLEDIGT, **BL-P9-02a** auf `main`; Notifications-Teil von BL-P9-02 offen.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-02a** – Feature-PR / manuelle Abnahme. Keine Notification-Implementierung
-in diesem Slice.
+**BL-P1-05a** – Outbox-Schema, Writer, Zustände, Reclaimer; Feature-PR.
+Kein Mailversand, keine Fachereignis-Verdrahtung.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1): Typ `general`, Extra-Recht
-`can_view_dispo_orders`, Historie+Formular, Port **8043**. Davor: **BL-P9-01c**
-gemergt und manuell abgenommen (PR **#86**, Port **8042**).
+**BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1) gemergt PR **#89**
+(`3d0789be…`). Davor: **BL-P9-01c** PR **#86**.
+
+## BL-P1-05a – Outbox-Fundament (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Tabelle `notification_outbox` + Idempotenzschlüssel | **umgesetzt** |
+| Writer (idempotent) + NOT-001-Payload-Vertrag (ohne Anlagen) | **umgesetzt** |
+| Zustandsübergänge + Reclaimer (`pending`/`available_at`) | **umgesetzt** |
+| Pest Unit/Feature + MySQL-Concurrency | **umgesetzt** |
+| Fachereignisse / echter Mailversand / Admin-UI / In-App | **bewusst nicht** |
+| NOT-001 / NOT-002 erfüllt | **nein** (folgt Folgeslice) |
+| UX-GATE-D Freigabe Mailversand | **nicht erteilt** |
 
 ## BL-P9-02a – Allgemeine Kommentare / PO-BLP902A-1 (September 2026)
 
@@ -30,7 +41,7 @@ gemergt und manuell abgenommen (PR **#86**, Port **8042**).
 | Alle 11 Status; kein Status-/Freigabe-Effekt; keine Mail/In-App | **umgesetzt** |
 | Textlimit 2000 (wie Inquiry) | **umgesetzt** |
 | Unit/Feature/Vitest/Playwright Port **8043** | **umgesetzt** |
-| Notifications / Outbox / BL-P1-05 | **bewusst nicht** |
+| Notifications / Outbox / BL-P1-05 | damals **bewusst nicht**; Outbox-Fundament nachgezogen in **BL-P1-05a** |
 
 ## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
 

@@ -151,12 +151,30 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P1-05 – In-App-Benachrichtigungsgrundlage
 
 - **Phase:** 1
-- **Status:** offen
+- **Status:** teilweise (`BL-P1-05a` Outbox-Fundament)
 - **Anforderungen:** `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-04
-- **Ergebnis:** Benachrichtigungsmodell und Zustellstatus ohne Fachereignisse vollständig verdrahtet
-- **Akzeptanz:** Schema und Service vorbereitet; konkrete Ereignisse folgen mit Workflows
-- **Tests:** Pest Persistenz und fehlgeschlagene Zustellung ohne Status-Rollback-Hook
+- **Ergebnis (Ziel):** Benachrichtigungsmodell und Zustellstatus ohne Fachereignisse vollständig verdrahtet
+- **Akzeptanz (Ziel):** Schema und Service vorbereitet; konkrete Ereignisse folgen mit Workflows
+- **Tests (Ziel):** Pest Persistenz und fehlgeschlagene Zustellung ohne Status-Rollback-Hook
+
+### BL-P1-05a – Persistiertes Notification-/Outbox-Fundament
+
+- **Phase:** 1
+- **Status:** umgesetzt (Feature-PR; September 2026)
+- **Anforderungen:** Fundament für späteres `NOT-001`/`NOT-002` (diese IDs sind durch 05a **noch nicht** erfüllt)
+- **Abhängigkeiten:** BL-P1-04
+- **Ergebnis:** Tabelle `notification_outbox`; Intent/Writer; Idempotenzschlüssel; Zustandsübergänge;
+  Reclaimer für fällige `pending`-Einträge (Recovery unabhängig von Job-Dispatch)
+- **Datenvertrag:** Ereigniskennung, Quellobjekt, Empfänger-Snapshot, Kanal `email`,
+  NOT-001-Payload-Felder (ohne Anlagen), Zustand, Versuche, Fehler-/Zeitstempel
+- **Transaktion:** Scheitert Outbox-Schreiben in einer Fach-TX → Fachaktion rollt mit zurück.
+  Queue-/Mailfehler *nach* Commit rollen Fachstatus nicht zurück (Versand folgt später).
+- **Zustellung:** potenziell mindestens einmal; keine Exactly-Once-Zusage bei Worker-Abbruch nach SMTP
+- **Bewusst nicht:** Fachereignis-Verdrahtung (Ask/Answer/Status), echter Mailversand, Admin-UI,
+  In-App-Kanal, Kommentar-Benachrichtigungen; keine UX-GATE-D-Freigabe für Mailversand
+- **Tests:** `NotificationOutboxContractTest`, `NotificationOutboxFoundationTest`,
+  `NotificationOutboxConcurrencyTest` (MySQL)
 
 ## Phase 2 – Stammdaten und Kombinationstabelle
 
@@ -628,7 +646,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
-- **Offen:** NOT-001/NOT-002, Outbox, In-App-Fundament (BL-P1-05)
+- **Offen:** NOT-001/NOT-002 (Fachereignisse + Versand), In-App; Outbox-Fundament siehe **BL-P1-05a**
 - **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück
 - **Tests:** Pest Unveränderbarkeit Kommentare (02a); Mail-Retry ohne Status-Rollback (folgt)
 

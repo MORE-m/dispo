@@ -420,7 +420,7 @@ Produktmanagement: Dispo-View nur mit Extra-Recht `users.can_view_dispo_orders`
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- Notifications / Outbox (`NOT-*`, BL-P1-05).
+- Fachliche Notification-Ereignisse / Mailversand (`NOT-*`; Fundament: **BL-P1-05a**).
 
 ## Dynamische Daten
 
@@ -635,8 +635,13 @@ Kundenkalkulationen oder Dispoaufträge (`AUTH-007`).
 - `QuestionThread` oder strukturierte Ereignisverknüpfung für Rückfrage/Antwort
   (**umgesetzt** über `parent_id` an `dispo_order_comments`).
 - `AuditEvent`: Objekt, Aktion, alte/neue Werte, Benutzer, Kontext und Korrelations-ID.
-- `Notification`: Kanal, Empfänger, Status, Wiederholungen und Fehler
-  (**noch nicht umgesetzt**; Outbox für späteren Notification-Slice vorgesehen).
+- `NotificationOutbox` (**BL-P1-05a** als `notification_outbox`): persistierte Zustellabsicht
+  mit `idempotency_key` (unique), `event_type`, Quellobjekt (`source_type`/`source_id`),
+  Kanal (`email`), Empfänger-Snapshot (`recipient_user_id`/`email`/`name`),
+  `payload_json` (NOT-001-Felder ohne Anlagen), Status
+  (`pending`/`queued`/`sending`/`sent`/`failed`), `attempt_count`, Fehler- und Zeitstempel,
+  `available_at` für Recovery fälliger `pending`-Zeilen ohne Abhängigkeit von Job-Dispatch.
+  **Nicht** in 05a: Fachereignis-Hooks, SMTP-Versand, Admin-UI, In-App.
 
 ## Dateien
 
