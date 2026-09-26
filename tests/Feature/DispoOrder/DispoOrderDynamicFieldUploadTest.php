@@ -349,6 +349,60 @@ class DispoOrderDynamicFieldUploadTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors('file');
     }
 
+    public function test_blocklist_still_rejects_when_type_is_explicitly_allowlisted(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        ['order' => $order, 'creator' => $creator, 'definition' => $definition] = $this->seedOrderWithFileField(
+            fieldKey: 'allow_but_blocked',
+            allowedMimeTypes: ['application/x-msdownload', 'application/pdf'],
+        );
+
+        $before = DispoOrderUpload::query()->where('dispo_order_id', $order->id)->count();
+        $exe = UploadedFile::fake()->create('evil.exe', 10, 'application/x-msdownload');
+
+        $response = $this->postDynamicField($creator, $order, [
+            'lock_version' => $order->lock_version,
+            'field_key' => $definition->key,
+            'file' => $exe,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('file');
+        $this->assertStringContainsString(
+            'Sicherheitsgründen',
+            (string) data_get($response->json(), 'errors.file.0'),
+        );
+        $this->assertSame($before, DispoOrderUpload::query()->where('dispo_order_id', $order->id)->count());
+    }
+
+    public function test_upload_and_schema_reject_file_field_with_applies_to_both(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        ['order' => $order, 'creator' => $creator, 'definition' => $definition, 'snap_def' => $snapDef] = $this->seedOrderWithFileField(
+            fieldKey: 'both_invalid',
+        );
+
+        $snapDef->applies_to = FieldAppliesTo::Both;
+        $snapDef->save();
+
+        $schema = app(DispoOrderDynamicFieldWriter::class)->fieldSchemaProp($order->fresh());
+        $editableKeys = array_column($schema['editable_custom_header_fields'], 'key');
+        $this->assertNotContains($definition->key, $editableKeys);
+
+        $allFields = collect($schema['fields'])->firstWhere('key', $definition->key);
+        $this->assertNotNull($allFields);
+        $this->assertSame(FieldAppliesTo::Both->value, $allFields['applies_to']);
+        $this->assertFalse($allFields['editable']);
+
+        $before = DispoOrderUpload::query()->where('dispo_order_id', $order->id)->count();
+        $this->postDynamicField($creator, $order->fresh(), [
+            'lock_version' => $order->fresh()->lock_version,
+            'field_key' => $definition->key,
+            'file' => $this->pdfFile('both.pdf'),
+        ])->assertStatus(422)->assertJsonValidationErrors('field_key');
+
+        $this->assertSame($before, DispoOrderUpload::query()->where('dispo_order_id', $order->id)->count());
+    }
+
     public function test_rejects_over_50mb(): void
     {
         Storage::fake((string) config('dispo.files_disk'));

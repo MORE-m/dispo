@@ -1652,7 +1652,7 @@ final class DispoOrderDynamicFieldWriter
             return false;
         }
 
-        return in_array($def->applies_to, [FieldAppliesTo::DispoOrder, FieldAppliesTo::Both], true);
+        return $def->applies_to === FieldAppliesTo::DispoOrder;
     }
 
     private function isTextOrChoiceFieldType(FieldType $fieldType): bool

@@ -717,20 +717,18 @@ final class DispoOrderUploadService
             return;
         }
 
-        if ($allowedMimeTypes !== null && $allowedMimeTypes !== []) {
-            if ($mime === null || ! in_array($mime, $allowedMimeTypes, true)) {
-                throw ValidationException::withMessages([
-                    'file' => 'Dieser Dateityp ist für dieses Feld nicht zulässig.',
-                ]);
-            }
-
-            return;
-        }
-
         foreach (self::BLOCKED_MIME_PREFIXES as $blocked) {
             if ($mime !== null && str_starts_with($mime, $blocked)) {
                 throw ValidationException::withMessages([
                     'file' => 'Dieser Dateityp ist aus Sicherheitsgründen nicht zulässig.',
+                ]);
+            }
+        }
+
+        if ($allowedMimeTypes !== null && $allowedMimeTypes !== []) {
+            if ($mime === null || ! in_array($mime, $allowedMimeTypes, true)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dieser Dateityp ist für dieses Feld nicht zulässig.',
                 ]);
             }
         }
@@ -847,9 +845,9 @@ final class DispoOrderUploadService
             ]);
         }
 
-        if (! in_array($def->applies_to, [FieldAppliesTo::DispoOrder, FieldAppliesTo::Both], true)) {
+        if ($def->applies_to !== FieldAppliesTo::DispoOrder) {
             throw ValidationException::withMessages([
-                'field_key' => 'Dieses Datei-Feld ist im Dispoauftrag nicht verfügbar.',
+                'field_key' => 'Datei-Felder sind nur für Dispoauftrag-Felder (applies_to=dispo_order) zulässig.',
             ]);
         }
 
