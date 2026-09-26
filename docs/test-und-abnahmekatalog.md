@@ -181,8 +181,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Browser-Smoke Port **8042** / `e2e-bl-p9-01c.sqlite`: **BESTANDEN** (Fälle 1–7)
   - Fixes im Smoke: Pflicht-UI für `file` ausgeblendet; Blockliste um
     `application/vnd.microsoft.portable-executable` ergänzt
-- Formale PO-Abnahme: **offen** (Checkbox bis zur Freigabe)
-- UPL-004 **ERFÜLLT** nach formaler 01c-Abnahme; `BL-P9-01` geschlossen nach Merge
+- Formale PO-Abnahme: **ERFOLGREICH** (manuell abgenommen; Feature-HEAD
+  `525faab5e52a821ec2514a020c0090032d6f2583`, CI Run `36244779460`)
+- UPL-004 **ERFÜLLT**; `BL-P9-01` **abgeschlossen**; Merge PR **#86** folgt
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 

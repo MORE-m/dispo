@@ -563,8 +563,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01c – Dyn-Feld-Dateien in Uploadliste (PO-BLP901C-1)
 
 - **Phase:** 9
-- **Status:** **umgesetzt**; Browser-Smoke Port **8042** bestanden;
-  formale PO-Abnahme + Merge ausstehend (PR **#86**)
+- **Status:** **manuell abgenommen**; Merge PR **#86** folgt
 - **Kennung:** PO-BLP901C-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01c
 - **Anforderungen:** `UPL-004` (Rest), `UPL-006` (unverändert)
 - **Abhängigkeiten:** BL-P9-01a, BL-P9-01b
@@ -575,29 +574,32 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Rollen Upload:** wie 9-01b (Sales/Disposition/Admin/Management; PM NEIN)
 - **Fachvertrag:** kein `require_field` / keine Pflicht-UI für `file`; kein
   Calc-Datei-Upload; keine Freigabeinvalidierung; Replace ≠ Admin-Archiv (E1–E7)
-- **UPL-Status nach Slice:** UPL-004 **ERFÜLLT** (nach formaler Abnahme);
-  UPL-006 weiter (Blockliste inkl. PE-MIME)
+- **UPL-Status nach Slice:** UPL-004 **ERFÜLLT**; UPL-006 weiter (Blockliste
+  inkl. PE-MIME)
 - **Bewusst nicht:** Kalkulations-Dateifelder; CMT-001; Notifications;
   Freigabeinvalidierung
 - **Tests:** `DispoOrderDynamicFieldUploadTest` (+ MySQL); Vitest Schema-File-Fields +
   Uploadliste; Playwright Port **8042** (`test:e2e:blp901c`)
+- **Feature-HEAD / CI:** `525faab5e52a821ec2514a020c0090032d6f2583` /
+  Run `36244779460` SUCCESS
 - **Smoke-HEAD / CI:** `114a23371ccb563dd50c7037c5846523078a1a68`
   (≡ pre-rewrite `f1140a6b76335fa5d296e976409cbb29323d58ed`) /
   Run `36240049854` SUCCESS
-- **Docs-Nachzug / Trailer-Rewrite:** PR **#86** Feature-Branch (docs-only;
-  `Co-authored-by: Cursor` aus History entfernt, Tree unverändert)
 - **Browser-Smoke:** Port **8042** / `e2e-bl-p9-01c.sqlite` Fälle 1–7 bestanden
   (inkl. Fixes Pflicht-UI + PE-Blockliste)
+- **Manuelle Abnahme:** **ERFOLGREICH** (26.09.2026)
 
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **umgesetzt** (`BL-P9-01a`–`c`; 01c formale Abnahme/Merge offen)
+- **Status:** **abgeschlossen** (`BL-P9-01a`–`c` manuell abgenommen; 01c-Merge
+  PR **#86** folgt)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
 - **Akzeptanz:** keine öffentlichen URLs; max. 50 MB Default
 - **Erledigt in 9-01c:** Dyn-Feld-Dateien in zentraler Uploadliste / UPL-004
+  **ERFÜLLT**
 - **Erledigt in 9-01b:** feste Materialkategorien + Audio / UPL-007
 - **Tests:** Pest MIME/Größe, Archiv, Download/Stream; E2E Port **8040** (9-01a),
   **8041** (9-01b), **8042** (9-01c)

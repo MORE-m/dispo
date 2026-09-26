@@ -1,29 +1,25 @@
 # Fortschritt V1
 
 Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
-(PO-BLP901C-1) **umgesetzt**; Browser-Smoke Port **8042** **bestanden**
-(Smoke-HEAD `114a233…` ≡ pre-rewrite `f1140a6…`, CI `36240049854`);
-Docs-Nachzug + Trailer-Rewrite auf PR **#86**. **Formale PO-Abnahme und Merge**
-ausstehend. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD
-`0adacb3…`, PR **#82**).
+(PO-BLP901C-1) **manuell abgenommen** (Feature-HEAD `525faab…`, PR **#86**).
+UPL-004 **ERFÜLLT**; **`BL-P9-01` abgeschlossen**. Merge PR **#86** folgt.
+**BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD `0adacb3…`,
+PR **#82**).
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01`** nach **`BL-P9-01a`** + **`BL-P9-01b`** + **`BL-P9-01c`**
-(01c: Smoke bestanden, formale Abnahme/Merge offen). `BL-P8-02` **ERLEDIGT**.
-UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
-UPL-004 nach formaler 01c-Abnahme **ERFÜLLT**.
+Phase 9 / **`BL-P9-01` ERLEDIGT** (`BL-P9-01a` + `BL-P9-01b` + `BL-P9-01c`
+manuell abgenommen). `BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005
+feste Kategorien **ERFÜLLT**; UPL-006 weiter; UPL-004 **ERFÜLLT**.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01c** formale PO-Abnahme + Merge (PO-BLP901C-1). Kein automatisches
-BL-P9-02/03.
+Merge PR **#86** (BL-P9-01c). Danach kein automatisches BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01c** dynamische Dispo-Datei-Felder in zentraler Uploadliste (Feature-Branch;
-Playwright Port **8042**; manueller Smoke Port **8042** bestanden). Davor:
-**BL-P9-01b** manuell abgenommen (Port **8041**).
+**BL-P9-01c** manuell abgenommen (Port **8042**; Feature-HEAD `525faab…`).
+Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
 
 ## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
 
@@ -40,13 +36,13 @@ Playwright Port **8042**; manueller Smoke Port **8042** bestanden). Davor:
 | Smoke-HEAD (pre-rewrite, gleiche Tree) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
 | CI Smoke-HEAD | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Trailer-Rewrite | `Co-authored-by: Cursor` aus 3 Commits entfernt; Tree unverändert |
-| Docs-Nachzug | PR **#86** Feature-Branch (docs-only) |
-| CI Feature-HEAD | nach Push auf den finalen Branch-HEAD |
+| Feature-HEAD | `525faab5e52a821ec2514a020c0090032d6f2583` |
+| CI Feature-HEAD | Run `36244779460` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Browser-Smoke Port **8042** | **BESTANDEN** (Fälle 1–7; zwei Fixes vor Abschluss) |
-| Formale PO-Abnahme | **offen** |
-| UPL-004 | **ERFÜLLT nach formaler Abnahme** |
-| `BL-P9-01` insgesamt | **umgesetzt** (01c formale Abnahme/Merge offen) |
-| Merge `main` | **ausstehend** (PR **#86**) |
+| Formale PO-Abnahme | **ERFOLGREICH** (manuell abgenommen) |
+| UPL-004 | **ERFÜLLT** |
+| `BL-P9-01` insgesamt | **abgeschlossen** |
+| Merge `main` | **folgt** (PR **#86**) |
 | Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
@@ -64,7 +60,7 @@ Playwright Port **8042**; manueller Smoke Port **8042** bestanden). Davor:
 | Unit/Feature/MySQL/Vitest/Playwright Port **8041** | **umgesetzt** |
 | UPL-007 | **ERFÜLLT** |
 | UPL-005 feste Kategorien | **ERFÜLLT** |
-| UPL-004 / `BL-P9-01` | **weiter teilweise** (Dyn-Feld-Dateien offen → 01c) |
+| UPL-004 / `BL-P9-01` | **geschlossen über 01c** |
 | Feature-HEAD | `0adacb3c4a83f8b763a83b51916c4e5342a68623` |
 | CI Feature-HEAD | Run `36182337813` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Manuelle Abnahme | **ERFOLGREICH** (Port **8041** / `e2e-bl-p9-01b.sqlite`; Smoke + echte MP3) |

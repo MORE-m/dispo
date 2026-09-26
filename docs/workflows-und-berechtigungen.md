@@ -210,9 +210,9 @@ Port **8041** Smoke + echte MP3): feste Materialuploads + Audio.
 
 ## Ist-Stand BL-P9-01c (PO-BLP901C-1)
 
-**umgesetzt**; Browser-Smoke Port **8042** bestanden (PR **#86**, Smoke-HEAD
-`114a233…` ≡ pre-rewrite `f1140a6…`, CI `36240049854`; Docs-Nachzug +
-Trailer-Rewrite); formale PO-Abnahme + Merge ausstehend.
+**manuell abgenommen** (PR **#86**, Feature-HEAD `525faab…`, CI Run
+`36244779460`; Smoke Port **8042** bestanden). Merge folgt. UPL-004 **ERFÜLLT**;
+`BL-P9-01` **abgeschlossen**.
 
 - Endpoint `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`
 - Nur optionale Datei-Felder `applies_to=dispo_order` (Header/Position im Snapshot)
@@ -221,7 +221,6 @@ Trailer-Rewrite); formale PO-Abnahme + Merge ausstehend.
   aktive Feldreferenz (`value_json` leer)
 - Kein `require_field` / keine Pflicht-UI für `file`; kein Kalkulations-Datei-Upload;
   keine Freigabeinvalidierung; Blockliste gilt auch mit Feld-Allowlist (inkl. PE-MIME)
-- UPL-004 **ERFÜLLT** nach formaler Abnahme; `BL-P9-01` fachlich geschlossen nach Merge
 
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
