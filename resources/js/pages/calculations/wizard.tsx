@@ -2147,7 +2147,45 @@ export default function CalculationWizard({
               : '/kalkulationen';
 
         const savePayload = isStandardOffer
-            ? { ...payload, title: templateTitle.trim() || 'Standardangebot' }
+            ? (() => {
+                  const {
+                      customer_name: _c,
+                      agency_name: _a,
+                      target_budget_nn: _t,
+                      budget_strategy: _bs,
+                      budget_elements: _be,
+                      budget_distribution_ranges: _bdr,
+                      budget_proposal_manual: _bpm,
+                      calculation_id: _cid,
+                      ...rest
+                  } = payload as Record<string, unknown>;
+                  return {
+                      ...rest,
+                      title: templateTitle.trim() || 'Standardangebot',
+                      planning_mode: 'manual',
+                      positions: (
+                          (rest.positions as Array<Record<string, unknown>>) ??
+                          []
+                      ).map((position) => {
+                          const {
+                              components: _comp,
+                              planner_entries: _plan,
+                              component_profile: _prof,
+                              fixed_price_nn: _fp,
+                              ...posRest
+                          } = position;
+                          return {
+                              ...posRest,
+                              spot_method: 'average',
+                              pricing_settlement_mode: 'normal',
+                              components: [],
+                              planner_entries: [],
+                              component_profile: null,
+                              fixed_price_nn: null,
+                          };
+                      }),
+                  };
+              })()
             : payload;
 
         const options = {

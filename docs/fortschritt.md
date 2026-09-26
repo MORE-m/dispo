@@ -35,14 +35,17 @@ VER-004, AT-28–31).
 | Übernahme ohne Live-`CalculationWriter::create()` | **umgesetzt** |
 | Kunde Freitext Pflicht bei Übernahme (CRM-Slice später) | **umgesetzt** |
 | PM ohne Calc/Dispo/Übernahme (AUTH-007) | **umgesetzt** |
-| Feature-Tests AT-28–31-Kern | **umgesetzt** (14 Feature-Tests) |
+| Feature-Tests AT-28–31-Kern | **umgesetzt** (15 Feature-Tests; inkl. HTTP Publish/Adopt-Policy) |
 | Vorlagen-Editor via Calc-Wizard (Average, multi-Position) | **umgesetzt** |
 | Feldmatrix Gruppe 1–4 dokumentiert | **umgesetzt** (`docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`) |
+| `StandardOfferVersion` an `StandardOfferPolicy` gebunden | **umgesetzt** (Publish/Adopt HTTP) |
+| Manueller Smoke Port 8044 | **durchgeführt** (`docs/smoke-bl-p4-03a/protokoll.md`) |
 | Calendar/Komponenten/Festpreis/Tandem/Abbinder | **bewusst nicht** (Gruppe 4) |
 | Aus Kalkulation → Vorlage | **bewusst nicht** (Folgeslice, kein Button) |
 | Lokale Gates (Pint/PHPStan/Pest SQLite/Vitest/`npm check`/`tsc`) | **grün** vor Draft-PR |
 | MySQL-Gate lokal | STD-Filter nach `dispo_test`-Reset; Full-Suite an GitHub `mysql`-Job |
-| Calendar/Komponenten/Festpreis/Tandem/Abbinder UI | **bewusst nicht** |
+| Calendar/Komponenten/Festpreis/Tandem/Abbinder UI | **bewusst nicht** (UI zeigt Optionen; Server lehnt ab) |
+| Merge | **kein Merge** (Draft PR #91) |
 
 ## BL-P1-05a – Outbox-Fundament (September 2026)
 

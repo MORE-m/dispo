@@ -178,6 +178,45 @@ class StandardOfferBlP403aTest extends TestCase
         );
     }
 
+    public function test_http_publish_and_sales_adopt_use_version_policy(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $disposition = User::factory()->role(Role::Disposition)->create();
+
+        $offer = $this->writer()->create('HTTP Policy', $this->draftPayload($catalog), $pm);
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+
+        $this->actingAs($pm)->post(route('standard-offers.publish', [
+            'standardOffer' => $offer,
+            'version' => $draft,
+        ]), [
+            'lock_version' => $draft->lock_version,
+        ])->assertRedirect();
+
+        $published = $offer->fresh(['publishedVersion'])?->publishedVersion;
+        $this->assertNotNull($published);
+        $this->assertSame(StandardOfferVersionStatus::Published, $published->status);
+
+        $this->actingAs($disposition)->get(route('standard-offers.index'))->assertForbidden();
+
+        $this->actingAs($sales)->post(route('standard-offers.adopt', [
+            'standardOffer' => $offer,
+            'version' => $published,
+        ]), [
+            'customer_name' => 'HTTP Kunde',
+            'agency_name' => 'HTTP Agentur',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('calculations', [
+            'customer_name' => 'HTTP Kunde',
+            'agency_name' => 'HTTP Agentur',
+            'origin_standard_offer_version_id' => $published->id,
+        ]);
+    }
+
     public function test_rejects_non_average_content(): void
     {
         $catalog = $this->createSpotClassicCatalog();
