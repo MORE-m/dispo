@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $personal_discount_limit_percent
  * @property int $lock_version
  * @property int|null $configuration_snapshot_id
+ * @property int|null $origin_standard_offer_version_id
  */
 class Calculation extends Model
 {
@@ -78,6 +79,7 @@ class Calculation extends Model
         'personal_discount_limit_percent',
         'lock_version',
         'configuration_snapshot_id',
+        'origin_standard_offer_version_id',
     ];
 
     /**
@@ -151,6 +153,16 @@ class Calculation extends Model
     public function configurationSnapshot(): BelongsTo
     {
         return $this->belongsTo(ConfigurationSnapshot::class);
+    }
+
+    /**
+     * Herkunft aus Standardangebotsversion (STD-005 / VER-004) – nur Nachvollziehbarkeit.
+     *
+     * @return BelongsTo<StandardOfferVersion, $this>
+     */
+    public function originStandardOfferVersion(): BelongsTo
+    {
+        return $this->belongsTo(StandardOfferVersion::class, 'origin_standard_offer_version_id');
     }
 
     /**

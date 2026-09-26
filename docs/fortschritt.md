@@ -1,23 +1,39 @@
 # Fortschritt V1
 
-Stand: 26. September 2026 – **BL-P1-05a** persistiertes Outbox-Fundament
-(Feature-Branch; Base `main` @ `3d0789be…`). **BL-P9-02a** auf `main` gemergt
-(PR #89). Fachliche Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
+Stand: 26. September 2026 – **BL-P4-03a** Standardangebote (PO-BLP403A-1)
+in Feature-Umsetzung; Base `origin/main` @ `56a10e6…` (nach PR #88/#90).
+**BL-P1-05a** Outbox-Fundament auf `main` gemergt (PR #90). Fachliche
+Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 ## Aktuelle Phase
 
-Phase 1 / **BL-P1-05a** Outbox-Fundament in Feature-Umsetzung. Phase 9:
-**BL-P9-01** ERLEDIGT, **BL-P9-02a** auf `main`; Notifications-Teil von BL-P9-02 offen.
+Phase 4 / **BL-P4-03a** (Standardangebote, Spot Classic Average).
 
 ## Aktuelle Aufgabe
 
-**BL-P1-05a** – Outbox-Schema, Writer, Zustände, Reclaimer; Feature-PR.
-Kein Mailversand, keine Fachereignis-Verdrahtung.
+**BL-P4-03a** – Feature-PR / manuelle Abnahme. Kein Calendar/Komponenten/Festpreis/Tandem.
 
-## Zuletzt abgeschlossene Aufgabe (Umsetzung)
+## Zuletzt begonnene Aufgabe (Umsetzung)
 
-**BL-P9-02a** allgemeine Kommentare (PO-BLP902A-1) gemergt PR **#89**
-(`3d0789be…`). Davor: **BL-P9-01c** PR **#86**.
+**BL-P4-03a** Standardangebote: Liste, Draft, Publish/Archiv, Versionshistorie,
+Vertrieb-Ansicht, Übernahme mit Frozen Materialization (STD-001–009, AUTH-006/007,
+VER-004, AT-28–31).
+
+## BL-P4-03a – Standardangebote / PO-BLP403A-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP403A-1 (nur 03a-Oberflächen) | **freigegeben** (dieser Scope) |
+| Domain `StandardOffer` / `StandardOfferVersion`, Nummern `SA-` | **umgesetzt** |
+| Nur Spot Classic Average; Ablehnung anderer Inhalte | **umgesetzt** |
+| Publish archiviert vorherige Published atomar; paralleler Draft | **umgesetzt** |
+| Übernahme ohne Live-`CalculationWriter::create()` | **umgesetzt** |
+| Kunde Freitext Pflicht bei Übernahme (CRM-Slice später) | **umgesetzt** |
+| PM ohne Calc/Dispo/Übernahme (AUTH-007) | **umgesetzt** |
+| Feature-Tests AT-28–31-Kern | **umgesetzt** (9/9 Feature) |
+| Lokale Gates (Pint/PHPStan/Pest SQLite/Vitest/`npm check`/`tsc`) | **grün** vor Draft-PR |
+| MySQL-Gate lokal | STD-Filter 9/9 nach `dispo_test`-Reset; Full-Suite an GitHub `mysql`-Job |
+| Calendar/Komponenten/Festpreis/Tandem/Abbinder | **bewusst nicht** |
 
 ## BL-P1-05a – Outbox-Fundament (September 2026)
 
@@ -27,6 +43,7 @@ Kein Mailversand, keine Fachereignis-Verdrahtung.
 | Writer (idempotent) + NOT-001-Payload-Vertrag (ohne Anlagen) | **umgesetzt** |
 | Zustandsübergänge + Reclaimer (`pending`/`available_at`) | **umgesetzt** |
 | Pest Unit/Feature + MySQL-Concurrency | **umgesetzt** |
+| Merge `main` | **PR #90** |
 | Fachereignisse / echter Mailversand / Admin-UI / In-App | **bewusst nicht** |
 | NOT-001 / NOT-002 erfüllt | **nein** (folgt Folgeslice) |
 | UX-GATE-D Freigabe Mailversand | **nicht erteilt** |

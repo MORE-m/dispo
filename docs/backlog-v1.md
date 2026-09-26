@@ -304,12 +304,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** offen
+- **Status:** teilweise (`BL-P4-03a` in Umsetzung / Feature-Branch)
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`
-- **Abhängigkeiten:** BL-P4-02, UX-GATE-D
-- **Ergebnis:** versionierte Vorlagen ohne Kundenbindung; Navigation; Übernahme als Kundenkalkulations-Snapshot; Historie/Audit
-- **Akzeptanz:** `AT-28` bis `AT-31`; Dispo nur aus übernommener Kundenkalkulation; Änderungen isoliert
-- **Tests:** Pest Statuswechsel, Snapshot-Isolation, Rechte Produktmanagement vs. Vertrieb
+- **Abhängigkeiten:** BL-P4-02 (Average-Pfad; Abbinder nicht blockierend), UX-GATE-D Teilfreigabe **PO-BLP403A-1**
+- **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
+- **Grenzen 03a:** kein Calendar/Komponenten/Festpreis/Tandem/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später)
+- **Akzeptanz:** `AT-28` bis `AT-31`
+- **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
 
 ## Phase 5 – SWF, Produktion und freie Preisbestandteile
 

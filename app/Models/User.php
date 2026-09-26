@@ -81,6 +81,30 @@ class User extends Authenticatable
     }
 
     /**
+     * AUTH-006 / STD-009: Vorlagen anlegen, bearbeiten, versionieren, publish/archiv.
+     */
+    public function canManageStandardOffers(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Management,
+            Role::ProductManagement,
+        );
+    }
+
+    /**
+     * STD-004: Übernahme in Kundenkalkulation (kein PM in 03a).
+     */
+    public function canAdoptStandardOffers(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Management,
+        );
+    }
+
+    /**
      * Dispo-Ansicht: Kernrollen immer; Produktmanagement nur mit Extra-Recht
      * {@see $can_view_dispo_orders} (AUTH-007 / CMT-001 Auslegung BL-P9-02a).
      * Öffnet keinen Zugang zu Kundenkalkulationen ({@see canAccessCalculations}).

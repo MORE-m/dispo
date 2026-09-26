@@ -18,6 +18,7 @@ use App\Http\Controllers\DispoOrderController;
 use App\Http\Controllers\E2E\E2EChoiceSnapshotController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\OverviewController;
+use App\Http\Controllers\StandardOfferController;
 use App\Http\Controllers\UnavailableModuleController;
 use Illuminate\Support\Facades\Route;
 
@@ -40,7 +41,16 @@ Route::middleware(['auth'])->group(function () {
     Route::post('kalkulationen/{calculation}/budget-vorschlaege/{proposal}/uebernehmen', [CalculationController::class, 'applyBudget'])
         ->name('calculations.budget-apply');
 
-    Route::get('standardangebote', UnavailableModuleController::class)->defaults('module', 'standard-offers')->name('standard-offers.index');
+    Route::get('standardangebote', [StandardOfferController::class, 'index'])->name('standard-offers.index');
+    Route::get('standardangebote/neu', [StandardOfferController::class, 'create'])->name('standard-offers.create');
+    Route::post('standardangebote', [StandardOfferController::class, 'store'])->name('standard-offers.store');
+    Route::get('standardangebote/{standardOffer}', [StandardOfferController::class, 'show'])->name('standard-offers.show');
+    Route::put('standardangebote/{standardOffer}/versionen/{version}', [StandardOfferController::class, 'update'])->name('standard-offers.update');
+    Route::post('standardangebote/{standardOffer}/entwurf', [StandardOfferController::class, 'storeDraft'])->name('standard-offers.draft');
+    Route::post('standardangebote/{standardOffer}/versionen/{version}/veroeffentlichen', [StandardOfferController::class, 'publish'])->name('standard-offers.publish');
+    Route::post('standardangebote/{standardOffer}/versionen/{version}/archivieren', [StandardOfferController::class, 'archive'])->name('standard-offers.archive');
+    Route::post('standardangebote/{standardOffer}/versionen/{version}/uebernehmen', [StandardOfferController::class, 'adopt'])->name('standard-offers.adopt');
+
     Route::get('dispoauftraege', [DispoOrderController::class, 'index'])->name('dispo-orders.index');
     Route::get('dispoauftraege/{dispoOrder}', [DispoOrderController::class, 'show'])->name('dispo-orders.show');
     Route::get('dispoauftraege/{dispoOrder}/spotverteilung.xlsx', [DispoOrderController::class, 'exportSpotDistribution'])

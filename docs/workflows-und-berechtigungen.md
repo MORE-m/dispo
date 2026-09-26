@@ -43,6 +43,16 @@ flowchart TD
 Übernahme erzeugt einen Snapshot. Änderungen fließen nicht zurück (`STD-005`).
 Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
+### Implementierter Slice BL-P4-03a / PO-BLP403A-1
+
+- Nur Spot Classic Average; andere Methoden/Komponenten serverseitig abgewiesen.
+- Published immutable; paralleler Draft erlaubt; Publish archiviert vorherige
+  Published atomar (Lock + Konkurrenz über `lock_version`).
+- Übernahme: Vertrieb/Admin/GF; Kunde Freitext Pflicht, Agentur optional
+  (CRM-001 später). PM verwaltet Vorlagen ohne Calc-/Dispo-/Übernahme-Recht.
+- Isolation: Frozen Materialization bei Publish; Adopt ohne
+  `CalculationWriter::create()`-Live-Bindung.
+
 ## Vier-Augen-Prinzip
 
 Der Ersteller eines Dispoauftrags darf den eigenen Auftrag niemals genehmigen
