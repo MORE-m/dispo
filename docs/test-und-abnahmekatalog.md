@@ -170,13 +170,17 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 ### BL-P9-01c (Dyn-Feld-Dateien / PO-BLP901C-1)
 
 - Dynamisches Datei-Feld am Dispoauftrag; Upload erscheint in zentraler Liste als
-  „Dynamisches Feld“ mit Feldlabel
+  „Dynamisches Feld“ mit Feldlabel (+ Positionsbezug)
 - Ersetzen: zwei Zeilen (eine archiviert); Admin-Archiv: Feld leer, Eintrag archiviert
-- Rollen Upload wie 9-01b; PM weder UI noch POST (403)
-- Feature/Vitest; E2E `npm run test:e2e:blp901c` (Port **8042**,
+- Rollen Upload wie 9-01b; ProductManagement POST **403**; gesperrter Status **422**
+- Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901c` (Port **8042**,
   `E2EDynamicFieldUploadSeeder`)
-- Umsetzung auf Feature-Branch; Merge/manuelle Abnahme ausstehend
-- UPL-004 **ERFÜLLT** nach 01c-Abnahme; `BL-P9-01` geschlossen (Abnahme offen)
+- PR **#86**; Smoke-HEAD `f1140a6b76335fa5d296e976409cbb29323d58ed` (CI `36240049854`); Docs-Nachzug auf Feature-Branch
+- Browser-Smoke Port **8042** / `e2e-bl-p9-01c.sqlite`: **BESTANDEN** (Fälle 1–7)
+  - Fixes im Smoke: Pflicht-UI für `file` ausgeblendet; Blockliste um
+    `application/vnd.microsoft.portable-executable` ergänzt
+- Formale PO-Abnahme: **offen** (Checkbox bis zur Freigabe)
+- UPL-004 **ERFÜLLT** nach formaler 01c-Abnahme; `BL-P9-01` geschlossen nach Merge
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 

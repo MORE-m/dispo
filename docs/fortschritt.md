@@ -1,26 +1,28 @@
 # Fortschritt V1
 
 Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
-(PO-BLP901C-1) **umgesetzt auf Feature-Branch**; Merge und manuelle Abnahme
-ausstehend. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD
-`0adacb3…`, PR **#82**).
+(PO-BLP901C-1) **umgesetzt**; Browser-Smoke Port **8042** **bestanden**
+(Smoke-HEAD `f1140a6…`, CI `36240049854`); Docs-Nachzug auf PR **#86**.
+**Formale PO-Abnahme und Merge** ausstehend. **BL-P9-01b** (PO-BLP901B-1)
+manuell abgenommen (Feature-HEAD `0adacb3…`, PR **#82**).
 
 ## Aktuelle Phase
 
 Phase 9 / **`BL-P9-01`** nach **`BL-P9-01a`** + **`BL-P9-01b`** + **`BL-P9-01c`**
-(01c: Umsetzung auf Feature-Branch, Abnahme offen). `BL-P8-02` **ERLEDIGT**.
+(01c: Smoke bestanden, formale Abnahme/Merge offen). `BL-P8-02` **ERLEDIGT**.
 UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
-UPL-004 nach 01c-Abnahme **ERFÜLLT**.
+UPL-004 nach formaler 01c-Abnahme **ERFÜLLT**.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01c** Merge + manuelle Abnahme (PO-BLP901C-1). Kein automatisches
+**BL-P9-01c** formale PO-Abnahme + Merge (PO-BLP901C-1). Kein automatisches
 BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P9-01c** dynamische Dispo-Datei-Felder in zentraler Uploadliste (Feature-Branch;
-Playwright Port **8042**). Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
+Playwright Port **8042**; manueller Smoke Port **8042** bestanden). Davor:
+**BL-P9-01b** manuell abgenommen (Port **8041**).
 
 ## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
 
@@ -30,12 +32,18 @@ Playwright Port **8042**). Davor: **BL-P9-01b** manuell abgenommen (Port **8041*
 | Optionale Dispo-Datei-Felder (`applies_to=dispo_order`); kein Calc-Upload | **umgesetzt** |
 | `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field` | **umgesetzt** |
 | `value_json` `{"upload_id": int}`; Replace historisiert; Admin-Archiv ≠ Replace | **umgesetzt** |
-| Kein `require_field`; keine Freigabeinvalidierung | **umgesetzt** |
+| Kein `require_field` / keine Pflicht-UI für `file`; keine Freigabeinvalidierung | **umgesetzt** |
 | Rollen/Status wie Material (PM NEIN) | **umgesetzt** |
 | Unit/Feature/Vitest/Playwright Port **8042** | **umgesetzt** |
-| UPL-004 | **ERFÜLLT nach Abnahme** |
-| `BL-P9-01` insgesamt | **umgesetzt** (01c Abnahme offen) |
-| Merge / manuelle Abnahme | **ausstehend** |
+| Smoke-HEAD (Code) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
+| CI Smoke-HEAD | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Docs-Nachzug | PR **#86** Feature-Branch (docs-only Commit) |
+| CI Docs-Nachzug | nach Push auf den finalen Docs-HEAD |
+| Browser-Smoke Port **8042** | **BESTANDEN** (Fälle 1–7; zwei Fixes vor Abschluss) |
+| Formale PO-Abnahme | **offen** |
+| UPL-004 | **ERFÜLLT nach formaler Abnahme** |
+| `BL-P9-01` insgesamt | **umgesetzt** (01c formale Abnahme/Merge offen) |
+| Merge `main` | **ausstehend** (PR **#86**) |
 | Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)

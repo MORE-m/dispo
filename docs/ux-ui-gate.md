@@ -12,7 +12,7 @@
   + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
   + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**
   + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**
-  + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – umgesetzt auf Feature-Branch; Merge/manuelle Abnahme ausstehend)
+  + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – umgesetzt; Smoke Port **8042** bestanden; formale Abnahme/Merge ausstehend)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
@@ -20,9 +20,10 @@
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
 - **Hinweis Stand 26.09.2026 (PO-BLP901C-1):** zusätzlich freigegeben (dieser
   Slice) sind **optionale** Dispo-Datei-Dynamikfelder (`applies_to=dispo_order`,
-  Header/Position) in zentraler Uploadliste (UPL-004 Rest). Umsetzung auf
-  Feature-Branch; **Merge und manuelle Abnahme ausstehend**. **Nicht** freigegeben:
-  allgemeine Kommentare, Notifications, Freigabeinvalidierung, sonstiger Gate-D-Rest.
+  Header/Position) in zentraler Uploadliste (UPL-004 Rest). Umsetzung + Smoke
+  Port **8042** bestanden (PR **#86**, HEAD `159427b…`); **formale PO-Abnahme
+  und Merge ausstehend**. **Nicht** freigegeben: allgemeine Kommentare,
+  Notifications, Freigabeinvalidierung, sonstiger Gate-D-Rest.
 - **Hinweis Stand 25.09.2026 (PO-BLP901B-1):** feste Materialuploads + Audio
   (UPL-007, UPL-005 fest, zentrale Liste erweitert); manuell abgenommen PR **#82**.
 - **Hinweis Stand 25.09.2026 (PO-BLP901A-1):** zusätzlich freigegeben und
@@ -368,13 +369,14 @@ Ausschließlich freigegeben für diesen Slice:
 - UPL-007 vollständig; UPL-005 für feste Kategorien vollständig
 
 **Product-Owner-Teilfreigabe (26. September 2026, UX-GATE-D / BL-P9-01c / PO-BLP901C-1):**
-Ausschließlich freigegeben für diesen Slice (Umsetzung auf Feature-Branch;
-Merge/manuelle Abnahme ausstehend):
+Ausschließlich freigegeben für diesen Slice (Umsetzung + Smoke Port **8042**
+bestanden; formale PO-Abnahme/Merge ausstehend):
 
 - optionale Datei-Dynamikfelder nur am **Dispoauftrag** (`applies_to=dispo_order`,
   Feldtyp `file`; kein Kalkulations-Upload in 01c)
 - **E1:** Header- und Positions-Datei-Felder im Dispo-Snapshot; kein `both`
 - **E2:** strikt optional – kein `require_field`, kein `required_override=true`
+  (Admin-UI bietet Pflicht für `file` nicht an)
 - **E3:** Wert in `value_json` kanonisch `{"upload_id": int}` oder leer
 - **E4:** Kategorie `dynamic_field` in zentraler Uploadliste inkl. Feldlabel-Snapshot
 - **E5:** Nutzer-Ersetzen historisiert Vorgänger (Audit `reason=replace`) –
@@ -382,7 +384,9 @@ Merge/manuelle Abnahme ausstehend):
 - **E6:** Upload-Rollen/-Status wie Material (Sales/Disposition/Admin/Management;
   ProductManagement NEIN; Draft + operativ laut 9-01b-Matrix)
 - **E7:** keine Freigabeinvalidierung; kein Status-Automatismus
-- UPL-004 **vollständig** nach Abnahme dieses Slices
+- UPL-004 **vollständig** nach formaler Abnahme dieses Slices
+- Smoke-Nachzug: PE-MIME `application/vnd.microsoft.portable-executable` in
+  globaler Blockliste (auch bei Feld-Allowlist)
 
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 

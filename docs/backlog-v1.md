@@ -563,27 +563,34 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01c – Dyn-Feld-Dateien in Uploadliste (PO-BLP901C-1)
 
 - **Phase:** 9
-- **Status:** **umgesetzt auf Feature-Branch**; Merge/manuelle Abnahme ausstehend
+- **Status:** **umgesetzt**; Browser-Smoke Port **8042** bestanden;
+  formale PO-Abnahme + Merge ausstehend (PR **#86**)
 - **Kennung:** PO-BLP901C-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01c
 - **Anforderungen:** `UPL-004` (Rest), `UPL-006` (unverändert)
 - **Abhängigkeiten:** BL-P9-01a, BL-P9-01b
 - **Ergebnis:** `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`;
   optionale Dispo-Datei-Felder (`applies_to=dispo_order`); `value_json`
   `{"upload_id": int}`; Ersetzen historisiert; Admin-Archiv löscht Referenz;
-  zentrale Liste mit Feldlabel
+  zentrale Liste mit Feldlabel (+ Positionsbezug)
 - **Rollen Upload:** wie 9-01b (Sales/Disposition/Admin/Management; PM NEIN)
-- **Fachvertrag:** kein `require_field`; kein Calc-Datei-Upload; keine
-  Freigabeinvalidierung; Replace ≠ Admin-Archiv (E1–E7)
-- **UPL-Status nach Slice:** UPL-004 **ERFÜLLT** (nach Abnahme); UPL-006 weiter
+- **Fachvertrag:** kein `require_field` / keine Pflicht-UI für `file`; kein
+  Calc-Datei-Upload; keine Freigabeinvalidierung; Replace ≠ Admin-Archiv (E1–E7)
+- **UPL-Status nach Slice:** UPL-004 **ERFÜLLT** (nach formaler Abnahme);
+  UPL-006 weiter (Blockliste inkl. PE-MIME)
 - **Bewusst nicht:** Kalkulations-Dateifelder; CMT-001; Notifications;
   Freigabeinvalidierung
-- **Tests:** `DispoOrderDynamicFieldUploadTest`; Vitest Schema-File-Fields +
+- **Tests:** `DispoOrderDynamicFieldUploadTest` (+ MySQL); Vitest Schema-File-Fields +
   Uploadliste; Playwright Port **8042** (`test:e2e:blp901c`)
+- **Smoke-HEAD / CI:** `f1140a6b76335fa5d296e976409cbb29323d58ed` /
+  Run `36240049854` SUCCESS
+- **Docs-Nachzug:** PR **#86** Feature-Branch (docs-only)
+- **Browser-Smoke:** Port **8042** / `e2e-bl-p9-01c.sqlite` Fälle 1–7 bestanden
+  (inkl. Fixes Pflicht-UI + PE-Blockliste)
 
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **umgesetzt** (`BL-P9-01a`–`c` auf Feature-Branch; 01c Abnahme offen)
+- **Status:** **umgesetzt** (`BL-P9-01a`–`c`; 01c formale Abnahme/Merge offen)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
