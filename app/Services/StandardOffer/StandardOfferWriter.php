@@ -110,7 +110,15 @@ final class StandardOfferWriter
             $locked->save();
 
             $offer = StandardOffer::query()->whereKey($locked->standard_offer_id)->lockForUpdate()->firstOrFail();
-            $offer->title = $title;
+            // Offer-Titel bleibt die sichtbare Published-Fassade für Vertrieb,
+            // solange eine veröffentlichte Version existiert (PO-BLP403A-1).
+            $hasPublished = StandardOfferVersion::query()
+                ->where('standard_offer_id', $offer->id)
+                ->where('status', StandardOfferVersionStatus::Published->value)
+                ->exists();
+            if (! $hasPublished) {
+                $offer->title = $title;
+            }
             $offer->lock_version = $offer->lock_version + 1;
             $offer->save();
 
@@ -160,12 +168,13 @@ final class StandardOfferWriter
             $version->standard_offer_id = $lockedOffer->id;
             $version->version_number = $maxVersion + 1;
             $version->status = StandardOfferVersionStatus::Draft;
-            $version->title = $lockedOffer->title;
+            $version->title = $published->title;
             $version->author_id = $user->id;
             $version->draft_payload = $draftPayload;
             $version->lock_version = 1;
             $version->save();
 
+            // Offer-Titel bleibt die Published-Fassade; Draft ändert ihn nicht.
             $lockedOffer->lock_version = $lockedOffer->lock_version + 1;
             $lockedOffer->save();
 
@@ -208,7 +217,6 @@ final class StandardOfferWriter
             }
 
             $before = $this->versionSnapshot($locked);
-            $locked->title = $offer->title;
             $locked->status = StandardOfferVersionStatus::Published;
             $locked->published_at = now();
             $locked->author_id = $user->id;
@@ -218,6 +226,8 @@ final class StandardOfferWriter
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
+            // Erst mit Publish wird der Offer-Titel zur neuen Published-Fassade.
+            $offer->title = $locked->title;
             $offer->lock_version = $offer->lock_version + 1;
             $offer->save();
 
@@ -657,6 +667,8 @@ final class StandardOfferWriter
     }
 
     /**
+     * AUD-001: nachvollziehbare Old/New inkl. Entwurfsinhalt (Positionen/Mengen).
+     *
      * @return array<string, mixed>
      */
     private function versionSnapshot(StandardOfferVersion $version): array
@@ -672,6 +684,7 @@ final class StandardOfferWriter
             'archived_at' => $version->archived_at?->toIso8601String(),
             'configuration_snapshot_id' => $version->configuration_snapshot_id,
             'lock_version' => $version->lock_version,
+            'draft_payload' => $version->draft_payload,
         ];
     }
 }

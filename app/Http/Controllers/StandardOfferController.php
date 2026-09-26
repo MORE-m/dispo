@@ -116,10 +116,16 @@ class StandardOfferController extends Controller
             abort(403);
         }
 
+        $versionsForUi = $canManage
+            ? $standardOffer->versions
+            : $standardOffer->versions->filter(
+                fn (StandardOfferVersion $row): bool => $row->status === StandardOfferVersionStatus::Published,
+            )->values();
+
         return Inertia::render('standard-offers/show', [
             'offer' => $this->offerSummary($standardOffer, $canManage),
-            'version' => $this->versionDetail($version),
-            'versions' => $standardOffer->versions->map(fn (StandardOfferVersion $row): array => [
+            'version' => $this->versionDetail($version, $canManage),
+            'versions' => $versionsForUi->map(fn (StandardOfferVersion $row): array => [
                 'id' => $row->id,
                 'version_number' => $row->version_number,
                 'status' => $row->status->value,
@@ -344,23 +350,37 @@ class StandardOfferController extends Controller
         $published = $offer->publishedVersion;
         $draft = $offer->draftVersion;
 
+        // Vertrieb sieht ausschließlich die Published-Fassade (Titel/Version).
+        // Draft-Titel darf die sichtbaren Published-Daten nicht überschreiben.
+        $visibleTitle = $published !== null ? $published->title : $offer->title;
+
         return [
             'id' => $offer->id,
             'number' => $offer->number,
-            'title' => $offer->title,
+            'title' => $visibleTitle,
             'lock_version' => $offer->lock_version,
             'published_version_id' => $published?->id,
             'published_version_number' => $published?->version_number,
             'draft_version_id' => $canManage ? $draft?->id : null,
             'has_draft' => $canManage && $draft !== null,
+            'draft_title' => $canManage ? $draft?->title : null,
         ];
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function versionDetail(StandardOfferVersion $version): array
+    private function versionDetail(StandardOfferVersion $version, bool $canManage): array
     {
+        $draftPayload = $version->draft_payload;
+        // Vertrieb: Inhalt nur aus Frozen Published-Stand, kein Draft-Leak.
+        if (! $canManage && $version->status === StandardOfferVersionStatus::Published) {
+            $frozen = $version->frozen_materialization;
+            $draftPayload = is_array($frozen)
+                ? ($frozen['draft_payload'] ?? $version->draft_payload)
+                : $version->draft_payload;
+        }
+
         return [
             'id' => $version->id,
             'version_number' => $version->version_number,
@@ -372,7 +392,7 @@ class StandardOfferController extends Controller
             'published_at' => $version->published_at?->timezone('Europe/Berlin')->toIso8601String(),
             'archived_at' => $version->archived_at?->timezone('Europe/Berlin')->toIso8601String(),
             'lock_version' => $version->lock_version,
-            'draft_payload' => $version->draft_payload,
+            'draft_payload' => $draftPayload,
             'frozen_summary' => is_array($version->frozen_materialization)
                 ? [
                     'nn_invest' => $version->frozen_materialization['nn_invest'] ?? null,
@@ -380,7 +400,7 @@ class StandardOfferController extends Controller
                     'position_count' => count($version->frozen_materialization['positions'] ?? []),
                 ]
                 : null,
-            'is_editable' => $version->status->isEditable(),
+            'is_editable' => $canManage && $version->status->isEditable(),
             'is_adoptable' => $version->status->isAdoptable(),
         ];
     }

@@ -10,6 +10,7 @@ use App\Models\PriceListItem;
 use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
+use App\Services\Calculation\CalculationWriter;
 use App\Services\StandardOffer\StandardOfferWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
@@ -206,6 +207,149 @@ class StandardOfferBlP403aTest extends TestCase
             ->get(route('standard-offers.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('standard-offers/index'));
+    }
+
+    public function test_parallel_draft_does_not_change_sales_published_face(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $offer = $this->createPublishedOffer($catalog, $pm);
+        $published = $offer->publishedVersion;
+        $this->assertNotNull($published);
+        $publishedTitle = $published->title;
+        $publishedSpotCount = (int) ($published->frozen_materialization['positions'][0]['total_spot_count'] ?? 0);
+
+        $draft = $this->writer()->createDraftFromPublished($offer->fresh(), $pm);
+        $payload = $draft->draft_payload ?? [];
+        $payload['positions'][0]['total_spot_count'] = 77;
+        $payload['positions'][0]['time_ranges'][0]['spot_count'] = 77;
+        $this->writer()->updateDraft(
+            $draft,
+            'DRAFT-TITEL-ABWEICHEND',
+            $payload,
+            (int) $draft->lock_version,
+            $pm,
+        );
+
+        $offer->refresh()->load(['publishedVersion', 'draftVersion']);
+        $this->assertSame($publishedTitle, $offer->title);
+        $this->assertSame('DRAFT-TITEL-ABWEICHEND', $offer->draftVersion?->title);
+        $this->assertSame($publishedTitle, $offer->publishedVersion?->title);
+
+        $this->actingAs($sales)->get(route('standard-offers.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('standard-offers/index')
+                ->where('canManage', false)
+                ->has('offers', 1)
+                ->where('offers.0.title', $publishedTitle)
+                ->where('offers.0.published_version_id', $published->id)
+                ->where('offers.0.draft_version_id', null)
+                ->where('offers.0.has_draft', false));
+
+        $this->actingAs($sales)->get(route('standard-offers.show', [
+            'standardOffer' => $offer,
+        ]))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('standard-offers/show')
+                ->where('offer.title', $publishedTitle)
+                ->where('version.id', $published->id)
+                ->where('version.title', $publishedTitle)
+                ->where('version.status', StandardOfferVersionStatus::Published->value)
+                ->has('versions', 1)
+                ->where('versions.0.id', $published->id)
+                ->where(
+                    'version.draft_payload.positions.0.total_spot_count',
+                    $publishedSpotCount,
+                ));
+    }
+
+    public function test_draft_content_change_is_audited_with_old_and_new_values(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $offer = $this->writer()->create('Audit Vorlage', $this->draftPayload($catalog), $pm);
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+
+        $payload = $draft->draft_payload ?? [];
+        $this->assertSame(10, (int) ($payload['positions'][0]['total_spot_count'] ?? 0));
+        $payload['positions'][0]['total_spot_count'] = 42;
+        $payload['positions'][0]['time_ranges'][0]['spot_count'] = 42;
+
+        $this->writer()->updateDraft(
+            $draft,
+            $draft->title,
+            $payload,
+            (int) $draft->lock_version,
+            $pm,
+        );
+
+        $audit = AuditEvent::query()
+            ->where('action', 'standard_offer.version.updated')
+            ->where('auditable_type', StandardOfferVersion::class)
+            ->where('auditable_id', $draft->id)
+            ->latest('id')
+            ->first();
+
+        $this->assertNotNull($audit);
+        $this->assertIsArray($audit->old_values);
+        $this->assertIsArray($audit->new_values);
+        $this->assertSame(10, (int) ($audit->old_values['draft_payload']['positions'][0]['total_spot_count'] ?? 0));
+        $this->assertSame(42, (int) ($audit->new_values['draft_payload']['positions'][0]['total_spot_count'] ?? 0));
+        $this->assertNotSame(
+            $audit->old_values['lock_version'] ?? null,
+            $audit->new_values['lock_version'] ?? null,
+        );
+    }
+
+    public function test_adopt_then_calculation_writer_update_recalculates_without_mutating_template(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $offer = $this->createPublishedOffer($catalog, $pm);
+        $published = $offer->publishedVersion;
+        $this->assertNotNull($published);
+
+        $nnBefore = (string) ($published->frozen_materialization['nn_invest'] ?? '');
+        $spotBefore = (int) ($published->frozen_materialization['positions'][0]['total_spot_count'] ?? 0);
+        $priceListId = (int) ($published->frozen_materialization['positions'][0]['price_list_id'] ?? 0);
+        $this->assertGreaterThan(0, $spotBefore);
+        $this->assertGreaterThan(0, $priceListId);
+
+        $calculation = $this->writer()->adopt($published, 'Kunde Update', null, null, $sales);
+        $calcWriter = app(CalculationWriter::class);
+        $payload = $calcWriter->payloadFromCalculation($calculation->fresh([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'orderDiscounts',
+            'configurationSnapshot',
+            'fieldValues',
+        ]));
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'][0]['total_spot_count'] = 25;
+        if (isset($payload['positions'][0]['time_ranges'][0])) {
+            $payload['positions'][0]['time_ranges'][0]['spot_count'] = 25;
+        }
+
+        $updated = $calcWriter->update($calculation->fresh(), $payload, $sales);
+        $updatedPosition = $updated->positions()->firstOrFail();
+
+        $this->assertSame(25, (int) $updatedPosition->total_spot_count);
+        $this->assertSame($priceListId, (int) $updatedPosition->price_list_id);
+        $this->assertNotSame($nnBefore, (string) $updated->nn_invest);
+        $this->assertSame($published->id, $updated->origin_standard_offer_version_id);
+
+        $publishedAfter = $published->fresh();
+        $this->assertSame(
+            $spotBefore,
+            (int) ($publishedAfter->frozen_materialization['positions'][0]['total_spot_count'] ?? 0),
+        );
+        $this->assertSame($nnBefore, (string) ($publishedAfter->frozen_materialization['nn_invest'] ?? ''));
+        $this->assertSame(StandardOfferVersionStatus::Published, $publishedAfter->status);
     }
 
     /**
