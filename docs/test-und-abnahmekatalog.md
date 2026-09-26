@@ -196,11 +196,23 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Pflichtnotiz `question`/`answer` (trim, max 2000); stale lock 409
 - Append-only `dispo_order_comments` (CMT-003; CMT-002 für diese Typen);
   StatusEvents + Audit atomar; ein offener Zyklus
-- UI: Ask/Answer-Dialoge + Kommunikationshistorie; keine allgemeine Comment-UI
-- **Nicht** enthalten: CMT-001, NOT-001/NOT-002, Uploads, Completed/Cancelled
+- UI: Ask/Answer-Dialoge + Kommunikationshistorie; allgemeine Comment-UI folgt BL-P9-02a
+- **Nicht** enthalten damals: CMT-001, NOT-001/NOT-002, Uploads, Completed/Cancelled
 - Unit/Feature/MySQL/Vitest; E2E `npm run test:e2e:blp802b` (Port **8036**)
 - Manuelle Abnahme: **noch offen** (separater Browsertest)
 - `BL-P8-02` insgesamt **teilweise**
+
+### BL-P9-02a (allgemeine Kommentare / PO-BLP902A-1)
+
+- Typ `general` in `dispo_order_comments`; Create `POST …/kommentare`
+- Rollen: Dispo-View (Admin/Sales/Disposition/Management); PM nur mit
+  `can_view_dispo_orders`; Gast/PM ohne Flag 401/403
+- Schreiben in allen 11 Statusen; kein Status-/Lock-/Freigabe-Effekt
+- Textlimit 2000; CMT-002 Unveränderbarkeit; Audit `dispo_order.comment.created`
+- Gemischte Historie mit Rückfrage/Antwort
+- **Nicht** enthalten: NOT-001/NOT-002, Outbox, Mail, In-App
+- Feature `DispoOrderGeneralCommentTest`; Vitest Historie/Formular;
+  E2E `npm run test:e2e:blp902a` (Port **8043**, `e2e-bl-p9-02a.sqlite`)
 
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 

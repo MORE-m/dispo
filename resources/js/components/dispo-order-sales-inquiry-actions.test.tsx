@@ -284,4 +284,38 @@ describe('DispoOrderCommunicationHistory', () => {
             ),
         ).toHaveClass('break-words');
     });
+
+    it('renders general comments and comment form when allowed', () => {
+        render(
+            <DispoOrderCommunicationHistory
+                orderId={42}
+                canAddComment
+                entries={[
+                    {
+                        id: 9,
+                        type: 'general',
+                        type_label: 'Kommentar',
+                        body: 'Allgemeiner Hinweis',
+                        created_by_name: 'Vertrieb',
+                        created_at: '2026-09-26T10:00:00+00:00',
+                        parent_id: null,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByTestId('communication-entry-9')).toHaveAttribute(
+            'data-type',
+            'general',
+        );
+        expect(screen.getByTestId('dispo-order-comment-form')).toBeInTheDocument();
+        expect(screen.getByTestId('dispo-order-comment-submit')).toBeDisabled();
+    });
+
+    it('hides form without canAddComment and shows empty history as null', () => {
+        const { container } = render(
+            <DispoOrderCommunicationHistory entries={[]} canAddComment={false} />,
+        );
+        expect(container).toBeEmptyDOMElement();
+    });
 });

@@ -222,6 +222,15 @@ class DispoOrderPolicy
     }
 
     /**
+     * Allgemeinen Kommentar schreiben (BL-P9-02a / CMT-001).
+     * Alle Nutzer mit Dispo-Ansicht (inkl. PM mit Extra-Recht); alle Status.
+     */
+    public function addComment(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $this->view($user, $dispoOrder);
+    }
+
+    /**
      * Rückfrage an Vertrieb stellen (BL-P8-02b / PO-BLP802B-1).
      */
     public function askSalesInquiry(User $user, DispoOrder $dispoOrder): bool

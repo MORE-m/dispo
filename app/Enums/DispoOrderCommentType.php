@@ -4,12 +4,14 @@ namespace App\Enums;
 
 enum DispoOrderCommentType: string
 {
+    case General = 'general';
     case SalesInquiry = 'sales_inquiry';
     case SalesInquiryResponse = 'sales_inquiry_response';
 
     public function label(): string
     {
         return match ($this) {
+            self::General => 'Kommentar',
             self::SalesInquiry => 'Rückfrage',
             self::SalesInquiryResponse => 'Antwort',
         };

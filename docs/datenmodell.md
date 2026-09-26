@@ -411,15 +411,16 @@ Audio-Längen-/Motiv-/Positions-Spalten. Autorisierter Stream-Endpoint nur für
 - Rückkehr ausschließlich → `Liegt bei Disposition` über Answer-Endpunkt
 
 Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
-`created_by_*`, optional `parent_id` Antwort→Frage). Typen jetzt:
-`sales_inquiry`, `sales_inquiry_response`. Allgemeine freie Kommentare
-(`CMT-001`) sind modellseitig vorbereitet, aber **nicht** freigeschaltet
-(keine allgemeine Comment-UI/API).
+`created_by_*`, optional `parent_id` Antwort→Frage). Typen:
+`general` (**BL-P9-02a**), `sales_inquiry`, `sales_inquiry_response`.
+Schreiben allgemeiner Kommentare in allen Statusen; kein Statuswechsel.
+Produktmanagement: Dispo-View nur mit Extra-Recht `users.can_view_dispo_orders`
+(AUTH-007); kein Kalkulationszugang über dieses Flag.
 
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- allgemeine Kommentare.
+- Notifications / Outbox (`NOT-*`, BL-P1-05).
 
 ## Dynamische Daten
 
@@ -629,12 +630,13 @@ Kundenkalkulationen oder Dispoaufträge (`AUTH-007`).
 - `Approval`: Typ, Status, Anforderer, Entscheider, Zeitpunkt, Begründung und Grundlage.
 - `StatusEvent` (**BL-P8-02a umgesetzt** als `dispo_order_status_events`): alter/neuer
   Status, Person, Zeit, optionale Begründung; Wiederöffnung markiert (`is_reopen`).
-- `Comment`: append-only, Autor und Zeit (**noch nicht umgesetzt**).
+- `Comment`: append-only, Autor und Zeit (**BL-P8-02b** Rückfrage/Antwort;
+  **BL-P9-02a** Typ `general`).
 - `QuestionThread` oder strukturierte Ereignisverknüpfung für Rückfrage/Antwort
-  (**noch nicht umgesetzt**).
+  (**umgesetzt** über `parent_id` an `dispo_order_comments`).
 - `AuditEvent`: Objekt, Aktion, alte/neue Werte, Benutzer, Kontext und Korrelations-ID.
 - `Notification`: Kanal, Empfänger, Status, Wiederholungen und Fehler
-  (**noch nicht umgesetzt**).
+  (**noch nicht umgesetzt**; Outbox für späteren Notification-Slice vorgesehen).
 
 ## Dateien
 

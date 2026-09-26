@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 /**
- * Append-only Kommunikationsfundament (BL-P8-02b / CMT-003).
- * Allgemeine freie Kommentare (CMT-001) sind hier noch nicht freigeschaltet.
+ * Append-only Kommunikationsfundament (BL-P8-02b / CMT-003; BL-P9-02a / CMT-001).
+ * Typen: general, sales_inquiry, sales_inquiry_response. Unveränderbar (CMT-002).
  *
  * @property int $id
  * @property int $dispo_order_id

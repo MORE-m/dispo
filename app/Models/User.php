@@ -18,12 +18,13 @@ use Illuminate\Support\Carbon;
  * @property Role $role
  * @property string|null $discount_limit_percent
  * @property bool $can_special_approve
+ * @property bool $can_view_dispo_orders Extra-Recht Dispo-Ansicht (AUTH-007 / BL-P9-02a); öffnet keinen Kalkulationszugang
  * @property string $password
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'role', 'discount_limit_percent', 'can_special_approve'])]
+#[Fillable(['name', 'email', 'password', 'role', 'discount_limit_percent', 'can_special_approve', 'can_view_dispo_orders'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -40,6 +41,7 @@ class User extends Authenticatable
             'role' => Role::class,
             'discount_limit_percent' => 'decimal:4',
             'can_special_approve' => 'boolean',
+            'can_view_dispo_orders' => 'boolean',
         ];
     }
 
@@ -78,14 +80,23 @@ class User extends Authenticatable
         );
     }
 
+    /**
+     * Dispo-Ansicht: Kernrollen immer; Produktmanagement nur mit Extra-Recht
+     * {@see $can_view_dispo_orders} (AUTH-007 / CMT-001 Auslegung BL-P9-02a).
+     * Öffnet keinen Zugang zu Kundenkalkulationen ({@see canAccessCalculations}).
+     */
     public function canViewDispoOrders(): bool
     {
-        return $this->hasAnyRole(
+        if ($this->hasAnyRole(
             Role::Admin,
             Role::Sales,
             Role::Disposition,
             Role::Management,
-        );
+        )) {
+            return true;
+        }
+
+        return $this->hasRole(Role::ProductManagement) && $this->can_view_dispo_orders;
     }
 
     public function canManageDispoOrders(): bool

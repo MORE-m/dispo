@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DispoOrderStatus;
+use App\Http\Requests\DispoOrder\AddDispoOrderCommentRequest;
 use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
 use App\Http\Requests\DispoOrder\ArchiveDispoOrderUploadRequest;
@@ -36,6 +37,7 @@ use App\Services\DispoOrder\DispoOrderCompletedReopenService;
 use App\Services\DispoOrder\DispoOrderCompletionReadiness;
 use App\Services\DispoOrder\DispoOrderCompletionService;
 use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
+use App\Services\DispoOrder\DispoOrderGeneralCommentService;
 use App\Services\DispoOrder\DispoOrderInvoiceEndService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
@@ -65,6 +67,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderApprovalService $approvals,
         private readonly DispoOrderOperationalStatusService $operationalStatus,
         private readonly DispoOrderSalesInquiryService $salesInquiry,
+        private readonly DispoOrderGeneralCommentService $generalComments,
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
         private readonly DispoOrderUploadService $uploads,
         private readonly DispoOrderInvoiceEndService $invoiceEnd,
@@ -169,6 +172,7 @@ class DispoOrderController extends Controller
         $canAnswerSalesInquiry = ($user?->can('answerSalesInquiry', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::SalesInquiry
             && $openSalesInquiry !== null;
+        $canAddComment = $user?->can('addComment', $dispoOrder) ?? false;
         $canUpdateInvoiceEndMonths = ($user?->can('updateInvoiceEndMonths', $dispoOrder) ?? false)
             && DispoOrderStatusTransition::isInvoiceEndEditable($dispoOrder->status);
         $canComplete = ($user?->can('complete', $dispoOrder) ?? false)
@@ -220,6 +224,7 @@ class DispoOrderController extends Controller
             'operationalStatusTargets' => $operationalTargets,
             'canAskSalesInquiry' => $canAskSalesInquiry,
             'canAnswerSalesInquiry' => $canAnswerSalesInquiry,
+            'canAddComment' => $canAddComment,
             'openSalesInquiry' => $openSalesInquiry !== null
                 ? $this->serializeComment($openSalesInquiry)
                 : null,
@@ -665,6 +670,36 @@ class DispoOrderController extends Controller
             $request,
             $order,
             'Rückfrage beantwortet. Status: Liegt bei Disposition.',
+        );
+    }
+
+    public function addComment(
+        AddDispoOrderCommentRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->generalComments->add(
+            $dispoOrder,
+            $user,
+            $request->body(),
+        );
+
+        $order = $dispoOrder->fresh([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+            'statusEvents',
+            'comments',
+        ]);
+
+        return $this->respondSuccess(
+            $request,
+            $order ?? $dispoOrder,
+            'Kommentar hinzugefügt.',
         );
     }
 

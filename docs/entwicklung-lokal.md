@@ -415,6 +415,20 @@ E2E: `npm run test:e2e:blp802b` bzw.
 `database/e2e-bl-p8-02b.sqlite`, Seeder `E2ESalesInquirySeeder` – niemals
 Dev-DB `dispo`).
 
+## BL-P9-02a – Allgemeine Kommentare
+
+Migration `users.can_view_dispo_orders` (Extra-Recht AUTH-007). Typ `general`
+in `DispoOrderCommentType`. Service `DispoOrderGeneralCommentService`.
+Endpunkt `POST …/kommentare`.
+
+Tests: `DispoOrderGeneralCommentTest`; Vitest Kommunikationshistorie/Formular;
+Regression `DispoOrderSalesInquiryTest`.
+
+E2E: `npm run test:e2e:blp902a` bzw.
+`npx playwright test -c playwright.blp902a.config.ts` (Port **8043**, DB
+`database/e2e-bl-p9-02a.sqlite`, Seeder `E2EGeneralCommentSeeder` – niemals
+Dev-DB `dispo` / Port 8000).
+
 ## BL-P4-02d – Preisabschluss Festpreis
 
 Migration `pricing_settlement_mode` + `fixed_price_nn` auf `calculation_positions`

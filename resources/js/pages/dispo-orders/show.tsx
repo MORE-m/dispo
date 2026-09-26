@@ -352,6 +352,7 @@ export default function DispoOrderShow({
     operationalStatusTargets = [],
     canAskSalesInquiry = false,
     canAnswerSalesInquiry = false,
+    canAddComment = false,
     openSalesInquiry = null,
     canUpdateInvoiceEndMonths = false,
     canComplete = false,
@@ -384,6 +385,7 @@ export default function DispoOrderShow({
     operationalStatusTargets?: OperationalStatusTarget[];
     canAskSalesInquiry?: boolean;
     canAnswerSalesInquiry?: boolean;
+    canAddComment?: boolean;
     openSalesInquiry?: OpenSalesInquiry | null;
     canUpdateInvoiceEndMonths?: boolean;
     canComplete?: boolean;
@@ -2022,6 +2024,8 @@ export default function DispoOrderShow({
 
                 <DispoOrderCommunicationHistory
                     entries={order.communication ?? []}
+                    orderId={order.id}
+                    canAddComment={canAddComment}
                 />
 
                 <Card className="border-border/70 rounded-xl shadow-xs">

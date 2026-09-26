@@ -180,7 +180,7 @@ class DispoOrder extends Model
     }
 
     /**
-     * Append-only Kommunikationshistorie (Rückfragen/Antworten; CMT-001 später).
+     * Append-only Kommunikationshistorie (allgemeine Kommentare + Rückfragen/Antworten).
      *
      * @return HasMany<DispoOrderComment, $this>
      */
