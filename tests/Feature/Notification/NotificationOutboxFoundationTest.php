@@ -54,7 +54,14 @@ class NotificationOutboxFoundationTest extends TestCase
         ]);
 
         $row->refresh();
-        $this->assertSame(NotificationOutboxIntent::PAYLOAD_KEYS, array_keys($row->payload_json));
+        $this->assertSame(
+            NotificationOutboxIntent::PAYLOAD_KEYS,
+            array_values(array_intersect(
+                NotificationOutboxIntent::PAYLOAD_KEYS,
+                array_keys($row->payload_json),
+            )),
+        );
+        $this->assertCount(count(NotificationOutboxIntent::PAYLOAD_KEYS), $row->payload_json);
         $this->assertSame('D-2026-1-1', $row->payload_json['order_number']);
         $this->assertSame('Beispiel GmbH', $row->payload_json['customer_name']);
         $this->assertSame('Frühjahr', $row->payload_json['campaign']);
