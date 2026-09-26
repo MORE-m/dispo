@@ -32,6 +32,7 @@ type Membership = {
     is_system: boolean;
     scope?: string;
     applies_to?: string;
+    field_type?: string;
     sort: number;
     required_override: boolean | null;
     visible_override: boolean | null;
@@ -456,9 +457,12 @@ export default function FieldSetVersionEdit({
                                                     <option value="">
                                                         Standard
                                                     </option>
-                                                    <option value="1">
-                                                        Pflicht
-                                                    </option>
+                                                    {field.field_type !==
+                                                    'file' ? (
+                                                        <option value="1">
+                                                            Pflicht
+                                                        </option>
+                                                    ) : null}
                                                     <option value="0">
                                                         Optional
                                                     </option>

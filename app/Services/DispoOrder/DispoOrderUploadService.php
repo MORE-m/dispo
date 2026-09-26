@@ -77,6 +77,7 @@ final class DispoOrderUploadService
     private const BLOCKED_MIME_PREFIXES = [
         'application/x-msdownload',
         'application/x-msdos-program',
+        'application/vnd.microsoft.portable-executable',
         'application/x-executable',
         'application/x-sharedlib',
         'application/x-httpd-php',

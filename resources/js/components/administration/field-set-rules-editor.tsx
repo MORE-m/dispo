@@ -624,7 +624,13 @@ export default function FieldSetRulesEditor({
                         {writableActionTargets(
                             fieldCatalog,
                             action.field_key,
-                        ).map((field) => (
+                        )
+                            .filter(
+                                (field) =>
+                                    action.op !== 'require_field' ||
+                                    field.field_type !== 'file',
+                            )
+                            .map((field) => (
                             <option key={field.key} value={field.key}>
                                 {field.label} ({field.key}) · {field.scope}
                             </option>

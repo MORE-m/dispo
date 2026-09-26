@@ -347,6 +347,18 @@ class DispoOrderDynamicFieldUploadTest extends TestCase
             'field_key' => $definition->key,
             'file' => $exe,
         ])->assertStatus(422)->assertJsonValidationErrors('file');
+
+        $pe = UploadedFile::fake()->create(
+            'evil-pe.exe',
+            10,
+            'application/vnd.microsoft.portable-executable',
+        );
+
+        $this->postDynamicField($creator, $order->fresh(), [
+            'lock_version' => $order->fresh()->lock_version,
+            'field_key' => $definition->key,
+            'file' => $pe,
+        ])->assertStatus(422)->assertJsonValidationErrors('file');
     }
 
     public function test_blocklist_still_rejects_when_type_is_explicitly_allowlisted(): void
