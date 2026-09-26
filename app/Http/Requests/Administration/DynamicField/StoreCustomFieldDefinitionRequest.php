@@ -28,7 +28,10 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
                 FieldType::LongText,
                 FieldType::Select,
                 FieldType::MultiSelect,
+                FieldType::File,
             ])],
+            'allowed_mime_types' => ['nullable', 'array'],
+            'allowed_mime_types.*' => ['string', 'max:255'],
             'scope' => ['required', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['required', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],
@@ -50,7 +53,8 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
      *     group_key: string|null,
      *     sort_default: int,
      *     reportable: bool,
-     *     max_length: int|null
+     *     max_length: int|null,
+     *     allowed_mime_types?: list<string>|null
      * }
      */
     public function payload(): array
@@ -72,6 +76,9 @@ class StoreCustomFieldDefinitionRequest extends FormRequest
             'sort_default' => (int) ($data['sort_default'] ?? 100),
             'reportable' => (bool) ($data['reportable'] ?? false),
             'max_length' => array_key_exists('max_length', $data) ? ($data['max_length'] !== null ? (int) $data['max_length'] : null) : null,
+            'allowed_mime_types' => array_key_exists('allowed_mime_types', $data)
+                ? (is_array($data['allowed_mime_types']) ? array_values($data['allowed_mime_types']) : null)
+                : null,
         ];
     }
 }

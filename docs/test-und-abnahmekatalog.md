@@ -167,6 +167,17 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
   UPL-004 teilweise (Dyn-Feld-Dateien → BL-P9-01c); `BL-P9-01` teilweise
 
+### BL-P9-01c (Dyn-Feld-Dateien / PO-BLP901C-1)
+
+- Dynamisches Datei-Feld am Dispoauftrag; Upload erscheint in zentraler Liste als
+  „Dynamisches Feld“ mit Feldlabel
+- Ersetzen: zwei Zeilen (eine archiviert); Admin-Archiv: Feld leer, Eintrag archiviert
+- Rollen Upload wie 9-01b; PM weder UI noch POST (403)
+- Feature/Vitest; E2E `npm run test:e2e:blp901c` (Port **8042**,
+  `E2EDynamicFieldUploadSeeder`)
+- Umsetzung auf Feature-Branch; Merge/manuelle Abnahme ausstehend
+- UPL-004 **ERFÜLLT** nach 01c-Abnahme; `BL-P9-01` geschlossen (Abnahme offen)
+
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 
 - Ask-Kanten: `at_disposition|in_progress|material_missing|material_received` → `sales_inquiry`

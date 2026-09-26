@@ -4,6 +4,7 @@ namespace App\Services\DynamicField;
 
 use App\Enums\ConfigurationSnapshotSource as ConfigurationSnapshotSourceEnum;
 use App\Enums\DispoOrderStatus;
+use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Exceptions\DispoOrderConflictException;
@@ -14,11 +15,13 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderFieldValue;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
+use App\Models\DispoOrderUpload;
 use App\Models\FieldDefinition;
 use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Support\DynamicField\ChoiceFieldValueContract;
+use App\Support\DynamicField\FileFieldValueContract;
 use App\Support\DynamicField\FieldRuleDefinitionContext;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
@@ -814,6 +817,9 @@ final class DispoOrderDynamicFieldWriter
             if (! $def->required) {
                 continue;
             }
+            if ($def->field_type->isFile()) {
+                continue;
+            }
             if (! $this->isTextOrChoiceFieldType($def->field_type)) {
                 continue;
             }
@@ -840,6 +846,9 @@ final class DispoOrderDynamicFieldWriter
             $positionValues = $this->positionValuesForValidation($position, $snapshot);
             foreach ($this->positionDefinitions($snapshot, $position) as $def) {
                 if (! $def->required) {
+                    continue;
+                }
+                if ($def->field_type->isFile()) {
                     continue;
                 }
                 if (! $this->isTextOrChoiceFieldType($def->field_type)) {
@@ -929,11 +938,14 @@ final class DispoOrderDynamicFieldWriter
             ->whereIn('id', $definitionIds)
             ->pluck('is_system', 'id');
 
+        $order->loadMissing(['fieldValues', 'positions.fieldValues']);
+
         $fields = array_map(
             fn (array $entry): array => $this->mapSchemaFieldProp(
                 $entry['def'],
                 $entry['snapshot'],
                 $systemByDefinitionId,
+                $order,
             ),
             $entries,
         );
@@ -943,6 +955,7 @@ final class DispoOrderDynamicFieldWriter
             FieldType::LongText->value,
             FieldType::Select->value,
             FieldType::MultiSelect->value,
+            FieldType::File->value,
         ];
 
         $editableCustom = $this->filterCustomSchemaFields(
@@ -995,6 +1008,8 @@ final class DispoOrderDynamicFieldWriter
                     $def,
                     $positionSnapshot,
                     $systemByDefinitionId,
+                    $order,
+                    $position,
                 );
             }
 
@@ -1043,10 +1058,12 @@ final class DispoOrderDynamicFieldWriter
         SnapshotFieldDefinition $def,
         ConfigurationSnapshot $owner,
         $systemByDefinitionId,
+        ?DispoOrder $order = null,
+        ?DispoOrderPosition $position = null,
     ): array {
         $calcOrigin = $this->isCalcOriginKey($owner, $def->key);
 
-        return [
+        $prop = [
             'key' => $def->key,
             'label' => $def->label,
             'help_text' => $def->help_text,
@@ -1056,7 +1073,7 @@ final class DispoOrderDynamicFieldWriter
             'group_key' => $def->group_key,
             'applies_to' => $def->applies_to->value,
             'is_system' => (bool) ($systemByDefinitionId[$def->field_definition_id] ?? false),
-            'required' => (bool) $def->required,
+            'required' => $def->field_type->isFile() ? false : (bool) $def->required,
             'visible' => (bool) $def->visible,
             'editable' => $def->scope === FieldScope::Header
                 ? $this->isNativeEditableHeaderText($owner, $def)
@@ -1070,6 +1087,28 @@ final class DispoOrderDynamicFieldWriter
                 $def->field_type,
             ),
         ];
+
+        if ($def->field_type->isFile() && $order !== null) {
+            $stored = $def->scope === FieldScope::Header
+                ? $this->readHeaderValue($order, $def)
+                : ($position !== null ? $this->readPositionValue($position, $def) : null);
+            if (is_array($stored) && isset($stored['upload_id'])) {
+                $upload = DispoOrderUpload::query()->find((int) $stored['upload_id']);
+                if ($upload !== null && $upload->isActive()) {
+                    $prop['current_upload'] = [
+                        'id' => $upload->id,
+                        'filename' => $upload->original_filename,
+                        'download_url' => route('dispo-orders.uploads.download', [
+                            'dispoOrder' => $order->id,
+                            'upload' => $upload->id,
+                        ]),
+                        'archived' => false,
+                    ];
+                }
+            }
+        }
+
+        return $prop;
     }
 
     /**
@@ -1574,6 +1613,9 @@ final class DispoOrderDynamicFieldWriter
         if ($def->scope !== FieldScope::Header) {
             return false;
         }
+        if ($def->field_type->isFile()) {
+            return $this->isNativeEditableFileField($snapshot, $def);
+        }
         if (! $this->isTextOrChoiceFieldType($def->field_type)) {
             return false;
         }
@@ -1591,11 +1633,26 @@ final class DispoOrderDynamicFieldWriter
         if ($def->scope !== FieldScope::Position) {
             return false;
         }
+        if ($def->field_type->isFile()) {
+            return $this->isNativeEditableFileField($snapshot, $def);
+        }
         if (! $this->isTextOrChoiceFieldType($def->field_type)) {
             return false;
         }
 
         return ! $this->isCalcOriginKey($snapshot, $def->key);
+    }
+
+    private function isNativeEditableFileField(ConfigurationSnapshot $snapshot, SnapshotFieldDefinition $def): bool
+    {
+        if (! $def->field_type->isFile()) {
+            return false;
+        }
+        if ($this->isCalcOriginKey($snapshot, $def->key)) {
+            return false;
+        }
+
+        return in_array($def->applies_to, [FieldAppliesTo::DispoOrder, FieldAppliesTo::Both], true);
     }
 
     private function isTextOrChoiceFieldType(FieldType $fieldType): bool
@@ -2057,13 +2114,19 @@ final class DispoOrderDynamicFieldWriter
     {
         $row = $order->fieldValues->firstWhere('snapshot_field_definition_id', $def->id);
         if ($row === null) {
-            return $def->field_type->isChoice()
-                ? ChoiceFieldValueContract::emptyValue($def->field_type)
-                : null;
+            if ($def->field_type->isChoice()) {
+                return ChoiceFieldValueContract::emptyValue($def->field_type);
+            }
+
+            return $def->field_type->isFile() ? FileFieldValueContract::emptyValue() : null;
         }
 
         if ($def->field_type->isChoice()) {
             return ChoiceFieldValueContract::readStored($def, $row);
+        }
+
+        if ($def->field_type->isFile()) {
+            return FileFieldValueContract::readStored($def, $row);
         }
 
         ChoiceFieldValueContract::assertChoiceChannelExclusive($def, $row);
@@ -2094,13 +2157,19 @@ final class DispoOrderDynamicFieldWriter
     {
         $row = $position->fieldValues->firstWhere('snapshot_field_definition_id', $def->id);
         if ($row === null) {
-            return $def->field_type->isChoice()
-                ? ChoiceFieldValueContract::emptyValue($def->field_type)
-                : null;
+            if ($def->field_type->isChoice()) {
+                return ChoiceFieldValueContract::emptyValue($def->field_type);
+            }
+
+            return $def->field_type->isFile() ? FileFieldValueContract::emptyValue() : null;
         }
 
         if ($def->field_type->isChoice()) {
             return ChoiceFieldValueContract::readStored($def, $row);
+        }
+
+        if ($def->field_type->isFile()) {
+            return FileFieldValueContract::readStored($def, $row);
         }
 
         ChoiceFieldValueContract::assertChoiceChannelExclusive($def, $row);

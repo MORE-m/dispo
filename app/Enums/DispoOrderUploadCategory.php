@@ -16,6 +16,7 @@ enum DispoOrderUploadCategory: string
     case LayoutGraphics = 'layout_graphics';
     case EventDocuments = 'event_documents';
     case Other = 'other';
+    case DynamicField = 'dynamic_field';
 
     public function label(): string
     {
@@ -27,6 +28,7 @@ enum DispoOrderUploadCategory: string
             self::LayoutGraphics => 'Layout/Grafik',
             self::EventDocuments => 'Event-Unterlagen',
             self::Other => 'Sonstiges',
+            self::DynamicField => 'Dynamisches Feld',
         };
     }
 
@@ -82,5 +84,10 @@ enum DispoOrderUploadCategory: string
     public function isAudioMotif(): bool
     {
         return $this === self::AudioMotif;
+    }
+
+    public function isDynamicField(): bool
+    {
+        return $this === self::DynamicField;
     }
 }

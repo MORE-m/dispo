@@ -37,6 +37,7 @@ export default function DefinitionCreate({
         sort_default: defaults.sort_default ?? 100,
         reportable: defaults.reportable ?? false,
         max_length: '' as string | number,
+        allowed_mime_types: '',
     });
     const [keyTouched, setKeyTouched] = useState(false);
 
@@ -50,6 +51,7 @@ export default function DefinitionCreate({
     const isChoice =
         form.data.field_type === 'select' ||
         form.data.field_type === 'multi_select';
+    const isFile = form.data.field_type === 'file';
     const maxHint =
         form.data.field_type === 'short_text'
             ? 'Standard 255, max. 255'
@@ -95,7 +97,7 @@ export default function DefinitionCreate({
                                         ? null
                                         : data.group_key,
                             };
-                            if (choice) {
+                            if (choice || data.field_type === 'file') {
                                 delete payload.max_length;
                             } else {
                                 payload.max_length =
@@ -103,6 +105,16 @@ export default function DefinitionCreate({
                                     data.max_length === null
                                         ? null
                                         : Number(data.max_length);
+                            }
+                            if (data.field_type === 'file') {
+                                const lines = data.allowed_mime_types
+                                    .split('\n')
+                                    .map((line) => line.trim())
+                                    .filter((line) => line !== '');
+                                payload.allowed_mime_types =
+                                    lines.length > 0 ? lines : null;
+                            } else {
+                                delete payload.allowed_mime_types;
                             }
                             return payload;
                         });
@@ -152,15 +164,20 @@ export default function DefinitionCreate({
                             id="field_type"
                             className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
                             value={form.data.field_type}
-                            onChange={(e) =>
-                                form.setData('field_type', e.target.value)
-                            }
+                            onChange={(e) => {
+                                const nextType = e.target.value;
+                                form.setData('field_type', nextType);
+                                if (nextType === 'file') {
+                                    form.setData('applies_to', 'dispo_order');
+                                }
+                            }}
                             data-test="custom-field-type-select"
                         >
                             <option value="short_text">short_text</option>
                             <option value="long_text">long_text</option>
                             <option value="select">select</option>
                             <option value="multi_select">multi_select</option>
+                            <option value="file">Datei</option>
                         </select>
                     </FormField>
 
@@ -173,13 +190,18 @@ export default function DefinitionCreate({
                             id="applies_to"
                             className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
                             value={form.data.applies_to}
+                            disabled={isFile}
                             onChange={(e) =>
                                 form.setData('applies_to', e.target.value)
                             }
                         >
-                            <option value="calculation">Kalkulation</option>
+                            <option value="calculation" disabled={isFile}>
+                                Kalkulation
+                            </option>
                             <option value="dispo_order">Dispoauftrag</option>
-                            <option value="both">Beide</option>
+                            <option value="both" disabled={isFile}>
+                                Beide
+                            </option>
                         </select>
                     </FormField>
 
@@ -202,7 +224,30 @@ export default function DefinitionCreate({
                         </select>
                     </FormField>
 
-                    {!isChoice ? (
+                    {isFile ? (
+                        <FormField
+                            label="Zulässige MIME-Typen (optional)"
+                            htmlFor="allowed_mime_types"
+                            error={form.errors.allowed_mime_types}
+                            hint="Ein MIME-Typ pro Zeile, z. B. application/pdf"
+                        >
+                            <textarea
+                                id="allowed_mime_types"
+                                rows={4}
+                                value={form.data.allowed_mime_types}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'allowed_mime_types',
+                                        e.target.value,
+                                    )
+                                }
+                                className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                                data-test="custom-field-allowed-mime-types"
+                            />
+                        </FormField>
+                    ) : null}
+
+                    {!isChoice && !isFile ? (
                         <FormField
                             label="Maximallänge"
                             htmlFor="max_length"

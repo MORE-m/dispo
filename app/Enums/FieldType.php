@@ -10,9 +10,15 @@ enum FieldType: string
     case LongText = 'long_text';
     case Select = 'select';
     case MultiSelect = 'multi_select';
+    case File = 'file';
 
     public function isChoice(): bool
     {
         return $this === self::Select || $this === self::MultiSelect;
+    }
+
+    public function isFile(): bool
+    {
+        return $this === self::File;
     }
 }

@@ -37,6 +37,10 @@ export type DispoOrderUpload = {
     is_active_customer_confirmation: boolean;
     download_url: string;
     stream_url?: string | null;
+    field_key?: string | null;
+    field_label?: string | null;
+    position_id?: number | null;
+    position_label?: string | null;
 };
 
 export type ApprovalHistoryEntry = {

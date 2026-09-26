@@ -46,6 +46,11 @@ import { DispoOrderStatusBadge } from '@/components/dispo-order-status-badge';
 import { SchemaChoiceFields } from '@/components/dynamic-fields/schema-choice-fields';
 import { SchemaChoiceReadonlyFields } from '@/components/dynamic-fields/schema-choice-readonly';
 import {
+    SchemaFileFields,
+    fileFieldsFromCustomBucket,
+    type SchemaFileField,
+} from '@/components/dynamic-fields/schema-file-fields';
+import {
     SchemaTextFields,
     type SchemaTextField,
 } from '@/components/dynamic-fields/schema-text-fields';
@@ -111,6 +116,16 @@ type SchemaField = {
     visible?: boolean;
     max_length?: number | null;
     required?: boolean;
+    validation_json?: {
+        max_length?: number;
+        allowed_mime_types?: string[];
+    } | null;
+    current_upload?: {
+        id: number;
+        filename: string;
+        download_url: string;
+        archived: boolean;
+    } | null;
 };
 
 type PositionFieldSchemaBucket = {
@@ -307,8 +322,10 @@ type ChoiceMeta = Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>;
 type PositionFieldView = {
     editableText: SchemaTextField[];
     editableChoice: SchemaChoiceField[];
+    editableFile: SchemaFileField[];
     calcOriginText: SchemaTextField[];
     calcOriginChoice: SchemaChoiceField[];
+    calcOriginFile: SchemaFileField[];
 };
 
 const LOCK_CONFLICT_FALLBACK =
@@ -409,7 +426,10 @@ export default function DispoOrderShow({
                     field.editable === true &&
                     field.scope === 'header' &&
                     (field.field_type === 'short_text' ||
-                        field.field_type === 'long_text'),
+                        field.field_type === 'long_text' ||
+                        field.field_type === 'select' ||
+                        field.field_type === 'multi_select' ||
+                        field.field_type === 'file'),
             )
         );
     }, [fieldSchema]);
@@ -424,6 +444,11 @@ export default function DispoOrderShow({
             choiceFieldsFromCustomBucket(editableHeaderSource),
         [editableHeaderSource],
     );
+    const editableCustomFileFields = useMemo(
+        (): SchemaFileField[] =>
+            fileFieldsFromCustomBucket(editableHeaderSource),
+        [editableHeaderSource],
+    );
 
     const calcOriginHeaderSource = useMemo((): SchemaField[] => {
         return (
@@ -434,7 +459,10 @@ export default function DispoOrderShow({
                     field.calc_origin === true &&
                     field.scope === 'header' &&
                     (field.field_type === 'short_text' ||
-                        field.field_type === 'long_text'),
+                        field.field_type === 'long_text' ||
+                        field.field_type === 'select' ||
+                        field.field_type === 'multi_select' ||
+                        field.field_type === 'file'),
             )
         );
     }, [fieldSchema]);
@@ -447,6 +475,11 @@ export default function DispoOrderShow({
     const calcOriginCustomChoiceFields = useMemo(
         (): SchemaChoiceField[] =>
             choiceFieldsFromCustomBucket(calcOriginHeaderSource),
+        [calcOriginHeaderSource],
+    );
+    const calcOriginCustomFileFields = useMemo(
+        (): SchemaFileField[] =>
+            fileFieldsFromCustomBucket(calcOriginHeaderSource),
         [calcOriginHeaderSource],
     );
 
@@ -464,10 +497,16 @@ export default function DispoOrderShow({
                 editableChoice: choiceFieldsFromCustomBucket(
                     bucket.editable_custom_fields,
                 ),
+                editableFile: fileFieldsFromCustomBucket(
+                    bucket.editable_custom_fields,
+                ),
                 calcOriginText: textFieldsFromCustomBucket(
                     bucket.calc_origin_custom_fields,
                 ),
                 calcOriginChoice: choiceFieldsFromCustomBucket(
+                    bucket.calc_origin_custom_fields,
+                ),
+                calcOriginFile: fileFieldsFromCustomBucket(
                     bucket.calc_origin_custom_fields,
                 ),
             };
@@ -481,7 +520,8 @@ export default function DispoOrderShow({
                 const view = positionFieldViews[position.id];
                 return (
                     (view?.editableText.length ?? 0) > 0 ||
-                    (view?.editableChoice.length ?? 0) > 0
+                    (view?.editableChoice.length ?? 0) > 0 ||
+                    (view?.editableFile.length ?? 0) > 0
                 );
             }),
         [order.positions, positionFieldViews],
@@ -681,6 +721,14 @@ export default function DispoOrderShow({
             ),
         [editableCustomChoiceFields, headerRuntime],
     );
+    const visibleEditableHeaderFileFields = useMemo(
+        () =>
+            filterByEffectiveVisible(
+                editableCustomFileFields,
+                headerRuntime,
+            ),
+        [editableCustomFileFields, headerRuntime],
+    );
     const visibleCalcOriginHeaderTextFields = useMemo(
         () =>
             filterByEffectiveVisible(calcOriginCustomTextFields, headerRuntime),
@@ -693,6 +741,14 @@ export default function DispoOrderShow({
                 headerRuntime,
             ),
         [calcOriginCustomChoiceFields, headerRuntime],
+    );
+    const visibleCalcOriginHeaderFileFields = useMemo(
+        () =>
+            filterByEffectiveVisible(
+                calcOriginCustomFileFields,
+                headerRuntime,
+            ),
+        [calcOriginCustomFileFields, headerRuntime],
     );
 
     const positionRuntimes = useMemo(() => {
@@ -749,8 +805,10 @@ export default function DispoOrderShow({
             const view = positionFieldViews[position.id] ?? {
                 editableText: [],
                 editableChoice: [],
+                editableFile: [],
                 calcOriginText: [],
                 calcOriginChoice: [],
+                calcOriginFile: [],
             };
             const runtime = positionRuntimes[position.id] ?? headerRuntime;
             map[position.id] = {
@@ -762,12 +820,20 @@ export default function DispoOrderShow({
                     filterByEffectiveVisible(view.editableChoice, runtime),
                     runtime,
                 ),
+                editableFile: filterByEffectiveVisible(
+                    view.editableFile,
+                    runtime,
+                ),
                 calcOriginText: filterByEffectiveVisible(
                     view.calcOriginText,
                     runtime,
                 ),
                 calcOriginChoice: filterByEffectiveVisible(
                     view.calcOriginChoice,
+                    runtime,
+                ),
+                calcOriginFile: filterByEffectiveVisible(
+                    view.calcOriginFile,
                     runtime,
                 ),
             };
@@ -1089,10 +1155,17 @@ export default function DispoOrderShow({
     const showHeaderCustomCard =
         dynamicControlsLocked ||
         visibleEditableHeaderTextFields.length > 0 ||
-        visibleEditableHeaderChoiceFields.length > 0;
+        visibleEditableHeaderChoiceFields.length > 0 ||
+        visibleEditableHeaderFileFields.some(
+            (field) =>
+                canUploadMaterial || field.current_upload !== null,
+        );
     const showHeaderCalcOrigin =
         visibleCalcOriginHeaderTextFields.length > 0 ||
-        visibleCalcOriginHeaderChoiceFields.length > 0;
+        visibleCalcOriginHeaderChoiceFields.length > 0 ||
+        visibleCalcOriginHeaderFileFields.some(
+            (field) => field.current_upload !== null,
+        );
 
     return (
         <>
@@ -1516,6 +1589,17 @@ export default function DispoOrderShow({
                                         idPrefix="dispo-calc-origin-choice"
                                     />
                                 ) : null}
+                                {visibleCalcOriginHeaderFileFields.length >
+                                0 ? (
+                                    <SchemaFileFields
+                                        fields={
+                                            visibleCalcOriginHeaderFileFields
+                                        }
+                                        orderId={order.id}
+                                        lockVersion={order.lock_version}
+                                        canUpload={false}
+                                    />
+                                ) : null}
                             </div>
                         ) : null}
                     </CardContent>
@@ -1778,6 +1862,21 @@ export default function DispoOrderShow({
                                             />
                                         </div>
                                     ) : null}
+                                    {visibleEditableHeaderFileFields.length >
+                                    0 ? (
+                                        <SchemaFileFields
+                                            fields={
+                                                visibleEditableHeaderFileFields
+                                            }
+                                            orderId={order.id}
+                                            lockVersion={order.lock_version}
+                                            canUpload={canUploadMaterial}
+                                            disabled={
+                                                savingNotes ||
+                                                dynamicControlsLocked
+                                            }
+                                        />
+                                    ) : null}
                                     {fieldErrors.dynamic_field_values ||
                                     fieldErrors.lock_version ? (
                                         <p className="text-destructive text-xs">
@@ -1845,6 +1944,17 @@ export default function DispoOrderShow({
                                                 idPrefix="dispo-custom-choice-ro"
                                             />
                                         </div>
+                                    ) : null}
+                                    {visibleEditableHeaderFileFields.length >
+                                    0 ? (
+                                        <SchemaFileFields
+                                            fields={
+                                                visibleEditableHeaderFileFields
+                                            }
+                                            orderId={order.id}
+                                            lockVersion={order.lock_version}
+                                            canUpload={canUploadMaterial}
+                                        />
                                     ) : null}
                                 </>
                             )}
@@ -1949,15 +2059,25 @@ export default function DispoOrderShow({
                             ] ?? {
                                 editableText: [],
                                 editableChoice: [],
+                                editableFile: [],
                                 calcOriginText: [],
                                 calcOriginChoice: [],
+                                calcOriginFile: [],
                             };
                             const showCalcOrigin =
                                 view.calcOriginText.length > 0 ||
-                                view.calcOriginChoice.length > 0;
+                                view.calcOriginChoice.length > 0 ||
+                                view.calcOriginFile.some(
+                                    (field) => field.current_upload !== null,
+                                );
                             const showNative =
                                 view.editableText.length > 0 ||
-                                view.editableChoice.length > 0;
+                                view.editableChoice.length > 0 ||
+                                view.editableFile.some(
+                                    (field) =>
+                                        canUploadMaterial ||
+                                        field.current_upload !== null,
+                                );
 
                             return (
                                 <section
@@ -2139,6 +2259,17 @@ export default function DispoOrderShow({
                                                     idPrefix={`dispo-pos-calc-choice-${position.id}`}
                                                 />
                                             ) : null}
+                                            {view.calcOriginFile.length > 0 ? (
+                                                <SchemaFileFields
+                                                    fields={view.calcOriginFile}
+                                                    orderId={order.id}
+                                                    lockVersion={
+                                                        order.lock_version
+                                                    }
+                                                    positionId={position.id}
+                                                    canUpload={false}
+                                                />
+                                            ) : null}
                                         </div>
                                     ) : null}
                                     {showNative ? (
@@ -2273,6 +2404,27 @@ export default function DispoOrderShow({
                                                             />
                                                         </div>
                                                     ) : null}
+                                                    {view.editableFile.length >
+                                                    0 ? (
+                                                        <SchemaFileFields
+                                                            fields={
+                                                                view.editableFile
+                                                            }
+                                                            orderId={order.id}
+                                                            lockVersion={
+                                                                order.lock_version
+                                                            }
+                                                            positionId={
+                                                                position.id
+                                                            }
+                                                            canUpload={
+                                                                canUploadMaterial
+                                                            }
+                                                            disabled={
+                                                                savingPositionCustoms
+                                                            }
+                                                        />
+                                                    ) : null}
                                                 </>
                                             ) : (
                                                 <>
@@ -2313,6 +2465,24 @@ export default function DispoOrderShow({
                                                                 idPrefix={`dispo-pos-custom-choice-ro-${position.id}`}
                                                             />
                                                         </div>
+                                                    ) : null}
+                                                    {view.editableFile.length >
+                                                    0 ? (
+                                                        <SchemaFileFields
+                                                            fields={
+                                                                view.editableFile
+                                                            }
+                                                            orderId={order.id}
+                                                            lockVersion={
+                                                                order.lock_version
+                                                            }
+                                                            positionId={
+                                                                position.id
+                                                            }
+                                                            canUpload={
+                                                                canUploadMaterial
+                                                            }
+                                                        />
                                                     ) : null}
                                                 </>
                                             )}

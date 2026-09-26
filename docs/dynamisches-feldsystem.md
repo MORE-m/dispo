@@ -271,6 +271,11 @@ Eine Felddefinition besitzt mindestens:
 - Datei-Upload
 - Inventar-, Werbemittel-, Ansprechpartner- und Kunden-Auswahl
 
+**BL-P9-01c / PO-BLP901C-1:** Feldtyp `file` produktiv nur am **Dispoauftrag**
+(`applies_to=dispo_order`), strikt optional (kein `require_field` in V1/01c).
+Wert kanonisch `value_json` = `{"upload_id": int}`; Upload in zentraler Liste
+(`dynamic_field`). Kalkulations-Datei-Upload bewusst nicht in 01c.
+
 Jeder Typ besitzt eine klar definierte kanonische Speicherung. Geld und Prozent
 werden nicht als formatierter Text gespeichert. Referenzfelder speichern stabile
 IDs und zusätzlich im Snapshot die damals sichtbare Bezeichnung.

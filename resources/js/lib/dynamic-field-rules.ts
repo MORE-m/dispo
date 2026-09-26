@@ -11,7 +11,8 @@ export type FieldType =
     | 'short_text'
     | 'long_text'
     | 'select'
-    | 'multi_select';
+    | 'multi_select'
+    | 'file';
 
 export type RuleFieldDefinition = {
     key: string;
@@ -109,6 +110,23 @@ export function isEmpty(
             return value === '';
         case 'multi_select':
             return value === '' || (Array.isArray(value) && value.length === 0);
+        case 'file': {
+            if (value === null || value === undefined) {
+                return true;
+            }
+            if (typeof value !== 'object' || value === null) {
+                return true;
+            }
+            const uploadId = (value as { upload_id?: unknown }).upload_id;
+            if (typeof uploadId === 'number') {
+                return uploadId <= 0;
+            }
+            if (typeof uploadId === 'string' && /^\d+$/.test(uploadId)) {
+                return parseInt(uploadId, 10) <= 0;
+            }
+
+            return true;
+        }
         default:
             return false;
     }
@@ -316,6 +334,10 @@ function assertConditionNode(
             throw new Error(
                 'field_equals ist für Multi-Select nicht erlaubt; field_contains verwenden.',
             );
+        } else if (def.field_type === 'file') {
+            throw new Error(
+                'field_equals ist für Datei-Felder nicht erlaubt; field_empty / field_not_empty verwenden.',
+            );
         } else {
             throw new Error(
                 'field_equals ist für Zeitraum-Felder nicht erlaubt; field_empty / field_not_empty verwenden.',
@@ -358,6 +380,14 @@ function assertActionNode(
     if (op === 'set_visible') {
         if (!('value' in action) || typeof action.value !== 'boolean') {
             throw new Error('set_visible benötigt value als Boolean.');
+        }
+    }
+    if (op === 'require_field') {
+        const target = defsByKey[fieldKey];
+        if (target?.field_type === 'file') {
+            throw new Error(
+                'Datei-Felder können in V1/01c nicht per require_field-Regel verpflichtet werden.',
+            );
         }
     }
 }

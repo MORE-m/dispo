@@ -1,28 +1,42 @@
 # Fortschritt V1
 
-Stand: 25. September 2026 – **BL-P9-01b** feste Materialuploads + Audio / UPL-007
-(PO-BLP901B-1) **manuell abgenommen** (Feature-HEAD `0adacb3…`). Base: `main`
-`c64518dcc53ad154b973f3a99649f4ab075f09d8` (inkl. PR **#80** BL-P9-01a). Merge
-PR **#82** folgt nach Abschluss-Gates.
+Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
+(PO-BLP901C-1) **umgesetzt auf Feature-Branch**; Merge und manuelle Abnahme
+ausstehend. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD
+`0adacb3…`, PR **#82**).
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01` teilweise** nach **`BL-P9-01a`** + **`BL-P9-01b`**.
-`BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005 für feste Uploadkategorien
-**ERFÜLLT**; UPL-006 weiter erfüllt. Offen u. a.: Dyn-Feld-Dateien in zentraler
-Uploadliste (UPL-004 Rest → **BL-P9-01c**).
+Phase 9 / **`BL-P9-01`** nach **`BL-P9-01a`** + **`BL-P9-01b`** + **`BL-P9-01c`**
+(01c: Umsetzung auf Feature-Branch, Abnahme offen). `BL-P8-02` **ERLEDIGT**.
+UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
+UPL-004 nach 01c-Abnahme **ERFÜLLT**.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01b** manuell abgenommen (PO-BLP901B-1). Nächster Slice nur nach expliziter
-PO-Teilfreigabe: **BL-P9-01c** Dyn-Feld-Dateien in zentraler Uploadliste.
-Kein automatisches BL-P9-02/03.
+**BL-P9-01c** Merge + manuelle Abnahme (PO-BLP901C-1). Kein automatisches
+BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01b** Material- + Audio-Uploads (PR **#82**, Feature-HEAD `0adacb3…`,
-manuell abgenommen inkl. Smoke/MP3-Nachtest Port **8041**). Davor: PR **#80**
-BL-P9-01a auf `main` (Merge `3ba505735…`), manuell abgenommen.
+**BL-P9-01c** dynamische Dispo-Datei-Felder in zentraler Uploadliste (Feature-Branch;
+Playwright Port **8042**). Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
+
+## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP901C-1 | **freigegeben** (nur 9-01c-Scope) |
+| Optionale Dispo-Datei-Felder (`applies_to=dispo_order`); kein Calc-Upload | **umgesetzt** |
+| `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field` | **umgesetzt** |
+| `value_json` `{"upload_id": int}`; Replace historisiert; Admin-Archiv ≠ Replace | **umgesetzt** |
+| Kein `require_field`; keine Freigabeinvalidierung | **umgesetzt** |
+| Rollen/Status wie Material (PM NEIN) | **umgesetzt** |
+| Unit/Feature/Vitest/Playwright Port **8042** | **umgesetzt** |
+| UPL-004 | **ERFÜLLT nach Abnahme** |
+| `BL-P9-01` insgesamt | **umgesetzt** (01c Abnahme offen) |
+| Merge / manuelle Abnahme | **ausstehend** |
+| Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
 

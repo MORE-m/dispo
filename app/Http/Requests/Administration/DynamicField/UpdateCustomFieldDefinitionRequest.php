@@ -28,7 +28,10 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
                 FieldType::LongText,
                 FieldType::Select,
                 FieldType::MultiSelect,
+                FieldType::File,
             ])],
+            'allowed_mime_types' => ['nullable', 'array'],
+            'allowed_mime_types.*' => ['string', 'max:255'],
             'scope' => ['sometimes', Rule::enum(FieldScope::class)->only([FieldScope::Header, FieldScope::Position])],
             'applies_to' => ['sometimes', Rule::enum(FieldAppliesTo::class)],
             'help_text' => ['nullable', 'string', 'max:5000'],
@@ -85,6 +88,11 @@ class UpdateCustomFieldDefinitionRequest extends FormRequest
         }
         if (array_key_exists('max_length', $data)) {
             $payload['max_length'] = $data['max_length'] !== null ? (int) $data['max_length'] : null;
+        }
+        if (array_key_exists('allowed_mime_types', $data)) {
+            $payload['allowed_mime_types'] = is_array($data['allowed_mime_types'])
+                ? array_values($data['allowed_mime_types'])
+                : null;
         }
 
         return $payload;

@@ -5,6 +5,7 @@
 /database/e2e-derived-campaign-period-orders.json
 /database/e2e-bl-p9-01a-orders.json
 /database/e2e-bl-p9-01b-orders.json
+/database/e2e-bl-p9-01c-orders.json
 /database/e2e-derived-campaign-period.sqlite
 /database/e2e-derived-campaign-period.sqlite-journal
 /playwright-report

@@ -100,6 +100,18 @@ export function DispoOrderUploadsSection({
                                         <p className="font-medium">
                                             {upload.category_label}
                                         </p>
+                                        {upload.category === 'dynamic_field' &&
+                                        upload.field_label ? (
+                                            <p
+                                                className="text-muted-foreground text-xs"
+                                                data-test={`dispo-order-upload-field-context-${upload.id}`}
+                                            >
+                                                {upload.field_label}
+                                                {upload.position_label
+                                                    ? ` · ${upload.position_label}`
+                                                    : ''}
+                                            </p>
+                                        ) : null}
                                         <p className="truncate">
                                             {upload.original_filename}
                                         </p>

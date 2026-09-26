@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**); Rest blockiert (u. a. Dyn-Feld-Dateien in Uploadliste)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1**); Rest blockiert (u. a. Kommentare, Notifications)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -560,19 +560,38 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   HEAD `0adacb3…`; Smoke (Briefing/Audio/Mixed/Archiv/Status-CC) + echte MP3
   (filesamples sample1, play/seek)
 
+### BL-P9-01c – Dyn-Feld-Dateien in Uploadliste (PO-BLP901C-1)
+
+- **Phase:** 9
+- **Status:** **umgesetzt auf Feature-Branch**; Merge/manuelle Abnahme ausstehend
+- **Kennung:** PO-BLP901C-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01c
+- **Anforderungen:** `UPL-004` (Rest), `UPL-006` (unverändert)
+- **Abhängigkeiten:** BL-P9-01a, BL-P9-01b
+- **Ergebnis:** `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`;
+  optionale Dispo-Datei-Felder (`applies_to=dispo_order`); `value_json`
+  `{"upload_id": int}`; Ersetzen historisiert; Admin-Archiv löscht Referenz;
+  zentrale Liste mit Feldlabel
+- **Rollen Upload:** wie 9-01b (Sales/Disposition/Admin/Management; PM NEIN)
+- **Fachvertrag:** kein `require_field`; kein Calc-Datei-Upload; keine
+  Freigabeinvalidierung; Replace ≠ Admin-Archiv (E1–E7)
+- **UPL-Status nach Slice:** UPL-004 **ERFÜLLT** (nach Abnahme); UPL-006 weiter
+- **Bewusst nicht:** Kalkulations-Dateifelder; CMT-001; Notifications;
+  Freigabeinvalidierung
+- **Tests:** `DispoOrderDynamicFieldUploadTest`; Vitest Schema-File-Fields +
+  Uploadliste; Playwright Port **8042** (`test:e2e:blp901c`)
+
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **TEILWEISE** (`BL-P9-01a` + `BL-P9-01b` umgesetzt; Dyn-Feld-Rest offen)
+- **Status:** **umgesetzt** (`BL-P9-01a`–`c` auf Feature-Branch; 01c Abnahme offen)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe
 - **Akzeptanz:** keine öffentlichen URLs; max. 50 MB Default
-- **Offen explizit:**
-  - C) Dyn-Feld-Dateien in zentraler Uploadliste (UPL-004 Rest → **BL-P9-01c**)
+- **Erledigt in 9-01c:** Dyn-Feld-Dateien in zentraler Uploadliste / UPL-004
 - **Erledigt in 9-01b:** feste Materialkategorien + Audio / UPL-007
 - **Tests:** Pest MIME/Größe, Archiv, Download/Stream; E2E Port **8040** (9-01a),
-  **8041** (9-01b)
+  **8041** (9-01b), **8042** (9-01c)
 
 ### BL-P9-02 – Kommentare und Nachrichten
 

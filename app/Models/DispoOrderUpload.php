@@ -24,12 +24,22 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $archived_at
  * @property int|null $archived_by_user_id
  * @property string|null $archived_by_name_snapshot
+ * @property string|null $field_key
+ * @property string|null $field_label_snapshot
+ * @property int|null $snapshot_field_definition_id
+ * @property int|null $dispo_order_position_id
+ * @property string|null $position_label_snapshot
  */
 class DispoOrderUpload extends Model
 {
     protected $fillable = [
         'dispo_order_id',
         'category',
+        'field_key',
+        'field_label_snapshot',
+        'snapshot_field_definition_id',
+        'dispo_order_position_id',
+        'position_label_snapshot',
         'original_filename',
         'storage_path',
         'mime_type',
@@ -55,7 +65,25 @@ class DispoOrderUpload extends Model
             'uploaded_at' => 'datetime',
             'archived_at' => 'datetime',
             'archived_by_user_id' => 'integer',
+            'snapshot_field_definition_id' => 'integer',
+            'dispo_order_position_id' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<SnapshotFieldDefinition, $this>
+     */
+    public function snapshotFieldDefinition(): BelongsTo
+    {
+        return $this->belongsTo(SnapshotFieldDefinition::class);
+    }
+
+    /**
+     * @return BelongsTo<DispoOrderPosition, $this>
+     */
+    public function dispoOrderPosition(): BelongsTo
+    {
+        return $this->belongsTo(DispoOrderPosition::class);
     }
 
     /**

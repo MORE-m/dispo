@@ -19,7 +19,10 @@ type Revision = {
     group_key: string | null;
     sort_default: number;
     reportable: boolean;
-    validation_json?: { max_length?: number } | null;
+    validation_json?: {
+        max_length?: number;
+        allowed_mime_types?: string[];
+    } | null;
     created_at?: string | null;
 };
 
@@ -61,9 +64,22 @@ function isChoiceType(fieldType: string): boolean {
     return fieldType === 'select' || fieldType === 'multi_select';
 }
 
+function isFileType(fieldType: string): boolean {
+    return fieldType === 'file';
+}
+
 function maxLengthFromRevision(revision: Revision | null): string {
     const value = revision?.validation_json?.max_length;
     return value === undefined || value === null ? '' : String(value);
+}
+
+function allowedMimeFromRevision(revision: Revision | null): string {
+    const types = revision?.validation_json?.allowed_mime_types;
+    if (!types || types.length === 0) {
+        return '';
+    }
+
+    return types.join('\n');
 }
 
 export default function DefinitionShow({
@@ -97,6 +113,7 @@ export default function DefinitionShow({
         reportable: current?.reportable ?? false,
         max_length:
             definition.max_length === null ? '' : String(definition.max_length),
+        allowed_mime_types: allowedMimeFromRevision(current),
     });
 
     const [revision, setRevision] = useState({
@@ -106,6 +123,7 @@ export default function DefinitionShow({
         sort_default: current?.sort_default ?? 0,
         reportable: current?.reportable ?? true,
         max_length: maxLengthFromRevision(current),
+        allowed_mime_types: allowedMimeFromRevision(current),
     });
 
     function handleCaught(caught: unknown, fallback: string) {
@@ -158,7 +176,14 @@ export default function DefinitionShow({
                 sort_default: structural.sort_default,
                 reportable: structural.reportable,
             };
-            if (!isChoiceType(structural.field_type)) {
+            if (isFileType(structural.field_type)) {
+                const lines = structural.allowed_mime_types
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter((line) => line !== '');
+                payload.allowed_mime_types =
+                    lines.length > 0 ? lines : null;
+            } else if (!isChoiceType(structural.field_type)) {
                 payload.max_length =
                     structural.max_length === ''
                         ? null
@@ -201,7 +226,14 @@ export default function DefinitionShow({
                 sort_default: revision.sort_default,
                 reportable: revision.reportable,
             };
-            if (!isChoiceType(definition.field_type)) {
+            if (isFileType(definition.field_type)) {
+                const lines = revision.allowed_mime_types
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter((line) => line !== '');
+                payload.allowed_mime_types =
+                    lines.length > 0 ? lines : null;
+            } else if (!isChoiceType(definition.field_type)) {
                 payload.max_length =
                     revision.max_length === ''
                         ? null
@@ -365,12 +397,17 @@ export default function DefinitionShow({
                                     id="structural-field-type"
                                     className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
                                     value={structural.field_type}
-                                    onChange={(e) =>
+                                    onChange={(e) => {
+                                        const nextType = e.target.value;
                                         setStructural({
                                             ...structural,
-                                            field_type: e.target.value,
-                                        })
-                                    }
+                                            field_type: nextType,
+                                            applies_to:
+                                                nextType === 'file'
+                                                    ? 'dispo_order'
+                                                    : structural.applies_to,
+                                        });
+                                    }}
                                 >
                                     <option value="short_text">
                                         short_text
@@ -380,6 +417,7 @@ export default function DefinitionShow({
                                     <option value="multi_select">
                                         multi_select
                                     </option>
+                                    <option value="file">Datei</option>
                                 </select>
                             </FormField>
                             <FormField
@@ -412,6 +450,7 @@ export default function DefinitionShow({
                                     id="structural-applies-to"
                                     className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
                                     value={structural.applies_to}
+                                    disabled={isFileType(structural.field_type)}
                                     onChange={(e) =>
                                         setStructural({
                                             ...structural,
@@ -419,16 +458,51 @@ export default function DefinitionShow({
                                         })
                                     }
                                 >
-                                    <option value="calculation">
+                                    <option
+                                        value="calculation"
+                                        disabled={isFileType(
+                                            structural.field_type,
+                                        )}
+                                    >
                                         Kalkulation
                                     </option>
                                     <option value="dispo_order">
                                         Dispoauftrag
                                     </option>
-                                    <option value="both">Beide</option>
+                                    <option
+                                        value="both"
+                                        disabled={isFileType(
+                                            structural.field_type,
+                                        )}
+                                    >
+                                        Beide
+                                    </option>
                                 </select>
                             </FormField>
-                            {!isChoiceType(structural.field_type) ? (
+                            {isFileType(structural.field_type) ? (
+                                <FormField
+                                    label="Zulässige MIME-Typen (optional)"
+                                    htmlFor="structural-allowed-mime"
+                                    error={fieldErrors.allowed_mime_types}
+                                    hint="Ein MIME-Typ pro Zeile"
+                                >
+                                    <textarea
+                                        id="structural-allowed-mime"
+                                        rows={4}
+                                        value={structural.allowed_mime_types}
+                                        onChange={(e) =>
+                                            setStructural({
+                                                ...structural,
+                                                allowed_mime_types:
+                                                    e.target.value,
+                                            })
+                                        }
+                                        className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                                    />
+                                </FormField>
+                            ) : null}
+                            {!isChoiceType(structural.field_type) &&
+                            !isFileType(structural.field_type) ? (
                                 <FormField
                                     label="Maximallänge"
                                     htmlFor="structural-max-length"
@@ -636,7 +710,30 @@ export default function DefinitionShow({
                                 required
                             />
                         </FormField>
-                        {isCustom && !isChoiceType(definition.field_type) ? (
+                        {isCustom && isFileType(definition.field_type) ? (
+                            <FormField
+                                label="Zulässige MIME-Typen (optional)"
+                                htmlFor="rev-allowed-mime"
+                                error={fieldErrors.allowed_mime_types}
+                                hint="Ein MIME-Typ pro Zeile"
+                            >
+                                <textarea
+                                    id="rev-allowed-mime"
+                                    rows={4}
+                                    value={revision.allowed_mime_types}
+                                    onChange={(e) =>
+                                        setRevision({
+                                            ...revision,
+                                            allowed_mime_types: e.target.value,
+                                        })
+                                    }
+                                    className="border-input bg-background flex w-full rounded-md border px-3 py-2 text-sm"
+                                />
+                            </FormField>
+                        ) : null}
+                        {isCustom &&
+                        !isChoiceType(definition.field_type) &&
+                        !isFileType(definition.field_type) ? (
                             <FormField
                                 label="Maximallänge"
                                 htmlFor="rev-max-length"
