@@ -5,6 +5,11 @@ in Feature-Umsetzung; Base `origin/main` @ `56a10e6…` (nach PR #88/#90).
 **BL-P1-05a** Outbox-Fundament auf `main` gemergt (PR #90). Fachliche
 Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
+Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
+Mehrfachpositionen). Feldmatrix: `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`.
+Calendar/Komponenten/Festpreis/Tandem/Abbinder und „aus Kalkulation erzeugen“ =
+Folgeslices. Kein Merge von PR #91 bis manuelle Abnahme.
+
 ## Aktuelle Phase
 
 Phase 4 / **BL-P4-03a** (Standardangebote, Spot Classic Average).
@@ -30,10 +35,14 @@ VER-004, AT-28–31).
 | Übernahme ohne Live-`CalculationWriter::create()` | **umgesetzt** |
 | Kunde Freitext Pflicht bei Übernahme (CRM-Slice später) | **umgesetzt** |
 | PM ohne Calc/Dispo/Übernahme (AUTH-007) | **umgesetzt** |
-| Feature-Tests AT-28–31-Kern | **umgesetzt** (9/9 Feature) |
+| Feature-Tests AT-28–31-Kern | **umgesetzt** (14 Feature-Tests) |
+| Vorlagen-Editor via Calc-Wizard (Average, multi-Position) | **umgesetzt** |
+| Feldmatrix Gruppe 1–4 dokumentiert | **umgesetzt** (`docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`) |
+| Calendar/Komponenten/Festpreis/Tandem/Abbinder | **bewusst nicht** (Gruppe 4) |
+| Aus Kalkulation → Vorlage | **bewusst nicht** (Folgeslice, kein Button) |
 | Lokale Gates (Pint/PHPStan/Pest SQLite/Vitest/`npm check`/`tsc`) | **grün** vor Draft-PR |
-| MySQL-Gate lokal | STD-Filter 9/9 nach `dispo_test`-Reset; Full-Suite an GitHub `mysql`-Job |
-| Calendar/Komponenten/Festpreis/Tandem/Abbinder | **bewusst nicht** |
+| MySQL-Gate lokal | STD-Filter nach `dispo_test`-Reset; Full-Suite an GitHub `mysql`-Job |
+| Calendar/Komponenten/Festpreis/Tandem/Abbinder UI | **bewusst nicht** |
 
 ## BL-P1-05a – Outbox-Fundament (September 2026)
 

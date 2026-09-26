@@ -44,6 +44,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('standardangebote', [StandardOfferController::class, 'index'])->name('standard-offers.index');
     Route::get('standardangebote/neu', [StandardOfferController::class, 'create'])->name('standard-offers.create');
     Route::post('standardangebote', [StandardOfferController::class, 'store'])->name('standard-offers.store');
+    Route::post('standardangebote/vorschau', [StandardOfferController::class, 'preview'])->name('standard-offers.preview');
+    Route::post('standardangebote/feldschema', [StandardOfferController::class, 'fieldSchema'])
+        ->name('standard-offers.field-schema');
     Route::get('standardangebote/{standardOffer}', [StandardOfferController::class, 'show'])->name('standard-offers.show');
     Route::put('standardangebote/{standardOffer}/versionen/{version}', [StandardOfferController::class, 'update'])->name('standard-offers.update');
     Route::post('standardangebote/{standardOffer}/entwurf', [StandardOfferController::class, 'storeDraft'])->name('standard-offers.draft');

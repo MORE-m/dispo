@@ -209,6 +209,70 @@ class StandardOfferBlP403aTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->component('standard-offers/index'));
     }
 
+    public function test_pm_create_uses_calculation_wizard_template_mode(): void
+    {
+        $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+
+        $this->actingAs($pm)
+            ->get(route('standard-offers.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('calculations/wizard')
+                ->where('canCreateDispoOrder', false)
+                ->where('standardOffer.mode', 'create')
+                ->where('standardOffer.allowed_spot_methods.0', 'average'));
+    }
+
+    public function test_multi_position_draft_roundtrip_preserves_average_fields(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $payload = $this->draftPayload($catalog);
+        $second = $payload['positions'][0];
+        $second['total_spot_count'] = 4;
+        $second['time_ranges'][0]['spot_count'] = 4;
+        $second['ae_percent'] = '10';
+        $second['position_discounts'] = [[
+            'type' => 'special',
+            'custom_label' => null,
+            'percent' => '5',
+        ]];
+        $payload['positions'][] = $second;
+        $payload['order_discounts'] = [[
+            'type' => 'special',
+            'custom_label' => null,
+            'percent' => '2',
+        ]];
+        $payload['campaign'] = 'Kampagne Multi';
+        $payload['product_title'] = 'Produkt Multi';
+        $payload['briefing'] = 'Briefing Text';
+        $payload['dynamic_field_values'] = ['campaign_period' => null];
+
+        $offer = $this->writer()->create('Multi Vorlage', $payload, $pm);
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $this->assertCount(2, $draft->draft_payload['positions'] ?? []);
+        $this->assertSame('Kampagne Multi', $draft->draft_payload['campaign'] ?? null);
+        $this->assertSame('2', (string) ($draft->draft_payload['order_discounts'][0]['percent'] ?? ''));
+        $this->assertSame(4, (int) ($draft->draft_payload['positions'][1]['total_spot_count'] ?? 0));
+
+        $this->actingAs($pm)
+            ->get(route('standard-offers.show', [
+                'standardOffer' => $offer,
+                'version' => $draft->id,
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('calculations/wizard')
+                ->where('standardOffer.mode', 'edit')
+                ->has('calculation.positions', 2)
+                ->where('calculation.campaign', 'Kampagne Multi')
+                ->where('calculation.product_title', 'Produkt Multi')
+                ->where('calculation.briefing', 'Briefing Text')
+                ->where('calculation.positions.1.total_spot_count', 4));
+    }
+
     public function test_parallel_draft_does_not_change_sales_published_face(): void
     {
         $catalog = $this->createSpotClassicCatalog();

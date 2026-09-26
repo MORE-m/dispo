@@ -202,7 +202,7 @@ type FieldSchema = {
 };
 
 type PositionDraft = {
-    id?: number;
+    id?: number | null;
     client_key: string;
     inventory_id: number;
     inventory_name?: string | null;
@@ -443,7 +443,7 @@ type SavedSummary = {
 };
 
 type SavedCalculation = {
-    id: number;
+    id: number | null;
     lock_version: number;
     planning_mode: string;
     customer_name: string | null;
@@ -465,7 +465,7 @@ type SavedCalculation = {
         percent: string;
     }>;
     positions: {
-        id: number;
+        id: number | null;
         client_key: string | null;
         inventory_id: number;
         inventory_name?: string | null;
@@ -959,6 +959,7 @@ export default function CalculationWizard({
     canEdit,
     canCreateDispoOrder = false,
     dispoOrderRevision = null,
+    standardOffer = null,
 }: {
     catalog: Catalog;
     component_profiles: ComponentProfilesProp;
@@ -973,12 +974,31 @@ export default function CalculationWizard({
     canEdit: boolean;
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
+    standardOffer?: {
+        mode: 'create' | 'edit';
+        offer_id: number | null;
+        version_id: number | null;
+        number: string | null;
+        title: string;
+        lock_version: number;
+        status: string;
+        status_label: string;
+        allowed_spot_methods: string[];
+        scope_note: string;
+    } | null;
 }) {
     const flash = usePage().props.flash;
+    const isStandardOffer = standardOffer !== null;
+    const [templateTitle, setTemplateTitle] = useState(
+        standardOffer?.title ?? 'Standardangebot',
+    );
     const initialBudgetApplied =
         calculation?.budget_proposal_status === 'applied' ||
         calculation?.budget_proposal_status === 'manual';
     const [step, setStep] = useState(() => {
+        if (isStandardOffer) {
+            return 0;
+        }
         if (calculation?.planning_mode === 'budget') {
             if (
                 initialBudgetApplied &&
@@ -998,13 +1018,13 @@ export default function CalculationWizard({
         return 0;
     });
     const [planningMode, setPlanningMode] = useState(
-        calculation?.planning_mode ?? 'manual',
+        isStandardOffer ? 'manual' : (calculation?.planning_mode ?? 'manual'),
     );
     const [customerName, setCustomerName] = useState(
-        calculation?.customer_name ?? '',
+        isStandardOffer ? '' : (calculation?.customer_name ?? ''),
     );
     const [agencyName, setAgencyName] = useState(
-        calculation?.agency_name ?? '',
+        isStandardOffer ? '' : (calculation?.agency_name ?? ''),
     );
     const [campaign, setCampaign] = useState(calculation?.campaign ?? '');
     const [productTitle, setProductTitle] = useState(
@@ -1447,12 +1467,18 @@ export default function CalculationWizard({
                 try {
                     const response = await jsonPost<{
                         fieldSchema?: FieldSchema;
-                    }>('/kalkulationen/feldschema', {
-                        advertising_medium_id: position.advertising_medium_id,
-                        ...(calculation?.id
-                            ? { calculation_id: calculation.id }
-                            : {}),
-                    });
+                    }>(
+                        isStandardOffer
+                            ? '/standardangebote/feldschema'
+                            : '/kalkulationen/feldschema',
+                        {
+                            advertising_medium_id:
+                                position.advertising_medium_id,
+                            ...(!isStandardOffer && calculation?.id
+                                ? { calculation_id: calculation.id }
+                                : {}),
+                        },
+                    );
                     const nextSchema = response.fieldSchema;
                     const fingerprint = nextSchema?.schema_fingerprint ?? null;
                     const pending = schemaFetchPendingRef.current.get(
@@ -1592,7 +1618,12 @@ export default function CalculationWizard({
         // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
         // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
-    }, [calculation?.id, positionsNeedingSchemaKey, schemaRetryToken]);
+    }, [
+        calculation?.id,
+        positionsNeedingSchemaKey,
+        schemaRetryToken,
+        isStandardOffer,
+    ]);
 
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
@@ -1620,9 +1651,13 @@ export default function CalculationWizard({
 
     const payload = useMemo(
         () => ({
-            planning_mode: planningMode,
-            customer_name: customerName || null,
-            agency_name: agencyName || null,
+            planning_mode: isStandardOffer ? 'manual' : planningMode,
+            ...(isStandardOffer
+                ? {}
+                : {
+                      customer_name: customerName || null,
+                      agency_name: agencyName || null,
+                  }),
             campaign: campaign || null,
             product_title: productTitle || null,
             briefing: briefing || null,
@@ -1670,8 +1705,10 @@ export default function CalculationWizard({
                   }
                 : {}),
             budget_proposal_manual: budgetProposalManual,
-            lock_version: calculation?.lock_version,
-            calculation_id: calculation?.id,
+            lock_version: isStandardOffer
+                ? standardOffer.lock_version
+                : calculation?.lock_version,
+            calculation_id: isStandardOffer ? null : calculation?.id,
             schema_fingerprint: fieldSchema.schema_fingerprint ?? null,
             positions: isBudgetSetup
                 ? []
@@ -1778,6 +1815,8 @@ export default function CalculationWizard({
                   }),
         }),
         [
+            isStandardOffer,
+            standardOffer?.lock_version,
             planningMode,
             customerName,
             agencyName,
@@ -1825,8 +1864,12 @@ export default function CalculationWizard({
         error: previewError,
         fieldErrors: previewFieldErrors,
     } = useCalculationPreview<Totals>({
-        url: '/kalkulationen/vorschau',
-        payload,
+        url: isStandardOffer
+            ? '/standardangebote/vorschau'
+            : '/kalkulationen/vorschau',
+        payload: isStandardOffer
+            ? { ...payload, title: templateTitle }
+            : payload,
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
     });
@@ -2093,9 +2136,19 @@ export default function CalculationWizard({
         setBusy(true);
         setSaveError(null);
         setSaveFieldErrors({});
-        const url = calculation
-            ? `/kalkulationen/${calculation.id}`
-            : '/kalkulationen';
+        const url = isStandardOffer
+            ? standardOffer.mode === 'edit' &&
+              standardOffer.offer_id &&
+              standardOffer.version_id
+                ? `/standardangebote/${standardOffer.offer_id}/versionen/${standardOffer.version_id}`
+                : '/standardangebote'
+            : calculation
+              ? `/kalkulationen/${calculation.id}`
+              : '/kalkulationen';
+
+        const savePayload = isStandardOffer
+            ? { ...payload, title: templateTitle.trim() || 'Standardangebot' }
+            : payload;
 
         const options = {
             preserveState: true,
@@ -2128,10 +2181,16 @@ export default function CalculationWizard({
             },
         };
 
-        if (calculation) {
-            router.put(url, payload, options);
+        if (isStandardOffer) {
+            if (standardOffer.mode === 'edit') {
+                router.put(url, savePayload, options);
+            } else {
+                router.post(url, savePayload, options);
+            }
+        } else if (calculation) {
+            router.put(url, savePayload, options);
         } else {
-            router.post(url, payload, options);
+            router.post(url, savePayload, options);
         }
     }
 
@@ -2177,7 +2236,7 @@ export default function CalculationWizard({
                 targetBudget,
                 budgetElements,
                 budgetPositionDiscounts,
-                calculationId: calculation?.id,
+                calculationId: calculation?.id ?? undefined,
                 lockVersion: calculation?.lock_version,
                 priceYear: budgetPriceYear,
                 expectedPriceListIds: expectedPriceListIdsForBudget(
@@ -2415,15 +2474,35 @@ export default function CalculationWizard({
         <>
             <Head
                 title={
-                    calculation
-                        ? `Kalkulation ${calculation.id}`
-                        : 'Neue Kalkulation'
+                    isStandardOffer
+                        ? standardOffer.number
+                            ? `Standardangebot ${standardOffer.number}`
+                            : 'Neues Standardangebot'
+                        : calculation
+                          ? `Kalkulation ${calculation.id}`
+                          : 'Neue Kalkulation'
                 }
             />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
                 <PageHeader
-                    title={calculation ? `Kalkulation` : 'Neue Kalkulation'}
+                    title={
+                        isStandardOffer
+                            ? standardOffer.number
+                                ? `Standardangebot ${standardOffer.number}`
+                                : 'Neues Standardangebot'
+                            : calculation
+                              ? `Kalkulation`
+                              : 'Neue Kalkulation'
+                    }
+                    description={
+                        isStandardOffer ? standardOffer.scope_note : undefined
+                    }
                 />
+                {isStandardOffer ? (
+                    <StatusBanner data-test="standard-offer-scope-note">
+                        {standardOffer.scope_note}
+                    </StatusBanner>
+                ) : null}
                 {!canEdit ? (
                     <StatusBanner>
                         Lesemodus – keine Änderungen möglich.
@@ -2528,8 +2607,13 @@ export default function CalculationWizard({
                                                 checked={
                                                     planningMode === 'budget'
                                                 }
-                                                disabled={!canEdit}
+                                                disabled={
+                                                    !canEdit || isStandardOffer
+                                                }
                                                 onChange={() => {
+                                                    if (isStandardOffer) {
+                                                        return;
+                                                    }
                                                     setPlanningMode('budget');
                                                     if (
                                                         !calculation?.positions
@@ -2568,36 +2652,60 @@ export default function CalculationWizard({
                                     <CardContent
                                         className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
                                     >
-                                        <FormField
-                                            label="Kunde"
-                                            htmlFor="customer"
-                                        >
-                                            <Input
-                                                id="customer"
-                                                value={customerName}
-                                                onChange={(event) =>
-                                                    setCustomerName(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
-                                        <FormField
-                                            label="Agentur"
-                                            htmlFor="agency"
-                                        >
-                                            <Input
-                                                id="agency"
-                                                value={agencyName}
-                                                onChange={(event) =>
-                                                    setAgencyName(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
+                                        {isStandardOffer ? (
+                                            <FormField
+                                                label="Vorlagen-Titel"
+                                                htmlFor="template-title"
+                                            >
+                                                <Input
+                                                    id="template-title"
+                                                    data-test="standard-offer-title"
+                                                    value={templateTitle}
+                                                    onChange={(event) =>
+                                                        setTemplateTitle(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    disabled={!canEdit}
+                                                    className="sm:col-span-2"
+                                                />
+                                            </FormField>
+                                        ) : (
+                                            <>
+                                                <FormField
+                                                    label="Kunde"
+                                                    htmlFor="customer"
+                                                >
+                                                    <Input
+                                                        id="customer"
+                                                        value={customerName}
+                                                        onChange={(event) =>
+                                                            setCustomerName(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur"
+                                                    htmlFor="agency"
+                                                >
+                                                    <Input
+                                                        id="agency"
+                                                        value={agencyName}
+                                                        onChange={(event) =>
+                                                            setAgencyName(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                            </>
+                                        )}
                                         <FormField
                                             label="Kampagne"
                                             htmlFor="campaign"
@@ -5042,6 +5150,30 @@ export default function CalculationWizard({
                                 data-test="wizard-save"
                             >
                                 Speichern
+                            </Button>
+                        ) : null}
+                        {isStandardOffer &&
+                        canEdit &&
+                        standardOffer.mode === 'edit' &&
+                        standardOffer.status === 'draft' &&
+                        standardOffer.offer_id &&
+                        standardOffer.version_id ? (
+                            <Button
+                                type="button"
+                                variant="default"
+                                data-test="standard-offer-publish"
+                                disabled={busy}
+                                onClick={() => {
+                                    router.post(
+                                        `/standardangebote/${standardOffer.offer_id}/versionen/${standardOffer.version_id}/veroeffentlichen`,
+                                        {
+                                            lock_version:
+                                                standardOffer.lock_version,
+                                        },
+                                    );
+                                }}
+                            >
+                                Veröffentlichen
                             </Button>
                         ) : null}
                     </div>

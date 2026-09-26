@@ -3,30 +3,34 @@
 namespace App\Http\Controllers;
 
 use App\Enums\StandardOfferVersionStatus;
-use App\Models\AdvertisingMedium;
-use App\Models\Inventory;
-use App\Models\InventoryMediumRule;
 use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
+use App\Services\Calculation\CalculationWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
+use App\Services\StandardOffer\StandardOfferAverageContract;
 use App\Services\StandardOffer\StandardOfferWriter;
-use App\Support\PriceList\PriceListCalendar;
-use App\Support\PriceList\PriceListYearSelection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * BL-P4-03a / STD-003–STD-009 / AUTH-006 / AUTH-007 / UX-GATE-D Teilfreigabe.
+ *
+ * Editor: Kalkulations-Wizard im Template-Modus (Spot Classic Average, Gruppe 1).
  */
 class StandardOfferController extends Controller
 {
     public function __construct(
         private readonly StandardOfferWriter $writer,
         private readonly ConfigurationSnapshotFreezeService $snapshots,
+        private readonly CalculationController $calculations,
+        private readonly CalculationWriter $calculationWriter,
+        private readonly StandardOfferAverageContract $averageContract,
     ) {}
 
     public function index(Request $request): Response
@@ -66,13 +70,7 @@ class StandardOfferController extends Controller
     {
         $this->authorize('create', StandardOffer::class);
 
-        return Inertia::render('standard-offers/edit', [
-            'mode' => 'create',
-            'offer' => null,
-            'version' => null,
-            'catalog' => $this->catalogProps(),
-            'schemaFingerprint' => $this->snapshots->resolveLiveSchemaForCalculationV3()['schema_fingerprint'],
-        ]);
+        return $this->renderTemplateWizard($request, null, null, editable: true);
     }
 
     public function store(Request $request): RedirectResponse
@@ -88,6 +86,34 @@ class StandardOfferController extends Controller
         return redirect()
             ->route('standard-offers.show', ['standardOffer' => $offer, 'version' => $version?->id])
             ->with('success', 'Standardangebot als Entwurf angelegt.');
+    }
+
+    public function preview(Request $request): JsonResponse
+    {
+        $this->authorize('create', StandardOffer::class);
+
+        /** @var User $user */
+        $user = $request->user();
+        $data = $this->validatedDraftRequest($request, requireTitle: false);
+
+        return response()->json([
+            'totals' => $this->calculationWriter->preview($data['payload'], $user, null)->toArray(),
+        ]);
+    }
+
+    public function fieldSchema(Request $request): JsonResponse
+    {
+        $this->authorize('create', StandardOffer::class);
+
+        $validated = $request->validate([
+            'advertising_medium_id' => ['sometimes', 'nullable', 'integer', 'min:1', 'exists:advertising_media,id'],
+        ]);
+
+        $mediumId = isset($validated['advertising_medium_id'])
+            ? (int) $validated['advertising_medium_id']
+            : null;
+
+        return $this->calculations->liveFieldSchemaJson($mediumId);
     }
 
     public function show(Request $request, StandardOffer $standardOffer): Response
@@ -116,6 +142,10 @@ class StandardOfferController extends Controller
             abort(403);
         }
 
+        if ($canManage && $version->status->isEditable()) {
+            return $this->renderTemplateWizard($request, $standardOffer, $version, editable: true);
+        }
+
         $versionsForUi = $canManage
             ? $standardOffer->versions
             : $standardOffer->versions->filter(
@@ -135,10 +165,9 @@ class StandardOfferController extends Controller
             ])->values(),
             'canManage' => $canManage,
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
-            'catalog' => $canManage && $version->status->isEditable() ? $this->catalogProps() : null,
-            'schemaFingerprint' => $canManage && $version->status->isEditable()
-                ? $this->snapshots->resolveLiveSchemaForCalculationV3()['schema_fingerprint']
-                : null,
+            'catalog' => null,
+            'schemaFingerprint' => null,
+            'scopeNote' => 'BL-P4-03a: Spot Classic Average. Calendar/Komponenten/Festpreis/Tandem/Abbinder: Folgeslices.',
         ]);
     }
 
@@ -233,39 +262,55 @@ class StandardOfferController extends Controller
     /**
      * @return array{title: string, payload: array<string, mixed>}
      */
-    private function validatedDraftRequest(Request $request): array
+    private function validatedDraftRequest(Request $request, bool $requireTitle = true): array
     {
         $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
+            'title' => [$requireTitle ? 'required' : 'nullable', 'string', 'max:255'],
             'campaign' => ['nullable', 'string', 'max:255'],
             'product_title' => ['nullable', 'string', 'max:255'],
             'briefing' => ['nullable', 'string', 'max:20000'],
             'order_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'order_discounts' => ['sometimes', 'array'],
+            'order_discounts.*.type' => ['nullable', 'string'],
+            'order_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'order_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'ae_enabled' => ['sometimes', 'boolean'],
             'schema_fingerprint' => ['required', 'string'],
+            'dynamic_field_values' => ['sometimes', 'array'],
             'positions' => ['required', 'array', 'min:1'],
+            'positions.*.client_key' => ['nullable', 'string', 'max:64'],
             'positions.*.inventory_id' => ['required', 'integer'],
             'positions.*.advertising_medium_id' => ['required', 'integer'],
             'positions.*.spot_method' => ['nullable', 'in:average'],
             'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'positions.*.total_spot_count' => ['nullable', 'integer', 'min:0'],
+            'positions.*.price_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
             'positions.*.position_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.ae_percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.schema_fingerprint' => ['nullable', 'string'],
             'positions.*.time_ranges' => ['nullable', 'array'],
-            'positions.*.time_ranges.*.start_hour' => ['required_with:positions.*.time_ranges', 'integer', 'min:0', 'max:23'],
-            'positions.*.time_ranges.*.end_hour_exclusive' => ['required_with:positions.*.time_ranges', 'integer', 'min:1', 'max:24'],
-            'positions.*.time_ranges.*.day_group' => ['required_with:positions.*.time_ranges', 'string'],
-            'positions.*.time_ranges.*.spot_count' => ['required_with:positions.*.time_ranges', 'integer', 'min:0'],
+            'positions.*.time_ranges.*.start_hour' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'positions.*.time_ranges.*.end_hour_exclusive' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'positions.*.time_ranges.*.day_group' => ['nullable', 'string'],
+            'positions.*.time_ranges.*.spot_count' => ['nullable', 'integer', 'min:0'],
             'positions.*.plan_rows' => ['nullable', 'array'],
-            'positions.*.plan_rows.*.hour' => ['required_with:positions.*.plan_rows', 'integer', 'min:0', 'max:23'],
-            'positions.*.plan_rows.*.day_group' => ['required_with:positions.*.plan_rows', 'string'],
+            'positions.*.plan_rows.*.hour' => ['nullable', 'integer', 'min:0', 'max:23'],
+            'positions.*.plan_rows.*.day_group' => ['nullable', 'string'],
+            'positions.*.position_discounts' => ['sometimes', 'array'],
+            'positions.*.position_discounts.*.type' => ['nullable', 'string'],
+            'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
+            'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'positions.*.dynamic_field_values' => ['sometimes', 'array'],
             'positions.*.components' => ['prohibited'],
             'positions.*.planner_entries' => ['prohibited'],
             'positions.*.component_profile' => ['prohibited'],
             'positions.*.pricing_settlement_mode' => ['nullable', 'in:normal'],
+            'positions.*.fixed_price_nn' => ['prohibited'],
             'customer_name' => ['prohibited'],
             'agency_name' => ['prohibited'],
+            'planning_mode' => ['nullable', 'in:manual'],
+            'target_budget_nn' => ['prohibited'],
+            'budget_elements' => ['prohibited'],
         ]);
 
         $positions = [];
@@ -282,6 +327,7 @@ class StandardOfferController extends Controller
 
             $row = [
                 ...$position,
+                'client_key' => $position['client_key'] ?? (string) Str::uuid(),
                 'spot_method' => 'average',
                 'schema_fingerprint' => $fingerprint,
                 'pricing_settlement_mode' => 'normal',
@@ -290,55 +336,121 @@ class StandardOfferController extends Controller
             $positions[] = $row;
         }
 
+        $payload = $this->averageContract->normalizeDraftPayload([
+            'planning_mode' => 'manual',
+            'campaign' => $validated['campaign'] ?? null,
+            'product_title' => $validated['product_title'] ?? null,
+            'briefing' => $validated['briefing'] ?? null,
+            'order_discount_percent' => $validated['order_discount_percent'] ?? '0',
+            'order_discounts' => $validated['order_discounts'] ?? [],
+            'ae_enabled' => (bool) ($validated['ae_enabled'] ?? false),
+            'schema_fingerprint' => $validated['schema_fingerprint'],
+            'dynamic_field_values' => $validated['dynamic_field_values'] ?? [],
+            'positions' => $positions,
+        ]);
+
         return [
-            'title' => $validated['title'],
-            'payload' => [
-                'planning_mode' => 'manual',
-                'campaign' => $validated['campaign'] ?? null,
-                'product_title' => $validated['product_title'] ?? null,
-                'briefing' => $validated['briefing'] ?? null,
-                'order_discount_percent' => $validated['order_discount_percent'] ?? '0',
-                'ae_enabled' => (bool) ($validated['ae_enabled'] ?? false),
-                'schema_fingerprint' => $validated['schema_fingerprint'],
-                'positions' => $positions,
-            ],
+            'title' => (string) ($validated['title'] ?? 'Standardangebot'),
+            'payload' => $payload,
         ];
+    }
+
+    private function renderTemplateWizard(
+        Request $request,
+        ?StandardOffer $offer,
+        ?StandardOfferVersion $version,
+        bool $editable,
+    ): Response {
+        $props = $this->calculations->buildWizardProps($request, null);
+        $props['canEdit'] = $editable;
+        $props['canCreateDispoOrder'] = false;
+        $props['latestBudgetProposal'] = null;
+        $props['appliedBudgetProposal'] = null;
+        $props['dispoOrderRevision'] = null;
+
+        if ($version !== null) {
+            $props['calculation'] = $this->calculationShapeFromDraft($version);
+            $nn = is_array($version->frozen_materialization)
+                ? ($version->frozen_materialization['nn_invest'] ?? null)
+                : null;
+            $props['savedSummary'] = $nn !== null
+                ? [
+                    'nn_invest' => (string) ($version->frozen_materialization['nn_invest'] ?? ''),
+                    'media_gross' => (string) ($version->frozen_materialization['media_gross'] ?? ''),
+                    'position_discount_total' => (string) ($version->frozen_materialization['position_discount_total'] ?? ''),
+                    'order_discount_total' => (string) ($version->frozen_materialization['order_discount_total'] ?? ''),
+                    'ae_total' => (string) ($version->frozen_materialization['ae_total'] ?? ''),
+                    'target_budget_nn' => null,
+                    'requires_special_approval' => (bool) ($version->frozen_materialization['requires_special_approval'] ?? false),
+                    'positions' => [],
+                    'order_discounts' => $version->draft_payload['order_discounts'] ?? [],
+                    'ae_enabled' => (bool) ($version->draft_payload['ae_enabled'] ?? false),
+                ]
+                : null;
+        }
+
+        $props['standardOffer'] = [
+            'mode' => $offer === null ? 'create' : 'edit',
+            'offer_id' => $offer?->id,
+            'version_id' => $version?->id,
+            'number' => $offer?->number,
+            'title' => $version !== null
+                ? $version->title
+                : ($offer !== null ? $offer->title : 'Standardangebot'),
+            'lock_version' => $version !== null ? $version->lock_version : 1,
+            'status' => $version !== null ? $version->status->value : 'draft',
+            'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
+            'allowed_spot_methods' => ['average'],
+            'scope_note' => 'Vorlagen-Editor BL-P4-03a: Spot Classic Average. Keine Kundendaten. Calendar/Komponenten/Festpreis/Tandem/Abbinder: Folgeslices.',
+        ];
+
+        return Inertia::render('calculations/wizard', $props);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function catalogProps(): array
+    private function calculationShapeFromDraft(StandardOfferVersion $version): array
     {
-        $inventories = Inventory::query()
-            ->where('is_active', true)
-            ->orderBy('sort')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'type']);
-
-        $media = AdvertisingMedium::query()
-            ->where('is_active', true)
-            ->whereNull('component_profile')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'default_length_seconds', 'kind']);
-
-        $rules = InventoryMediumRule::query()
-            ->where('is_active', true)
-            ->whereIn('inventory_id', $inventories->pluck('id'))
-            ->whereIn('advertising_medium_id', $media->pluck('id'))
-            ->get(['inventory_id', 'advertising_medium_id']);
-
-        $priceYears = [];
-        foreach ($inventories as $inventory) {
-            $priceYears[$inventory->id] = PriceListYearSelection::optionsForInventory((int) $inventory->id);
+        $payload = is_array($version->draft_payload) ? $version->draft_payload : [];
+        $positions = [];
+        foreach ($payload['positions'] ?? [] as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+            $positions[] = [
+                ...$position,
+                'id' => $position['id'] ?? null,
+                'client_key' => $position['client_key'] ?? ('draft-'.$index),
+                'spot_method' => 'average',
+                'pricing_settlement_mode' => $position['pricing_settlement_mode'] ?? 'normal',
+                'components' => [],
+                'planner_entries' => [],
+                'component_profile' => null,
+                'plan_rows' => $position['plan_rows'] ?? [],
+                'time_ranges' => $position['time_ranges'] ?? [],
+                'position_discounts' => $position['position_discounts'] ?? [],
+                'dynamic_field_values' => $position['dynamic_field_values'] ?? ['period_open' => true],
+            ];
         }
 
         return [
-            'inventories' => $inventories,
-            'media' => $media,
-            'rules' => $rules,
-            'price_years_by_inventory' => $priceYears,
-            'current_price_year' => PriceListCalendar::currentYear(),
+            'id' => null,
+            'lock_version' => $version->lock_version,
+            'planning_mode' => 'manual',
+            'customer_name' => null,
+            'agency_name' => null,
+            'campaign' => $payload['campaign'] ?? null,
+            'product_title' => $payload['product_title'] ?? null,
+            'briefing' => $payload['briefing'] ?? null,
+            'order_discount_percent' => (string) ($payload['order_discount_percent'] ?? '0'),
+            'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
+            'target_budget_nn' => null,
+            'budget_strategy' => null,
+            'budget_proposal_status' => null,
+            'dynamic_field_values' => $payload['dynamic_field_values'] ?? [],
+            'order_discounts' => $payload['order_discounts'] ?? [],
+            'positions' => $positions,
         ];
     }
 
