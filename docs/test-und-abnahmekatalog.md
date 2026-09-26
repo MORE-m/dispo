@@ -175,7 +175,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Rollen Upload wie 9-01b; ProductManagement POST **403**; gesperrter Status **422**
 - Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901c` (Port **8042**,
   `E2EDynamicFieldUploadSeeder`)
-- PR **#86**; Smoke-HEAD `f1140a6b76335fa5d296e976409cbb29323d58ed` (CI `36240049854`); Docs-Nachzug auf Feature-Branch
+- PR **#86**; Smoke-HEAD `114a23371ccb563dd50c7037c5846523078a1a68`
+  (≡ pre-rewrite `f1140a6…`, CI `36240049854`); Docs-Nachzug + Trailer-Rewrite
+  auf Feature-Branch
 - Browser-Smoke Port **8042** / `e2e-bl-p9-01c.sqlite`: **BESTANDEN** (Fälle 1–7)
   - Fixes im Smoke: Pflicht-UI für `file` ausgeblendet; Blockliste um
     `application/vnd.microsoft.portable-executable` ergänzt

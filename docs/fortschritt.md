@@ -2,9 +2,10 @@
 
 Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
 (PO-BLP901C-1) **umgesetzt**; Browser-Smoke Port **8042** **bestanden**
-(Smoke-HEAD `f1140a6…`, CI `36240049854`); Docs-Nachzug auf PR **#86**.
-**Formale PO-Abnahme und Merge** ausstehend. **BL-P9-01b** (PO-BLP901B-1)
-manuell abgenommen (Feature-HEAD `0adacb3…`, PR **#82**).
+(Smoke-HEAD `114a233…` ≡ pre-rewrite `f1140a6…`, CI `36240049854`);
+Docs-Nachzug + Trailer-Rewrite auf PR **#86**. **Formale PO-Abnahme und Merge**
+ausstehend. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD
+`0adacb3…`, PR **#82**).
 
 ## Aktuelle Phase
 
@@ -35,10 +36,12 @@ Playwright Port **8042**; manueller Smoke Port **8042** bestanden). Davor:
 | Kein `require_field` / keine Pflicht-UI für `file`; keine Freigabeinvalidierung | **umgesetzt** |
 | Rollen/Status wie Material (PM NEIN) | **umgesetzt** |
 | Unit/Feature/Vitest/Playwright Port **8042** | **umgesetzt** |
-| Smoke-HEAD (Code) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
+| Smoke-HEAD (Code, post-rewrite) | `114a23371ccb563dd50c7037c5846523078a1a68` |
+| Smoke-HEAD (pre-rewrite, gleiche Tree) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
 | CI Smoke-HEAD | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
-| Docs-Nachzug | PR **#86** Feature-Branch (docs-only Commit) |
-| CI Docs-Nachzug | nach Push auf den finalen Docs-HEAD |
+| Trailer-Rewrite | `Co-authored-by: Cursor` aus 3 Commits entfernt; Tree unverändert |
+| Docs-Nachzug | PR **#86** Feature-Branch (docs-only) |
+| CI Feature-HEAD | nach Push auf den finalen Branch-HEAD |
 | Browser-Smoke Port **8042** | **BESTANDEN** (Fälle 1–7; zwei Fixes vor Abschluss) |
 | Formale PO-Abnahme | **offen** |
 | UPL-004 | **ERFÜLLT nach formaler Abnahme** |

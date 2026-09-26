@@ -210,8 +210,9 @@ Port **8041** Smoke + echte MP3): feste Materialuploads + Audio.
 
 ## Ist-Stand BL-P9-01c (PO-BLP901C-1)
 
-**umgesetzt**; Browser-Smoke Port **8042** bestanden (PR **#86**, Feature-HEAD
-`f1140a6…`, CI `36240049854`; Docs-Nachzug PR **#86**); formale PO-Abnahme + Merge ausstehend.
+**umgesetzt**; Browser-Smoke Port **8042** bestanden (PR **#86**, Smoke-HEAD
+`114a233…` ≡ pre-rewrite `f1140a6…`, CI `36240049854`; Docs-Nachzug +
+Trailer-Rewrite); formale PO-Abnahme + Merge ausstehend.
 
 - Endpoint `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`
 - Nur optionale Datei-Felder `applies_to=dispo_order` (Header/Position im Snapshot)

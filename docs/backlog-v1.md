@@ -581,9 +581,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Freigabeinvalidierung
 - **Tests:** `DispoOrderDynamicFieldUploadTest` (+ MySQL); Vitest Schema-File-Fields +
   Uploadliste; Playwright Port **8042** (`test:e2e:blp901c`)
-- **Smoke-HEAD / CI:** `f1140a6b76335fa5d296e976409cbb29323d58ed` /
+- **Smoke-HEAD / CI:** `114a23371ccb563dd50c7037c5846523078a1a68`
+  (≡ pre-rewrite `f1140a6b76335fa5d296e976409cbb29323d58ed`) /
   Run `36240049854` SUCCESS
-- **Docs-Nachzug:** PR **#86** Feature-Branch (docs-only)
+- **Docs-Nachzug / Trailer-Rewrite:** PR **#86** Feature-Branch (docs-only;
+  `Co-authored-by: Cursor` aus History entfernt, Tree unverändert)
 - **Browser-Smoke:** Port **8042** / `e2e-bl-p9-01c.sqlite` Fälle 1–7 bestanden
   (inkl. Fixes Pflicht-UI + PE-Blockliste)
 
