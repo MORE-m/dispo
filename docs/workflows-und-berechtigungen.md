@@ -210,9 +210,10 @@ Port **8041** Smoke + echte MP3): feste Materialuploads + Audio.
 
 ## Ist-Stand BL-P9-01c (PO-BLP901C-1)
 
-**manuell abgenommen** (PR **#86**, Feature-HEAD `525faab…`, CI Run
-`36244779460`; Smoke Port **8042** bestanden). Merge folgt. UPL-004 **ERFÜLLT**;
-`BL-P9-01` **abgeschlossen**.
+**ERLEDIGT** (PR **#86** MERGED `68cc875…`; manuell abgenommen; Post-Merge-CI
+Run `36249359170` SUCCESS; Smoke Port **8042** bestanden). UPL-004 **ERFÜLLT**;
+`BL-P9-01` **ERLEDIGT**. Historische Feature-/Smoke-HEADs: Merge-Quelle
+`1afe904…`, Abnahme-CI `525faab…`, Smoke `114a233…`.
 
 - Endpoint `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`
 - Nur optionale Datei-Felder `applies_to=dispo_order` (Header/Position im Snapshot)

@@ -563,7 +563,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01c – Dyn-Feld-Dateien in Uploadliste (PO-BLP901C-1)
 
 - **Phase:** 9
-- **Status:** **manuell abgenommen**; Merge PR **#86** folgt
+- **Status:** **ERLEDIGT** (PR **#86** MERGED `68cc87569…`; manuelle Abnahme
+  SUCCESS; Post-Merge CI Run `36249359170` SUCCESS)
 - **Kennung:** PO-BLP901C-1 / UX-GATE-D Teilfreigabe ausschließlich für 9-01c
 - **Anforderungen:** `UPL-004` (Rest), `UPL-006` (unverändert)
 - **Abhängigkeiten:** BL-P9-01a, BL-P9-01b
@@ -580,9 +581,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Freigabeinvalidierung
 - **Tests:** `DispoOrderDynamicFieldUploadTest` (+ MySQL); Vitest Schema-File-Fields +
   Uploadliste; Playwright Port **8042** (`test:e2e:blp901c`)
-- **Feature-HEAD / CI:** `525faab5e52a821ec2514a020c0090032d6f2583` /
-  Run `36244779460` SUCCESS
-- **Smoke-HEAD / CI:** `114a23371ccb563dd50c7037c5846523078a1a68`
+- **Feature-HEAD (historisch, Merge-Quelle):** `1afe9048a8ecc54ef595013cc69d253ea08709a0`
+  (Abnahme-CI zuvor auf `525faab5…` / Run `36244779460`; finaler Feature-CI
+  Run `36247507656`)
+- **Smoke-HEAD (historisch) / CI:** `114a23371ccb563dd50c7037c5846523078a1a68`
   (≡ pre-rewrite `f1140a6b76335fa5d296e976409cbb29323d58ed`) /
   Run `36240049854` SUCCESS
 - **Browser-Smoke:** Port **8042** / `e2e-bl-p9-01c.sqlite` Fälle 1–7 bestanden
@@ -592,8 +594,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-01 – Uploads und Audio
 
 - **Phase:** 9
-- **Status:** **abgeschlossen** (`BL-P9-01a`–`c` manuell abgenommen; 01c-Merge
-  PR **#86** folgt)
+- **Status:** **ERLEDIGT** (`BL-P9-01a`–`c` auf `main`, manuell abgenommen;
+  PR **#86** MERGED `68cc875…`)
 - **Anforderungen:** `UPL-004` bis `UPL-007` (+ UPL-001 über 9-01a geschlossen)
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis (Ziel):** zentrale Uploadliste, Archivierung statt Löschen, autorisierte Downloads, Audio-Wiedergabe

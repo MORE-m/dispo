@@ -1,25 +1,26 @@
 # Fortschritt V1
 
 Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
-(PO-BLP901C-1) **manuell abgenommen** (Feature-HEAD `525faab…`, PR **#86**).
-UPL-004 **ERFÜLLT**; **`BL-P9-01` abgeschlossen**. Merge PR **#86** folgt.
-**BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD `0adacb3…`,
-PR **#82**).
+(PO-BLP901C-1) **ERLEDIGT** (PR **#86** MERGED `68cc875…`; manuell
+abgenommen; Post-Merge-CI Run `36249359170` SUCCESS). UPL-004 **ERFÜLLT**;
+**`BL-P9-01` ERLEDIGT**. **BL-P9-01b** (PO-BLP901B-1) manuell abgenommen
+(historischer Feature-HEAD `0adacb3…`, PR **#82**).
 
 ## Aktuelle Phase
 
 Phase 9 / **`BL-P9-01` ERLEDIGT** (`BL-P9-01a` + `BL-P9-01b` + `BL-P9-01c`
-manuell abgenommen). `BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005
-feste Kategorien **ERFÜLLT**; UPL-006 weiter; UPL-004 **ERFÜLLT**.
+auf `main`, manuell abgenommen). `BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**;
+UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter; UPL-004 **ERFÜLLT**.
 
 ## Aktuelle Aufgabe
 
-Merge PR **#86** (BL-P9-01c). Danach kein automatisches BL-P9-02/03.
+Nächster Fachblock **offen** bis zur PO-Priorisierung. Kein automatisches
+BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01c** manuell abgenommen (Port **8042**; Feature-HEAD `525faab…`).
-Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
+**BL-P9-01c** gemergt und manuell abgenommen (PR **#86**, Merge `68cc875…`,
+Port **8042**). Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
 
 ## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
 
@@ -32,17 +33,19 @@ Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
 | Kein `require_field` / keine Pflicht-UI für `file`; keine Freigabeinvalidierung | **umgesetzt** |
 | Rollen/Status wie Material (PM NEIN) | **umgesetzt** |
 | Unit/Feature/Vitest/Playwright Port **8042** | **umgesetzt** |
-| Smoke-HEAD (Code, post-rewrite) | `114a23371ccb563dd50c7037c5846523078a1a68` |
-| Smoke-HEAD (pre-rewrite, gleiche Tree) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
-| CI Smoke-HEAD | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Smoke-HEAD (historisch, Code post-rewrite) | `114a23371ccb563dd50c7037c5846523078a1a68` |
+| Smoke-HEAD (historisch, pre-rewrite, gleiche Tree) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
+| CI Smoke-HEAD (historisch) | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Trailer-Rewrite | `Co-authored-by: Cursor` aus 3 Commits entfernt; Tree unverändert |
-| Feature-HEAD | `525faab5e52a821ec2514a020c0090032d6f2583` |
-| CI Feature-HEAD | Run `36244779460` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Feature-HEAD (historisch, Merge-Quelle) | `1afe9048a8ecc54ef595013cc69d253ea08709a0` |
+| Feature-HEAD Abnahme-CI (historisch) | `525faab5e52a821ec2514a020c0090032d6f2583` / Run `36244779460` |
+| CI Feature-HEAD final (historisch) | Run `36247507656` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Browser-Smoke Port **8042** | **BESTANDEN** (Fälle 1–7; zwei Fixes vor Abschluss) |
 | Formale PO-Abnahme | **ERFOLGREICH** (manuell abgenommen) |
 | UPL-004 | **ERFÜLLT** |
-| `BL-P9-01` insgesamt | **abgeschlossen** |
-| Merge `main` | **folgt** (PR **#86**) |
+| `BL-P9-01` insgesamt | **ERLEDIGT** |
+| Merge `main` | **PR #86** (`68cc87569ec2f71822dd253f83e14e262a3255db`) |
+| Post-Merge CI | **`36249359170` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 | Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
