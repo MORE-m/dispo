@@ -2,7 +2,6 @@
 
 namespace App\Support\DynamicField;
 
-use App\Enums\FieldType;
 use App\Models\CalculationFieldValue;
 use App\Models\CalculationPositionFieldValue;
 use App\Models\DispoOrderFieldValue;
