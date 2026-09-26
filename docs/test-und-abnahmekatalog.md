@@ -175,15 +175,17 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Rollen Upload wie 9-01b; ProductManagement POST **403**; gesperrter Status **422**
 - Feature/MySQL/Vitest; E2E `npm run test:e2e:blp901c` (Port **8042**,
   `E2EDynamicFieldUploadSeeder`)
-- PR **#86**; Smoke-HEAD `114a23371ccb563dd50c7037c5846523078a1a68`
-  (≡ pre-rewrite `f1140a6…`, CI `36240049854`); Docs-Nachzug + Trailer-Rewrite
-  auf Feature-Branch
+- PR **#86** MERGED (`68cc87569ec2f71822dd253f83e14e262a3255db`); Post-Merge
+  CI Run `36249359170` SUCCESS
+- Smoke-HEAD (historisch) `114a23371ccb563dd50c7037c5846523078a1a68`
+  (≡ pre-rewrite `f1140a6…`, CI `36240049854`)
+- Feature-HEAD (historisch, Merge-Quelle) `1afe9048a8ecc54ef595013cc69d253ea08709a0`
+  (Abnahme-CI zuvor `525faab…` / Run `36244779460`)
 - Browser-Smoke Port **8042** / `e2e-bl-p9-01c.sqlite`: **BESTANDEN** (Fälle 1–7)
   - Fixes im Smoke: Pflicht-UI für `file` ausgeblendet; Blockliste um
     `application/vnd.microsoft.portable-executable` ergänzt
-- Formale PO-Abnahme: **ERFOLGREICH** (manuell abgenommen; Feature-HEAD
-  `525faab5e52a821ec2514a020c0090032d6f2583`, CI Run `36244779460`)
-- UPL-004 **ERFÜLLT**; `BL-P9-01` **abgeschlossen**; Merge PR **#86** folgt
+- Formale PO-Abnahme: **ERFOLGREICH** (manuell abgenommen)
+- UPL-004 **ERFÜLLT**; `BL-P9-01` **ERLEDIGT**
 
 ### BL-P8-02b (Rückfrage Vertrieb / PO-BLP802B-1)
 
