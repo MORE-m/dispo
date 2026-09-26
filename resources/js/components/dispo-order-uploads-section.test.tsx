@@ -139,6 +139,34 @@ describe('DispoOrderUploadsSection', () => {
         ).not.toBeInTheDocument();
     });
 
+    it('shows dynamic field label context for dynamic_field uploads', () => {
+        const dynamicUpload: DispoOrderUpload = {
+            ...activeUpload,
+            id: 11,
+            category: 'dynamic_field',
+            category_label: 'Dynamisches Feld',
+            original_filename: 'anhang.pdf',
+            field_key: 'anhang',
+            field_label: 'Anhang Dispo',
+            position_id: 42,
+            position_label: 'Position 1 · Radio',
+            is_active_customer_confirmation: false,
+            download_url: '/dispoauftraege/1/uploads/11/download',
+        };
+
+        render(
+            <DispoOrderUploadsSection
+                orderId={1}
+                lockVersion={1}
+                uploads={[dynamicUpload]}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-order-upload-field-context-11'),
+        ).toHaveTextContent('Anhang Dispo · Position 1 · Radio');
+    });
+
     it('renders audio player for audio_motif uploads', () => {
         const audioUpload: DispoOrderUpload = {
             ...activeUpload,

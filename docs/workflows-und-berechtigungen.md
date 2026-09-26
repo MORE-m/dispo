@@ -208,6 +208,20 @@ Port **8041** Smoke + echte MP3): feste Materialuploads + Audio.
 - UPL-007 **ERFÜLLT**; UPL-005 feste Kategorien **ERFÜLLT**; UPL-006 weiter;
   UPL-004 teilweise (Dyn-Feld-Dateien → BL-P9-01c); `BL-P9-01` weiter teilweise
 
+## Ist-Stand BL-P9-01c (PO-BLP901C-1)
+
+**manuell abgenommen** (PR **#86**, Feature-HEAD `525faab…`, CI Run
+`36244779460`; Smoke Port **8042** bestanden). Merge folgt. UPL-004 **ERFÜLLT**;
+`BL-P9-01` **abgeschlossen**.
+
+- Endpoint `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field`
+- Nur optionale Datei-Felder `applies_to=dispo_order` (Header/Position im Snapshot)
+- Upload-Rollen/-Status wie **BL-P9-01b**; ProductManagement NEIN
+- Nutzer-Ersetzen historisiert Vorgänger (`reason=replace`); Admin-Archiv löscht
+  aktive Feldreferenz (`value_json` leer)
+- Kein `require_field` / keine Pflicht-UI für `file`; kein Kalkulations-Datei-Upload;
+  keine Freigabeinvalidierung; Blockliste gilt auch mit Feld-Allowlist (inkl. PE-MIME)
+
 ## Ist-Stand BL-P8-02a (PO-BLP802A-1)
 
 Umgesetzt + manuell abgenommen: bewusste operative Statusübergänge bis Disponiert

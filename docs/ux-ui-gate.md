@@ -1,6 +1,6 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 25. September 2026
+- **Stand:** 26. September 2026
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
@@ -11,16 +11,21 @@
   + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1**
   + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1**
   + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1**
-  + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**)
+  + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**
+  + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – manuell abgenommen; Merge PR **#86** folgt)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 25.09.2026 (PO-BLP901B-1):** zusätzlich freigegeben (dieser
-  Slice) sind feste Materialuploads + Audio (UPL-007, UPL-005 fest, zentrale
-  Liste erweitert). **Nicht** freigegeben: Dyn-Feld-Dateien (BL-P9-01c),
-  allgemeine Kommentare, Notifications, Freigabeinvalidierung, sonstiger Gate-D-Rest.
+- **Hinweis Stand 26.09.2026 (PO-BLP901C-1):** zusätzlich freigegeben (dieser
+  Slice) sind **optionale** Dispo-Datei-Dynamikfelder (`applies_to=dispo_order`,
+  Header/Position) in zentraler Uploadliste (UPL-004 **ERFÜLLT**). Manuell
+  abgenommen (PR **#86**, Feature-HEAD `525faab…`); Merge folgt. **Nicht**
+  freigegeben: allgemeine Kommentare,
+  Notifications, Freigabeinvalidierung, sonstiger Gate-D-Rest.
+- **Hinweis Stand 25.09.2026 (PO-BLP901B-1):** feste Materialuploads + Audio
+  (UPL-007, UPL-005 fest, zentrale Liste erweitert); manuell abgenommen PR **#82**.
 - **Hinweis Stand 25.09.2026 (PO-BLP901A-1):** zusätzlich freigegeben und
   abgeschlossen (PR **#80** MERGED + manuell abgenommen) sind Upload-Fundament
   und Kundenbestätigungs-Upload inkl. Dateiliste (UPL-001 A∨B, UPL-004 Teil,
@@ -51,7 +56,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -363,10 +368,29 @@ Ausschließlich freigegeben für diesen Slice:
 - zentrale Uploadliste erweitert; Admin-Archiv für alle festen Kategorien
 - UPL-007 vollständig; UPL-005 für feste Kategorien vollständig
 
+**Product-Owner-Teilfreigabe (26. September 2026, UX-GATE-D / BL-P9-01c / PO-BLP901C-1):**
+Ausschließlich freigegeben für diesen Slice (manuell abgenommen; Feature-HEAD
+`525faab…`; Merge PR **#86** folgt):
+
+- optionale Datei-Dynamikfelder nur am **Dispoauftrag** (`applies_to=dispo_order`,
+  Feldtyp `file`; kein Kalkulations-Upload in 01c)
+- **E1:** Header- und Positions-Datei-Felder im Dispo-Snapshot; kein `both`
+- **E2:** strikt optional – kein `require_field`, kein `required_override=true`
+  (Admin-UI bietet Pflicht für `file` nicht an)
+- **E3:** Wert in `value_json` kanonisch `{"upload_id": int}` oder leer
+- **E4:** Kategorie `dynamic_field` in zentraler Uploadliste inkl. Feldlabel-Snapshot
+- **E5:** Nutzer-Ersetzen historisiert Vorgänger (Audit `reason=replace`) –
+  **≠** Admin-Archiv (löscht aktive Feldreferenz)
+- **E6:** Upload-Rollen/-Status wie Material (Sales/Disposition/Admin/Management;
+  ProductManagement NEIN; Draft + operativ laut 9-01b-Matrix)
+- **E7:** keine Freigabeinvalidierung; kein Status-Automatismus
+- UPL-004 **ERFÜLLT**; `BL-P9-01` **abgeschlossen**
+- Smoke-Nachzug: PE-MIME `application/vnd.microsoft.portable-executable` in
+  globaler Blockliste (auch bei Feld-Allowlist)
+
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
-- Dyn-Feld-Dateien in der Uploadliste (UPL-004 Rest / BL-P9-01c)
 - allgemeine Kommentare, Notifications
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
@@ -386,7 +410,8 @@ nachbessern und einen neuen verknüpften Entwurf erzeugen. Operative Statuswerte
 bis Disponiert sind über BL-P8-02a erreichbar; Rückfrage Vertrieb über BL-P8-02b;
 Ausnahmeweg Kundenbestätigung über BL-P8-02c; Completion über BL-P8-02d;
 Completed-Reopen und Storno über BL-P8-02e; Kundenbestätigungs-Upload über BL-P9-01a;
-Material- und Audio-Uploads über BL-P9-01b.
+Material- und Audio-Uploads über BL-P9-01b; dynamische Dispo-Datei-Felder über
+BL-P9-01c.
 
 ## Erlaubt / nicht erlaubt
 
@@ -394,7 +419,7 @@ Material- und Audio-Uploads über BL-P9-01b.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1); Dyn-Feld-Dateien/allgemeine Kommentare/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1); allgemeine Kommentare/Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

@@ -389,4 +389,31 @@ describe('dynamic-field-rules', () => {
             ),
         ).not.toThrow();
     });
+
+    it('rejects require_field targeting file fields', () => {
+        const defs: Record<string, RuleFieldDefinition> = {
+            trigger: {
+                key: 'trigger',
+                field_type: 'boolean',
+                scope: 'header',
+            },
+            attachment: {
+                key: 'attachment',
+                field_type: 'file',
+                scope: 'header',
+            },
+        };
+
+        expect(() =>
+            assertRuleStructure(
+                defs,
+                {
+                    op: 'field_equals',
+                    field_key: 'trigger',
+                    value: true,
+                },
+                { op: 'require_field', field_key: 'attachment' },
+            ),
+        ).toThrow(/Datei-Felder/);
+    });
 });

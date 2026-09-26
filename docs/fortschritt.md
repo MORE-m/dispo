@@ -1,28 +1,49 @@
 # Fortschritt V1
 
-Stand: 25. September 2026 – **BL-P9-01b** feste Materialuploads + Audio / UPL-007
-(PO-BLP901B-1) **manuell abgenommen** (Feature-HEAD `0adacb3…`). Base: `main`
-`c64518dcc53ad154b973f3a99649f4ab075f09d8` (inkl. PR **#80** BL-P9-01a). Merge
-PR **#82** folgt nach Abschluss-Gates.
+Stand: 26. September 2026 – **BL-P9-01c** Dyn-Feld-Dateien / UPL-004 Rest
+(PO-BLP901C-1) **manuell abgenommen** (Feature-HEAD `525faab…`, PR **#86**).
+UPL-004 **ERFÜLLT**; **`BL-P9-01` abgeschlossen**. Merge PR **#86** folgt.
+**BL-P9-01b** (PO-BLP901B-1) manuell abgenommen (Feature-HEAD `0adacb3…`,
+PR **#82**).
 
 ## Aktuelle Phase
 
-Phase 9 / **`BL-P9-01` teilweise** nach **`BL-P9-01a`** + **`BL-P9-01b`**.
-`BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005 für feste Uploadkategorien
-**ERFÜLLT**; UPL-006 weiter erfüllt. Offen u. a.: Dyn-Feld-Dateien in zentraler
-Uploadliste (UPL-004 Rest → **BL-P9-01c**).
+Phase 9 / **`BL-P9-01` ERLEDIGT** (`BL-P9-01a` + `BL-P9-01b` + `BL-P9-01c`
+manuell abgenommen). `BL-P8-02` **ERLEDIGT**. UPL-007 **ERFÜLLT**; UPL-005
+feste Kategorien **ERFÜLLT**; UPL-006 weiter; UPL-004 **ERFÜLLT**.
 
 ## Aktuelle Aufgabe
 
-**BL-P9-01b** manuell abgenommen (PO-BLP901B-1). Nächster Slice nur nach expliziter
-PO-Teilfreigabe: **BL-P9-01c** Dyn-Feld-Dateien in zentraler Uploadliste.
-Kein automatisches BL-P9-02/03.
+Merge PR **#86** (BL-P9-01c). Danach kein automatisches BL-P9-02/03.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-01b** Material- + Audio-Uploads (PR **#82**, Feature-HEAD `0adacb3…`,
-manuell abgenommen inkl. Smoke/MP3-Nachtest Port **8041**). Davor: PR **#80**
-BL-P9-01a auf `main` (Merge `3ba505735…`), manuell abgenommen.
+**BL-P9-01c** manuell abgenommen (Port **8042**; Feature-HEAD `525faab…`).
+Davor: **BL-P9-01b** manuell abgenommen (Port **8041**).
+
+## BL-P9-01c – Dyn-Feld-Dateien / PO-BLP901C-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP901C-1 | **freigegeben** (nur 9-01c-Scope) |
+| Optionale Dispo-Datei-Felder (`applies_to=dispo_order`); kein Calc-Upload | **umgesetzt** |
+| `POST …/uploads/dynamisches-feld`; Kategorie `dynamic_field` | **umgesetzt** |
+| `value_json` `{"upload_id": int}`; Replace historisiert; Admin-Archiv ≠ Replace | **umgesetzt** |
+| Kein `require_field` / keine Pflicht-UI für `file`; keine Freigabeinvalidierung | **umgesetzt** |
+| Rollen/Status wie Material (PM NEIN) | **umgesetzt** |
+| Unit/Feature/Vitest/Playwright Port **8042** | **umgesetzt** |
+| Smoke-HEAD (Code, post-rewrite) | `114a23371ccb563dd50c7037c5846523078a1a68` |
+| Smoke-HEAD (pre-rewrite, gleiche Tree) | `f1140a6b76335fa5d296e976409cbb29323d58ed` |
+| CI Smoke-HEAD | Run `36240049854` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Trailer-Rewrite | `Co-authored-by: Cursor` aus 3 Commits entfernt; Tree unverändert |
+| Feature-HEAD | `525faab5e52a821ec2514a020c0090032d6f2583` |
+| CI Feature-HEAD | Run `36244779460` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
+| Browser-Smoke Port **8042** | **BESTANDEN** (Fälle 1–7; zwei Fixes vor Abschluss) |
+| Formale PO-Abnahme | **ERFOLGREICH** (manuell abgenommen) |
+| UPL-004 | **ERFÜLLT** |
+| `BL-P9-01` insgesamt | **abgeschlossen** |
+| Merge `main` | **folgt** (PR **#86**) |
+| Kommentare / Notifications / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-01b – Materialuploads + Audio / PO-BLP901B-1 (September 2026)
 
@@ -39,7 +60,7 @@ BL-P9-01a auf `main` (Merge `3ba505735…`), manuell abgenommen.
 | Unit/Feature/MySQL/Vitest/Playwright Port **8041** | **umgesetzt** |
 | UPL-007 | **ERFÜLLT** |
 | UPL-005 feste Kategorien | **ERFÜLLT** |
-| UPL-004 / `BL-P9-01` | **weiter teilweise** (Dyn-Feld-Dateien offen → 01c) |
+| UPL-004 / `BL-P9-01` | **geschlossen über 01c** |
 | Feature-HEAD | `0adacb3c4a83f8b763a83b51916c4e5342a68623` |
 | CI Feature-HEAD | Run `36182337813` SUCCESS (`ci`/`mysql`/`e2e-spt008`) |
 | Manuelle Abnahme | **ERFOLGREICH** (Port **8041** / `e2e-bl-p9-01b.sqlite`; Smoke + echte MP3) |

@@ -601,6 +601,7 @@ final class FieldSetVersionRulesWriter
             FieldType::ShortText => 'Beispiel',
             FieldType::LongText => 'Beispieltext für die Admin-Vorschau.',
             FieldType::Select, FieldType::MultiSelect => null,
+            FieldType::File => null,
         };
     }
 

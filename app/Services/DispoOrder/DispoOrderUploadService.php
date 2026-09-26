@@ -4,11 +4,20 @@ namespace App\Services\DispoOrder;
 
 use App\Enums\DispoOrderStatus;
 use App\Enums\DispoOrderUploadCategory;
+use App\Enums\FieldAppliesTo;
+use App\Enums\FieldScope;
+use App\Enums\FieldType;
 use App\Exceptions\DispoOrderConflictException;
+use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderFieldValue;
+use App\Models\DispoOrderPosition;
+use App\Models\DispoOrderPositionFieldValue;
 use App\Models\DispoOrderUpload;
+use App\Models\SnapshotFieldDefinition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Support\DynamicField\FileFieldValueContract;
 use App\Support\PrivateFileStorage;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -68,6 +77,7 @@ final class DispoOrderUploadService
     private const BLOCKED_MIME_PREFIXES = [
         'application/x-msdownload',
         'application/x-msdos-program',
+        'application/vnd.microsoft.portable-executable',
         'application/x-executable',
         'application/x-sharedlib',
         'application/x-httpd-php',
@@ -153,6 +163,124 @@ final class DispoOrderUploadService
         );
     }
 
+    public function uploadDynamicFieldFile(
+        DispoOrder $order,
+        User $user,
+        int $expectedLockVersion,
+        UploadedFile $file,
+        string $fieldKey,
+        ?int $positionId,
+    ): DispoOrderUpload {
+        if (! Gate::forUser($user)->allows('uploadMaterial', $order)) {
+            abort(403);
+        }
+
+        $resolved = $this->resolveDynamicFieldUploadTarget($order, $fieldKey, $positionId);
+        /** @var SnapshotFieldDefinition $def */
+        $def = $resolved['definition'];
+        /** @var DispoOrderPosition|null $position */
+        $position = $resolved['position'];
+
+        $allowedMimeTypes = $this->allowedMimeTypesFromValidation($def->validation_json);
+        $this->assertUploadFile($file, null, $allowedMimeTypes);
+
+        $orderId = (int) $order->id;
+        $uuid = Str::uuid()->toString();
+        $storagePath = self::STORAGE_PREFIX.$orderId.'/uploads/'.$uuid;
+        $this->assertSafeStoragePath($storagePath);
+
+        $prepared = $this->prepareUploadedFilePayload($file, $storagePath);
+
+        try {
+            return DB::transaction(function () use (
+                $order,
+                $user,
+                $expectedLockVersion,
+                $fieldKey,
+                $def,
+                $position,
+                $prepared,
+            ): DispoOrderUpload {
+                $locked = $this->lockOrder($order);
+                $this->assertLockVersion($locked, $expectedLockVersion);
+
+                if (! $this->statusAllowsMaterialUpload($locked->status)) {
+                    throw ValidationException::withMessages([
+                        'order' => 'Datei-Uploads für dynamische Felder sind in diesem Status nicht erlaubt.',
+                    ]);
+                }
+
+                if (! Gate::forUser($user)->allows('uploadMaterial', $locked)) {
+                    abort(403);
+                }
+
+                $resolved = $this->resolveDynamicFieldUploadTarget($locked, $fieldKey, $position?->id);
+                $def = $resolved['definition'];
+                $position = $resolved['position'];
+
+                $previousUploadId = $this->readCurrentDynamicFieldUploadId($locked, $def, $position);
+                if ($previousUploadId !== null) {
+                    $this->historizeDynamicFieldUpload($locked, $previousUploadId, $user, $fieldKey);
+                }
+
+                $positionLabel = $position === null
+                    ? null
+                    : $this->positionLabelSnapshot($position);
+
+                $upload = DispoOrderUpload::query()->create([
+                    'dispo_order_id' => $locked->id,
+                    'category' => DispoOrderUploadCategory::DynamicField,
+                    'field_key' => $def->key,
+                    'field_label_snapshot' => $def->label,
+                    'snapshot_field_definition_id' => $def->id,
+                    'dispo_order_position_id' => $position?->id,
+                    'position_label_snapshot' => $positionLabel,
+                    'original_filename' => $prepared['original_filename'],
+                    'storage_path' => $prepared['storage_path'],
+                    'mime_type' => $prepared['mime'],
+                    'size_bytes' => $prepared['size_bytes'],
+                    'sha256' => $prepared['sha256'],
+                    'uploaded_by_user_id' => $user->id,
+                    'uploaded_by_name_snapshot' => $user->name,
+                    'uploaded_at' => Carbon::now(),
+                ]);
+
+                $this->writeDynamicFieldUploadReference($locked, $def, $position, (int) $upload->id);
+
+                $locked->lock_version = $locked->lock_version + 1;
+                $locked->save();
+
+                $this->audit->record(
+                    $locked,
+                    'dispo_order.upload.created',
+                    $user,
+                    null,
+                    [
+                        'upload_id' => $upload->id,
+                        'category' => $upload->category->value,
+                        'field_key' => $def->key,
+                        'original_filename' => $upload->original_filename,
+                        'mime_type' => $upload->mime_type,
+                        'size_bytes' => $upload->size_bytes,
+                        'sha256' => $upload->sha256,
+                        'lock_version' => $locked->lock_version,
+                    ],
+                );
+
+                return $upload->fresh() ?? $upload;
+            });
+        } catch (Throwable $exception) {
+            if ($this->files->exists($prepared['storage_path'])) {
+                try {
+                    $this->files->disk()->delete($prepared['storage_path']);
+                } catch (Throwable) {
+                }
+            }
+
+            throw $exception;
+        }
+    }
+
     public function archive(
         DispoOrder $order,
         DispoOrderUpload $upload,
@@ -195,6 +323,19 @@ final class DispoOrderUploadService
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
+            $this->clearDynamicFieldReferenceIfCurrent($locked, $lockedUpload);
+
+            $auditAfter = [
+                'upload_id' => $lockedUpload->id,
+                'category' => $lockedUpload->category->value,
+                'archived' => true,
+                'archived_at' => $lockedUpload->archived_at->toIso8601String(),
+                'lock_version' => $locked->lock_version,
+            ];
+            if ($lockedUpload->field_key !== null) {
+                $auditAfter['field_key'] = $lockedUpload->field_key;
+            }
+
             $this->audit->record(
                 $locked,
                 'dispo_order.upload.archived',
@@ -204,13 +345,7 @@ final class DispoOrderUploadService
                     'category' => $lockedUpload->category->value,
                     'archived' => false,
                 ],
-                [
-                    'upload_id' => $lockedUpload->id,
-                    'category' => $lockedUpload->category->value,
-                    'archived' => true,
-                    'archived_at' => $lockedUpload->archived_at->toIso8601String(),
-                    'lock_version' => $locked->lock_version,
-                ],
+                $auditAfter,
             );
 
             return $lockedUpload->fresh() ?? $lockedUpload;
@@ -412,6 +547,11 @@ final class DispoOrderUploadService
             ]);
         }
 
+        $payload['field_key'] = $upload->field_key;
+        $payload['field_label'] = $upload->field_label_snapshot;
+        $payload['position_id'] = $upload->dispo_order_position_id;
+        $payload['position_label'] = $upload->position_label_snapshot;
+
         return $payload;
     }
 
@@ -539,9 +679,13 @@ final class DispoOrderUploadService
         }
     }
 
+    /**
+     * @param  list<string>|null  $allowedMimeTypes
+     */
     private function assertUploadFile(
         UploadedFile $file,
         ?DispoOrderUploadCategory $category = null,
+        ?array $allowedMimeTypes = null,
     ): void {
         if (! $file->isValid()) {
             throw ValidationException::withMessages([
@@ -578,6 +722,14 @@ final class DispoOrderUploadService
             if ($mime !== null && str_starts_with($mime, $blocked)) {
                 throw ValidationException::withMessages([
                     'file' => 'Dieser Dateityp ist aus Sicherheitsgründen nicht zulässig.',
+                ]);
+            }
+        }
+
+        if ($allowedMimeTypes !== null && $allowedMimeTypes !== []) {
+            if ($mime === null || ! in_array($mime, $allowedMimeTypes, true)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Dieser Dateityp ist für dieses Feld nicht zulässig.',
                 ]);
             }
         }
@@ -643,5 +795,347 @@ final class DispoOrderUploadService
                 'Der Dispoauftrag wurde parallel geändert. Bitte die Seite neu laden.',
             );
         }
+    }
+
+    /**
+     * @return array{
+     *     definition: SnapshotFieldDefinition,
+     *     owner_snapshot: ConfigurationSnapshot,
+     *     position: DispoOrderPosition|null
+     * }
+     */
+    private function resolveDynamicFieldUploadTarget(
+        DispoOrder $order,
+        string $fieldKey,
+        ?int $positionId,
+    ): array {
+        $fieldKey = trim($fieldKey);
+        if ($fieldKey === '') {
+            throw ValidationException::withMessages([
+                'field_key' => 'field_key ist erforderlich.',
+            ]);
+        }
+
+        $order->loadMissing(['configurationSnapshot', 'positions']);
+        $baseSnapshot = $order->configurationSnapshot;
+        $baseSnapshot->loadMissing('fieldDefinitions');
+
+        $position = null;
+        $ownerSnapshot = $baseSnapshot;
+
+        if ($positionId !== null) {
+            $position = $order->positions->firstWhere('id', $positionId);
+            if ($position === null) {
+                throw ValidationException::withMessages([
+                    'position_id' => 'Die Position gehört nicht zu diesem Dispoauftrag.',
+                ]);
+            }
+            $ownerSnapshot = $this->positionEffectiveSnapshot($baseSnapshot, $position);
+        }
+
+        $def = $ownerSnapshot->fieldDefinitions->firstWhere('key', $fieldKey);
+        if ($def === null) {
+            throw ValidationException::withMessages([
+                'field_key' => 'Unbekanntes dynamisches Feld.',
+            ]);
+        }
+
+        if ($def->field_type !== FieldType::File) {
+            throw ValidationException::withMessages([
+                'field_key' => 'Das Feld ist kein Datei-Feld.',
+            ]);
+        }
+
+        if ($def->applies_to !== FieldAppliesTo::DispoOrder) {
+            throw ValidationException::withMessages([
+                'field_key' => 'Datei-Felder sind nur für Dispoauftrag-Felder (applies_to=dispo_order) zulässig.',
+            ]);
+        }
+
+        if ($def->scope === FieldScope::Header && $positionId !== null) {
+            throw ValidationException::withMessages([
+                'position_id' => 'Header-Datei-Felder dürfen keine position_id tragen.',
+            ]);
+        }
+
+        if ($def->scope === FieldScope::Position && $positionId === null) {
+            throw ValidationException::withMessages([
+                'position_id' => 'Für Positions-Datei-Felder ist position_id erforderlich.',
+            ]);
+        }
+
+        return [
+            'definition' => $def,
+            'owner_snapshot' => $ownerSnapshot,
+            'position' => $position,
+        ];
+    }
+
+    private function positionEffectiveSnapshot(
+        ConfigurationSnapshot $baseSnapshot,
+        DispoOrderPosition $position,
+    ): ConfigurationSnapshot {
+        if ((int) $baseSnapshot->format_version !== ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE) {
+            return $baseSnapshot;
+        }
+
+        $position->loadMissing('effectiveConfigurationSnapshot.fieldDefinitions');
+        $effective = $position->effectiveConfigurationSnapshot;
+        if ($effective === null) {
+            throw ValidationException::withMessages([
+                'position_id' => 'Die Position hat keinen Effektiv-Snapshot.',
+            ]);
+        }
+
+        $effective->loadMissing('fieldDefinitions');
+
+        return $effective;
+    }
+
+    private function positionLabelSnapshot(DispoOrderPosition $position): string
+    {
+        $inventory = trim((string) $position->inventory_name);
+        $medium = trim((string) $position->advertising_medium_name);
+        if ($inventory === '' && $medium === '') {
+            return 'Position #'.$position->id;
+        }
+        if ($inventory === '') {
+            return $medium;
+        }
+        if ($medium === '') {
+            return $inventory;
+        }
+
+        return $inventory.' · '.$medium;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $validationJson
+     * @return list<string>|null
+     */
+    private function allowedMimeTypesFromValidation(?array $validationJson): ?array
+    {
+        if (! is_array($validationJson)) {
+            return null;
+        }
+
+        $raw = $validationJson['allowed_mime_types'] ?? null;
+        if (! is_array($raw) || $raw === []) {
+            return null;
+        }
+
+        $list = [];
+        foreach ($raw as $mime) {
+            if (is_string($mime) && trim($mime) !== '') {
+                $list[] = strtolower(trim($mime));
+            }
+        }
+
+        return $list === [] ? null : $list;
+    }
+
+    /**
+     * @return array{
+     *     storage_path: string,
+     *     original_filename: string,
+     *     mime: ?string,
+     *     size_bytes: int,
+     *     sha256: string
+     * }
+     */
+    private function prepareUploadedFilePayload(UploadedFile $file, string $storagePath): array
+    {
+        $absolute = $file->getRealPath();
+        if ($absolute === false || $absolute === '' || ! is_file($absolute)) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gelesen werden.',
+            ]);
+        }
+
+        $sha256 = hash_file('sha256', $absolute);
+        if ($sha256 === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gehasht werden.',
+            ]);
+        }
+
+        $sizeBytes = (int) $file->getSize();
+        $mime = $this->normalizeMime($file);
+        $originalFilename = $this->sanitizeOriginalFilename($file->getClientOriginalName());
+
+        $stream = fopen($absolute, 'rb');
+        if ($stream === false) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gelesen werden.',
+            ]);
+        }
+
+        try {
+            $written = $this->files->disk()->writeStream($storagePath, $stream);
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+        }
+
+        if ($written !== true) {
+            throw ValidationException::withMessages([
+                'file' => 'Die Datei konnte nicht gespeichert werden.',
+            ]);
+        }
+
+        return [
+            'storage_path' => $storagePath,
+            'original_filename' => $originalFilename,
+            'mime' => $mime,
+            'size_bytes' => $sizeBytes,
+            'sha256' => $sha256,
+        ];
+    }
+
+    private function readCurrentDynamicFieldUploadId(
+        DispoOrder $order,
+        SnapshotFieldDefinition $def,
+        ?DispoOrderPosition $position,
+    ): ?int {
+        if ($def->scope === FieldScope::Header) {
+            $row = DispoOrderFieldValue::query()
+                ->where('dispo_order_id', $order->id)
+                ->where('snapshot_field_definition_id', $def->id)
+                ->first();
+
+            return $row === null ? null : FileFieldValueContract::readUploadId($row);
+        }
+
+        if ($position === null) {
+            return null;
+        }
+
+        $row = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $position->id)
+            ->where('snapshot_field_definition_id', $def->id)
+            ->first();
+
+        return $row === null ? null : FileFieldValueContract::readUploadId($row);
+    }
+
+    private function writeDynamicFieldUploadReference(
+        DispoOrder $order,
+        SnapshotFieldDefinition $def,
+        ?DispoOrderPosition $position,
+        int $uploadId,
+    ): void {
+        if ($def->scope === FieldScope::Header) {
+            $row = DispoOrderFieldValue::query()->firstOrNew([
+                'dispo_order_id' => $order->id,
+                'snapshot_field_definition_id' => $def->id,
+            ]);
+            FileFieldValueContract::writeStored($def, $row, $uploadId);
+            $row->save();
+
+            return;
+        }
+
+        if ($position === null) {
+            throw ValidationException::withMessages([
+                'position_id' => 'Positions-Datei-Felder benötigen eine gültige Position.',
+            ]);
+        }
+
+        $row = DispoOrderPositionFieldValue::query()->firstOrNew([
+            'dispo_order_position_id' => $position->id,
+            'snapshot_field_definition_id' => $def->id,
+        ]);
+        FileFieldValueContract::writeStored($def, $row, $uploadId);
+        $row->save();
+    }
+
+    private function historizeDynamicFieldUpload(
+        DispoOrder $order,
+        int $uploadId,
+        User $user,
+        string $fieldKey,
+    ): void {
+        $previous = DispoOrderUpload::query()
+            ->whereKey($uploadId)
+            ->where('dispo_order_id', $order->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($previous === null || $previous->isArchived()) {
+            return;
+        }
+
+        $previous->archived_at = Carbon::now();
+        $previous->archived_by_user_id = $user->id;
+        $previous->archived_by_name_snapshot = $user->name;
+        $previous->save();
+
+        $this->audit->record(
+            $order,
+            'dispo_order.upload.archived',
+            $user,
+            [
+                'upload_id' => $previous->id,
+                'category' => $previous->category->value,
+                'field_key' => $fieldKey,
+                'archived' => false,
+                'reason' => 'replace',
+            ],
+            [
+                'upload_id' => $previous->id,
+                'category' => $previous->category->value,
+                'field_key' => $fieldKey,
+                'archived' => true,
+                'archived_at' => $previous->archived_at->toIso8601String(),
+                'reason' => 'replace',
+            ],
+        );
+    }
+
+    private function clearDynamicFieldReferenceIfCurrent(DispoOrder $order, DispoOrderUpload $upload): void
+    {
+        if (! $upload->category->isDynamicField() || $upload->field_key === null) {
+            return;
+        }
+
+        $snapshotDefId = $upload->snapshot_field_definition_id;
+        if ($snapshotDefId === null) {
+            return;
+        }
+
+        if ($upload->dispo_order_position_id === null) {
+            $row = DispoOrderFieldValue::query()
+                ->where('dispo_order_id', $order->id)
+                ->where('snapshot_field_definition_id', $snapshotDefId)
+                ->lockForUpdate()
+                ->first();
+            if ($row === null) {
+                return;
+            }
+            if (FileFieldValueContract::readUploadId($row) !== (int) $upload->id) {
+                return;
+            }
+            $def = SnapshotFieldDefinition::query()->whereKey($snapshotDefId)->firstOrFail();
+            FileFieldValueContract::writeStored($def, $row, null);
+            $row->save();
+
+            return;
+        }
+
+        $row = DispoOrderPositionFieldValue::query()
+            ->where('dispo_order_position_id', $upload->dispo_order_position_id)
+            ->where('snapshot_field_definition_id', $snapshotDefId)
+            ->lockForUpdate()
+            ->first();
+        if ($row === null) {
+            return;
+        }
+        if (FileFieldValueContract::readUploadId($row) !== (int) $upload->id) {
+            return;
+        }
+        $def = SnapshotFieldDefinition::query()->whereKey($snapshotDefId)->firstOrFail();
+        FileFieldValueContract::writeStored($def, $row, null);
+        $row->save();
     }
 }

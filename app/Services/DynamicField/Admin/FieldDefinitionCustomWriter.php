@@ -43,7 +43,8 @@ final class FieldDefinitionCustomWriter
      *     group_key?: string|null,
      *     sort_default?: int,
      *     reportable?: bool,
-     *     max_length?: int|null
+     *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null
      * }  $payload
      */
     public function create(array $payload, User $actor): FieldDefinition
@@ -52,10 +53,13 @@ final class FieldDefinitionCustomWriter
         $scope = $this->normalizeScope($payload['scope']);
         $appliesTo = $this->normalizeAppliesTo($payload['applies_to']);
         $this->assertAllowedCustomType($fieldType);
+        $this->assertFileAppliesToOnlyDispoOrder($fieldType, $appliesTo);
         $validationJson = $this->resolveValidationJson(
             $fieldType,
             array_key_exists('max_length', $payload),
             $payload['max_length'] ?? null,
+            array_key_exists('allowed_mime_types', $payload),
+            $payload['allowed_mime_types'] ?? null,
         );
         $keyCandidate = $payload['key'] ?? null;
         $explicitKey = is_string($keyCandidate) && trim($keyCandidate) !== ''
@@ -108,7 +112,10 @@ final class FieldDefinitionCustomWriter
                     'lock_version' => $definition->lock_version,
                     'revision_id' => $revision->id,
                     'label' => $revision->label,
-                    'max_length' => is_array($validationJson) ? $validationJson['max_length'] : null,
+                    'max_length' => is_array($validationJson) ? ($validationJson['max_length'] ?? null) : null,
+                    'allowed_mime_types' => is_array($validationJson)
+                        ? ($validationJson['allowed_mime_types'] ?? null)
+                        : null,
                 ],
             );
 
@@ -129,6 +136,7 @@ final class FieldDefinitionCustomWriter
      *     sort_default?: int,
      *     reportable?: bool,
      *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null,
      *     lock_version: int
      * }  $payload
      */
@@ -183,14 +191,21 @@ final class FieldDefinitionCustomWriter
             }
 
             $fieldType = $locked->field_type;
+            $this->assertFileAppliesToOnlyDispoOrder($fieldType, $locked->applies_to);
             $previousMaxLength = is_array($previous->validation_json)
                 ? ($previous->validation_json['max_length'] ?? null)
                 : null;
+            $previousAllowedMime = is_array($previous->validation_json)
+                ? ($previous->validation_json['allowed_mime_types'] ?? null)
+                : null;
             $maxLengthPresent = array_key_exists('max_length', $payload);
+            $allowedMimePresent = array_key_exists('allowed_mime_types', $payload);
             $validationJson = $this->resolveValidationJson(
                 $fieldType,
                 $maxLengthPresent,
                 $maxLengthPresent ? ($payload['max_length'] ?? null) : $previousMaxLength,
+                $allowedMimePresent,
+                $allowedMimePresent ? ($payload['allowed_mime_types'] ?? null) : $previousAllowedMime,
             );
 
             if (isset($payload['label'])) {
@@ -246,6 +261,7 @@ final class FieldDefinitionCustomWriter
      *     sort_default: int,
      *     reportable: bool,
      *     max_length?: int|null,
+     *     allowed_mime_types?: list<string>|null,
      *     lock_version: int
      * }  $payload
      */
@@ -254,11 +270,33 @@ final class FieldDefinitionCustomWriter
         $this->assertCustom($definition);
 
         $fieldType = $definition->field_type;
-        if ($fieldType->isChoice()) {
+        if ($fieldType->isChoice() || $fieldType->isFile()) {
             if (array_key_exists('max_length', $payload) && $payload['max_length'] !== null) {
                 throw ValidationException::withMessages([
-                    'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
+                    'max_length' => 'max_length ist für select-, multi_select- und file-Felder nicht zulässig.',
                 ]);
+            }
+
+            if ($fieldType->isFile()) {
+                $allowedMime = array_key_exists('allowed_mime_types', $payload)
+                    ? $this->normalizeAllowedMimeTypes($payload['allowed_mime_types'])
+                    : (is_array($definition->currentRevision?->validation_json)
+                        ? ($definition->currentRevision->validation_json['allowed_mime_types'] ?? null)
+                        : null);
+
+                return $this->revisions->createRevision(
+                    $definition,
+                    [
+                        'label' => $payload['label'],
+                        'help_text' => $payload['help_text'] ?? null,
+                        'group_key' => $payload['group_key'] ?? null,
+                        'sort_default' => (int) $payload['sort_default'],
+                        'reportable' => (bool) $payload['reportable'],
+                        'validation_json' => $this->validationJsonFromAllowedMimeTypes($allowedMime),
+                    ],
+                    $actor,
+                    (int) $payload['lock_version'],
+                );
             }
 
             return $this->revisions->createRevision(
@@ -441,9 +479,19 @@ final class FieldDefinitionCustomWriter
             FieldType::LongText,
             FieldType::Select,
             FieldType::MultiSelect,
+            FieldType::File,
         ], true)) {
             throw ValidationException::withMessages([
-                'field_type' => 'Zulässig sind short_text, long_text, select und multi_select.',
+                'field_type' => 'Zulässig sind short_text, long_text, select, multi_select und file.',
+            ]);
+        }
+    }
+
+    private function assertFileAppliesToOnlyDispoOrder(FieldType $fieldType, FieldAppliesTo $appliesTo): void
+    {
+        if ($fieldType->isFile() && $appliesTo !== FieldAppliesTo::DispoOrder) {
+            throw ValidationException::withMessages([
+                'applies_to' => 'Datei-Felder sind nur mit applies_to dispo_order zulässig.',
             ]);
         }
     }
@@ -471,12 +519,17 @@ final class FieldDefinitionCustomWriter
     }
 
     /**
-     * @return array{max_length: int}|null
+     * @return array{max_length?: int, allowed_mime_types?: list<string>}|null
      */
-    private function resolveValidationJson(FieldType $fieldType, bool $maxLengthPresent, mixed $raw): ?array
-    {
+    private function resolveValidationJson(
+        FieldType $fieldType,
+        bool $maxLengthPresent,
+        mixed $maxLengthRaw,
+        bool $allowedMimeTypesPresent,
+        mixed $allowedMimeTypesRaw,
+    ): ?array {
         if ($fieldType->isChoice()) {
-            if ($maxLengthPresent && $raw !== null && $raw !== '') {
+            if ($maxLengthPresent && $maxLengthRaw !== null && $maxLengthRaw !== '') {
                 throw ValidationException::withMessages([
                     'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
                 ]);
@@ -485,14 +538,74 @@ final class FieldDefinitionCustomWriter
             return null;
         }
 
-        return ['max_length' => $this->resolveMaxLength($fieldType, $raw)];
+        if ($fieldType->isFile()) {
+            if ($maxLengthPresent && $maxLengthRaw !== null && $maxLengthRaw !== '') {
+                throw ValidationException::withMessages([
+                    'max_length' => 'max_length ist für file-Felder nicht zulässig.',
+                ]);
+            }
+
+            if (! $allowedMimeTypesPresent) {
+                return null;
+            }
+
+            return $this->validationJsonFromAllowedMimeTypes(
+                $this->normalizeAllowedMimeTypes($allowedMimeTypesRaw),
+            );
+        }
+
+        return ['max_length' => $this->resolveMaxLength($fieldType, $maxLengthRaw)];
+    }
+
+    /**
+     * @param  list<string>|null  $allowedMimeTypes
+     * @return array{allowed_mime_types: list<string>}|null
+     */
+    private function validationJsonFromAllowedMimeTypes(?array $allowedMimeTypes): ?array
+    {
+        if ($allowedMimeTypes === null || $allowedMimeTypes === []) {
+            return null;
+        }
+
+        return ['allowed_mime_types' => $allowedMimeTypes];
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function normalizeAllowedMimeTypes(mixed $raw): ?array
+    {
+        if ($raw === null) {
+            return null;
+        }
+
+        if (! is_array($raw)) {
+            throw ValidationException::withMessages([
+                'allowed_mime_types' => 'allowed_mime_types muss ein Array von MIME-Typ-Strings sein.',
+            ]);
+        }
+
+        $normalized = [];
+        foreach ($raw as $item) {
+            if (! is_string($item) || trim($item) === '') {
+                throw ValidationException::withMessages([
+                    'allowed_mime_types' => 'allowed_mime_types darf nur nicht-leere MIME-Typ-Strings enthalten.',
+                ]);
+            }
+            $normalized[] = strtolower(trim($item));
+        }
+
+        $unique = array_values(array_unique($normalized));
+        sort($unique, SORT_STRING);
+
+        return $unique === [] ? null : $unique;
     }
 
     private function resolveMaxLength(FieldType $fieldType, mixed $raw): int
     {
-        if ($fieldType->isChoice()) {
+        if ($fieldType->isChoice() || $fieldType->isFile()) {
             throw ValidationException::withMessages([
-                'max_length' => 'max_length ist für select- und multi_select-Felder nicht zulässig.',
+                'max_length' => 'max_length ist für select-, multi_select- und file-Felder nicht zulässig.',
             ]);
         }
 

@@ -52,6 +52,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.uploads.customer-confirmation');
     Route::post('dispoauftraege/{dispoOrder}/uploads', [DispoOrderController::class, 'uploadMaterial'])
         ->name('dispo-orders.uploads.store');
+    Route::post('dispoauftraege/{dispoOrder}/uploads/dynamisches-feld', [DispoOrderController::class, 'uploadDynamicField'])
+        ->name('dispo-orders.uploads.dynamic-field');
     Route::post('dispoauftraege/{dispoOrder}/uploads/{upload}/archivieren', [DispoOrderController::class, 'archiveUpload'])
         ->name('dispo-orders.uploads.archive');
     Route::get('dispoauftraege/{dispoOrder}/uploads/{upload}/download', [DispoOrderController::class, 'downloadUpload'])

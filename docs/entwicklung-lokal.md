@@ -364,6 +364,21 @@ E2E: `npm run test:e2e:blp901b` bzw.
 niemals Dev-DB `dispo`). Server-Helper
 `tests/e2e/helpers/run-blp901b-server.sh` (gleiche 50M/55M-Runtime wie 9-01a).
 
+## BL-P9-01c – Dynamische Dispo-Datei-Felder
+
+Endpoint `POST /dispoauftraege/{order}/uploads/dynamisches-feld`; UI
+`SchemaFileFields` am Dispo-Show; zentrale Uploadliste Kategorie
+`dynamic_field`.
+
+Tests: `DispoOrderDynamicFieldUploadTest`; Vitest
+`schema-file-fields.test.tsx`, `dispo-order-uploads-section.test.tsx`.
+
+E2E: `npm run test:e2e:blp901c` bzw.
+`npx playwright test -c playwright.blp901c.config.ts` (Port **8042**, DB
+`database/e2e-bl-p9-01c.sqlite`, Seeder `E2EDynamicFieldUploadSeeder` –
+niemals Dev-DB `dispo`). Server-Helper
+`tests/e2e/helpers/run-blp901c-server.sh`.
+
 ## BL-P8-02d – Rechnung per Ende + Completion
 
 Migrationen: `invoice_end_months` (JSON nullable) auf `dispo_order_positions`;

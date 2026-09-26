@@ -20,6 +20,7 @@ use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
 use App\Http\Requests\DispoOrder\UploadCustomerConfirmationRequest;
+use App\Http\Requests\DispoOrder\UploadDispoOrderDynamicFieldRequest;
 use App\Http\Requests\DispoOrder\UploadDispoOrderMaterialRequest;
 use App\Models\Calculation;
 use App\Models\DispoOrder;
@@ -342,6 +343,33 @@ class DispoOrderController extends Controller
         ]) ?? $dispoOrder;
 
         return $this->respondSuccess($request, $order, 'Material hochgeladen.');
+    }
+
+    public function uploadDynamicField(
+        UploadDispoOrderDynamicFieldRequest $request,
+        DispoOrder $dispoOrder,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $this->uploads->uploadDynamicFieldFile(
+            $dispoOrder,
+            $user,
+            $request->expectedLockVersion(),
+            $request->file('file'),
+            $request->fieldKey(),
+            $request->positionId(),
+        );
+
+        $order = $dispoOrder->fresh([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+        ]) ?? $dispoOrder;
+
+        return $this->respondSuccess($request, $order, 'Datei hochgeladen.');
     }
 
     public function archiveUpload(

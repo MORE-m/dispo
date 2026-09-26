@@ -12,9 +12,10 @@ use JsonException;
  * Kein Array-Zwang wie beim Eloquent-Cast `array`.
  *
  * Der Cast kennt keinen FieldType und rät nicht: zulässig sind ausschließlich
- * SQL-NULL, JSON-String (Select-Key) oder JSON-Array aus Strings (Multi).
+ * SQL-NULL, JSON-String (Select-Key), JSON-Array aus Strings (Multi)
+ * oder kanonisches Datei-Objekt {"upload_id": int} (BL-P9-01c).
  *
- * @implements CastsAttributes<string|list<string>|null, string|list<string>|null>
+ * @implements CastsAttributes<string|list<string>|array{upload_id: int}|null, string|list<string>|array{upload_id: int}|null>
  */
 final class ChoiceValueJsonCast implements CastsAttributes
 {
@@ -65,7 +66,7 @@ final class ChoiceValueJsonCast implements CastsAttributes
     }
 
     /**
-     * @return string|list<string>
+     * @return string|list<string>|array{upload_id: int}
      */
     private static function assertDecodableChoicePayload(mixed $value, string $key): string|array
     {
@@ -80,6 +81,11 @@ final class ChoiceValueJsonCast implements CastsAttributes
         }
 
         if (! array_is_list($value)) {
+            $filePayload = self::normalizeFileUploadPayload($value, $key);
+            if ($filePayload !== null) {
+                return $filePayload;
+            }
+
             throw new InvalidArgumentException(
                 "{$key} darf kein assoziatives JSON-Objekt sein.",
             );
@@ -95,5 +101,36 @@ final class ChoiceValueJsonCast implements CastsAttributes
 
         /** @var list<string> $value */
         return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $value
+     * @return array{upload_id: int}|null
+     */
+    private static function normalizeFileUploadPayload(array $value, string $key): ?array
+    {
+        if (array_keys($value) !== ['upload_id']) {
+            return null;
+        }
+
+        $uploadId = $value['upload_id'];
+        if (is_int($uploadId)) {
+            if ($uploadId <= 0) {
+                throw new InvalidArgumentException("{$key}.upload_id muss eine positive Ganzzahl sein.");
+            }
+
+            return ['upload_id' => $uploadId];
+        }
+
+        if (is_string($uploadId) && ctype_digit($uploadId)) {
+            $id = (int) $uploadId;
+            if ($id <= 0) {
+                throw new InvalidArgumentException("{$key}.upload_id muss eine positive Ganzzahl sein.");
+            }
+
+            return ['upload_id' => $id];
+        }
+
+        throw new InvalidArgumentException("{$key}.upload_id muss eine positive Ganzzahl sein.");
     }
 }

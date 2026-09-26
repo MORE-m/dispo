@@ -395,7 +395,15 @@ Felder plus Acknowledgement-Felder bei erfolgreicher Genehmigung.
 für feste Materialkategorien `audio_motif`, `briefing`, `script_text`,
 `layout_graphics`, `event_documents`, `other`. Keine Schemaänderung; keine
 Audio-Längen-/Motiv-/Positions-Spalten. Autorisierter Stream-Endpoint nur für
-`audio_motif`. Dyn-Feld-Dateien bleiben außerhalb (BL-P9-01c).
+`audio_motif`.
+
+**BL-P9-01c / PO-BLP901C-1 (September 2026):** Additiv an `dispo_order_uploads`:
+`field_key`, `field_label_snapshot`, `snapshot_field_definition_id`,
+`dispo_order_position_id`, `position_label_snapshot` (nullable; FKs
+`snapshot_field_definitions`, `dispo_order_positions`). Kategorie
+`dynamic_field` produktiv. Datei-Dynamikfelder speichern den aktiven Verweis in
+`dispo_order_field_values` / `dispo_order_position_field_values` als
+`value_json` = `{"upload_id": int}` oder leer (`FileFieldValueContract`).
 
 **BL-P8-02b / PO-BLP802B-1 (September 2026):** Zusätzlich erreichbar:
 
@@ -411,7 +419,6 @@ Append-only Kommunikation: `dispo_order_comments` (`type`, `body`,
 Zusätzlich vorgesehen, aber noch nicht operativ:
 
 - Priorität, Rechnungsempfänger-/Meridian-Snapshot,
-- Dyn-Feld-Dateien in Uploadliste (UPL-004 Rest),
 - allgemeine Kommentare.
 
 ## Dynamische Daten

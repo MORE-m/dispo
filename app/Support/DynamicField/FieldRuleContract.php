@@ -370,6 +370,7 @@ final class FieldRuleContract
             FieldType::ShortText, FieldType::LongText => trim((string) $value) === '',
             FieldType::Select => $value === '',
             FieldType::MultiSelect => $value === [] || $value === '',
+            FieldType::File => FileFieldValueContract::isEmpty($value),
         };
     }
 
@@ -537,6 +538,12 @@ final class FieldRuleContract
             );
         }
 
+        if ($type === FieldType::File) {
+            throw new RuntimeException(
+                'field_equals ist für Datei-Felder nicht erlaubt; field_empty / field_not_empty verwenden.',
+            );
+        }
+
         throw new RuntimeException(
             'field_equals ist für Zeitraum-Felder nicht erlaubt; field_empty / field_not_empty verwenden.',
         );
@@ -624,6 +631,16 @@ final class FieldRuleContract
         if ($op === self::ACTION_SET_VISIBLE) {
             if (! array_key_exists('value', $action) || ! is_bool($action['value'])) {
                 throw new RuntimeException('set_visible benötigt value als Boolean.');
+            }
+        }
+
+        if ($op === self::ACTION_REQUIRE_FIELD) {
+            /** @var object{field_type: FieldType} $targetDef */
+            $targetDef = $defsByKey[$fieldKey];
+            if ($targetDef->field_type === FieldType::File) {
+                throw new RuntimeException(
+                    'Datei-Felder können in V1/01c nicht per require_field-Regel verpflichtet werden.',
+                );
             }
         }
     }

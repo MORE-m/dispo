@@ -395,6 +395,7 @@ class FieldSetAdminController extends Controller
                         'is_system' => (bool) $definition->is_system,
                         'scope' => $definition->scope->value,
                         'applies_to' => $definition->applies_to->value,
+                        'field_type' => $definition->field_type->value,
                         'sort' => $membership->sort,
                         'required_override' => $membership->required_override,
                         'visible_override' => $membership->visible_override,

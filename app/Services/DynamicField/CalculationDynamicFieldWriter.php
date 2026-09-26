@@ -393,6 +393,9 @@ final class CalculationDynamicFieldWriter
                 FieldType::Period => $this->normalizePeriod($raw),
                 FieldType::ShortText, FieldType::LongText => $this->normalizeText($raw, $def, $errorPrefix, $errors),
                 FieldType::Select, FieldType::MultiSelect => null,
+                FieldType::File => throw new RuntimeException(
+                    'Datei-Felder sind in der Kalkulations-Runtime nicht erlaubt.',
+                ),
             };
             $dirty[$def->key] = true;
         }
@@ -657,6 +660,9 @@ final class CalculationDynamicFieldWriter
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
                 'Unerreichbarer Choice-Zweig in fillRow.',
             ),
+            FieldType::File => throw new RuntimeException(
+                'Datei-Felder sind in der Kalkulations-Runtime nicht erlaubt.',
+            ),
         };
     }
 
@@ -684,6 +690,7 @@ final class CalculationDynamicFieldWriter
             FieldType::Period => null,
             FieldType::ShortText, FieldType::LongText => null,
             FieldType::Select, FieldType::MultiSelect => ChoiceFieldValueContract::emptyValue($def->field_type),
+            FieldType::File => null,
         };
     }
 
@@ -709,6 +716,9 @@ final class CalculationDynamicFieldWriter
             FieldType::LongText => $value->value_text,
             FieldType::Select, FieldType::MultiSelect => throw new RuntimeException(
                 'Unerreichbarer Choice-Zweig in exportValue.',
+            ),
+            FieldType::File => throw new RuntimeException(
+                'Datei-Felder sind in der Kalkulations-Runtime nicht erlaubt.',
             ),
         };
     }

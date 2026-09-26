@@ -621,14 +621,17 @@ export default function FieldSetRulesEditor({
                             )
                         }
                     >
-                        {writableActionTargets(
-                            fieldCatalog,
-                            action.field_key,
-                        ).map((field) => (
-                            <option key={field.key} value={field.key}>
-                                {field.label} ({field.key}) · {field.scope}
-                            </option>
-                        ))}
+                        {writableActionTargets(fieldCatalog, action.field_key)
+                            .filter(
+                                (field) =>
+                                    action.op !== 'require_field' ||
+                                    field.field_type !== 'file',
+                            )
+                            .map((field) => (
+                                <option key={field.key} value={field.key}>
+                                    {field.label} ({field.key}) · {field.scope}
+                                </option>
+                            ))}
                     </select>
                 </label>
                 {action.op === 'set_visible' ? (

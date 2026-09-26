@@ -5,6 +5,7 @@ namespace App\Services\DynamicField\Admin;
 use App\Enums\FieldAppliesTo;
 use App\Enums\FieldScope;
 use App\Enums\FieldSetVersionStatus;
+use App\Enums\FieldType;
 use App\Exceptions\FieldSetConflictException;
 use App\Models\FieldDefinition;
 use App\Models\FieldDefinitionRevision;
@@ -499,6 +500,10 @@ final class FieldSetVersionAdminWriter
                 $membership->visible_override = array_key_exists('visible_override', $row)
                     ? $row['visible_override']
                     : $membership->visible_override;
+                $this->assertFileRequiredOverrideAllowed(
+                    FieldDefinition::query()->whereKey($membership->field_definition_id)->firstOrFail(),
+                    $membership->required_override,
+                );
                 $membership->save();
             }
 
@@ -781,6 +786,7 @@ final class FieldSetVersionAdminWriter
             $membership->visible_override = array_key_exists('visible_override', $payload)
                 ? $payload['visible_override']
                 : null;
+            $this->assertFileRequiredOverrideAllowed($definition, $membership->required_override);
             $membership->save();
 
             $lockedDraft->load(['fields.revision.definition', 'fields.revision.options', 'rules']);
@@ -920,6 +926,15 @@ final class FieldSetVersionAdminWriter
                 FieldAppliesTo::Both->value,
             ],
         };
+    }
+
+    private function assertFileRequiredOverrideAllowed(FieldDefinition $definition, ?bool $requiredOverride): void
+    {
+        if ($definition->field_type === FieldType::File && $requiredOverride === true) {
+            throw ValidationException::withMessages([
+                'required_override' => 'Datei-Felder können nicht als Pflichtfeld (required_override) gesetzt werden.',
+            ]);
+        }
     }
 
     private function assertAppliesToMatchesFieldSet(FieldAppliesTo $definitionAppliesTo, FieldSet $fieldSet): void
