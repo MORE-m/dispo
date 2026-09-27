@@ -1,43 +1,46 @@
 # Fortschritt V1
 
-Stand: 27. September 2026 – **BL-P4-03c** Average-Vorlagen + Hauptspot/Allonge
-(PO-BLP403C-1) in Feature-Umsetzung; Base `main` @ `5b3431e…` (nach Merge PR #91).
-**BL-P4-03a** Standardangebote Average auf `main` gemergt (PR #91). Fachliche
-Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
+Stand: 27. September 2026 – **BL-P4-03b** „Kalkulation als Standardangebot speichern“
+(PO-BLP403B-1) in Feature-Umsetzung. **BL-P4-03c** auf `main` abgeschlossen
+(Merge-Commit `392aa7db034c7237aeea955cf7b0f487ca57ff02`, PR #92; Post-Merge-CI
+[36320331824](https://github.com/MORE-m/dispo/actions/runs/36320331824) grün).
+**BL-P4-03a** auf `main` (PR #91). Fachliche Notifications (`NOT-001`/`NOT-002`)
+**weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge). Feldmatrix:
 `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`.
-Calendar/Festpreis/Tandem/Abbinder und „aus Kalkulation erzeugen“ (03b) =
-Folgeslices.
+Calendar/Festpreis/Tandem/Abbinder = Folgeslices. **03b** ist der priorisierte
+Folgeslice nach 03c (Calc → kundenloser Entwurf → Publish → Adopt).
 
 ## Aktuelle Phase
 
-Phase 4 / **BL-P4-03c** (Standardangebote, Average + Komponenten).
+Phase 4 / **BL-P4-03b** (Standardangebote, aus Kalkulation).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03c** – Feature-PR / manuelle Abnahme. Kein Calendar/Festpreis/Tandem/03b.
+**BL-P4-03b** – Feature-PR / Draft. Kein Calendar/Festpreis/Tandem/Abbinder.
 
 ## Zuletzt begonnene Aufgabe (Umsetzung)
 
-**BL-P4-03c** Hauptspot+Allonge in Average-Standardangeboten (PO-BLP403C-1,
-SPT-014, VER-004); Draft/Publish/Adopt/Dispo-Snapshot.
+**BL-P4-03b** Kalkulation als Standardangebot speichern (PO-BLP403B-1); schmales
+Vertriebs-Vorschlagsrecht; Sanitize; gemeinsamer Materialisierungspfad.
 
 ## BL-P4-03c – Average-Vorlagen + Hauptspot/Allonge / PO-BLP403C-1 (September 2026)
 
 | Teil | Status |
 |------|--------|
-| UX-GATE-D Teilfreigabe PO-BLP403C-1 (nur Komponenten im Vorlageneditor) | **freigegeben** (dieser Scope) |
+| UX-GATE-D Teilfreigabe PO-BLP403C-1 (nur Komponenten im Vorlageneditor) | **freigegeben** |
 | Optional Hauptspot+Allonge; Strategien laut Inventar-/Werbemittelregel | **umgesetzt** |
 | Contract/Validierung/Vorschau/Writer Freeze+Adopt inkl. Komponenten | **umgesetzt** |
 | UI: Komponentenbedienung im Template-Modus; übrige Scope-Hides bleiben | **umgesetzt** |
 | Feature-Tests `StandardOfferBlP403cTest` | **umgesetzt** |
 | Einfache Average-Vorlagen ohne Komponenten | **unverändert** |
-| Calendar/Festpreis/Tandem/Budget-auf-Vorlage/Abbinder/03b-Button | **bewusst nicht** |
+| Calendar/Festpreis/Tandem/Budget-auf-Vorlage/Abbinder/03b-Button | **bewusst nicht** (03b folgt) |
 | `campaign_period` / Flight-Felder | **stabil wie 03a** (keine neue Datums-/Shift-Logik) |
 | Manueller Smoke Port 8045 | **durchgeführt** (`docs/smoke-bl-p4-03c/protokoll.md`) |
-| Merge | **kein Merge** (Draft-PR) |
+| Fachliche Abnahme Average + Hauptspot/Allonge | **abgenommen** (27.09.2026) |
+| Merge `main` | **PR #92** (`392aa7db034c7237aeea955cf7b0f487ca57ff02`); Post-Merge-CI grün |
 
 ## BL-P4-03a – Standardangebote / PO-BLP403A-1 (September 2026)
 

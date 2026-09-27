@@ -1,12 +1,14 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 27. September 2026 · `main` nach PR #91 (`5b3431e…`) · 03c Feature-Branch
-PO-BLP403A-1 / PO-BLP403C-1 / UX-GATE-D Teilfreigaben
+Stand: 27. September 2026 · `main` nach PR #92 (`392aa7d…`, 03c abgeschlossen) ·
+03b Feature-Branch. PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
-Gruppe‑1-Feldern. **03c:** zusätzlich optionale **Hauptspot+Allonge**-Komponenten
-(Semantik BL-P4-02c / SPT-014). Keine vollständige Standardangebotsfunktion über
-alle Kalkulationsmethoden.
+Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
+Komponenten (Semantik BL-P4-02c / SPT-014). **03b (priorisiert):** aus zugänglicher
+Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
+sonst Ablehnung ohne stille Reduktion). Keine vollständige Standardangebotsfunktion
+über alle Kalkulationsmethoden.
 
 ## Gruppen
 
@@ -50,7 +52,7 @@ alle Kalkulationsmethoden.
 | Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Abbinder | 4 | zurückgestellt | Kein Scope |
-| „Aus Kundenkalkulation Standardangebot erzeugen“ | 4 | **BL-P4-03b** (Arbeitstitel) | **Kein Button**; Rechte/Produktentscheidung offen |
+| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** / PO-BLP403B-1 | *nur Average + optionale Komponenten; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
 
 ## Vertrags-IDs
 
@@ -60,14 +62,17 @@ alle Kalkulationsmethoden.
 - **SPT-014** Hauptspot/Allonge (Calc-Semantik 02c, Vorlagen 03c)
 - **UX-GATE-D / PO-BLP403A-1** Teilfreigabe Oberfläche 03a
 - **UX-GATE-D / PO-BLP403C-1** Teilfreigabe Komponentenbedienung im bestehenden Vorlageneditor
+- **UX-GATE-D / PO-BLP403B-1** Teilfreigabe From-Calc-Vorschlag (Feature-Branch)
 
-## Folgeslice (spezifiziert, nicht gebaut)
+## Folgeslice in Umsetzung
 
-**BL-P4-03b (Arbeitstitel) – Aus Kalkulation Vorlage erzeugen**
+**BL-P4-03b / PO-BLP403B-1 – Kalkulation als Standardangebot speichern**
 
-- Rechte: analog AUTH-006 (PM/Admin/GF); kein automatisches Calc-Recht für PM
-- Entfernt `customer_name` / `agency_name` und kundenbezogene Dyn-Felder
-- Übernimmt geeignete Positionen laut dann freigegebenem Methodenvertrag
-- Neuer Vorlagen-Snapshot (Publish-Freeze), eigene `SA-`-Nummer
-- UI-Button erst nach eigener UX-GATE-D-Teilfreigabe
-- Keine Admin/GF-only-Produktentscheidung in 03c festgeschrieben
+- Ablauf: zugängliche Calc → Vorschlags-Draft (`SA-`) → PM prüft/bearbeitet ohne Calc-Zugang → Publish (AUTH-006) → Adopt unabhängig
+- Vertrieb: **nur** schmales Recht „Vorschlags-Draft erzeugen“; kein Edit/Publish/Vorlagen-Verwaltung (kein STD-009)
+- Admin/GF behalten bestehende Manage-/Calc-Rechte
+- Sanitize zentral (Feldklassifikation); Request- und Persistenz-Absicherung gegen Kundendatenlecks
+- Freitext (Titel/Kampagne/Briefing/…): sichtbare Prüfstufe, nicht still in Publish übernehmen
+- Gemeinsamer versionierter Freeze-/Materialisierungspfad; Publish und Adopt denselben Vertrag; Altversionen 03a/03c übernahmefähig
+- Keine stille Reduktion nicht unterstützter Methoden/Positionen; Ablehnung mit Positionsangabe
+- Keine Sync mit Quellkalkulation; keine Auto-Veröffentlichung

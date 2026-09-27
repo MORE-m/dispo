@@ -9,6 +9,7 @@
 | Standardangebote sehen (veröffentlicht) | ✓ | ✓ | – | ✓ | ✓ |
 | Standardangebote anlegen/bearbeiten/versionieren | ✓ | – | – | ✓ | ✓ |
 | Standardangebote veröffentlichen/archivieren | ✓ | – | – | ✓ | ✓ |
+| Aus Calc Vorschlags-Draft erzeugen (BL-P4-03b) | ✓ | ✓ | – | ✓ | – |
 | Standardangebot in Kundenkalkulation übernehmen | ✓ | ✓ | – | ✓ | nur mit Extra-Recht |
 | Dispoentwurf anlegen/bearbeiten | ✓ | ✓ | operativ | ✓ | nur mit Extra-Recht |
 | Vier-Augen-Freigabe | ✓ | berechtigt, nie eigener Auftrag | – | ✓ | nur mit Extra-Recht |
@@ -53,6 +54,14 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
   (CRM-001 später). PM verwaltet Vorlagen ohne Calc-/Dispo-/Übernahme-Recht.
 - Isolation: Frozen Materialization bei Publish (inkl. Komponenten); Adopt ohne
   `CalculationWriter::create()`-Live-Bindung; danach normale Calc-Änderung.
+
+### Slice BL-P4-03b / PO-BLP403B-1 (Feature-Branch)
+
+- Aus zugänglicher Kundenkalkulation: Aktion „Als Standardangebot speichern“
+  erzeugt **immer** einen neuen kundenlosen `SA-`-Draft (kein Auto-Publish, keine Sync).
+- Vertrieb: nur Vorschlags-Draft; **kein** STD-009 (kein Edit/Publish/Listen-Manage).
+- PM prüft/bearbeitet Draft ohne Zugang zur Quellkalkulation (`AUTH-007`).
+- Nur Average + optionale Komponenten; sonst Ablehnung mit Positionsangabe.
 
 ## Vier-Augen-Prinzip
 
