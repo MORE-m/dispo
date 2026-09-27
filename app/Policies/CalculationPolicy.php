@@ -21,11 +21,12 @@ class CalculationPolicy
     }
 
     /**
-     * BL-P4-03b: Vorschlag nur bei Calc-Zugang und schmalem Propose-Recht.
+     * BL-P4-03b: Vorschlag nur bei Calc-View-Recht und schmalem Propose-Recht
+     * (AUTH-002: Vertrieb sieht alle Calc; kein separates Eigentumsmodell).
      */
     public function proposeAsStandardOffer(User $user, Calculation $calculation): bool
     {
-        return $user->canAccessCalculations()
+        return $this->view($user, $calculation)
             && $user->canProposeStandardOfferFromCalculation();
     }
 

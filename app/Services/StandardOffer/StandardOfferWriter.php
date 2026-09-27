@@ -143,14 +143,13 @@ final class StandardOfferWriter
         array $draftPayload,
         int $expectedLockVersion,
         User $user,
-        bool $acknowledgeProposalReview = false,
     ): StandardOfferVersion {
         $title = $this->assertTitle($title);
         $payload = $this->averageContract->normalizeDraftPayload($draftPayload);
         $this->fromCalculation->assertNoCustomerLeak($payload);
         $this->assertResolvable($payload, $user);
 
-        return DB::transaction(function () use ($version, $title, $payload, $expectedLockVersion, $user, $acknowledgeProposalReview): StandardOfferVersion {
+        return DB::transaction(function () use ($version, $title, $payload, $expectedLockVersion, $user): StandardOfferVersion {
             $locked = StandardOfferVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
             $this->assertDraftEditable($locked, $expectedLockVersion);
             $before = $this->versionSnapshot($locked);
@@ -158,9 +157,7 @@ final class StandardOfferWriter
             $locked->title = $title;
             $locked->draft_payload = $payload;
             $locked->author_id = $user->id;
-            if ($acknowledgeProposalReview) {
-                $locked->proposal_review = $this->acknowledgedProposalReview($locked->proposal_review, $user);
-            }
+            // Speichern bestätigt die Freitext-Prüfung bewusst nicht.
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
@@ -179,6 +176,47 @@ final class StandardOfferWriter
 
             $fresh = $locked->fresh() ?? $locked;
             $this->audit->record($fresh, 'standard_offer.version.updated', $user, $before, $this->versionSnapshot($fresh));
+
+            return $fresh;
+        });
+    }
+
+    /**
+     * Ausdrückliche Bestätigung der Freitext-Prüfung (kein Auto-Ack bei Save/Publish).
+     */
+    public function acknowledgeProposalReview(
+        StandardOfferVersion $version,
+        int $expectedLockVersion,
+        User $user,
+    ): StandardOfferVersion {
+        return DB::transaction(function () use ($version, $expectedLockVersion, $user): StandardOfferVersion {
+            $locked = StandardOfferVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+            $this->assertDraftEditable($locked, $expectedLockVersion);
+
+            $review = $locked->proposal_review;
+            if (! is_array($review) || ($review['review_required'] ?? false) !== true) {
+                throw ValidationException::withMessages([
+                    'proposal_review' => 'Für diesen Entwurf ist keine Freitext-Prüfung erforderlich.',
+                ]);
+            }
+
+            $before = $this->versionSnapshot($locked);
+            $locked->proposal_review = $this->acknowledgedProposalReview($review, $user);
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $offer = StandardOffer::query()->whereKey($locked->standard_offer_id)->lockForUpdate()->firstOrFail();
+            $offer->lock_version = $offer->lock_version + 1;
+            $offer->save();
+
+            $fresh = $locked->fresh() ?? $locked;
+            $this->audit->record(
+                $fresh,
+                'standard_offer.version.proposal_review_acknowledged',
+                $user,
+                $before,
+                $this->versionSnapshot($fresh),
+            );
 
             return $fresh;
         });
@@ -239,15 +277,11 @@ final class StandardOfferWriter
         });
     }
 
-    public function publish(StandardOfferVersion $version, int $expectedLockVersion, User $user, bool $acknowledgeProposalReview = false): StandardOfferVersion
+    public function publish(StandardOfferVersion $version, int $expectedLockVersion, User $user): StandardOfferVersion
     {
-        return DB::transaction(function () use ($version, $expectedLockVersion, $user, $acknowledgeProposalReview): StandardOfferVersion {
+        return DB::transaction(function () use ($version, $expectedLockVersion, $user): StandardOfferVersion {
             $locked = StandardOfferVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
             $this->assertDraftEditable($locked, $expectedLockVersion);
-
-            if ($acknowledgeProposalReview) {
-                $locked->proposal_review = $this->acknowledgedProposalReview($locked->proposal_review, $user);
-            }
 
             $offer = StandardOffer::query()->whereKey($locked->standard_offer_id)->lockForUpdate()->firstOrFail();
             $this->assertProposalReviewReadyForPublish($locked);
@@ -646,7 +680,7 @@ final class StandardOfferWriter
     }
 
     /**
-     * Nach Publish keine Quell-Freitexte in der Version belassen (STD-001).
+     * Nach Publish keine Quell-Feldliste mehr nötig; Bestätigungsmeta bleibt auditierbar.
      *
      * @param  array<string, mixed>|null  $review
      * @return array<string, mixed>|null
@@ -658,10 +692,7 @@ final class StandardOfferWriter
         }
 
         return [
-            'source_calculation_id' => $review['source_calculation_id'] ?? null,
-            'source_calculation_number' => $review['source_calculation_number'] ?? null,
-            'free_text' => [],
-            'stripped_dynamic_field_values' => [],
+            'field_keys_requiring_review' => [],
             'review_required' => false,
             'acknowledged_at' => $review['acknowledged_at'] ?? now()->toIso8601String(),
             'acknowledged_by' => $review['acknowledged_by'] ?? $user->id,
@@ -678,7 +709,7 @@ final class StandardOfferWriter
 
         if (($review['review_required'] ?? false) === true && empty($review['acknowledged_at'])) {
             throw ValidationException::withMessages([
-                'proposal_review' => 'Freitext aus der Quellkalkulation muss vor der Veröffentlichung geprüft und bestätigt werden.',
+                'proposal_review' => 'Die Freitext-Prüfung muss vor der Veröffentlichung ausdrücklich bestätigt werden.',
             ]);
         }
     }

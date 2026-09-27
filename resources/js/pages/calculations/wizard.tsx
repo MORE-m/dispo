@@ -1011,8 +1011,7 @@ export default function CalculationWizard({
         allowed_spot_methods: string[];
         scope_note: string;
         proposal_review?: {
-            source_calculation_number: string | null;
-            free_text: Record<string, string | null>;
+            field_keys_requiring_review: string[];
             review_required: boolean;
             acknowledged_at: string | null;
         } | null;
@@ -2230,17 +2229,11 @@ export default function CalculationWizard({
               : '/kalkulationen';
 
         const savePayload = isStandardOffer
-            ? {
-                  ...(templateRequestPayload ?? {
-                      ...payload,
-                      title: templateTitle.trim() || 'Standardangebot',
-                      planning_mode: 'manual',
-                  }),
-                  acknowledge_proposal_review: Boolean(
-                      standardOffer.proposal_review?.review_required &&
-                      !standardOffer.proposal_review.acknowledged_at,
-                  ),
-              }
+            ? (templateRequestPayload ?? {
+                  ...payload,
+                  title: templateTitle.trim() || 'Standardangebot',
+                  planning_mode: 'manual',
+              })
             : payload;
 
         const options = {
@@ -2619,28 +2612,47 @@ export default function CalculationWizard({
                     >
                         <p className="font-medium">
                             Freitext-Prüfung erforderlich
-                            {standardOffer.proposal_review
-                                .source_calculation_number
-                                ? ` (Quelle ${standardOffer.proposal_review.source_calculation_number})`
-                                : ''}
                         </p>
                         <p>
-                            Kundendaten wurden entfernt. Die folgenden Freitexte
-                            aus der Quellkalkulation wurden nicht in die Vorlage
-                            übernommen – bitte prüfen und bei Bedarf manuell,
-                            kundenfrei setzen. Vor der Veröffentlichung muss die
-                            Prüfung bestätigt werden.
+                            Aus der Quellkalkulation wurden mögliche
+                            kundenbezogene Freitexte und nicht freigegebene
+                            dynamische Felder entfernt. Bitte geeignete,
+                            kundenfreie Angaben manuell ergänzen. Quellinhalte
+                            werden nicht angezeigt und nicht gespeichert.
                         </p>
                         <ul className="list-disc space-y-1 pl-5">
-                            {Object.entries(
-                                standardOffer.proposal_review.free_text,
-                            ).map(([key, value]) => (
-                                <li key={key}>
-                                    <span className="font-medium">{key}:</span>{' '}
-                                    {value ?? '—'}
-                                </li>
-                            ))}
+                            {standardOffer.proposal_review.field_keys_requiring_review.map(
+                                (key) => (
+                                    <li key={key}>
+                                        <span className="font-medium">
+                                            {key}
+                                        </span>
+                                    </li>
+                                ),
+                            )}
                         </ul>
+                        {canEdit &&
+                        standardOffer.mode === 'edit' &&
+                        standardOffer.offer_id &&
+                        standardOffer.version_id ? (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                data-test="standard-offer-acknowledge-proposal-review"
+                                disabled={busy}
+                                onClick={() => {
+                                    router.post(
+                                        `/standardangebote/${standardOffer.offer_id}/versionen/${standardOffer.version_id}/pruefung-bestaetigen`,
+                                        {
+                                            lock_version:
+                                                standardOffer.lock_version,
+                                        },
+                                    );
+                                }}
+                            >
+                                Freitext-Prüfung bestätigt
+                            </Button>
+                        ) : null}
                     </div>
                 ) : null}
                 {isStandardOffer ? (
@@ -5347,12 +5359,6 @@ export default function CalculationWizard({
                                         {
                                             lock_version:
                                                 standardOffer.lock_version,
-                                            acknowledge_proposal_review:
-                                                Boolean(
-                                                    standardOffer
-                                                        .proposal_review
-                                                        ?.review_required,
-                                                ),
                                         },
                                     );
                                 }}

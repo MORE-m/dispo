@@ -54,8 +54,18 @@ class StandardOfferBlP403bTest extends TestCase
         $this->assertArrayNotHasKey('customer_name', $draft->draft_payload);
         $this->assertArrayNotHasKey('agency_name', $draft->draft_payload);
         $this->assertTrue((bool) ($draft->proposal_review['review_required'] ?? false));
-        $this->assertSame('Kundenkampagne Q1', $draft->proposal_review['free_text']['campaign'] ?? null);
+        $this->assertSame(['campaign', 'briefing'], $draft->proposal_review['field_keys_requiring_review'] ?? null);
+        $this->assertArrayNotHasKey('free_text', $draft->proposal_review ?? []);
+        $this->assertArrayNotHasKey('stripped_dynamic_field_values', $draft->proposal_review ?? []);
         $this->assertSame($calculation->id, $draft->source_calculation_id);
+
+        $audit = AuditEvent::query()->where('action', 'standard_offer.proposed_from_calculation')->first();
+        $this->assertNotNull($audit);
+        $auditJson = json_encode($audit->new_values ?? []);
+        $this->assertIsString($auditJson);
+        $this->assertStringNotContainsString('Kundenkampagne', $auditJson);
+        $this->assertStringNotContainsString('Geheimkunde', $auditJson);
+        $this->assertStringNotContainsString('Internes Briefing', $auditJson);
 
         $this->actingAs($sales)->get(route('standard-offers.show', [
             'standardOffer' => $offer,
@@ -100,26 +110,52 @@ class StandardOfferBlP403bTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('standardOffer.proposal_review.review_required', true)
-                ->where('calculation.customer_name', null));
+                ->where('standardOffer.proposal_review.field_keys_requiring_review', ['campaign'])
+                ->missing('standardOffer.proposal_review.free_text')
+                ->where('calculation.customer_name', null)
+                ->where('calculation.campaign', null));
 
+        // Speichern ohne Bestätigung lässt die Prüfstufe bestehen.
+        $this->actingAs($pm)->put(route('standard-offers.update', [
+            'standardOffer' => $offer,
+            'version' => $draft->id,
+        ]), [
+            'title' => 'Geprüft ohne Bestätigung',
+            'lock_version' => $draft->lock_version,
+            ...$draft->draft_payload,
+            'campaign' => 'Kundenfreie Kampagne',
+        ])->assertRedirect();
+        $draft = $draft->fresh();
+        $this->assertNotNull($draft);
+        $this->assertTrue((bool) ($draft->proposal_review['review_required'] ?? false));
+        $this->assertNull($draft->proposal_review['acknowledged_at'] ?? null);
+
+        // Publish ohne ausdrückliche Bestätigung → abgelehnt.
         $this->actingAs($pm)->post(route('standard-offers.publish', [
             'standardOffer' => $offer,
             'version' => $draft->id,
-        ]), ['lock_version' => $draft->lock_version])
-            ->assertSessionHasErrors('proposal_review');
+        ]), [
+            'lock_version' => $draft->lock_version,
+            'acknowledge_proposal_review' => true,
+        ])->assertSessionHasErrors('proposal_review');
+
+        $acknowledged = $this->writer()->acknowledgeProposalReview($draft, (int) $draft->lock_version, $pm);
+        $this->assertNotNull($acknowledged->proposal_review['acknowledged_at'] ?? null);
 
         $published = $this->writer()->publish(
-            $draft,
-            (int) $draft->lock_version,
+            $acknowledged,
+            (int) $acknowledged->lock_version,
             $pm,
-            acknowledgeProposalReview: true,
         );
         $this->assertSame(StandardOfferVersionStatus::Published, $published->status);
         $this->assertSame(
             StandardOfferMaterializer::MATERIALIZATION_VERSION,
             (int) ($published->frozen_materialization['materialization_version'] ?? 0),
         );
-        $this->assertSame([], $published->proposal_review['free_text'] ?? ['x']);
+        $this->assertSame([], $published->proposal_review['field_keys_requiring_review'] ?? ['x']);
+        $this->assertArrayNotHasKey('free_text', $published->proposal_review ?? []);
+        $this->assertSame('Kundenfreie Kampagne', $published->frozen_materialization['campaign'] ?? null);
+        $this->assertArrayNotHasKey('customer_name', $published->frozen_materialization['draft_payload'] ?? []);
 
         $adopted = $this->writer()->adopt($published, 'Neuer Kunde', null, 'Neue Kampagne', $sales);
         $this->assertSame('Neuer Kunde', $adopted->customer_name);
@@ -237,13 +273,35 @@ class StandardOfferBlP403bTest extends TestCase
         $disposition = User::factory()->role(Role::Disposition)->create();
         $calculation = $this->createAverageCalculation($catalog, $sales);
 
-        $this->actingAs($pm)
-            ->post(route('standard-offers.from-calculation', $calculation))
-            ->assertForbidden();
+        // Disposition darf Calc sehen (AUTH-002-Rolle), aber nicht vorschlagen.
+        $this->actingAs($disposition)->get(route('calculations.edit', $calculation))->assertOk();
         $this->actingAs($disposition)
             ->post(route('standard-offers.from-calculation', $calculation))
             ->assertForbidden();
+
+        // PM ohne Calc-View → Propose abgeglichen mit view()-Vertrag.
+        $this->actingAs($pm)->get(route('calculations.edit', $calculation))->assertForbidden();
+        $this->actingAs($pm)
+            ->post(route('standard-offers.from-calculation', $calculation))
+            ->assertForbidden();
         $this->assertSame(0, StandardOffer::query()->count());
+    }
+
+    public function test_sales_can_propose_from_any_viewable_calculation_per_auth_002(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $owner = User::factory()->role(Role::Sales)->create();
+        $otherSales = User::factory()->role(Role::Sales)->create();
+        $calculation = $this->createAverageCalculation($catalog, $owner, [
+            'customer_name' => 'Fremde Calc GmbH',
+        ]);
+
+        // AUTH-002: Vertrieb sieht alle Calc – Propose folgt view(), nicht Eigentum.
+        $this->actingAs($otherSales)->get(route('calculations.edit', $calculation))->assertOk();
+        $this->actingAs($otherSales)
+            ->post(route('standard-offers.from-calculation', $calculation))
+            ->assertRedirect();
+        $this->assertSame(1, StandardOffer::query()->count());
     }
 
     public function test_manipulated_request_cannot_inject_customer_into_draft_update(): void

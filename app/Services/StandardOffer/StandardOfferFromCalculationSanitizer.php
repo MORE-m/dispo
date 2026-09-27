@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * BL-P4-03b / PO-BLP403B-1 / STD-001: Calc-Payload → kundenloser Vorlagen-Draft
- * plus Prüfstufe für Freitext. Keine stille Methodenreduktion.
+ * plus Prüfstufe (nur Feldnamen, keine Quell-Freitextwerte).
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -30,18 +30,17 @@ final class StandardOfferFromCalculationSanitizer
     {
         $this->assertCompatibleOrFail($calcPayload);
 
-        $freeText = [];
+        /** @var list<string> $reviewFieldKeys */
+        $reviewFieldKeys = [];
+
         foreach (StandardOfferFieldClassification::FREE_TEXT_REVIEW_HEADER_KEYS as $key) {
             $value = $calcPayload[$key] ?? null;
-            if (is_string($value) && trim($value) !== '') {
-                $freeText[$key] = trim($value);
-            } elseif ($value !== null && $value !== '') {
-                $freeText[$key] = $value;
+            if ($this->hasNonEmptyValue($value)) {
+                $reviewFieldKeys[] = $key;
             }
         }
 
         $headerDyn = [];
-        $reviewedDyn = [];
         $rawHeaderDyn = is_array($calcPayload['dynamic_field_values'] ?? null)
             ? $calcPayload['dynamic_field_values']
             : [];
@@ -54,7 +53,9 @@ final class StandardOfferFromCalculationSanitizer
 
                 continue;
             }
-            $reviewedDyn[$key] = $value;
+            if ($this->hasNonEmptyValue($value)) {
+                $reviewFieldKeys[] = 'dynamic_field_values.'.$key;
+            }
         }
 
         $positions = [];
@@ -62,7 +63,11 @@ final class StandardOfferFromCalculationSanitizer
             if (! is_array($position)) {
                 continue;
             }
-            $positions[] = $this->sanitizePosition($position, (int) $index);
+            [$sanitizedPosition, $positionReviewKeys] = $this->sanitizePosition($position, (int) $index);
+            $positions[] = $sanitizedPosition;
+            foreach ($positionReviewKeys as $key) {
+                $reviewFieldKeys[] = $key;
+            }
         }
 
         $draft = [
@@ -80,22 +85,18 @@ final class StandardOfferFromCalculationSanitizer
             'positions' => $positions,
         ];
 
-        // Contract als zweite Absicherung gegen Kundenschlüssel / Methoden.
         $draft = $this->averageContract->normalizeDraftPayload($draft);
         $this->assertNoCustomerLeak($draft);
 
-        $title = 'Vorschlag aus '.$calculation->number;
-        $hasReviewContent = $freeText !== [] || $reviewedDyn !== [];
+        $reviewFieldKeys = array_values(array_unique($reviewFieldKeys));
 
         return [
-            'title' => $title,
+            // Neutrale Vorlage ohne Quell-Freitext; Nummernreferenz ist Vorgangs-ID, kein Kundeninhalt.
+            'title' => 'Vorschlag aus '.$calculation->number,
             'draft_payload' => $draft,
             'proposal_review' => [
-                'source_calculation_id' => $calculation->id,
-                'source_calculation_number' => $calculation->number,
-                'free_text' => $freeText,
-                'stripped_dynamic_field_values' => $reviewedDyn,
-                'review_required' => $hasReviewContent,
+                'field_keys_requiring_review' => $reviewFieldKeys,
+                'review_required' => $reviewFieldKeys !== [],
                 'acknowledged_at' => null,
                 'acknowledged_by' => null,
             ],
@@ -169,7 +170,7 @@ final class StandardOfferFromCalculationSanitizer
 
     /**
      * @param  array<string, mixed>  $position
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: list<string>}
      */
     private function sanitizePosition(array $position, int $index): array
     {
@@ -179,13 +180,23 @@ final class StandardOfferFromCalculationSanitizer
                 $safe[$key] = $position[$key];
             }
         }
+
+        $reviewKeys = [];
         $posDyn = [];
         $rawPosDyn = is_array($position['dynamic_field_values'] ?? null)
             ? $position['dynamic_field_values']
             : [];
         foreach ($rawPosDyn as $key => $value) {
-            if (is_string($key) && $this->classification->isTemplateSafePositionDynamicKey($key)) {
+            if (! is_string($key)) {
+                continue;
+            }
+            if ($this->classification->isTemplateSafePositionDynamicKey($key)) {
                 $posDyn[$key] = $value;
+
+                continue;
+            }
+            if ($this->hasNonEmptyValue($value)) {
+                $reviewKeys[] = "positions.{$index}.dynamic_field_values.{$key}";
             }
         }
         $safe['dynamic_field_values'] = $posDyn === [] ? ['period_open' => true] : $posDyn;
@@ -199,10 +210,7 @@ final class StandardOfferFromCalculationSanitizer
             $safe['components'] = [];
         }
 
-        // Positionsindex nur für Fehlermeldungen; Client-Key neu vergeben beim Create optional.
-        unset($index);
-
-        return $safe;
+        return [$safe, $reviewKeys];
     }
 
     /**
@@ -217,5 +225,23 @@ final class StandardOfferFromCalculationSanitizer
                 ]);
             }
         }
+    }
+
+    private function hasNonEmptyValue(mixed $value): bool
+    {
+        if ($value === null) {
+            return false;
+        }
+        if (is_string($value)) {
+            return trim($value) !== '';
+        }
+        if (is_array($value)) {
+            return $value !== [];
+        }
+        if (is_bool($value) || is_int($value) || is_float($value)) {
+            return true;
+        }
+
+        return false;
     }
 }

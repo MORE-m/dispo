@@ -33,11 +33,13 @@ Publish/Adopt über denselben Vertrag.
 |------|--------|
 | UX-GATE-D Teilfreigabe PO-BLP403B-1 (From-Calc-Vorschlag) | **freigegeben** (dieser Scope) |
 | Route/Button „Als Standardangebot speichern“ | **umgesetzt** |
-| Schmales Vertriebsrecht (nur Draft erzeugen) | **umgesetzt** |
-| Sanitize + Feldklassifikation + Freitext-Prüfstufe | **umgesetzt** |
+| Schmales Vertriebsrecht (Propose = view ∩ Propose; AUTH-002) | **umgesetzt** |
+| Sanitize: nur Feldnamen in Prüfstufe, keine Quell-Freitextwerte | **umgesetzt** |
+| Ausdrückliche Bestätigung vor Publish (kein Auto-Ack) | **umgesetzt** |
 | Ablehnung nicht unterstützter Methoden mit Positionsangabe | **umgesetzt** |
 | Immer neuer `SA-`-Draft; kein Auto-Publish; keine Sync | **umgesetzt** |
-| `StandardOfferMaterializer` (versioniert) für Publish | **umgesetzt** |
+| `StandardOfferMaterializer` für Publish/Freeze | **umgesetzt** |
+| Gemeinsamer Hydrate-Pfad für Adopt | **Folgearbeit** |
 | Altversionen 03a/03c übernahmefähig | **abgesichert** (Tests) |
 | Feature-Tests `StandardOfferBlP403bTest` | **umgesetzt** |
 | Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** |

@@ -67,9 +67,11 @@ sonst Ablehnung ohne stille Reduktion). Keine vollständige Standardangebotsfunk
 
 ## Geliefert in BL-P4-03b
 
-- Aktion „Als Standardangebot speichern“ (Button/Route/Policy deckungsgleich)
-- Zentraler Sanitize (`StandardOfferFieldClassification` + `StandardOfferFromCalculationSanitizer`)
-- Freitext-Prüfstufe (`proposal_review`, Publish-Gate)
-- `StandardOfferMaterializer` (materialization_version=1) für Publish; Adopt liest Frozen-Stand
+- Aktion „Als Standardangebot speichern“ (Button/Route/Policy deckungsgleich; Propose = `view` ∩ schmales Propose-Recht, AUTH-002)
+- Zentraler Sanitize (`StandardOfferFieldClassification` + `StandardOfferFromCalculationSanitizer`); Prüfstufe speichert **nur Feldnamen**, keine Quell-Freitextwerte
+- Ausdrückliche Bestätigung `pruefung-bestaetigen` vor Publish; Save/Publish bestätigen nicht still
+- `StandardOfferMaterializer` (materialization_version=1) für **Publish/Freeze**
+- Adopt nutzt Frozen-Stand, behält aber **eigene Persistenzlisten** (gemeinsamer Hydrate-Pfad = Folgearbeit)
 - Immer neuer `SA-`-Draft; keine Auto-Publish; keine Sync zur Quelle
 - Nur Average + optionale Komponenten; sonst Ablehnung ohne stille Reduktion
+- `source_calculation_id` nur als technische Referenz an der Version (keine Kundendaten); Quell-Freitexte nicht in Audit/Frozen

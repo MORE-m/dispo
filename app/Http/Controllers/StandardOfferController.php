@@ -213,12 +213,32 @@ class StandardOfferController extends Controller
             $data['payload'],
             (int) $request->input('lock_version'),
             $user,
-            $request->boolean('acknowledge_proposal_review'),
         );
 
         return redirect()
             ->route('standard-offers.show', ['standardOffer' => $standardOffer, 'version' => $version->id])
             ->with('success', 'Entwurf gespeichert.');
+    }
+
+    public function acknowledgeProposalReview(
+        Request $request,
+        StandardOffer $standardOffer,
+        StandardOfferVersion $version,
+    ): RedirectResponse {
+        $this->authorize('update', $standardOffer);
+        abort_unless($version->standard_offer_id === $standardOffer->id, 404);
+
+        /** @var User $user */
+        $user = $request->user();
+        $fresh = $this->writer->acknowledgeProposalReview(
+            $version,
+            (int) $request->input('lock_version'),
+            $user,
+        );
+
+        return redirect()
+            ->route('standard-offers.show', ['standardOffer' => $standardOffer, 'version' => $fresh->id])
+            ->with('success', 'Freitext-Prüfung bestätigt. Vorlage kann veröffentlicht werden.');
     }
 
     public function storeDraft(Request $request, StandardOffer $standardOffer): RedirectResponse
@@ -245,7 +265,6 @@ class StandardOfferController extends Controller
             $version,
             (int) $request->input('lock_version'),
             $user,
-            $request->boolean('acknowledge_proposal_review'),
         );
 
         return redirect()
@@ -467,8 +486,12 @@ class StandardOfferController extends Controller
         $review = $version->proposal_review;
 
         return [
-            'source_calculation_number' => $review['source_calculation_number'] ?? null,
-            'free_text' => is_array($review['free_text'] ?? null) ? $review['free_text'] : [],
+            'field_keys_requiring_review' => is_array($review['field_keys_requiring_review'] ?? null)
+                ? array_values(array_filter(
+                    $review['field_keys_requiring_review'],
+                    static fn (mixed $key): bool => is_string($key) && $key !== '',
+                ))
+                : [],
             'review_required' => (bool) ($review['review_required'] ?? false),
             'acknowledged_at' => $review['acknowledged_at'] ?? null,
         ];
