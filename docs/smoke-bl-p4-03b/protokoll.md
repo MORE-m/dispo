@@ -48,5 +48,10 @@ Behoben: Propose-`onError` + Anzeige der Page-Validation im `ErrorState`. HTTP-A
 
 ## Grenzen / Folge
 
-- Gemeinsamer Adopt-Hydrate-Pfad: Folgearbeit (Freeze zentral, Adopt-Listen separat)
+- Gemeinsamer Adopt-Hydrate-Pfad: Folgeslice **BL-P4-03d** (Freeze zentral in 03b)
 - Calendar/Festpreis/Tandem: weiter abgelehnt
+
+## Merge
+
+- **PR #93** gemergt auf `main`: `a850d52c0fee2861d829a38d4a03ebd73b4db22a`
+- Post-Merge-CI Run [`36349475834`](https://github.com/MORE-m/dispo/actions/runs/36349475834) SUCCESS

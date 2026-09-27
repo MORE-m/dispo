@@ -1,37 +1,38 @@
 # Fortschritt V1
 
-Stand: 27. September 2026 – **BL-P4-03b** „Kalkulation als Standardangebot speichern“
-(PO-BLP403B-1) in Feature-Umsetzung. **BL-P4-03c** auf `main` abgeschlossen
-(Merge-Commit `392aa7db034c7237aeea955cf7b0f487ca57ff02`, PR #92; Post-Merge-CI
-[36320331824](https://github.com/MORE-m/dispo/actions/runs/36320331824) grün).
-**BL-P4-03a** auf `main` (PR #91). Fachliche Notifications (`NOT-001`/`NOT-002`)
-**weiter offen**.
+Stand: 27. September 2026 – **BL-P4-03b** auf `main` abgeschlossen
+(Merge-Commit `a850d52c0fee2861d829a38d4a03ebd73b4db22a`, PR #93; Post-Merge-CI
+[36349475834](https://github.com/MORE-m/dispo/actions/runs/36349475834) grün).
+**BL-P4-03c** auf `main` (PR #92, `392aa7d…`). **BL-P4-03a** auf `main` (PR #91).
+Gemeinsamer Hydrate-Pfad für Adopt (**BL-P4-03d**) **offen**. Fachliche
+Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge). Feldmatrix:
 `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`.
-Calendar/Festpreis/Tandem/Abbinder = Folgeslices. **03b** ist der priorisierte
-Folgeslice nach 03c (Calc → kundenloser Entwurf → Publish → Adopt).
+Calendar/Festpreis/Tandem/Abbinder = Folgeslices. Nächster technischer Folgeslice:
+gemeinsamer versionierter Persistenzvertrag Freeze↔Hydrate (**BL-P4-03d**).
 
 ## Aktuelle Phase
 
-Phase 4 / **BL-P4-03b** (Standardangebote, aus Kalkulation).
+Phase 4 / Standardangebote (**03a/03b/03c** auf `main`; Hydrate-Folgeslice offen).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03b** – Feature-PR / Draft; Gates und Smoke. Kein Merge in diesem Schritt.
+**BL-P4-03d** – gemeinsamer Hydrate-/Persistenzvertrag für eingefrorene
+Vorlagendaten (technischer Folgeslice nach 03b). Keine neue Fachoberfläche.
 
-## Zuletzt begonnene Aufgabe (Umsetzung)
+## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P4-03b** Kalkulation als Standardangebot speichern (PO-BLP403B-1): schmales
-Vertriebs-Vorschlagsrecht; Sanitize + Freitext-Prüfstufe; Materializer;
-Publish/Adopt über denselben Vertrag.
+Vertriebs-Vorschlagsrecht; Sanitize + Freitext-Prüfstufe; Materializer-Freeze;
+Publish/Adopt über Frozen-Stand. Hydrate-Pfad bewusst als Folgearbeit offen.
 
 ## BL-P4-03b – Calc → Standardangebot / PO-BLP403B-1 (September 2026)
 
 | Teil | Status |
 |------|--------|
-| UX-GATE-D Teilfreigabe PO-BLP403B-1 (From-Calc-Vorschlag) | **freigegeben** (dieser Scope) |
+| UX-GATE-D Teilfreigabe PO-BLP403B-1 (From-Calc-Vorschlag) | **freigegeben** |
 | Route/Button „Als Standardangebot speichern“ | **umgesetzt** |
 | Schmales Vertriebsrecht (Propose = view ∩ Propose; AUTH-002) | **umgesetzt** |
 | Sanitize: nur Feldnamen in Prüfstufe, keine Quell-Freitextwerte | **umgesetzt** |
@@ -39,11 +40,13 @@ Publish/Adopt über denselben Vertrag.
 | Ablehnung nicht unterstützter Methoden mit Positionsangabe | **umgesetzt** |
 | Immer neuer `SA-`-Draft; kein Auto-Publish; keine Sync | **umgesetzt** |
 | `StandardOfferMaterializer` für Publish/Freeze | **umgesetzt** |
-| Gemeinsamer Hydrate-Pfad für Adopt | **Folgearbeit** |
+| Gemeinsamer Hydrate-Pfad für Adopt | **offen** → **BL-P4-03d** |
 | Altversionen 03a/03c übernahmefähig | **abgesichert** (Tests) |
 | Feature-Tests `StandardOfferBlP403bTest` | **umgesetzt** |
+| Browser-Smoke Port **8046** | **BESTANDEN** (`docs/smoke-bl-p4-03b/protokoll.md`) |
 | Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** |
-| Merge | **kein Merge** (Draft-PR) |
+| Merge `main` | **PR #93** (`a850d52c0fee2861d829a38d4a03ebd73b4db22a`) |
+| Post-Merge CI | **`36349475834` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P4-03c – Average-Vorlagen + Hauptspot/Allonge / PO-BLP403C-1 (September 2026)
 
