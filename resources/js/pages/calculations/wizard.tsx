@@ -770,6 +770,29 @@ function methodOptionsForMedium(
     );
 }
 
+/** BL-P4-03a: in Vorlagen nur Average anbieten. */
+function methodOptionsForTemplate(
+    options: CalculationMethodOptions | null,
+    templateMode: boolean,
+): CalculationMethodOptions | null {
+    if (!templateMode || options === null) {
+        return options;
+    }
+
+    const methods = (options.methods ?? []).filter(
+        (method) => method.key === 'average',
+    );
+
+    return {
+        ...options,
+        default_calculation_method_key: 'average',
+        methods: methods.map((method) => ({
+            ...method,
+            is_default: true,
+        })),
+    };
+}
+
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
     // ADV-001c4b: erstes aktives, buchbares Medium mit Inventarregel (kein Code-Hardcode).
     const preferredMedium =
@@ -1846,6 +1869,58 @@ export default function CalculationWizard({
         ],
     );
 
+    const templateRequestPayload = useMemo(() => {
+        if (!isStandardOffer) {
+            return null;
+        }
+
+        const {
+            customer_name: _c,
+            agency_name: _a,
+            target_budget_nn: _t,
+            budget_strategy: _bs,
+            budget_elements: _be,
+            budget_distribution_ranges: _bdr,
+            budget_proposal_manual: _bpm,
+            calculation_id: _cid,
+            ...rest
+        } = payload as Record<string, unknown>;
+
+        return {
+            ...rest,
+            title: templateTitle.trim() || 'Standardangebot',
+            planning_mode: 'manual',
+            positions: (
+                (rest.positions as Array<Record<string, unknown>>) ?? []
+            ).map((position) => {
+                const {
+                    components: _comp,
+                    planner_entries: _plan,
+                    component_profile: _prof,
+                    fixed_price_nn: _fp,
+                    component_calculation_strategy: _strat,
+                    ...posRest
+                } = position;
+
+                // Keys weglassen, die der Server für 03a verbietet – Werte nicht umschreiben.
+                // spot_method aus calculation_method_key spiegeln (Wizard sendet sonst nur den Key).
+                const methodKey =
+                    typeof posRest.calculation_method_key === 'string'
+                        ? posRest.calculation_method_key
+                        : typeof posRest.spot_method === 'string'
+                          ? posRest.spot_method
+                          : undefined;
+
+                return {
+                    ...posRest,
+                    ...(methodKey !== undefined
+                        ? { spot_method: methodKey }
+                        : {}),
+                };
+            }),
+        };
+    }, [isStandardOffer, payload, templateTitle]);
+
     const steps = isBudgetSetup ? BUDGET_STEPS : MANUAL_STEPS;
     const budgetPreviewReady =
         planningMode === 'budget' &&
@@ -1868,7 +1943,7 @@ export default function CalculationWizard({
             ? '/standardangebote/vorschau'
             : '/kalkulationen/vorschau',
         payload: isStandardOffer
-            ? { ...payload, title: templateTitle }
+            ? (templateRequestPayload ?? { ...payload, title: templateTitle })
             : payload,
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
@@ -1900,7 +1975,9 @@ export default function CalculationWizard({
         return catalog.media.filter(
             (medium) =>
                 isSelectableForNewWizardPositions(medium) &&
-                mediumIds.has(medium.id),
+                mediumIds.has(medium.id) &&
+                // BL-P4-03a: Tandem/Tridem (component_profile) nicht wählbar.
+                !(isStandardOffer && medium.component_profile != null),
         );
     }
 
@@ -2147,45 +2224,11 @@ export default function CalculationWizard({
               : '/kalkulationen';
 
         const savePayload = isStandardOffer
-            ? (() => {
-                  const {
-                      customer_name: _c,
-                      agency_name: _a,
-                      target_budget_nn: _t,
-                      budget_strategy: _bs,
-                      budget_elements: _be,
-                      budget_distribution_ranges: _bdr,
-                      budget_proposal_manual: _bpm,
-                      calculation_id: _cid,
-                      ...rest
-                  } = payload as Record<string, unknown>;
-                  return {
-                      ...rest,
-                      title: templateTitle.trim() || 'Standardangebot',
-                      planning_mode: 'manual',
-                      positions: (
-                          (rest.positions as Array<Record<string, unknown>>) ??
-                          []
-                      ).map((position) => {
-                          const {
-                              components: _comp,
-                              planner_entries: _plan,
-                              component_profile: _prof,
-                              fixed_price_nn: _fp,
-                              ...posRest
-                          } = position;
-                          return {
-                              ...posRest,
-                              spot_method: 'average',
-                              pricing_settlement_mode: 'normal',
-                              components: [],
-                              planner_entries: [],
-                              component_profile: null,
-                              fixed_price_nn: null,
-                          };
-                      }),
-                  };
-              })()
+            ? (templateRequestPayload ?? {
+                  ...payload,
+                  title: templateTitle.trim() || 'Standardangebot',
+                  planning_mode: 'manual',
+              })
             : payload;
 
         const options = {
@@ -2604,7 +2647,13 @@ export default function CalculationWizard({
                                     <CardContent
                                         className={wizardCardContentClass}
                                     >
-                                        <SelectionCardGrid className="sm:grid-cols-2">
+                                        <SelectionCardGrid
+                                            className={
+                                                isStandardOffer
+                                                    ? 'sm:grid-cols-1'
+                                                    : 'sm:grid-cols-2'
+                                            }
+                                        >
                                             <SelectionCard
                                                 name="planning_mode"
                                                 checked={
@@ -2640,39 +2689,40 @@ export default function CalculationWizard({
                                                     description="Sender, Werbeelemente und Konditionen manuell festlegen."
                                                 />
                                             </SelectionCard>
-                                            <SelectionCard
-                                                name="planning_mode"
-                                                checked={
-                                                    planningMode === 'budget'
-                                                }
-                                                disabled={
-                                                    !canEdit || isStandardOffer
-                                                }
-                                                onChange={() => {
-                                                    if (isStandardOffer) {
-                                                        return;
+                                            {!isStandardOffer ? (
+                                                <SelectionCard
+                                                    name="planning_mode"
+                                                    checked={
+                                                        planningMode ===
+                                                        'budget'
                                                     }
-                                                    setPlanningMode('budget');
-                                                    if (
-                                                        !calculation?.positions
-                                                            ?.length
-                                                    ) {
-                                                        setPositions([]);
-                                                        setProposal(null);
-                                                        setProposalAtRevision(
-                                                            null,
+                                                    disabled={!canEdit}
+                                                    onChange={() => {
+                                                        setPlanningMode(
+                                                            'budget',
                                                         );
-                                                    }
-                                                }}
-                                            >
-                                                <div data-test="planning-mode-budget">
-                                                    <SelectionCardOption
-                                                        icon={Wallet}
-                                                        title="Mit Budget planen"
-                                                        description="Zielbudget und Verteilungslogik vorgeben."
-                                                    />
-                                                </div>
-                                            </SelectionCard>
+                                                        if (
+                                                            !calculation
+                                                                ?.positions
+                                                                ?.length
+                                                        ) {
+                                                            setPositions([]);
+                                                            setProposal(null);
+                                                            setProposalAtRevision(
+                                                                null,
+                                                            );
+                                                        }
+                                                    }}
+                                                >
+                                                    <div data-test="planning-mode-budget">
+                                                        <SelectionCardOption
+                                                            icon={Wallet}
+                                                            title="Mit Budget planen"
+                                                            description="Zielbudget und Verteilungslogik vorgeben."
+                                                        />
+                                                    </div>
+                                                </SelectionCard>
+                                            ) : null}
                                         </SelectionCardGrid>
                                     </CardContent>
                                 </Card>
@@ -2937,28 +2987,30 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         ) : null}
-                                        <FormField
-                                            label="Zielbudget N/N"
-                                            htmlFor="budget"
-                                            hint={
-                                                planningMode === 'manual'
-                                                    ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                                    : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
-                                            }
-                                        >
-                                            <Input
-                                                id="budget"
-                                                inputMode="decimal"
-                                                value={targetBudget}
-                                                onChange={(event) => {
-                                                    setTargetBudget(
-                                                        event.target.value,
-                                                    );
-                                                    markBudgetInputsChanged();
-                                                }}
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
+                                        {!isStandardOffer ? (
+                                            <FormField
+                                                label="Zielbudget N/N"
+                                                htmlFor="budget"
+                                                hint={
+                                                    planningMode === 'manual'
+                                                        ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
+                                                        : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
+                                                }
+                                            >
+                                                <Input
+                                                    id="budget"
+                                                    inputMode="decimal"
+                                                    value={targetBudget}
+                                                    onChange={(event) => {
+                                                        setTargetBudget(
+                                                            event.target.value,
+                                                        );
+                                                        markBudgetInputsChanged();
+                                                    }}
+                                                    disabled={!canEdit}
+                                                />
+                                            </FormField>
+                                        ) : null}
                                     </CardContent>
                                 </Card>
                             </div>
@@ -3640,9 +3692,12 @@ export default function CalculationWizard({
                                                                 index
                                                             }
                                                             legendLabel="Berechnungsbasis für Mediabrutto"
-                                                            options={methodOptionsForMedium(
-                                                                catalog,
-                                                                position.advertising_medium_id,
+                                                            options={methodOptionsForTemplate(
+                                                                methodOptionsForMedium(
+                                                                    catalog,
+                                                                    position.advertising_medium_id,
+                                                                ),
+                                                                isStandardOffer,
                                                             )}
                                                             state={{
                                                                 calculation_method_key:
@@ -3663,6 +3718,13 @@ export default function CalculationWizard({
                                                             onSelectLiveKey={(
                                                                 key,
                                                             ) => {
+                                                                if (
+                                                                    isStandardOffer &&
+                                                                    key !==
+                                                                        'average'
+                                                                ) {
+                                                                    return;
+                                                                }
                                                                 const next =
                                                                     selectLiveCalculationMethod(
                                                                         {
@@ -3675,9 +3737,12 @@ export default function CalculationWizard({
                                                                             historical_calculation_method_name:
                                                                                 position.historical_calculation_method_name,
                                                                         },
-                                                                        methodOptionsForMedium(
-                                                                            catalog,
-                                                                            position.advertising_medium_id,
+                                                                        methodOptionsForTemplate(
+                                                                            methodOptionsForMedium(
+                                                                                catalog,
+                                                                                position.advertising_medium_id,
+                                                                            ),
+                                                                            isStandardOffer,
                                                                         ),
                                                                         key,
                                                                     );
@@ -3721,6 +3786,9 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
+                                                            hideFixedPrice={
+                                                                isStandardOffer
+                                                            }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index
@@ -3987,7 +4055,7 @@ export default function CalculationWizard({
                                                             ) : null}
                                                         </div>
 
-                                                        {(() => {
+                                                        {isStandardOffer ? null : (() => {
                                                             const positionProfile =
                                                                 profileForMedium(
                                                                     catalog,

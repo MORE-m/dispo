@@ -38,17 +38,17 @@ Stand: 26. September 2026 · Feature-HEAD PR #91 · PO-BLP403A-1 / UX-GATE-D Tei
 | `price_list_id` / Version (Pin) | 3 | Freeze bei Publish; Client `prohibited` auf Create | |
 | Konfigurationssnapshot / Fingerprints | 3 | `ConfigurationSnapshotFreezeService` | |
 | Herkunft `origin_standard_offer_version_id` | 3 | STD-005 Nachvollziehbarkeit | Keine Sync |
-| Calendar / `planner_entries` | 4 | Contract lehnt ab | Folgeslice |
-| Komponenten | 4 | Contract lehnt ab | Folgeslice |
-| Tandem/Tridem (`component_profile`) | 4 | Contract lehnt ab | Folgeslice |
-| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 4 | Contract lehnt ab | Folgeslice |
-| Budget-Planungsmodus | 4 | Wizard Budget-Pfad | Nicht in 03a |
+| Calendar / `planner_entries` | 4 | Contract + Validierung lehnen ab | UI im Vorlagenmodus ausgeblendet |
+| Komponenten | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
+| Tandem/Tridem (`component_profile`) | 4 | Contract + Validierung lehnen ab | Medium nicht wählbar |
+| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
+| Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Abbinder | 4 | zurückgestellt | Kein Scope |
 | „Aus Kundenkalkulation Standardangebot erzeugen“ | 4 | eigener Folgeslice | **Kein Button** in PR #91 |
 
 ## Vertrags-IDs
 
-- **STD-001** kundenlos · **STD-002** Versionen · **STD-003** Nav · **STD-004** Übernahme · **STD-005** Isolation · **STD-006** Sichtbarkeit Vertrieb nur published · **STD-007** kein Dispo aus Vorlage · **STD-008** Audit/Autor · **STD-009** Nummern
+- **STD-001** kundenlos · **STD-002** Versionen · **STD-003** Nav · **STD-004** Übernahme · **STD-005** Isolation · **STD-006** übernommene Kundenkalkulation anpassbar (Sender, Mengen, Budget-Assistent) · **STD-007** kein Dispo aus Vorlage · **STD-008** Audit/Autor · **STD-009** PM/Admin/GF verwalten Vorlagen inkl. Preis-/Produkt-Snapshots
 - **AUTH-006** PM verwaltet Vorlagen · **AUTH-007** PM ohne Calc/Dispo/Adopt
 - **VER-004** Snapshot-Freeze, keine Sync
 - **UX-GATE-D / PO-BLP403A-1** Teilfreigabe Oberfläche 03a

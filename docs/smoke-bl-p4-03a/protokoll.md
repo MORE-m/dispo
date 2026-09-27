@@ -45,3 +45,18 @@
 - Kein Button „aus Kalkulation Standardangebot erstellen“ (eigener Folgeslice).
 - Preisvorschau im Template manchmal „Berechnet …“ bis Preview durch ist; Materialisierung bei Publish ist maßgeblich.
 - UI zeigt weiterhin Kalender-/Festpreis-Optionen (Hinweis im Banner; nicht freigegeben).
+
+## Nachzug: nur unterstützte Optionen (HEAD nach Scope-Hide)
+
+| Prüfpunkt | Ergebnis |
+|-----------|----------|
+| Budgetplanung (Grunddaten) | **ausgeblendet** |
+| Zielbudget-Feld | **ausgeblendet** |
+| Kalenderplaner | **nicht sichtbar** (nur Durchschnitt) |
+| Festpreis | **nicht sichtbar** (nur Normal) |
+| Spot-Komponenten aktivieren | **nicht sichtbar** |
+| Werbemittel Tandem | **nicht in Select** (nur Spot Classic) |
+| Speichern Average | **OK** – `Smoke Scope Hide` → SA Entwurf |
+| Manipulierte Requests | Pest: Calendar/Festpreis/Budget/Komponenten/Tandem → Session-Errors, kein Speichern |
+
+Screenshot: `smoke-pm-hidden-options.png`

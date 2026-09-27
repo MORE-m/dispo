@@ -281,7 +281,7 @@ class StandardOfferController extends Controller
             'positions.*.client_key' => ['nullable', 'string', 'max:64'],
             'positions.*.inventory_id' => ['required', 'integer'],
             'positions.*.advertising_medium_id' => ['required', 'integer'],
-            'positions.*.spot_method' => ['nullable', 'in:average'],
+            'positions.*.spot_method' => ['required', 'in:average'],
             'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'positions.*.total_spot_count' => ['nullable', 'integer', 'min:0'],
             'positions.*.price_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
@@ -305,20 +305,20 @@ class StandardOfferController extends Controller
             'positions.*.dynamic_field_values' => ['sometimes', 'array'],
             'positions.*.components' => ['sometimes', 'array', 'max:0'],
             'positions.*.planner_entries' => ['sometimes', 'array', 'max:0'],
-            'positions.*.component_profile' => ['nullable'],
-            'positions.*.pricing_settlement_mode' => ['nullable', 'in:normal'],
-            'positions.*.fixed_price_nn' => ['nullable'],
-            'positions.*.calculation_method_key' => ['nullable', 'in:average'],
-            'positions.*.component_calculation_strategy' => ['nullable'],
+            'positions.*.component_profile' => ['prohibited'],
+            'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal'],
+            'positions.*.fixed_price_nn' => ['prohibited'],
+            'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average'],
+            'positions.*.component_calculation_strategy' => ['prohibited'],
             'customer_name' => ['prohibited'],
             'agency_name' => ['prohibited'],
-            'planning_mode' => ['nullable', 'in:manual'],
-            'target_budget_nn' => ['nullable'],
-            'budget_strategy' => ['nullable'],
+            'planning_mode' => ['sometimes', 'nullable', 'in:manual'],
+            'target_budget_nn' => ['prohibited'],
+            'budget_strategy' => ['prohibited'],
             'budget_elements' => ['prohibited'],
             'budget_distribution_ranges' => ['prohibited'],
-            'budget_proposal_manual' => ['nullable'],
-            'calculation_id' => ['nullable'],
+            'budget_proposal_manual' => ['prohibited'],
+            'calculation_id' => ['prohibited'],
             'lock_version' => ['sometimes', 'integer', 'min:1'],
         ]);
 
@@ -334,15 +334,11 @@ class StandardOfferController extends Controller
                 ]);
             }
 
-            $row = [
+            $positions[] = [
                 ...$position,
                 'client_key' => $position['client_key'] ?? (string) Str::uuid(),
-                'spot_method' => 'average',
                 'schema_fingerprint' => $fingerprint,
-                'pricing_settlement_mode' => 'normal',
             ];
-            unset($row['components'], $row['planner_entries'], $row['component_profile'], $row['fixed_price_nn']);
-            $positions[] = $row;
         }
 
         $payload = $this->averageContract->normalizeDraftPayload([
@@ -410,7 +406,7 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03a: Spot Classic Average. Keine Kundendaten. Calendar/Komponenten/Festpreis/Tandem/Abbinder: Folgeslices.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03a: Spot Classic Average. Keine Kundendaten. Calendar, Komponenten, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
         ];
 
         return Inertia::render('calculations/wizard', $props);

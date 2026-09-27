@@ -228,6 +228,85 @@ class StandardOfferBlP403aTest extends TestCase
         $this->writer()->create('Ungültig', $payload, $pm);
     }
 
+    public function test_http_rejects_unsupported_options_without_coercion(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $base = $this->draftPayload($catalog);
+        $base['title'] = 'Abgelehnte Vorlage';
+
+        $this->actingAs($pm)->post(route('standard-offers.store'), [
+            ...$base,
+            'positions' => [[
+                ...$base['positions'][0],
+                'spot_method' => 'calendar',
+            ]],
+        ])->assertSessionHasErrors('positions.0.spot_method');
+
+        $this->actingAs($pm)->post(route('standard-offers.store'), [
+            ...$base,
+            'positions' => [[
+                ...$base['positions'][0],
+                'pricing_settlement_mode' => 'fixed_price',
+                'fixed_price_nn' => '100.00',
+            ]],
+        ])->assertSessionHasErrors();
+
+        $this->actingAs($pm)->post(route('standard-offers.store'), [
+            ...$base,
+            'planning_mode' => 'budget',
+            'target_budget_nn' => '500',
+        ])->assertSessionHasErrors();
+
+        $this->actingAs($pm)->post(route('standard-offers.store'), [
+            ...$base,
+            'positions' => [[
+                ...$base['positions'][0],
+                'components' => [[
+                    'role' => 'main_spot',
+                    'length_seconds' => 20,
+                ]],
+            ]],
+        ])->assertSessionHasErrors('positions.0.components');
+
+        $this->actingAs($pm)->post(route('standard-offers.store'), [
+            ...$base,
+            'positions' => [[
+                ...$base['positions'][0],
+                'component_profile' => 'tandem',
+            ]],
+        ])->assertSessionHasErrors('positions.0.component_profile');
+
+        $this->assertSame(0, StandardOffer::query()->count());
+    }
+
+    public function test_contract_rejects_fixed_price_and_budget_without_coercion(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+
+        $fixed = $this->draftPayload($catalog);
+        $fixed['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+        $fixed['positions'][0]['fixed_price_nn'] = '99.00';
+        try {
+            $this->writer()->create('Festpreis', $fixed, $pm);
+            $this->fail('Festpreis hätte abgelehnt werden müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
+        }
+
+        $budget = $this->draftPayload($catalog);
+        $budget['planning_mode'] = 'budget';
+        try {
+            $this->writer()->create('Budget', $budget, $pm);
+            $this->fail('Budget hätte abgelehnt werden müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('planning_mode', $exception->errors());
+        }
+
+        $this->assertSame(0, StandardOffer::query()->count());
+    }
+
     public function test_adopt_requires_customer_name(): void
     {
         $catalog = $this->createSpotClassicCatalog();

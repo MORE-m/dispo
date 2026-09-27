@@ -38,10 +38,20 @@ final class StandardOfferAverageContract
                 ]);
             }
 
-            $method = (string) ($position['spot_method'] ?? SpotCalculationMethod::Average->value);
+            $method = array_key_exists('spot_method', $position)
+                ? (string) $position['spot_method']
+                : SpotCalculationMethod::Average->value;
             if ($method !== SpotCalculationMethod::Average->value) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.spot_method" => 'BL-P4-03a erlaubt nur Spot Classic Average.',
+                ]);
+            }
+
+            $calculationMethodKey = $position['calculation_method_key'] ?? null;
+            if ($calculationMethodKey !== null && $calculationMethodKey !== ''
+                && (string) $calculationMethodKey !== SpotCalculationMethod::Average->value) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.calculation_method_key" => 'BL-P4-03a erlaubt nur Spot Classic Average.',
                 ]);
             }
 
@@ -63,8 +73,10 @@ final class StandardOfferAverageContract
                 ]);
             }
 
-            $settlement = (string) ($position['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value);
-            if ($settlement !== PricingSettlementMode::Normal->value) {
+            if (array_key_exists('pricing_settlement_mode', $position)
+                && $position['pricing_settlement_mode'] !== null
+                && $position['pricing_settlement_mode'] !== ''
+                && (string) $position['pricing_settlement_mode'] !== PricingSettlementMode::Normal->value) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.pricing_settlement_mode" => 'Festpreis ist in BL-P4-03a nicht erlaubt.',
                 ]);
@@ -80,12 +92,16 @@ final class StandardOfferAverageContract
                 ...$position,
                 'spot_method' => SpotCalculationMethod::Average->value,
                 'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
-                'fixed_price_nn' => null,
                 'components' => [],
                 'planner_entries' => [],
-                'component_profile' => null,
-                'component_calculation_strategy' => null,
             ];
+        }
+
+        $planningMode = (string) ($payload['planning_mode'] ?? 'manual');
+        if ($planningMode !== 'manual') {
+            throw ValidationException::withMessages([
+                'planning_mode' => 'Budgetplanung ist in BL-P4-03a nicht erlaubt.',
+            ]);
         }
 
         return [
