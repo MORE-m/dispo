@@ -160,7 +160,7 @@ test('DF-3.2a Admin: unbenutztes Custom-Feld Scope Kopfbereich → Position', as
                 response.request().method() === 'PUT' &&
                 response.ok(),
         ),
-        page.getByRole('button', { name: 'Speichern' }).click(),
+        page.getByRole('button', { name: 'Speichern', exact: true }).click(),
     ]);
     await page.reload();
     await expect(
@@ -228,7 +228,7 @@ test('DF-3.2a Custom-Header: Admin → Calc Pflicht → Dispo Capture read-only'
     await page.getByRole('button', { name: '3. Konditionen' }).click();
     // PO-32b-1: Calc-Create wird nicht durch leere Custom-Pflichtfelder blockiert
     // (Feature-Tests); hier Capture-Pfad mit gesetztem Wert.
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
 
     await page.reload();

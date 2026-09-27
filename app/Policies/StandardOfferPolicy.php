@@ -7,7 +7,7 @@ use App\Models\StandardOfferVersion;
 use App\Models\User;
 
 /**
- * AUTH-006, AUTH-007, STD-003, STD-004, STD-009.
+ * AUTH-006, AUTH-007, STD-003, STD-004, STD-009, PO-BLP403B-1.
  */
 class StandardOfferPolicy
 {
@@ -32,6 +32,14 @@ class StandardOfferPolicy
     public function create(User $user): bool
     {
         return $user->canManageStandardOffers();
+    }
+
+    /**
+     * Schmales Vorschlagsrecht: Draft aus Calc, ohne Manage/Edit/Publish.
+     */
+    public function createFromCalculation(User $user): bool
+    {
+        return $user->canProposeStandardOfferFromCalculation();
     }
 
     public function update(User $user, StandardOffer $offer): bool

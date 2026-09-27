@@ -141,7 +141,7 @@ test('CAL-001 Mehrsender-Wizard mit Durchschnitt und Konditionen', async ({
     await waitForCalculationPreview(page);
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
@@ -586,7 +586,7 @@ test('Preiszeiträume, gestaffelte Rabatte und AE bleiben persistent', async ({
             response.request().method() === 'POST' &&
             /\/kalkulationen\/?$/.test(new URL(response.url()).pathname),
     );
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await saveResponse;
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
     await expect(page.getByText('Kalkulation gespeichert')).toBeVisible({

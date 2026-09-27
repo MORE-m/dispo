@@ -176,7 +176,7 @@ test.describe('DF-3-RULE-B runtime UI', () => {
         ).toHaveCount(0);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eTextValue(page, { calculationId: calcId }, hiddenTextKey))

@@ -24,6 +24,14 @@ final class StandardOfferAverageContract
             ]);
         }
 
+        foreach (StandardOfferFieldClassification::STRIP_HEADER_KEYS as $key) {
+            if (array_key_exists($key, $payload)) {
+                throw ValidationException::withMessages([
+                    $key => 'Standardangebote speichern keine Kundendaten (STD-001).',
+                ]);
+            }
+        }
+
         $positions = $payload['positions'] ?? null;
         if (! is_array($positions) || $positions === []) {
             throw ValidationException::withMessages([

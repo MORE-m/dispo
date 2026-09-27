@@ -201,6 +201,8 @@ Eine Sonderfreigabe ist ein eigener Freigabetyp und nicht mit der allgemeinen Vi
 
 **AUTH-007** Produktmanagement erhält nicht automatisch Zugriff auf Kundenkalkulationen oder Dispoaufträge. Solche Rechte müssen gesondert über die vorhandene Berechtigungslogik erteilt werden.
 
+**Auslegung BL-P4-03b / PO-BLP403B-1:** Vertrieb (sowie Admin/GF) darf aus einer zugänglichen Kundenkalkulation einen **Vorschlags-Draft** erzeugen. Das Recht erweitert **nicht** STD-009: kein allgemeiner Vorlagen-Edit-, Publish- oder Listen-Manage-Zugriff für Vertrieb. PM prüft den Draft ohne Calc-Zugang.
+
 **Umsetzung Extra-Recht Dispo (BL-P9-02a):** Boolean `users.can_view_dispo_orders` (Default `false`). Greift nur für Rolle Produktmanagement in `User::canViewDispoOrders()`; Kernrollen Admin/Vertrieb/Disposition/Geschäftsführung bleiben rollenbasiert berechtigt. Das Flag ändert `canAccessCalculations()` nicht.
 
 # 5. Organisation, Sender, Kombis und Inventare

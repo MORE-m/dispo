@@ -404,7 +404,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             .locator(`[data-test="calc-custom-${textKey}"]`)
             .fill('andere fachliche aenderung');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         await page.reload();
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
@@ -453,7 +453,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             page.locator(`[data-test="calc-choice-${headerSelectKey}"]`),
         ).toContainText('Keine Auswahl');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
@@ -543,7 +543,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             ),
         ).toBeChecked();
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         await page.reload();
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
@@ -611,7 +611,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
                 ['PUT', 'POST'].includes(request.method()),
         );
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         const hideSaveRequest = await hideSaveRequestPromise;
         const hidePayload = hideSaveRequest.postData() ?? '';
         expect(hidePayload).not.toContain(`"${headerSelectKey}"`);
@@ -637,7 +637,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             )
             .click();
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
@@ -653,7 +653,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
             .locator(`[data-test="calc-custom-${textKey}"]`)
             .fill('nach-gamma-hide');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         expect(
             (await e2eChoiceValue(page, calcId, headerSelectKey)).value_json,
@@ -761,7 +761,7 @@ test.describe('DF-3-REST-C2 calc choice UI', () => {
                 response.status() !== 0,
         );
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         const saveResponse = await saveResponsePromise;
         // Inertia-PUT: ValidationException → Redirect zurück, Middleware setzt 303.
         expect(saveResponse.status()).toBe(303);

@@ -137,7 +137,7 @@ test.describe.serial('BL-P4-01c Wizard-Preisjahrwahl', () => {
         await waitForCalculationPreview(page);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         await expect(page.getByText('Kalkulation gespeichert')).toBeVisible();
 
@@ -229,7 +229,7 @@ echo 'ok';
         await page.locator('[data-test="range-spots-0-0"]').fill('1');
         await page.locator('[data-test="position-length-seconds-0"]').fill('30');
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
 
         const calcUrl = page.url();
@@ -331,7 +331,7 @@ echo json_encode([
         expect(pinnedVersion ?? '').toMatch(/·/);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
         const calcId = Number(page.url().match(/kalkulationen\/(\d+)/)?.[1] ?? 0);
         expect(calcId).toBeGreaterThan(0);

@@ -18,7 +18,7 @@ async function saveSimpleCalculation(page: Page) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 15_000 });
 }
 
@@ -82,7 +82,7 @@ test('Nachbesserung abgelehnter Dispoauftrag als neuer Entwurf', async ({
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await page.locator('[data-test="range-spots-0-0"]').fill('12');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page.getByText('Kalkulation gespeichert.')).toBeVisible({
         timeout: 15_000,
     });

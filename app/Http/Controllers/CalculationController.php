@@ -686,6 +686,8 @@ class CalculationController extends Controller
             'latestBudgetProposal' => $latestBudgetProposal,
             'appliedBudgetProposal' => $appliedBudgetProposal,
             'canEdit' => $canEdit,
+            'canProposeAsStandardOffer' => $calculation !== null
+                && ($request->user()?->can('proposeAsStandardOffer', $calculation) ?? false),
             'canCreateDispoOrder' => $calculation !== null
                 && ($request->user()?->can('create', [DispoOrder::class, $calculation]) ?? false),
             'dispoOrderRevision' => $calculation === null

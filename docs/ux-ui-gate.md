@@ -464,8 +464,17 @@ innerhalb von UX-GATE-D **ausschließlich** folgende Bestandteile freigegeben:
 
 **Fachvertrag 03c (IDs):** `SPT-014`, `STD-001`–`STD-009`, `AUTH-006`, `AUTH-007`,
 `VER-004`. Keine eigene Vereinfachungsformel; Calc-Engine unverändert.
-Calendar/Tandem/Festpreis/Budget-auf-Vorlage/Abbinder und BL-P4-03b bleiben
-gesperrt. `campaign_period`/Flight-Felder unverändert zu 03a.
+Calendar/Tandem/Festpreis/Budget-auf-Vorlage/Abbinder bleiben gesperrt.
+`campaign_period`/Flight-Felder unverändert zu 03a. **03c gemergt** (PR #92,
+`392aa7d…`).
+
+**Product-Owner-Teilfreigabe (27. September 2026, UX-GATE-D / BL-P4-03b / PO-BLP403B-1):**
+Für `BL-P4-03b – Kalkulation als Standardangebot speichern` sind innerhalb von
+UX-GATE-D **ausschließlich** freigegeben: Aktion aus zugänglicher Calc → neuer
+kundenloser Draft; schmales Vertriebs-Vorschlagsrecht ohne Manage/Edit/Publish;
+PM-Prüfung ohne Calc-Zugang; Sanitize inkl. Freitext-Prüfstufe; gemeinsamer
+Materialisierungspfad für Average (+ optionale Komponenten). Keine stille
+Methodenreduktion; keine Auto-Publish/Sync.
 
 Diese Entscheidungen geben **nicht** das gesamte UX-GATE-D und **nicht** den
 Rest von `BL-P4-03` frei.

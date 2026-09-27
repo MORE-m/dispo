@@ -31,10 +31,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c / STD-001–STD-009 / VER-004 / AUTH-006 / SPT-014.
+ * BL-P4-03a/03c/03b / STD-001–STD-009 / VER-004 / AUTH-006 / SPT-014 / PO-BLP403B-1.
  *
- * Publish: Live-Auflösung einmalig einfrieren (inkl. optionaler Komponenten).
+ * Publish: Freeze über {@see StandardOfferMaterializer}.
  * Adopt: Materialisierung aus Frozen-Stand ohne CalculationWriter::create().
+ * From-Calc: Sanitize + neuer Draft, keine Sync/Auto-Publish.
  */
 final class StandardOfferWriter
 {
@@ -42,6 +43,8 @@ final class StandardOfferWriter
         private readonly StandardOfferNumberSequencer $offerNumbers,
         private readonly CalculationNumberSequencer $calculationNumbers,
         private readonly StandardOfferAverageContract $averageContract,
+        private readonly StandardOfferFromCalculationSanitizer $fromCalculation,
+        private readonly StandardOfferMaterializer $materializer,
         private readonly CalculationWriter $calculations,
         private readonly ConfigurationSnapshotFreezeService $snapshots,
         private readonly ConfigurationSnapshotCloneService $clones,
@@ -56,6 +59,7 @@ final class StandardOfferWriter
     {
         $title = $this->assertTitle($title);
         $payload = $this->averageContract->normalizeDraftPayload($draftPayload);
+        $this->fromCalculation->assertNoCustomerLeak($payload);
         $this->assertResolvable($payload, $user);
 
         return DB::transaction(function () use ($title, $payload, $user): StandardOffer {
@@ -87,6 +91,50 @@ final class StandardOfferWriter
     }
 
     /**
+     * BL-P4-03b: immer neuer SA-Draft aus zugänglicher Kalkulation.
+     */
+    public function createFromCalculation(Calculation $calculation, User $user): StandardOffer
+    {
+        $payload = $this->calculations->payloadFromCalculation($calculation);
+        $sanitized = $this->fromCalculation->sanitize($calculation, $payload);
+        $sanitized['draft_payload'] = $this->rebindLiveSchemaFingerprints($sanitized['draft_payload']);
+        $this->assertResolvable($sanitized['draft_payload'], $user);
+
+        return DB::transaction(function () use ($calculation, $sanitized, $user): StandardOffer {
+            [$year, $seq, $number] = $this->offerNumbers->next();
+
+            $offer = new StandardOffer;
+            $offer->number = $number;
+            $offer->number_year = $year;
+            $offer->number_seq = $seq;
+            $offer->title = $sanitized['title'];
+            $offer->lock_version = 1;
+            $offer->created_by = $user->id;
+            $offer->save();
+
+            $version = new StandardOfferVersion;
+            $version->standard_offer_id = $offer->id;
+            $version->version_number = 1;
+            $version->status = StandardOfferVersionStatus::Draft;
+            $version->title = $sanitized['title'];
+            $version->author_id = $user->id;
+            $version->draft_payload = $sanitized['draft_payload'];
+            $version->proposal_review = $sanitized['proposal_review'];
+            $version->source_calculation_id = $calculation->id;
+            $version->lock_version = 1;
+            $version->save();
+
+            $this->audit->record($offer, 'standard_offer.proposed_from_calculation', $user, null, [
+                ...$this->offerSnapshot($offer->fresh(['versions']) ?? $offer),
+                'source_calculation_id' => $calculation->id,
+                'source_calculation_number' => $calculation->number,
+            ]);
+
+            return $offer->fresh(['versions', 'draftVersion', 'publishedVersion']) ?? $offer;
+        });
+    }
+
+    /**
      * @param  array<string, mixed>  $draftPayload
      */
     public function updateDraft(
@@ -98,6 +146,7 @@ final class StandardOfferWriter
     ): StandardOfferVersion {
         $title = $this->assertTitle($title);
         $payload = $this->averageContract->normalizeDraftPayload($draftPayload);
+        $this->fromCalculation->assertNoCustomerLeak($payload);
         $this->assertResolvable($payload, $user);
 
         return DB::transaction(function () use ($version, $title, $payload, $expectedLockVersion, $user): StandardOfferVersion {
@@ -108,6 +157,7 @@ final class StandardOfferWriter
             $locked->title = $title;
             $locked->draft_payload = $payload;
             $locked->author_id = $user->id;
+            // Speichern bestätigt die Freitext-Prüfung bewusst nicht.
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
@@ -126,6 +176,47 @@ final class StandardOfferWriter
 
             $fresh = $locked->fresh() ?? $locked;
             $this->audit->record($fresh, 'standard_offer.version.updated', $user, $before, $this->versionSnapshot($fresh));
+
+            return $fresh;
+        });
+    }
+
+    /**
+     * Ausdrückliche Bestätigung der Freitext-Prüfung (kein Auto-Ack bei Save/Publish).
+     */
+    public function acknowledgeProposalReview(
+        StandardOfferVersion $version,
+        int $expectedLockVersion,
+        User $user,
+    ): StandardOfferVersion {
+        return DB::transaction(function () use ($version, $expectedLockVersion, $user): StandardOfferVersion {
+            $locked = StandardOfferVersion::query()->whereKey($version->id)->lockForUpdate()->firstOrFail();
+            $this->assertDraftEditable($locked, $expectedLockVersion);
+
+            $review = $locked->proposal_review;
+            if (! is_array($review) || ($review['review_required'] ?? false) !== true) {
+                throw ValidationException::withMessages([
+                    'proposal_review' => 'Für diesen Entwurf ist keine Freitext-Prüfung erforderlich.',
+                ]);
+            }
+
+            $before = $this->versionSnapshot($locked);
+            $locked->proposal_review = $this->acknowledgedProposalReview($review, $user);
+            $locked->lock_version = $locked->lock_version + 1;
+            $locked->save();
+
+            $offer = StandardOffer::query()->whereKey($locked->standard_offer_id)->lockForUpdate()->firstOrFail();
+            $offer->lock_version = $offer->lock_version + 1;
+            $offer->save();
+
+            $fresh = $locked->fresh() ?? $locked;
+            $this->audit->record(
+                $fresh,
+                'standard_offer.version.proposal_review_acknowledged',
+                $user,
+                $before,
+                $this->versionSnapshot($fresh),
+            );
 
             return $fresh;
         });
@@ -193,8 +284,10 @@ final class StandardOfferWriter
             $this->assertDraftEditable($locked, $expectedLockVersion);
 
             $offer = StandardOffer::query()->whereKey($locked->standard_offer_id)->lockForUpdate()->firstOrFail();
+            $this->assertProposalReviewReadyForPublish($locked);
             $payload = $this->averageContract->normalizeDraftPayload($locked->draft_payload ?? []);
-            $frozen = $this->freezePayload($payload, $user);
+            $this->fromCalculation->assertNoCustomerLeak($payload);
+            $frozen = $this->materializer->freeze($payload, $user);
 
             $previousPublished = StandardOfferVersion::query()
                 ->where('standard_offer_id', $offer->id)
@@ -225,6 +318,7 @@ final class StandardOfferWriter
             $locked->draft_payload = $payload;
             $locked->frozen_materialization = $frozen['materialization'];
             $locked->configuration_snapshot_id = $frozen['base_snapshot_id'];
+            $locked->proposal_review = $this->clearedProposalReviewAfterPublish($locked->proposal_review, $user);
             $locked->lock_version = $locked->lock_version + 1;
             $locked->save();
 
@@ -527,6 +621,39 @@ final class StandardOfferWriter
     }
 
     /**
+     * Vorlagen-Draft bindet an Live-Schema (Publish-Freeze), nicht an den
+     * historischen Calc-Fingerprint – Quelle bleibt ungekoppelt (STD-005).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function rebindLiveSchemaFingerprints(array $payload): array
+    {
+        $live = $this->snapshots->resolveLiveSchemaForCalculationV3();
+        $payload['schema_fingerprint'] = $live['schema_fingerprint'];
+
+        $positions = $payload['positions'] ?? [];
+        if (! is_array($positions)) {
+            return $payload;
+        }
+
+        foreach ($positions as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+            $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
+            if ($mediumId <= 0) {
+                continue;
+            }
+            $positions[$index]['schema_fingerprint'] = $this->snapshots
+                ->resolveLivePositionSchema($mediumId)['schema_fingerprint'];
+        }
+        $payload['positions'] = $positions;
+
+        return $payload;
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function assertResolvable(array $payload, User $user): void
@@ -535,142 +662,56 @@ final class StandardOfferWriter
     }
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @return array{base_snapshot_id: int, materialization: array<string, mixed>}
+     * @param  array<string, mixed>|null  $review
+     * @return array<string, mixed>|null
      */
-    private function freezePayload(array $payload, User $user): array
+    private function acknowledgedProposalReview(?array $review, User $user): ?array
     {
-        $fingerprint = $payload['schema_fingerprint'] ?? null;
-        if (! is_string($fingerprint) || $fingerprint === '') {
-            throw ValidationException::withMessages([
-                'schema_fingerprint' => 'Schema-Fingerprint fehlt oder ist ungültig.',
-            ]);
-        }
-
-        $totals = $this->calculations->totalsFromPayload($payload, $user);
-        $resolved = $this->calculations->resolvedPositions($payload);
-
-        $freezeInputs = [];
-        foreach ($resolved as $index => $item) {
-            $positionPayload = $payload['positions'][$index] ?? [];
-            $freezeInputs[] = [
-                'client_key' => (string) $index,
-                'advertising_medium_id' => (int) $item['medium']->id,
-                'schema_fingerprint' => $positionPayload['schema_fingerprint'] ?? null,
-            ];
-        }
-
-        $frozen = $this->snapshots->freezeCalculationV3($fingerprint, $freezeInputs);
-        $positions = [];
-        /** @var array<string, ConfigurationSnapshot> $effectives */
-        $effectives = $frozen['effectives_by_client_key'];
-
-        foreach ($resolved as $index => $item) {
-            $result = $totals->positions[$index];
-            $effectiveKey = (string) $index;
-            if (! array_key_exists($effectiveKey, $effectives)) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}" => 'Konfigurationssnapshot für Position fehlt.',
-                ]);
-            }
-            $effective = $effectives[$effectiveKey];
-
-            $positions[] = [
-                'client_key' => (string) Str::uuid(),
-                'inventory_id' => (int) $item['inventory']->id,
-                'inventory_name' => $item['inventory']->name,
-                'inventory_code' => $item['inventory']->code,
-                'advertising_medium_id' => (int) $item['medium']->id,
-                'advertising_medium_name' => $effective->context_advertising_medium_name,
-                'advertising_medium_code' => $effective->context_advertising_medium_code,
-                'advertising_category_id' => $effective->context_advertising_category_id,
-                'advertising_category_key' => $effective->context_advertising_category_key,
-                'advertising_category_name' => $effective->context_advertising_category_name,
-                'effective_configuration_snapshot_id' => $effective->id,
-                'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
-                'price_list_id' => (int) $item['priceList']->id,
-                'price_list_version' => $item['priceList']->version,
-                'kind' => $item['freeze']->legacyKind()->value,
-                'spot_method' => SpotCalculationMethod::Average->value,
-                'length_seconds' => (int) $item['length_seconds'],
-                'component_calculation_strategy' => $result->componentCalculationStrategy instanceof ComponentCalculationStrategy
-                    ? $result->componentCalculationStrategy->value
-                    : ($item['component_calculation_strategy'] instanceof ComponentCalculationStrategy
-                        ? $item['component_calculation_strategy']->value
-                        : null),
-                'component_profile' => null,
-                'components' => array_map(
-                    static function (array $component): array {
-                        return [
-                            'role' => (string) $component['role'],
-                            'label' => (string) $component['label'],
-                            'length_seconds' => (int) $component['length_seconds'],
-                            'sort' => (int) $component['sort'],
-                            'length_index' => (int) $component['length_index'],
-                            'media_gross' => (string) $component['media_gross'],
-                        ];
-                    },
-                    $result->components,
-                ),
-                'total_spot_count' => (int) $item['total_spot_count'],
-                'needs_spot_redistribution' => (bool) $item['needs_spot_redistribution'],
-                'average_second_price' => $result->averageSecondPrice,
-                'length_index' => $result->lengthIndex,
-                'surcharge_percent' => $item['surcharge_percent'],
-                'position_discount_percent' => $item['is_discountable']
-                    ? ($payload['positions'][$index]['position_discount_percent'] ?? '0')
-                    : '0',
-                'ae_percent' => $item['is_ae_eligible'] ? ($item['ae_percent'] ?? '0') : '0',
-                'is_discountable' => (bool) $item['is_discountable'],
-                'is_ae_eligible' => (bool) $item['is_ae_eligible'],
-                'media_gross' => $result->mediaGross,
-                'position_discount_amount' => $result->positionDiscountAmount,
-                'order_discount_amount' => $result->orderDiscountAmount,
-                'ae_amount' => $result->aeAmount,
-                'nn_invest' => $result->nnInvest,
-                'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
-                'fixed_price_nn' => null,
-                'effective_pay_factor_percent' => $result->effectivePayFactorPercent,
-                'effective_total_discount_percent' => $result->effectiveDiscountPercent,
-                'engine_profile_key' => $item['freeze']->engineProfileKey,
-                'calculation_method_key' => $item['freeze']->calculationMethodKey,
-                'calculation_method_name' => $item['freeze']->calculationMethodName,
-                'algorithm_version' => $item['freeze']->algorithmVersion,
-                'time_ranges' => $result->timeRanges,
-                'plan_rows' => $result->rows,
-                'position_discounts' => array_map(
-                    static fn (array $discount): array => [
-                        'type' => $discount['type'],
-                        'custom_label' => $discount['label'] === '' ? null : $discount['label'],
-                        'percent' => $discount['percent'],
-                    ],
-                    $result->positionDiscounts,
-                ),
-            ];
+        if ($review === null) {
+            return null;
         }
 
         return [
-            'base_snapshot_id' => (int) $frozen['base']->id,
-            'materialization' => [
-                'draft_payload' => $payload,
-                'configuration_snapshot_id' => (int) $frozen['base']->id,
-                'schema_fingerprint' => $frozen['base']->schema_fingerprint,
-                'campaign' => $payload['campaign'] ?? null,
-                'product_title' => $payload['product_title'] ?? null,
-                'briefing' => $payload['briefing'] ?? null,
-                'order_discount_percent' => $payload['order_discount_percent'] ?? '0',
-                'order_discounts' => $payload['order_discounts'] ?? [],
-                'ae_enabled' => (bool) ($payload['ae_enabled'] ?? false),
-                'media_gross' => $totals->mediaGross,
-                'position_discount_total' => $totals->positionDiscountTotal,
-                'order_discount_total' => $totals->orderDiscountTotal,
-                'ae_total' => $totals->aeTotal,
-                'nn_invest' => $totals->nnInvest,
-                'requires_special_approval' => $totals->requiresSpecialApproval,
-                'special_approval_reasons' => $totals->specialApprovalReasons,
-                'positions' => $positions,
-            ],
+            ...$review,
+            'review_required' => false,
+            'acknowledged_at' => now()->toIso8601String(),
+            'acknowledged_by' => $user->id,
         ];
+    }
+
+    /**
+     * Nach Publish keine Quell-Feldliste mehr nötig; Bestätigungsmeta bleibt auditierbar.
+     *
+     * @param  array<string, mixed>|null  $review
+     * @return array<string, mixed>|null
+     */
+    private function clearedProposalReviewAfterPublish(?array $review, User $user): ?array
+    {
+        if ($review === null) {
+            return null;
+        }
+
+        return [
+            'field_keys_requiring_review' => [],
+            'review_required' => false,
+            'acknowledged_at' => $review['acknowledged_at'] ?? now()->toIso8601String(),
+            'acknowledged_by' => $review['acknowledged_by'] ?? $user->id,
+            'cleared_at_publish' => now()->toIso8601String(),
+        ];
+    }
+
+    private function assertProposalReviewReadyForPublish(StandardOfferVersion $version): void
+    {
+        $review = $version->proposal_review;
+        if (! is_array($review)) {
+            return;
+        }
+
+        if (($review['review_required'] ?? false) === true && empty($review['acknowledged_at'])) {
+            throw ValidationException::withMessages([
+                'proposal_review' => 'Die Freitext-Prüfung muss vor der Veröffentlichung ausdrücklich bestätigt werden.',
+            ]);
+        }
     }
 
     private function assertTitle(string $title): string

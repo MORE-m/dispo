@@ -38,6 +38,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('calculations.field-schema');
     Route::get('kalkulationen/{calculation}', [CalculationController::class, 'edit'])->name('calculations.edit');
     Route::put('kalkulationen/{calculation}', [CalculationController::class, 'update'])->name('calculations.update');
+    Route::post('kalkulationen/{calculation}/als-standardangebot', [StandardOfferController::class, 'storeFromCalculation'])
+        ->name('standard-offers.from-calculation');
     Route::post('kalkulationen/{calculation}/budget-vorschlaege/{proposal}/uebernehmen', [CalculationController::class, 'applyBudget'])
         ->name('calculations.budget-apply');
 
@@ -49,6 +51,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('standard-offers.field-schema');
     Route::get('standardangebote/{standardOffer}', [StandardOfferController::class, 'show'])->name('standard-offers.show');
     Route::put('standardangebote/{standardOffer}/versionen/{version}', [StandardOfferController::class, 'update'])->name('standard-offers.update');
+    Route::post('standardangebote/{standardOffer}/versionen/{version}/pruefung-bestaetigen', [StandardOfferController::class, 'acknowledgeProposalReview'])
+        ->name('standard-offers.acknowledge-proposal-review');
     Route::post('standardangebote/{standardOffer}/entwurf', [StandardOfferController::class, 'storeDraft'])->name('standard-offers.draft');
     Route::post('standardangebote/{standardOffer}/versionen/{version}/veroeffentlichen', [StandardOfferController::class, 'publish'])->name('standard-offers.publish');
     Route::post('standardangebote/{standardOffer}/versionen/{version}/archivieren', [StandardOfferController::class, 'archive'])->name('standard-offers.archive');
