@@ -19,7 +19,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * BL-P4-03a / STD-003–STD-009 / AUTH-006 / AUTH-007 / UX-GATE-D Teilfreigabe.
+ * BL-P4-03a/03c / STD-003–STD-009 / AUTH-006 / AUTH-007 / UX-GATE-D Teilfreigabe.
  *
  * Editor: Kalkulations-Wizard im Template-Modus (Spot Classic Average, Gruppe 1).
  */
@@ -167,7 +167,7 @@ class StandardOfferController extends Controller
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
             'catalog' => null,
             'schemaFingerprint' => null,
-            'scopeNote' => 'BL-P4-03a: Spot Classic Average. Calendar/Komponenten/Festpreis/Tandem/Abbinder: Folgeslices.',
+            'scopeNote' => 'BL-P4-03c: Spot Classic Average mit optional Hauptspot+Allonge. Calendar/Festpreis/Tandem/Abbinder: Folgeslices.',
         ]);
     }
 
@@ -303,13 +303,21 @@ class StandardOfferController extends Controller
             'positions.*.position_discounts.*.custom_label' => ['nullable', 'string', 'max:120'],
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.dynamic_field_values' => ['sometimes', 'array'],
-            'positions.*.components' => ['sometimes', 'array', 'max:0'],
+            'positions.*.components' => ['sometimes', 'nullable', 'array'],
+            'positions.*.components.*.role' => ['required', 'string', 'in:main_spot,allonge'],
+            'positions.*.components.*.label' => ['nullable', 'string', 'max:120'],
+            'positions.*.components.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
+            'positions.*.components.*.sort' => ['nullable', 'integer', 'min:0'],
             'positions.*.planner_entries' => ['sometimes', 'array', 'max:0'],
             'positions.*.component_profile' => ['prohibited'],
             'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal'],
             'positions.*.fixed_price_nn' => ['prohibited'],
             'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average'],
-            'positions.*.component_calculation_strategy' => ['prohibited'],
+            'positions.*.component_calculation_strategy' => [
+                'sometimes',
+                'nullable',
+                'in:shared_total_length,individual',
+            ],
             'customer_name' => ['prohibited'],
             'agency_name' => ['prohibited'],
             'planning_mode' => ['sometimes', 'nullable', 'in:manual'],
@@ -406,7 +414,7 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03a: Spot Classic Average. Keine Kundendaten. Calendar, Komponenten, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03c: Spot Classic Average mit optional Hauptspot+Allonge. Keine Kundendaten. Calendar, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
         ];
 
         return Inertia::render('calculations/wizard', $props);
@@ -429,7 +437,8 @@ class StandardOfferController extends Controller
                 'client_key' => $position['client_key'] ?? ('draft-'.$index),
                 'spot_method' => 'average',
                 'pricing_settlement_mode' => $position['pricing_settlement_mode'] ?? 'normal',
-                'components' => [],
+                'components' => is_array($position['components'] ?? null) ? $position['components'] : [],
+                'component_calculation_strategy' => $position['component_calculation_strategy'] ?? null,
                 'planner_entries' => [],
                 'component_profile' => null,
                 'plan_rows' => $position['plan_rows'] ?? [],

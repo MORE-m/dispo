@@ -304,13 +304,15 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a` in Umsetzung / Feature-Branch)
-- **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`
-- **Abhängigkeiten:** BL-P4-02 (Average-Pfad; Abbinder nicht blockierend), UX-GATE-D Teilfreigabe **PO-BLP403A-1**
+- **Status:** teilweise (`BL-P4-03a` auf `main` / PR #91; `BL-P4-03c` in Umsetzung)
+- **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c)
+- **Abhängigkeiten:** BL-P4-02 (Average + Komponenten 02c; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
-- **Grenzen 03a:** kein Calendar/Komponenten/Festpreis/Tandem/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später)
-- **Akzeptanz:** `AT-28` bis `AT-31`
+- **Ergebnis 03c:** optionale Hauptspot+Allonge in Average-Vorlagen; Strategien laut Inventarregel; Freeze/Adopt/Dispo-Snapshot; Calc-Update nach Übernahme
+- **Grenzen:** kein Calendar/Festpreis/Tandem/Abbinder; kein Button „aus Kalkulation“ (**03b**); PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später)
+- **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c siehe Feature-Tests Komponenten-Roundtrip/Isolation
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
+- **Tests 03c:** `tests/Feature/StandardOffer/StandardOfferBlP403cTest.php`
 
 ## Phase 5 – SWF, Produktion und freie Preisbestandteile
 

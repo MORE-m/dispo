@@ -127,7 +127,7 @@ export default function StandardOfferEdit({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Standardangebot anlegen"
-                    description="Kundenlose Vorlage, nur Spot Classic Average (BL-P4-03a)."
+                    description="Kundenlose Vorlage, Spot Classic Average inkl. optional Hauptspot+Allonge (BL-P4-03c)."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/standardangebote">Zurück</Link>

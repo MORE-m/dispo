@@ -1,51 +1,64 @@
 # Fortschritt V1
 
-Stand: 26. September 2026 – **BL-P4-03a** Standardangebote (PO-BLP403A-1)
-in Feature-Umsetzung; Base `origin/main` @ `56a10e6…` (nach PR #88/#90).
-**BL-P1-05a** Outbox-Fundament auf `main` gemergt (PR #90). Fachliche
+Stand: 27. September 2026 – **BL-P4-03c** Average-Vorlagen + Hauptspot/Allonge
+(PO-BLP403C-1) in Feature-Umsetzung; Base `main` @ `5b3431e…` (nach Merge PR #91).
+**BL-P4-03a** Standardangebote Average auf `main` gemergt (PR #91). Fachliche
 Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
-Mehrfachpositionen). Feldmatrix: `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`.
-Calendar/Komponenten/Festpreis/Tandem/Abbinder und „aus Kalkulation erzeugen“ =
-Folgeslices. Kein Merge von PR #91 bis manuelle Abnahme.
+Mehrfachpositionen, optional Hauptspot+Allonge). Feldmatrix:
+`docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`.
+Calendar/Festpreis/Tandem/Abbinder und „aus Kalkulation erzeugen“ (03b) =
+Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 4 / **BL-P4-03a** (Standardangebote, Spot Classic Average).
+Phase 4 / **BL-P4-03c** (Standardangebote, Average + Komponenten).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03a** – Feature-PR / manuelle Abnahme. Kein Calendar/Komponenten/Festpreis/Tandem.
+**BL-P4-03c** – Feature-PR / manuelle Abnahme. Kein Calendar/Festpreis/Tandem/03b.
 
 ## Zuletzt begonnene Aufgabe (Umsetzung)
 
-**BL-P4-03a** Standardangebote: Liste, Draft, Publish/Archiv, Versionshistorie,
-Vertrieb-Ansicht, Übernahme mit Frozen Materialization (STD-001–009, AUTH-006/007,
-VER-004, AT-28–31).
+**BL-P4-03c** Hauptspot+Allonge in Average-Standardangeboten (PO-BLP403C-1,
+SPT-014, VER-004); Draft/Publish/Adopt/Dispo-Snapshot.
+
+## BL-P4-03c – Average-Vorlagen + Hauptspot/Allonge / PO-BLP403C-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP403C-1 (nur Komponenten im Vorlageneditor) | **freigegeben** (dieser Scope) |
+| Optional Hauptspot+Allonge; Strategien laut Inventar-/Werbemittelregel | **umgesetzt** |
+| Contract/Validierung/Vorschau/Writer Freeze+Adopt inkl. Komponenten | **umgesetzt** |
+| UI: Komponentenbedienung im Template-Modus; übrige Scope-Hides bleiben | **umgesetzt** |
+| Feature-Tests `StandardOfferBlP403cTest` | **umgesetzt** |
+| Einfache Average-Vorlagen ohne Komponenten | **unverändert** |
+| Calendar/Festpreis/Tandem/Budget-auf-Vorlage/Abbinder/03b-Button | **bewusst nicht** |
+| `campaign_period` / Flight-Felder | **stabil wie 03a** (keine neue Datums-/Shift-Logik) |
+| Manueller Smoke Port 8045 | **durchgeführt** (`docs/smoke-bl-p4-03c/protokoll.md`) |
+| Merge | **kein Merge** (Draft-PR) |
 
 ## BL-P4-03a – Standardangebote / PO-BLP403A-1 (September 2026)
 
 | Teil | Status |
 |------|--------|
-| UX-GATE-D Teilfreigabe PO-BLP403A-1 (nur 03a-Oberflächen) | **freigegeben** (dieser Scope) |
+| UX-GATE-D Teilfreigabe PO-BLP403A-1 (nur 03a-Oberflächen) | **freigegeben** |
 | Domain `StandardOffer` / `StandardOfferVersion`, Nummern `SA-` | **umgesetzt** |
-| Nur Spot Classic Average; Ablehnung anderer Inhalte | **umgesetzt** |
+| Nur Spot Classic Average; Ablehnung anderer Inhalte | **umgesetzt** (03c erweitert um optionale Komponenten) |
 | Publish archiviert vorherige Published atomar; paralleler Draft | **umgesetzt** |
 | Übernahme ohne Live-`CalculationWriter::create()` | **umgesetzt** |
 | Kunde Freitext Pflicht bei Übernahme (CRM-Slice später) | **umgesetzt** |
 | PM ohne Calc/Dispo/Übernahme (AUTH-007) | **umgesetzt** |
-| Feature-Tests AT-28–31-Kern | **umgesetzt** (15 Feature-Tests; inkl. HTTP Publish/Adopt-Policy) |
+| Feature-Tests AT-28–31-Kern | **umgesetzt** (17 Feature-Tests in `StandardOfferBlP403aTest`) |
 | Vorlagen-Editor via Calc-Wizard (Average, multi-Position) | **umgesetzt** |
 | Feldmatrix Gruppe 1–4 dokumentiert | **umgesetzt** (`docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`) |
 | `StandardOfferVersion` an `StandardOfferPolicy` gebunden | **umgesetzt** (Publish/Adopt HTTP) |
 | Manueller Smoke Port 8044 | **durchgeführt** (`docs/smoke-bl-p4-03a/protokoll.md`) |
-| Calendar/Komponenten/Festpreis/Tandem/Abbinder | **bewusst nicht** (Gruppe 4) |
-| Aus Kalkulation → Vorlage | **bewusst nicht** (Folgeslice, kein Button) |
-| Lokale Gates (Pint/PHPStan/Pest SQLite/Vitest/`npm check`/`tsc`) | **grün** vor Draft-PR |
-| MySQL-Gate lokal | STD-Filter nach `dispo_test`-Reset; Full-Suite an GitHub `mysql`-Job |
-| Calendar/Komponenten/Festpreis/Tandem/Abbinder UI | **bewusst nicht** (UI zeigt Optionen; Server lehnt ab) |
-| Merge | **kein Merge** (Draft PR #91) |
+| Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** (Gruppe 4; Komponenten → **03c**) |
+| Aus Kalkulation → Vorlage | **bewusst nicht** (Folgeslice **03b**, kein Button) |
+| Scope-Hide UI (nicht unterstützte Optionen ausgeblendet) | **umgesetzt** (PR #91) |
+| Merge `main` | **PR #91** (`5b3431ecf055d1c4b28bd9bad7a97c31393509b2`) |
 
 ## BL-P1-05a – Outbox-Fundament (September 2026)
 

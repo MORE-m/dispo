@@ -258,16 +258,20 @@ class StandardOfferBlP403aTest extends TestCase
             'target_budget_nn' => '500',
         ])->assertSessionHasErrors();
 
+        // Unvollständige Komponenten (nur Hauptspot) bleiben abgelehnt; gültige 03c-Fälle separat.
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
             'positions' => [[
                 ...$base['positions'][0],
+                'component_calculation_strategy' => 'shared_total_length',
                 'components' => [[
                     'role' => 'main_spot',
+                    'label' => 'Hauptspot',
                     'length_seconds' => 20,
+                    'sort' => 0,
                 ]],
             ]],
-        ])->assertSessionHasErrors('positions.0.components');
+        ])->assertSessionHasErrors();
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,

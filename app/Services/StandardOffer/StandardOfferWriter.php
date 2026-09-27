@@ -3,6 +3,7 @@
 namespace App\Services\StandardOffer;
 
 use App\Enums\CalculationStatus;
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
@@ -11,6 +12,7 @@ use App\Enums\StandardOfferVersionStatus;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
+use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
@@ -29,9 +31,9 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a / STD-001–STD-009 / VER-004 / AUTH-006.
+ * BL-P4-03a/03c / STD-001–STD-009 / VER-004 / AUTH-006 / SPT-014.
  *
- * Publish: Live-Auflösung einmalig einfrieren.
+ * Publish: Live-Auflösung einmalig einfrieren (inkl. optionaler Komponenten).
  * Adopt: Materialisierung aus Frozen-Stand ohne CalculationWriter::create().
  */
 final class StandardOfferWriter
@@ -360,6 +362,11 @@ final class StandardOfferWriter
                 $templateEffective = ConfigurationSnapshot::query()->whereKey($templateEffectiveId)->firstOrFail();
                 $calcEffective = $this->clones->cloneCalculationPositionEffective($templateEffective, $calcBase);
 
+                $frozenStrategy = $frozenPosition['component_calculation_strategy'] ?? null;
+                $strategyValue = is_string($frozenStrategy) && $frozenStrategy !== ''
+                    ? ComponentCalculationStrategy::tryFrom($frozenStrategy)?->value
+                    : null;
+
                 $position = new CalculationPosition;
                 $position->fill([
                     'client_key' => (string) ($frozenPosition['client_key'] ?? (string) Str::uuid()),
@@ -378,7 +385,7 @@ final class StandardOfferWriter
                     'kind' => $frozenPosition['kind'],
                     'spot_method' => SpotCalculationMethod::Average->value,
                     'length_seconds' => (int) $frozenPosition['length_seconds'],
-                    'component_calculation_strategy' => null,
+                    'component_calculation_strategy' => $strategyValue,
                     'component_profile' => null,
                     'total_spot_count' => (int) $frozenPosition['total_spot_count'],
                     'needs_spot_redistribution' => (bool) ($frozenPosition['needs_spot_redistribution'] ?? false),
@@ -407,6 +414,32 @@ final class StandardOfferWriter
                 $position->algorithm_version = $frozenPosition['algorithm_version'] ?? null;
                 $position->calculation()->associate($calculation);
                 $position->save();
+
+                foreach ($frozenPosition['components'] ?? [] as $componentIndex => $component) {
+                    if (! is_array($component)) {
+                        continue;
+                    }
+                    $mediaGross = $component['media_gross'] ?? null;
+                    if ($mediaGross === '' || $mediaGross === null) {
+                        $mediaGross = null;
+                    } else {
+                        $mediaGross = (string) $mediaGross;
+                    }
+                    $lengthIndex = $component['length_index'] ?? null;
+                    $componentModel = new CalculationPositionComponent;
+                    $componentModel->fill([
+                        'role' => $component['role'] ?? 'main_spot',
+                        'label' => $component['label'] ?? '',
+                        'length_seconds' => (int) ($component['length_seconds'] ?? 0),
+                        'sort' => (int) ($component['sort'] ?? $componentIndex),
+                        'length_index' => $lengthIndex === null || $lengthIndex === ''
+                            ? null
+                            : (int) $lengthIndex,
+                        'media_gross' => $mediaGross,
+                    ]);
+                    $componentModel->position()->associate($position);
+                    $componentModel->save();
+                }
 
                 foreach ($frozenPosition['time_ranges'] ?? [] as $rangeIndex => $range) {
                     if (! is_array($range)) {
@@ -560,6 +593,25 @@ final class StandardOfferWriter
                 'kind' => $item['freeze']->legacyKind()->value,
                 'spot_method' => SpotCalculationMethod::Average->value,
                 'length_seconds' => (int) $item['length_seconds'],
+                'component_calculation_strategy' => $result->componentCalculationStrategy instanceof ComponentCalculationStrategy
+                    ? $result->componentCalculationStrategy->value
+                    : ($item['component_calculation_strategy'] instanceof ComponentCalculationStrategy
+                        ? $item['component_calculation_strategy']->value
+                        : null),
+                'component_profile' => null,
+                'components' => array_map(
+                    static function (array $component): array {
+                        return [
+                            'role' => (string) $component['role'],
+                            'label' => (string) $component['label'],
+                            'length_seconds' => (int) $component['length_seconds'],
+                            'sort' => (int) $component['sort'],
+                            'length_index' => (int) $component['length_index'],
+                            'media_gross' => (string) $component['media_gross'],
+                        ];
+                    },
+                    $result->components,
+                ),
                 'total_spot_count' => (int) $item['total_spot_count'],
                 'needs_spot_redistribution' => (bool) $item['needs_spot_redistribution'],
                 'average_second_price' => $result->averageSecondPrice,
