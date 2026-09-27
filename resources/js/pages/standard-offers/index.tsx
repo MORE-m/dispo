@@ -29,7 +29,7 @@ export default function StandardOffersIndex({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Standardangebote"
-                    description="Versionierte Vorlagen ohne Kundenbindung. Spot Classic Average (BL-P4-03a)."
+                    description="Versionierte Vorlagen ohne Kundenbindung. Spot Classic Average inkl. optional Hauptspot+Allonge (BL-P4-03c)."
                     actions={
                         canManage ? (
                             <Button asChild>
