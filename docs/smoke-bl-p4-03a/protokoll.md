@@ -1,10 +1,10 @@
 # Smoke BL-P4-03a – Vorlagen-Editor (Average)
 
-**Datum:** 2026-09-26  
+**Datum:** 2026-09-26 (Nachzug Scope-Hide 2026-09-27)  
 **Port:** `http://127.0.0.1:8044`  
 **Worktree:** `dispo-wt-bl-p4-03a-smoke` (isoliert, SQLite `database/smoke-bl-p4-03a.sqlite`)  
 **Testdaten:** `E2ESpotDistributionExportSeeder` (APP_ENV=testing, E2E_SERVER=1 beim Seed)  
-**Kein Merge.**
+**Endstand:** nur unterstützte Optionen wählbar; Speichern Average OK.
 
 ## Befunde (behoben vor Abnahme-Bericht)
 
@@ -39,24 +39,25 @@
 | PM | `GET /kalkulationen` | **403** (AUTH-007, Pest) |
 | PM | Adopt HTTP | **403** (Pest AT-29) |
 
-## Verbleibende Grenzen (kein vollständiges Standardangebot)
+## Endstand Scope-Hide (verbindlich)
 
-- Server akzeptiert nur **Spot Classic Average** (Calendar / Komponenten / Festpreis / Tandem/Tridem / Abbinder: Folgeslices; UI zeigt Methoden noch an, Speichern wird abgewiesen).
-- Kein Button „aus Kalkulation Standardangebot erstellen“ (eigener Folgeslice).
-- Preisvorschau im Template manchmal „Berechnet …“ bis Preview durch ist; Materialisierung bei Publish ist maßgeblich.
-- UI zeigt weiterhin Kalender-/Festpreis-Optionen (Hinweis im Banner; nicht freigegeben).
-
-## Nachzug: nur unterstützte Optionen (HEAD nach Scope-Hide)
+Im Vorlagenmodus sind **nicht unterstützt und nicht wählbar** (UI ausgeblendet; manipulierte Requests serverseitig abgelehnt, kein stilles Umschreiben auf average/normal):
 
 | Prüfpunkt | Ergebnis |
 |-----------|----------|
 | Budgetplanung (Grunddaten) | **ausgeblendet** |
 | Zielbudget-Feld | **ausgeblendet** |
-| Kalenderplaner | **nicht sichtbar** (nur Durchschnitt) |
-| Festpreis | **nicht sichtbar** (nur Normal) |
-| Spot-Komponenten aktivieren | **nicht sichtbar** |
-| Werbemittel Tandem | **nicht in Select** (nur Spot Classic) |
+| Kalenderplaner | **ausgeblendet** (nur Durchschnitt) |
+| Festpreis | **ausgeblendet** (nur Normal) |
+| Spot-Komponenten aktivieren | **ausgeblendet** |
+| Werbemittel Tandem/Tridem | **nicht in Select** (nur Spot Classic) |
 | Speichern Average | **OK** – `Smoke Scope Hide` → SA Entwurf |
 | Manipulierte Requests | Pest: Calendar/Festpreis/Budget/Komponenten/Tandem → Session-Errors, kein Speichern |
 
 Screenshot: `smoke-pm-hidden-options.png`
+
+## Verbleibende Grenzen (kein vollständiges Standardangebot)
+
+- Scope dieses Slices: **Spot Classic Average** (Calendar / Komponenten / Festpreis / Tandem/Tridem / Abbinder: Folgeslices; im Vorlagenmodus nicht wählbar).
+- Kein Button „aus Kalkulation Standardangebot erstellen“ (eigener Folgeslice).
+- Preisvorschau im Template manchmal „Berechnet …“ bis Preview durch ist; Materialisierung bei Publish ist maßgeblich.
