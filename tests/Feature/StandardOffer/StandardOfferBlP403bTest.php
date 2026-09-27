@@ -186,6 +186,12 @@ class StandardOfferBlP403bTest extends TestCase
         }
 
         $this->assertSame(0, StandardOffer::query()->count());
+
+        $this->actingAs($sales)
+            ->from(route('calculations.edit', $calculation))
+            ->post(route('standard-offers.from-calculation', $calculation))
+            ->assertRedirect(route('calculations.edit', $calculation))
+            ->assertSessionHasErrors('positions.0.spot_method');
     }
 
     public function test_components_roundtrip_from_calculation(): void

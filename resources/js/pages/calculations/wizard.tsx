@@ -1953,7 +1953,6 @@ export default function CalculationWizard({
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
     });
-    const error = previewError ?? saveError ?? proposalError ?? schemaLoadError;
     const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
@@ -1966,6 +1965,12 @@ export default function CalculationWizard({
         ...previewFieldErrors,
         ...saveFieldErrors,
     };
+    const error =
+        previewError ??
+        saveError ??
+        proposalError ??
+        schemaLoadError ??
+        firstValidationMessage(pageValidationErrors);
 
     function allowedMediaFor(inventoryId: number) {
         const mediumIds = new Set(
@@ -2594,8 +2599,26 @@ export default function CalculationWizard({
                             data-test="calculation-save-as-standard-offer"
                             disabled={busy}
                             onClick={() => {
+                                setProposalError(null);
                                 router.post(
                                     `/kalkulationen/${calculation.id}/als-standardangebot`,
+                                    {},
+                                    {
+                                        onError: (errors) => {
+                                            const mapped = mapValidationErrors(
+                                                errors as Record<
+                                                    string,
+                                                    string | string[]
+                                                >,
+                                            );
+                                            setProposalError(
+                                                firstValidationMessage(
+                                                    mapped,
+                                                ) ??
+                                                    'Als Standardangebot speichern ist für diese Kalkulation nicht möglich.',
+                                            );
+                                        },
+                                    },
                                 );
                             }}
                         >
