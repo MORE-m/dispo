@@ -19,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CarbonImmutable|null $published_at
  * @property CarbonImmutable|null $archived_at
  * @property array<string, mixed>|null $draft_payload
+ * @property array<string, mixed>|null $proposal_review
+ * @property int|null $source_calculation_id
  * @property array<string, mixed>|null $frozen_materialization
  * @property int|null $configuration_snapshot_id
  * @property int $lock_version
@@ -40,6 +42,8 @@ class StandardOfferVersion extends Model
         'published_at',
         'archived_at',
         'draft_payload',
+        'proposal_review',
+        'source_calculation_id',
         'frozen_materialization',
         'configuration_snapshot_id',
         'lock_version',
@@ -56,6 +60,7 @@ class StandardOfferVersion extends Model
             'published_at' => 'datetime',
             'archived_at' => 'datetime',
             'draft_payload' => 'array',
+            'proposal_review' => 'array',
             'frozen_materialization' => 'array',
             'lock_version' => 'integer',
         ];
@@ -83,5 +88,13 @@ class StandardOfferVersion extends Model
     public function configurationSnapshot(): BelongsTo
     {
         return $this->belongsTo(ConfigurationSnapshot::class);
+    }
+
+    /**
+     * @return BelongsTo<Calculation, $this>
+     */
+    public function sourceCalculation(): BelongsTo
+    {
+        return $this->belongsTo(Calculation::class, 'source_calculation_id');
     }
 }

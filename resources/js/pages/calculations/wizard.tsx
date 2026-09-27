@@ -980,6 +980,7 @@ export default function CalculationWizard({
     latestBudgetProposal,
     appliedBudgetProposal: _appliedBudgetProposal,
     canEdit,
+    canProposeAsStandardOffer = false,
     canCreateDispoOrder = false,
     dispoOrderRevision = null,
     standardOffer = null,
@@ -995,6 +996,7 @@ export default function CalculationWizard({
     latestBudgetProposal: LatestBudgetProposal | null;
     appliedBudgetProposal: AppliedBudgetProposal | null;
     canEdit: boolean;
+    canProposeAsStandardOffer?: boolean;
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
     standardOffer?: {
@@ -1008,6 +1010,12 @@ export default function CalculationWizard({
         status_label: string;
         allowed_spot_methods: string[];
         scope_note: string;
+        proposal_review?: {
+            source_calculation_number: string | null;
+            free_text: Record<string, string | null>;
+            review_required: boolean;
+            acknowledged_at: string | null;
+        } | null;
     } | null;
 }) {
     const flash = usePage().props.flash;
@@ -2222,11 +2230,17 @@ export default function CalculationWizard({
               : '/kalkulationen';
 
         const savePayload = isStandardOffer
-            ? (templateRequestPayload ?? {
-                  ...payload,
-                  title: templateTitle.trim() || 'Standardangebot',
-                  planning_mode: 'manual',
-              })
+            ? {
+                  ...(templateRequestPayload ?? {
+                      ...payload,
+                      title: templateTitle.trim() || 'Standardangebot',
+                      planning_mode: 'manual',
+                  }),
+                  acknowledge_proposal_review: Boolean(
+                      standardOffer.proposal_review?.review_required &&
+                      !standardOffer.proposal_review.acknowledged_at,
+                  ),
+              }
             : payload;
 
         const options = {
@@ -2577,6 +2591,58 @@ export default function CalculationWizard({
                         isStandardOffer ? standardOffer.scope_note : undefined
                     }
                 />
+                {!isStandardOffer &&
+                canProposeAsStandardOffer &&
+                calculation?.id ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            data-test="calculation-save-as-standard-offer"
+                            disabled={busy}
+                            onClick={() => {
+                                router.post(
+                                    `/kalkulationen/${calculation.id}/als-standardangebot`,
+                                );
+                            }}
+                        >
+                            Als Standardangebot speichern
+                        </Button>
+                    </div>
+                ) : null}
+                {isStandardOffer &&
+                standardOffer.proposal_review?.review_required &&
+                !standardOffer.proposal_review.acknowledged_at ? (
+                    <div
+                        className="border-border bg-muted/40 space-y-3 rounded-md border p-4 text-sm"
+                        data-test="standard-offer-proposal-review"
+                    >
+                        <p className="font-medium">
+                            Freitext-Prüfung erforderlich
+                            {standardOffer.proposal_review
+                                .source_calculation_number
+                                ? ` (Quelle ${standardOffer.proposal_review.source_calculation_number})`
+                                : ''}
+                        </p>
+                        <p>
+                            Kundendaten wurden entfernt. Die folgenden Freitexte
+                            aus der Quellkalkulation wurden nicht in die Vorlage
+                            übernommen – bitte prüfen und bei Bedarf manuell,
+                            kundenfrei setzen. Vor der Veröffentlichung muss die
+                            Prüfung bestätigt werden.
+                        </p>
+                        <ul className="list-disc space-y-1 pl-5">
+                            {Object.entries(
+                                standardOffer.proposal_review.free_text,
+                            ).map(([key, value]) => (
+                                <li key={key}>
+                                    <span className="font-medium">{key}:</span>{' '}
+                                    {value ?? '—'}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                ) : null}
                 {isStandardOffer ? (
                     <StatusBanner data-test="standard-offer-scope-note">
                         {standardOffer.scope_note}
@@ -5281,6 +5347,12 @@ export default function CalculationWizard({
                                         {
                                             lock_version:
                                                 standardOffer.lock_version,
+                                            acknowledge_proposal_review:
+                                                Boolean(
+                                                    standardOffer
+                                                        .proposal_review
+                                                        ?.review_required,
+                                                ),
                                         },
                                     );
                                 }}

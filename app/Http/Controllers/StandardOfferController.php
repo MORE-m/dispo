@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\StandardOfferVersionStatus;
+use App\Models\Calculation;
 use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
@@ -86,6 +87,33 @@ class StandardOfferController extends Controller
         return redirect()
             ->route('standard-offers.show', ['standardOffer' => $offer, 'version' => $version?->id])
             ->with('success', 'Standardangebot als Entwurf angelegt.');
+    }
+
+    /**
+     * BL-P4-03b / PO-BLP403B-1: Vorschlags-Draft aus Kalkulation.
+     */
+    public function storeFromCalculation(Request $request, Calculation $calculation): RedirectResponse
+    {
+        $this->authorize('proposeAsStandardOffer', $calculation);
+        $this->authorize('createFromCalculation', StandardOffer::class);
+
+        /** @var User $user */
+        $user = $request->user();
+        $offer = $this->writer->createFromCalculation($calculation, $user);
+        $version = $offer->draftVersion;
+
+        if ($user->canManageStandardOffers()) {
+            return redirect()
+                ->route('standard-offers.show', ['standardOffer' => $offer, 'version' => $version?->id])
+                ->with('success', 'Vorschlag als Standardangebot-Entwurf angelegt. Bitte Freitext prüfen.');
+        }
+
+        return redirect()
+            ->route('calculations.edit', $calculation)
+            ->with(
+                'success',
+                'Vorschlag '.$offer->number.' als Standardangebot-Entwurf angelegt. Produktmanagement prüft den Entwurf.',
+            );
     }
 
     public function preview(Request $request): JsonResponse
@@ -185,6 +213,7 @@ class StandardOfferController extends Controller
             $data['payload'],
             (int) $request->input('lock_version'),
             $user,
+            $request->boolean('acknowledge_proposal_review'),
         );
 
         return redirect()
@@ -212,7 +241,12 @@ class StandardOfferController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $published = $this->writer->publish($version, (int) $request->input('lock_version'), $user);
+        $published = $this->writer->publish(
+            $version,
+            (int) $request->input('lock_version'),
+            $user,
+            $request->boolean('acknowledge_proposal_review'),
+        );
 
         return redirect()
             ->route('standard-offers.show', ['standardOffer' => $standardOffer, 'version' => $published->id])
@@ -414,10 +448,30 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03c: Spot Classic Average mit optional Hauptspot+Allonge. Keine Kundendaten. Calendar, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03b/03c: Spot Classic Average mit optional Hauptspot+Allonge. Keine Kundendaten. Calendar, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
+            'proposal_review' => $this->proposalReviewProp($version),
         ];
 
         return Inertia::render('calculations/wizard', $props);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function proposalReviewProp(?StandardOfferVersion $version): ?array
+    {
+        if ($version === null || ! is_array($version->proposal_review)) {
+            return null;
+        }
+
+        $review = $version->proposal_review;
+
+        return [
+            'source_calculation_number' => $review['source_calculation_number'] ?? null,
+            'free_text' => is_array($review['free_text'] ?? null) ? $review['free_text'] : [],
+            'review_required' => (bool) ($review['review_required'] ?? false),
+            'acknowledged_at' => $review['acknowledged_at'] ?? null,
+        ];
     }
 
     /**

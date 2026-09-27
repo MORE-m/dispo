@@ -19,12 +19,29 @@ Phase 4 / **BL-P4-03b** (Standardangebote, aus Kalkulation).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03b** – Feature-PR / Draft. Kein Calendar/Festpreis/Tandem/Abbinder.
+**BL-P4-03b** – Feature-PR / Draft; Gates und Smoke. Kein Merge in diesem Schritt.
 
 ## Zuletzt begonnene Aufgabe (Umsetzung)
 
-**BL-P4-03b** Kalkulation als Standardangebot speichern (PO-BLP403B-1); schmales
-Vertriebs-Vorschlagsrecht; Sanitize; gemeinsamer Materialisierungspfad.
+**BL-P4-03b** Kalkulation als Standardangebot speichern (PO-BLP403B-1): schmales
+Vertriebs-Vorschlagsrecht; Sanitize + Freitext-Prüfstufe; Materializer;
+Publish/Adopt über denselben Vertrag.
+
+## BL-P4-03b – Calc → Standardangebot / PO-BLP403B-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP403B-1 (From-Calc-Vorschlag) | **freigegeben** (dieser Scope) |
+| Route/Button „Als Standardangebot speichern“ | **umgesetzt** |
+| Schmales Vertriebsrecht (nur Draft erzeugen) | **umgesetzt** |
+| Sanitize + Feldklassifikation + Freitext-Prüfstufe | **umgesetzt** |
+| Ablehnung nicht unterstützter Methoden mit Positionsangabe | **umgesetzt** |
+| Immer neuer `SA-`-Draft; kein Auto-Publish; keine Sync | **umgesetzt** |
+| `StandardOfferMaterializer` (versioniert) für Publish | **umgesetzt** |
+| Altversionen 03a/03c übernahmefähig | **abgesichert** (Tests) |
+| Feature-Tests `StandardOfferBlP403bTest` | **umgesetzt** |
+| Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** |
+| Merge | **kein Merge** (Draft-PR) |
 
 ## BL-P4-03c – Average-Vorlagen + Hauptspot/Allonge / PO-BLP403C-1 (September 2026)
 

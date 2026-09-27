@@ -58,21 +58,18 @@ sonst Ablehnung ohne stille Reduktion). Keine vollständige Standardangebotsfunk
 
 - **STD-001** kundenlos · **STD-002** Versionen · **STD-003** Nav · **STD-004** Übernahme · **STD-005** Isolation · **STD-006** übernommene Kundenkalkulation anpassbar (Sender, Mengen, Budget-Assistent) · **STD-007** kein Dispo aus Vorlage · **STD-008** Audit/Autor · **STD-009** PM/Admin/GF verwalten Vorlagen inkl. Preis-/Produkt-Snapshots
 - **AUTH-006** PM verwaltet Vorlagen · **AUTH-007** PM ohne Calc/Dispo/Adopt
+- **PO-BLP403B-1** Vertrieb: nur Vorschlags-Draft aus zugänglicher Calc (kein STD-009)
 - **VER-004** Snapshot-Freeze, keine Sync
 - **SPT-014** Hauptspot/Allonge (Calc-Semantik 02c, Vorlagen 03c)
 - **UX-GATE-D / PO-BLP403A-1** Teilfreigabe Oberfläche 03a
 - **UX-GATE-D / PO-BLP403C-1** Teilfreigabe Komponentenbedienung im bestehenden Vorlageneditor
-- **UX-GATE-D / PO-BLP403B-1** Teilfreigabe From-Calc-Vorschlag (Feature-Branch)
+- **UX-GATE-D / PO-BLP403B-1** Teilfreigabe From-Calc-Vorschlag
 
-## Folgeslice in Umsetzung
+## Geliefert in BL-P4-03b
 
-**BL-P4-03b / PO-BLP403B-1 – Kalkulation als Standardangebot speichern**
-
-- Ablauf: zugängliche Calc → Vorschlags-Draft (`SA-`) → PM prüft/bearbeitet ohne Calc-Zugang → Publish (AUTH-006) → Adopt unabhängig
-- Vertrieb: **nur** schmales Recht „Vorschlags-Draft erzeugen“; kein Edit/Publish/Vorlagen-Verwaltung (kein STD-009)
-- Admin/GF behalten bestehende Manage-/Calc-Rechte
-- Sanitize zentral (Feldklassifikation); Request- und Persistenz-Absicherung gegen Kundendatenlecks
-- Freitext (Titel/Kampagne/Briefing/…): sichtbare Prüfstufe, nicht still in Publish übernehmen
-- Gemeinsamer versionierter Freeze-/Materialisierungspfad; Publish und Adopt denselben Vertrag; Altversionen 03a/03c übernahmefähig
-- Keine stille Reduktion nicht unterstützter Methoden/Positionen; Ablehnung mit Positionsangabe
-- Keine Sync mit Quellkalkulation; keine Auto-Veröffentlichung
+- Aktion „Als Standardangebot speichern“ (Button/Route/Policy deckungsgleich)
+- Zentraler Sanitize (`StandardOfferFieldClassification` + `StandardOfferFromCalculationSanitizer`)
+- Freitext-Prüfstufe (`proposal_review`, Publish-Gate)
+- `StandardOfferMaterializer` (materialization_version=1) für Publish; Adopt liest Frozen-Stand
+- Immer neuer `SA-`-Draft; keine Auto-Publish; keine Sync zur Quelle
+- Nur Average + optionale Komponenten; sonst Ablehnung ohne stille Reduktion

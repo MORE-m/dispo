@@ -20,6 +20,15 @@ class CalculationPolicy
         return $user->canAccessCalculations();
     }
 
+    /**
+     * BL-P4-03b: Vorschlag nur bei Calc-Zugang und schmalem Propose-Recht.
+     */
+    public function proposeAsStandardOffer(User $user, Calculation $calculation): bool
+    {
+        return $user->canAccessCalculations()
+            && $user->canProposeStandardOfferFromCalculation();
+    }
+
     public function create(User $user): bool
     {
         return $user->canManageCalculations();

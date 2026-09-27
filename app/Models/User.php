@@ -105,6 +105,19 @@ class User extends Authenticatable
     }
 
     /**
+     * BL-P4-03b / PO-BLP403B-1: schmales Recht – nur Vorschlags-Draft aus
+     * zugänglicher Kalkulation. Kein STD-009 (kein Edit/Publish/Manage).
+     */
+    public function canProposeStandardOfferFromCalculation(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Sales,
+            Role::Management,
+        );
+    }
+
+    /**
      * Dispo-Ansicht: Kernrollen immer; Produktmanagement nur mit Extra-Recht
      * {@see $can_view_dispo_orders} (AUTH-007 / CMT-001 Auslegung BL-P9-02a).
      * Öffnet keinen Zugang zu Kundenkalkulationen ({@see canAccessCalculations}).

@@ -38,6 +38,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('calculations.field-schema');
     Route::get('kalkulationen/{calculation}', [CalculationController::class, 'edit'])->name('calculations.edit');
     Route::put('kalkulationen/{calculation}', [CalculationController::class, 'update'])->name('calculations.update');
+    Route::post('kalkulationen/{calculation}/als-standardangebot', [StandardOfferController::class, 'storeFromCalculation'])
+        ->name('standard-offers.from-calculation');
     Route::post('kalkulationen/{calculation}/budget-vorschlaege/{proposal}/uebernehmen', [CalculationController::class, 'applyBudget'])
         ->name('calculations.budget-apply');
 
