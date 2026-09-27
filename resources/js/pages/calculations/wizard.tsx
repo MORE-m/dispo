@@ -4055,162 +4055,164 @@ export default function CalculationWizard({
                                                             ) : null}
                                                         </div>
 
-                                                        {isStandardOffer ? null : (() => {
-                                                            const positionProfile =
-                                                                profileForMedium(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                );
-                                                            const forcedProfile =
-                                                                isForcedProfile(
-                                                                    positionProfile,
-                                                                );
-                                                            const profileMeta =
-                                                                positionProfile
-                                                                    ? component_profiles[
-                                                                          positionProfile
-                                                                      ]
-                                                                    : undefined;
-
-                                                            return (
-                                                                <div className="space-y-2">
-                                                                    {!forcedProfile &&
-                                                                    position
-                                                                        .components
-                                                                        .length ===
-                                                                        0 &&
-                                                                    canEdit ? (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            data-test={`spot-components-activate-${index}`}
-                                                                            onClick={() => {
-                                                                                const rule =
-                                                                                    ruleFor(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        position.advertising_medium_id,
-                                                                                    );
-                                                                                const next =
-                                                                                    activateComponentsFromLength(
-                                                                                        position.length_seconds,
-                                                                                    );
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            next,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                next,
-                                                                                            ),
-                                                                                        component_calculation_strategy:
-                                                                                            position.component_calculation_strategy ??
-                                                                                            resolveStrategyFromRule(
-                                                                                                rule?.component_calculation_strategy,
-                                                                                            ),
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Spot-Komponenten
-                                                                            aktivieren
-                                                                        </Button>
-                                                                    ) : null}
-                                                                    {forcedProfile ||
-                                                                    position
-                                                                        .components
-                                                                        .length >
-                                                                        0 ? (
-                                                                        <SpotComponentsSection
-                                                                            positionIndex={
-                                                                                index
-                                                                            }
-                                                                            profile={
+                                                        {isStandardOffer
+                                                            ? null
+                                                            : (() => {
+                                                                  const positionProfile =
+                                                                      profileForMedium(
+                                                                          catalog,
+                                                                          position.advertising_medium_id,
+                                                                      );
+                                                                  const forcedProfile =
+                                                                      isForcedProfile(
+                                                                          positionProfile,
+                                                                      );
+                                                                  const profileMeta =
+                                                                      positionProfile
+                                                                          ? component_profiles[
                                                                                 positionProfile
-                                                                            }
-                                                                            profileLabel={
-                                                                                profileMeta?.label
-                                                                            }
-                                                                            profileMeta={
-                                                                                profileMeta
-                                                                                    ? {
-                                                                                          unit_label:
-                                                                                              profileMeta.unit_label,
-                                                                                          unit_count:
-                                                                                              profileMeta.unit_count,
-                                                                                          slots: profileMeta.slots,
-                                                                                      }
-                                                                                    : undefined
-                                                                            }
-                                                                            unitCount={positionUnitCount(
-                                                                                position,
-                                                                            )}
-                                                                            components={
-                                                                                position.components
-                                                                            }
-                                                                            strategy={
-                                                                                position.component_calculation_strategy ??
-                                                                                'shared_total_length'
-                                                                            }
-                                                                            canEdit={
-                                                                                canEdit
-                                                                            }
-                                                                            positionMediaGross={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.media_gross
-                                                                            }
-                                                                            componentResults={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.components
-                                                                            }
-                                                                            lengthIndex={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.length_index
-                                                                            }
-                                                                            errors={
-                                                                                fieldErrors
-                                                                            }
-                                                                            onChange={(
-                                                                                components,
-                                                                            ) =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                components,
-                                                                                            ),
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                            onDeactivate={() =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            [],
-                                                                                        component_calculation_strategy:
-                                                                                            null,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    ) : null}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                                            ]
+                                                                          : undefined;
+
+                                                                  return (
+                                                                      <div className="space-y-2">
+                                                                          {!forcedProfile &&
+                                                                          position
+                                                                              .components
+                                                                              .length ===
+                                                                              0 &&
+                                                                          canEdit ? (
+                                                                              <Button
+                                                                                  type="button"
+                                                                                  variant="outline"
+                                                                                  size="sm"
+                                                                                  data-test={`spot-components-activate-${index}`}
+                                                                                  onClick={() => {
+                                                                                      const rule =
+                                                                                          ruleFor(
+                                                                                              catalog,
+                                                                                              position.inventory_id,
+                                                                                              position.advertising_medium_id,
+                                                                                          );
+                                                                                      const next =
+                                                                                          activateComponentsFromLength(
+                                                                                              position.length_seconds,
+                                                                                          );
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components:
+                                                                                                  next,
+                                                                                              length_seconds:
+                                                                                                  totalComponentLength(
+                                                                                                      next,
+                                                                                                  ),
+                                                                                              component_calculation_strategy:
+                                                                                                  position.component_calculation_strategy ??
+                                                                                                  resolveStrategyFromRule(
+                                                                                                      rule?.component_calculation_strategy,
+                                                                                                  ),
+                                                                                          },
+                                                                                      );
+                                                                                  }}
+                                                                              >
+                                                                                  Spot-Komponenten
+                                                                                  aktivieren
+                                                                              </Button>
+                                                                          ) : null}
+                                                                          {forcedProfile ||
+                                                                          position
+                                                                              .components
+                                                                              .length >
+                                                                              0 ? (
+                                                                              <SpotComponentsSection
+                                                                                  positionIndex={
+                                                                                      index
+                                                                                  }
+                                                                                  profile={
+                                                                                      positionProfile
+                                                                                  }
+                                                                                  profileLabel={
+                                                                                      profileMeta?.label
+                                                                                  }
+                                                                                  profileMeta={
+                                                                                      profileMeta
+                                                                                          ? {
+                                                                                                unit_label:
+                                                                                                    profileMeta.unit_label,
+                                                                                                unit_count:
+                                                                                                    profileMeta.unit_count,
+                                                                                                slots: profileMeta.slots,
+                                                                                            }
+                                                                                          : undefined
+                                                                                  }
+                                                                                  unitCount={positionUnitCount(
+                                                                                      position,
+                                                                                  )}
+                                                                                  components={
+                                                                                      position.components
+                                                                                  }
+                                                                                  strategy={
+                                                                                      position.component_calculation_strategy ??
+                                                                                      'shared_total_length'
+                                                                                  }
+                                                                                  canEdit={
+                                                                                      canEdit
+                                                                                  }
+                                                                                  positionMediaGross={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.media_gross
+                                                                                  }
+                                                                                  componentResults={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.components
+                                                                                  }
+                                                                                  lengthIndex={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.length_index
+                                                                                  }
+                                                                                  errors={
+                                                                                      fieldErrors
+                                                                                  }
+                                                                                  onChange={(
+                                                                                      components,
+                                                                                  ) =>
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components,
+                                                                                              length_seconds:
+                                                                                                  totalComponentLength(
+                                                                                                      components,
+                                                                                                  ),
+                                                                                          },
+                                                                                      )
+                                                                                  }
+                                                                                  onDeactivate={() =>
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components:
+                                                                                                  [],
+                                                                                              component_calculation_strategy:
+                                                                                                  null,
+                                                                                          },
+                                                                                      )
+                                                                                  }
+                                                                              />
+                                                                          ) : null}
+                                                                      </div>
+                                                                  );
+                                                              })()}
 
                                                         {(() => {
                                                             const positionProfile =
