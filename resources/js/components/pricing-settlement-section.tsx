@@ -11,6 +11,8 @@ type Props = {
     mode: PricingSettlementMode;
     fixedPriceNnInput: string;
     disabled?: boolean;
+    /** BL-P4-03a Vorlagen: Festpreis nicht anbieten. */
+    hideFixedPrice?: boolean;
     showFixedPriceValidation: boolean;
     fieldError?: string;
     onModeChange: (mode: PricingSettlementMode) => void;
@@ -22,6 +24,7 @@ export function PricingSettlementSection({
     mode,
     fixedPriceNnInput,
     disabled = false,
+    hideFixedPrice = false,
     showFixedPriceValidation,
     fieldError,
     onModeChange,
@@ -36,6 +39,22 @@ export function PricingSettlementSection({
               })
             : null;
     const error = fieldError ?? localMessage ?? undefined;
+    const options = (
+        [
+            {
+                key: 'normal' as const,
+                title: 'Normal',
+                description:
+                    'Positions- und Auftragsrabatte sowie AE wirken auf den N/N-Betrag.',
+            },
+            {
+                key: 'fixed_price' as const,
+                title: 'Festpreis (N/N)',
+                description:
+                    'Vereinbarter N/N-Endbetrag; Mediabrutto bleibt referenzbasiert.',
+            },
+        ] as const
+    ).filter((option) => !(hideFixedPrice && option.key === 'fixed_price'));
 
     return (
         <fieldset
@@ -43,23 +62,14 @@ export function PricingSettlementSection({
             data-test={`pricing-settlement-mode-${positionIndex}`}
         >
             <legend className="text-sm font-medium">Preisabschluss</legend>
-            <div className="grid gap-3 sm:grid-cols-2">
-                {(
-                    [
-                        {
-                            key: 'normal' as const,
-                            title: 'Normal',
-                            description:
-                                'Positions- und Auftragsrabatte sowie AE wirken auf den N/N-Betrag.',
-                        },
-                        {
-                            key: 'fixed_price' as const,
-                            title: 'Festpreis (N/N)',
-                            description:
-                                'Vereinbarter N/N-Endbetrag; Mediabrutto bleibt referenzbasiert.',
-                        },
-                    ] as const
-                ).map((option) => {
+            <div
+                className={
+                    options.length > 1
+                        ? 'grid gap-3 sm:grid-cols-2'
+                        : 'grid gap-3'
+                }
+            >
+                {options.map((option) => {
                     const selected = mode === option.key;
                     const inputId = `${groupName}-${option.key}`;
 

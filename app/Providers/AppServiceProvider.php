@@ -4,9 +4,12 @@ namespace App\Providers;
 
 use App\Models\Calculation;
 use App\Models\DispoOrder;
+use App\Models\StandardOffer;
+use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Policies\CalculationPolicy;
 use App\Policies\DispoOrderPolicy;
+use App\Policies\StandardOfferPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -66,5 +69,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::policy(Calculation::class, CalculationPolicy::class);
         Gate::policy(DispoOrder::class, DispoOrderPolicy::class);
+        Gate::policy(StandardOffer::class, StandardOfferPolicy::class);
+        Gate::policy(StandardOfferVersion::class, StandardOfferPolicy::class);
     }
 }

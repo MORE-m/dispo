@@ -123,6 +123,16 @@ class CalculationController extends Controller
         return Inertia::render('calculations/wizard', $this->wizardProps($request, $calculation));
     }
 
+    /**
+     * Shared Inertia props for Kalkulations- und Standardangebots-Wizard.
+     *
+     * @return array<string, mixed>
+     */
+    public function buildWizardProps(Request $request, ?Calculation $calculation = null): array
+    {
+        return $this->wizardProps($request, $calculation);
+    }
+
     public function update(CalculationPayloadRequest $request, Calculation $calculation): RedirectResponse
     {
         $this->authorize('update', $calculation);
@@ -191,6 +201,34 @@ class CalculationController extends Controller
 
         $this->authorize('create', Calculation::class);
 
+        $resolved = $mediumId !== null && $mediumId > 0
+            ? $this->freeze->resolveLivePositionSchema($mediumId)
+            : $this->freeze->resolveLiveSchemaForCalculationV3();
+
+        if ($resolved['has_blocking_conflicts']) {
+            throw ValidationException::withMessages([
+                'configuration' => 'Die aktive Feldkonfiguration ist widersprüchlich und kann nicht verwendet werden.',
+                'conflicts' => array_map(
+                    static fn (array $conflict): string => (string) $conflict['message'],
+                    $resolved['conflicts'],
+                ),
+            ]);
+        }
+
+        $fieldSchema = $this->liveFieldSchemaProp($resolved);
+
+        return response()->json([
+            'fieldSchema' => $fieldSchema,
+            'format_version' => $fieldSchema['format_version'],
+            'target_format_version' => ConfigurationSnapshot::FORMAT_VERSION_CONTEXTUAL_FREEZE,
+        ]);
+    }
+
+    /**
+     * Live-Feldschema für Standardangebots-Wizard (AUTH-006, ohne Calc-Recht).
+     */
+    public function liveFieldSchemaJson(?int $mediumId = null): JsonResponse
+    {
         $resolved = $mediumId !== null && $mediumId > 0
             ? $this->freeze->resolveLivePositionSchema($mediumId)
             : $this->freeze->resolveLiveSchemaForCalculationV3();

@@ -202,7 +202,7 @@ type FieldSchema = {
 };
 
 type PositionDraft = {
-    id?: number;
+    id?: number | null;
     client_key: string;
     inventory_id: number;
     inventory_name?: string | null;
@@ -443,7 +443,7 @@ type SavedSummary = {
 };
 
 type SavedCalculation = {
-    id: number;
+    id: number | null;
     lock_version: number;
     planning_mode: string;
     customer_name: string | null;
@@ -465,7 +465,7 @@ type SavedCalculation = {
         percent: string;
     }>;
     positions: {
-        id: number;
+        id: number | null;
         client_key: string | null;
         inventory_id: number;
         inventory_name?: string | null;
@@ -770,6 +770,29 @@ function methodOptionsForMedium(
     );
 }
 
+/** BL-P4-03a: in Vorlagen nur Average anbieten. */
+function methodOptionsForTemplate(
+    options: CalculationMethodOptions | null,
+    templateMode: boolean,
+): CalculationMethodOptions | null {
+    if (!templateMode || options === null) {
+        return options;
+    }
+
+    const methods = (options.methods ?? []).filter(
+        (method) => method.key === 'average',
+    );
+
+    return {
+        ...options,
+        default_calculation_method_key: 'average',
+        methods: methods.map((method) => ({
+            ...method,
+            is_default: true,
+        })),
+    };
+}
+
 function firstValidPosition(catalog: Catalog): PositionDraft | null {
     // ADV-001c4b: erstes aktives, buchbares Medium mit Inventarregel (kein Code-Hardcode).
     const preferredMedium =
@@ -959,6 +982,7 @@ export default function CalculationWizard({
     canEdit,
     canCreateDispoOrder = false,
     dispoOrderRevision = null,
+    standardOffer = null,
 }: {
     catalog: Catalog;
     component_profiles: ComponentProfilesProp;
@@ -973,12 +997,31 @@ export default function CalculationWizard({
     canEdit: boolean;
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
+    standardOffer?: {
+        mode: 'create' | 'edit';
+        offer_id: number | null;
+        version_id: number | null;
+        number: string | null;
+        title: string;
+        lock_version: number;
+        status: string;
+        status_label: string;
+        allowed_spot_methods: string[];
+        scope_note: string;
+    } | null;
 }) {
     const flash = usePage().props.flash;
+    const isStandardOffer = standardOffer !== null;
+    const [templateTitle, setTemplateTitle] = useState(
+        standardOffer?.title ?? 'Standardangebot',
+    );
     const initialBudgetApplied =
         calculation?.budget_proposal_status === 'applied' ||
         calculation?.budget_proposal_status === 'manual';
     const [step, setStep] = useState(() => {
+        if (isStandardOffer) {
+            return 0;
+        }
         if (calculation?.planning_mode === 'budget') {
             if (
                 initialBudgetApplied &&
@@ -998,13 +1041,13 @@ export default function CalculationWizard({
         return 0;
     });
     const [planningMode, setPlanningMode] = useState(
-        calculation?.planning_mode ?? 'manual',
+        isStandardOffer ? 'manual' : (calculation?.planning_mode ?? 'manual'),
     );
     const [customerName, setCustomerName] = useState(
-        calculation?.customer_name ?? '',
+        isStandardOffer ? '' : (calculation?.customer_name ?? ''),
     );
     const [agencyName, setAgencyName] = useState(
-        calculation?.agency_name ?? '',
+        isStandardOffer ? '' : (calculation?.agency_name ?? ''),
     );
     const [campaign, setCampaign] = useState(calculation?.campaign ?? '');
     const [productTitle, setProductTitle] = useState(
@@ -1447,12 +1490,18 @@ export default function CalculationWizard({
                 try {
                     const response = await jsonPost<{
                         fieldSchema?: FieldSchema;
-                    }>('/kalkulationen/feldschema', {
-                        advertising_medium_id: position.advertising_medium_id,
-                        ...(calculation?.id
-                            ? { calculation_id: calculation.id }
-                            : {}),
-                    });
+                    }>(
+                        isStandardOffer
+                            ? '/standardangebote/feldschema'
+                            : '/kalkulationen/feldschema',
+                        {
+                            advertising_medium_id:
+                                position.advertising_medium_id,
+                            ...(!isStandardOffer && calculation?.id
+                                ? { calculation_id: calculation.id }
+                                : {}),
+                        },
+                    );
                     const nextSchema = response.fieldSchema;
                     const fingerprint = nextSchema?.schema_fingerprint ?? null;
                     const pending = schemaFetchPendingRef.current.get(
@@ -1592,7 +1641,12 @@ export default function CalculationWizard({
         // positionsNeedingSchemaKey + schemaRetryToken steuern den Reload;
         // positions wird bewusst nur gelesen, um Restart-Schleifen zu vermeiden.
         // eslint-disable-next-line react-hooks/exhaustive-deps -- siehe Kommentar
-    }, [calculation?.id, positionsNeedingSchemaKey, schemaRetryToken]);
+    }, [
+        calculation?.id,
+        positionsNeedingSchemaKey,
+        schemaRetryToken,
+        isStandardOffer,
+    ]);
 
     const [proposal, setProposal] = useState<Proposal | null>(
         initialBudgetApplied ? null : (latestBudgetProposal?.payload ?? null),
@@ -1620,9 +1674,13 @@ export default function CalculationWizard({
 
     const payload = useMemo(
         () => ({
-            planning_mode: planningMode,
-            customer_name: customerName || null,
-            agency_name: agencyName || null,
+            planning_mode: isStandardOffer ? 'manual' : planningMode,
+            ...(isStandardOffer
+                ? {}
+                : {
+                      customer_name: customerName || null,
+                      agency_name: agencyName || null,
+                  }),
             campaign: campaign || null,
             product_title: productTitle || null,
             briefing: briefing || null,
@@ -1670,8 +1728,10 @@ export default function CalculationWizard({
                   }
                 : {}),
             budget_proposal_manual: budgetProposalManual,
-            lock_version: calculation?.lock_version,
-            calculation_id: calculation?.id,
+            lock_version: isStandardOffer
+                ? standardOffer.lock_version
+                : calculation?.lock_version,
+            calculation_id: isStandardOffer ? null : calculation?.id,
             schema_fingerprint: fieldSchema.schema_fingerprint ?? null,
             positions: isBudgetSetup
                 ? []
@@ -1778,6 +1838,8 @@ export default function CalculationWizard({
                   }),
         }),
         [
+            isStandardOffer,
+            standardOffer?.lock_version,
             planningMode,
             customerName,
             agencyName,
@@ -1807,6 +1869,58 @@ export default function CalculationWizard({
         ],
     );
 
+    const templateRequestPayload = useMemo(() => {
+        if (!isStandardOffer) {
+            return null;
+        }
+
+        const {
+            customer_name: _c,
+            agency_name: _a,
+            target_budget_nn: _t,
+            budget_strategy: _bs,
+            budget_elements: _be,
+            budget_distribution_ranges: _bdr,
+            budget_proposal_manual: _bpm,
+            calculation_id: _cid,
+            ...rest
+        } = payload as Record<string, unknown>;
+
+        return {
+            ...rest,
+            title: templateTitle.trim() || 'Standardangebot',
+            planning_mode: 'manual',
+            positions: (
+                (rest.positions as Array<Record<string, unknown>>) ?? []
+            ).map((position) => {
+                const {
+                    components: _comp,
+                    planner_entries: _plan,
+                    component_profile: _prof,
+                    fixed_price_nn: _fp,
+                    component_calculation_strategy: _strat,
+                    ...posRest
+                } = position;
+
+                // Keys weglassen, die der Server für 03a verbietet – Werte nicht umschreiben.
+                // spot_method aus calculation_method_key spiegeln (Wizard sendet sonst nur den Key).
+                const methodKey =
+                    typeof posRest.calculation_method_key === 'string'
+                        ? posRest.calculation_method_key
+                        : typeof posRest.spot_method === 'string'
+                          ? posRest.spot_method
+                          : undefined;
+
+                return {
+                    ...posRest,
+                    ...(methodKey !== undefined
+                        ? { spot_method: methodKey }
+                        : {}),
+                };
+            }),
+        };
+    }, [isStandardOffer, payload, templateTitle]);
+
     const steps = isBudgetSetup ? BUDGET_STEPS : MANUAL_STEPS;
     const budgetPreviewReady =
         planningMode === 'budget' &&
@@ -1825,8 +1939,12 @@ export default function CalculationWizard({
         error: previewError,
         fieldErrors: previewFieldErrors,
     } = useCalculationPreview<Totals>({
-        url: '/kalkulationen/vorschau',
-        payload,
+        url: isStandardOffer
+            ? '/standardangebote/vorschau'
+            : '/kalkulationen/vorschau',
+        payload: isStandardOffer
+            ? (templateRequestPayload ?? { ...payload, title: templateTitle })
+            : payload,
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
         blocked: busy || proposalLoading,
     });
@@ -1857,7 +1975,9 @@ export default function CalculationWizard({
         return catalog.media.filter(
             (medium) =>
                 isSelectableForNewWizardPositions(medium) &&
-                mediumIds.has(medium.id),
+                mediumIds.has(medium.id) &&
+                // BL-P4-03a: Tandem/Tridem (component_profile) nicht wählbar.
+                !(isStandardOffer && medium.component_profile != null),
         );
     }
 
@@ -2093,9 +2213,23 @@ export default function CalculationWizard({
         setBusy(true);
         setSaveError(null);
         setSaveFieldErrors({});
-        const url = calculation
-            ? `/kalkulationen/${calculation.id}`
-            : '/kalkulationen';
+        const url = isStandardOffer
+            ? standardOffer.mode === 'edit' &&
+              standardOffer.offer_id &&
+              standardOffer.version_id
+                ? `/standardangebote/${standardOffer.offer_id}/versionen/${standardOffer.version_id}`
+                : '/standardangebote'
+            : calculation
+              ? `/kalkulationen/${calculation.id}`
+              : '/kalkulationen';
+
+        const savePayload = isStandardOffer
+            ? (templateRequestPayload ?? {
+                  ...payload,
+                  title: templateTitle.trim() || 'Standardangebot',
+                  planning_mode: 'manual',
+              })
+            : payload;
 
         const options = {
             preserveState: true,
@@ -2128,10 +2262,16 @@ export default function CalculationWizard({
             },
         };
 
-        if (calculation) {
-            router.put(url, payload, options);
+        if (isStandardOffer) {
+            if (standardOffer.mode === 'edit') {
+                router.put(url, savePayload, options);
+            } else {
+                router.post(url, savePayload, options);
+            }
+        } else if (calculation) {
+            router.put(url, savePayload, options);
         } else {
-            router.post(url, payload, options);
+            router.post(url, savePayload, options);
         }
     }
 
@@ -2177,7 +2317,7 @@ export default function CalculationWizard({
                 targetBudget,
                 budgetElements,
                 budgetPositionDiscounts,
-                calculationId: calculation?.id,
+                calculationId: calculation?.id ?? undefined,
                 lockVersion: calculation?.lock_version,
                 priceYear: budgetPriceYear,
                 expectedPriceListIds: expectedPriceListIdsForBudget(
@@ -2415,15 +2555,35 @@ export default function CalculationWizard({
         <>
             <Head
                 title={
-                    calculation
-                        ? `Kalkulation ${calculation.id}`
-                        : 'Neue Kalkulation'
+                    isStandardOffer
+                        ? standardOffer.number
+                            ? `Standardangebot ${standardOffer.number}`
+                            : 'Neues Standardangebot'
+                        : calculation
+                          ? `Kalkulation ${calculation.id}`
+                          : 'Neue Kalkulation'
                 }
             />
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
                 <PageHeader
-                    title={calculation ? `Kalkulation` : 'Neue Kalkulation'}
+                    title={
+                        isStandardOffer
+                            ? standardOffer.number
+                                ? `Standardangebot ${standardOffer.number}`
+                                : 'Neues Standardangebot'
+                            : calculation
+                              ? `Kalkulation`
+                              : 'Neue Kalkulation'
+                    }
+                    description={
+                        isStandardOffer ? standardOffer.scope_note : undefined
+                    }
                 />
+                {isStandardOffer ? (
+                    <StatusBanner data-test="standard-offer-scope-note">
+                        {standardOffer.scope_note}
+                    </StatusBanner>
+                ) : null}
                 {!canEdit ? (
                     <StatusBanner>
                         Lesemodus – keine Änderungen möglich.
@@ -2487,7 +2647,13 @@ export default function CalculationWizard({
                                     <CardContent
                                         className={wizardCardContentClass}
                                     >
-                                        <SelectionCardGrid className="sm:grid-cols-2">
+                                        <SelectionCardGrid
+                                            className={
+                                                isStandardOffer
+                                                    ? 'sm:grid-cols-1'
+                                                    : 'sm:grid-cols-2'
+                                            }
+                                        >
                                             <SelectionCard
                                                 name="planning_mode"
                                                 checked={
@@ -2523,34 +2689,40 @@ export default function CalculationWizard({
                                                     description="Sender, Werbeelemente und Konditionen manuell festlegen."
                                                 />
                                             </SelectionCard>
-                                            <SelectionCard
-                                                name="planning_mode"
-                                                checked={
-                                                    planningMode === 'budget'
-                                                }
-                                                disabled={!canEdit}
-                                                onChange={() => {
-                                                    setPlanningMode('budget');
-                                                    if (
-                                                        !calculation?.positions
-                                                            ?.length
-                                                    ) {
-                                                        setPositions([]);
-                                                        setProposal(null);
-                                                        setProposalAtRevision(
-                                                            null,
-                                                        );
+                                            {!isStandardOffer ? (
+                                                <SelectionCard
+                                                    name="planning_mode"
+                                                    checked={
+                                                        planningMode ===
+                                                        'budget'
                                                     }
-                                                }}
-                                            >
-                                                <div data-test="planning-mode-budget">
-                                                    <SelectionCardOption
-                                                        icon={Wallet}
-                                                        title="Mit Budget planen"
-                                                        description="Zielbudget und Verteilungslogik vorgeben."
-                                                    />
-                                                </div>
-                                            </SelectionCard>
+                                                    disabled={!canEdit}
+                                                    onChange={() => {
+                                                        setPlanningMode(
+                                                            'budget',
+                                                        );
+                                                        if (
+                                                            !calculation
+                                                                ?.positions
+                                                                ?.length
+                                                        ) {
+                                                            setPositions([]);
+                                                            setProposal(null);
+                                                            setProposalAtRevision(
+                                                                null,
+                                                            );
+                                                        }
+                                                    }}
+                                                >
+                                                    <div data-test="planning-mode-budget">
+                                                        <SelectionCardOption
+                                                            icon={Wallet}
+                                                            title="Mit Budget planen"
+                                                            description="Zielbudget und Verteilungslogik vorgeben."
+                                                        />
+                                                    </div>
+                                                </SelectionCard>
+                                            ) : null}
                                         </SelectionCardGrid>
                                     </CardContent>
                                 </Card>
@@ -2568,36 +2740,60 @@ export default function CalculationWizard({
                                     <CardContent
                                         className={`${wizardCardContentClass} grid gap-4 sm:grid-cols-2`}
                                     >
-                                        <FormField
-                                            label="Kunde"
-                                            htmlFor="customer"
-                                        >
-                                            <Input
-                                                id="customer"
-                                                value={customerName}
-                                                onChange={(event) =>
-                                                    setCustomerName(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
-                                        <FormField
-                                            label="Agentur"
-                                            htmlFor="agency"
-                                        >
-                                            <Input
-                                                id="agency"
-                                                value={agencyName}
-                                                onChange={(event) =>
-                                                    setAgencyName(
-                                                        event.target.value,
-                                                    )
-                                                }
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
+                                        {isStandardOffer ? (
+                                            <FormField
+                                                label="Vorlagen-Titel"
+                                                htmlFor="template-title"
+                                            >
+                                                <Input
+                                                    id="template-title"
+                                                    data-test="standard-offer-title"
+                                                    value={templateTitle}
+                                                    onChange={(event) =>
+                                                        setTemplateTitle(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    disabled={!canEdit}
+                                                    className="sm:col-span-2"
+                                                />
+                                            </FormField>
+                                        ) : (
+                                            <>
+                                                <FormField
+                                                    label="Kunde"
+                                                    htmlFor="customer"
+                                                >
+                                                    <Input
+                                                        id="customer"
+                                                        value={customerName}
+                                                        onChange={(event) =>
+                                                            setCustomerName(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur"
+                                                    htmlFor="agency"
+                                                >
+                                                    <Input
+                                                        id="agency"
+                                                        value={agencyName}
+                                                        onChange={(event) =>
+                                                            setAgencyName(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                            </>
+                                        )}
                                         <FormField
                                             label="Kampagne"
                                             htmlFor="campaign"
@@ -2791,28 +2987,30 @@ export default function CalculationWizard({
                                                 />
                                             </div>
                                         ) : null}
-                                        <FormField
-                                            label="Zielbudget N/N"
-                                            htmlFor="budget"
-                                            hint={
-                                                planningMode === 'manual'
-                                                    ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
-                                                    : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
-                                            }
-                                        >
-                                            <Input
-                                                id="budget"
-                                                inputMode="decimal"
-                                                value={targetBudget}
-                                                onChange={(event) => {
-                                                    setTargetBudget(
-                                                        event.target.value,
-                                                    );
-                                                    markBudgetInputsChanged();
-                                                }}
-                                                disabled={!canEdit}
-                                            />
-                                        </FormField>
+                                        {!isStandardOffer ? (
+                                            <FormField
+                                                label="Zielbudget N/N"
+                                                htmlFor="budget"
+                                                hint={
+                                                    planningMode === 'manual'
+                                                        ? 'Nur Vergleich mit dem aktuellen N/N-Invest.'
+                                                        : 'Das Zielbudget wird bei der Berechnung nicht überschritten.'
+                                                }
+                                            >
+                                                <Input
+                                                    id="budget"
+                                                    inputMode="decimal"
+                                                    value={targetBudget}
+                                                    onChange={(event) => {
+                                                        setTargetBudget(
+                                                            event.target.value,
+                                                        );
+                                                        markBudgetInputsChanged();
+                                                    }}
+                                                    disabled={!canEdit}
+                                                />
+                                            </FormField>
+                                        ) : null}
                                     </CardContent>
                                 </Card>
                             </div>
@@ -3494,9 +3692,12 @@ export default function CalculationWizard({
                                                                 index
                                                             }
                                                             legendLabel="Berechnungsbasis für Mediabrutto"
-                                                            options={methodOptionsForMedium(
-                                                                catalog,
-                                                                position.advertising_medium_id,
+                                                            options={methodOptionsForTemplate(
+                                                                methodOptionsForMedium(
+                                                                    catalog,
+                                                                    position.advertising_medium_id,
+                                                                ),
+                                                                isStandardOffer,
                                                             )}
                                                             state={{
                                                                 calculation_method_key:
@@ -3517,6 +3718,13 @@ export default function CalculationWizard({
                                                             onSelectLiveKey={(
                                                                 key,
                                                             ) => {
+                                                                if (
+                                                                    isStandardOffer &&
+                                                                    key !==
+                                                                        'average'
+                                                                ) {
+                                                                    return;
+                                                                }
                                                                 const next =
                                                                     selectLiveCalculationMethod(
                                                                         {
@@ -3529,9 +3737,12 @@ export default function CalculationWizard({
                                                                             historical_calculation_method_name:
                                                                                 position.historical_calculation_method_name,
                                                                         },
-                                                                        methodOptionsForMedium(
-                                                                            catalog,
-                                                                            position.advertising_medium_id,
+                                                                        methodOptionsForTemplate(
+                                                                            methodOptionsForMedium(
+                                                                                catalog,
+                                                                                position.advertising_medium_id,
+                                                                            ),
+                                                                            isStandardOffer,
                                                                         ),
                                                                         key,
                                                                     );
@@ -3575,6 +3786,9 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
+                                                            hideFixedPrice={
+                                                                isStandardOffer
+                                                            }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index
@@ -3841,162 +4055,164 @@ export default function CalculationWizard({
                                                             ) : null}
                                                         </div>
 
-                                                        {(() => {
-                                                            const positionProfile =
-                                                                profileForMedium(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                );
-                                                            const forcedProfile =
-                                                                isForcedProfile(
-                                                                    positionProfile,
-                                                                );
-                                                            const profileMeta =
-                                                                positionProfile
-                                                                    ? component_profiles[
-                                                                          positionProfile
-                                                                      ]
-                                                                    : undefined;
-
-                                                            return (
-                                                                <div className="space-y-2">
-                                                                    {!forcedProfile &&
-                                                                    position
-                                                                        .components
-                                                                        .length ===
-                                                                        0 &&
-                                                                    canEdit ? (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            data-test={`spot-components-activate-${index}`}
-                                                                            onClick={() => {
-                                                                                const rule =
-                                                                                    ruleFor(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        position.advertising_medium_id,
-                                                                                    );
-                                                                                const next =
-                                                                                    activateComponentsFromLength(
-                                                                                        position.length_seconds,
-                                                                                    );
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            next,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                next,
-                                                                                            ),
-                                                                                        component_calculation_strategy:
-                                                                                            position.component_calculation_strategy ??
-                                                                                            resolveStrategyFromRule(
-                                                                                                rule?.component_calculation_strategy,
-                                                                                            ),
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Spot-Komponenten
-                                                                            aktivieren
-                                                                        </Button>
-                                                                    ) : null}
-                                                                    {forcedProfile ||
-                                                                    position
-                                                                        .components
-                                                                        .length >
-                                                                        0 ? (
-                                                                        <SpotComponentsSection
-                                                                            positionIndex={
-                                                                                index
-                                                                            }
-                                                                            profile={
+                                                        {isStandardOffer
+                                                            ? null
+                                                            : (() => {
+                                                                  const positionProfile =
+                                                                      profileForMedium(
+                                                                          catalog,
+                                                                          position.advertising_medium_id,
+                                                                      );
+                                                                  const forcedProfile =
+                                                                      isForcedProfile(
+                                                                          positionProfile,
+                                                                      );
+                                                                  const profileMeta =
+                                                                      positionProfile
+                                                                          ? component_profiles[
                                                                                 positionProfile
-                                                                            }
-                                                                            profileLabel={
-                                                                                profileMeta?.label
-                                                                            }
-                                                                            profileMeta={
-                                                                                profileMeta
-                                                                                    ? {
-                                                                                          unit_label:
-                                                                                              profileMeta.unit_label,
-                                                                                          unit_count:
-                                                                                              profileMeta.unit_count,
-                                                                                          slots: profileMeta.slots,
-                                                                                      }
-                                                                                    : undefined
-                                                                            }
-                                                                            unitCount={positionUnitCount(
-                                                                                position,
-                                                                            )}
-                                                                            components={
-                                                                                position.components
-                                                                            }
-                                                                            strategy={
-                                                                                position.component_calculation_strategy ??
-                                                                                'shared_total_length'
-                                                                            }
-                                                                            canEdit={
-                                                                                canEdit
-                                                                            }
-                                                                            positionMediaGross={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.media_gross
-                                                                            }
-                                                                            componentResults={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.components
-                                                                            }
-                                                                            lengthIndex={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.length_index
-                                                                            }
-                                                                            errors={
-                                                                                fieldErrors
-                                                                            }
-                                                                            onChange={(
-                                                                                components,
-                                                                            ) =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                components,
-                                                                                            ),
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                            onDeactivate={() =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            [],
-                                                                                        component_calculation_strategy:
-                                                                                            null,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    ) : null}
-                                                                </div>
-                                                            );
-                                                        })()}
+                                                                            ]
+                                                                          : undefined;
+
+                                                                  return (
+                                                                      <div className="space-y-2">
+                                                                          {!forcedProfile &&
+                                                                          position
+                                                                              .components
+                                                                              .length ===
+                                                                              0 &&
+                                                                          canEdit ? (
+                                                                              <Button
+                                                                                  type="button"
+                                                                                  variant="outline"
+                                                                                  size="sm"
+                                                                                  data-test={`spot-components-activate-${index}`}
+                                                                                  onClick={() => {
+                                                                                      const rule =
+                                                                                          ruleFor(
+                                                                                              catalog,
+                                                                                              position.inventory_id,
+                                                                                              position.advertising_medium_id,
+                                                                                          );
+                                                                                      const next =
+                                                                                          activateComponentsFromLength(
+                                                                                              position.length_seconds,
+                                                                                          );
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components:
+                                                                                                  next,
+                                                                                              length_seconds:
+                                                                                                  totalComponentLength(
+                                                                                                      next,
+                                                                                                  ),
+                                                                                              component_calculation_strategy:
+                                                                                                  position.component_calculation_strategy ??
+                                                                                                  resolveStrategyFromRule(
+                                                                                                      rule?.component_calculation_strategy,
+                                                                                                  ),
+                                                                                          },
+                                                                                      );
+                                                                                  }}
+                                                                              >
+                                                                                  Spot-Komponenten
+                                                                                  aktivieren
+                                                                              </Button>
+                                                                          ) : null}
+                                                                          {forcedProfile ||
+                                                                          position
+                                                                              .components
+                                                                              .length >
+                                                                              0 ? (
+                                                                              <SpotComponentsSection
+                                                                                  positionIndex={
+                                                                                      index
+                                                                                  }
+                                                                                  profile={
+                                                                                      positionProfile
+                                                                                  }
+                                                                                  profileLabel={
+                                                                                      profileMeta?.label
+                                                                                  }
+                                                                                  profileMeta={
+                                                                                      profileMeta
+                                                                                          ? {
+                                                                                                unit_label:
+                                                                                                    profileMeta.unit_label,
+                                                                                                unit_count:
+                                                                                                    profileMeta.unit_count,
+                                                                                                slots: profileMeta.slots,
+                                                                                            }
+                                                                                          : undefined
+                                                                                  }
+                                                                                  unitCount={positionUnitCount(
+                                                                                      position,
+                                                                                  )}
+                                                                                  components={
+                                                                                      position.components
+                                                                                  }
+                                                                                  strategy={
+                                                                                      position.component_calculation_strategy ??
+                                                                                      'shared_total_length'
+                                                                                  }
+                                                                                  canEdit={
+                                                                                      canEdit
+                                                                                  }
+                                                                                  positionMediaGross={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.media_gross
+                                                                                  }
+                                                                                  componentResults={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.components
+                                                                                  }
+                                                                                  lengthIndex={
+                                                                                      displayTotals
+                                                                                          ?.positions?.[
+                                                                                          index
+                                                                                      ]
+                                                                                          ?.length_index
+                                                                                  }
+                                                                                  errors={
+                                                                                      fieldErrors
+                                                                                  }
+                                                                                  onChange={(
+                                                                                      components,
+                                                                                  ) =>
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components,
+                                                                                              length_seconds:
+                                                                                                  totalComponentLength(
+                                                                                                      components,
+                                                                                                  ),
+                                                                                          },
+                                                                                      )
+                                                                                  }
+                                                                                  onDeactivate={() =>
+                                                                                      updatePosition(
+                                                                                          index,
+                                                                                          {
+                                                                                              components:
+                                                                                                  [],
+                                                                                              component_calculation_strategy:
+                                                                                                  null,
+                                                                                          },
+                                                                                      )
+                                                                                  }
+                                                                              />
+                                                                          ) : null}
+                                                                      </div>
+                                                                  );
+                                                              })()}
 
                                                         {(() => {
                                                             const positionProfile =
@@ -5042,6 +5258,30 @@ export default function CalculationWizard({
                                 data-test="wizard-save"
                             >
                                 Speichern
+                            </Button>
+                        ) : null}
+                        {isStandardOffer &&
+                        canEdit &&
+                        standardOffer.mode === 'edit' &&
+                        standardOffer.status === 'draft' &&
+                        standardOffer.offer_id &&
+                        standardOffer.version_id ? (
+                            <Button
+                                type="button"
+                                variant="default"
+                                data-test="standard-offer-publish"
+                                disabled={busy}
+                                onClick={() => {
+                                    router.post(
+                                        `/standardangebote/${standardOffer.offer_id}/versionen/${standardOffer.version_id}/veroeffentlichen`,
+                                        {
+                                            lock_version:
+                                                standardOffer.lock_version,
+                                        },
+                                    );
+                                }}
+                            >
+                                Veröffentlichen
                             </Button>
                         ) : null}
                     </div>

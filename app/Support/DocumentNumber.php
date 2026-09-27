@@ -6,6 +6,7 @@ namespace App\Support;
  * Zentrale Formatierung lesbarer Dokumentnummern.
  *
  * Kalkulation: K-JJJJ-NNNNN (SEQUENCE_PAD Stellen)
+ * Standardangebot: SA-JJJJ-NNNNN (TEC-001)
  * Dispoauftrag: DA-JJJJ-NNNNN-SS (neue Familien) bzw. Legacy-Padding aus Bestandsnummer
  */
 final class DocumentNumber
@@ -15,6 +16,11 @@ final class DocumentNumber
     public static function calculation(int $year, int $seq): string
     {
         return sprintf('K-%d-%0'.self::SEQUENCE_PAD.'d', $year, $seq);
+    }
+
+    public static function standardOffer(int $year, int $seq): string
+    {
+        return sprintf('SA-%d-%0'.self::SEQUENCE_PAD.'d', $year, $seq);
     }
 
     public static function dispoOrder(

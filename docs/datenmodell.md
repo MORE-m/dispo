@@ -215,6 +215,13 @@ Ein Standardangebot hat keine CRM-Bindung.
 
 ## Standardangebot
 
+**Implementiert (BL-P4-03a / PO-BLP403A-1):** Tabellen `standard_offers`,
+`standard_offer_versions`, `standard_offer_number_sequences`; Kalkulationen tragen
+optional `origin_standard_offer_version_id` (Nachvollziehbarkeit ohne Sync).
+Publish speichert `frozen_materialization` inkl. Preislisten-Pin und Config-
+Snapshot-IDs; Adopt klont Snapshots und materialisiert ohne Live-`create()`.
+Slice-Grenze: nur Spot Classic Average. Übernahme-Kunde als Freitext bis CRM-Slice.
+
 `StandardOffer` ist die kundenlose, sender- bzw. kombibezogene Vorlage.
 
 `StandardOfferVersion` speichert mindestens:
