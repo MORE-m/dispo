@@ -13,13 +13,16 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b / VER-004: gemeinsamer versionierter Freeze für Average-Vorlagen.
- * Publish und Adopt nutzen dieselbe Materialisierungsstruktur; Altstände ohne
- * materialization_version bleiben lesbar (implizit Version 1).
+ * BL-P4-03b/03d / VER-004: Freeze-Seite des versionierten Persistenzvertrags
+ * {@see FrozenCalculationPersistenceContract} für Spot-Classic-Average-Vorlagen.
+ *
+ * Adopt hydratisiert über denselben Vertrag (nicht über CalculationWriter::create()).
+ * Altstände ohne materialization_version bleiben lesbar (implizit Version 1).
+ * Feldabbildung Average v1 wird im Persistenzvertrag zentral dokumentiert/gepflegt.
  */
 final class StandardOfferMaterializer
 {
-    public const MATERIALIZATION_VERSION = 1;
+    public const MATERIALIZATION_VERSION = FrozenCalculationPersistenceContract::LEGACY_IMPLICIT_VERSION;
 
     public function __construct(
         private readonly CalculationWriter $calculations,
@@ -144,7 +147,7 @@ final class StandardOfferMaterializer
         return [
             'base_snapshot_id' => (int) $frozen['base']->id,
             'materialization' => [
-                'materialization_version' => self::MATERIALIZATION_VERSION,
+                'materialization_version' => FrozenCalculationPersistenceContract::LEGACY_IMPLICIT_VERSION,
                 'draft_payload' => $payload,
                 'configuration_snapshot_id' => (int) $frozen['base']->id,
                 'schema_fingerprint' => $frozen['base']->schema_fingerprint,
@@ -164,15 +167,5 @@ final class StandardOfferMaterializer
                 'positions' => $positions,
             ],
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $materialization
-     */
-    public function materializationVersion(array $materialization): int
-    {
-        $version = $materialization['materialization_version'] ?? null;
-
-        return is_int($version) ? $version : self::MATERIALIZATION_VERSION;
     }
 }
