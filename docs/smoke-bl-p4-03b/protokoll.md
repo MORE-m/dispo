@@ -5,7 +5,7 @@
 **Worktree:** `dispo-wt-bl-p4-03b` (isoliert, SQLite `database/smoke-bl-p4-03b.sqlite`)  
 **Testdaten:** `E2ESpotDistributionExportSeeder` + Kampagne/Briefing auf `K-2026-00004`  
 **Getesteter Produkt-HEAD vor Fix:** `f58b2d66976a30dbc44c4a26feba0152855d5569`  
-**Smoke-Abschluss-HEAD:** nach UI-Fix für sichtbare Calendar-Ablehnung (Commit dieses Smoke-Laufs)
+**Smoke-Abschluss-HEAD:** `e5e02b1d282ab0cc2889e76c1439c49263340291`
 
 ## Rollen / Konten
 
