@@ -183,7 +183,7 @@ test('DF-3.2b Position-Custom: zwei Positionen, Capture und native Dispo-Felder'
     await page.locator('[data-test="range-spots-1-0"]').fill('5');
 
     await page.getByRole('button', { name: '3. Konditionen' }).click();
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
 
     await page.reload();

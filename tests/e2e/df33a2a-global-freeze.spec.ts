@@ -233,7 +233,7 @@ test.describe.serial('DF-3.3a2α globaler Snapshot-Freeze', () => {
         await page.locator('[data-test="range-spots-0-0"]').fill('10');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern' }).click();
+        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+$/, {
             timeout: 30_000,
         });

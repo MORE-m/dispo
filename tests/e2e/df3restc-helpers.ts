@@ -128,7 +128,7 @@ export async function fillMinimalCalcSpots(page: Page) {
 }
 
 export async function saveCalculationDraft(page: Page) {
-    await page.getByRole('button', { name: 'Speichern' }).click();
+    await page.getByRole('button', { name: 'Speichern', exact: true }).click();
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 20_000 });
 }
 
