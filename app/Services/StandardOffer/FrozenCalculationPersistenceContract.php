@@ -53,6 +53,9 @@ use Illuminate\Validation\ValidationException;
  * - Methoden-/Abrechnungskennzeichen: nur `spot_method=average` und
  *   `pricing_settlement_mode=normal`; kein `component_profile`; Strategie nur
  *   gültige Enum-Werte bzw. leer ohne Komponenten
+ * - Kindlisten: `time_ranges`/`plan_rows` Pflicht (fehlend/null ≠ `[]`);
+ *   `components`/`position_discounts`/`order_discounts` dürfen fehlen (Legacy
+ *   leer); explizites null ungültig; `[]` = gültige leere Liste
  *
  * Verbleibende Pflege bei neuen Methoden (Calendar/Festpreis/Tandem/…):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
@@ -71,6 +74,18 @@ final class FrozenCalculationPersistenceContract
     public const SUPPORTED_VERSIONS = [1];
 
     public const LEGACY_IMPLICIT_VERSION = 1;
+
+    /**
+     * Kindliste muss als Array-Schlüssel vorhanden sein (auch `[]` erlaubt).
+     * Fehlender Schlüssel oder null → Fail-closed (keine stille Leer-Übernahme).
+     */
+    private const CHILD_LIST_REQUIRED = 'required';
+
+    /**
+     * Kindliste darf aus Legacy-Gründen fehlen (= gültig leer).
+     * Explizites null ist ungültig; `[]` ist gültige leere Liste.
+     */
+    private const CHILD_LIST_OPTIONAL_ABSENT = 'optional_absent';
 
     public function __construct(
         private readonly ConfigurationSnapshotCloneService $clones,
@@ -180,7 +195,7 @@ final class FrozenCalculationPersistenceContract
         $calculation->originStandardOfferVersion()->associate($origin);
         $calculation->save();
 
-        $this->persistOrderDiscounts($calculation, $materialization['order_discounts']);
+        $this->persistOrderDiscounts($calculation, $materialization['order_discounts'] ?? []);
         $this->persistPositions($calculation, $calcBase, $materialization['positions']);
         $this->syncDynamicFields($calculation, $calcBase, $materialization, $customerName);
 
@@ -212,13 +227,7 @@ final class FrozenCalculationPersistenceContract
             ]);
         }
 
-        $orderDiscounts = $materialization['order_discounts'] ?? [];
-        if (! is_array($orderDiscounts)) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => 'Eingefrorene Vorlagendaten sind ungültig (Kopfrabatte).',
-            ]);
-        }
-
+        $orderDiscounts = $this->assertRootChildList($materialization, 'order_discounts');
         foreach ($orderDiscounts as $index => $discount) {
             if (! is_array($discount)) {
                 throw ValidationException::withMessages([
@@ -261,24 +270,47 @@ final class FrozenCalculationPersistenceContract
             }
 
             $this->assertAverageMethodAndSettlement($position, $index);
-            $this->assertComponentStrategyAndProfile($position, $index);
 
-            $components = $this->assertChildList($position, $index, 'components');
+            // Kindlisten (03a/03c-Freeze): time_ranges/plan_rows immer geschrieben und
+            // Pflicht; components/position_discounts dürfen aus Legacy fehlen (= leer),
+            // [] ist gültige leere Liste, null ist ungültig.
+            $components = $this->assertChildList(
+                $position,
+                $index,
+                'components',
+                self::CHILD_LIST_OPTIONAL_ABSENT,
+            );
+            $this->assertComponentStrategyAndProfile($position, $index, $components);
             foreach ($components as $childIndex => $component) {
                 $this->assertComponentRow($component, $index, $childIndex);
             }
 
-            $ranges = $this->assertChildList($position, $index, 'time_ranges');
+            $ranges = $this->assertChildList(
+                $position,
+                $index,
+                'time_ranges',
+                self::CHILD_LIST_REQUIRED,
+            );
             foreach ($ranges as $childIndex => $range) {
                 $this->assertTimeRangeRow($range, $index, $childIndex);
             }
 
-            $planRows = $this->assertChildList($position, $index, 'plan_rows');
+            $planRows = $this->assertChildList(
+                $position,
+                $index,
+                'plan_rows',
+                self::CHILD_LIST_REQUIRED,
+            );
             foreach ($planRows as $childIndex => $row) {
                 $this->assertPlanRow($row, $index, $childIndex);
             }
 
-            $discounts = $this->assertChildList($position, $index, 'position_discounts');
+            $discounts = $this->assertChildList(
+                $position,
+                $index,
+                'position_discounts',
+                self::CHILD_LIST_OPTIONAL_ABSENT,
+            );
             foreach ($discounts as $childIndex => $discount) {
                 $this->assertDiscountRow($discount, "Position {$index}: position_discounts.{$childIndex}");
             }
@@ -319,25 +351,15 @@ final class FrozenCalculationPersistenceContract
 
     /**
      * @param  array<string, mixed>  $position
+     * @param  list<array<string, mixed>>  $components
      */
-    private function assertComponentStrategyAndProfile(array $position, int $index): void
+    private function assertComponentStrategyAndProfile(array $position, int $index, array $components): void
     {
         if (array_key_exists('component_profile', $position)
             && $position['component_profile'] !== null
             && $position['component_profile'] !== []) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Average-Vorlagen nicht erlaubt).",
-            ]);
-        }
-
-        if (! array_key_exists('components', $position) || $position['components'] === null) {
-            $components = [];
-        } else {
-            $components = $position['components'];
-        }
-        if (! is_array($components)) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components).",
             ]);
         }
 
@@ -367,13 +389,32 @@ final class FrozenCalculationPersistenceContract
     }
 
     /**
+     * Kindlisten-Präsenz laut Average-v1 Freeze (Materializer schreibt alle Keys):
+     * - required: time_ranges, plan_rows – Schlüssel muss Array sein; fehlend/null
+     *   scheitert (keine scheinbar erfolgreiche Übernahme mit verlorenen Zeilen).
+     * - optional_absent: components, position_discounts – fehlender Schlüssel =
+     *   Legacy leer; null ungültig; [] = gültige leere Liste.
+     *
      * @param  array<string, mixed>  $position
+     * @param  self::CHILD_LIST_REQUIRED|self::CHILD_LIST_OPTIONAL_ABSENT  $presence
      * @return list<array<string, mixed>>
      */
-    private function assertChildList(array $position, int $index, string $childKey): array
+    private function assertChildList(array $position, int $index, string $childKey, string $presence): array
     {
-        if (! array_key_exists($childKey, $position) || $position[$childKey] === null) {
-            return [];
+        if (! array_key_exists($childKey, $position)) {
+            if ($presence === self::CHILD_LIST_OPTIONAL_ABSENT) {
+                return [];
+            }
+
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: {$childKey} fehlt).",
+            ]);
+        }
+
+        if ($position[$childKey] === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: {$childKey} ist null).",
+            ]);
         }
 
         $children = $position[$childKey];
@@ -392,6 +433,34 @@ final class FrozenCalculationPersistenceContract
         }
 
         /** @var list<array<string, mixed>> $children */
+        return $children;
+    }
+
+    /**
+     * Kopfrabatte: fehlender Schlüssel = Legacy leer; null ungültig; [] gültig.
+     *
+     * @param  array<string, mixed>  $materialization
+     * @return list<mixed>
+     */
+    private function assertRootChildList(array $materialization, string $childKey): array
+    {
+        if (! array_key_exists($childKey, $materialization)) {
+            return [];
+        }
+
+        if ($materialization[$childKey] === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig ({$childKey} ist null).",
+            ]);
+        }
+
+        $children = $materialization[$childKey];
+        if (! is_array($children)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => 'Eingefrorene Vorlagendaten sind ungültig (Kopfrabatte).',
+            ]);
+        }
+
         return $children;
     }
 

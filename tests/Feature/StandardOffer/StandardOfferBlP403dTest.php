@@ -215,6 +215,103 @@ class StandardOfferBlP403dTest extends TestCase
         }
     }
 
+    public function test_child_list_presence_missing_null_empty_and_legacy_rollback(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+
+        $failCases = [
+            ['path' => 'time_ranges_missing', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['time_ranges']);
+            }, 'needle' => 'time_ranges fehlt'],
+            ['path' => 'plan_rows_missing', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['plan_rows']);
+            }, 'needle' => 'plan_rows fehlt'],
+            ['path' => 'time_ranges_null', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['time_ranges'] = null;
+            }, 'needle' => 'time_ranges ist null'],
+            ['path' => 'plan_rows_null', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['plan_rows'] = null;
+            }, 'needle' => 'plan_rows ist null'],
+            ['path' => 'components_null', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['components'] = null;
+            }, 'needle' => 'components ist null'],
+            ['path' => 'position_discounts_null', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['position_discounts'] = null;
+            }, 'needle' => 'position_discounts ist null'],
+            ['path' => 'order_discounts_null', 'mutate' => function (array &$m): void {
+                $m['order_discounts'] = null;
+            }, 'needle' => 'order_discounts ist null'],
+        ];
+
+        foreach ($failCases as $case) {
+            $published = $this->publish($catalog, $pm, $this->richPlainPayload($catalog));
+            $materialization = $published->frozen_materialization;
+            ($case['mutate'])($materialization);
+            $published->frozen_materialization = $materialization;
+            $published->save();
+
+            $beforeCalc = Calculation::query()->count();
+            $beforePositions = CalculationPosition::query()->count();
+
+            try {
+                $this->writer()->adopt($published->fresh(), 'Child '.$case['path'], null, null, $sales);
+                $this->fail('Expected ValidationException for '.$case['path']);
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('frozen_materialization', $exception->errors());
+                $this->assertStringContainsString(
+                    $case['needle'],
+                    $exception->errors()['frozen_materialization'][0],
+                );
+            }
+
+            $this->assertSame($beforeCalc, Calculation::query()->count(), $case['path']);
+            $this->assertSame($beforePositions, CalculationPosition::query()->count(), $case['path']);
+        }
+
+        // Gültiger Legacy-Stand: kein Versionsfeld; optionale Kindlisten fehlen
+        // (components/position_discounts/order_discounts); Pflichtlisten bleiben
+        // als echte 03a-Freeze-Arrays erhalten.
+        $legacy = $this->publish($catalog, $pm, $this->richPlainPayload($catalog));
+        $legacyMat = $legacy->frozen_materialization;
+        $expectedRanges = count($legacyMat['positions'][0]['time_ranges']);
+        $expectedPlanRows = count($legacyMat['positions'][0]['plan_rows']);
+        unset($legacyMat['materialization_version']);
+        unset($legacyMat['positions'][0]['components']);
+        unset($legacyMat['positions'][0]['position_discounts']);
+        unset($legacyMat['order_discounts']);
+        $legacy->frozen_materialization = $legacyMat;
+        $legacy->save();
+
+        $adopted = $this->writer()->adopt($legacy->fresh(), 'Legacy Child Listen', null, null, $sales);
+        $adopted->load(['positions.timeRanges', 'positions.planRows', 'positions.components', 'positions.discounts', 'orderDiscounts']);
+        $this->assertCount($expectedRanges, $adopted->positions->first()->timeRanges);
+        $this->assertCount($expectedPlanRows, $adopted->positions->first()->planRows);
+        $this->assertCount(0, $adopted->positions->first()->components);
+        $this->assertCount(0, $adopted->positions->first()->discounts);
+        $this->assertCount(0, $adopted->orderDiscounts);
+
+        // Gültige leere Pflichtlisten (bewusst [] ≠ fehlend) bleiben übernehmbar.
+        $emptyLists = $this->publish($catalog, $pm, $this->richPlainPayload($catalog));
+        $emptyMat = $emptyLists->frozen_materialization;
+        $emptyMat['positions'][0]['time_ranges'] = [];
+        $emptyMat['positions'][0]['plan_rows'] = [];
+        $emptyMat['positions'][0]['components'] = [];
+        $emptyMat['positions'][0]['position_discounts'] = [];
+        $emptyMat['order_discounts'] = [];
+        $emptyLists->frozen_materialization = $emptyMat;
+        $emptyLists->save();
+
+        $emptyAdopted = $this->writer()->adopt($emptyLists->fresh(), 'Empty Child Listen', null, null, $sales);
+        $emptyAdopted->load(['positions.timeRanges', 'positions.planRows', 'positions.components', 'positions.discounts', 'orderDiscounts']);
+        $this->assertCount(0, $emptyAdopted->positions->first()->timeRanges);
+        $this->assertCount(0, $emptyAdopted->positions->first()->planRows);
+        $this->assertCount(0, $emptyAdopted->positions->first()->components);
+        $this->assertCount(0, $emptyAdopted->positions->first()->discounts);
+        $this->assertCount(0, $emptyAdopted->orderDiscounts);
+    }
+
     public function test_adopt_isolation_after_price_master_and_template_changes_and_remains_editable(): void
     {
         $catalog = $this->createSpotClassicCatalog();

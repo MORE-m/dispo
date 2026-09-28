@@ -50,6 +50,13 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
 - Komponenten vorhanden → gültige `component_calculation_strategy` Pflicht
 - Komponenten-/Zeitbereich-/Planzeilen-/Rabattzeilen: erforderliche Felder
   vorhanden und typgültig (kein Default-Auffüllen bei Widerspruch)
+- **Kindlisten-Präsenz** (Freeze schreibt alle Keys; Hydrate unterscheidet):
+  - `time_ranges` / `plan_rows`: Schlüssel muss als Array vorliegen; fehlend
+    oder `null` → Fail-closed (keine scheinbar erfolgreiche Übernahme mit
+    verlorenen Zeilen). `[]` ist eine gültige leere Liste.
+  - `components` / `position_discounts` / `order_discounts`: fehlender Schlüssel
+    aus Legacy-Gründen = leer; `null` ungültig; `[]` = gültige leere Liste
+  (Draft-Semantik 03c: Komponenten absent/`[]` = aus, `null` abgelehnt)
 
 ## Verbleibende Pflege bei neuen Methoden
 
