@@ -1,8 +1,9 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 28. September 2026 · **BL-P4-03f** Feature-PR (PO-BLP403F-1). **BL-P4-03e**
-auf `main` (PR #97, `4eddc94…`; Status PR #98). **BL-P4-03d** auf `main` (PR #95).
-PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / UX-GATE-D
+Stand: 28. September 2026 · **BL-P4-03f** auf `main` (PR #99, `6737026…`;
+PO-BLP403F-1). **BL-P4-03e** auf `main` (PR #97, `4eddc94…`; Status PR #98).
+**BL-P4-03d** auf `main` (PR #95). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 /
+PO-BLP403F-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
@@ -13,9 +14,9 @@ Persistenzvertrag Freeze↔Hydrate
 (`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
 sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e (PR #97):**
 N/N-Festpreis (02d) in Average-Vorlagen; Materialisierung v2; Legacy v1 lesbar.
-**03f:** Tandem/Tridem (02e) in Average-Vorlagen; Materialisierung v3; gemischt
-mit Average/Allonge; Calendar/Budget/Abbinder weiter Folgeslices. Keine vollständige
-Standardangebotsfunktion über alle Kalkulationsmethoden.
+**03f (PR #99):** Tandem/Tridem (02e) × Average × normal/Festpreis; Materialisierung
+v3; gemischt mit Average/Allonge; Calendar/Budget/Abbinder weiter Folgeslices. Keine
+vollständige Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
 
@@ -114,5 +115,6 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - normal + Festpreis; gemischte Vorlagen mit Average/Allonge
 - Legacy v1/v2 inkl. fehlendem Versionsfeld weiter übernehmbar
 - Calendar/Budget/Abbinder weiter abgewiesen; Average+Calendar-Quelle ganz abgewiesen
+- Freeze und Hydrate bleiben zwei gepflegte Seiten; keine Auto-Übernahme neuer Methoden
 - ADR: `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
-- Status: Feature-PR (kein Merge)
+- **Merge `main`:** PR #99 (`6737026…`); Post-Merge-CI `36480624574` SUCCESS

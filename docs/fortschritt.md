@@ -1,8 +1,11 @@
 # Fortschritt V1
 
 Stand: 28. September 2026 – **BL-P4-03f** Tandem/Tridem in Average-Standardangeboten
-im Feature-PR (PO-BLP403F-1). **BL-P4-03e** auf `main` (PR #97, `4eddc94…`;
-Status-Nachzug PR #98, `f6daf52…`). **BL-P4-03d/03b/03c/03a** auf `main`. Fachliche
+auf `main` abgeschlossen (Merge-Commit
+`6737026243b2a5832b8f6e005598190a4db71892`, PR #99; Post-Merge-CI
+[36480624574](https://github.com/MORE-m/dispo/actions/runs/36480624574) grün
+`ci`/`mysql`/`e2e-spt008`). **BL-P4-03e** auf `main` (PR #97, `4eddc94…`;
+Status-Nachzug PR #98). **BL-P4-03d/03b/03c/03a** auf `main`. Fachliche
 Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
@@ -16,18 +19,18 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 4 / Standardangebote (**03a–03e** auf `main`; **03f** Feature-PR).
+Phase 4 / Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03f** – Tandem/Tridem in Spot-Classic-Average-Standardangeboten
-(PO-BLP403F-1). Draft-PR / Gates / Smoke. Kein Merge in diesem Schritt.
+Nächster sinnvoller Folgeslice nach Priorisierung (z. B. Calendar- oder
+Budget-Vorlagen). Kein Merge und keine Feature-Umsetzung in diesem Docs-Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P4-03e** N/N-Festpreis in Spot-Classic-Average-Standardangeboten;
-Materialisierung **v2**; Freeze und Hydrate als zwei gepflegte Vertragsseiten;
-Legacy v1 weiter übernehmbar (**auf `main`**, PR #97/#98).
+**BL-P4-03f** Tandem/Tridem × Average × normal/Festpreis in Standardangeboten;
+Materialisierung **v3**; Freeze und Hydrate als zwei gepflegte Vertragsseiten;
+Legacy v1/v2 weiter übernehmbar (**auf `main`**, PR #99).
 
 ## BL-P4-03f – Tandem/Tridem in Average-Standardangeboten / PO-BLP403F-1 (September 2026)
 
@@ -39,13 +42,14 @@ Legacy v1 weiter übernehmbar (**auf `main`**, PR #97/#98).
 | Strategie verbindlich `shared_total_length`; individual fail-closed | **umgesetzt** |
 | Freeze schreibt Profil + Komponenten + Settlement, `materialization_version=3` | **umgesetzt** |
 | Hydrate v3: Profil persistieren; Legacy v1/v2 weiter übernehmbar | **umgesetzt** |
-| Hydrate v3: Slot-/Sort-/Längen-Asserts + `[]`-Profil fail-closed | **umgesetzt** (Nachzug) |
+| Hydrate v3: Slot-/Sort-/Längen-Asserts + `[]`-Profil fail-closed | **umgesetzt** |
 | Gemischte Vorlagen (Tandem/Tridem + Average/Allonge) | **umgesetzt** |
 | Feature-Tests `StandardOfferBlP403fTest` | **umgesetzt** |
 | Browser-Smoke Port **8049** | **BESTANDEN** (`docs/smoke-bl-p4-03f/protokoll.md`) |
 | Calendar/Budget/Abbinder | **bewusst nicht** |
 | Freeze- und Hydrate-Seiten getrennt gepflegt | **dokumentiert** (ADR 03f) |
-| Merge | **kein Merge** (Draft-PR) |
+| Merge `main` | **PR #99** (`6737026243b2a5832b8f6e005598190a4db71892`) |
+| Post-Merge CI | **`36480624574` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P4-03e – Festpreis in Average-Standardangeboten (September 2026)
 
