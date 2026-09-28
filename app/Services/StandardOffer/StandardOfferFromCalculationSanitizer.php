@@ -215,7 +215,7 @@ final class StandardOfferFromCalculationSanitizer
 
         // BL-P4-03e: Festpreis unverändert übernehmen (kein stilles Zurücksetzen auf normal).
         $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
-        if ($modeRaw === null || $modeRaw === '') {
+        if ($modeRaw === '') {
             $modeRaw = PricingSettlementMode::Normal->value;
         }
         $safe['pricing_settlement_mode'] = is_scalar($modeRaw)

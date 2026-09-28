@@ -414,7 +414,7 @@ final class FrozenCalculationPersistenceContract
         }
 
         $raw = is_int($value) ? (string) $value : trim($value);
-        if ($raw === '' || ! preg_match('/^\d+(\.\d{1,2})?$/', $raw)) {
+        if ($raw === '' || ! preg_match('/^\d+(\.\d{1,2})?$/', $raw) || ! is_numeric($raw)) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
             ]);

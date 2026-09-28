@@ -76,11 +76,13 @@ final class StandardOfferMaterializer
             $fixedPriceNn = $settlementMode === PricingSettlementMode::FixedPrice
                 ? $result->fixedPriceNn
                 : null;
-            if ($settlementMode === PricingSettlementMode::FixedPrice
-                && ($fixedPriceNn === null || $fixedPriceNn === '' || bccomp((string) $fixedPriceNn, '0', 2) !== 1)) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.fixed_price_nn" => 'Festpreis erfordert einen N/N-Endbetrag größer 0.',
-                ]);
+            if ($settlementMode === PricingSettlementMode::FixedPrice) {
+                $nnRaw = $fixedPriceNn === null ? '' : trim((string) $fixedPriceNn);
+                if ($nnRaw === '' || ! is_numeric($nnRaw) || bccomp($nnRaw, '0', 2) !== 1) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.fixed_price_nn" => 'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                    ]);
+                }
             }
 
             $positions[] = [

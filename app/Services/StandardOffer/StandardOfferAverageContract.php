@@ -147,7 +147,7 @@ final class StandardOfferAverageContract
     private function normalizeSettlement(array $position, int $index): array
     {
         $modeRaw = $position['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
-        if ($modeRaw === null || $modeRaw === '') {
+        if ($modeRaw === '') {
             $modeRaw = PricingSettlementMode::Normal->value;
         }
         if (! is_scalar($modeRaw)) {
