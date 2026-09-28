@@ -35,17 +35,23 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
 
 ## Versionierung
 
-- Aktuell unterstützt: **Version 1** (`SUPPORTED_VERSIONS = [1]`).
+- Unterstützt: **Version 1** und **Version 2** (`SUPPORTED_VERSIONS = [1, 2]`).
 - Fehlendes `materialization_version` = Legacy **implizit 1** (03a/03c-Stände).
+- Aktuelle Freeze-Schreibversion: **2** (ab BL-P4-03e; Festpreis-fähiges Settlement).
 - Unbekannte künftige Versionen → verständlicher Fehler, **keine** teilweise
   angelegte Kalkulation (Assert vor Persistenz + Transaktion).
 - Unvollständige/ungültige Frozen-Struktur (Methoden-/Abrechnungskennzeichen,
   Strategie/Profil, Kindzeilen) → Fail-closed mit Validation-Meldung.
 
-## Average v1 – Prüfungen vor Persistenz
+## Average – Prüfungen vor Persistenz
 
 - `spot_method` falls gesetzt: nur `average`
-- `pricing_settlement_mode` falls gesetzt: nur `normal`; kein `fixed_price_nn`
+- **Settlement v1:** `pricing_settlement_mode` falls gesetzt nur `normal`; kein
+  `fixed_price_nn`
+- **Settlement v2 (03e):** `pricing_settlement_mode` Pflicht (`normal`|`fixed_price`);
+  fehlend/leer → unvollständig fail-closed; bei Festpreis Pflicht-
+  `fixed_price_nn` im strikten Dezimalformat (`^\d+(\.\d{1,2})?$`, string|int);
+  Exponentialnotation/nicht skalare Werte fail-closed vor `bccomp`
 - `component_profile` muss leer/null sein
 - Komponenten vorhanden → gültige `component_calculation_strategy` Pflicht
 - Komponenten-/Zeitbereich-/Planzeilen-/Rabattzeilen: erforderliche Felder

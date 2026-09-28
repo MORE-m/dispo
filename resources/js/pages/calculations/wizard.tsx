@@ -1903,11 +1903,11 @@ export default function CalculationWizard({
                 const {
                     planner_entries: _plan,
                     component_profile: _prof,
-                    fixed_price_nn: _fp,
                     ...posRest
                 } = position;
 
-                // BL-P4-03c: Komponenten + Strategie mitsenden; Calendar/Profil/Festpreis weglassen.
+                // BL-P4-03e: Komponenten + Strategie + Festpreis mitsenden;
+                // Calendar/Profil weiter weglassen.
                 // spot_method aus calculation_method_key spiegeln (Wizard sendet sonst nur den Key).
                 const methodKey =
                     typeof posRest.calculation_method_key === 'string'
@@ -3886,7 +3886,7 @@ export default function CalculationWizard({
                                                             }
                                                             disabled={!canEdit}
                                                             hideFixedPrice={
-                                                                isStandardOffer
+                                                                false
                                                             }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[

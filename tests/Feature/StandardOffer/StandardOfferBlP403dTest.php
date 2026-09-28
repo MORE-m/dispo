@@ -164,7 +164,18 @@ class StandardOfferBlP403dTest extends TestCase
 
         $cases = [
             ['path' => 'spot_method', 'mutate' => fn (array &$m) => $m['positions'][0]['spot_method'] = 'calendar', 'needle' => 'spot_method'],
-            ['path' => 'settlement', 'mutate' => fn (array &$m) => $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price', 'needle' => 'pricing_settlement_mode'],
+            ['path' => 'settlement_v1', 'mutate' => function (array &$m): void {
+                $m['materialization_version'] = 1;
+                $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                $m['positions'][0]['fixed_price_nn'] = '50.00';
+            }, 'needle' => 'pricing_settlement_mode'],
+            ['path' => 'settlement_v2_incomplete', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                $m['positions'][0]['fixed_price_nn'] = null;
+            }, 'needle' => 'fixed_price_nn'],
+            ['path' => 'settlement_v2_missing_mode', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['pricing_settlement_mode']);
+            }, 'needle' => 'pricing_settlement_mode'],
             ['path' => 'profile', 'mutate' => fn (array &$m) => $m['positions'][0]['component_profile'] = ['kind' => 'tandem'], 'needle' => 'component_profile'],
             ['path' => 'strategy', 'mutate' => fn (array &$m) => $m['positions'][0]['component_calculation_strategy'] = 'not_a_strategy', 'needle' => 'component_calculation_strategy'],
             ['path' => 'component_role', 'mutate' => function (array &$m): void {
