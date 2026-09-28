@@ -5,7 +5,7 @@
 **Worktree:** `dispo-wt-bl-p4-03f` (isoliert, SQLite `database/smoke-bl-p4-03f.sqlite`)  
 **Testdaten:** `E2ETandemTridemSeeder` + PM `pm@example.com` + Calc `K-2026-00001` (Tandem, Festpreis N/N **777,00**)  
 **Base:** `f6daf528a02772e4abd0a809c7d1559a56cd49ba` (`main`)  
-**Feature-HEAD (Smoke):** Tip dieses Feature-Branches (Draft-PR-HEAD nach Push)
+**Feature-HEAD (Smoke):** `3e2c2dc6f02fde80d36c64fe28ddcf52ec4fdbe0`
 
 ## Pfad A – Writer / Feature-Tests (technisch, getrennt)
 
