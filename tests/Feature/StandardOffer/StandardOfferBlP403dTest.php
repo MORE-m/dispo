@@ -155,6 +155,66 @@ class StandardOfferBlP403dTest extends TestCase
         $this->assertSame($beforePositions, CalculationPosition::query()->count());
     }
 
+    public function test_manipulated_method_settlement_strategy_and_child_rows_fail_closed(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+
+        $cases = [
+            ['path' => 'spot_method', 'mutate' => fn (array &$m) => $m['positions'][0]['spot_method'] = 'calendar', 'needle' => 'spot_method'],
+            ['path' => 'settlement', 'mutate' => fn (array &$m) => $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price', 'needle' => 'pricing_settlement_mode'],
+            ['path' => 'profile', 'mutate' => fn (array &$m) => $m['positions'][0]['component_profile'] = ['kind' => 'tandem'], 'needle' => 'component_profile'],
+            ['path' => 'strategy', 'mutate' => fn (array &$m) => $m['positions'][0]['component_calculation_strategy'] = 'not_a_strategy', 'needle' => 'component_calculation_strategy'],
+            ['path' => 'component_role', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['components'][0]['role'] = 'reminder';
+            }, 'needle' => 'components.0.role'],
+            ['path' => 'time_range', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['time_ranges'][0]['spot_count']);
+            }, 'needle' => 'time_ranges.0.spot_count'],
+            ['path' => 'plan_row', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['plan_rows'][0]['second_price']);
+            }, 'needle' => 'plan_rows.0.second_price'],
+            ['path' => 'discount_type', 'mutate' => function (array &$m): void {
+                $m['positions'][0]['position_discounts'] = [[
+                    'type' => 'not_a_discount',
+                    'custom_label' => null,
+                    'percent' => '1',
+                ]];
+            }, 'needle' => 'type'],
+        ];
+
+        foreach ($cases as $case) {
+            $published = $this->publish(
+                $catalog,
+                $pm,
+                $this->componentPayload($catalog, ComponentCalculationStrategy::SharedTotalLength),
+            );
+            $materialization = $published->frozen_materialization;
+            ($case['mutate'])($materialization);
+            $published->frozen_materialization = $materialization;
+            $published->save();
+
+            $beforeCalc = Calculation::query()->count();
+            $beforePositions = CalculationPosition::query()->count();
+
+            try {
+                $this->writer()->adopt($published->fresh(), 'Manip '.$case['path'], null, null, $sales);
+                $this->fail('Expected ValidationException for manipulated '.$case['path']);
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('frozen_materialization', $exception->errors());
+                $this->assertStringContainsString(
+                    $case['needle'],
+                    $exception->errors()['frozen_materialization'][0],
+                );
+            }
+
+            $this->assertSame($beforeCalc, Calculation::query()->count(), $case['path']);
+            $this->assertSame($beforePositions, CalculationPosition::query()->count(), $case['path']);
+        }
+    }
+
     public function test_adopt_isolation_after_price_master_and_template_changes_and_remains_editable(): void
     {
         $catalog = $this->createSpotClassicCatalog();

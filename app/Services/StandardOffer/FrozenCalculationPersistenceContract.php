@@ -8,6 +8,7 @@ use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentRole;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
@@ -35,22 +36,29 @@ use Illuminate\Validation\ValidationException;
  * - Freeze schreibt diesen Vertrag ({@see StandardOfferMaterializer::freeze()}).
  * - Hydrate materialisiert Kundenkalkulationen ausschließlich aus Frozen-Werten
  *   und geklonten Config-Snapshots ({@see self::hydrateAdoptedCalculation()}).
- * - Kein {@see CalculationWriter::create()}, keine
- *   Live-Preisauflösung, keine Kopplung zur Quellkalkulation.
+ * - Adopt-Persistenz ist aus {@see StandardOfferWriter::adopt()} extrahiert und
+ *   versioniert; Freeze- und Hydrate-Feldabbildungen bleiben **zwei gepflegte
+ *   Seiten** desselben Vertrags (nicht eine automatisch synchrone Abbildung).
+ * - Kein {@see CalculationWriter::create()}, keine Live-Preisauflösung, keine
+ *   Kopplung zur Quellkalkulation.
  * - Übernahmekontext (Kunde, optionale Agentur, Advisor, Kampagne) wird von
  *   außen ergänzt; Vorlagenwerte bleiben unverändert.
  *
- * Zentrale Feldabbildung (Average v1) – hier pflegen, nicht in Adopt-Listen
- * duplizieren:
+ * Average-v1 Hydrate-Feldabbildung (hier pflegen):
  * - Kopf: campaign/product_title/briefing, order_discount*, ae_*, Summen,
  *   Sonderfreigabe, configuration_snapshot_id, draft_payload
  * - Position: Katalog-Identität, Preislisten-Pin, Länge/Spots, Konditionen,
  *   AE, Engine-Freeze, Komponenten (+ Strategie), time_ranges, plan_rows,
  *   position_discounts, effective_configuration_snapshot_id
+ * - Methoden-/Abrechnungskennzeichen: nur `spot_method=average` und
+ *   `pricing_settlement_mode=normal`; kein `component_profile`; Strategie nur
+ *   gültige Enum-Werte bzw. leer ohne Komponenten
  *
- * Neue Kalkulationsmethoden (Calendar/Festpreis/Tandem/…) erfordern eine neue
- * materialization_version bzw. explizite Contract-Erweiterung. Dieser Refactor
- * allein unterstützt sie nicht automatisch.
+ * Verbleibende Pflege bei neuen Methoden (Calendar/Festpreis/Tandem/…):
+ * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
+ * 2) Freeze-Seite im Materializer (oder Nachfolger) erweitern,
+ * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
+ * 4) Tests für Parity und Fail-closed. Dieser Slice allein unterstützt sie nicht.
  */
 final class FrozenCalculationPersistenceContract
 {
@@ -217,6 +225,7 @@ final class FrozenCalculationPersistenceContract
                     'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Kopfrabatt {$index}).",
                 ]);
             }
+            $this->assertDiscountRow($discount, "Kopfrabatt {$index}");
         }
 
         foreach ($positions as $index => $position) {
@@ -251,24 +260,250 @@ final class FrozenCalculationPersistenceContract
                 ]);
             }
 
-            foreach (['components', 'time_ranges', 'plan_rows', 'position_discounts'] as $childKey) {
-                if (! array_key_exists($childKey, $position) || $position[$childKey] === null) {
-                    continue;
-                }
-                $children = $position[$childKey];
-                if (! is_array($children)) {
-                    throw ValidationException::withMessages([
-                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: {$childKey}).",
-                    ]);
-                }
-                foreach ($children as $childIndex => $child) {
-                    if (! is_array($child)) {
-                        throw ValidationException::withMessages([
-                            'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: {$childKey}.{$childIndex}).",
-                        ]);
-                    }
-                }
+            $this->assertAverageMethodAndSettlement($position, $index);
+            $this->assertComponentStrategyAndProfile($position, $index);
+
+            $components = $this->assertChildList($position, $index, 'components');
+            foreach ($components as $childIndex => $component) {
+                $this->assertComponentRow($component, $index, $childIndex);
             }
+
+            $ranges = $this->assertChildList($position, $index, 'time_ranges');
+            foreach ($ranges as $childIndex => $range) {
+                $this->assertTimeRangeRow($range, $index, $childIndex);
+            }
+
+            $planRows = $this->assertChildList($position, $index, 'plan_rows');
+            foreach ($planRows as $childIndex => $row) {
+                $this->assertPlanRow($row, $index, $childIndex);
+            }
+
+            $discounts = $this->assertChildList($position, $index, 'position_discounts');
+            foreach ($discounts as $childIndex => $discount) {
+                $this->assertDiscountRow($discount, "Position {$index}: position_discounts.{$childIndex}");
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function assertAverageMethodAndSettlement(array $position, int $index): void
+    {
+        if (array_key_exists('spot_method', $position) && $position['spot_method'] !== null) {
+            if (! is_string($position['spot_method'])
+                || $position['spot_method'] !== SpotCalculationMethod::Average->value) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: spot_method muss average sein).",
+                ]);
+            }
+        }
+
+        if (array_key_exists('pricing_settlement_mode', $position) && $position['pricing_settlement_mode'] !== null) {
+            if (! is_string($position['pricing_settlement_mode'])
+                || $position['pricing_settlement_mode'] !== PricingSettlementMode::Normal->value) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode muss normal sein).",
+                ]);
+            }
+        }
+
+        if (array_key_exists('fixed_price_nn', $position)
+            && $position['fixed_price_nn'] !== null
+            && $position['fixed_price_nn'] !== '') {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ist für Average-Vorlagen nicht erlaubt).",
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function assertComponentStrategyAndProfile(array $position, int $index): void
+    {
+        if (array_key_exists('component_profile', $position)
+            && $position['component_profile'] !== null
+            && $position['component_profile'] !== []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Average-Vorlagen nicht erlaubt).",
+            ]);
+        }
+
+        if (! array_key_exists('components', $position) || $position['components'] === null) {
+            $components = [];
+        } else {
+            $components = $position['components'];
+        }
+        if (! is_array($components)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components).",
+            ]);
+        }
+
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if ($components !== []) {
+            if (! is_string($strategy) || $strategy === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: component_calculation_strategy).",
+                ]);
+            }
+            if (ComponentCalculationStrategy::tryFrom($strategy) === null) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy).",
+                ]);
+            }
+
+            return;
+        }
+
+        if ($strategy !== null && $strategy !== '') {
+            if (! is_string($strategy) || ComponentCalculationStrategy::tryFrom($strategy) === null) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy).",
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return list<array<string, mixed>>
+     */
+    private function assertChildList(array $position, int $index, string $childKey): array
+    {
+        if (! array_key_exists($childKey, $position) || $position[$childKey] === null) {
+            return [];
+        }
+
+        $children = $position[$childKey];
+        if (! is_array($children)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: {$childKey}).",
+            ]);
+        }
+
+        foreach ($children as $childIndex => $child) {
+            if (! is_array($child)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: {$childKey}.{$childIndex}).",
+                ]);
+            }
+        }
+
+        /** @var list<array<string, mixed>> $children */
+        return $children;
+    }
+
+    /**
+     * @param  array<string, mixed>  $component
+     */
+    private function assertComponentRow(array $component, int $positionIndex, int|string $childIndex): void
+    {
+        foreach (['role', 'length_seconds', 'sort', 'length_index'] as $required) {
+            if (! array_key_exists($required, $component) || $component[$required] === null || $component[$required] === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: components.{$childIndex}.{$required}).",
+                ]);
+            }
+        }
+
+        if (! array_key_exists('media_gross', $component) || $component['media_gross'] === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
+            ]);
+        }
+
+        if (! is_string($component['media_gross']) && ! is_numeric($component['media_gross'])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
+            ]);
+        }
+
+        if (! array_key_exists('label', $component) || ! is_string($component['label'])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: components.{$childIndex}.label).",
+            ]);
+        }
+
+        $allowedRoles = array_map(
+            static fn (SpotComponentRole $role): string => $role->value,
+            SpotComponentRole::allowedForOptionalAllonge(),
+        );
+        if (! is_string($component['role']) || ! in_array($component['role'], $allowedRoles, true)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.role).",
+            ]);
+        }
+
+        if (! is_numeric($component['length_seconds']) || (int) $component['length_seconds'] < 0) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.length_seconds).",
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $range
+     */
+    private function assertTimeRangeRow(array $range, int $positionIndex, int|string $childIndex): void
+    {
+        foreach (['start_hour', 'end_hour_exclusive', 'day_group', 'spot_count'] as $required) {
+            if (! array_key_exists($required, $range) || $range[$required] === null || $range[$required] === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: time_ranges.{$childIndex}.{$required}).",
+                ]);
+            }
+        }
+
+        if (! is_string($range['day_group'])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: time_ranges.{$childIndex}.day_group).",
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function assertPlanRow(array $row, int $positionIndex, int|string $childIndex): void
+    {
+        foreach (['hour', 'day_group', 'second_price'] as $required) {
+            if (! array_key_exists($required, $row) || $row[$required] === null || $row[$required] === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: plan_rows.{$childIndex}.{$required}).",
+                ]);
+            }
+        }
+
+        if (! is_string($row['day_group'])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: plan_rows.{$childIndex}.day_group).",
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $discount
+     */
+    private function assertDiscountRow(array $discount, string $path): void
+    {
+        if (! array_key_exists('type', $discount) || $discount['type'] === null || $discount['type'] === '') {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig ({$path}: type).",
+            ]);
+        }
+
+        if (! is_string($discount['type']) || DiscountType::tryFrom($discount['type']) === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig ({$path}: type).",
+            ]);
+        }
+
+        if (! array_key_exists('percent', $discount) || $discount['percent'] === null || $discount['percent'] === '') {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig ({$path}: percent).",
+            ]);
         }
     }
 
@@ -280,9 +515,9 @@ final class FrozenCalculationPersistenceContract
         foreach ($discounts as $index => $discount) {
             $row = new CalculationOrderDiscount;
             $row->calculation()->associate($calculation);
-            $row->type = DiscountType::from((string) ($discount['type'] ?? DiscountType::Other->value));
+            $row->type = DiscountType::from((string) $discount['type']);
             $row->custom_label = $discount['custom_label'] ?? null;
-            $row->percent = $discount['percent'] ?? '0';
+            $row->percent = $discount['percent'];
             $row->sort = max(0, (int) $index);
             $row->save();
         }
@@ -309,8 +544,15 @@ final class FrozenCalculationPersistenceContract
 
             $frozenStrategy = $frozenPosition['component_calculation_strategy'] ?? null;
             $strategyValue = is_string($frozenStrategy) && $frozenStrategy !== ''
-                ? ComponentCalculationStrategy::tryFrom($frozenStrategy)?->value
+                ? ComponentCalculationStrategy::from($frozenStrategy)->value
                 : null;
+
+            $spotMethod = array_key_exists('spot_method', $frozenPosition) && is_string($frozenPosition['spot_method'])
+                ? $frozenPosition['spot_method']
+                : SpotCalculationMethod::Average->value;
+            $settlement = array_key_exists('pricing_settlement_mode', $frozenPosition) && is_string($frozenPosition['pricing_settlement_mode'])
+                ? $frozenPosition['pricing_settlement_mode']
+                : PricingSettlementMode::Normal->value;
 
             $position = new CalculationPosition;
             $position->fill([
@@ -328,7 +570,7 @@ final class FrozenCalculationPersistenceContract
                 'inventory_medium_rule_id' => $frozenPosition['inventory_medium_rule_id'] ?? null,
                 'price_list_id' => (int) $frozenPosition['price_list_id'],
                 'kind' => $frozenPosition['kind'],
-                'spot_method' => SpotCalculationMethod::Average->value,
+                'spot_method' => $spotMethod,
                 'length_seconds' => (int) $frozenPosition['length_seconds'],
                 'component_calculation_strategy' => $strategyValue,
                 'component_profile' => null,
@@ -347,7 +589,7 @@ final class FrozenCalculationPersistenceContract
                 'order_discount_amount' => $frozenPosition['order_discount_amount'] ?? '0',
                 'ae_amount' => $frozenPosition['ae_amount'] ?? '0',
                 'nn_invest' => $frozenPosition['nn_invest'] ?? '0',
-                'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
+                'pricing_settlement_mode' => $settlement,
                 'fixed_price_nn' => null,
                 'effective_pay_factor_percent' => $frozenPosition['effective_pay_factor_percent'] ?? null,
                 'effective_total_discount_percent' => $frozenPosition['effective_total_discount_percent'] ?? null,
@@ -373,23 +615,16 @@ final class FrozenCalculationPersistenceContract
     private function persistComponents(CalculationPosition $position, array $components): void
     {
         foreach ($components as $componentIndex => $component) {
-            $mediaGross = $component['media_gross'] ?? null;
-            if ($mediaGross === '' || $mediaGross === null) {
-                $mediaGross = null;
-            } else {
-                $mediaGross = (string) $mediaGross;
-            }
-            $lengthIndex = $component['length_index'] ?? null;
             $componentModel = new CalculationPositionComponent;
+            $mediaGross = $component['media_gross'];
             $componentModel->fill([
-                'role' => $component['role'] ?? 'main_spot',
-                'label' => $component['label'] ?? '',
-                'length_seconds' => (int) ($component['length_seconds'] ?? 0),
-                'sort' => (int) ($component['sort'] ?? $componentIndex),
-                'length_index' => $lengthIndex === null || $lengthIndex === ''
-                    ? null
-                    : (int) $lengthIndex,
-                'media_gross' => $mediaGross,
+                'role' => $component['role'],
+                'label' => (string) $component['label'],
+                'length_seconds' => (int) $component['length_seconds'],
+                'sort' => (int) $component['sort'],
+                'length_index' => (int) $component['length_index'],
+                // Freeze speichert leeren Brutto als ""; Spalte ist nullable.
+                'media_gross' => $mediaGross === '' ? null : (string) $mediaGross,
             ]);
             $componentModel->position()->associate($position);
             $componentModel->save();
@@ -444,9 +679,9 @@ final class FrozenCalculationPersistenceContract
         foreach ($discounts as $discountIndex => $discount) {
             $model = new CalculationPositionDiscount;
             $model->fill([
-                'type' => $discount['type'] ?? DiscountType::Other->value,
+                'type' => $discount['type'],
                 'custom_label' => $discount['custom_label'] ?? null,
-                'percent' => $discount['percent'] ?? '0',
+                'percent' => $discount['percent'],
                 'sort' => (int) $discountIndex,
             ]);
             $model->position()->associate($position);
