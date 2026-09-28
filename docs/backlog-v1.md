@@ -304,14 +304,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`/`BL-P4-03b`/`BL-P4-03c` auf `main`; **`BL-P4-03d` Hydrate-Persistenzvertrag im Feature-PR**)
+- **Status:** teilweise (`BL-P4-03a`/`BL-P4-03b`/`BL-P4-03c`/`BL-P4-03d` auf `main`; Festpreis/Calendar/Tandem/Abbinder offen)
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c); 03b zusätzlich schmales Vorschlagsrecht (kein STD-009 für Vertrieb)
 - **Abhängigkeiten:** BL-P4-02 (Average + Komponenten 02c; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1** (03b); 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
 - **Ergebnis 03c:** optionale Hauptspot+Allonge in Average-Vorlagen; Strategien laut Inventarregel; Freeze/Adopt/Dispo-Snapshot; Calc-Update nach Übernahme; **Merge PR #92** `392aa7d…`
 - **Ergebnis 03b:** Calc → „Als Standardangebot speichern“ → kundenloser Draft → PM-Prüfung → Publish → Adopt; Sanitize; Freeze zentral (`StandardOfferMaterializer`); Vertrieb nur Vorschlags-Draft; **Merge PR #93** `a850d52…`; Post-Merge-CI grün
-- **Ziel/Umsetzung 03d:** `FrozenCalculationPersistenceContract` (versioniert); Adopt hydratisiert ausschließlich aus Published-Frozen; Legacy ohne Version; Fail-closed; zentrale Feldabbildung; ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
-- **Grenzen:** kein Calendar/Festpreis/Tandem/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); 03d behauptet keine automatische Unterstützung neuer Methoden
+- **Ergebnis 03d (`main`, PR #95, `6af849a…`; Post-Merge-CI `36398695877` grün):** `FrozenCalculationPersistenceContract` (versioniert); Adopt hydratisiert ausschließlich aus Published-Frozen; Legacy ohne Version; Fail-closed; zentrale Feldabbildung; Freeze und Hydrate als **zwei gepflegte Seiten** (keine automatische Übernahme neuer Methoden); ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
+- **Grenzen:** kein Calendar/Festpreis/Tandem/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); 03d unterstützt neue Methoden nicht automatisch
 - **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c Feature-Tests; 03b Feature-Tests From-Calc; 03d Parity-/Fail-closed-Tests
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
 - **Tests 03c:** `tests/Feature/StandardOffer/StandardOfferBlP403cTest.php`

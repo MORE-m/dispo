@@ -26,3 +26,9 @@
 
 - UI-Wizard-Publish-Klick nicht separat durchgespielt (Publish über denselben Writer-Pfad wie die UI; Detail-Ansicht published im Browser bestätigt)
 - Calendar/Festpreis/Tandem weiter außerhalb Scope
+
+## Merge
+
+- PR #95 Merge-Commit `6af849ad47f48e48c8f3d58e0fb6abfd9a337020`
+- Post-Merge-CI [`36398695877`](https://github.com/MORE-m/dispo/actions/runs/36398695877) SUCCESS (`ci`/`mysql`/`e2e-spt008`)
+- Vertragsgrenze: Freeze und Hydrate bleiben zwei gepflegte Seiten; neue Methoden nicht automatisch übernommen

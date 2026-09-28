@@ -1,15 +1,17 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 27. September 2026 · Feature **BL-P4-03d** auf Basis `main` nach PR #93
-(`a850d52…`). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
+Stand: 28. September 2026 · **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
+Post-Merge-CI `36398695877`). Basis nach PR #93 (`a850d52…`).
+PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
 Komponenten (Semantik BL-P4-02c / SPT-014). **03b (PR #93):** aus zugänglicher
 Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
-sonst Ablehnung ohne stille Reduktion). **03d:** gemeinsamer versionierter
+sonst Ablehnung ohne stille Reduktion). **03d (PR #95):** gemeinsamer versionierter
 Persistenzvertrag Freeze↔Hydrate
-(`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`). Keine vollständige
+(`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
+sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. Keine vollständige
 Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
@@ -88,3 +90,4 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - Freeze- und Hydrate-Feldabbildungen bleiben **zwei gepflegte Seiten**; neue
   Methoden erfordern Version/Contract + Freeze + Hydrate + Tests (ADR 03d)
 - ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
+- **Merge `main`:** PR #95 (`6af849a…`); Post-Merge-CI `36398695877` SUCCESS
