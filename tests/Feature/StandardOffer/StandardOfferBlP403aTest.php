@@ -273,13 +273,14 @@ class StandardOfferBlP403aTest extends TestCase
             ]],
         ])->assertSessionHasErrors();
 
+        // Tandem ohne passende Reminder-Komponenten bleibt fail-closed (03f).
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
             'positions' => [[
                 ...$base['positions'][0],
                 'component_profile' => 'tandem',
             ]],
-        ])->assertSessionHasErrors('positions.0.component_profile');
+        ])->assertSessionHasErrors();
 
         $this->assertSame(0, StandardOffer::query()->count());
     }

@@ -1771,6 +1771,10 @@ export default function CalculationWizard({
                               position.components.length > 0
                                   ? position.component_calculation_strategy
                                   : null,
+                          component_profile: profileForMedium(
+                              catalog,
+                              position.advertising_medium_id,
+                          ),
                           total_spot_count: timing.total_spot_count,
                           needs_spot_redistribution:
                               position.needs_spot_redistribution ?? false,
@@ -1873,6 +1877,7 @@ export default function CalculationWizard({
             usesRegularPlanningEditorView,
             calculation,
             positions,
+            catalog,
         ],
     );
 
@@ -1900,14 +1905,10 @@ export default function CalculationWizard({
             positions: (
                 (rest.positions as Array<Record<string, unknown>>) ?? []
             ).map((position) => {
-                const {
-                    planner_entries: _plan,
-                    component_profile: _prof,
-                    ...posRest
-                } = position;
+                const { planner_entries: _plan, ...posRest } = position;
 
-                // BL-P4-03e: Komponenten + Strategie + Festpreis mitsenden;
-                // Calendar/Profil weiter weglassen.
+                // BL-P4-03f: Komponenten + Strategie + Profil + Festpreis mitsenden;
+                // Calendar weiter weglassen.
                 // spot_method aus calculation_method_key spiegeln (Wizard sendet sonst nur den Key).
                 const methodKey =
                     typeof posRest.calculation_method_key === 'string'
@@ -1985,9 +1986,7 @@ export default function CalculationWizard({
         return catalog.media.filter(
             (medium) =>
                 isSelectableForNewWizardPositions(medium) &&
-                mediumIds.has(medium.id) &&
-                // BL-P4-03a: Tandem/Tridem (component_profile) nicht wählbar.
-                !(isStandardOffer && medium.component_profile != null),
+                mediumIds.has(medium.id),
         );
     }
 
@@ -4155,7 +4154,7 @@ export default function CalculationWizard({
                                                         </div>
 
                                                         {(() => {
-                                                            // BL-P4-03c: Hauptspot+Allonge auch im Vorlagenmodus; Tandem/Tridem-Medien bleiben ausgefiltert.
+                                                            // BL-P4-03c/03f: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
                                                             const positionProfile =
                                                                 profileForMedium(
                                                                     catalog,
@@ -4171,13 +4170,6 @@ export default function CalculationWizard({
                                                                           positionProfile
                                                                       ]
                                                                     : undefined;
-
-                                                            if (
-                                                                isStandardOffer &&
-                                                                forcedProfile
-                                                            ) {
-                                                                return null;
-                                                            }
 
                                                             return (
                                                                 <div className="space-y-2">

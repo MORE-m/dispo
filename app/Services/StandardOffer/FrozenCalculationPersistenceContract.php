@@ -8,6 +8,7 @@ use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
 use App\Enums\SpotComponentRole;
 use App\Models\Calculation;
 use App\Models\CalculationOrderDiscount;
@@ -23,15 +24,16 @@ use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
+use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03d / BL-P4-03e / VER-004 / STD-004 / STD-005 / STD-006.
+ * BL-P4-03d / BL-P4-03e / BL-P4-03f / VER-004 / STD-004 / STD-005 / STD-006.
  *
  * Ausdrücklich versionierter Persistenzvertrag für eingefrorene Spot-Classic-
  * Average-Kalkulationsdaten (optional Hauptspot+Allonge; ab v2 optional N/N-
- * Festpreis-Abschluss 02d).
+ * Festpreis-Abschluss 02d; ab v3 optional Tandem/Tridem 02e).
  *
  * Architekturgrenze:
  * - Freeze schreibt diesen Vertrag ({@see StandardOfferMaterializer::freeze()}).
@@ -64,7 +66,12 @@ use Illuminate\Validation\ValidationException;
  * - bei `normal`: kein `fixed_price_nn`; Widersprüche fail-closed
  * - kein stilles Zurücksetzen auf `normal`, keine Live-Neuberechnung des Festpreises
  *
- * Verbleibende Pflege bei neuen Methoden (Calendar/Tandem/…):
+ * Average-v3 Ergänzung (BL-P4-03f):
+ * - optional `component_profile` `tandem`|`tridem` (null = bisherige Average/Allonge)
+ * - bei Profil: Pflicht `shared_total_length`, Reminder-Rollen laut 02e-Vertrag
+ * - v1/v2 ohne Profil bleiben übernehmbar; Profil in v1/v2 fail-closed
+ *
+ * Verbleibende Pflege bei neuen Methoden (Calendar/Abbinder/…):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
  * 2) Freeze-Seite im Materializer (oder Nachfolger) erweitern,
  * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
@@ -78,12 +85,12 @@ final class FrozenCalculationPersistenceContract
      *
      * @var list<int>
      */
-    public const SUPPORTED_VERSIONS = [1, 2];
+    public const SUPPORTED_VERSIONS = [1, 2, 3];
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Festpreis-fähiges Settlement-Schema). */
-    public const CURRENT_WRITE_VERSION = 2;
+    /** Aktuelle Freeze-Schreibversion (Tandem/Tridem + Festpreis-fähiges Schema). */
+    public const CURRENT_WRITE_VERSION = 3;
 
     /**
      * Kindliste muss als Array-Schlüssel vorhanden sein (auch `[]` erlaubt).
@@ -290,9 +297,9 @@ final class FrozenCalculationPersistenceContract
                 'components',
                 self::CHILD_LIST_OPTIONAL_ABSENT,
             );
-            $this->assertComponentStrategyAndProfile($position, $index, $components);
+            $this->assertComponentStrategyAndProfile($position, $index, $components, $version);
             foreach ($components as $childIndex => $component) {
-                $this->assertComponentRow($component, $index, $childIndex);
+                $this->assertComponentRow($component, $index, $childIndex, $position);
             }
 
             $ranges = $this->assertChildList(
@@ -433,16 +440,84 @@ final class FrozenCalculationPersistenceContract
      * @param  array<string, mixed>  $position
      * @param  list<array<string, mixed>>  $components
      */
-    private function assertComponentStrategyAndProfile(array $position, int $index, array $components): void
+    private function assertComponentStrategyAndProfile(array $position, int $index, array $components, int $version): void
     {
-        if (array_key_exists('component_profile', $position)
-            && $position['component_profile'] !== null
-            && $position['component_profile'] !== []) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Average-Vorlagen nicht erlaubt).",
-            ]);
+        $profileRaw = $position['component_profile'] ?? null;
+        $hasProfile = $profileRaw !== null && $profileRaw !== '' && $profileRaw !== [];
+
+        if ($version < 3) {
+            if ($hasProfile) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Average-v{$version} nicht erlaubt).",
+                ]);
+            }
+
+            $this->assertOptionalAllongeStrategy($position, $index, $components);
+
+            return;
         }
 
+        $profile = null;
+        if ($hasProfile) {
+            if (! is_string($profileRaw)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
+                ]);
+            }
+            $profile = SpotComponentProfile::tryFrom($profileRaw);
+            if ($profile === null) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
+                ]);
+            }
+        }
+
+        if ($profile !== null) {
+            $required = SpotComponentProfileContract::requiredStrategy($profile)->value;
+            $strategy = $position['component_calculation_strategy'] ?? null;
+            if (! is_string($strategy) || $strategy !== $required) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy muss shared_total_length sein).",
+                ]);
+            }
+            if ($components === []) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: components für {$profile->value}).",
+                ]);
+            }
+
+            $roles = array_map(
+                static fn (array $row): string => is_string($row['role'] ?? null) ? $row['role'] : '',
+                $components,
+            );
+            $expected = array_map(
+                static fn (array $slot): string => $slot['role']->value,
+                SpotComponentProfileContract::slots($profile),
+            );
+            $mainCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::MainSpot->value));
+            $reminderCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::Reminder->value));
+            $allongeCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::Allonge->value));
+            if ($mainCount !== 1
+                || $reminderCount !== $profile->reminderCount()
+                || $allongeCount !== 0
+                || count($roles) !== count($expected)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
+                ]);
+            }
+
+            return;
+        }
+
+        $this->assertOptionalAllongeStrategy($position, $index, $components);
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  list<array<string, mixed>>  $components
+     */
+    private function assertOptionalAllongeStrategy(array $position, int $index, array $components): void
+    {
         $strategy = $position['component_calculation_strategy'] ?? null;
         if ($components !== []) {
             if (! is_string($strategy) || $strategy === '') {
@@ -546,8 +621,9 @@ final class FrozenCalculationPersistenceContract
 
     /**
      * @param  array<string, mixed>  $component
+     * @param  array<string, mixed>  $position
      */
-    private function assertComponentRow(array $component, int $positionIndex, int|string $childIndex): void
+    private function assertComponentRow(array $component, int $positionIndex, int|string $childIndex, array $position): void
     {
         foreach (['role', 'length_seconds', 'sort', 'length_index'] as $required) {
             if (! array_key_exists($required, $component) || $component[$required] === null || $component[$required] === '') {
@@ -575,10 +651,17 @@ final class FrozenCalculationPersistenceContract
             ]);
         }
 
-        $allowedRoles = array_map(
-            static fn (SpotComponentRole $role): string => $role->value,
-            SpotComponentRole::allowedForOptionalAllonge(),
-        );
+        $profileRaw = $position['component_profile'] ?? null;
+        $profile = is_string($profileRaw) ? SpotComponentProfile::tryFrom($profileRaw) : null;
+        $allowedRoles = $profile !== null
+            ? array_map(
+                static fn (SpotComponentRole $role): string => $role->value,
+                SpotComponentProfileContract::allowedRoles($profile),
+            )
+            : array_map(
+                static fn (SpotComponentRole $role): string => $role->value,
+                SpotComponentRole::allowedForOptionalAllonge(),
+            );
         if (! is_string($component['role']) || ! in_array($component['role'], $allowedRoles, true)) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.role).",
@@ -696,6 +779,11 @@ final class FrozenCalculationPersistenceContract
                 ? ComponentCalculationStrategy::from($frozenStrategy)->value
                 : null;
 
+            $frozenProfile = $frozenPosition['component_profile'] ?? null;
+            $profileValue = is_string($frozenProfile) && $frozenProfile !== ''
+                ? SpotComponentProfile::from($frozenProfile)->value
+                : null;
+
             $spotMethod = array_key_exists('spot_method', $frozenPosition) && is_string($frozenPosition['spot_method'])
                 ? $frozenPosition['spot_method']
                 : SpotCalculationMethod::Average->value;
@@ -730,7 +818,7 @@ final class FrozenCalculationPersistenceContract
                 'spot_method' => $spotMethod,
                 'length_seconds' => (int) $frozenPosition['length_seconds'],
                 'component_calculation_strategy' => $strategyValue,
-                'component_profile' => null,
+                'component_profile' => $profileValue,
                 'total_spot_count' => (int) $frozenPosition['total_spot_count'],
                 'needs_spot_redistribution' => (bool) ($frozenPosition['needs_spot_redistribution'] ?? false),
                 'average_second_price' => $frozenPosition['average_second_price'] ?? null,

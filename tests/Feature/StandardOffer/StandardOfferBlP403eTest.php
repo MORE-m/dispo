@@ -387,7 +387,7 @@ class StandardOfferBlP403eTest extends TestCase
             StandardOfferMaterializer::MATERIALIZATION_VERSION,
             (int) ($published->frozen_materialization['materialization_version'] ?? 0),
         );
-        $this->assertSame(2, StandardOfferMaterializer::MATERIALIZATION_VERSION);
+        $this->assertSame(3, StandardOfferMaterializer::MATERIALIZATION_VERSION);
         $this->assertSame('215.00', (string) ($published->frozen_materialization['positions'][0]['fixed_price_nn'] ?? ''));
         $this->assertSame('215.00', (string) ($published->frozen_materialization['positions'][0]['nn_invest'] ?? ''));
     }

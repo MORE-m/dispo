@@ -5,6 +5,7 @@ namespace App\Services\StandardOffer;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
 use App\Models\ConfigurationSnapshot;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
@@ -13,14 +14,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b/03d/03e / VER-004: Freeze-Seite des versionierten Persistenzvertrags
+ * BL-P4-03b/03d/03e/03f / VER-004: Freeze-Seite des versionierten Persistenzvertrags
  * {@see FrozenCalculationPersistenceContract} für Spot-Classic-Average-Vorlagen
- * inkl. optionalem N/N-Festpreis (02d).
+ * inkl. optionalem N/N-Festpreis (02d) und optionalem Tandem/Tridem (02e).
  *
  * Adopt hydratisiert über denselben Vertrag (nicht über CalculationWriter::create()).
  * Altstände ohne materialization_version bleiben lesbar (implizit Version 1).
- * Neue Freezes schreiben Version 2 (Festpreis-fähiges Settlement-Schema).
- * Feldabbildung Average v1/v2 wird im Persistenzvertrag zentral dokumentiert/gepflegt.
+ * Neue Freezes schreiben Version 3 (Profil + Festpreis-fähiges Settlement).
+ * Feldabbildung Average v1/v2/v3 wird im Persistenzvertrag zentral dokumentiert/gepflegt.
  */
 final class StandardOfferMaterializer
 {
@@ -85,6 +86,11 @@ final class StandardOfferMaterializer
                 }
             }
 
+            $profile = $item['component_profile'] ?? null;
+            $profileValue = $profile instanceof SpotComponentProfile
+                ? $profile->value
+                : (is_string($profile) && $profile !== '' ? $profile : null);
+
             $positions[] = [
                 'client_key' => (string) Str::uuid(),
                 'inventory_id' => (int) $item['inventory']->id,
@@ -108,7 +114,7 @@ final class StandardOfferMaterializer
                     : ($item['component_calculation_strategy'] instanceof ComponentCalculationStrategy
                         ? $item['component_calculation_strategy']->value
                         : null),
-                'component_profile' => null,
+                'component_profile' => $profileValue,
                 'components' => array_map(
                     static function (array $component): array {
                         return [

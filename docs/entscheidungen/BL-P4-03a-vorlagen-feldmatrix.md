@@ -1,8 +1,8 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 28. September 2026 · **BL-P4-03e** auf `main` (PR #97, `4eddc94…`;
-Post-Merge-CI `36435981330` grün). **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
-Status PR #96). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
+Stand: 28. September 2026 · **BL-P4-03f** Feature-PR (PO-BLP403F-1). **BL-P4-03e**
+auf `main` (PR #97, `4eddc94…`; Status PR #98). **BL-P4-03d** auf `main` (PR #95).
+PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
@@ -13,7 +13,8 @@ Persistenzvertrag Freeze↔Hydrate
 (`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
 sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e (PR #97):**
 N/N-Festpreis (02d) in Average-Vorlagen; Materialisierung v2; Legacy v1 lesbar.
-Calendar/Tandem/Budget/Abbinder weiter Folgeslices. Keine vollständige
+**03f:** Tandem/Tridem (02e) in Average-Vorlagen; Materialisierung v3; gemischt
+mit Average/Allonge; Calendar/Budget/Abbinder weiter Folgeslices. Keine vollständige
 Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
@@ -54,11 +55,11 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 | `campaign_period` (Header-Dyn-Feld) | 1* | Wizard-Payload unverändert zu 03a | *keine neue Datums-/Shift-Logik in 03c; Werte wie bisher mitspeicherbar; fachliche Klärung Folgeslice möglich |
 | `period_open` / `position_flight_period` | 1* | Positions-Dyn-Felder unverändert zu 03a | *stabil; keine Calendar-/Kampagnenverschiebung in 03c |
 | Calendar / `planner_entries` | 4 | Contract + Validierung lehnen ab | UI im Vorlagenmodus ausgeblendet |
-| Tandem/Tridem (`component_profile`) | 4 | Contract + Validierung lehnen ab | Medium nicht wählbar |
-| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 1 | **BL-P4-03e** / 02d-Semantik | UI wählbar; serverseitig validiert; Freeze v2; kein stilles Zurücksetzen |
+| Tandem/Tridem (`component_profile`) | 1 | **BL-P4-03f** / PO-BLP403F-1 / 02e-Semantik | Medium wählbar; Reminder-Rollen; `shared_total_length`; Freeze v3 |
+| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 1 | **BL-P4-03e** / 02d-Semantik (+ 03f mit Profil) | UI wählbar; serverseitig validiert; Freeze v2+; kein stilles Zurücksetzen |
 | Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Abbinder | 4 | zurückgestellt | Kein Scope |
-| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** / PO-BLP403B-1 (+ **03e** Festpreis) | *Average + optionale Komponenten + Festpreis; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
+| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** (+ **03e**/**03f**) | *Average + optionale Komponenten/Tandem/Tridem + Festpreis; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
 
 ## Vertrags-IDs
 
@@ -105,3 +106,13 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - Freeze und Hydrate bleiben zwei gepflegte Seiten; keine Auto-Übernahme neuer Methoden
 - ADR: `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
 - **Merge `main`:** PR #97 (`4eddc94…`); Post-Merge-CI `36435981330` SUCCESS
+
+## Geliefert in BL-P4-03f
+
+- Tandem/Tridem in Average-Vorlagen (Calc-Engine 02e, keine Vorlagenformel)
+- Draft-Contract, Sanitize, UI, HTTP-Validierung, Freeze v3, Hydrate v3
+- normal + Festpreis; gemischte Vorlagen mit Average/Allonge
+- Legacy v1/v2 inkl. fehlendem Versionsfeld weiter übernehmbar
+- Calendar/Budget/Abbinder weiter abgewiesen; Average+Calendar-Quelle ganz abgewiesen
+- ADR: `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
+- Status: Feature-PR (kein Merge)
