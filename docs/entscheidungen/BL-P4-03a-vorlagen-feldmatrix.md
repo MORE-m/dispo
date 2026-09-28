@@ -1,13 +1,15 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 27. September 2026 · `main` nach PR #92 (`392aa7d…`, 03c abgeschlossen) ·
-03b Feature-Branch. PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
+Stand: 27. September 2026 · `main` nach PR #93 (`a850d52…`, 03b abgeschlossen) ·
+Hydrate-Folgeslice **BL-P4-03d** offen. PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 /
+UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
-Komponenten (Semantik BL-P4-02c / SPT-014). **03b (priorisiert):** aus zugänglicher
+Komponenten (Semantik BL-P4-02c / SPT-014). **03b (PR #93):** aus zugänglicher
 Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
-sonst Ablehnung ohne stille Reduktion). Keine vollständige Standardangebotsfunktion
+sonst Ablehnung ohne stille Reduktion). **03d (offen):** gemeinsamer versionierter
+Persistenzvertrag Freeze↔Hydrate. Keine vollständige Standardangebotsfunktion
 über alle Kalkulationsmethoden.
 
 ## Gruppen
@@ -71,7 +73,7 @@ sonst Ablehnung ohne stille Reduktion). Keine vollständige Standardangebotsfunk
 - Zentraler Sanitize (`StandardOfferFieldClassification` + `StandardOfferFromCalculationSanitizer`); Prüfstufe speichert **nur Feldnamen**, keine Quell-Freitextwerte
 - Ausdrückliche Bestätigung `pruefung-bestaetigen` vor Publish; Save/Publish bestätigen nicht still
 - `StandardOfferMaterializer` (materialization_version=1) für **Publish/Freeze**
-- Adopt nutzt Frozen-Stand, behält aber **eigene Persistenzlisten** (gemeinsamer Hydrate-Pfad = Folgearbeit)
+- Adopt nutzt Frozen-Stand; **gemeinsamer Hydrate-Pfad** = Folgeslice **BL-P4-03d**
 - Immer neuer `SA-`-Draft; keine Auto-Publish; keine Sync zur Quelle
 - Nur Average + optionale Komponenten; sonst Ablehnung ohne stille Reduktion
 - `source_calculation_id` nur als technische Referenz an der Version (keine Kundendaten); Quell-Freitexte nicht in Audit/Frozen

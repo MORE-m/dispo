@@ -66,7 +66,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1**) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -423,9 +423,9 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
 - Notifications (allgemeine Kommentare: PO-BLP902A-1)
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
-- Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a / PO-BLP403A-1 und
-  BL-P4-03c / PO-BLP403C-1 (Calendar/Festpreis/Tandem, erweiterte REP-Listen,
-  Budget-auf-Vorlage, Button „aus Kalkulation“)
+- Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a / PO-BLP403A-1,
+  BL-P4-03c / PO-BLP403C-1 und BL-P4-03b / PO-BLP403B-1 (Calendar/Festpreis/Tandem,
+  erweiterte REP-Listen, Budget-auf-Vorlage)
 - Administration der übrigen Initialkataloge (Kombinationstabelle) –
   Oberkategorien/Werbemittel (ADV-001b), Inventar-Admin (BL-P2-01a),
   Preislisten-Lifecycle (BL-P4-01a), Excel-Import (BL-P4-01b) und
@@ -472,9 +472,10 @@ Calendar/Tandem/Festpreis/Budget-auf-Vorlage/Abbinder bleiben gesperrt.
 Für `BL-P4-03b – Kalkulation als Standardangebot speichern` sind innerhalb von
 UX-GATE-D **ausschließlich** freigegeben: Aktion aus zugänglicher Calc → neuer
 kundenloser Draft; schmales Vertriebs-Vorschlagsrecht ohne Manage/Edit/Publish;
-PM-Prüfung ohne Calc-Zugang; Sanitize inkl. Freitext-Prüfstufe; gemeinsamer
-Materialisierungspfad für Average (+ optionale Komponenten). Keine stille
-Methodenreduktion; keine Auto-Publish/Sync.
+PM-Prüfung ohne Calc-Zugang; Sanitize inkl. Freitext-Prüfstufe; Freeze-Pfad für
+Average (+ optionale Komponenten). Keine stille Methodenreduktion; keine
+Auto-Publish/Sync. **Gemergt:** PR #93 (`a850d52…`). Gemeinsamer Hydrate-Pfad =
+technischer Folgeslice **BL-P4-03d** (keine neue Fachoberfläche).
 
 Diese Entscheidungen geben **nicht** das gesamte UX-GATE-D und **nicht** den
 Rest von `BL-P4-03` frei.
@@ -495,7 +496,7 @@ BL-P9-01c.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1); Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + Calc→Standardangebot-Vorschlag (BL-P4-03b / PO-BLP403B-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1); Notifications und Kombinationstabelle weiterhin gesperrt; Kombi-Mitgliedschaften entfallen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

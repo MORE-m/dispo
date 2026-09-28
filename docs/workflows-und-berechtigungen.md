@@ -55,7 +55,7 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Isolation: Frozen Materialization bei Publish (inkl. Komponenten); Adopt ohne
   `CalculationWriter::create()`-Live-Bindung; danach normale Calc-Änderung.
 
-### Slice BL-P4-03b / PO-BLP403B-1 (Feature-Branch)
+### Slice BL-P4-03b / PO-BLP403B-1 (`main`, PR #93)
 
 - Aus zugänglicher Kundenkalkulation: Aktion „Als Standardangebot speichern“
   erzeugt **immer** einen neuen kundenlosen `SA-`-Draft (kein Auto-Publish, keine Sync).
@@ -65,7 +65,7 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Prüfstufe zeigt nur betroffene Feldnamen; Quell-Freitexte werden nicht gespeichert.
 - Bestätigung der Prüfung ist eigene Aktion vor Publish.
 - Nur Average + optionale Komponenten; sonst Ablehnung mit Positionsangabe.
-- Freeze zentral (`StandardOfferMaterializer`); Adopt-Hydrate bleibt Folgearbeit.
+- Freeze zentral (`StandardOfferMaterializer`); gemeinsamer Adopt-Hydrate-Pfad → **BL-P4-03d**.
 
 ## Vier-Augen-Prinzip
 
