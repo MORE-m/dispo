@@ -4,7 +4,7 @@
 **Port:** `http://127.0.0.1:8048`  
 **Worktree:** `dispo-wt-bl-p4-03e` (isoliert, SQLite `database/smoke-bl-p4-03e.sqlite`)  
 **Testdaten:** `E2ESpotDistributionExportSeeder` + Calc `K-2026-00007` (Festpreis N/N **288,50**)  
-**Feature-HEAD (Smoke):** `0371589` (+ uncommitted Härtung/Format; Push folgt)
+**Feature-HEAD (Smoke):** `8a5ee65`
 
 ## Pfad A – Writer-Nachzug (früherer Durchlauf, Referenz)
 
