@@ -193,10 +193,14 @@ class StandardOfferBlP403cTest extends TestCase
         $profile = $this->componentDraftPayload($catalog, ComponentCalculationStrategy::SharedTotalLength);
         $profile['positions'][0]['component_profile'] = 'tandem';
         try {
-            $this->writer()->create('Tandem Profil', $profile, $pm);
-            $this->fail('component_profile hätte abgelehnt werden müssen.');
+            $this->writer()->create('Tandem ohne Reminder', $profile, $pm);
+            $this->fail('Tandem ohne Reminder-Komponenten hätte abgelehnt werden müssen.');
         } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
+            $this->assertTrue(
+                collect($exception->errors())->keys()->contains(
+                    fn ($key) => str_contains((string) $key, 'component'),
+                ),
+            );
         }
 
         $this->assertSame(0, StandardOffer::query()->count());

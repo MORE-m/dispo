@@ -2,17 +2,25 @@
 
 namespace App\Services\StandardOffer;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
+use App\Services\Calculation\ComponentValidator;
+use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03e: Spot Classic Average; optional Hauptspot+Allonge (02c);
- * optional N/N-Festpreis-Abschluss (02d) auf Average-Basis.
- * Calendar/Tandem/Budget bleiben abgewiesen.
+ * BL-P4-03a/03c/03e/03f: Spot Classic Average; optional Hauptspot+Allonge (02c);
+ * optional N/N-Festpreis (02d); optional Tandem/Tridem (02e) auf Average-Basis.
+ * Calendar/Budget bleiben abgewiesen.
  */
 final class StandardOfferAverageContract
 {
+    public function __construct(
+        private readonly ComponentValidator $components,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
@@ -53,7 +61,7 @@ final class StandardOfferAverageContract
                 : SpotCalculationMethod::Average->value;
             if ($method !== SpotCalculationMethod::Average->value) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.spot_method" => 'BL-P4-03a/03c/03e erlaubt nur Spot Classic Average.',
+                    "positions.{$index}.spot_method" => 'BL-P4-03a/03c/03e/03f erlaubt nur Spot Classic Average.',
                 ]);
             }
 
@@ -61,48 +69,61 @@ final class StandardOfferAverageContract
             if ($calculationMethodKey !== null && $calculationMethodKey !== ''
                 && (string) $calculationMethodKey !== SpotCalculationMethod::Average->value) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.calculation_method_key" => 'BL-P4-03a/03c/03e erlaubt nur Spot Classic Average.',
-                ]);
-            }
-
-            if (($position['component_profile'] ?? null) !== null && $position['component_profile'] !== '') {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.component_profile" => 'Tandem/Tridem ist in BL-P4-03a/03c/03e nicht erlaubt.',
+                    "positions.{$index}.calculation_method_key" => 'BL-P4-03a/03c/03e/03f erlaubt nur Spot Classic Average.',
                 ]);
             }
 
             if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.planner_entries" => 'Kalenderplaner ist in BL-P4-03a/03c/03e nicht erlaubt.',
+                    "positions.{$index}.planner_entries" => 'Kalenderplaner ist in BL-P4-03a/03c/03e/03f nicht erlaubt.',
                 ]);
             }
 
+            $profile = $this->normalizeProfile($position, (int) $index);
             $settlement = $this->normalizeSettlement($position, (int) $index);
 
             if (array_key_exists('components', $position) && $position['components'] === null) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.components" => 'Komponenten dürfen nicht null sein. Fehlendes Feld oder [] deaktiviert sie; gefüllte Liste aktiviert Hauptspot+Allonge.',
+                    "positions.{$index}.components" => 'Komponenten dürfen nicht null sein. Fehlendes Feld oder [] deaktiviert sie; gefüllte Liste aktiviert Komponenten.',
                 ]);
             }
 
-            $components = [];
-            if (array_key_exists('components', $position)) {
-                if (! is_array($position['components'])) {
-                    throw ValidationException::withMessages([
-                        "positions.{$index}.components" => 'Komponenten müssen als Liste übergeben werden.',
-                    ]);
-                }
-                $components = $position['components'];
-            }
+            $normalizedComponents = $this->components->validateAndNormalize(
+                $position,
+                (int) $index,
+                SpotCalculationMethod::Average,
+                null,
+                $profile,
+            );
 
             $strategy = $position['component_calculation_strategy'] ?? null;
-            if ($components === []) {
+            if ($profile !== null) {
+                $required = SpotComponentProfileContract::requiredStrategy($profile);
+                if ($strategy !== null && $strategy !== ''
+                    && (string) $strategy !== $required->value) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.component_calculation_strategy" => 'Tandem/Tridem erfordert shared_total_length.',
+                    ]);
+                }
+                $strategy = $required->value;
+            } elseif ($normalizedComponents === []) {
                 if ($strategy !== null && $strategy !== '') {
                     throw ValidationException::withMessages([
                         "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
                     ]);
                 }
                 $strategy = null;
+            } else {
+                if ($strategy === null || $strategy === '') {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.component_calculation_strategy" => 'Strategie ist für Komponenten erforderlich.',
+                    ]);
+                }
+                if (ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.component_calculation_strategy" => 'Ungültige Komponentenstrategie.',
+                    ]);
+                }
             }
 
             $normalizedPositions[] = [
@@ -110,9 +131,9 @@ final class StandardOfferAverageContract
                 'spot_method' => SpotCalculationMethod::Average->value,
                 'pricing_settlement_mode' => $settlement['mode']->value,
                 'fixed_price_nn' => $settlement['fixed_price_nn'],
-                'components' => $components,
+                'components' => $normalizedComponents,
                 'planner_entries' => [],
-                'component_profile' => null,
+                'component_profile' => $profile?->value,
                 'component_calculation_strategy' => $strategy,
             ];
         }
@@ -120,7 +141,7 @@ final class StandardOfferAverageContract
         $planningMode = (string) ($payload['planning_mode'] ?? 'manual');
         if ($planningMode !== 'manual') {
             throw ValidationException::withMessages([
-                'planning_mode' => 'Budgetplanung ist in BL-P4-03a/03c/03e nicht erlaubt.',
+                'planning_mode' => 'Budgetplanung ist in BL-P4-03a/03c/03e/03f nicht erlaubt.',
             ]);
         }
 
@@ -138,6 +159,33 @@ final class StandardOfferAverageContract
                 : [],
             'positions' => $normalizedPositions,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function normalizeProfile(array $position, int $index): ?SpotComponentProfile
+    {
+        if (! array_key_exists('component_profile', $position)
+            || $position['component_profile'] === null
+            || $position['component_profile'] === '') {
+            return null;
+        }
+
+        if (! is_string($position['component_profile'])) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_profile" => 'Komponentenprofil ist ungültig.',
+            ]);
+        }
+
+        $profile = SpotComponentProfile::tryFrom($position['component_profile']);
+        if ($profile === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_profile" => 'Komponentenprofil ist ungültig (nur tandem|tridem).',
+            ]);
+        }
+
+        return $profile;
     }
 
     /**

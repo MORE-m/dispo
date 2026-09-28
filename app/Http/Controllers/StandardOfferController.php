@@ -195,7 +195,7 @@ class StandardOfferController extends Controller
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
             'catalog' => null,
             'schemaFingerprint' => null,
-            'scopeNote' => 'BL-P4-03e: Spot Classic Average mit optional Hauptspot+Allonge und N/N-Festpreis. Calendar/Tandem/Abbinder: Folgeslices.',
+            'scopeNote' => 'BL-P4-03f: Spot Classic Average mit optional Hauptspot+Allonge, Tandem/Tridem und N/N-Festpreis. Calendar/Budget/Abbinder: Folgeslices.',
         ]);
     }
 
@@ -357,12 +357,12 @@ class StandardOfferController extends Controller
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.dynamic_field_values' => ['sometimes', 'array'],
             'positions.*.components' => ['sometimes', 'nullable', 'array'],
-            'positions.*.components.*.role' => ['required', 'string', 'in:main_spot,allonge'],
+            'positions.*.components.*.role' => ['required', 'string', 'in:main_spot,allonge,reminder'],
             'positions.*.components.*.label' => ['nullable', 'string', 'max:120'],
             'positions.*.components.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'positions.*.components.*.sort' => ['nullable', 'integer', 'min:0'],
             'positions.*.planner_entries' => ['sometimes', 'array', 'max:0'],
-            'positions.*.component_profile' => ['prohibited'],
+            'positions.*.component_profile' => ['sometimes', 'nullable', 'in:tandem,tridem'],
             'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal,fixed_price'],
             'positions.*.fixed_price_nn' => ['sometimes', 'nullable', 'numeric', 'gt:0'],
             'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average'],
@@ -467,7 +467,7 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03e: Spot Classic Average mit optional Hauptspot+Allonge und N/N-Festpreis. Keine Kundendaten. Calendar, Tandem/Tridem und Budgetplanung sind nicht wählbar.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03f / PO-BLP403F-1: Spot Classic Average mit optional Hauptspot+Allonge, Tandem/Tridem und N/N-Festpreis. Keine Kundendaten. Calendar und Budgetplanung sind nicht wählbar.',
             'proposal_review' => $this->proposalReviewProp($version),
         ];
 
@@ -518,7 +518,7 @@ class StandardOfferController extends Controller
                 'components' => is_array($position['components'] ?? null) ? $position['components'] : [],
                 'component_calculation_strategy' => $position['component_calculation_strategy'] ?? null,
                 'planner_entries' => [],
-                'component_profile' => null,
+                'component_profile' => $position['component_profile'] ?? null,
                 'plan_rows' => $position['plan_rows'] ?? [],
                 'time_ranges' => $position['time_ranges'] ?? [],
                 'position_discounts' => $position['position_discounts'] ?? [],

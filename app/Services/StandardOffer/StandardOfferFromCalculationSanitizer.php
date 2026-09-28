@@ -4,6 +4,7 @@ namespace App\Services\StandardOffer;
 
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Enums\SpotComponentProfile;
 use App\Models\Calculation;
 use Illuminate\Validation\ValidationException;
 
@@ -142,8 +143,11 @@ final class StandardOfferFromCalculationSanitizer
                 $errors["positions.{$index}.calculation_method_key"] = "{$label}: Berechnungsmethode „{$calcMethod}“ wird nicht unterstützt.";
             }
 
-            if (($position['component_profile'] ?? null) !== null && $position['component_profile'] !== '') {
-                $errors["positions.{$index}.component_profile"] = "{$label}: Tandem/Tridem kann nicht als Standardangebot gespeichert werden.";
+            $profileRaw = $position['component_profile'] ?? null;
+            if ($profileRaw !== null && $profileRaw !== '') {
+                if (! is_string($profileRaw) || SpotComponentProfile::tryFrom($profileRaw) === null) {
+                    $errors["positions.{$index}.component_profile"] = "{$label}: Komponentenprofil ist ungültig.";
+                }
             }
 
             if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
@@ -210,7 +214,10 @@ final class StandardOfferFromCalculationSanitizer
         }
         $safe['dynamic_field_values'] = $posDyn === [] ? ['period_open' => true] : $posDyn;
         $safe['planner_entries'] = [];
-        $safe['component_profile'] = null;
+        $profileRaw = $safe['component_profile'] ?? null;
+        $safe['component_profile'] = is_string($profileRaw) && $profileRaw !== ''
+            ? $profileRaw
+            : null;
         $safe['spot_method'] = SpotCalculationMethod::Average->value;
 
         // BL-P4-03e: Festpreis unverändert übernehmen (kein stilles Zurücksetzen auf normal).
