@@ -461,7 +461,7 @@ final class FrozenCalculationPersistenceContract
             ]);
         }
 
-        return $children;
+        return array_values($children);
     }
 
     /**
