@@ -39,6 +39,7 @@ Legacy v1 weiter übernehmbar (**auf `main`**, PR #97/#98).
 | Strategie verbindlich `shared_total_length`; individual fail-closed | **umgesetzt** |
 | Freeze schreibt Profil + Komponenten + Settlement, `materialization_version=3` | **umgesetzt** |
 | Hydrate v3: Profil persistieren; Legacy v1/v2 weiter übernehmbar | **umgesetzt** |
+| Hydrate v3: Slot-/Sort-/Längen-Asserts + `[]`-Profil fail-closed | **umgesetzt** (Nachzug) |
 | Gemischte Vorlagen (Tandem/Tridem + Average/Allonge) | **umgesetzt** |
 | Feature-Tests `StandardOfferBlP403fTest` | **umgesetzt** |
 | Browser-Smoke Port **8049** | **BESTANDEN** (`docs/smoke-bl-p4-03f/protokoll.md`) |

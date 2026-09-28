@@ -67,9 +67,15 @@ use Illuminate\Validation\ValidationException;
  * - kein stilles Zurücksetzen auf `normal`, keine Live-Neuberechnung des Festpreises
  *
  * Average-v3 Ergänzung (BL-P4-03f):
- * - optional `component_profile` `tandem`|`tridem` (null = bisherige Average/Allonge)
- * - bei Profil: Pflicht `shared_total_length`, Reminder-Rollen laut 02e-Vertrag
- * - v1/v2 ohne Profil bleiben übernehmbar; Profil in v1/v2 fail-closed
+ * - optional `component_profile` `tandem`|`tridem` (null/'' = bisherige Average/Allonge)
+ * - bei Profil: Pflicht `shared_total_length`; Komponenten gegen
+ *   {@see SpotComponentProfileContract::slots()} (Rollen, kanonische Sortierung
+ *   Tandem 1/2 bzw. Tridem 1/2/3, eindeutige int-sort, Längen positiv ganzzahlig,
+ *   Summe = `position.length_seconds`)
+ * - explizites nicht-skalares `component_profile` (z. B. `[]`) fail-closed, kein
+ *   stilles „ohne Profil“
+ * - v1/v2 ohne Profil bleiben übernehmbar (bisheriges Leseverhalten inkl. Legacy
+ *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
  * Verbleibende Pflege bei neuen Methoden (Calendar/Abbinder/…):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
@@ -443,6 +449,7 @@ final class FrozenCalculationPersistenceContract
     private function assertComponentStrategyAndProfile(array $position, int $index, array $components, int $version): void
     {
         $profileRaw = $position['component_profile'] ?? null;
+        // v1/v2 Legacy: explizites [] blieb bisher „kein Profil“ – Leseverhalten erhalten.
         $hasProfile = $profileRaw !== null && $profileRaw !== '' && $profileRaw !== [];
 
         if ($version < 3) {
@@ -457,59 +464,131 @@ final class FrozenCalculationPersistenceContract
             return;
         }
 
-        $profile = null;
-        if ($hasProfile) {
-            if (! is_string($profileRaw)) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
-                ]);
-            }
-            $profile = SpotComponentProfile::tryFrom($profileRaw);
-            if ($profile === null) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
-                ]);
-            }
-        }
-
-        if ($profile !== null) {
-            $required = SpotComponentProfileContract::requiredStrategy($profile)->value;
-            $strategy = $position['component_calculation_strategy'] ?? null;
-            if (! is_string($strategy) || $strategy !== $required) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy muss shared_total_length sein).",
-                ]);
-            }
-            if ($components === []) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: components für {$profile->value}).",
-                ]);
-            }
-
-            $roles = array_map(
-                static fn (array $row): string => is_string($row['role'] ?? null) ? $row['role'] : '',
-                $components,
-            );
-            $expected = array_map(
-                static fn (array $slot): string => $slot['role']->value,
-                SpotComponentProfileContract::slots($profile),
-            );
-            $mainCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::MainSpot->value));
-            $reminderCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::Reminder->value));
-            $allongeCount = count(array_filter($roles, static fn (string $role): bool => $role === SpotComponentRole::Allonge->value));
-            if ($mainCount !== 1
-                || $reminderCount !== $profile->reminderCount()
-                || $allongeCount !== 0
-                || count($roles) !== count($expected)) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
-                ]);
-            }
+        if ($profileRaw === null || $profileRaw === '') {
+            $this->assertOptionalAllongeStrategy($position, $index, $components);
 
             return;
         }
 
-        $this->assertOptionalAllongeStrategy($position, $index, $components);
+        // v3: nicht-skalares Profil (z. B. []) nicht still als „ohne Profil“ lesen.
+        if (! is_string($profileRaw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
+            ]);
+        }
+
+        $profile = SpotComponentProfile::tryFrom($profileRaw);
+        if ($profile === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile).",
+            ]);
+        }
+
+        $required = SpotComponentProfileContract::requiredStrategy($profile)->value;
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if (! is_string($strategy) || $strategy !== $required) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy muss shared_total_length sein).",
+            ]);
+        }
+        if ($components === []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: components für {$profile->value}).",
+            ]);
+        }
+
+        $this->assertV3ProfileComponentsMatchSlots($profile, $components, $position, $index);
+    }
+
+    /**
+     * v3 Tandem/Tridem: Komponenten müssen exakt den kanonischen Slots entsprechen.
+     *
+     * @param  list<array<string, mixed>>  $components
+     * @param  array<string, mixed>  $position
+     */
+    private function assertV3ProfileComponentsMatchSlots(
+        SpotComponentProfile $profile,
+        array $components,
+        array $position,
+        int $index,
+    ): void {
+        $slots = SpotComponentProfileContract::slots($profile);
+        $expectedSorts = array_map(
+            static fn (array $slot): int => $slot['sort'],
+            $slots,
+        );
+
+        if (count($components) !== count($slots)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
+            ]);
+        }
+
+        $seenSorts = [];
+        $lengthSum = 0;
+
+        foreach ($components as $childIndex => $component) {
+            $sort = $component['sort'] ?? null;
+            if (! is_int($sort) || ! in_array($sort, $expectedSorts, true)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            if (isset($seenSorts[$sort])) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            $seenSorts[$sort] = true;
+
+            $length = $component['length_seconds'] ?? null;
+            if (! is_int($length) || $length < 1) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_seconds).",
+                ]);
+            }
+            $lengthSum += $length;
+
+            $role = $component['role'] ?? null;
+            if (! is_string($role) || $role === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.role).",
+                ]);
+            }
+        }
+
+        if (count($seenSorts) !== count($expectedSorts)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
+            ]);
+        }
+
+        $ordered = $components;
+        usort(
+            $ordered,
+            static fn (array $left, array $right): int => ((int) $left['sort']) <=> ((int) $right['sort']),
+        );
+
+        foreach ($slots as $slotIndex => $slot) {
+            $role = $ordered[$slotIndex]['role'] ?? null;
+            if (! is_string($role) || $role !== $slot['role']->value) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
+                ]);
+            }
+            if ((int) $ordered[$slotIndex]['sort'] !== $slot['sort']) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponenten passen nicht zu {$profile->value}).",
+                ]);
+            }
+        }
+
+        $positionLength = $position['length_seconds'] ?? null;
+        if (! is_int($positionLength) || $lengthSum !== $positionLength) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Komponentenlängen weichen von length_seconds ab).",
+            ]);
+        }
     }
 
     /**

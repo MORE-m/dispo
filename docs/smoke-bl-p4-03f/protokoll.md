@@ -43,3 +43,12 @@
 - Pfad A bleibt als Writer/Feature-Test-Nachweis getrennt dokumentiert
 - Calendar-/Budget-Vorlagen und Abbinder weiter außerhalb Scope
 - Browser-Smoke deckt die Kombination **Tandem × Festpreis** auf dem UI-Pfad ab; die übrigen drei Kombinationen sowie Misch-/Negativfälle laufen über Pfad A
+
+## Nachzug Hydrate-Härtung (Frozen v3)
+
+Der UI-Smoke (Pfad B) bleibt **gültig**: er prüft den echten Happy-Path mit gültigem
+Publish-Freeze (mat v3, kanonische Slots, Summe = Länge). Der Nachzug ergänzt nur
+**serverseitige Fail-closed-Asserts** im Hydrate bei manipulierten/ungültigen Frozen-
+Daten; er ändert weder Freeze-Ausgabe gültiger Vorlagen noch den UI-Adopt-Pfad für
+korrekte v3-Materialisierungen. Negativfälle: Feature-Tests gegen veröffentlichte
+Frozen-Mutationen (nicht erneuter Browser-Smoke).

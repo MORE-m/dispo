@@ -250,6 +250,84 @@ class StandardOfferBlP403fTest extends TestCase
         $this->assertSame($beforePositions, CalculationPosition::query()->count());
     }
 
+    public function test_frozen_v3_hydrate_rejects_invalid_profile_components_without_partial_create(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $offer = $this->writer()->create(
+            '03f hydrate base',
+            $this->profilePayload($catalog, $tandem, 'tandem', $this->tandemComponents(), 30, 'normal', null),
+            $pm,
+        );
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $published = $this->writer()->publish($draft, (int) $draft->lock_version, $pm);
+        $baseMat = $published->frozen_materialization;
+        $this->assertSame(3, (int) ($baseMat['materialization_version'] ?? 0));
+        $this->assertSame('tandem', $baseMat['positions'][0]['component_profile'] ?? null);
+
+        $cases = [
+            'duplicate_sort' => static function (array $mat): array {
+                $mat['positions'][0]['components'][1]['sort'] = 1;
+
+                return $mat;
+            },
+            'swapped_sort' => static function (array $mat): array {
+                $mat['positions'][0]['components'][0]['sort'] = 2;
+                $mat['positions'][0]['components'][1]['sort'] = 1;
+
+                return $mat;
+            },
+            'sort_string' => static function (array $mat): array {
+                $mat['positions'][0]['components'][0]['sort'] = '1';
+
+                return $mat;
+            },
+            'length_zero' => static function (array $mat): array {
+                $mat['positions'][0]['components'][1]['length_seconds'] = 0;
+                $mat['positions'][0]['length_seconds'] = 20;
+
+                return $mat;
+            },
+            'length_float' => static function (array $mat): array {
+                $mat['positions'][0]['components'][1]['length_seconds'] = 10.5;
+
+                return $mat;
+            },
+            'length_sum_mismatch' => static function (array $mat): array {
+                $mat['positions'][0]['length_seconds'] = 40;
+
+                return $mat;
+            },
+            'profile_empty_array' => static function (array $mat): array {
+                $mat['positions'][0]['component_profile'] = [];
+
+                return $mat;
+            },
+        ];
+
+        foreach ($cases as $label => $mutate) {
+            $version = $published->fresh();
+            $version->frozen_materialization = $mutate($baseMat);
+            $version->save();
+
+            $before = Calculation::query()->count();
+            $beforePositions = CalculationPosition::query()->count();
+            try {
+                $this->writer()->adopt($version->fresh(), "Fail {$label}", null, null, $sales);
+                $this->fail("Fall {$label} hätte scheitern müssen.");
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('frozen_materialization', $exception->errors(), $label);
+            }
+            $this->assertSame($before, Calculation::query()->count(), $label);
+            $this->assertSame($beforePositions, CalculationPosition::query()->count(), $label);
+        }
+    }
+
     public function test_rejects_individual_calendar_mix_and_wrong_roles(): void
     {
         $catalog = $this->createSpotClassicCatalog();

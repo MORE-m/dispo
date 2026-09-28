@@ -35,11 +35,17 @@ ohne Teilanlage.
 **Freeze** (`StandardOfferMaterializer`) und **Hydrate**
 (`FrozenCalculationPersistenceContract`) bleiben zwei gepflegte Seiten (ADR 03d).
 
+**Hydrate v3 (Härtung):** Bei `tandem`/`tridem` prüft der Persistenzvertrag Komponenten
+gegen `SpotComponentProfileContract::slots()` – kanonische Sortierung (Tandem 1/2,
+Tridem 1/2/3), eindeutige int-`sort`, positive ganzzahlige Längen, Summe =
+`length_seconds`. Explizites nicht-skalares `component_profile` (z. B. `[]`) scheitert;
+kein stilles „ohne Profil“. v1/v2-Leseverhalten unverändert.
+
 ## Vertrag / Verhalten
 
 - 02e-Semantik: Profil am Medium, Reminder-Rollen, verbindlich `shared_total_length`,
   Mengen = Tandem-/Tridem-Einheiten; ×2/×3 nur Anzeige. Keine Vorlagenformel.
-- `individual`, falsche Rollen, widersprüchliche Profile → kontrolliert 422.
+- `individual`, falsche Rollen, widersprüchliche Profile / Slot-Abweichungen → kontrolliert 422.
 - Kein stilles Entfernen von Profil, Komponenten oder Festpreisfeldern.
 - Nach Publish keine Live-Neuberechnung; nach Adopt keine Sync zu Vorlage/Quelle.
 - Rechte unverändert zu 03b (Vertrieb Vorschlag; PM Prüfung/Publish; Adopt ohne PM).
