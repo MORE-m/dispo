@@ -7,6 +7,7 @@ use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Enums\StandardOfferVersionStatus;
 use App\Models\Calculation;
+use App\Models\CalculationPosition;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
@@ -224,9 +225,9 @@ class StandardOfferBlP403eTest extends TestCase
         $published = $this->publish($catalog, $pm, $this->fixedPricePayload($catalog, '120.00'));
         $materialization = $published->frozen_materialization;
         unset($materialization['materialization_version']);
-        $materialization['positions'][0]['pricing_settlement_mode'] = 'normal';
+        unset($materialization['positions'][0]['pricing_settlement_mode']);
         $materialization['positions'][0]['fixed_price_nn'] = null;
-        // Simuliere Legacy-v1-Freeze (nur Normal); Summen bleiben aus Freeze.
+        // Legacy-v1 ohne Settlement-Feld; Summen bleiben aus Freeze.
         $published->frozen_materialization = $materialization;
         $published->save();
 
@@ -240,6 +241,7 @@ class StandardOfferBlP403eTest extends TestCase
         $v1Fixed->save();
 
         $before = Calculation::query()->count();
+        $beforePositions = CalculationPosition::query()->count();
         try {
             $this->writer()->adopt($v1Fixed->fresh(), 'Fail', null, null, $sales);
             $this->fail('v1 mit Festpreis hätte scheitern müssen.');
@@ -248,6 +250,89 @@ class StandardOfferBlP403eTest extends TestCase
             $this->assertStringContainsString('pricing_settlement_mode', $exception->errors()['frozen_materialization'][0]);
         }
         $this->assertSame($before, Calculation::query()->count());
+        $this->assertSame($beforePositions, CalculationPosition::query()->count());
+    }
+
+    public function test_v2_incomplete_or_invalid_settlement_fails_closed_without_partial_create(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+
+        $cases = [
+            [
+                'path' => 'missing_mode',
+                'mutate' => static function (array &$m): void {
+                    unset($m['positions'][0]['pricing_settlement_mode']);
+                },
+                'needle' => 'pricing_settlement_mode',
+            ],
+            [
+                'path' => 'empty_mode',
+                'mutate' => static function (array &$m): void {
+                    $m['positions'][0]['pricing_settlement_mode'] = '';
+                },
+                'needle' => 'pricing_settlement_mode',
+            ],
+            [
+                'path' => 'exponential_nn',
+                'mutate' => static function (array &$m): void {
+                    $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                    $m['positions'][0]['fixed_price_nn'] = '1e2';
+                },
+                'needle' => 'fixed_price_nn',
+            ],
+            [
+                'path' => 'too_many_decimals',
+                'mutate' => static function (array &$m): void {
+                    $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                    $m['positions'][0]['fixed_price_nn'] = '12.345';
+                },
+                'needle' => 'fixed_price_nn',
+            ],
+            [
+                'path' => 'non_scalar_nn',
+                'mutate' => static function (array &$m): void {
+                    $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                    $m['positions'][0]['fixed_price_nn'] = ['12.00'];
+                },
+                'needle' => 'fixed_price_nn',
+            ],
+            [
+                'path' => 'float_nn',
+                'mutate' => static function (array &$m): void {
+                    $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+                    $m['positions'][0]['fixed_price_nn'] = 12.5;
+                },
+                'needle' => 'fixed_price_nn',
+            ],
+        ];
+
+        foreach ($cases as $case) {
+            $published = $this->publish($catalog, $pm, $this->fixedPricePayload($catalog, '120.00'));
+            $materialization = $published->frozen_materialization;
+            ($case['mutate'])($materialization);
+            $published->frozen_materialization = $materialization;
+            $published->save();
+
+            $beforeCalc = Calculation::query()->count();
+            $beforePositions = CalculationPosition::query()->count();
+
+            try {
+                $this->writer()->adopt($published->fresh(), 'Fail '.$case['path'], null, null, $sales);
+                $this->fail('Expected ValidationException for '.$case['path']);
+            } catch (ValidationException $exception) {
+                $this->assertArrayHasKey('frozen_materialization', $exception->errors(), $case['path']);
+                $this->assertStringContainsString(
+                    $case['needle'],
+                    $exception->errors()['frozen_materialization'][0],
+                    $case['path'],
+                );
+            }
+
+            $this->assertSame($beforeCalc, Calculation::query()->count(), $case['path']);
+            $this->assertSame($beforePositions, CalculationPosition::query()->count(), $case['path']);
+        }
     }
 
     public function test_contradictory_settlement_payload_is_rejected_without_coercion(): void

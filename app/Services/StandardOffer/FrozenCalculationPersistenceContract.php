@@ -347,7 +347,7 @@ final class FrozenCalculationPersistenceContract
             && $position['fixed_price_nn'] !== '';
 
         if ($version <= self::LEGACY_IMPLICIT_VERSION) {
-            if ($modeRaw !== null) {
+            if ($modeRaw !== null && $modeRaw !== '') {
                 if (! is_string($modeRaw) || $modeRaw !== PricingSettlementMode::Normal->value) {
                     throw ValidationException::withMessages([
                         'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode muss normal sein).",
@@ -363,15 +363,11 @@ final class FrozenCalculationPersistenceContract
             return;
         }
 
-        // v2+: normal | fixed_price; Widersprüche fail-closed (kein stilles Zurücksetzen).
+        // v2+: Settlement-Kennzeichen Pflicht; Widersprüche fail-closed (kein stilles Zurücksetzen).
         if ($modeRaw === null || $modeRaw === '') {
-            if ($hasFixedNn) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ohne Festpreismodus).",
-                ]);
-            }
-
-            return;
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: pricing_settlement_mode).",
+            ]);
         }
 
         if (! is_string($modeRaw)) {
@@ -393,14 +389,7 @@ final class FrozenCalculationPersistenceContract
                     'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: fixed_price_nn).",
                 ]);
             }
-            $nn = is_scalar($position['fixed_price_nn'])
-                ? str_replace(',', '.', (string) $position['fixed_price_nn'])
-                : '';
-            if (! is_numeric($nn) || bccomp($nn, '0', 2) !== 1) {
-                throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
-                ]);
-            }
+            $this->assertFrozenFixedPriceNn($position['fixed_price_nn'], $index);
 
             return;
         }
@@ -410,6 +399,34 @@ final class FrozenCalculationPersistenceContract
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ohne Festpreismodus).",
             ]);
         }
+    }
+
+    /**
+     * Strictes Dezimalformat vor jedem bccomp: höchstens zwei Nachkommastellen,
+     * keine Exponentialnotation, nur skalar string|int.
+     */
+    private function assertFrozenFixedPriceNn(mixed $value, int $index): string
+    {
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
+            ]);
+        }
+
+        $raw = is_int($value) ? (string) $value : trim($value);
+        if ($raw === '' || ! preg_match('/^\d+(\.\d{1,2})?$/', $raw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
+            ]);
+        }
+
+        if (bccomp($raw, '0', 2) !== 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
+            ]);
+        }
+
+        return bcadd($raw, '0', 2);
     }
 
     /**

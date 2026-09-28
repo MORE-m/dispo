@@ -173,6 +173,9 @@ class StandardOfferBlP403dTest extends TestCase
                 $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
                 $m['positions'][0]['fixed_price_nn'] = null;
             }, 'needle' => 'fixed_price_nn'],
+            ['path' => 'settlement_v2_missing_mode', 'mutate' => function (array &$m): void {
+                unset($m['positions'][0]['pricing_settlement_mode']);
+            }, 'needle' => 'pricing_settlement_mode'],
             ['path' => 'profile', 'mutate' => fn (array &$m) => $m['positions'][0]['component_profile'] = ['kind' => 'tandem'], 'needle' => 'component_profile'],
             ['path' => 'strategy', 'mutate' => fn (array &$m) => $m['positions'][0]['component_calculation_strategy'] = 'not_a_strategy', 'needle' => 'component_calculation_strategy'],
             ['path' => 'component_role', 'mutate' => function (array &$m): void {

@@ -3885,7 +3885,9 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
-                                                            hideFixedPrice={false}
+                                                            hideFixedPrice={
+                                                                false
+                                                            }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index

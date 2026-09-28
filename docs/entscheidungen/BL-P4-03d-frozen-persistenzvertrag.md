@@ -48,8 +48,10 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
 - `spot_method` falls gesetzt: nur `average`
 - **Settlement v1:** `pricing_settlement_mode` falls gesetzt nur `normal`; kein
   `fixed_price_nn`
-- **Settlement v2 (03e):** `normal`|`fixed_price`; bei Festpreis Pflicht-
-  `fixed_price_nn` > 0; Widersprüche fail-closed (kein stilles Zurücksetzen)
+- **Settlement v2 (03e):** `pricing_settlement_mode` Pflicht (`normal`|`fixed_price`);
+  fehlend/leer → unvollständig fail-closed; bei Festpreis Pflicht-
+  `fixed_price_nn` im strikten Dezimalformat (`^\d+(\.\d{1,2})?$`, string|int);
+  Exponentialnotation/nicht skalare Werte fail-closed vor `bccomp`
 - `component_profile` muss leer/null sein
 - Komponenten vorhanden → gültige `component_calculation_strategy` Pflicht
 - Komponenten-/Zeitbereich-/Planzeilen-/Rabattzeilen: erforderliche Felder
