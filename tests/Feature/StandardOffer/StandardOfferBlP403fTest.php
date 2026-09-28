@@ -14,7 +14,6 @@ use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\StandardOffer;
-use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\StandardOffer\FrozenCalculationPersistenceContract;
