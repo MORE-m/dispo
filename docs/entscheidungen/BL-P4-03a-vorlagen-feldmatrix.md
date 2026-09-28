@@ -1,16 +1,16 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 27. September 2026 · `main` nach PR #93 (`a850d52…`, 03b abgeschlossen) ·
-Hydrate-Folgeslice **BL-P4-03d** offen. PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 /
-UX-GATE-D
+Stand: 27. September 2026 · Feature **BL-P4-03d** auf Basis `main` nach PR #93
+(`a850d52…`). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
 Komponenten (Semantik BL-P4-02c / SPT-014). **03b (PR #93):** aus zugänglicher
 Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
-sonst Ablehnung ohne stille Reduktion). **03d (offen):** gemeinsamer versionierter
-Persistenzvertrag Freeze↔Hydrate. Keine vollständige Standardangebotsfunktion
-über alle Kalkulationsmethoden.
+sonst Ablehnung ohne stille Reduktion). **03d:** gemeinsamer versionierter
+Persistenzvertrag Freeze↔Hydrate
+(`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`). Keine vollständige
+Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
 
@@ -73,7 +73,18 @@ Persistenzvertrag Freeze↔Hydrate. Keine vollständige Standardangebotsfunktion
 - Zentraler Sanitize (`StandardOfferFieldClassification` + `StandardOfferFromCalculationSanitizer`); Prüfstufe speichert **nur Feldnamen**, keine Quell-Freitextwerte
 - Ausdrückliche Bestätigung `pruefung-bestaetigen` vor Publish; Save/Publish bestätigen nicht still
 - `StandardOfferMaterializer` (materialization_version=1) für **Publish/Freeze**
-- Adopt nutzt Frozen-Stand; **gemeinsamer Hydrate-Pfad** = Folgeslice **BL-P4-03d**
+- Adopt-Hydrate: Folgeslice **BL-P4-03d** (`FrozenCalculationPersistenceContract`)
 - Immer neuer `SA-`-Draft; keine Auto-Publish; keine Sync zur Quelle
 - Nur Average + optionale Komponenten; sonst Ablehnung ohne stille Reduktion
 - `source_calculation_id` nur als technische Referenz an der Version (keine Kundendaten); Quell-Freitexte nicht in Audit/Frozen
+
+## Geliefert in BL-P4-03d
+
+- `FrozenCalculationPersistenceContract`: versionierter Persistenzvertrag Average v1
+- Adopt-Persistenzlisten aus `StandardOfferWriter` in den Vertrag verschoben
+- Fail-closed für unbekannte `materialization_version`, widersprüchliche
+  Methoden-/Abrechnungskennzeichen, Strategie/Profil und unvollständige Kindzeilen
+- Legacy ohne Versionsfeld weiterhin übernehmbar; Semantik 03a/03c/03b unverändert
+- Freeze- und Hydrate-Feldabbildungen bleiben **zwei gepflegte Seiten**; neue
+  Methoden erfordern Version/Contract + Freeze + Hydrate + Tests (ADR 03d)
+- ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`

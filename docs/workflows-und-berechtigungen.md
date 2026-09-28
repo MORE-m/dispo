@@ -65,7 +65,17 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Prüfstufe zeigt nur betroffene Feldnamen; Quell-Freitexte werden nicht gespeichert.
 - Bestätigung der Prüfung ist eigene Aktion vor Publish.
 - Nur Average + optionale Komponenten; sonst Ablehnung mit Positionsangabe.
-- Freeze zentral (`StandardOfferMaterializer`); gemeinsamer Adopt-Hydrate-Pfad → **BL-P4-03d**.
+- Freeze zentral (`StandardOfferMaterializer`); Adopt-Hydrate über
+  `FrozenCalculationPersistenceContract` (**BL-P4-03d**).
+
+### Slice BL-P4-03d – Frozen Persistenzvertrag
+
+- Technischer Folgeslice ohne neue Fachoberfläche.
+- Freeze (`StandardOfferMaterializer`) und Hydrate (`FrozenCalculationPersistenceContract`)
+  teilen denselben versionierten Vertrag; Adopt ohne Live-`CalculationWriter::create()`.
+- Legacy ohne `materialization_version` bleibt übernehmbar; unbekannte Versionen
+  und unvollständige Frozen-Daten scheitern ohne Teilanlage.
+- ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`.
 
 ## Vier-Augen-Prinzip
 

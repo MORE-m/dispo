@@ -2,53 +2,35 @@
 
 namespace App\Services\StandardOffer;
 
-use App\Enums\CalculationStatus;
-use App\Enums\ComponentCalculationStrategy;
-use App\Enums\DiscountType;
-use App\Enums\PlanningMode;
-use App\Enums\PricingSettlementMode;
-use App\Enums\SpotCalculationMethod;
 use App\Enums\StandardOfferVersionStatus;
 use App\Models\Calculation;
-use App\Models\CalculationOrderDiscount;
-use App\Models\CalculationPosition;
-use App\Models\CalculationPositionComponent;
-use App\Models\CalculationPositionDiscount;
-use App\Models\CalculationPositionTimeRange;
-use App\Models\ConfigurationSnapshot;
-use App\Models\SpotClassicPlanRow;
 use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\CalculationWriter;
-use App\Services\DynamicField\CalculationDynamicFieldWriter;
-use App\Services\DynamicField\ConfigurationSnapshotCloneService;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03b / STD-001–STD-009 / VER-004 / AUTH-006 / SPT-014 / PO-BLP403B-1.
+ * BL-P4-03a/03c/03b/03d / STD-001–STD-009 / VER-004 / AUTH-006 / SPT-014.
  *
  * Publish: Freeze über {@see StandardOfferMaterializer}.
- * Adopt: Materialisierung aus Frozen-Stand ohne CalculationWriter::create().
+ * Adopt: Hydrate über {@see FrozenCalculationPersistenceContract} (kein
+ * CalculationWriter::create(), keine Live-Preisauflösung).
  * From-Calc: Sanitize + neuer Draft, keine Sync/Auto-Publish.
  */
 final class StandardOfferWriter
 {
     public function __construct(
         private readonly StandardOfferNumberSequencer $offerNumbers,
-        private readonly CalculationNumberSequencer $calculationNumbers,
         private readonly StandardOfferAverageContract $averageContract,
         private readonly StandardOfferFromCalculationSanitizer $fromCalculation,
         private readonly StandardOfferMaterializer $materializer,
+        private readonly FrozenCalculationPersistenceContract $frozenPersistence,
         private readonly CalculationWriter $calculations,
         private readonly ConfigurationSnapshotFreezeService $snapshots,
-        private readonly ConfigurationSnapshotCloneService $clones,
-        private readonly CalculationDynamicFieldWriter $dynamicFields,
         private readonly AuditLogger $audit,
     ) {}
 
@@ -399,212 +381,20 @@ final class StandardOfferWriter
             }
 
             $materialization = $locked->frozen_materialization;
-            $baseSnapshotId = (int) ($materialization['configuration_snapshot_id'] ?? 0);
-            $templateBase = ConfigurationSnapshot::query()->whereKey($baseSnapshotId)->firstOrFail();
-            $calcBase = $this->clones->cloneCalculationBase($templateBase);
+            // Fail-closed vor Persistenz: unbekannte Version / unvollständige Frozen-Daten.
+            $this->frozenPersistence->assertHydratable($materialization);
 
-            [$year, $seq, $number] = $this->calculationNumbers->next();
+            $agency = $agencyName !== null && trim($agencyName) !== '' ? trim($agencyName) : null;
+            $campaignValue = $campaign !== null && trim($campaign) !== '' ? trim($campaign) : null;
 
-            $calculation = new Calculation;
-            $calculation->number = $number;
-            $calculation->number_year = $year;
-            $calculation->number_seq = $seq;
-            $calculation->status = CalculationStatus::Draft;
-            $calculation->planning_mode = PlanningMode::Manual;
-            $calculation->advisor_id = $user->id;
-            $calculation->customer_name = $customerName;
-            $calculation->agency_name = $agencyName !== null && trim($agencyName) !== '' ? trim($agencyName) : null;
-            $calculation->campaign = $campaign !== null && trim($campaign) !== ''
-                ? trim($campaign)
-                : ($materialization['campaign'] ?? null);
-            $calculation->product_title = $materialization['product_title'] ?? null;
-            $calculation->briefing = $materialization['briefing'] ?? null;
-            $calculation->order_discount_percent = $materialization['order_discount_percent'] ?? '0';
-            $calculation->ae_enabled = (bool) ($materialization['ae_enabled'] ?? false);
-            $calculation->media_gross = $materialization['media_gross'] ?? '0';
-            $calculation->position_discount_total = $materialization['position_discount_total'] ?? '0';
-            $calculation->order_discount_total = $materialization['order_discount_total'] ?? '0';
-            $calculation->ae_total = $materialization['ae_total'] ?? '0';
-            $calculation->nn_invest = $materialization['nn_invest'] ?? '0';
-            $calculation->requires_special_approval = (bool) ($materialization['requires_special_approval'] ?? false);
-            $calculation->special_approval_reasons = $materialization['special_approval_reasons'] ?? null;
-            $calculation->personal_discount_limit_percent = $user->discount_limit_percent;
-            $calculation->lock_version = 1;
-            $calculation->configuration_snapshot_id = $calcBase->id;
-            $calculation->originStandardOfferVersion()->associate($locked);
-            $calculation->save();
+            $fresh = $this->frozenPersistence->hydrateAdoptedCalculation($materialization, [
+                'customer_name' => $customerName,
+                'agency_name' => $agency,
+                'campaign' => $campaignValue,
+                'advisor' => $user,
+                'origin_version' => $locked,
+            ]);
 
-            foreach ($materialization['order_discounts'] ?? [] as $index => $discount) {
-                if (! is_array($discount)) {
-                    continue;
-                }
-                $row = new CalculationOrderDiscount;
-                $row->calculation()->associate($calculation);
-                $row->type = DiscountType::from((string) ($discount['type'] ?? DiscountType::Other->value));
-                $row->custom_label = $discount['custom_label'] ?? null;
-                $row->percent = $discount['percent'] ?? '0';
-                $row->sort = max(0, (int) $index);
-                $row->save();
-            }
-
-            foreach ($materialization['positions'] ?? [] as $index => $frozenPosition) {
-                if (! is_array($frozenPosition)) {
-                    continue;
-                }
-
-                $templateEffectiveId = (int) ($frozenPosition['effective_configuration_snapshot_id'] ?? 0);
-                $templateEffective = ConfigurationSnapshot::query()->whereKey($templateEffectiveId)->firstOrFail();
-                $calcEffective = $this->clones->cloneCalculationPositionEffective($templateEffective, $calcBase);
-
-                $frozenStrategy = $frozenPosition['component_calculation_strategy'] ?? null;
-                $strategyValue = is_string($frozenStrategy) && $frozenStrategy !== ''
-                    ? ComponentCalculationStrategy::tryFrom($frozenStrategy)?->value
-                    : null;
-
-                $position = new CalculationPosition;
-                $position->fill([
-                    'client_key' => (string) ($frozenPosition['client_key'] ?? (string) Str::uuid()),
-                    'inventory_id' => (int) $frozenPosition['inventory_id'],
-                    'inventory_name' => $frozenPosition['inventory_name'] ?? null,
-                    'inventory_code' => $frozenPosition['inventory_code'] ?? null,
-                    'advertising_medium_id' => (int) $frozenPosition['advertising_medium_id'],
-                    'advertising_medium_name' => $frozenPosition['advertising_medium_name'] ?? null,
-                    'advertising_medium_code' => $frozenPosition['advertising_medium_code'] ?? null,
-                    'advertising_category_id' => $frozenPosition['advertising_category_id'] ?? null,
-                    'advertising_category_key' => $frozenPosition['advertising_category_key'] ?? null,
-                    'advertising_category_name' => $frozenPosition['advertising_category_name'] ?? null,
-                    'effective_configuration_snapshot_id' => $calcEffective->id,
-                    'inventory_medium_rule_id' => $frozenPosition['inventory_medium_rule_id'] ?? null,
-                    'price_list_id' => (int) $frozenPosition['price_list_id'],
-                    'kind' => $frozenPosition['kind'],
-                    'spot_method' => SpotCalculationMethod::Average->value,
-                    'length_seconds' => (int) $frozenPosition['length_seconds'],
-                    'component_calculation_strategy' => $strategyValue,
-                    'component_profile' => null,
-                    'total_spot_count' => (int) $frozenPosition['total_spot_count'],
-                    'needs_spot_redistribution' => (bool) ($frozenPosition['needs_spot_redistribution'] ?? false),
-                    'average_second_price' => $frozenPosition['average_second_price'] ?? null,
-                    'length_index' => $frozenPosition['length_index'] ?? null,
-                    'surcharge_percent' => $frozenPosition['surcharge_percent'] ?? '0',
-                    'position_discount_percent' => $frozenPosition['position_discount_percent'] ?? '0',
-                    'ae_percent' => $frozenPosition['ae_percent'] ?? '0',
-                    'is_discountable' => (bool) ($frozenPosition['is_discountable'] ?? true),
-                    'is_ae_eligible' => (bool) ($frozenPosition['is_ae_eligible'] ?? true),
-                    'price_list_version' => $frozenPosition['price_list_version'] ?? null,
-                    'media_gross' => $frozenPosition['media_gross'] ?? '0',
-                    'position_discount_amount' => $frozenPosition['position_discount_amount'] ?? '0',
-                    'order_discount_amount' => $frozenPosition['order_discount_amount'] ?? '0',
-                    'ae_amount' => $frozenPosition['ae_amount'] ?? '0',
-                    'nn_invest' => $frozenPosition['nn_invest'] ?? '0',
-                    'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
-                    'fixed_price_nn' => null,
-                    'effective_pay_factor_percent' => $frozenPosition['effective_pay_factor_percent'] ?? null,
-                    'effective_total_discount_percent' => $frozenPosition['effective_total_discount_percent'] ?? null,
-                    'sort' => (int) $index,
-                ]);
-                $position->engine_profile_key = $frozenPosition['engine_profile_key'] ?? null;
-                $position->calculation_method_key = $frozenPosition['calculation_method_key'] ?? null;
-                $position->calculation_method_name = $frozenPosition['calculation_method_name'] ?? null;
-                $position->algorithm_version = $frozenPosition['algorithm_version'] ?? null;
-                $position->calculation()->associate($calculation);
-                $position->save();
-
-                foreach ($frozenPosition['components'] ?? [] as $componentIndex => $component) {
-                    if (! is_array($component)) {
-                        continue;
-                    }
-                    $mediaGross = $component['media_gross'] ?? null;
-                    if ($mediaGross === '' || $mediaGross === null) {
-                        $mediaGross = null;
-                    } else {
-                        $mediaGross = (string) $mediaGross;
-                    }
-                    $lengthIndex = $component['length_index'] ?? null;
-                    $componentModel = new CalculationPositionComponent;
-                    $componentModel->fill([
-                        'role' => $component['role'] ?? 'main_spot',
-                        'label' => $component['label'] ?? '',
-                        'length_seconds' => (int) ($component['length_seconds'] ?? 0),
-                        'sort' => (int) ($component['sort'] ?? $componentIndex),
-                        'length_index' => $lengthIndex === null || $lengthIndex === ''
-                            ? null
-                            : (int) $lengthIndex,
-                        'media_gross' => $mediaGross,
-                    ]);
-                    $componentModel->position()->associate($position);
-                    $componentModel->save();
-                }
-
-                foreach ($frozenPosition['time_ranges'] ?? [] as $rangeIndex => $range) {
-                    if (! is_array($range)) {
-                        continue;
-                    }
-                    $model = new CalculationPositionTimeRange;
-                    $model->fill([
-                        'start_hour' => (int) $range['start_hour'],
-                        'end_hour_exclusive' => (int) $range['end_hour_exclusive'],
-                        'day_group' => $range['day_group'],
-                        'spot_count' => (int) $range['spot_count'],
-                        'sort' => (int) $rangeIndex,
-                        'average_second_price' => $range['average_second_price'] ?? null,
-                        'range_gross' => $range['range_gross'] ?? '0',
-                    ]);
-                    $model->position()->associate($position);
-                    $model->save();
-                }
-
-                foreach ($frozenPosition['plan_rows'] ?? [] as $row) {
-                    if (! is_array($row)) {
-                        continue;
-                    }
-                    $planRow = new SpotClassicPlanRow;
-                    $planRow->fill([
-                        'hour' => (int) $row['hour'],
-                        'day_group' => $row['day_group'],
-                        'spot_count' => (int) ($row['spot_count'] ?? 0),
-                        'second_price' => $row['second_price'],
-                        'line_gross' => $row['line_gross'] ?? '0.00',
-                    ]);
-                    $planRow->position()->associate($position);
-                    $planRow->save();
-                }
-
-                foreach ($frozenPosition['position_discounts'] ?? [] as $discountIndex => $discount) {
-                    if (! is_array($discount)) {
-                        continue;
-                    }
-                    $model = new CalculationPositionDiscount;
-                    $model->fill([
-                        'type' => $discount['type'] ?? DiscountType::Other->value,
-                        'custom_label' => $discount['custom_label'] ?? null,
-                        'percent' => $discount['percent'] ?? '0',
-                        'sort' => (int) $discountIndex,
-                    ]);
-                    $model->position()->associate($position);
-                    $model->save();
-                }
-            }
-
-            $syncPayload = $materialization['draft_payload'] ?? [];
-            if (is_array($syncPayload)) {
-                $syncPayload['customer_name'] = $customerName;
-                $syncPayload['agency_name'] = $calculation->agency_name;
-                $syncPayload['schema_fingerprint'] = $calcBase->schema_fingerprint;
-                $calculation->load('positions');
-                foreach ($calculation->positions as $posIndex => $pos) {
-                    if (! isset($syncPayload['positions'][$posIndex]) || ! is_array($syncPayload['positions'][$posIndex])) {
-                        continue;
-                    }
-                    $syncPayload['positions'][$posIndex]['id'] = $pos->id;
-                    $syncPayload['positions'][$posIndex]['client_key'] = $pos->client_key;
-                    $syncPayload['positions'][$posIndex]['schema_fingerprint'] = ConfigurationSnapshot::query()
-                        ->whereKey($pos->effective_configuration_snapshot_id)
-                        ->value('schema_fingerprint');
-                }
-                $this->dynamicFields->syncFromPayload($calculation, $syncPayload);
-            }
-
-            $fresh = $calculation->fresh(['positions.timeRanges', 'positions.planRows', 'orderDiscounts']) ?? $calculation;
             $this->audit->record($fresh, 'standard_offer.adopted', $user, null, [
                 'calculation_id' => $fresh->id,
                 'calculation_number' => $fresh->number,
