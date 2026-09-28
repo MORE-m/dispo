@@ -248,9 +248,9 @@ class StandardOfferBlP403aTest extends TestCase
             'positions' => [[
                 ...$base['positions'][0],
                 'pricing_settlement_mode' => 'fixed_price',
-                'fixed_price_nn' => '100.00',
+                // unvollständig: ohne N/N → Ablehnung (kein stilles Zurücksetzen)
             ]],
-        ])->assertSessionHasErrors();
+        ])->assertSessionHasErrors('positions.0.fixed_price_nn');
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
@@ -284,7 +284,7 @@ class StandardOfferBlP403aTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
-    public function test_contract_rejects_fixed_price_and_budget_without_coercion(): void
+    public function test_contract_accepts_fixed_price_and_rejects_budget_without_coercion(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
@@ -292,12 +292,11 @@ class StandardOfferBlP403aTest extends TestCase
         $fixed = $this->draftPayload($catalog);
         $fixed['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
         $fixed['positions'][0]['fixed_price_nn'] = '99.00';
-        try {
-            $this->writer()->create('Festpreis', $fixed, $pm);
-            $this->fail('Festpreis hätte abgelehnt werden müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
-        }
+        $offer = $this->writer()->create('Festpreis', $fixed, $pm);
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $this->assertSame('fixed_price', $draft->draft_payload['positions'][0]['pricing_settlement_mode'] ?? null);
+        $this->assertSame('99.00', $draft->draft_payload['positions'][0]['fixed_price_nn'] ?? null);
 
         $budget = $this->draftPayload($catalog);
         $budget['planning_mode'] = 'budget';
@@ -308,7 +307,7 @@ class StandardOfferBlP403aTest extends TestCase
             $this->assertArrayHasKey('planning_mode', $exception->errors());
         }
 
-        $this->assertSame(0, StandardOffer::query()->count());
+        $this->assertSame(1, StandardOffer::query()->count());
     }
 
     public function test_adopt_requires_customer_name(): void

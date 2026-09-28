@@ -202,7 +202,7 @@ class StandardOfferBlP403cTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
-    public function test_http_accepts_valid_components_and_rejects_calendar_budget_fixed_price(): void
+    public function test_http_accepts_valid_components_and_rejects_calendar_budget(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
@@ -233,15 +233,17 @@ class StandardOfferBlP403cTest extends TestCase
             'planning_mode' => 'budget',
         ])->assertSessionHasErrors();
 
+        // BL-P4-03e: gültiger Festpreis mit Komponenten ist erlaubt.
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
-            'title' => 'Festpreis Reject',
+            'title' => 'Festpreis mit Komponenten',
             'positions' => [[
                 ...$base['positions'][0],
                 'pricing_settlement_mode' => 'fixed_price',
                 'fixed_price_nn' => '100.00',
             ]],
-        ])->assertSessionHasErrors();
+        ])->assertRedirect();
+        $this->assertSame(2, StandardOffer::query()->count());
     }
 
     public function test_price_list_change_after_publish_does_not_mutate_adopted_components(): void
@@ -284,7 +286,7 @@ class StandardOfferBlP403cTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('standardOffer.allowed_spot_methods.0', 'average')
-                ->where('standardOffer.scope_note', fn ($note) => is_string($note) && str_contains($note, 'Hauptspot+Allonge')));
+                ->where('standardOffer.scope_note', fn ($note) => is_string($note) && str_contains($note, 'Hauptspot+Allonge') && str_contains($note, 'Festpreis')));
     }
 
     /**

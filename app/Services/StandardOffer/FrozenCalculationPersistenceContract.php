@@ -27,10 +27,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03d / VER-004 / STD-004 / STD-005 / STD-006.
+ * BL-P4-03d / BL-P4-03e / VER-004 / STD-004 / STD-005 / STD-006.
  *
  * Ausdrücklich versionierter Persistenzvertrag für eingefrorene Spot-Classic-
- * Average-Kalkulationsdaten (optional Hauptspot+Allonge).
+ * Average-Kalkulationsdaten (optional Hauptspot+Allonge; ab v2 optional N/N-
+ * Festpreis-Abschluss 02d).
  *
  * Architekturgrenze:
  * - Freeze schreibt diesen Vertrag ({@see StandardOfferMaterializer::freeze()}).
@@ -57,7 +58,13 @@ use Illuminate\Validation\ValidationException;
  *   `components`/`position_discounts`/`order_discounts` dürfen fehlen (Legacy
  *   leer); explizites null ungültig; `[]` = gültige leere Liste
  *
- * Verbleibende Pflege bei neuen Methoden (Calendar/Festpreis/Tandem/…):
+ * Average-v2 Ergänzung (BL-P4-03e):
+ * - `pricing_settlement_mode` `normal`|`fixed_price`
+ * - bei `fixed_price`: `fixed_price_nn` Pflicht (> 0), Persistenz aus Frozen
+ * - bei `normal`: kein `fixed_price_nn`; Widersprüche fail-closed
+ * - kein stilles Zurücksetzen auf `normal`, keine Live-Neuberechnung des Festpreises
+ *
+ * Verbleibende Pflege bei neuen Methoden (Calendar/Tandem/…):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
  * 2) Freeze-Seite im Materializer (oder Nachfolger) erweitern,
  * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
@@ -71,9 +78,12 @@ final class FrozenCalculationPersistenceContract
      *
      * @var list<int>
      */
-    public const SUPPORTED_VERSIONS = [1];
+    public const SUPPORTED_VERSIONS = [1, 2];
 
     public const LEGACY_IMPLICIT_VERSION = 1;
+
+    /** Aktuelle Freeze-Schreibversion (Festpreis-fähiges Settlement-Schema). */
+    public const CURRENT_WRITE_VERSION = 2;
 
     /**
      * Kindliste muss als Array-Schlüssel vorhanden sein (auch `[]` erlaubt).
@@ -127,7 +137,7 @@ final class FrozenCalculationPersistenceContract
     public function assertHydratable(array $materialization): int
     {
         $version = $this->resolveVersion($materialization);
-        $this->assertAverageV1Shape($materialization);
+        $this->assertAverageShape($materialization, $version);
 
         return $version;
     }
@@ -211,7 +221,7 @@ final class FrozenCalculationPersistenceContract
     /**
      * @param  array<string, mixed>  $materialization
      */
-    private function assertAverageV1Shape(array $materialization): void
+    private function assertAverageShape(array $materialization, int $version): void
     {
         $baseSnapshotId = (int) ($materialization['configuration_snapshot_id'] ?? 0);
         if ($baseSnapshotId <= 0) {
@@ -269,7 +279,7 @@ final class FrozenCalculationPersistenceContract
                 ]);
             }
 
-            $this->assertAverageMethodAndSettlement($position, $index);
+            $this->assertAverageMethodAndSettlement($position, $index, $version);
 
             // Kindlisten (03a/03c-Freeze): time_ranges/plan_rows immer geschrieben und
             // Pflicht; components/position_discounts dürfen aus Legacy fehlen (= leer),
@@ -320,7 +330,7 @@ final class FrozenCalculationPersistenceContract
     /**
      * @param  array<string, mixed>  $position
      */
-    private function assertAverageMethodAndSettlement(array $position, int $index): void
+    private function assertAverageMethodAndSettlement(array $position, int $index, int $version): void
     {
         if (array_key_exists('spot_method', $position) && $position['spot_method'] !== null) {
             if (! is_string($position['spot_method'])
@@ -331,20 +341,73 @@ final class FrozenCalculationPersistenceContract
             }
         }
 
-        if (array_key_exists('pricing_settlement_mode', $position) && $position['pricing_settlement_mode'] !== null) {
-            if (! is_string($position['pricing_settlement_mode'])
-                || $position['pricing_settlement_mode'] !== PricingSettlementMode::Normal->value) {
+        $modeRaw = $position['pricing_settlement_mode'] ?? null;
+        $hasFixedNn = array_key_exists('fixed_price_nn', $position)
+            && $position['fixed_price_nn'] !== null
+            && $position['fixed_price_nn'] !== '';
+
+        if ($version <= self::LEGACY_IMPLICIT_VERSION) {
+            if ($modeRaw !== null) {
+                if (! is_string($modeRaw) || $modeRaw !== PricingSettlementMode::Normal->value) {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode muss normal sein).",
+                    ]);
+                }
+            }
+            if ($hasFixedNn) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode muss normal sein).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ist für Average-v1 nicht erlaubt).",
                 ]);
             }
+
+            return;
         }
 
-        if (array_key_exists('fixed_price_nn', $position)
-            && $position['fixed_price_nn'] !== null
-            && $position['fixed_price_nn'] !== '') {
+        // v2+: normal | fixed_price; Widersprüche fail-closed (kein stilles Zurücksetzen).
+        if ($modeRaw === null || $modeRaw === '') {
+            if ($hasFixedNn) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ohne Festpreismodus).",
+                ]);
+            }
+
+            return;
+        }
+
+        if (! is_string($modeRaw)) {
             throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ist für Average-Vorlagen nicht erlaubt).",
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode).",
+            ]);
+        }
+
+        $mode = PricingSettlementMode::tryFrom($modeRaw);
+        if ($mode === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode).",
+            ]);
+        }
+
+        if ($mode === PricingSettlementMode::FixedPrice) {
+            if (! $hasFixedNn) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: fixed_price_nn).",
+                ]);
+            }
+            $nn = is_scalar($position['fixed_price_nn'])
+                ? str_replace(',', '.', (string) $position['fixed_price_nn'])
+                : '';
+            if (! is_numeric($nn) || bccomp($nn, '0', 2) !== 1) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn).",
+                ]);
+            }
+
+            return;
+        }
+
+        if ($hasFixedNn) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ohne Festpreismodus).",
             ]);
         }
     }
@@ -622,6 +685,14 @@ final class FrozenCalculationPersistenceContract
             $settlement = array_key_exists('pricing_settlement_mode', $frozenPosition) && is_string($frozenPosition['pricing_settlement_mode'])
                 ? $frozenPosition['pricing_settlement_mode']
                 : PricingSettlementMode::Normal->value;
+            $fixedPriceNn = null;
+            if ($settlement === PricingSettlementMode::FixedPrice->value) {
+                $fixedPriceNn = array_key_exists('fixed_price_nn', $frozenPosition)
+                    && $frozenPosition['fixed_price_nn'] !== null
+                    && $frozenPosition['fixed_price_nn'] !== ''
+                    ? (string) $frozenPosition['fixed_price_nn']
+                    : null;
+            }
 
             $position = new CalculationPosition;
             $position->fill([
@@ -659,7 +730,7 @@ final class FrozenCalculationPersistenceContract
                 'ae_amount' => $frozenPosition['ae_amount'] ?? '0',
                 'nn_invest' => $frozenPosition['nn_invest'] ?? '0',
                 'pricing_settlement_mode' => $settlement,
-                'fixed_price_nn' => null,
+                'fixed_price_nn' => $fixedPriceNn,
                 'effective_pay_factor_percent' => $frozenPosition['effective_pay_factor_percent'] ?? null,
                 'effective_total_discount_percent' => $frozenPosition['effective_total_discount_percent'] ?? null,
                 'sort' => (int) $index,

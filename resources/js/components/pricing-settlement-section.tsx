@@ -11,7 +11,7 @@ type Props = {
     mode: PricingSettlementMode;
     fixedPriceNnInput: string;
     disabled?: boolean;
-    /** BL-P4-03a Vorlagen: Festpreis nicht anbieten. */
+    /** BL-P4-03e: Festpreis in Average-Vorlagen anbieten; Calendar bleibt ausgeblendet. */
     hideFixedPrice?: boolean;
     showFixedPriceValidation: boolean;
     fieldError?: string;

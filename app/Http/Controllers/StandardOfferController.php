@@ -195,7 +195,7 @@ class StandardOfferController extends Controller
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
             'catalog' => null,
             'schemaFingerprint' => null,
-            'scopeNote' => 'BL-P4-03c: Spot Classic Average mit optional Hauptspot+Allonge. Calendar/Festpreis/Tandem/Abbinder: Folgeslices.',
+            'scopeNote' => 'BL-P4-03e: Spot Classic Average mit optional Hauptspot+Allonge und N/N-Festpreis. Calendar/Tandem/Abbinder: Folgeslices.',
         ]);
     }
 
@@ -363,8 +363,8 @@ class StandardOfferController extends Controller
             'positions.*.components.*.sort' => ['nullable', 'integer', 'min:0'],
             'positions.*.planner_entries' => ['sometimes', 'array', 'max:0'],
             'positions.*.component_profile' => ['prohibited'],
-            'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal'],
-            'positions.*.fixed_price_nn' => ['prohibited'],
+            'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal,fixed_price'],
+            'positions.*.fixed_price_nn' => ['sometimes', 'nullable', 'numeric', 'gt:0'],
             'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average'],
             'positions.*.component_calculation_strategy' => [
                 'sometimes',
@@ -467,7 +467,7 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03b/03c: Spot Classic Average mit optional Hauptspot+Allonge. Keine Kundendaten. Calendar, Tandem/Tridem, Festpreis und Budgetplanung sind nicht wählbar.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03e: Spot Classic Average mit optional Hauptspot+Allonge und N/N-Festpreis. Keine Kundendaten. Calendar, Tandem/Tridem und Budgetplanung sind nicht wählbar.',
             'proposal_review' => $this->proposalReviewProp($version),
         ];
 
@@ -514,6 +514,7 @@ class StandardOfferController extends Controller
                 'client_key' => $position['client_key'] ?? ('draft-'.$index),
                 'spot_method' => 'average',
                 'pricing_settlement_mode' => $position['pricing_settlement_mode'] ?? 'normal',
+                'fixed_price_nn' => $position['fixed_price_nn'] ?? null,
                 'components' => is_array($position['components'] ?? null) ? $position['components'] : [],
                 'component_calculation_strategy' => $position['component_calculation_strategy'] ?? null,
                 'planner_entries' => [],

@@ -1,35 +1,51 @@
 # Fortschritt V1
 
-Stand: 28. September 2026 – **BL-P4-03d** Frozen-Persistenzvertrag (Hydrate)
-auf `main` abgeschlossen (Merge-Commit
-`6af849ad47f48e48c8f3d58e0fb6abfd9a337020`, PR #95; Post-Merge-CI
-[36398695877](https://github.com/MORE-m/dispo/actions/runs/36398695877) grün).
-**BL-P4-03b** auf `main` (PR #93, `a850d52…`). **BL-P4-03c** / **03a** auf
-`main`. Fachliche Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
+Stand: 28. September 2026 – **BL-P4-03e** Festpreis in Average-Standardangeboten
+in Abnahme (Feature-PR). **BL-P4-03d** Frozen-Persistenzvertrag auf `main`
+abgeschlossen (PR #95, `6af849a…`; Post-Merge-CI
+[36398695877](https://github.com/MORE-m/dispo/actions/runs/36398695877) grün;
+Status-Nachzug PR #96, `015e5a9…`). **BL-P4-03b/03c/03a** auf `main`. Fachliche
+Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
-Mehrfachpositionen, optional Hauptspot+Allonge). Feldmatrix:
+Mehrfachpositionen, optional Hauptspot+Allonge, **N/N-Festpreis**). Feldmatrix:
 `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`. Persistenzvertrag:
-`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`.
+`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md` (+ ADR 03e).
 **Vertragsgrenze:** Freeze (`StandardOfferMaterializer`) und Hydrate
 (`FrozenCalculationPersistenceContract`) sind zwei ausdrücklich gepflegte Seiten;
-neue Methoden werden nicht automatisch übernommen. Calendar/Festpreis/Tandem/
-Abbinder = Folgeslices.
+neue Methoden werden nicht automatisch übernommen. Calendar/Tandem/Budget-auf-
+Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 4 / Standardangebote (**03a/03b/03c/03d** auf `main`).
+Phase 4 / Standardangebote (**03a/03b/03c/03d** auf `main`; **03e** Feature in
+Abnahme).
 
 ## Aktuelle Aufgabe
 
-Nächster sinnvoller Slice nach Priorisierung (z. B. Festpreis in Average-
-Standardangeboten). Kein Merge in diesem Docs-Schritt.
+**BL-P4-03e** – Festpreis in Spot-Classic-Average-Standardangeboten. Draft-PR /
+Gates / Smoke. Kein Merge in diesem Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P4-03d** gemeinsamer versionierter Persistenzvertrag Freeze↔Hydrate;
 Adopt ohne Live-`create()`; Fail-closed für unbekannte Versionen; zwei gepflegte
-Vertragsseiten ohne Auto-Support neuer Methoden.
+Vertragsseiten ohne Auto-Support neuer Methoden (**auf `main`**, PR #95/#96).
+
+## BL-P4-03e – Festpreis in Average-Standardangeboten (September 2026)
+
+| Teil | Status |
+|------|--------|
+| Draft-Contract + HTTP: `fixed_price` / `fixed_price_nn` | **umgesetzt** |
+| UI: Festpreis im Vorlagenmodus; Calendar/Tandem/Budget weiter hide | **umgesetzt** |
+| Sanitize From-Calc: Festpreis erhalten, kein Kundenleak | **umgesetzt** |
+| Freeze schreibt Settlement + `materialization_version=2` | **umgesetzt** |
+| Hydrate v2: Persistenz `fixed_price_nn`; v1 Legacy unverändert | **umgesetzt** |
+| Kein stilles Zurücksetzen; keine Live-Neuberechnung nach Publish | **umgesetzt** |
+| Feature-Tests `StandardOfferBlP403eTest` | **umgesetzt** |
+| Browser-Smoke Port **8048** | **BESTANDEN** (`docs/smoke-bl-p4-03e/protokoll.md`) |
+| Calendar/Tandem/Budget-auf-Vorlage/Abbinder | **bewusst nicht** |
+| Merge | **kein Merge** (Draft-PR in Abnahme) |
 
 ## BL-P4-03b – Calc → Standardangebot / PO-BLP403B-1 (September 2026)
 
@@ -63,7 +79,7 @@ Vertragsseiten ohne Auto-Support neuer Methoden.
 | Feature-Tests `StandardOfferBlP403dTest` (Parity, Isolation, Edit, Rollback) | **umgesetzt** |
 | ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md` | **umgesetzt** |
 | Browser-Smoke Publish→Adopt→Bearbeiten Port **8047** | **BESTANDEN** (`docs/smoke-bl-p4-03d/protokoll.md`) |
-| Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** (keine Auto-Übernahme neuer Methoden) |
+| Calendar/Festpreis/Tandem/Abbinder | **bewusst nicht** (keine Auto-Übernahme neuer Methoden; Festpreis → **03e**) |
 | Freeze- und Hydrate-Seiten getrennt gepflegt | **dokumentiert** (ADR 03d) |
 | Merge `main` | **PR #95** (`6af849ad47f48e48c8f3d58e0fb6abfd9a337020`) |
 | Post-Merge CI | **`36398695877` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |

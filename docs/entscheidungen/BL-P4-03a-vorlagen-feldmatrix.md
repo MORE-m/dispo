@@ -1,8 +1,9 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
 Stand: 28. September 2026 · **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
-Post-Merge-CI `36398695877`). Basis nach PR #93 (`a850d52…`).
-PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
+Post-Merge-CI `36398695877`; Status PR #96). **BL-P4-03e** Feature in Abnahme
+auf Basis `main` nach #96 (`015e5a9…`). PO-BLP403A-1 / PO-BLP403C-1 /
+PO-BLP403B-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
@@ -11,7 +12,9 @@ Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
 sonst Ablehnung ohne stille Reduktion). **03d (PR #95):** gemeinsamer versionierter
 Persistenzvertrag Freeze↔Hydrate
 (`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
-sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. Keine vollständige
+sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e:** N/N-Festpreis
+(02d) in Average-Vorlagen; Materialisierung v2 (Feature in Abnahme).
+Calendar/Tandem/Budget/Abbinder weiter Folgeslices. Keine vollständige
 Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
@@ -53,10 +56,10 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 | `period_open` / `position_flight_period` | 1* | Positions-Dyn-Felder unverändert zu 03a | *stabil; keine Calendar-/Kampagnenverschiebung in 03c |
 | Calendar / `planner_entries` | 4 | Contract + Validierung lehnen ab | UI im Vorlagenmodus ausgeblendet |
 | Tandem/Tridem (`component_profile`) | 4 | Contract + Validierung lehnen ab | Medium nicht wählbar |
-| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
+| Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 1 | **BL-P4-03e** / 02d-Semantik | UI wählbar; serverseitig validiert; Freeze v2; kein stilles Zurücksetzen |
 | Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Abbinder | 4 | zurückgestellt | Kein Scope |
-| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** / PO-BLP403B-1 | *nur Average + optionale Komponenten; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
+| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** / PO-BLP403B-1 (+ **03e** Festpreis) | *Average + optionale Komponenten + Festpreis; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
 
 ## Vertrags-IDs
 
@@ -90,4 +93,15 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - Freeze- und Hydrate-Feldabbildungen bleiben **zwei gepflegte Seiten**; neue
   Methoden erfordern Version/Contract + Freeze + Hydrate + Tests (ADR 03d)
 - ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
-- **Merge `main`:** PR #95 (`6af849a…`); Post-Merge-CI `36398695877` SUCCESS
+- **Merge `main`:** PR #95 (`6af849a…`); Post-Merge-CI `36398695877` SUCCESS;
+  Status-Nachzug PR #96
+
+## Geliefert in BL-P4-03e
+
+- N/N-Festpreis in Average-Vorlagen inkl. Komponenten (Calc-Engine 02d, keine Vorlagenformel)
+- Draft-Contract, Sanitize, UI, HTTP-Validierung, Freeze v2, Hydrate v2
+- Legacy Average-v1 inkl. fehlendem Versionsfeld weiter übernehmbar
+- Kein stilles Zurücksetzen auf `normal`; keine Live-Neuberechnung nach Publish
+- Calendar/Tandem/Budget/Abbinder weiter abgewiesen
+- ADR: `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
+- Status: Feature in Abnahme (kein Merge)

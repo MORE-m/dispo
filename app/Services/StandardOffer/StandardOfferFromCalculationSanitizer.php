@@ -150,16 +150,25 @@ final class StandardOfferFromCalculationSanitizer
                 $errors["positions.{$index}.planner_entries"] = "{$label}: Kalenderplaner kann nicht als Standardangebot gespeichert werden.";
             }
 
-            $settlement = array_key_exists('pricing_settlement_mode', $position)
+            $settlementRaw = array_key_exists('pricing_settlement_mode', $position)
                 ? $position['pricing_settlement_mode']
                 : PricingSettlementMode::Normal->value;
-            if ($settlement !== null && $settlement !== ''
-                && (string) $settlement !== PricingSettlementMode::Normal->value) {
-                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis kann nicht als Standardangebot gespeichert werden.";
+            if ($settlementRaw === null || $settlementRaw === '') {
+                $settlementRaw = PricingSettlementMode::Normal->value;
             }
-
-            if (($position['fixed_price_nn'] ?? null) !== null && $position['fixed_price_nn'] !== '') {
-                $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis kann nicht als Standardangebot gespeichert werden.";
+            $settlement = is_scalar($settlementRaw)
+                ? PricingSettlementMode::tryFrom((string) $settlementRaw)
+                : null;
+            if ($settlement === null) {
+                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Preisabschluss ist ungültig.";
+            } elseif ($settlement === PricingSettlementMode::FixedPrice) {
+                $nn = $position['fixed_price_nn'] ?? null;
+                if ($nn === null || $nn === '' || ! is_numeric(str_replace(',', '.', (string) $nn))
+                    || bccomp(str_replace(',', '.', (string) $nn), '0', 2) !== 1) {
+                    $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis erfordert einen N/N-Endbetrag größer 0.";
+                }
+            } elseif (($position['fixed_price_nn'] ?? null) !== null && $position['fixed_price_nn'] !== '') {
+                $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis-N/N ist nur im Festpreismodus erlaubt.";
             }
         }
 
@@ -203,8 +212,19 @@ final class StandardOfferFromCalculationSanitizer
         $safe['planner_entries'] = [];
         $safe['component_profile'] = null;
         $safe['spot_method'] = SpotCalculationMethod::Average->value;
-        $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
-        $safe['fixed_price_nn'] = null;
+
+        // BL-P4-03e: Festpreis unverändert übernehmen (kein stilles Zurücksetzen auf normal).
+        $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
+        if ($modeRaw === null || $modeRaw === '') {
+            $modeRaw = PricingSettlementMode::Normal->value;
+        }
+        $safe['pricing_settlement_mode'] = is_scalar($modeRaw)
+            ? (string) $modeRaw
+            : PricingSettlementMode::Normal->value;
+        if (array_key_exists('fixed_price_nn', $safe)
+            && ($safe['fixed_price_nn'] === null || $safe['fixed_price_nn'] === '')) {
+            $safe['fixed_price_nn'] = null;
+        }
 
         if (! array_key_exists('components', $safe) || $safe['components'] === null) {
             $safe['components'] = [];
