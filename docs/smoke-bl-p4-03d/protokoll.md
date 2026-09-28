@@ -4,7 +4,7 @@
 **Port:** `http://127.0.0.1:8047`  
 **Worktree:** `dispo-wt-bl-p4-03d` (isoliert, SQLite `database/smoke-bl-p4-03d.sqlite`)  
 **Testdaten:** `E2ESpotDistributionExportSeeder`  
-**Feature-HEAD (Smoke):** `3d8143f6ff55b17c2aa48ca1ef91860e82871dea`
+**Feature-HEAD (Smoke):** `8866e5e31b9bab9e719b40aa6420ab3d812e66cc`
 
 ## Ablauf
 
