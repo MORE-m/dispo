@@ -52,7 +52,7 @@ Adopt ohne Live-`create()`; Fail-closed für unbekannte Versionen.
 | `FrozenCalculationPersistenceContract` (versioniert, Average v1) | **umgesetzt** |
 | Adopt nutzt ausschließlich Vertrag (kein `CalculationWriter::create()`) | **umgesetzt** |
 | Legacy ohne `materialization_version` weiterhin übernehmbar | **umgesetzt** |
-| Unbekannte Version / unvollständige Frozen-Daten fail-closed | **umgesetzt** |
+| Unbekannte Version / unvollständige Frozen-Daten fail-closed | **umgesetzt** (inkl. Methoden-/Abrechnungs-/Strategie-/Kindzeilen-Asserts) |
 | Feldabbildung zentral dokumentiert; keine Auto-Support neuer Methoden | **umgesetzt** |
 | Feature-Tests `StandardOfferBlP403dTest` (Parity, Isolation, Edit, Rollback) | **umgesetzt** |
 | ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md` | **umgesetzt** |

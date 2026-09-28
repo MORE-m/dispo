@@ -82,7 +82,9 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 - `FrozenCalculationPersistenceContract`: versionierter Persistenzvertrag Average v1
 - Adopt-Persistenzlisten aus `StandardOfferWriter` in den Vertrag verschoben
-- Fail-closed für unbekannte `materialization_version` und unvollständige Frozen-Daten
+- Fail-closed für unbekannte `materialization_version`, widersprüchliche
+  Methoden-/Abrechnungskennzeichen, Strategie/Profil und unvollständige Kindzeilen
 - Legacy ohne Versionsfeld weiterhin übernehmbar; Semantik 03a/03c/03b unverändert
-- Keine automatische Unterstützung neuer Kalkulationsmethoden allein durch den Refactor
+- Freeze- und Hydrate-Feldabbildungen bleiben **zwei gepflegte Seiten**; neue
+  Methoden erfordern Version/Contract + Freeze + Hydrate + Tests (ADR 03d)
 - ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
