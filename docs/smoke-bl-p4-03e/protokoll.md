@@ -4,7 +4,12 @@
 **Port:** `http://127.0.0.1:8048`  
 **Worktree:** `dispo-wt-bl-p4-03e` (isoliert, SQLite `database/smoke-bl-p4-03e.sqlite`)  
 **Testdaten:** `E2ESpotDistributionExportSeeder` + Calc `K-2026-00007` (Festpreis N/N **288,50**)  
-**Feature-HEAD (Smoke):** `9b94134` (UI-Publish-Smoke unverändert gültig; PHPStan-Nachzug)
+**Feature-HEAD (Smoke):** `9b94134` (UI-Publish-Smoke; PHPStan-Nachzug)  
+**Rebase-Prüfung (nach #96 / `015e5a9`):** Diff `app/` + `resources/js/` + `tests/`
+gegenüber Pre-Rebase-Tip `3ee8d25` = **leer** (0 Dateien). Keine verhaltensrelevanten
+Codeänderungen durch Rebase/Doku-Konfliktlösung → bestehendes manuelles
+Smoke-Protokoll (Pfad A Writer / Pfad B UI-Publish) bleibt gültiger Nachweis;
+kein erneuter Browser-Smoke.
 
 ## Pfad A – Writer-Nachzug (früherer Durchlauf, Referenz)
 
