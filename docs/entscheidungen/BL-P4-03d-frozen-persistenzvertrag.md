@@ -1,6 +1,6 @@
 # BL-P4-03d – Frozen Persistenzvertrag (Freeze ↔ Hydrate)
 
-Status: **Akzeptiert** (technischer Folgeslice nach BL-P4-03b)  
+Status: **Akzeptiert** (`main`, PR #95)  
 Stand: 28. September 2026  
 IDs: `VER-004`, `STD-004`, `STD-005`, `STD-006`, `SPT-014`
 

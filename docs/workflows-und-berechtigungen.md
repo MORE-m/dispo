@@ -68,11 +68,15 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Freeze zentral (`StandardOfferMaterializer`); Adopt-Hydrate über
   `FrozenCalculationPersistenceContract` (**BL-P4-03d**).
 
-### Slice BL-P4-03d – Frozen Persistenzvertrag
+### Slice BL-P4-03d – Frozen Persistenzvertrag (`main`, PR #95)
 
-- Technischer Folgeslice ohne neue Fachoberfläche.
+- Technischer Folgeslice ohne neue Fachoberfläche; Post-Merge-CI `36398695877` grün.
 - Freeze (`StandardOfferMaterializer`) und Hydrate (`FrozenCalculationPersistenceContract`)
-  teilen denselben versionierten Vertrag; Adopt ohne Live-`CalculationWriter::create()`.
+  sind **zwei ausdrücklich gepflegte Seiten** desselben versionierten Vertrags –
+  nicht eine automatisch synchrone Abbildung. Neue Methoden (Calendar/Festpreis/
+  Tandem/…) werden **nicht** automatisch übernommen; sie brauchen Version oder
+  Contract-Erweiterung plus Freeze-, Hydrate- und Testpflege.
+- Adopt ohne Live-`CalculationWriter::create()`.
 - Legacy ohne `materialization_version` bleibt übernehmbar; unbekannte Versionen
   und unvollständige Frozen-Daten scheitern ohne Teilanlage.
 - ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`.
