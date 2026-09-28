@@ -1,10 +1,11 @@
 # Fortschritt V1
 
 Stand: 28. September 2026 – **BL-P4-03e** Festpreis in Average-Standardangeboten
-in Abnahme (Feature-PR). **BL-P4-03d** Frozen-Persistenzvertrag auf `main`
-abgeschlossen (PR #95, `6af849a…`; Post-Merge-CI
-[36398695877](https://github.com/MORE-m/dispo/actions/runs/36398695877) grün;
-Status-Nachzug PR #96, `015e5a9…`). **BL-P4-03b/03c/03a** auf `main`. Fachliche
+auf `main` abgeschlossen (Merge-Commit
+`4eddc94be010f0887e6dfaf1459fe7d5f6a8f1bf`, PR #97; Post-Merge-CI
+[36435981330](https://github.com/MORE-m/dispo/actions/runs/36435981330) grün
+`ci`/`mysql`/`e2e-spt008`). **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
+Status-Nachzug PR #96). **BL-P4-03b/03c/03a** auf `main`. Fachliche
 Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
@@ -13,24 +14,24 @@ Mehrfachpositionen, optional Hauptspot+Allonge, **N/N-Festpreis**). Feldmatrix:
 `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md` (+ ADR 03e).
 **Vertragsgrenze:** Freeze (`StandardOfferMaterializer`) und Hydrate
 (`FrozenCalculationPersistenceContract`) sind zwei ausdrücklich gepflegte Seiten;
-neue Methoden werden nicht automatisch übernommen. Calendar/Tandem/Budget-auf-
-Vorlage/Abbinder = Folgeslices.
+v1/v2 bleiben lesbar; neue Methoden werden nicht automatisch übernommen.
+Calendar/Tandem/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 4 / Standardangebote (**03a/03b/03c/03d** auf `main`; **03e** Feature in
-Abnahme).
+Phase 4 / Standardangebote (**03a/03b/03c/03d/03e** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03e** – Festpreis in Spot-Classic-Average-Standardangeboten. Draft-PR /
-Gates / Smoke. Kein Merge in diesem Schritt.
+Nächster sinnvoller Folgeslice nach Priorisierung (z. B. Tandem/Tridem in
+Average-Standardangeboten). Kein Merge und keine Feature-Umsetzung in diesem
+Docs-Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P4-03d** gemeinsamer versionierter Persistenzvertrag Freeze↔Hydrate;
-Adopt ohne Live-`create()`; Fail-closed für unbekannte Versionen; zwei gepflegte
-Vertragsseiten ohne Auto-Support neuer Methoden (**auf `main`**, PR #95/#96).
+**BL-P4-03e** N/N-Festpreis in Spot-Classic-Average-Standardangeboten;
+Materialisierung **v2**; Freeze und Hydrate als zwei gepflegte Vertragsseiten;
+Legacy v1 weiter übernehmbar (**auf `main`**, PR #97).
 
 ## BL-P4-03e – Festpreis in Average-Standardangeboten (September 2026)
 
@@ -45,7 +46,9 @@ Vertragsseiten ohne Auto-Support neuer Methoden (**auf `main`**, PR #95/#96).
 | Feature-Tests `StandardOfferBlP403eTest` | **umgesetzt** |
 | Browser-Smoke Port **8048** | **BESTANDEN** (`docs/smoke-bl-p4-03e/protokoll.md`) |
 | Calendar/Tandem/Budget-auf-Vorlage/Abbinder | **bewusst nicht** |
-| Merge | **kein Merge** (Draft-PR in Abnahme) |
+| Freeze- und Hydrate-Seiten getrennt gepflegt | **dokumentiert** (ADR 03d/03e) |
+| Merge `main` | **PR #97** (`4eddc94be010f0887e6dfaf1459fe7d5f6a8f1bf`) |
+| Post-Merge CI | **`36435981330` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P4-03b – Calc → Standardangebot / PO-BLP403B-1 (September 2026)
 

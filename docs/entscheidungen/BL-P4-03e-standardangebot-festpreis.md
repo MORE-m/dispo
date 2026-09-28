@@ -1,9 +1,12 @@
 # BL-P4-03e – Festpreis in Spot-Classic-Average-Standardangeboten
 
-Status: **Vorgeschlagen** (Feature-PR)  
+Status: **Akzeptiert** (`main`, PR #97)  
 Stand: 28. September 2026  
 IDs: `STD-001`–`STD-009`, `AUTH-006`/`AUTH-007`, `VER-004`, `SPT-014`, `COM-009`  
-Basis: `main` nach PR #95 (`6af849a…`); baut auf BL-P4-02d (N/N-Festpreis) und 03a–03d
+Basis: `main` nach PR #95 (`6af849a…`); baut auf BL-P4-02d (N/N-Festpreis) und 03a–03d  
+Merge: `4eddc94be010f0887e6dfaf1459fe7d5f6a8f1bf`; Post-Merge-CI
+[`36435981330`](https://github.com/MORE-m/dispo/actions/runs/36435981330) grün
+(`ci`/`mysql`/`e2e-spt008`)
 
 ## Entscheidung
 
@@ -23,10 +26,12 @@ Sonderfreigabe).
 
 Neue Freezes schreiben immer **Version 2**. Unbekannte Versionen und
 widersprüchliche Settlement-Werte scheitern fail-closed ohne Teilanlage.
+Legacy **v1** (inkl. fehlendem Versionsfeld) bleibt lesbar/übernehmbar.
 
 **Freeze** (`StandardOfferMaterializer`) und **Hydrate**
 (`FrozenCalculationPersistenceContract`) bleiben zwei gepflegte Seiten
-(ADR 03d); Festpreis ist ausdrücklich in beiden erweitert.
+(ADR 03d); Festpreis ist ausdrücklich in beiden erweitert. Weitere Methoden
+werden nicht automatisch übernommen.
 
 ## Vertrag / Verhalten
 

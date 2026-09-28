@@ -1,9 +1,8 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 28. September 2026 · **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
-Post-Merge-CI `36398695877`; Status PR #96). **BL-P4-03e** Feature in Abnahme
-auf Basis `main` nach #96 (`015e5a9…`). PO-BLP403A-1 / PO-BLP403C-1 /
-PO-BLP403B-1 / UX-GATE-D
+Stand: 28. September 2026 · **BL-P4-03e** auf `main` (PR #97, `4eddc94…`;
+Post-Merge-CI `36435981330` grün). **BL-P4-03d** auf `main` (PR #95, `6af849a…`;
+Status PR #96). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / UX-GATE-D
 
 **03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
 Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
@@ -12,8 +11,8 @@ Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
 sonst Ablehnung ohne stille Reduktion). **03d (PR #95):** gemeinsamer versionierter
 Persistenzvertrag Freeze↔Hydrate
 (`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
-sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e:** N/N-Festpreis
-(02d) in Average-Vorlagen; Materialisierung v2 (Feature in Abnahme).
+sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e (PR #97):**
+N/N-Festpreis (02d) in Average-Vorlagen; Materialisierung v2; Legacy v1 lesbar.
 Calendar/Tandem/Budget/Abbinder weiter Folgeslices. Keine vollständige
 Standardangebotsfunktion über alle Kalkulationsmethoden.
 
@@ -103,5 +102,6 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - Legacy Average-v1 inkl. fehlendem Versionsfeld weiter übernehmbar
 - Kein stilles Zurücksetzen auf `normal`; keine Live-Neuberechnung nach Publish
 - Calendar/Tandem/Budget/Abbinder weiter abgewiesen
+- Freeze und Hydrate bleiben zwei gepflegte Seiten; keine Auto-Übernahme neuer Methoden
 - ADR: `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
-- Status: Feature in Abnahme (kein Merge)
+- **Merge `main`:** PR #97 (`4eddc94…`); Post-Merge-CI `36435981330` SUCCESS
