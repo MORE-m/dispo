@@ -1,6 +1,28 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
+Stand: 30. September 2026 – **BL-P2-02a / MAT-CORE-1** Kombinationstabellen-Admin
+(PO-BLP202A-1) und Dispo-Freeze Buchungskennzeichen/Einplanung/Hinweis
+(PO-MAT-BOOKING-VIS-1 Option A) umgesetzt auf Feature-Branch (Draft-PR).  
+**Kein** Produktivmatrix-Seed; vollständige operative Abnahme der Startdaten
+bleibt aus. AT-13 (PR #106) parallel, unberührt.
+
+## BL-P2-02a – Kombinationstabelle operativ (MAT-CORE-1)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe PO-BLP202A-1 | **freigegeben / umgesetzt** |
+| PO-MAT-BOOKING-VIS-1 Option A (kein Calc-UI) | **akzeptiert / umgesetzt** |
+| Admin Liste/Detail/Create/Edit/Deakt./Reakt. | **umgesetzt** |
+| Filter Inventar/Medium/Kategorie/Einplanung/Kennzeichen | **umgesetzt** |
+| Freeze Calc → Dispo read-only | **umgesetzt** |
+| Unvollständige aktive Regeln / Planungsverbot fail-closed | **umgesetzt** |
+| Legacy ohne Freeze ohne Backfill | **umgesetzt** |
+| Produktivmatrix / MAT-003 Vollabnahme | **offen** (Lieferdaten) |
+| MAT-004 Massenimport | **bewusst nicht** |
+
+---
+
+Stand zuvor: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
 auf `main` abgeschlossen (Merge-Commit
 `5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
 `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI

@@ -172,14 +172,18 @@ Snapshot-Mutation.
 
 - Inventar- und Werbemittel-ID,
 - Aktivstatus und Sortierung,
-- Buchungskennzeichen,
-- `Einplanung durch`,
-- Hinweistext,
-- zulässige Kalkulationsarten,
+- Buchungskennzeichen (`booking_code`),
+- `Einplanung durch` (`planning_responsibility_key`),
+- Hinweistext (`hint_text`),
+- zulässige Kalkulationsarten (über Medium/Kategorie-Methoden, nicht als Rule-Feld),
 - Standardlänge und Aufschlag,
 - Komponenten-/Allonge-Strategie,
 - Rabatt-/AE-Defaults,
-- Versions-/Gültigkeitsinformation.
+- Optimistic Lock (`lock_version`).
+
+**BL-P2-02a:** Calc- und Dispo-Positionen frieren `booking_code`,
+`planning_responsibility_key`/`label` und `combination_hint_text` ein.
+Anzeige laut PO-MAT-BOOKING-VIS-1 A nur im Dispo. Legacy-Null ohne Backfill.
 
 ## Preise
 

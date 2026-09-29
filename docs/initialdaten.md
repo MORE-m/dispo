@@ -182,7 +182,9 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
 
 ## Vor Produktivsetzung noch zu liefern
 
-- vollständige Kombinationstabelle mit Buchungskennzeichen, Zuständigkeit und Hinweisen,
+- vollständige Kombinationstabelle mit Buchungskennzeichen, Zuständigkeit und Hinweisen
+  (**Admin-/Freeze-Logik BL-P2-02a ist umgesetzt; die Matrix selbst fehlt weiterhin und
+  darf nicht erfunden werden**),
 - Jahrespreislisten je Inventar im vereinbarten Excel-Format,
 - Festpreise für Online Audio, Podcast, Events und weitere digitale Produkte,
 - Produktionspreise je Inventar und Typ,

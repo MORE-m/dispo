@@ -158,6 +158,10 @@ type OrderPosition = {
     id: number;
     inventory_name: string;
     advertising_medium_name: string;
+    booking_code?: string | null;
+    planning_responsibility_key?: string | null;
+    planning_responsibility_label?: string | null;
+    combination_hint_text?: string | null;
     spot_method: string;
     spot_method_label: string;
     length_seconds: number;
@@ -2084,6 +2088,23 @@ export default function DispoOrderShow({
                                     <p className="font-medium">
                                         {position.inventory_name} ·{' '}
                                         {position.advertising_medium_name}
+                                    </p>
+                                    <p
+                                        className="text-muted-foreground mt-1 text-xs"
+                                        data-test={`dispo-order-position-combination-${index}`}
+                                    >
+                                        Buchungskennzeichen:{' '}
+                                        {position.booking_code?.trim()
+                                            ? position.booking_code
+                                            : '— (Legacy)'}
+                                        {' · '}
+                                        Einplanung durch:{' '}
+                                        {position.planning_responsibility_label?.trim()
+                                            ? position.planning_responsibility_label
+                                            : '— (Legacy)'}
+                                        {position.combination_hint_text?.trim()
+                                            ? ` · Hinweis: ${position.combination_hint_text}`
+                                            : ''}
                                     </p>
                                     <p className="text-muted-foreground mt-1 text-xs">
                                         {position.spot_method_label} ·{' '}
