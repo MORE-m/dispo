@@ -335,7 +335,10 @@ Admin-Outbox-UI, Empfängerwahl, Freigabeinvalidierung, Audit-Anzeigefläche.
 
 ## Ist-Stand BL-P9-02c (PO-BLP902C-1)
 
-Umgesetzt (Feature-PR): SMTP-Zustellung nur für Ask/Answer-Outbox-Zeilen.
+**ERLEDIGT** (PR **#103** MERGED `5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`;
+Feature-HEAD `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI Run
+`36602377339` SUCCESS; Post-Merge-CI Run `36609997929` SUCCESS
+`ci`/`mysql`/`e2e-spt008`). SMTP-Zustellung nur für Ask/Answer-Outbox-Zeilen.
 
 - Scheduler: `notification-outbox:dispatch-sales-inquiry` (Stuck-Recovery + Claim/Dispatch)
 - Job: `DeliverSalesInquiryOutboxJob` (tries=3, backoff=30, timeout=45, unique)
