@@ -14,21 +14,24 @@
   + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**
   + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** – ERLEDIGT, PR **#86** MERGED
   + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**
-  + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**)
+  + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**
+  + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 29.09.2026 (PO-BLP902C-1):** zusätzlich freigegeben ist ausschließlich
+  die **SMTP-Zustellung** bereits persistierter Ask/Answer-Outbox-Zeilen
+  (`asked`/`answered`, Kanal `email`) über die DB-Queue (tries=3, backoff=30,
+  timeout=45, stuck-Recovery 90s, max. 3 Versuche → `failed`). Mail nur NOT-001;
+  At-least-once akzeptiert; Secrets nur Server-Env. **Nicht** freigegeben: weitere
+  Status-Mails, In-App, Admin-/Audit-UI, Empfängerwahl, Freigabeinvalidierung.
 - **Hinweis Stand 29.09.2026 (PO-BLP902B-1):** zusätzlich freigegeben und auf
   `main` abgeschlossen (PR **#101** MERGED `889c93197…`; Post-Merge-CI
-  `36547798359` SUCCESS) ist ausschließlich die **Ask/Answer→Outbox-Verdrahtung**
-  (`BL-P9-02b`): 1:1-Empfänger (Ask → `dispo_orders.advisor_id`, Answer →
-  Rückfrage-`created_by_id`); Suppress mit dauerhaftem `audit_events`-Eintrag
-  **ohne** Nutzer-UI; Outbox-Write-Fail rollt Fach-TX; NOT-001-Payload ohne
-  Frage-/Antworttexte. **Nicht** freigegeben und weiterhin gesperrt: SMTP-Worker,
-  weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl,
-  Freigabeinvalidierung, Audit-UI – **keine pauschale Notifications-Freigabe**.
+  `36547798359` SUCCESS) ist die **Ask/Answer→Outbox-Verdrahtung**
+  (`BL-P9-02b`): 1:1-Empfänger; Suppress-Audit ohne Nutzer-UI; NOT-001-Payload ohne
+  Frage-/Antworttexte. SMTP-Zustellung nachgezogen als **PO-BLP902C-1**.
 - **Hinweis Stand 26.09.2026 (BL-P1-05a):** technisches **Outbox-Fundament**
   (Schema/Writer/Zustände/Reclaimer) umgesetzt. Das ist **keine** UX-GATE-D-
   Freigabe für Mailversand, Admin-Fehleransicht oder In-App. Ask/Answer-Enqueue
@@ -76,7 +79,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -337,6 +340,22 @@ Ausschließlich der **operative Statuskern** freigegeben:
 
 Diese Entscheidung gibt **nicht** die gesamte operative Disposition frei.
 
+**Product-Owner-Teilfreigabe (29. September 2026, UX-GATE-D / BL-P9-02c / PO-BLP902C-1):**
+Ausschließlich **SMTP-Zustellung** bereits persistierter Ask/Answer-Outbox-Zeilen:
+
+- Events: `dispo_order.sales_inquiry.asked` / `.answered`, Kanal `email`
+- Dispatch über DB-Queue (Job tries=3, backoff=30, timeout=45); Stuck queued/sending
+  nach 90s → pending; nach 3 Fehlversuchen → `failed`
+- Mail-Inhalt nur NOT-001; keine Rückfrage-/Antworttexte
+- At-least-once inkl. möglicher Doppelsendung akzeptiert; SMTP-Secrets nur Server-Env
+
+Ausdrücklich **nicht** freigegeben bleiben u. a.:
+
+- weitere Status-Ereignis-Mails
+- In-App
+- Admin-Outbox-UI, Audit-Anzeigefläche, Empfängerwahl-UI
+- Freigabeinvalidierung
+
 **Product-Owner-Teilfreigabe (29. September 2026, UX-GATE-D / BL-P9-02b / PO-BLP902B-1):**
 Ausschließlich **Ask/Answer → persistierte Outbox** freigegeben:
 
@@ -347,12 +366,12 @@ Ausschließlich **Ask/Answer → persistierte Outbox** freigegeben:
   Outbox-Zeile, dauerhafter Eintrag in `audit_events` (**keine** Nutzer-UI /
   keine Behauptung von UI-Sichtbarkeit; PO Option 1)
 - Outbox-DB-Write-Fail in Fach-TX → gemeinsamer Rollback; Versandfehler nach
-  Commit rollen Fachstatus nicht (SMTP-Worker **nicht** in diesem Slice)
+  Commit rollen Fachstatus nicht (SMTP-Zustellung nachgezogen in **PO-BLP902C-1**)
 - Payload nur NOT-001-Felder; keine Rückfrage-/Antworttexte; `source_id` = Comment-ID
 
-Ausdrücklich **nicht** freigegeben bleiben u. a.:
+Ausdrücklich **nicht** freigegeben blieben damals u. a.:
 
-- SMTP-Worker / echter Mailversand
+- SMTP-Worker / echter Mailversand → **nachgezogen** in PO-BLP902C-1 (nur Ask/Answer)
 - weitere Status-Ereignis-Mails, In-App
 - Admin-Outbox-UI, Audit-Anzeigefläche, Empfängerwahl-UI
 - Freigabeinvalidierung
@@ -452,9 +471,9 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
-- Notifications **außer** Ask/Answer→Outbox (PO-BLP902B-1): SMTP-Worker,
-  weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl (allgemeine
-  Kommentare: PO-BLP902A-1 erledigt)
+- Notifications **außer** Ask/Answer→Outbox (PO-BLP902B-1) und Ask/Answer-SMTP
+  (PO-BLP902C-1): weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl
+  (allgemeine Kommentare: PO-BLP902A-1 erledigt)
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
 - Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a–03f (Calendar,

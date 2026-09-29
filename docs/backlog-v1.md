@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**); Rest blockiert (u. a. SMTP/weitere Notifications)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**); Rest blockiert (u. a. weitere Status-Mails / In-App)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -171,9 +171,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Transaktion:** Scheitert Outbox-Schreiben in einer Fach-TX → Fachaktion rollt mit zurück.
   Queue-/Mailfehler *nach* Commit rollen Fachstatus nicht zurück (Versand folgt später).
 - **Zustellung:** potenziell mindestens einmal; keine Exactly-Once-Zusage bei Worker-Abbruch nach SMTP
-- **Bewusst nicht:** weiterer Status-Event-Enqueue, echter Mailversand/SMTP-Worker, Admin-UI,
-  In-App-Kanal; keine UX-GATE-D-Freigabe für Mailversand. Ask/Answer-Verdrahtung
-  erledigt in **BL-P9-02b** (PR #101; ohne SMTP)
+- **Bewusst nicht:** weiterer Status-Event-Enqueue, Admin-UI,
+  In-App-Kanal. Ask/Answer-Verdrahtung erledigt in **BL-P9-02b**; SMTP Ask/Answer
+  in **BL-P9-02c** (ohne Admin-UI)
 - **Tests:** `NotificationOutboxContractTest`, `NotificationOutboxFoundationTest`,
   `NotificationOutboxConcurrencyTest` (MySQL)
 
@@ -669,20 +669,39 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Freigabeinvalidierung, Audit-Anzeigefläche
 - **Tests:** `DispoOrderSalesInquiryOutboxTest` (SQLite); Ask-Concurrency schmal erweitert (MySQL)
 
+### BL-P9-02c – Ask/Answer SMTP-Delivery (PO-BLP902C-1)
+
+- **Phase:** 9
+- **Status:** in Umsetzung (Feature-PR)
+- **Kennung:** PO-BLP902C-1 / UX-GATE-D Teilfreigabe ausschließlich SMTP für
+  bereits persistierte Ask/Answer-Outbox-Zeilen
+- **Anforderungen:** `NOT-001` (Mail-Inhalt), `NOT-002` (Versandfehler ohne Fach-Rollback;
+  Admin-UI bewusst **nicht** in diesem Slice)
+- **Abhängigkeiten:** BL-P9-02b, BL-P1-05a, ADR-003 Queue/SMTP-Env
+- **Ergebnis:** Scheduler `notification-outbox:dispatch-sales-inquiry` (Stuck-Recovery +
+  Claim/Dispatch); Job `DeliverSalesInquiryOutboxJob` (tries=3, backoff=30, timeout=45);
+  Mailable nur NOT-001; max. 3 Versuche → `failed`; Stuck queued/sending nach 90s → pending
+- **Scope Events:** nur `dispo_order.sales_inquiry.asked` / `.answered`, Kanal `email`
+- **At-least-once:** Worker-Abbruch nach SMTP vor `markSent` kann Doppelsendung erzeugen (akzeptiert)
+- **Secrets:** SMTP nur über Server-`.env` (kein Repo-Secret)
+- **Bewusst nicht:** weitere Status-Mails, In-App, Admin-/Audit-UI, Empfängerwahl,
+  Freigabeinvalidierung
+- **Tests:** `SalesInquiryOutboxDeliveryTest` (SQLite); `SalesInquiryOutboxDeliveryConcurrencyTest` (MySQL, schmal)
+
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a Kommentare; **02b Ask/Answer-Outbox auf `main`**);
-  SMTP/In-App/weitere Events **offen** (kein PO-Gate für Notifications-Gesamt)
+- **Status:** teilweise (02a Kommentare; 02b Outbox auf `main`; **02c Ask/Answer-SMTP**);
+  weitere Status-Mails/In-App **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
 - **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
-  (ohne SMTP)
-- **Offen:** SMTP-Versand/Worker, weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
+- **Erledigt in 02c:** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
+- **Offen:** weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
 - **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück (NOT-002 Versand)
-- **Tests:** Pest Unveränderbarkeit Kommentare (02a); Outbox Ask/Answer (02b); Mail-Retry (folgt)
+- **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c)
 
 ## Phase 10 – Listen, Reports und Exporte
 

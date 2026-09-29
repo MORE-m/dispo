@@ -330,8 +330,21 @@ SUCCESS `ci`/`mysql`/`e2e-spt008`). Ask/Answer → persistierte Outbox (ohne SMT
   rollen Fachstatus nicht (NOT-002 Versand folgt später)
 - Payload NOT-001 ohne Frage-/Antworttexte; `source_id` = Comment-ID
 
-Bewusst **nicht** in 02b: SMTP-Worker, weitere Status-Mails, In-App,
+Bewusst **nicht** in 02b: SMTP-Worker (→ **BL-P9-02c**), weitere Status-Mails, In-App,
 Admin-Outbox-UI, Empfängerwahl, Freigabeinvalidierung, Audit-Anzeigefläche.
+
+## Ist-Stand BL-P9-02c (PO-BLP902C-1)
+
+Umgesetzt (Feature-PR): SMTP-Zustellung nur für Ask/Answer-Outbox-Zeilen.
+
+- Scheduler: `notification-outbox:dispatch-sales-inquiry` (Stuck-Recovery + Claim/Dispatch)
+- Job: `DeliverSalesInquiryOutboxJob` (tries=3, backoff=30, timeout=45, unique)
+- Nach 3 Fehlversuchen → `failed`; Stuck queued/sending nach 90s → pending
+- Mail (`SalesInquiryOutboxMail`) nur NOT-001-Felder; keine Frage-/Antworttexte
+- At-least-once akzeptiert; SMTP-Credentials nur Server-Env
+
+Bewusst **nicht** in 02c: weitere Status-Mails, In-App, Admin-/Audit-UI,
+Empfängerwahl, Freigabeinvalidierung.
 
 ## Abschlussbedingungen
 
@@ -366,8 +379,9 @@ E-Mail und In-App werden mindestens ausgelöst bei:
 - Material fehlt oder erhalten,
 - disponiert, abgeschlossen oder storniert.
 
-**Ist BL-P9-02b:** Für Rückfrage und Antwort wird eine Outbox-Zeile (Kanal `email`,
+**Ist BL-P9-02b/02c:** Für Rückfrage und Antwort wird eine Outbox-Zeile (Kanal `email`,
 NOT-001-Payload) persistiert bzw. bei fehlendem Empfänger unterdrückt und in
-`audit_events` protokolliert. SMTP-Versand und übrige Ereignisse folgen späteren
-Slices. Ein E-Mail-Fehler nach Commit darf den fachlichen Statusübergang nicht
-zurückrollen (`NOT-002`); ein Outbox-DB-Write-Fehler in der Fach-TX rollt mit.
+`audit_events` protokolliert. SMTP-Versand für Ask/Answer erfolgt über die DB-Queue
+(BL-P9-02c). Übrige Ereignisse folgen späteren Slices. Ein E-Mail-Fehler nach Commit
+darf den fachlichen Statusübergang nicht zurückrollen (`NOT-002`); ein Outbox-DB-Write-
+Fehler in der Fach-TX rollt mit.

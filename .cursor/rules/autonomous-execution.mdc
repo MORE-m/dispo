@@ -42,19 +42,20 @@ Katalog, Inventar-Admin, Preislisten-Lifecycle, Excel-Import, Wizard-Jahreswahl,
 + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1**
 + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1**
 + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**
-+ **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** (eng: nur Enqueue, kein SMTP)
++ **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**
++ **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** (eng: nur asked/answered Delivery)
 + Standardangebote Average inkl. Komponenten/From-Calc/Freeze/Festpreis/Tandem
   **BL-P4-03a–03f**) dürfen weiterentwickelt und gehärtet werden.
 Fail-closed nur für **nicht** freigegebene Teilbereiche
-(u. a. SMTP-Worker / weitere Status-Mails / In-App / Admin-Outbox-UI,
+(u. a. weitere Status-Mails / In-App / Admin-Outbox-UI,
 Empfängerwahl, Freigabeinvalidierung, Calendar-/Budget-Vorlagen, Abbinder-auf-Vorlage,
 Kombinationstabelle, Auswertungen, allgemeine operative Disposition außerhalb
 BL-P8-02a–02e): dort nur Sperr-/Leerzustand, keine Schein-Fachseiten.
-**Keine pauschale Freigabe** des Notifications-Bereichs – nur Ask/Answer→Outbox.
+**Keine pauschale Freigabe** des Notifications-Bereichs – nur Ask/Answer Outbox+SMTP.
 
-**Aktuelle Phase:** Phase 9 – BL-P9-02 teilweise (02a + 02b auf `main`).
+**Aktuelle Phase:** Phase 9 – BL-P9-02 teilweise (02a + 02b auf `main`; 02c SMTP).
 Nächste Facharbeit nur nach expliziter PO-Teilfreigabe für den nächsten Scope
-(z. B. Calendar-/Budget-Vorlagen, SMTP-Worker, Freigabeinvalidierung).
+(z. B. Calendar-/Budget-Vorlagen, weitere Status-Mails, Freigabeinvalidierung).
 Fail-closed für nicht freigegebenen Gate-D-Rest – siehe `docs/fortschritt.md`.
 
 ## Blocker

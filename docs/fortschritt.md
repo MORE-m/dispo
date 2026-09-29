@@ -1,12 +1,9 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **BL-P9-02b** Ask/Answer→Outbox (PO-BLP902B-1) auf
-`main` abgeschlossen (Merge-Commit
-`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`, PR #101; Post-Merge-CI
-[36547798359](https://github.com/MORE-m/dispo/actions/runs/36547798359) grün
-`ci`/`mysql`/`e2e-spt008`). **BL-P4-03f** auf `main` (PR #99, `6737026…`;
-Post-Merge-CI `36480624574`). Fachliche Notifications: Ask/Answer-Enqueue
-**erledigt in 02b**; SMTP/weitere Status-Mails/`NOT-002`-Versand **weiter offen**.
+Stand: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
+im Feature-PR. **BL-P9-02b** auf `main` (PR #101, `889c931…`). Ask/Answer-Enqueue
+**erledigt**; SMTP-Zustellung **nur** asked/answered im Slice 02c; weitere
+Status-Mails/In-App **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -19,21 +16,30 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 9 / Notifications (**02a/02b** auf `main`; SMTP/In-App Rest offen);
+Phase 9 / Notifications (**02a/02b** auf `main`; **02c** Ask/Answer-SMTP Feature-PR);
 Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-Kein freigegebener Folgeslice ohne neues PO-Gate. Technisch abhängigkeitsreif,
-aber PO-gesperrt: Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SMTP-Worker /
-weitere Status-Mails, Freigabeinvalidierung. SPT-013 Abbinder (BL-P4-02)
-bewusst zurückgestellt. Kein Merge und keine Feature-Umsetzung in diesem
-Docs-Schritt.
+**BL-P9-02c** – Ask/Answer Outbox → SMTP (PO-BLP902C-1). Keine weiteren Events.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P9-02b** Ask/Answer → Outbox (PO-BLP902B-1); 1:1-Empfänger, Suppress-Audit
 ohne Nutzer-UI; kein SMTP (**auf `main`**, PR #101).
+
+## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP902C-1 | **freigegeben** (nur Ask/Answer-SMTP) |
+| Dispatch fälliger `pending` asked/answered → DB-Queue-Job | **umgesetzt** |
+| Job tries=3 / backoff=30 / timeout=45; `attempt_count` konsistent | **umgesetzt** |
+| Stuck-Recovery queued/sending nach 90s → pending | **umgesetzt** |
+| Nach 3 Fehlversuchen → `failed` | **umgesetzt** |
+| Mail nur NOT-001; keine Frage-/Antworttexte | **umgesetzt** |
+| At-least-once / mögliche Doppelsendung akzeptiert | **dokumentiert** |
+| Weitere Status-Mails / In-App / Admin-UI / Empfängerwahl / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P9-02b – Ask/Answer → Outbox / PO-BLP902B-1 (September 2026)
 
@@ -45,7 +51,7 @@ ohne Nutzer-UI; kein SMTP (**auf `main`**, PR #101).
 | Outbox-Write in Fach-TX; Write-Fail → Rollback | **umgesetzt** |
 | NOT-001-Payload ohne Frage-/Antworttexte; `source_id`=Comment-ID | **umgesetzt** |
 | Unit/Feature SQLite + MySQL-Ask-Concurrency schmal | **umgesetzt** |
-| SMTP-Worker / weitere Status-Mails / Admin-UI / Freigabeinvalidierung | **bewusst nicht** |
+| SMTP-Worker / weitere Status-Mails / Admin-UI / Freigabeinvalidierung | **bewusst nicht** (SMTP Ask/Answer → **BL-P9-02c**) |
 | Merge `main` | **PR #101** (`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`) |
 | Post-Merge CI | **`36547798359` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 

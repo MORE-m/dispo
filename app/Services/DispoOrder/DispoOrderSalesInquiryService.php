@@ -19,10 +19,11 @@ use Illuminate\Validation\ValidationException;
 /**
  * Strukturierter Rückfrage-/Antwortprozess (BL-P8-02b / PO-BLP802B-1)
  * plus Outbox-Verdrahtung Ask/Answer (BL-P9-02b / PO-BLP902B-1).
+ * SMTP-Zustellung dieser Outbox-Zeilen: BL-P9-02c / PO-BLP902C-1.
  * Getrennt vom operativen Statuskern und vom Freigabe-Service.
  *
- * Kein SMTP-Worker: nur persistierte Outbox-Absichten. Fehlender Empfänger
- * unterdrückt die Outbox und schreibt einen Audit-Eintrag (keine UI-Anzeige).
+ * Fehlender Empfänger unterdrückt die Outbox und schreibt einen Audit-Eintrag
+ * (keine UI-Anzeige). Versandfehler nach Commit rollen den Fachstatus nicht.
  */
 final class DispoOrderSalesInquiryService
 {
