@@ -3,7 +3,6 @@
 namespace Tests\Feature\Notification;
 
 use App\Enums\NotificationOutboxStatus;
-use App\Jobs\DeliverSalesInquiryOutboxJob;
 use App\Models\NotificationOutbox;
 use App\Services\DispoOrder\DispoOrderSalesInquiryService;
 use App\Services\Notification\NotificationOutboxWriter;
@@ -17,8 +16,9 @@ use Tests\TestCase;
 /**
  * Parallele MySQL-Absicherung für Ask/Answer-Dispatch (BL-P9-02c).
  *
- * Zwei Prozesse rufen synchronisiert `dispatchDue()` auf derselben fälligen
- * `pending`-Zeile auf (Ready-Barrier wie übrige Outbox-Concurrency-Worker).
+ * Barrier liegt bewusst nach dem Laden derselben fälligen pending-Zeile und
+ * vor claimAndDispatch() – beide Prozesse müssen pending nachweislich geladen
+ * haben, bevor der Claim-Wettlauf startet.
  */
 class SalesInquiryOutboxDeliveryConcurrencyTest extends TestCase
 {
@@ -64,7 +64,7 @@ class SalesInquiryOutboxDeliveryConcurrencyTest extends TestCase
         $this->assertSame(
             1,
             array_sum($dispatchedCounts),
-            'Genau ein Worker darf dispatchen (Summe dispatched). Got: '.implode(',', $dispatchedCounts),
+            'Genau ein Worker darf claimen/dispatchen. Got: '.implode(',', $dispatchedCounts),
         );
         $this->assertContains(1, $dispatchedCounts);
         $this->assertContains(0, $dispatchedCounts);
@@ -74,31 +74,25 @@ class SalesInquiryOutboxDeliveryConcurrencyTest extends TestCase
         $this->assertSame(1, NotificationOutbox::query()->count());
 
         $jobCount = $this->countDeliveryJobsForOutbox($row->id);
-        if ($jobCount !== 1) {
-            $payloads = DB::table('jobs')->pluck('payload')->map(
-                static fn ($payload): string => Str::limit((string) $payload, 400),
-            )->all();
-            $this->fail(
-                'Erwartet genau 1 Delivery-Job, got '.$jobCount
-                .'. Worker: '.implode(' | ', $results)
-                .'. Jobs: '.json_encode($payloads, JSON_UNESCAPED_UNICODE),
-            );
-        }
+        $this->assertSame(
+            1,
+            $jobCount,
+            'Erwartet genau 1 Delivery-Job, got '.$jobCount
+            .'. Worker: '.implode(' | ', $results),
+        );
     }
 
     private function countDeliveryJobsForOutbox(int $outboxId): int
     {
-        $jobs = DB::table('jobs')->get(['id', 'payload', 'queue']);
-        $needleClass = str_replace('\\', '\\\\', DeliverSalesInquiryOutboxJob::class);
+        $jobs = DB::table('jobs')->pluck('payload');
         $count = 0;
 
-        foreach ($jobs as $job) {
-            $payloadString = (string) $job->payload;
+        foreach ($jobs as $payload) {
+            $payloadString = (string) $payload;
             if (! str_contains($payloadString, 'DeliverSalesInquiryOutboxJob')) {
                 continue;
             }
 
-            // PHP-serialize: s:8:"outboxId";i:123;  oder JSON-ähnlich
             if (preg_match('/outboxId";i:'.$outboxId.';/', $payloadString) === 1
                 || preg_match('/"outboxId"\s*:\s*'.$outboxId.'\b/', $payloadString) === 1
                 || preg_match('/outboxId[^0-9]{0,20}'.$outboxId.'\b/', $payloadString) === 1) {
@@ -110,7 +104,7 @@ class SalesInquiryOutboxDeliveryConcurrencyTest extends TestCase
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array<string, string>
      */
     private function workerProcessEnv(): array
     {
@@ -158,18 +152,40 @@ class SalesInquiryOutboxDeliveryConcurrencyTest extends TestCase
         $processA->wait();
         $processB->wait();
 
+        if ($processA->getExitCode() !== 0 || $processB->getExitCode() !== 0) {
+            $this->fail(
+                'Worker-Prozess fehlgeschlagen.'
+                .' exitA='.$processA->getExitCode()
+                .' exitB='.$processB->getExitCode()
+                .' stderrA='.$processA->getErrorOutput()
+                .' stderrB='.$processB->getErrorOutput()
+                .' stdoutA='.$processA->getOutput()
+                .' stdoutB='.$processB->getOutput(),
+            );
+        }
+
         $results = [];
         foreach ([0, 1] as $id) {
             $file = $runDir.'/worker-'.$id.'.result';
             $this->assertFileExists(
                 $file,
                 'Worker '.$id.' result fehlt. stderrA='.$processA->getErrorOutput()
-                .' stderrB='.$processB->getErrorOutput()
-                .' stdoutA='.$processA->getOutput()
-                .' stdoutB='.$processB->getOutput(),
+                .' stderrB='.$processB->getErrorOutput(),
             );
             $results[] = trim((string) file_get_contents($file));
         }
+
+        $loaded = [];
+        foreach ([0, 1] as $id) {
+            $loadedFile = $runDir.'/worker-'.$id.'.loaded';
+            $this->assertFileExists($loadedFile, 'Worker '.$id.' hat kein loaded-Signal geschrieben.');
+            $loaded[] = trim((string) file_get_contents($loadedFile));
+        }
+        $this->assertSame(
+            ['pending:'.$outboxId, 'pending:'.$outboxId],
+            $loaded,
+            'Beide Worker müssen vor dem Claim dieselbe pending-Zeile geladen haben.',
+        );
 
         return $results;
     }

@@ -102,17 +102,35 @@ final class NotificationOutboxDeliveryService
 
         $dispatched = 0;
         foreach ($due as $row) {
-            try {
-                $claimed = $this->states->tryClaimPending($row);
-            } catch (NotificationOutboxConflictException) {
-                continue;
+            if ($this->claimAndDispatch($row)) {
+                $dispatched++;
             }
-
-            DeliverSalesInquiryOutboxJob::dispatch($claimed->id);
-            $dispatched++;
         }
 
         return $dispatched;
+    }
+
+    /**
+     * Atomarer Claim einer bereits geladenen pending-Zeile inkl. Job-Dispatch.
+     *
+     * Wird von {@see dispatchDue()} und vom parallelen Concurrency-Worker genutzt,
+     * damit Load und Claim getrennt synchronisierbar sind.
+     */
+    public function claimAndDispatch(NotificationOutbox $row): bool
+    {
+        if (! self::isDeliverable($row)) {
+            return false;
+        }
+
+        try {
+            $claimed = $this->states->tryClaimPending($row);
+        } catch (NotificationOutboxConflictException) {
+            return false;
+        }
+
+        DeliverSalesInquiryOutboxJob::dispatch($claimed->id);
+
+        return true;
     }
 
     /**

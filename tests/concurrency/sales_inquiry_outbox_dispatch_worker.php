@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+/**
+ * MySQL-Parallelworker für Ask/Answer-Outbox-Dispatch (BL-P9-02c).
+ *
+ * Deterministische Dateibarriere zwischen Laden derselben fälligen pending-Zeile
+ * und dem konkurrierenden claimAndDispatch() – ohne Sleeps und ohne App-Test-Hooks.
+ */
+
+use App\Enums\NotificationOutboxStatus;
+use App\Models\NotificationOutbox;
 use App\Services\Notification\NotificationOutboxDeliveryService;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Str;
@@ -23,32 +32,61 @@ if (! is_dir($runDir) && ! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
 /** @var Application $app */
 $app = require __DIR__.'/bootstrap_mysql_worker.php';
 
-$readyFile = $runDir.'/worker-'.$workerId.'.ready';
+$loadedFile = $runDir.'/worker-'.$workerId.'.loaded';
 $resultFile = $runDir.'/worker-'.$workerId.'.result';
-
-file_put_contents($readyFile, '1');
-
-$deadline = microtime(true) + 30.0;
-while (count(glob($runDir.'/worker-*.ready')) < 2) {
-    if (microtime(true) > $deadline) {
-        fwrite(STDERR, "Barrier timeout for worker {$workerId}\n");
-        exit(2);
-    }
-
-    usleep(10_000);
-}
+$expectedToken = 'pending:'.$outboxId;
 
 try {
-    // Kurze künstliche Last, damit beide Worker denselben pending-Stand sehen.
-    usleep(20_000 + ($workerId * 5_000));
+    $row = NotificationOutbox::query()->findOrFail($outboxId);
 
-    $dispatched = $app->make(NotificationOutboxDeliveryService::class)->dispatchDue(limit: 100);
-    file_put_contents($resultFile, 'OK:'.$dispatched.':'.$outboxId);
+    if ($row->status !== NotificationOutboxStatus::Pending) {
+        throw new RuntimeException(
+            'Outbox '.$outboxId.' ist nicht pending (Status: '.$row->status->value.').',
+        );
+    }
+
+    // Nachweis: diese Instanz hat die fällige pending-Zeile geladen.
+    file_put_contents($loadedFile, $expectedToken);
+
+    $deadline = microtime(true) + 30.0;
+    while (true) {
+        $loadedFiles = glob($runDir.'/worker-*.loaded') ?: [];
+        if (count($loadedFiles) >= 2) {
+            $tokens = [];
+            foreach ($loadedFiles as $file) {
+                $tokens[] = trim((string) file_get_contents($file));
+            }
+
+            foreach ($tokens as $token) {
+                if ($token !== $expectedToken) {
+                    throw new RuntimeException(
+                        'Barrier-Inhalt inkonsistent: erwartet '.$expectedToken
+                        .', got '.implode('|', $tokens),
+                    );
+                }
+            }
+
+            break;
+        }
+
+        if (microtime(true) > $deadline) {
+            throw new RuntimeException(
+                'Barrier timeout: weniger als 2 Worker haben pending:'.$outboxId.' geladen.',
+            );
+        }
+
+        usleep(5_000);
+    }
+
+    // Beide haben pending geladen → konkurrierender Produktions-Claim/Dispatch.
+    $won = $app->make(NotificationOutboxDeliveryService::class)->claimAndDispatch($row);
+    file_put_contents($resultFile, 'OK:'.($won ? '1' : '0').':'.$outboxId);
 } catch (Throwable $exception) {
     file_put_contents(
         $resultFile,
         'ERROR:'.get_class($exception).'|'.Str::limit($exception->getMessage(), 200),
     );
+    exit(1);
 }
 
 exit(0);
