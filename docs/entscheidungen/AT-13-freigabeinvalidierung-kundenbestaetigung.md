@@ -10,6 +10,8 @@ IDs: `AT-13`, `APR-004`, `UPL-001`, `BL-P7-02a`, `PO-AT13-CC-1`
 | Teil | Verbindlich |
 |------|-------------|
 | Auslöser | **Nur** Admin **archiviert** eine **aktive** Kundenbestätigung (`customer_confirmation`) |
+| Aktive CC | Gleiche Regel wie Submit/UI: neueste nach `uploaded_at` DESC, dann `id` DESC |
+| Freigabebezug | Archivierte Datei muss der `customer_confirmation_upload_id` der genehmigten Freigabe entsprechen; sonst fail-closed ohne Mutation |
 | Quellstatus | **Nur** `at_disposition` (Auftrag bereits genehmigt) |
 | Zielstatus | `draft` |
 | Wirkung | Vollständiger erforderlicher Freigabezyklus erneut (`APR-004`): CC setzen → Submit → Approve |

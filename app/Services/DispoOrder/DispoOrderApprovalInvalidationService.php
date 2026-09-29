@@ -51,10 +51,12 @@ final class DispoOrderApprovalInvalidationService
             ]);
         }
 
+        // Gleiche Regel wie Submit/UI (DispoOrderUploadService::activeCustomerConfirmation).
         $active = DispoOrderUpload::query()
             ->where('dispo_order_id', $order->id)
             ->where('category', DispoOrderUploadCategory::CustomerConfirmation->value)
             ->whereNull('archived_at')
+            ->orderByDesc('uploaded_at')
             ->orderByDesc('id')
             ->first();
 
@@ -74,6 +76,15 @@ final class DispoOrderApprovalInvalidationService
         if ($approved === null) {
             throw ValidationException::withMessages([
                 'upload' => 'Ohne erteilte Freigabe kann die Kundenbestätigung in diesem Status nicht archiviert werden.',
+            ]);
+        }
+
+        if (
+            $approved->customer_confirmation_upload_id === null
+            || (int) $approved->customer_confirmation_upload_id !== (int) $upload->id
+        ) {
+            throw ValidationException::withMessages([
+                'upload' => 'Nur die Kundenbestätigung der erteilten Freigabe kann die Freigabe invalidieren.',
             ]);
         }
 

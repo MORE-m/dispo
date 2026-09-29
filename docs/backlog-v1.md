@@ -396,11 +396,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; Invalidierung **offen** (Design-Gate AT-13)
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; **CC-Archiv-Invalidierung** über **BL-P7-02a / PO-AT13-CC-1** (nicht mehr Design-Gate)
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
 - **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
-- **Offen:** Freigabeinvalidierung nach Änderungen (AT-13), Rückzug, AUTH-005 als zwei getrennte Ereignisse
+- **Offen:** weitere Invalidierungsauslöser (AT-13 Rest), Rückzug, AUTH-005 als zwei getrennte Ereignisse
 - **AT-13 Teil:** siehe **BL-P7-02a / PO-AT13-CC-1** (CC-Archiv bei `at_disposition`). Weitere Invalidierungsauslöser offen.
 - **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` teilweise über 02a
 - **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright (nach Gate)

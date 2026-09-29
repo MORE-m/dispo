@@ -310,4 +310,110 @@ class DispoOrderCustomerConfirmationApprovalInvalidationTest extends TestCase
             ->where('auditable_id', $order->id)
             ->count());
     }
+
+    public function test_multiple_active_ccs_use_uploaded_at_then_id_and_require_approval_upload_match(): void
+    {
+        $ctx = $this->approvedAtDispositionWithActiveCc();
+        $order = $ctx['order'];
+        $admin = $ctx['admin'];
+        $approval = $ctx['approval'];
+        $basisUpload = $ctx['upload'];
+
+        $this->assertSame($basisUpload->id, $approval->customer_confirmation_upload_id);
+
+        // Höhere id, aber älteres uploaded_at → aktiv nach Submit/UI bleibt $basisUpload.
+        $staleHigherId = DispoOrderUpload::query()->create([
+            'dispo_order_id' => $order->id,
+            'category' => DispoOrderUploadCategory::CustomerConfirmation,
+            'original_filename' => 'spaeter-id-aelter.pdf',
+            'storage_path' => 'dispo/'.$order->id.'/uploads/stale-higher-id',
+            'mime_type' => 'application/pdf',
+            'size_bytes' => 100,
+            'sha256' => hash('sha256', 'stale-higher-id'),
+            'uploaded_by_user_id' => $admin->id,
+            'uploaded_by_name_snapshot' => $admin->name,
+            'uploaded_at' => $basisUpload->uploaded_at->copy()->subMinute(),
+        ]);
+
+        $this->assertGreaterThan($basisUpload->id, $staleHigherId->id);
+
+        $lockBefore = $order->fresh()->lock_version;
+
+        // Archiv der id-neueren, zeitlich älteren Datei: nicht aktiv → fail-closed.
+        $this->actingAs($admin)
+            ->withHeader('Accept', 'application/json')
+            ->postJson(route('dispo-orders.uploads.archive', [$order, $staleHigherId]), [
+                'lock_version' => $lockBefore,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upload');
+
+        $order->refresh();
+        $staleHigherId->refresh();
+        $basisUpload->refresh();
+        $approval->refresh();
+        $this->assertSame(DispoOrderStatus::AtDisposition, $order->status);
+        $this->assertSame($lockBefore, $order->lock_version);
+        $this->assertNull($staleHigherId->archived_at);
+        $this->assertNull($basisUpload->archived_at);
+        $this->assertSame(DispoOrderApprovalStatus::Approved, $approval->status);
+
+        // Zeitlich neuere zweite Datei wird aktiv, gehört aber nicht zur Freigabe.
+        $staleHigherId->uploaded_at = $basisUpload->uploaded_at->copy()->addMinute();
+        $staleHigherId->save();
+
+        $this->actingAs($admin)
+            ->withHeader('Accept', 'application/json')
+            ->postJson(route('dispo-orders.uploads.archive', [$order, $staleHigherId]), [
+                'lock_version' => $order->lock_version,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upload');
+
+        $order->refresh();
+        $staleHigherId->refresh();
+        $this->assertSame(DispoOrderStatus::AtDisposition, $order->status);
+        $this->assertSame($lockBefore, $order->lock_version);
+        $this->assertNull($staleHigherId->archived_at);
+
+        // Freigabegrundlage ist nicht mehr aktiv → ebenfalls fail-closed.
+        $this->actingAs($admin)
+            ->withHeader('Accept', 'application/json')
+            ->postJson(route('dispo-orders.uploads.archive', [$order, $basisUpload]), [
+                'lock_version' => $order->lock_version,
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('upload');
+
+        $order->refresh();
+        $basisUpload->refresh();
+        $this->assertSame(DispoOrderStatus::AtDisposition, $order->status);
+        $this->assertSame($lockBefore, $order->lock_version);
+        $this->assertNull($basisUpload->archived_at);
+        $this->assertSame(0, AuditEvent::query()
+            ->where('action', DispoOrderApprovalInvalidationService::AUDIT_ACTION)
+            ->where('auditable_id', $order->id)
+            ->count());
+
+        // Wieder: Freigabegrundlage = aktive Datei → Invalidierung.
+        $staleHigherId->uploaded_at = $basisUpload->uploaded_at->copy()->subMinute();
+        $staleHigherId->save();
+
+        $this->actingAs($admin)
+            ->withHeader('Accept', 'application/json')
+            ->postJson(route('dispo-orders.uploads.archive', [$order, $basisUpload]), [
+                'lock_version' => $order->lock_version,
+            ])
+            ->assertOk();
+
+        $order->refresh();
+        $basisUpload->refresh();
+        $this->assertSame(DispoOrderStatus::Draft, $order->status);
+        $this->assertSame($lockBefore + 1, $order->lock_version);
+        $this->assertNotNull($basisUpload->archived_at);
+        $this->assertDatabaseHas('audit_events', [
+            'action' => DispoOrderApprovalInvalidationService::AUDIT_ACTION,
+            'auditable_id' => $order->id,
+        ]);
+    }
 }
