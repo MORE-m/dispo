@@ -1,13 +1,13 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **AT-13 / Freigabeinvalidierung** Design-Gate
-(Kundenbestätigung nach Genehmigung). Kein Produktionscode. Basis `main`
-`363def9932e6473904cfe09a02fa4a8193804c68` (PR #104). Zielstatus nach
-Invalidierung **nicht** aus dem Ist-Modell ableitbar → PO-Entscheidung nötig.
-Siehe `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
+Stand: 29. September 2026 – **PO-AT13-CC-1 / BL-P7-02a** Freigabeinvalidierung
+Kundenbestätigung (Archiv bei `at_disposition` → `draft`) freigegeben und in Umsetzung
+in PR #106. Entscheidungsdok:
+`docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
 
-Vorheriger Abschluss: **BL-P9-02c** Ask/Answer-SMTP (PR #103,
-`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`; Post-Merge-CI `36609997929` grün).
+Basis `main` `363def9932e6473904cfe09a02fa4a8193804c68` (PR #104). Post-Merge-CI
+[36630845368](https://github.com/MORE-m/dispo/actions/runs/36630845368) SUCCESS.
+Vorher: **BL-P9-02c** Ask/Answer-SMTP (PR #103).
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -25,15 +25,13 @@ Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**AT-13 Design-Gate (offen):** Enger Kandidat „CC archivieren/ersetzen nach
-Genehmigung → voller Freigabezyklus erneut“ ist fachlich skizziert, aber der
-**Zielstatus** ist nicht eindeutig (`draft` vs. Status behalten vs.
-`awaiting_sales_approval`). Kein Feature-Code bis PO-Entscheidung und
-UX-GATE-D-Teilfreigabe. Details:
-`docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
+**PO-AT13-CC-1 / BL-P7-02a:** CC-Archiv bei `at_disposition` → Invalidierung nach
+`draft` + voller Freigabezyklus (APR-004). Replace und spätere Quellstatus
+ausgeschlossen. Feature-Code + Tests in PR #106.
 
 Weiter PO-gesperrt / zurückgestellt: Calendar-/Budget-Vorlagen, weitere
-Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder.
+Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder; weitere
+Invalidierungsauslöser (Preis etc.).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
@@ -41,14 +39,15 @@ Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder.
 DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
 (**auf `main`**, PR #103).
 
-## AT-13 – Freigabeinvalidierung CC (Design-Gate, September 2026)
+## PO-AT13-CC-1 / BL-P7-02a – CC-Archiv-Invalidierung (September 2026)
 
 | Teil | Status |
 |------|--------|
-| Enger Kandidat CC-Archiv/Replace nach Approve + APR-004 voller Zyklus | **skizziert** |
-| Zielstatus nach Invalidierung | **offen (PO)** – Optionen A–D in Entscheidungsdok |
-| UX-GATE-D Teilfreigabe | **nicht erteilt** (weiter blockiert) |
-| Produktionscode / Tests | **bewusst nicht** (Stopp Aufgabe 1) |
+| UX-GATE-D Teilfreigabe PO-AT13-CC-1 | **freigegeben** (nur dieser Scope) |
+| Auslöser: Admin archiviert aktive CC bei `at_disposition` | **verbindlich** |
+| Zielstatus `draft`; voller Freigabezyklus erneut | **verbindlich** |
+| Replace nach Approve; spätere Quellstatus | **ausgeschlossen** |
+| Approval-Historie append-only; Audit mit Freigabebezug | **umgesetzt** |
 | Entscheidungsdok | `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md` |
 
 ## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)

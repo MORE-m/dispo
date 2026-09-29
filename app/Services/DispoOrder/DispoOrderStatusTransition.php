@@ -7,7 +7,8 @@ use App\Exceptions\DispoOrderConflictException;
 
 /**
  * Erlaubte Statusübergänge: Freigabe + operativer Kern (BL-P8-02a) + Rückfrage (BL-P8-02b)
- * + Abschluss (BL-P8-02d) + Completed-Reopen/Storno (BL-P8-02e).
+ * + Abschluss (BL-P8-02d) + Completed-Reopen/Storno (BL-P8-02e)
+ * + CC-Archiv-Invalidierung (BL-P7-02a / PO-AT13-CC-1: `at_disposition` → `draft`).
  */
 final class DispoOrderStatusTransition
 {
@@ -26,6 +27,7 @@ final class DispoOrderStatusTransition
                 DispoOrderStatus::InProgress,
                 DispoOrderStatus::SalesInquiry,
                 DispoOrderStatus::Cancelled,
+                DispoOrderStatus::Draft,
             ],
             DispoOrderStatus::InProgress => [
                 DispoOrderStatus::MaterialMissing,
@@ -208,6 +210,18 @@ final class DispoOrderStatusTransition
     {
         return $from === DispoOrderStatus::Disposed
             && $to === DispoOrderStatus::InProgress;
+    }
+
+    /**
+     * PO-AT13-CC-1: Invalidierung nach Archiv aktiver Kundenbestätigung.
+     * Nicht Teil der operativen UI-Buttons ({@see allowedOperationalTargets()}).
+     */
+    public static function isCustomerConfirmationArchiveInvalidation(
+        DispoOrderStatus $from,
+        DispoOrderStatus $to,
+    ): bool {
+        return $from === DispoOrderStatus::AtDisposition
+            && $to === DispoOrderStatus::Draft;
     }
 
     public static function isReopen(DispoOrderStatus $from, DispoOrderStatus $to): bool

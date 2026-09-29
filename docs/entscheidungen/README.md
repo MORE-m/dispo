@@ -26,4 +26,4 @@ Fachliche Design-Gates (kein ADR-Ersatz):
 
 | Dok | Thema | Status |
 |---|---|---|
-| [AT-13 CC-Invalidierung](AT-13-freigabeinvalidierung-kundenbestaetigung.md) | Freigabeinvalidierung Kundenbestätigung (Zielstatus) | Vorgeschlagen |
+| [AT-13 CC-Invalidierung](AT-13-freigabeinvalidierung-kundenbestaetigung.md) | Freigabeinvalidierung Kundenbestätigung (PO-AT13-CC-1) | Akzeptiert |
