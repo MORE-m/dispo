@@ -94,7 +94,6 @@ final class DispoOrderApprovalInvalidationService
         User $user,
         DispoOrderUpload $archivedUpload,
         DispoOrderApprovalRequest $approvedRequest,
-        int $lockVersionBefore,
     ): DispoOrder {
         $from = $order->status;
         $to = DispoOrderStatus::Draft;
@@ -107,8 +106,9 @@ final class DispoOrderApprovalInvalidationService
 
         DispoOrderStatusTransition::assertCanTransition($from, $to);
 
+        $lockBefore = $order->lock_version;
         $order->status = $to;
-        $order->lock_version = $lockVersionBefore + 1;
+        $order->lock_version = $order->lock_version + 1;
         $order->save();
 
         $event = new DispoOrderStatusEvent;
@@ -129,7 +129,7 @@ final class DispoOrderApprovalInvalidationService
             $user,
             [
                 'status' => $from->value,
-                'lock_version' => $lockVersionBefore,
+                'lock_version' => $lockBefore,
                 'approval_request_id' => $approvedRequest->id,
                 'approval_cycle_number' => $approvedRequest->cycle_number,
                 'approval_status' => $approvedRequest->status->value,

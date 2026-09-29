@@ -10,6 +10,7 @@ use App\Enums\FieldType;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderApprovalRequest;
 use App\Models\DispoOrderFieldValue;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
@@ -337,25 +338,23 @@ final class DispoOrderUploadService
                 }
             }
 
-            $lockBefore = $locked->lock_version;
-
             $lockedUpload->archived_at = Carbon::now();
             $lockedUpload->archived_by_user_id = $user->id;
             $lockedUpload->archived_by_name_snapshot = $user->name;
             $lockedUpload->save();
 
-            if ($invalidateApproval && $approvedRequest !== null) {
+            if ($invalidateApproval) {
+                /** @var DispoOrderApprovalRequest $approvedRequest */
                 $locked = $this->approvalInvalidation->applyAfterCustomerConfirmationArchived(
                     $locked,
                     $user,
                     $lockedUpload,
                     $approvedRequest,
-                    $lockBefore,
                 );
             } else {
                 // Draft-Archiv mutiert den Order-Zustand (UPL-001-Grundlage).
                 // Nach Submit ohne Invalidierung: Snapshot unverändert; lock_version +1.
-                $locked->lock_version = $lockBefore + 1;
+                $locked->lock_version = $locked->lock_version + 1;
                 $locked->save();
             }
 
