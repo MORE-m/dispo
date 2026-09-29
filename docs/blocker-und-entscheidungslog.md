@@ -7,6 +7,7 @@ Keine stillschweigenden ADR-Änderungen.
 
 | Datum | Thema | Entscheidung | Grundlage |
 |---|---|---|---|
+| 29.09.2026 | **PO-BLP902B-1** / BL-P9-02b Ask/Answer→Outbox | UX-GATE-D Teilfreigabe **nur**: Outbox-Enqueue bei Rückfrage/Antwort; Empfänger 1:1 (Ask→`dispo_orders.advisor_id`, Answer→Rückfrage-`created_by_id`); keine Gruppen-Fallbacks; keine Selbstbenachrichtigung; Suppress bei fehlendem/ungültigem Empfänger mit dauerhaftem `audit_events`-Eintrag **ohne** Nutzer-UI (PO Option 1); Outbox-Write-Fail rollt Fach-TX; NOT-001-Payload ohne Frage-/Antworttexte; `source_id`=Comment-ID. **Nicht:** SMTP-Worker, weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl, Freigabeinvalidierung, Audit-UI. | NOT-001, NOT-002 (Teil), PO-BLP902B-1, BL-P9-02b, BL-P1-05a |
 | 29.08.2026 | PHP | 8.3 Mindest- und Produktionsziel (Speedit); 8.4 nicht Voraussetzung | ADR-002 Konkretisierung |
 | 29.08.2026 | Dateispeicher | Laravel Filesystem, lokal privat, Adapter austauschbar | ADR-001, ADR-002 |
 | 29.08.2026 | Redis | kein V1-Muss; Queue/Cache/Sessions über Datenbank | ADR-002, ADR-003 |

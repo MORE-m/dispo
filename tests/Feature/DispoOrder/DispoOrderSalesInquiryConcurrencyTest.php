@@ -9,6 +9,7 @@ use App\Exceptions\DispoOrderConflictException;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderComment;
 use App\Models\DispoOrderStatusEvent;
+use App\Models\NotificationOutbox;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
@@ -59,14 +60,30 @@ class DispoOrderSalesInquiryConcurrencyTest extends TestCase
 
         $order->refresh();
         $this->assertSame(DispoOrderStatus::SalesInquiry, $order->status);
-        $this->assertSame(1, DispoOrderComment::query()
+        $inquiryComments = DispoOrderComment::query()
             ->where('dispo_order_id', $order->id)
             ->where('type', DispoOrderCommentType::SalesInquiry)
-            ->count());
+            ->get();
+        $this->assertCount(1, $inquiryComments);
         $this->assertSame(1, DispoOrderStatusEvent::query()
             ->where('dispo_order_id', $order->id)
             ->where('to_status', DispoOrderStatus::SalesInquiry->value)
             ->count());
+
+        // BL-P9-02b: Gewinner erzeugt höchstens eine passende Ask-Outbox (Comment-ID).
+        $winningCommentId = (int) $inquiryComments->firstOrFail()->id;
+        $askOutbox = NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->where('source_type', DispoOrderSalesInquiryService::SOURCE_TYPE_COMMENT)
+            ->where('source_id', $winningCommentId)
+            ->get();
+        $this->assertLessThanOrEqual(1, $askOutbox->count());
+        $this->assertSame(
+            $askOutbox->count(),
+            NotificationOutbox::query()
+                ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+                ->count(),
+        );
     }
 
     public function test_mysql_parallel_answers_yield_exactly_one_winner(): void
