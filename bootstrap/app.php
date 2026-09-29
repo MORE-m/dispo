@@ -21,6 +21,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
+        $schedule->command('notification-outbox:dispatch-sales-inquiry')
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('notification-outbox-dispatch-sales-inquiry');
+
         $schedule->command('queue:work --stop-when-empty --max-time=50 --timeout=45 --tries=3 --backoff=30')
             ->everyMinute()
             ->withoutOverlapping()
