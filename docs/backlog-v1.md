@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**); Rest blockiert (u. a. Notifications)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**); Rest blockiert (u. a. SMTP/weitere Notifications)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -162,7 +162,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 1
 - **Status:** umgesetzt (Feature-PR; September 2026)
-- **Anforderungen:** Fundament für späteres `NOT-001`/`NOT-002` (diese IDs sind durch 05a **noch nicht** erfüllt)
+- **Anforderungen:** Fundament für späteres `NOT-001`/`NOT-002` (diese IDs sind durch 05a **noch nicht** erfüllt; Ask/Answer-Enqueue siehe **BL-P9-02b**)
 - **Abhängigkeiten:** BL-P1-04
 - **Ergebnis:** Tabelle `notification_outbox`; Intent/Writer; Idempotenzschlüssel; Zustandsübergänge;
   Reclaimer für fällige `pending`-Einträge (Recovery unabhängig von Job-Dispatch)
@@ -171,8 +171,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Transaktion:** Scheitert Outbox-Schreiben in einer Fach-TX → Fachaktion rollt mit zurück.
   Queue-/Mailfehler *nach* Commit rollen Fachstatus nicht zurück (Versand folgt später).
 - **Zustellung:** potenziell mindestens einmal; keine Exactly-Once-Zusage bei Worker-Abbruch nach SMTP
-- **Bewusst nicht:** Fachereignis-Verdrahtung (Ask/Answer/Status), echter Mailversand, Admin-UI,
-  In-App-Kanal, Kommentar-Benachrichtigungen; keine UX-GATE-D-Freigabe für Mailversand
+- **Bewusst nicht:** weiterer Status-Event-Enqueue, echter Mailversand/SMTP-Worker, Admin-UI,
+  In-App-Kanal; keine UX-GATE-D-Freigabe für Mailversand. Ask/Answer-Verdrahtung → **BL-P9-02b**
 - **Tests:** `NotificationOutboxContractTest`, `NotificationOutboxFoundationTest`,
   `NotificationOutboxConcurrencyTest` (MySQL)
 
@@ -649,17 +649,36 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Bewusst nicht:** NOT-001/NOT-002, Outbox, E-Mail, In-App, Empfängerwahl, BL-P1-05
 - **Tests:** `DispoOrderGeneralCommentTest`; Vitest Historie/Formular; Playwright Port **8043** (`test:e2e:blp902a`)
 
+### BL-P9-02b – Ask/Answer → Outbox (PO-BLP902B-1)
+
+- **Phase:** 9
+- **Status:** in Umsetzung (Feature-PR)
+- **Kennung:** PO-BLP902B-1 / UX-GATE-D Teilfreigabe ausschließlich Ask/Answer-Outbox
+- **Anforderungen:** `NOT-001` (Payload für Ask/Answer), Teil von `NOT-002` (kein Fach-Rollback bei späterem Versand; SMTP folgt nicht in diesem Slice)
+- **Abhängigkeiten:** BL-P1-05a, BL-P8-02b
+- **Ergebnis:** Bei Ask/Answer optionaler Outbox-Enqueue (Kanal `email`); `source_id` = Comment-ID;
+  Empfänger 1:1 – Ask → `dispo_orders.advisor_id`, Answer → Rückfrage-`created_by_id`;
+  keine Gruppen-/Rollen-Fallbacks; keine Selbstbenachrichtigung
+- **Suppress:** fehlender/ladbarer Empfänger oder ungültige E-Mail → Fachvorgang speichern,
+  keine Outbox-Zeile, dauerhafter Audit-Eintrag `dispo_order.sales_inquiry.notification_suppressed`
+  in `audit_events` (**ohne** Nutzer-UI / ohne Behauptung von UI-Sichtbarkeit)
+- **Transaktion:** erforderlicher Outbox-DB-Write in Fach-TX; Write-Fail → gemeinsamer Rollback
+- **Bewusst nicht:** SMTP-Worker, weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl,
+  Freigabeinvalidierung, Audit-Anzeigefläche
+- **Tests:** `DispoOrderSalesInquiryOutboxTest` (SQLite); Ask-Concurrency schmal erweitert (MySQL)
+
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a allgemeine Kommentare); Notifications **offen**
+- **Status:** teilweise (02a Kommentare; 02b Ask/Answer-Outbox); SMTP/In-App/weitere Events **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
-- **Offen:** NOT-001/NOT-002 (Fachereignisse + Versand), In-App; Outbox-Fundament siehe **BL-P1-05a**
-- **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück
-- **Tests:** Pest Unveränderbarkeit Kommentare (02a); Mail-Retry ohne Status-Rollback (folgt)
+- **Erledigt in 02b:** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit (ohne SMTP)
+- **Offen:** SMTP-Versand/Worker, weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
+- **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück (NOT-002 Versand)
+- **Tests:** Pest Unveränderbarkeit Kommentare (02a); Outbox Ask/Answer (02b); Mail-Retry (folgt)
 
 ## Phase 10 – Listen, Reports und Exporte
 

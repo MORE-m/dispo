@@ -1,9 +1,8 @@
 # Fortschritt V1
 
-Stand: 28. September 2026 – **BL-P4-03f** Tandem/Tridem in Average-Standardangeboten
-im Feature-PR (PO-BLP403F-1). **BL-P4-03e** auf `main` (PR #97, `4eddc94…`;
-Status-Nachzug PR #98, `f6daf52…`). **BL-P4-03d/03b/03c/03a** auf `main`. Fachliche
-Notifications (`NOT-001`/`NOT-002`) **weiter offen**.
+Stand: 29. September 2026 – **BL-P9-02b** Ask/Answer→Outbox (PO-BLP902B-1) im
+Feature-PR. **BL-P4-03f** auf `main` (PR #99, `6737026…`). Fachliche Notifications:
+Ask/Answer-Enqueue **in 02b**; SMTP/weitere Status-Mails/`NOT-002`-Versand **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -16,18 +15,29 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 4 / Standardangebote (**03a–03e** auf `main`; **03f** Feature-PR).
+Phase 9 / Notifications (**BL-P9-02b** Feature-PR); Phase 4 Standardangebote
+(**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**BL-P4-03f** – Tandem/Tridem in Spot-Classic-Average-Standardangeboten
-(PO-BLP403F-1). Draft-PR / Gates / Smoke. Kein Merge in diesem Schritt.
+**BL-P9-02b** – Ask/Answer → Outbox (PO-BLP902B-1). Kein SMTP-Worker.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P4-03e** N/N-Festpreis in Spot-Classic-Average-Standardangeboten;
-Materialisierung **v2**; Freeze und Hydrate als zwei gepflegte Vertragsseiten;
-Legacy v1 weiter übernehmbar (**auf `main`**, PR #97/#98).
+**BL-P4-03f** Tandem/Tridem × Average × normal/Festpreis in Standardangeboten
+(**auf `main`**, PR #99).
+
+## BL-P9-02b – Ask/Answer → Outbox / PO-BLP902B-1 (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-BLP902B-1 | **freigegeben** (nur Ask/Answer-Outbox) |
+| Empfänger 1:1 Advisor / Fragesteller; kein Gruppen-Fallback; kein Self | **umgesetzt** |
+| Suppress → `audit_events` (ohne Nutzer-UI) | **umgesetzt** |
+| Outbox-Write in Fach-TX; Write-Fail → Rollback | **umgesetzt** |
+| NOT-001-Payload ohne Frage-/Antworttexte; `source_id`=Comment-ID | **umgesetzt** |
+| Unit/Feature SQLite + MySQL-Ask-Concurrency schmal | **umgesetzt** |
+| SMTP-Worker / weitere Status-Mails / Admin-UI / Freigabeinvalidierung | **bewusst nicht** |
 
 ## BL-P4-03f – Tandem/Tridem in Average-Standardangeboten / PO-BLP403F-1 (September 2026)
 

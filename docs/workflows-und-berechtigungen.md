@@ -315,6 +315,23 @@ Umgesetzt: allgemeine Kommentare auf dem bestehenden Kommunikationsfundament.
 Bewusst **nicht** in 02a: Notifications/Mail/Outbox (`NOT-001`/`NOT-002`),
 Empfängerwahl, In-App-Fundament (BL-P1-05).
 
+## Ist-Stand BL-P9-02b (PO-BLP902B-1)
+
+Umgesetzt: Ask/Answer → persistierte Outbox (ohne SMTP-Worker).
+
+- Ask-Empfänger: Mediaberater `dispo_orders.advisor_id` (Snapshot); Answer:
+  Fragesteller `created_by_id` der Rückfrage; 1:1, kein Gruppen-Fallback;
+  keine Selbstbenachrichtigung
+- Suppress: fehlender/ungültiger Empfänger → Fachvorgang speichern, Audit
+  `dispo_order.sales_inquiry.notification_suppressed` in `audit_events`
+  (**ohne** Nutzer-UI)
+- Outbox-DB-Write in Fach-TX; Write-Fail → Rollback; Versandfehler nach Commit
+  rollen Fachstatus nicht (NOT-002 Versand folgt später)
+- Payload NOT-001 ohne Frage-/Antworttexte; `source_id` = Comment-ID
+
+Bewusst **nicht** in 02b: SMTP-Worker, weitere Status-Mails, In-App,
+Admin-Outbox-UI, Empfängerwahl, Freigabeinvalidierung, Audit-Anzeigefläche.
+
 ## Abschlussbedingungen
 
 Ein Abschluss ist nur zulässig, wenn:
@@ -348,6 +365,8 @@ E-Mail und In-App werden mindestens ausgelöst bei:
 - Material fehlt oder erhalten,
 - disponiert, abgeschlossen oder storniert.
 
-Ein E-Mail-Fehler darf den fachlichen Statusübergang nicht zurückrollen; er wird
-protokolliert und erneut versucht (`NOT-002`).
-
+**Ist BL-P9-02b:** Für Rückfrage und Antwort wird eine Outbox-Zeile (Kanal `email`,
+NOT-001-Payload) persistiert bzw. bei fehlendem Empfänger unterdrückt und in
+`audit_events` protokolliert. SMTP-Versand und übrige Ereignisse folgen späteren
+Slices. Ein E-Mail-Fehler nach Commit darf den fachlichen Statusübergang nicht
+zurückrollen (`NOT-002`); ein Outbox-DB-Write-Fehler in der Fach-TX rollt mit.

@@ -4,23 +4,39 @@ namespace App\Services\DispoOrder;
 
 use App\Enums\DispoOrderCommentType;
 use App\Enums\DispoOrderStatus;
+use App\Enums\NotificationOutboxChannel;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderComment;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Notification\NotificationOutboxIntent;
+use App\Services\Notification\NotificationOutboxWriter;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Strukturierter Rückfrage-/Antwortprozess (BL-P8-02b / PO-BLP802B-1).
+ * Strukturierter Rückfrage-/Antwortprozess (BL-P8-02b / PO-BLP802B-1)
+ * plus Outbox-Verdrahtung Ask/Answer (BL-P9-02b / PO-BLP902B-1).
  * Getrennt vom operativen Statuskern und vom Freigabe-Service.
+ *
+ * Kein SMTP-Worker: nur persistierte Outbox-Absichten. Fehlender Empfänger
+ * unterdrückt die Outbox und schreibt einen Audit-Eintrag (keine UI-Anzeige).
  */
 final class DispoOrderSalesInquiryService
 {
+    public const string EVENT_ASKED = 'dispo_order.sales_inquiry.asked';
+
+    public const string EVENT_ANSWERED = 'dispo_order.sales_inquiry.answered';
+
+    public const string SOURCE_TYPE_COMMENT = 'dispo_order_comment';
+
+    public const string AUDIT_NOTIFICATION_SUPPRESSED = 'dispo_order.sales_inquiry.notification_suppressed';
+
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly NotificationOutboxWriter $outbox,
     ) {}
 
     public function ask(
@@ -81,6 +97,16 @@ final class DispoOrderSalesInquiryService
             $comment->save();
 
             $event = $this->recordStatusEvent($locked, $from, $to, $user);
+
+            $this->publishNotificationOrSuppress(
+                order: $locked,
+                comment: $comment,
+                actor: $user,
+                eventType: self::EVENT_ASKED,
+                eventLabel: 'Rückfrage Vertrieb',
+                recipientUserId: $locked->advisor_id !== null ? (int) $locked->advisor_id : null,
+                missingAssignmentReason: 'missing_advisor',
+            );
 
             $fresh = $this->reload($locked);
 
@@ -183,6 +209,16 @@ final class DispoOrderSalesInquiryService
 
             $event = $this->recordStatusEvent($locked, $from, $to, $user);
 
+            $this->publishNotificationOrSuppress(
+                order: $locked,
+                comment: $response,
+                actor: $user,
+                eventType: self::EVENT_ANSWERED,
+                eventLabel: 'Antwort auf Rückfrage',
+                recipientUserId: (int) $inquiry->created_by_id,
+                missingAssignmentReason: 'missing_ask_author',
+            );
+
             $fresh = $this->reload($locked);
 
             $this->audit->record(
@@ -237,6 +273,103 @@ final class DispoOrderSalesInquiryService
             'created_at' => $comment->created_at?->toIso8601String(),
             'parent_id' => $comment->parent_id,
         ])->all());
+    }
+
+    private function publishNotificationOrSuppress(
+        DispoOrder $order,
+        DispoOrderComment $comment,
+        User $actor,
+        string $eventType,
+        string $eventLabel,
+        ?int $recipientUserId,
+        string $missingAssignmentReason,
+    ): void {
+        if ($recipientUserId === null || $recipientUserId <= 0) {
+            $this->recordSuppressed($order, $actor, $eventType, $comment, $missingAssignmentReason, null);
+
+            return;
+        }
+
+        // Empfänger nach User-ID deduplizieren (1:1-Regel → höchstens einer).
+        $uniqueRecipientIds = array_values(array_unique([$recipientUserId]));
+        $recipientId = $uniqueRecipientIds[0];
+
+        if ($recipientId === (int) $actor->id) {
+            $this->recordSuppressed($order, $actor, $eventType, $comment, 'self_notification', $recipientId);
+
+            return;
+        }
+
+        $recipient = User::query()->find($recipientId);
+        if ($recipient === null) {
+            $this->recordSuppressed($order, $actor, $eventType, $comment, 'recipient_not_loadable', $recipientId);
+
+            return;
+        }
+
+        $email = trim((string) $recipient->email);
+        if (! $this->isValidEmail($email)) {
+            $this->recordSuppressed($order, $actor, $eventType, $comment, 'invalid_email', $recipientId);
+
+            return;
+        }
+
+        $intent = new NotificationOutboxIntent(
+            eventType: $eventType,
+            sourceType: self::SOURCE_TYPE_COMMENT,
+            sourceId: (int) $comment->id,
+            channel: NotificationOutboxChannel::Email,
+            recipientUserId: (int) $recipient->id,
+            recipientEmail: $email,
+            recipientName: trim((string) $recipient->name) !== ''
+                ? trim((string) $recipient->name)
+                : $email,
+            payload: [
+                'order_number' => (string) $order->number,
+                'customer_name' => $order->customer_name,
+                'campaign' => $order->campaign,
+                'event_label' => $eventLabel,
+                'actor_id' => (int) $actor->id,
+                'actor_name' => (string) $actor->name,
+                'internal_url' => route('dispo-orders.show', $order, absolute: true),
+                'occurred_at' => now()->toIso8601String(),
+            ],
+        );
+
+        // Erforderlicher Outbox-Write: bei Fehler rollt die umschließende Fach-TX mit zurück.
+        $this->outbox->enqueue($intent);
+    }
+
+    private function recordSuppressed(
+        DispoOrder $order,
+        User $actor,
+        string $eventType,
+        DispoOrderComment $comment,
+        string $reason,
+        ?int $intendedRecipientUserId,
+    ): void {
+        $this->audit->record(
+            $order,
+            self::AUDIT_NOTIFICATION_SUPPRESSED,
+            $actor,
+            null,
+            [
+                'event_type' => $eventType,
+                'reason' => $reason,
+                'comment_id' => $comment->id,
+                'intended_recipient_user_id' => $intendedRecipientUserId,
+                // Keine Nutzer-UI für diesen Eintrag (PO-BLP902B-1 Option 1).
+            ],
+        );
+    }
+
+    private function isValidEmail(string $email): bool
+    {
+        if ($email === '') {
+            return false;
+        }
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
     }
 
     private function recordStatusEvent(
