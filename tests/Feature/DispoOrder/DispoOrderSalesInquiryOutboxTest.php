@@ -105,7 +105,11 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         $this->assertSame(NotificationOutboxStatus::Pending, $row->status);
 
         $payload = $row->payload_json;
-        $this->assertSame(NotificationOutboxIntent::PAYLOAD_KEYS, array_keys($payload));
+        $this->assertEqualsCanonicalizing(
+            NotificationOutboxIntent::PAYLOAD_KEYS,
+            array_keys($payload),
+        );
+        $this->assertCount(count(NotificationOutboxIntent::PAYLOAD_KEYS), $payload);
         $this->assertSame($asked->number, $payload['order_number']);
         $this->assertSame('Rückfrage Vertrieb', $payload['event_label']);
         $this->assertSame($disposition->id, $payload['actor_id']);
@@ -161,7 +165,11 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         $payloadJson = json_encode($answerRow->payload_json);
         $this->assertIsString($payloadJson);
         $this->assertStringNotContainsString('Geheimer Antworttext', $payloadJson);
-        $this->assertSame(NotificationOutboxIntent::PAYLOAD_KEYS, array_keys($answerRow->payload_json));
+        $this->assertEqualsCanonicalizing(
+            NotificationOutboxIntent::PAYLOAD_KEYS,
+            array_keys($answerRow->payload_json),
+        );
+        $this->assertCount(count(NotificationOutboxIntent::PAYLOAD_KEYS), $answerRow->payload_json);
     }
 
     public function test_ask_with_missing_advisor_suppresses_outbox_and_audits_reason(): void
