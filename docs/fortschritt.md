@@ -1,15 +1,13 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
-auf `main` abgeschlossen (Merge-Commit
-`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
-`2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
-[36602377339](https://github.com/MORE-m/dispo/actions/runs/36602377339) grün;
-Post-Merge-CI
-[36609997929](https://github.com/MORE-m/dispo/actions/runs/36609997929) grün
-`ci`/`mysql`/`e2e-spt008`). Ask/Answer-Enqueue **erledigt in 02b**; SMTP-Zustellung
-**nur** asked/answered **erledigt in 02c**; weitere Status-Mails/In-App
-**weiter offen**.
+Stand: 29. September 2026 – **AT-13 / Freigabeinvalidierung** Design-Gate
+(Kundenbestätigung nach Genehmigung). Kein Produktionscode. Basis `main`
+`363def9932e6473904cfe09a02fa4a8193804c68` (PR #104). Zielstatus nach
+Invalidierung **nicht** aus dem Ist-Modell ableitbar → PO-Entscheidung nötig.
+Siehe `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
+
+Vorheriger Abschluss: **BL-P9-02c** Ask/Answer-SMTP (PR #103,
+`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`; Post-Merge-CI `36609997929` grün).
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -27,17 +25,31 @@ Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-Kein freigegebener Folgeslice ohne neues PO-Gate. Technisch abhängigkeitsreif,
-aber PO-gesperrt: Calendar-/Budget-Vorlagen (BL-P4-03 Rest), weitere Status-Mails /
-In-App / Admin-Outbox-UI, Freigabeinvalidierung. SPT-013 Abbinder (BL-P4-02)
-bewusst zurückgestellt. Kein Merge und keine Feature-Umsetzung in diesem
-Docs-Schritt.
+**AT-13 Design-Gate (offen):** Enger Kandidat „CC archivieren/ersetzen nach
+Genehmigung → voller Freigabezyklus erneut“ ist fachlich skizziert, aber der
+**Zielstatus** ist nicht eindeutig (`draft` vs. Status behalten vs.
+`awaiting_sales_approval`). Kein Feature-Code bis PO-Entscheidung und
+UX-GATE-D-Teilfreigabe. Details:
+`docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
+
+Weiter PO-gesperrt / zurückgestellt: Calendar-/Budget-Vorlagen, weitere
+Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P9-02c** Ask/Answer Outbox → SMTP (PO-BLP902C-1); nur asked/answered;
 DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
 (**auf `main`**, PR #103).
+
+## AT-13 – Freigabeinvalidierung CC (Design-Gate, September 2026)
+
+| Teil | Status |
+|------|--------|
+| Enger Kandidat CC-Archiv/Replace nach Approve + APR-004 voller Zyklus | **skizziert** |
+| Zielstatus nach Invalidierung | **offen (PO)** – Optionen A–D in Entscheidungsdok |
+| UX-GATE-D Teilfreigabe | **nicht erteilt** (weiter blockiert) |
+| Produktionscode / Tests | **bewusst nicht** (Stopp Aufgabe 1) |
+| Entscheidungsdok | `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md` |
 
 ## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)
 

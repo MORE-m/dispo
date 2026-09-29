@@ -382,13 +382,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; Invalidierung offen
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; Invalidierung **offen** (Design-Gate AT-13)
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
 - **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
-- **Offen:** Freigabeinvalidierung nach Änderungen, Rückzug, AUTH-005 als zwei getrennte Ereignisse
-- **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` offen
-- **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright
+- **Offen:** Freigabeinvalidierung nach Änderungen (AT-13), Rückzug, AUTH-005 als zwei getrennte Ereignisse
+- **AT-13 Design-Gate (29.09.2026):** Enger Kandidat CC-Archiv/Replace nach Approve dokumentiert; **Zielstatus PO-offen**; kein Feature-Code. Dok: `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`
+- **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` offen bis Gate + Zielstatus
+- **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright (nach Gate)
 
 ### BL-P7-03 – Budget-Assistent
 

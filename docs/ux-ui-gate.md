@@ -30,6 +30,11 @@
   timeout=45, stuck-Recovery 90s, max. 3 Versuche → `failed`). Mail nur NOT-001;
   At-least-once akzeptiert; Secrets nur Server-Env. **Nicht** freigegeben: weitere
   Status-Mails, In-App, Admin-/Audit-UI, Empfängerwahl, Freigabeinvalidierung.
+- **Hinweis Stand 29.09.2026 (AT-13 Design-Gate):** Kandidat Freigabeinvalidierung
+  nur Kundenbestätigung Archiv/Replace nach Genehmigung + APR-004 skizziert.
+  **Nicht freigegeben.** Zielstatus nach Invalidierung ist PO-offen (kein
+  Feature-Code). Dok:
+  `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
 - **Hinweis Stand 29.09.2026 (PO-BLP902B-1):** zusätzlich freigegeben und auf
   `main` abgeschlossen (PR **#101** MERGED `889c93197…`; Post-Merge-CI
   `36547798359` SUCCESS) ist die **Ask/Answer→Outbox-Verdrahtung**
