@@ -317,7 +317,8 @@ Empfängerwahl, In-App-Fundament (BL-P1-05).
 
 ## Ist-Stand BL-P9-02b (PO-BLP902B-1)
 
-Umgesetzt: Ask/Answer → persistierte Outbox (ohne SMTP-Worker).
+**ERLEDIGT** (PR **#101** MERGED `889c93197…`; Post-Merge-CI Run `36547798359`
+SUCCESS `ci`/`mysql`/`e2e-spt008`). Ask/Answer → persistierte Outbox (ohne SMTP-Worker).
 
 - Ask-Empfänger: Mediaberater `dispo_orders.advisor_id` (Snapshot); Answer:
   Fragesteller `created_by_id` der Rückfrage; 1:1, kein Gruppen-Fallback;

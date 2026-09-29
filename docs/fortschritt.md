@@ -1,8 +1,12 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **BL-P9-02b** Ask/Answer→Outbox (PO-BLP902B-1) im
-Feature-PR. **BL-P4-03f** auf `main` (PR #99, `6737026…`). Fachliche Notifications:
-Ask/Answer-Enqueue **in 02b**; SMTP/weitere Status-Mails/`NOT-002`-Versand **weiter offen**.
+Stand: 29. September 2026 – **BL-P9-02b** Ask/Answer→Outbox (PO-BLP902B-1) auf
+`main` abgeschlossen (Merge-Commit
+`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`, PR #101; Post-Merge-CI
+[36547798359](https://github.com/MORE-m/dispo/actions/runs/36547798359) grün
+`ci`/`mysql`/`e2e-spt008`). **BL-P4-03f** auf `main` (PR #99, `6737026…`;
+Post-Merge-CI `36480624574`). Fachliche Notifications: Ask/Answer-Enqueue
+**erledigt in 02b**; SMTP/weitere Status-Mails/`NOT-002`-Versand **weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -15,17 +19,21 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 9 / Notifications (**BL-P9-02b** Feature-PR); Phase 4 Standardangebote
-(**03a–03f** auf `main`).
+Phase 9 / Notifications (**02a/02b** auf `main`; SMTP/In-App Rest offen);
+Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**BL-P9-02b** – Ask/Answer → Outbox (PO-BLP902B-1). Kein SMTP-Worker.
+Kein freigegebener Folgeslice ohne neues PO-Gate. Technisch abhängigkeitsreif,
+aber PO-gesperrt: Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SMTP-Worker /
+weitere Status-Mails, Freigabeinvalidierung. SPT-013 Abbinder (BL-P4-02)
+bewusst zurückgestellt. Kein Merge und keine Feature-Umsetzung in diesem
+Docs-Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P4-03f** Tandem/Tridem × Average × normal/Festpreis in Standardangeboten
-(**auf `main`**, PR #99).
+**BL-P9-02b** Ask/Answer → Outbox (PO-BLP902B-1); 1:1-Empfänger, Suppress-Audit
+ohne Nutzer-UI; kein SMTP (**auf `main`**, PR #101).
 
 ## BL-P9-02b – Ask/Answer → Outbox / PO-BLP902B-1 (September 2026)
 
@@ -38,6 +46,8 @@ Phase 9 / Notifications (**BL-P9-02b** Feature-PR); Phase 4 Standardangebote
 | NOT-001-Payload ohne Frage-/Antworttexte; `source_id`=Comment-ID | **umgesetzt** |
 | Unit/Feature SQLite + MySQL-Ask-Concurrency schmal | **umgesetzt** |
 | SMTP-Worker / weitere Status-Mails / Admin-UI / Freigabeinvalidierung | **bewusst nicht** |
+| Merge `main` | **PR #101** (`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`) |
+| Post-Merge CI | **`36547798359` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P4-03f – Tandem/Tridem in Average-Standardangeboten / PO-BLP403F-1 (September 2026)
 
@@ -55,7 +65,8 @@ Phase 9 / Notifications (**BL-P9-02b** Feature-PR); Phase 4 Standardangebote
 | Browser-Smoke Port **8049** | **BESTANDEN** (`docs/smoke-bl-p4-03f/protokoll.md`) |
 | Calendar/Budget/Abbinder | **bewusst nicht** |
 | Freeze- und Hydrate-Seiten getrennt gepflegt | **dokumentiert** (ADR 03f) |
-| Merge | **kein Merge** (Draft-PR) |
+| Merge `main` | **PR #99** (`6737026243b2a5832b8f6e005598190a4db71892`) |
+| Post-Merge CI | **`36480624574` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P4-03e – Festpreis in Average-Standardangeboten (September 2026)
 

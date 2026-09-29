@@ -1,8 +1,10 @@
 # BL-P4-03f – Tandem/Tridem in Spot-Classic-Average-Standardangeboten
 
-Status: **Vorgeschlagen** (Feature-PR)  
+Status: **Umgesetzt** (`main`, PR #99)  
 Stand: 28. September 2026  
 IDs: `STD-001`–`STD-009`, `AUTH-006`/`AUTH-007`, `VER-004`, `SPT-012`, `COM-009`, **PO-BLP403F-1**  
+Merge: PR #99 (`6737026243b2a5832b8f6e005598190a4db71892`); Post-Merge-CI
+`36480624574` SUCCESS (`ci`/`mysql`/`e2e-spt008`)  
 Basis: `main` nach PR #98 (`f6daf52…`); baut auf BL-P4-02e (Tandem/Tridem) und 03a–03e
 
 ## Entscheidung / UX-GATE-D Teilfreigabe PO-BLP403F-1
