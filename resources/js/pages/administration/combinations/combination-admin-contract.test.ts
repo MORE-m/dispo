@@ -26,4 +26,22 @@ describe('BL-P2-02a combination admin UI contract', () => {
         ];
         expect(dispoFields).not.toContain('editable_booking_code');
     });
+
+    it('keeps create-form inventory/medium ids as string including empty selection', () => {
+        // Spiegel des Formularvertrags in create.tsx (HTML-Select / leere Wahl).
+        type CombinationCreateForm = {
+            inventory_id: string;
+            advertising_medium_id: string;
+        };
+        const empty: CombinationCreateForm = {
+            inventory_id: '',
+            advertising_medium_id: '',
+        };
+        const filled: CombinationCreateForm = {
+            inventory_id: '12',
+            advertising_medium_id: '34',
+        };
+        expect(empty.inventory_id).toBe('');
+        expect(Number(filled.inventory_id)).toBe(12);
+    });
 });

@@ -18,6 +18,11 @@ final class InventoryMediumRuleOperativeContract
     /**
      * Kanonische Einplanung-durch-Keys (Anforderungskatalog §6.3 / initialdaten).
      *
+     * Hinweis: `disposition_abbinder` ist ein Stammdatum-Auswahlwert für
+     * „Einplanung durch“ („Disposition, bitte Abbinder nutzen“). Das ist keine
+     * Abbinder-/SPT-013-Funktionalität und gehört zum MAT-CORE-Katalog der
+     * Einplanungswerte; SPT-013 bleibt zurückgestellt.
+     *
      * @var array<string, string>
      */
     public const PLANNING_RESPONSIBILITIES = [

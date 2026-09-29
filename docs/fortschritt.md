@@ -19,6 +19,7 @@ bleibt aus. AT-13 (PR #106) parallel, unberührt.
 | Legacy ohne Freeze ohne Backfill | **umgesetzt** |
 | Produktivmatrix / MAT-003 Vollabnahme | **offen** (Lieferdaten) |
 | MAT-004 Massenimport | **bewusst nicht** |
+| `disposition_abbinder` als Einplanungs-Wert | **behalten** (Stammdatum laut §6.3; keine SPT-013-Funktion) |
 
 ---
 

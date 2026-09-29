@@ -39,8 +39,8 @@ final class InventoryMediumRuleAdminWriter
 
             try {
                 $rule = new InventoryMediumRule;
-                $rule->inventory_id = $inventory->id;
-                $rule->advertising_medium_id = $medium->id;
+                $rule->inventory()->associate($inventory);
+                $rule->advertisingMedium()->associate($medium);
                 $rule->is_active = $isActive;
                 $this->applyWritableFields($rule, $fields);
                 $rule->lock_version = 1;

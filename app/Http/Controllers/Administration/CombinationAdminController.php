@@ -233,17 +233,19 @@ class CombinationAdminController extends Controller
     private function listRow(InventoryMediumRule $rule): array
     {
         $planningKey = $rule->planning_responsibility_key;
+        $inventory = $rule->inventory;
+        $medium = $rule->advertisingMedium;
 
         return [
             'id' => $rule->id,
             'inventory_id' => $rule->inventory_id,
-            'inventory_name' => $rule->inventory?->name ?? '—',
-            'inventory_code' => $rule->inventory?->code,
+            'inventory_name' => $inventory !== null ? $inventory->name : '—',
+            'inventory_code' => $inventory?->code,
             'advertising_medium_id' => $rule->advertising_medium_id,
-            'advertising_medium_name' => $rule->advertisingMedium?->name ?? '—',
-            'advertising_medium_code' => $rule->advertisingMedium?->code,
-            'category_id' => $rule->advertisingMedium?->category_id,
-            'category_name' => $rule->advertisingMedium?->category?->name,
+            'advertising_medium_name' => $medium !== null ? $medium->name : '—',
+            'advertising_medium_code' => $medium?->code,
+            'category_id' => $medium?->category_id,
+            'category_name' => $medium?->category?->name,
             'is_active' => (bool) $rule->is_active,
             'status_label' => $rule->is_active ? 'Aktiv' : 'Inaktiv',
             'booking_code' => $rule->booking_code,
@@ -282,54 +284,71 @@ class CombinationAdminController extends Controller
     /**
      * @return array{
      *     inventories: list<array{id: int, name: string, code: string}>,
-     *     media: list<array{id: int, name: string, code: string, category_id: int|null}>,
+     *     media: list<array{id: int, name: string, code: string, category_id: int}>,
      *     categories: list<array{id: int, name: string, key: string}>,
      *     booking_codes: list<string>
      * }
      */
     private function filterOptions(): array
     {
-        $bookingCodes = InventoryMediumRule::query()
-            ->whereNotNull('booking_code')
-            ->where('booking_code', '!=', '')
-            ->distinct()
-            ->orderBy('booking_code')
-            ->pluck('booking_code')
-            ->map(static fn ($code): string => (string) $code)
-            ->values()
-            ->all();
+        $bookingCodes = [];
+        foreach (
+            InventoryMediumRule::query()
+                ->whereNotNull('booking_code')
+                ->where('booking_code', '!=', '')
+                ->distinct()
+                ->orderBy('booking_code')
+                ->pluck('booking_code') as $code
+        ) {
+            $bookingCodes[] = (string) $code;
+        }
+
+        $inventories = [];
+        foreach (
+            Inventory::query()
+                ->orderBy('sort')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']) as $inventory
+        ) {
+            $inventories[] = [
+                'id' => $inventory->id,
+                'name' => $inventory->name,
+                'code' => $inventory->code,
+            ];
+        }
+
+        $media = [];
+        foreach (
+            AdvertisingMedium::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'category_id']) as $medium
+        ) {
+            $media[] = [
+                'id' => $medium->id,
+                'name' => $medium->name,
+                'code' => $medium->code,
+                'category_id' => (int) $medium->category_id,
+            ];
+        }
+
+        $categories = [];
+        foreach (
+            AdvertisingCategory::query()
+                ->orderBy('sort')
+                ->orderBy('name')
+                ->get(['id', 'name', 'key']) as $category
+        ) {
+            $categories[] = [
+                'id' => $category->id,
+                'name' => $category->name,
+                'key' => $category->key,
+            ];
+        }
 
         return [
-            'inventories' => Inventory::query()
-                ->orderBy('sort')
-                ->orderBy('name')
-                ->get(['id', 'name', 'code'])
-                ->map(static fn (Inventory $inventory): array => [
-                    'id' => $inventory->id,
-                    'name' => $inventory->name,
-                    'code' => $inventory->code,
-                ])
-                ->all(),
-            'media' => AdvertisingMedium::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'code', 'category_id'])
-                ->map(static fn (AdvertisingMedium $medium): array => [
-                    'id' => $medium->id,
-                    'name' => $medium->name,
-                    'code' => $medium->code,
-                    'category_id' => $medium->category_id,
-                ])
-                ->all(),
-            'categories' => AdvertisingCategory::query()
-                ->orderBy('sort')
-                ->orderBy('name')
-                ->get(['id', 'name', 'key'])
-                ->map(static fn (AdvertisingCategory $category): array => [
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'key' => $category->key,
-                ])
-                ->all(),
+            'inventories' => $inventories,
+            'media' => $media,
+            'categories' => $categories,
             'booking_codes' => $bookingCodes,
         ];
     }
@@ -339,12 +358,14 @@ class CombinationAdminController extends Controller
      */
     private function strategyOptions(): array
     {
-        return collect(ComponentCalculationStrategy::cases())
-            ->map(static fn (ComponentCalculationStrategy $strategy): array => [
+        $options = [];
+        foreach (ComponentCalculationStrategy::cases() as $strategy) {
+            $options[] = [
                 'value' => $strategy->value,
                 'label' => $strategy->label(),
-            ])
-            ->values()
-            ->all();
+            ];
+        }
+
+        return $options;
     }
 }

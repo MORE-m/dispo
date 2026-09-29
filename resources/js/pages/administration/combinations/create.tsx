@@ -18,6 +18,25 @@ type FilterOptions = {
 type PlanningOption = { key: string; label: string };
 type StrategyOption = { value: string; label: string };
 
+/**
+ * Select-Werte und leere Auswahl als string (HTML-Vertrag), analog Preislisten-Create.
+ * Server validiert inventory_id / advertising_medium_id als integer.
+ */
+type CombinationCreateForm = {
+    inventory_id: string;
+    advertising_medium_id: string;
+    is_active: boolean;
+    booking_code: string;
+    planning_responsibility_key: string;
+    hint_text: string;
+    sort: number;
+    default_length_seconds: string;
+    surcharge_percent: string;
+    is_discountable: boolean;
+    is_ae_eligible: boolean;
+    component_calculation_strategy: string;
+};
+
 export default function CombinationCreate({
     filterOptions,
     planningOptions,
@@ -27,15 +46,21 @@ export default function CombinationCreate({
     planningOptions: PlanningOption[];
     strategyOptions: StrategyOption[];
 }) {
-    const form = useForm({
-        inventory_id: filterOptions.inventories[0]?.id ?? '',
-        advertising_medium_id: filterOptions.media[0]?.id ?? '',
+    const form = useForm<CombinationCreateForm>({
+        inventory_id:
+            filterOptions.inventories[0] !== undefined
+                ? String(filterOptions.inventories[0].id)
+                : '',
+        advertising_medium_id:
+            filterOptions.media[0] !== undefined
+                ? String(filterOptions.media[0].id)
+                : '',
         is_active: true,
         booking_code: '',
         planning_responsibility_key: 'disposition',
         hint_text: '',
         sort: 0,
-        default_length_seconds: 30 as number | '',
+        default_length_seconds: '30',
         surcharge_percent: '0',
         is_discountable: true,
         is_ae_eligible: true,
@@ -77,17 +102,16 @@ export default function CombinationCreate({
                             className="w-full rounded-md border px-2 py-2"
                             value={form.data.inventory_id}
                             onChange={(e) =>
-                                form.setData(
-                                    'inventory_id',
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : '',
-                                )
+                                form.setData('inventory_id', e.target.value)
                             }
                             data-test="combination-inventory-input"
                         >
+                            <option value="">— bitte wählen —</option>
                             {filterOptions.inventories.map((inventory) => (
-                                <option key={inventory.id} value={inventory.id}>
+                                <option
+                                    key={inventory.id}
+                                    value={String(inventory.id)}
+                                >
                                     {inventory.name} ({inventory.code})
                                 </option>
                             ))}
@@ -105,15 +129,17 @@ export default function CombinationCreate({
                             onChange={(e) =>
                                 form.setData(
                                     'advertising_medium_id',
-                                    e.target.value
-                                        ? Number(e.target.value)
-                                        : '',
+                                    e.target.value,
                                 )
                             }
                             data-test="combination-medium-input"
                         >
+                            <option value="">— bitte wählen —</option>
                             {filterOptions.media.map((medium) => (
-                                <option key={medium.id} value={medium.id}>
+                                <option
+                                    key={medium.id}
+                                    value={String(medium.id)}
+                                >
                                     {medium.name}
                                 </option>
                             ))}
@@ -183,7 +209,12 @@ export default function CombinationCreate({
                             type="number"
                             value={form.data.sort}
                             onChange={(e) =>
-                                form.setData('sort', Number(e.target.value))
+                                form.setData(
+                                    'sort',
+                                    e.target.value === ''
+                                        ? 0
+                                        : Number(e.target.value),
+                                )
                             }
                         />
                     </FormField>
@@ -199,9 +230,7 @@ export default function CombinationCreate({
                             onChange={(e) =>
                                 form.setData(
                                     'default_length_seconds',
-                                    e.target.value === ''
-                                        ? ''
-                                        : Number(e.target.value),
+                                    e.target.value,
                                 )
                             }
                         />
