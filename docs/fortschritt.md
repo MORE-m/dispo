@@ -1,9 +1,15 @@
 # Fortschritt V1
 
 Stand: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
-im Feature-PR. **BL-P9-02b** auf `main` (PR #101, `889c931…`). Ask/Answer-Enqueue
-**erledigt**; SMTP-Zustellung **nur** asked/answered im Slice 02c; weitere
-Status-Mails/In-App **weiter offen**.
+auf `main` abgeschlossen (Merge-Commit
+`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
+`2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
+[36602377339](https://github.com/MORE-m/dispo/actions/runs/36602377339) grün;
+Post-Merge-CI
+[36609997929](https://github.com/MORE-m/dispo/actions/runs/36609997929) grün
+`ci`/`mysql`/`e2e-spt008`). Ask/Answer-Enqueue **erledigt in 02b**; SMTP-Zustellung
+**nur** asked/answered **erledigt in 02c**; weitere Status-Mails/In-App
+**weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -16,17 +22,22 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 9 / Notifications (**02a/02b** auf `main`; **02c** Ask/Answer-SMTP Feature-PR);
+Phase 9 / Notifications (**02a/02b/02c** auf `main`; weitere Status-Mails/In-App offen);
 Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-**BL-P9-02c** – Ask/Answer Outbox → SMTP (PO-BLP902C-1). Keine weiteren Events.
+Kein freigegebener Folgeslice ohne neues PO-Gate. Technisch abhängigkeitsreif,
+aber PO-gesperrt: Calendar-/Budget-Vorlagen (BL-P4-03 Rest), weitere Status-Mails /
+In-App / Admin-Outbox-UI, Freigabeinvalidierung. SPT-013 Abbinder (BL-P4-02)
+bewusst zurückgestellt. Kein Merge und keine Feature-Umsetzung in diesem
+Docs-Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-02b** Ask/Answer → Outbox (PO-BLP902B-1); 1:1-Empfänger, Suppress-Audit
-ohne Nutzer-UI; kein SMTP (**auf `main`**, PR #101).
+**BL-P9-02c** Ask/Answer Outbox → SMTP (PO-BLP902C-1); nur asked/answered;
+DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
+(**auf `main`**, PR #103).
 
 ## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)
 
@@ -40,6 +51,9 @@ ohne Nutzer-UI; kein SMTP (**auf `main`**, PR #101).
 | Mail nur NOT-001; keine Frage-/Antworttexte | **umgesetzt** |
 | At-least-once / mögliche Doppelsendung akzeptiert | **dokumentiert** |
 | Weitere Status-Mails / In-App / Admin-UI / Empfängerwahl / Freigabeinvalidierung | **bewusst nicht** |
+| Merge `main` | **PR #103** (`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`) |
+| Feature-HEAD CI | **`36602377339` SUCCESS** (`ci`/`mysql`/`e2e-spt008`; HEAD `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`) |
+| Post-Merge CI | **`36609997929` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
 ## BL-P9-02b – Ask/Answer → Outbox / PO-BLP902B-1 (September 2026)
 

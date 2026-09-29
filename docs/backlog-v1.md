@@ -672,7 +672,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02c – Ask/Answer SMTP-Delivery (PO-BLP902C-1)
 
 - **Phase:** 9
-- **Status:** in Umsetzung (Feature-PR)
+- **Status:** **ERLEDIGT** (PR **#103** MERGED `5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`;
+  Feature-HEAD `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI Run
+  `36602377339` SUCCESS; Post-Merge-CI Run `36609997929` SUCCESS
+  `ci`/`mysql`/`e2e-spt008`)
 - **Kennung:** PO-BLP902C-1 / UX-GATE-D Teilfreigabe ausschließlich SMTP für
   bereits persistierte Ask/Answer-Outbox-Zeilen
 - **Anforderungen:** `NOT-001` (Mail-Inhalt), `NOT-002` (Versandfehler ohne Fach-Rollback;
@@ -691,14 +694,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a Kommentare; 02b Outbox auf `main`; **02c Ask/Answer-SMTP**);
+- **Status:** teilweise (02a Kommentare; 02b Outbox; **02c Ask/Answer-SMTP** auf `main`);
   weitere Status-Mails/In-App **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
 - **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
-- **Erledigt in 02c:** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
+- **Erledigt in 02c (`main`, PR #103):** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
 - **Offen:** weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
 - **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück (NOT-002 Versand)
 - **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c)
