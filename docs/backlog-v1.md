@@ -172,7 +172,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Queue-/Mailfehler *nach* Commit rollen Fachstatus nicht zurück (Versand folgt später).
 - **Zustellung:** potenziell mindestens einmal; keine Exactly-Once-Zusage bei Worker-Abbruch nach SMTP
 - **Bewusst nicht:** weiterer Status-Event-Enqueue, echter Mailversand/SMTP-Worker, Admin-UI,
-  In-App-Kanal; keine UX-GATE-D-Freigabe für Mailversand. Ask/Answer-Verdrahtung → **BL-P9-02b**
+  In-App-Kanal; keine UX-GATE-D-Freigabe für Mailversand. Ask/Answer-Verdrahtung
+  erledigt in **BL-P9-02b** (PR #101; ohne SMTP)
 - **Tests:** `NotificationOutboxContractTest`, `NotificationOutboxFoundationTest`,
   `NotificationOutboxConcurrencyTest` (MySQL)
 
@@ -304,7 +305,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`–`03e` auf `main`; **`BL-P4-03f` Tandem/Tridem im Feature-PR**; Calendar/Budget/Abbinder offen)
+- **Status:** teilweise (`BL-P4-03a`–`03f` auf `main`; Calendar/Budget/Abbinder offen)
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**
 - **Abhängigkeiten:** BL-P4-02 (Average + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**; 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
@@ -312,7 +313,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 03b:** Calc → „Als Standardangebot speichern“ → kundenloser Draft → PM-Prüfung → Publish → Adopt; Sanitize; Freeze zentral (`StandardOfferMaterializer`); Vertrieb nur Vorschlags-Draft; **Merge PR #93** `a850d52…`; Post-Merge-CI grün
 - **Ergebnis 03d (`main`, PR #95, `6af849a…`; Post-Merge-CI `36398695877` grün; Status PR #96):** `FrozenCalculationPersistenceContract` (versioniert); Adopt hydratisiert ausschließlich aus Published-Frozen; Legacy ohne Version; Fail-closed; zentrale Feldabbildung; Freeze und Hydrate als **zwei gepflegte Seiten** (keine automatische Übernahme neuer Methoden); ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
 - **Ergebnis 03e (`main`, PR #97, `4eddc94…`; Post-Merge-CI `36435981330` grün; Status PR #98):** N/N-Festpreis in Average-Vorlagen (02d-Semantik, keine Vorlagenformel); Materialisierung **v2**; Draft/UI/Sanitize/Freeze/Hydrate; Normal+Festpreis nebeneinander; Snapshot-Isolation; Freeze/Hydrate weiter zwei gepflegte Seiten; Legacy v1 lesbar; ADR `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
-- **Ziel/Umsetzung 03f (Feature-PR):** Tandem/Tridem in Average-Vorlagen (02e-Semantik); Materialisierung **v3**; normal+Festpreis; gemischte Vorlagen; Legacy v1/v2 lesbar; ADR `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
+- **Ergebnis 03f (`main`, PR #99, `6737026…`; Post-Merge-CI `36480624574` grün):** Tandem/Tridem × Average × normal/Festpreis (02e-Semantik, keine Vorlagenformel); Materialisierung **v3**; gemischte Vorlagen mit Average/Allonge; Freeze schreibt v3; Hydrate Slot-/Sort-/Längen-Asserts; Legacy v1/v2 lesbar; Calendar/Budget/Abbinder weiter außerhalb; ADR `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
 - **Grenzen:** kein Calendar/Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
 - **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f Feature-Tests; 03f Smoke
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
@@ -652,7 +653,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02b – Ask/Answer → Outbox (PO-BLP902B-1)
 
 - **Phase:** 9
-- **Status:** in Umsetzung (Feature-PR)
+- **Status:** **ERLEDIGT** (PR **#101** MERGED `889c93197…`; Post-Merge-CI
+  Run `36547798359` SUCCESS `ci`/`mysql`/`e2e-spt008`)
 - **Kennung:** PO-BLP902B-1 / UX-GATE-D Teilfreigabe ausschließlich Ask/Answer-Outbox
 - **Anforderungen:** `NOT-001` (Payload für Ask/Answer), Teil von `NOT-002` (kein Fach-Rollback bei späterem Versand; SMTP folgt nicht in diesem Slice)
 - **Abhängigkeiten:** BL-P1-05a, BL-P8-02b
@@ -670,12 +672,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a Kommentare; 02b Ask/Answer-Outbox); SMTP/In-App/weitere Events **offen**
+- **Status:** teilweise (02a Kommentare; **02b Ask/Answer-Outbox auf `main`**);
+  SMTP/In-App/weitere Events **offen** (kein PO-Gate für Notifications-Gesamt)
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
-- **Erledigt in 02b:** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit (ohne SMTP)
+- **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
+  (ohne SMTP)
 - **Offen:** SMTP-Versand/Worker, weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
 - **Akzeptanz (Rest):** Mailfehler rollt Status nicht zurück (NOT-002 Versand)
 - **Tests:** Pest Unveränderbarkeit Kommentare (02a); Outbox Ask/Answer (02b); Mail-Retry (folgt)

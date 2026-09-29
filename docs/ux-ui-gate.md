@@ -20,12 +20,15 @@
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 29.09.2026 (PO-BLP902B-1):** zusätzlich freigegeben (dieser Slice)
-  ist ausschließlich die **Ask/Answer→Outbox-Verdrahtung** (`BL-P9-02b`): 1:1-Empfänger
-  (Ask → `dispo_orders.advisor_id`, Answer → Rückfrage-`created_by_id`); Suppress mit
-  dauerhaftem `audit_events`-Eintrag **ohne** Nutzer-UI; Outbox-Write-Fail rollt Fach-TX;
-  NOT-001-Payload ohne Frage-/Antworttexte. **Nicht** freigegeben: SMTP-Worker, weitere
-  Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl, Freigabeinvalidierung, Audit-UI.
+- **Hinweis Stand 29.09.2026 (PO-BLP902B-1):** zusätzlich freigegeben und auf
+  `main` abgeschlossen (PR **#101** MERGED `889c93197…`; Post-Merge-CI
+  `36547798359` SUCCESS) ist ausschließlich die **Ask/Answer→Outbox-Verdrahtung**
+  (`BL-P9-02b`): 1:1-Empfänger (Ask → `dispo_orders.advisor_id`, Answer →
+  Rückfrage-`created_by_id`); Suppress mit dauerhaftem `audit_events`-Eintrag
+  **ohne** Nutzer-UI; Outbox-Write-Fail rollt Fach-TX; NOT-001-Payload ohne
+  Frage-/Antworttexte. **Nicht** freigegeben und weiterhin gesperrt: SMTP-Worker,
+  weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl,
+  Freigabeinvalidierung, Audit-UI – **keine pauschale Notifications-Freigabe**.
 - **Hinweis Stand 26.09.2026 (BL-P1-05a):** technisches **Outbox-Fundament**
   (Schema/Writer/Zustände/Reclaimer) umgesetzt. Das ist **keine** UX-GATE-D-
   Freigabe für Mailversand, Admin-Fehleransicht oder In-App. Ask/Answer-Enqueue
@@ -449,12 +452,13 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
 **Weiterhin blockiert** (keine Umsetzung ohne erneute PO-Freigabe):
 
 - operative Bearbeitung durch die Disposition **außerhalb** BL-P8-02a–02e
-- Notifications (allgemeine Kommentare: PO-BLP902A-1)
+- Notifications **außer** Ask/Answer→Outbox (PO-BLP902B-1): SMTP-Worker,
+  weitere Status-Mails, In-App, Admin-Outbox-UI, Empfängerwahl (allgemeine
+  Kommentare: PO-BLP902A-1 erledigt)
 - Freigabeinvalidierung
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
-- Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a / PO-BLP403A-1,
-  BL-P4-03c / PO-BLP403C-1 und BL-P4-03b / PO-BLP403B-1 (Calendar/Festpreis/Tandem,
-  erweiterte REP-Listen, Budget-auf-Vorlage)
+- Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a–03f (Calendar,
+  Budget-auf-Vorlage, Abbinder-auf-Vorlage, erweiterte REP-Listen)
 - Administration der übrigen Initialkataloge (Kombinationstabelle) –
   Oberkategorien/Werbemittel (ADV-001b), Inventar-Admin (BL-P2-01a),
   Preislisten-Lifecycle (BL-P4-01a), Excel-Import (BL-P4-01b) und
