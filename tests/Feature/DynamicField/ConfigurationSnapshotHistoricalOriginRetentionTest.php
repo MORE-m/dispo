@@ -9,6 +9,7 @@ use App\Models\AdvertisingMedium;
 use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrderPosition;
+use App\Models\InventoryMediumRule;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
@@ -155,7 +156,8 @@ class ConfigurationSnapshotHistoricalOriginRetentionTest extends TestCase
             'default_length_seconds' => 30,
             'category_id' => $catalog['medium']->category_id,
         ]);
-        $catalog['hamburg']->mediumRules()->create([
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
             'advertising_medium_id' => $mediumB->id,
         ]);
 

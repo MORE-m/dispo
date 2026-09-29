@@ -15,6 +15,7 @@ use App\Models\CalculationPosition;
 use App\Models\ConfigurationSnapshot;
 use App\Models\FieldSet;
 use App\Models\FieldSetVersion;
+use App\Models\InventoryMediumRule;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
@@ -262,10 +263,12 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
             'kind' => CalculationKind::SpotClassic,
             'sort' => 1,
         ]);
-        $catalog['hamburg']->mediumRules()->create([
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
             'advertising_medium_id' => $otherMedium->id,
         ]);
-        $catalog['rock']->mediumRules()->create([
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['rock']->id,
             'advertising_medium_id' => $otherMedium->id,
         ]);
 
@@ -814,7 +817,8 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
             'default_length_seconds' => 30,
             'category_id' => $catalog['medium']->category_id,
         ]);
-        $catalog['hamburg']->mediumRules()->create([
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
             'advertising_medium_id' => $mediumB->id,
         ]);
 
