@@ -1,7 +1,28 @@
 # Fortschritt V1
 
-Stand: 30. September 2026 – **BL-P2-02b / MAT-CORE-Matrix-Seed** (PO-MAT-CORE-MATRIX-1)
-auf Feature-Branch (Draft-PR), Basis `main` inkl. gemergtem PR #108
+Stand: 30. September 2026 – **BL-P2-02c / Initialkatalog** (PO-MAT-CORE-CATALOG-1)
+auf Feature-Branch (Draft-PR), Basis `main` inkl. gemergtem PR #109
+(`124026f51440aee2d6e46254b66a6b2a3277c426`).  
+**Kein** Deploy; Seeder nur explizit/isoliert.
+
+## BL-P2-02c – Initialkatalog 14 Inventare / 42 Werbemittel
+
+| Thema | Status |
+|---|---|
+| PO-MAT-CORE-CATALOG-1 Mapping | **akzeptiert / dokumentiert** |
+| Idempotenter Bootstrap `InitialCatalogMatCoreSeeder` | **umgesetzt** |
+| Excel-Namen für Matrix-Match | **umgesetzt** |
+| Fail-closed bei Identitätskonflikten | **umgesetzt** |
+| Explizit, nicht in DatabaseSeeder | **umgesetzt** |
+| Kombinationstabellen-Regeln | **bewusst nicht** (weiter #109 / Matrix-Seeder) |
+
+Aufruf: `php artisan db:seed --class=InitialCatalogMatCoreSeeder`  
+danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
+
+---
+
+Stand zuvor: 30. September 2026 – **BL-P2-02b / MAT-CORE-Matrix-Seed** (PO-MAT-CORE-MATRIX-1)
+gemerged in PR #109 (`124026f`). Basis war `main` inkl. PR #108
 (`d6aed2fe75fb5e18a83af91de063cfaf10689049`).  
 **Kein** Deploy; Inventar-/Medien-Katalog muss vor Seed existieren.
 
