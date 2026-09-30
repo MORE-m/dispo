@@ -157,6 +157,47 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
         $this->assertSame(42, AdvertisingMedium::query()->count());
     }
 
+    public function test_bootstrap_fails_closed_when_required_category_is_inactive_without_partial_create(): void
+    {
+        $existingInventory = Inventory::factory()->create([
+            'name' => 'Vorhandenes Stammdaten-Inventar',
+            'code' => 'inv_preexisting_guard',
+            'type' => InventoryType::Sender,
+            'is_active' => true,
+        ]);
+        $existingName = $existingInventory->name;
+        $existingCode = $existingInventory->code;
+        $inventoryCountBefore = Inventory::query()->count();
+        $mediaCountBefore = AdvertisingMedium::query()->count();
+
+        $spots = AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::SPOTS)
+            ->firstOrFail();
+        $spots->is_active = false;
+        $spots->save();
+
+        try {
+            app(InitialCatalogBootstrapper::class)->bootstrap();
+            $this->fail('Erwartete RuntimeException bei deaktivierter Oberkategorie.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('deaktiviert', $exception->getMessage());
+            $this->assertStringContainsString(CanonicalAdvertisingCategories::SPOTS, $exception->getMessage());
+        }
+
+        $existingInventory->refresh();
+        $this->assertSame($existingName, $existingInventory->name);
+        $this->assertSame($existingCode, $existingInventory->code);
+        $this->assertSame($inventoryCountBefore, Inventory::query()->count());
+        $this->assertSame($mediaCountBefore, AdvertisingMedium::query()->count());
+        $this->assertSame(0, Inventory::query()->where('code', 'inv_radio_hamburg')->count());
+        $this->assertSame(0, AdvertisingMedium::query()->where('code', 'spot_classic')->count());
+        $this->assertFalse(
+            (bool) AdvertisingCategory::query()
+                ->where('key', CanonicalAdvertisingCategories::SPOTS)
+                ->value('is_active'),
+        );
+    }
+
     public function test_seeder_is_not_wired_into_database_seeder(): void
     {
         $source = file_get_contents((new ReflectionClass(DatabaseSeeder::class))->getFileName() ?: '');

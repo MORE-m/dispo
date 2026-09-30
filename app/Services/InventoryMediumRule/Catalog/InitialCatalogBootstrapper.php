@@ -42,6 +42,9 @@ final class InitialCatalogBootstrapper
             &$mediaCreated,
             &$mediaUnchanged,
         ): void {
+            // Kategorien zuerst: bei fehlender/inaktiver Oberkategorie keine Teilanlage.
+            $categoryIds = $this->resolveRequiredActiveCategoryIds();
+
             $organization = $this->organizations->resolve();
 
             foreach (InitialCatalogDefinitions::inventories() as $index => $definition) {
@@ -60,13 +63,8 @@ final class InitialCatalogBootstrapper
                 }
             }
 
-            $categoryIds = $this->resolveCategoryIds();
-
             foreach (InitialCatalogDefinitions::media() as $definition) {
-                $categoryId = $categoryIds[$definition['category_key']]
-                    ?? throw new RuntimeException(
-                        "Oberkategorie fehlt für Katalog-Bootstrap: {$definition['category_key']}",
-                    );
+                $categoryId = $categoryIds[$definition['category_key']];
                 $result = $this->ensureMedium($definition, $categoryId);
                 if ($result === 'created') {
                     $mediaCreated++;
@@ -85,13 +83,42 @@ final class InitialCatalogBootstrapper
     }
 
     /**
+     * Liefert ID-Map aller im Katalog benötigten Oberkategorien.
+     * Fail-closed: jede Key muss existieren und is_active=true sein.
+     *
      * @return array<string, int>
      */
-    private function resolveCategoryIds(): array
+    private function resolveRequiredActiveCategoryIds(): array
     {
+        $requiredKeys = array_values(array_unique(array_map(
+            static fn (array $definition): string => $definition['category_key'],
+            InitialCatalogDefinitions::media(),
+        )));
+
+        $categories = AdvertisingCategory::query()
+            ->whereIn('key', $requiredKeys)
+            ->lockForUpdate()
+            ->get(['id', 'key', 'name', 'is_active']);
+
+        $byKey = [];
+        foreach ($categories as $category) {
+            $byKey[$category->key] = $category;
+        }
+
         $map = [];
-        foreach (AdvertisingCategory::query()->get(['id', 'key']) as $category) {
-            $map[$category->key] = (int) $category->id;
+        foreach ($requiredKeys as $key) {
+            $category = $byKey[$key] ?? null;
+            if ($category === null) {
+                throw new RuntimeException(
+                    "Benötigte Oberkategorie fehlt für den Initialkatalog-Bootstrap: „{$key}“.",
+                );
+            }
+            if (! $category->is_active) {
+                throw new RuntimeException(
+                    "Benötigte Oberkategorie ist deaktiviert und kann für den Initialkatalog-Bootstrap nicht verwendet werden: „{$key}“ ({$category->name}).",
+                );
+            }
+            $map[$key] = (int) $category->id;
         }
 
         return $map;
