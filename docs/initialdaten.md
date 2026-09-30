@@ -9,7 +9,7 @@ zu erfinden.
 ## Inventare
 
 1. MORE Hamburg-Kombi
-2. Hamburg-Kombi+
+2. MORE Hamburg-Kombi+
 3. Radio Hamburg
 4. ROCK ANTENNE Hamburg
 5. 80er 90er OLDIE ANTENNE Hamburg
@@ -26,6 +26,7 @@ zu erfinden.
 Festlegungen:
 
 - HAMBURG ZWEI ist in der MORE Hamburg-Kombi durch 80er 90er OLDIE ANTENNE Hamburg ersetzt.
+- Kanonischer Name laut Matrix/Importvertrag (**PO-MAT-CORE-MATRIX-1**): `MORE Hamburg-Kombi+` (nicht verkürzt `Hamburg-Kombi+`).
 - `radio ffn` aus der Referenz entspricht `ffn Hamburg Plus`.
 - `BOLLERWAGEN` aus der Referenz entspricht `RADIO BOLLERWAGEN DAB+ Hamburg`.
 - Kombis besitzen eigene Preislisten, Werbemittelregeln und Positionen; sie werden nicht aus Sendern abgeleitet. Die 14 Inventare bleiben unverändert; Kombis behalten `type=kombi`.
@@ -98,7 +99,7 @@ Zusatzzeile innerhalb einer Position.
 42. Native-Ad
 
 Die kombinierten Werbemittel `Pre-/In-Stream` und `Pre-/In-Stream Influencer`
-entfallen. Single-Spots für Hamburg-Kombi+, Bollerwagen und ffn werden durch die
+entfallen. Single-Spots für MORE Hamburg-Kombi+, Bollerwagen und ffn werden durch die
 Kombinationstabelle ausgeschlossen.
 
 ## Standard-Auswahlwerte
@@ -183,8 +184,9 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
 ## Vor Produktivsetzung noch zu liefern
 
 - vollständige Kombinationstabelle mit Buchungskennzeichen, Zuständigkeit und Hinweisen
-  (**Admin-/Freeze-Logik BL-P2-02a ist umgesetzt; die Matrix selbst fehlt weiterhin und
-  darf nicht erfunden werden**),
+  (**Admin-/Freeze-Logik BL-P2-02a umgesetzt; Importvertrag PO-MAT-CORE-MATRIX-1 und
+  Seed-Slice BL-P2-02b vorhanden – Catalog-Namen müssen exakt zur Matrix passen;
+  Hinweistexte weiter separat / Regeln**),
 - Jahrespreislisten je Inventar im vereinbarten Excel-Format,
 - Festpreise für Online Audio, Podcast, Events und weitere digitale Produkte,
 - Produktionspreise je Inventar und Typ,

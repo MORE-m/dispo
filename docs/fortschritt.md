@@ -1,6 +1,26 @@
 # Fortschritt V1
 
-Stand: 30. September 2026 – **BL-P2-02a / MAT-CORE-1** Kombinationstabellen-Admin
+Stand: 30. September 2026 – **BL-P2-02b / MAT-CORE-Matrix-Seed** (PO-MAT-CORE-MATRIX-1)
+auf Feature-Branch (Draft-PR), Basis `main` inkl. gemergtem PR #108
+(`d6aed2fe75fb5e18a83af91de063cfaf10689049`).  
+**Kein** Deploy; Inventar-/Medien-Katalog muss vor Seed existieren.
+
+## BL-P2-02b – Produktivmatrix-Import (PO-MAT-CORE-MATRIX-1)
+
+| Thema | Status |
+|---|---|
+| Importvertrag PO-MAT-CORE-MATRIX-1 | **akzeptiert / dokumentiert** |
+| Workbook in `database/data/…xlsx` | **umgesetzt** |
+| Parser + idempotenter Importer | **umgesetzt** |
+| Seeder `CombinationMatrixMatCoreSeeder` | **umgesetzt** (explizit, nicht DatabaseSeeder) |
+| Desired-State ca. 201 aktive Regeln | **umgesetzt** |
+| MAT-003 / leere Zellen / must-not / Pre-/In-Stream | **kein Anlegen** |
+| Hinweistexte aus Matrix | **bewusst nicht** |
+| MAT-004 Admin-Matrixwerkzeuge | **bewusst nicht** |
+
+---
+
+Stand zuvor: 30. September 2026 – **BL-P2-02a / MAT-CORE-1** Kombinationstabellen-Admin
 (PO-BLP202A-1) und Dispo-Freeze Buchungskennzeichen/Einplanung/Hinweis
 (PO-MAT-BOOKING-VIS-1 Option A) auf Feature-Branch.  
 **Kein** Produktivmatrix-Seed; vollständige operative Abnahme der Startdaten
@@ -18,7 +38,7 @@ bleibt aus. PO-AT13-CC-1 / BL-P7-02a (PR #106) ist auf `main`
 | Freeze Calc → Dispo read-only | **umgesetzt** |
 | Unvollständige aktive Regeln / Planungsverbot fail-closed | **umgesetzt** |
 | Legacy ohne Freeze ohne Backfill | **umgesetzt** |
-| Produktivmatrix / MAT-003 Vollabnahme | **offen** (Lieferdaten) |
+| Produktivmatrix / MAT-003 Vollabnahme | **offen** (Importvertrag **PO-MAT-CORE-MATRIX-1** akzeptiert; Seed/Import in BL-P2-02b) |
 | MAT-004 Massenimport | **bewusst nicht** |
 | `disposition_abbinder` als Einplanungs-Wert | **behalten** (Stammdatum laut §6.3; keine SPT-013-Funktion) |
 
