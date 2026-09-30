@@ -385,22 +385,18 @@ class DispoOrderController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $this->uploads->archive(
+        $result = $this->uploads->archive(
             $dispoOrder,
             $upload,
             $user,
             $request->expectedLockVersion(),
         );
 
-        $order = $dispoOrder->fresh([
-            'positions',
-            'creator',
-            'approvalRequests',
-            'pendingApprovalRequest',
-            'latestApprovalRequest',
-        ]) ?? $dispoOrder;
+        $message = $result->approvalInvalidated
+            ? 'Kundenbestätigung archiviert. Freigabe ungültig – Auftrag ist wieder Entwurf und muss erneut freigegeben werden.'
+            : 'Datei archiviert.';
 
-        return $this->respondSuccess($request, $order, 'Datei archiviert.');
+        return $this->respondSuccess($request, $result->order, $message);
     }
 
     public function downloadUpload(

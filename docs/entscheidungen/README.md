@@ -22,3 +22,8 @@ ohne die Entscheidung zu ersetzen.
 | [ADR-002](ADR-002-technologie-stack.md) | Technologie-Stack | Akzeptiert |
 | [ADR-003](ADR-003-speedit-betrieb-und-deployment.md) | Speedit-Betrieb und Deployment | Akzeptiert |
 
+Fachliche Design-Gates (kein ADR-Ersatz):
+
+| Dok | Thema | Status |
+|---|---|---|
+| [AT-13 CC-Invalidierung](AT-13-freigabeinvalidierung-kundenbestaetigung.md) | Freigabeinvalidierung Kundenbestätigung (PO-AT13-CC-1) | Akzeptiert |

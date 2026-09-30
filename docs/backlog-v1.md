@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**); Rest blockiert (u. a. weitere Status-Mails / In-App)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. weitere Status-Mails / In-App; weitere Invalidierungsauslöser)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -379,16 +379,31 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Akzeptanz:** `AT-06`, `AT-07`; Division durch 0 bei Mediabrutto 0 verhindert
 - **Tests:** Zahlenbeispiel 10 %+10 % = 19 %
 
+### BL-P7-02a – CC-Archiv-Invalidierung (PO-AT13-CC-1)
+
+- **Phase:** 7
+- **Status:** in Umsetzung (PR #106; PO bestätigt 29.09.2026)
+- **Kennung:** PO-AT13-CC-1 / UX-GATE-D Teilfreigabe ausschließlich dieser Scope
+- **Anforderungen:** `AT-13` (Teil: CC-Archiv), `APR-004`
+- **Abhängigkeiten:** BL-P8-01b / BL-P9-01a (Approval + CC-Upload)
+- **Ergebnis:** Archiv aktiver CC bei `at_disposition` → `draft` in einer TX;
+  Historie append-only; Audit inkl. `approval_request_id`; erneuter voller Zyklus
+  über bestehende Draft-/Submit-/Approve-Pfade
+- **Nicht:** Replace nach Approve; andere Quellstatus; Preis-Invalidierung; Rückzug; AUTH-005
+- **Tests:** Feature SQLite; MySQL-Concurrency Archiv vs. Status; Regression Kommentar/Material/E7
+- **Dok:** `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`
+
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; Invalidierung offen
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; **CC-Archiv-Invalidierung** über **BL-P7-02a / PO-AT13-CC-1** (nicht mehr Design-Gate)
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
 - **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
-- **Offen:** Freigabeinvalidierung nach Änderungen, Rückzug, AUTH-005 als zwei getrennte Ereignisse
-- **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` offen
-- **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright
+- **Offen:** weitere Invalidierungsauslöser (AT-13 Rest), Rückzug, AUTH-005 als zwei getrennte Ereignisse
+- **AT-13 Teil:** siehe **BL-P7-02a / PO-AT13-CC-1** (CC-Archiv bei `at_disposition`). Weitere Invalidierungsauslöser offen.
+- **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` teilweise über 02a
+- **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright (nach Gate)
 
 ### BL-P7-03 – Budget-Assistent
 

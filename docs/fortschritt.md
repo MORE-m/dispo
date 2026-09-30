@@ -1,15 +1,13 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
-auf `main` abgeschlossen (Merge-Commit
-`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
-`2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
-[36602377339](https://github.com/MORE-m/dispo/actions/runs/36602377339) grün;
-Post-Merge-CI
-[36609997929](https://github.com/MORE-m/dispo/actions/runs/36609997929) grün
-`ci`/`mysql`/`e2e-spt008`). Ask/Answer-Enqueue **erledigt in 02b**; SMTP-Zustellung
-**nur** asked/answered **erledigt in 02c**; weitere Status-Mails/In-App
-**weiter offen**.
+Stand: 29. September 2026 – **PO-AT13-CC-1 / BL-P7-02a** Freigabeinvalidierung
+Kundenbestätigung (Archiv bei `at_disposition` → `draft`) freigegeben und in Umsetzung
+in PR #106. Entscheidungsdok:
+`docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
+
+Basis `main` `363def9932e6473904cfe09a02fa4a8193804c68` (PR #104). Post-Merge-CI
+[36630845368](https://github.com/MORE-m/dispo/actions/runs/36630845368) SUCCESS.
+Vorher: **BL-P9-02c** Ask/Answer-SMTP (PR #103).
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -27,17 +25,30 @@ Phase 4 Standardangebote (**03a–03f** auf `main`).
 
 ## Aktuelle Aufgabe
 
-Kein freigegebener Folgeslice ohne neues PO-Gate. Technisch abhängigkeitsreif,
-aber PO-gesperrt: Calendar-/Budget-Vorlagen (BL-P4-03 Rest), weitere Status-Mails /
-In-App / Admin-Outbox-UI, Freigabeinvalidierung. SPT-013 Abbinder (BL-P4-02)
-bewusst zurückgestellt. Kein Merge und keine Feature-Umsetzung in diesem
-Docs-Schritt.
+**PO-AT13-CC-1 / BL-P7-02a:** CC-Archiv bei `at_disposition` → Invalidierung nach
+`draft` + voller Freigabezyklus (APR-004). Replace und spätere Quellstatus
+ausgeschlossen. Feature-Code + Tests in PR #106.
+
+Weiter PO-gesperrt / zurückgestellt: Calendar-/Budget-Vorlagen, weitere
+Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder; weitere
+Invalidierungsauslöser (Preis etc.).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
 **BL-P9-02c** Ask/Answer Outbox → SMTP (PO-BLP902C-1); nur asked/answered;
 DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
 (**auf `main`**, PR #103).
+
+## PO-AT13-CC-1 / BL-P7-02a – CC-Archiv-Invalidierung (September 2026)
+
+| Teil | Status |
+|------|--------|
+| UX-GATE-D Teilfreigabe PO-AT13-CC-1 | **freigegeben** (nur dieser Scope) |
+| Auslöser: Admin archiviert aktive CC bei `at_disposition` | **verbindlich** |
+| Zielstatus `draft`; voller Freigabezyklus erneut | **verbindlich** |
+| Replace nach Approve; spätere Quellstatus | **ausgeschlossen** |
+| Approval-Historie append-only; Audit mit Freigabebezug | **umgesetzt** |
+| Entscheidungsdok | `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md` |
 
 ## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)
 
