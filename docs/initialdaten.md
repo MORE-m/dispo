@@ -76,7 +76,7 @@ Zusatzzeile innerhalb einer Position.
 19. Stinger
 20. Closer
 21. Gewinnspiel/Pay-Off
-22. Sondersendung (4x90 Sek.)
+22. Sondersendung (4x90Sek)
 23. Influencer-Spot
 24. Influencer-Spot als Single-Spot
 25. Infomercial / Profi-Tipp
@@ -95,12 +95,19 @@ Zusatzzeile innerhalb einer Position.
 38. In-Stream
 39. Pre-Stream Influencer
 40. In-Stream Influencer
-41. Mid-Roll Spotify / Deezer / YouTube Musikumfeld
+41. Mid-Roll Spotify / Deezer / Youtube Musikumfeld
 42. Native-Ad
 
 Die kombinierten Werbemittel `Pre-/In-Stream` und `Pre-/In-Stream Influencer`
 entfallen. Single-Spots für MORE Hamburg-Kombi+, Bollerwagen und ffn werden durch die
 Kombinationstabelle ausgeschlossen.
+
+Anzeigenamen **22** und **41** folgen der Excel-Matrix (PO-MAT-CORE-CATALOG-1 /
+PO-MAT-CORE-MATRIX-1), nicht der früheren Schreibweise mit `Sek.` / `YouTube`.
+
+Technische Codes, Typen und Oberkategorien: Entscheidung
+`docs/entscheidungen/PO-MAT-CORE-CATALOG-1-initialkatalog.md` und
+`InitialCatalogDefinitions` (Slice BL-P2-02c).
 
 ## Standard-Auswahlwerte
 
@@ -184,9 +191,9 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
 ## Vor Produktivsetzung noch zu liefern
 
 - vollständige Kombinationstabelle mit Buchungskennzeichen, Zuständigkeit und Hinweisen
-  (**Admin-/Freeze-Logik BL-P2-02a umgesetzt; Importvertrag PO-MAT-CORE-MATRIX-1 und
-  Seed-Slice BL-P2-02b vorhanden – Catalog-Namen müssen exakt zur Matrix passen;
-  Hinweistexte weiter separat / Regeln**),
+  (**Admin-/Freeze BL-P2-02a; Matrix-Import BL-P2-02b; Initialkatalog BL-P2-02c /
+  PO-MAT-CORE-CATALOG-1 – Reihenfolge Katalog-Seeder → Matrix-Seeder; Hinweise weiter
+  separat**),
 - Jahrespreislisten je Inventar im vereinbarten Excel-Format,
 - Festpreise für Online Audio, Podcast, Events und weitere digitale Produkte,
 - Produktionspreise je Inventar und Typ,
