@@ -53,7 +53,7 @@ final class MoreSpotkalkulationWorkbookParser
     public static function looksLikeMoreWorkbook(array $info): bool
     {
         foreach ($info as $sheet) {
-            $title = trim((string) ($sheet['worksheetName'] ?? ''));
+            $title = trim($sheet['worksheetName']);
             if (array_key_exists($title, self::SHEET_TO_INVENTORY_CODE)) {
                 return true;
             }

@@ -56,17 +56,17 @@ final class MoreSpotkalkulationMatCoreImporter
 
         $errorIssues = array_values(array_filter(
             $parsed['issues'],
-            static fn (array $issue): bool => ($issue['severity'] ?? '') === 'error',
+            static fn (array $issue): bool => $issue['severity'] === 'error',
         ));
         if ($errorIssues !== []) {
             $first = $errorIssues[0];
             throw ValidationException::withMessages([
-                'workbook' => ($first['sheet'] ? $first['sheet'].': ' : '').($first['message'] ?? 'Importfehler'),
+                'workbook' => ($first['sheet'] !== null && $first['sheet'] !== '' ? $first['sheet'].': ' : '').$first['message'],
             ]);
         }
 
-        $metaYear = $parsed['meta']['year'] ?? null;
-        if ($metaYear !== null && (int) $metaYear !== $year) {
+        $metaYear = $parsed['meta']['year'];
+        if ($metaYear !== null && $metaYear !== $year) {
             throw ValidationException::withMessages([
                 'year' => 'Workbook-Jahr ('.$metaYear.') weicht vom Importjahr ('.$year.') ab.',
             ]);
@@ -78,11 +78,16 @@ final class MoreSpotkalkulationMatCoreImporter
         $warnings = [];
 
         foreach ($parsed['issues'] as $issue) {
-            if (($issue['severity'] ?? '') === 'warning') {
-                $warnings[] = trim(
-                    (($issue['sheet'] ?? '') !== '' ? $issue['sheet'].' Z'.$issue['row'].': ' : '')
-                    .($issue['message'] ?? 'Warnung'),
-                );
+            if ($issue['severity'] === 'warning') {
+                $location = '';
+                if ($issue['sheet'] !== null && $issue['sheet'] !== '') {
+                    $location = $issue['sheet'];
+                    if ($issue['row'] !== null) {
+                        $location .= ' Z'.$issue['row'];
+                    }
+                    $location .= ': ';
+                }
+                $warnings[] = trim($location.$issue['message']);
             }
         }
 
@@ -154,8 +159,8 @@ final class MoreSpotkalkulationMatCoreImporter
         return [
             'year' => $year,
             'parsed_rows' => count($parsed['rows']),
-            'skipped_average_rows' => (int) ($parsed['meta']['skipped_average_rows'] ?? 0),
-            'skipped_empty_cells' => (int) ($parsed['meta']['skipped_empty_cells'] ?? 0),
+            'skipped_average_rows' => $parsed['meta']['skipped_average_rows'],
+            'skipped_empty_cells' => $parsed['meta']['skipped_empty_cells'],
             'created_drafts' => $created,
             'activated' => $activated,
             'warnings' => $warnings,
