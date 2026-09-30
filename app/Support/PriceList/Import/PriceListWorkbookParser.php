@@ -48,6 +48,18 @@ final class PriceListWorkbookParser
                 ];
             }
 
+            /** @var list<array{worksheetName: string, lastColumnLetter: string, lastColumnIndex: int, totalRows: int, totalColumns: int}> $sheetInfo */
+            $sheetInfo = $reader->listWorksheetInfo($absolutePath);
+            if (MoreSpotkalkulationWorkbookParser::looksLikeMoreWorkbook($sheetInfo)) {
+                $more = (new MoreSpotkalkulationWorkbookParser)->parse($absolutePath, $extension);
+
+                return [
+                    'sheet_count' => $more['sheet_count'],
+                    'issues' => $more['issues'],
+                    'rows' => $more['rows'],
+                ];
+            }
+
             $reader->setReadDataOnly(true);
             $reader->setReadEmptyCells(false);
             $reader->setReadFilter(new PriceListImportReadFilter(
