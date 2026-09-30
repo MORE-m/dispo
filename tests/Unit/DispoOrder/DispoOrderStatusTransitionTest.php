@@ -118,6 +118,26 @@ class DispoOrderStatusTransitionTest extends TestCase
         ));
     }
 
+    public function test_customer_confirmation_archive_invalidation_to_draft_is_allowed_but_not_operational(): void
+    {
+        $this->assertTrue(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::Draft,
+        ));
+        $this->assertTrue(DispoOrderStatusTransition::isCustomerConfirmationArchiveInvalidation(
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::Draft,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::isOperationalTransition(
+            DispoOrderStatus::AtDisposition,
+            DispoOrderStatus::Draft,
+        ));
+        $this->assertFalse(DispoOrderStatusTransition::canTransition(
+            DispoOrderStatus::InProgress,
+            DispoOrderStatus::Draft,
+        ));
+    }
+
     /**
      * @return list<array{0: DispoOrderStatus}>
      */

@@ -10,6 +10,7 @@ use App\Enums\FieldType;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
+use App\Models\DispoOrderApprovalRequest;
 use App\Models\DispoOrderFieldValue;
 use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderPositionFieldValue;
@@ -33,7 +34,8 @@ use Throwable;
 /**
  * Privates Dispo-Upload-Fundament (BL-P9-01a / BL-P9-01b).
  * Produktiv: Kundenbestätigung + feste Materialkategorien (PO-BLP901B-1).
- * Kein Hard-Delete (UPL-005). Keine Freigabeinvalidierung. Kein Status-Automatismus.
+ * Kein Hard-Delete (UPL-005). Kein Status-Automatismus.
+ * Freigabeinvalidierung nur PO-AT13-CC-1: Archiv aktiver CC bei `at_disposition`.
  */
 final class DispoOrderUploadService
 {
@@ -90,6 +92,7 @@ final class DispoOrderUploadService
     public function __construct(
         private readonly PrivateFileStorage $files,
         private readonly AuditLogger $audit,
+        private readonly DispoOrderApprovalInvalidationService $approvalInvalidation,
     ) {}
 
     public function uploadCustomerConfirmation(
@@ -286,14 +289,14 @@ final class DispoOrderUploadService
         DispoOrderUpload $upload,
         User $user,
         int $expectedLockVersion,
-    ): DispoOrderUpload {
+    ): DispoOrderUploadArchiveResult {
         if (! Gate::forUser($user)->allows('archiveUpload', $order)) {
             abort(403);
         }
 
         $this->assertUploadBelongsToOrder($order, $upload);
 
-        return DB::transaction(function () use ($order, $upload, $user, $expectedLockVersion): DispoOrderUpload {
+        return DB::transaction(function () use ($order, $upload, $user, $expectedLockVersion): DispoOrderUploadArchiveResult {
             $locked = $this->lockOrder($order);
             $this->assertLockVersion($locked, $expectedLockVersion);
 
@@ -313,15 +316,47 @@ final class DispoOrderUploadService
                 ]);
             }
 
+            $invalidateApproval = false;
+            $approvedRequest = null;
+
+            if ($lockedUpload->category === DispoOrderUploadCategory::CustomerConfirmation) {
+                if ($locked->status === DispoOrderStatus::Draft) {
+                    // Draft: bisheriges Verhalten ohne Invalidierung.
+                } elseif (
+                    $locked->status === DispoOrderStatus::AtDisposition
+                ) {
+                    $approvedRequest = $this->approvalInvalidation
+                        ->assertEligibleForCustomerConfirmationArchiveInvalidation(
+                            $locked,
+                            $lockedUpload,
+                        );
+                    $invalidateApproval = true;
+                } else {
+                    throw ValidationException::withMessages([
+                        'upload' => 'Die Kundenbestätigung kann in diesem Status nicht archiviert werden.',
+                    ]);
+                }
+            }
+
             $lockedUpload->archived_at = Carbon::now();
             $lockedUpload->archived_by_user_id = $user->id;
             $lockedUpload->archived_by_name_snapshot = $user->name;
             $lockedUpload->save();
 
-            // Draft-Archiv mutiert den Order-Zustand (UPL-001-Grundlage).
-            // Nach Submit: Snapshot unverändert; lock_version trotzdem +1 für Race-Schutz.
-            $locked->lock_version = $locked->lock_version + 1;
-            $locked->save();
+            if ($invalidateApproval) {
+                /** @var DispoOrderApprovalRequest $approvedRequest */
+                $locked = $this->approvalInvalidation->applyAfterCustomerConfirmationArchived(
+                    $locked,
+                    $user,
+                    $lockedUpload,
+                    $approvedRequest,
+                );
+            } else {
+                // Draft-Archiv mutiert den Order-Zustand (UPL-001-Grundlage).
+                // Nach Submit ohne Invalidierung: Snapshot unverändert; lock_version +1.
+                $locked->lock_version = $locked->lock_version + 1;
+                $locked->save();
+            }
 
             $this->clearDynamicFieldReferenceIfCurrent($locked, $lockedUpload);
 
@@ -334,6 +369,10 @@ final class DispoOrderUploadService
             ];
             if ($lockedUpload->field_key !== null) {
                 $auditAfter['field_key'] = $lockedUpload->field_key;
+            }
+            if ($invalidateApproval) {
+                $auditAfter['approval_invalidated'] = true;
+                $auditAfter['status'] = $locked->status->value;
             }
 
             $this->audit->record(
@@ -348,8 +387,30 @@ final class DispoOrderUploadService
                 $auditAfter,
             );
 
-            return $lockedUpload->fresh() ?? $lockedUpload;
+            $freshUpload = $lockedUpload->fresh() ?? $lockedUpload;
+            $freshOrder = $this->reloadOrder($locked);
+
+            return new DispoOrderUploadArchiveResult(
+                $freshUpload,
+                $freshOrder,
+                $invalidateApproval,
+            );
         });
+    }
+
+    private function reloadOrder(DispoOrder $order): DispoOrder
+    {
+        $order->refresh();
+        $order->load([
+            'positions',
+            'creator',
+            'approvalRequests',
+            'pendingApprovalRequest',
+            'latestApprovalRequest',
+            'statusEvents',
+        ]);
+
+        return $order;
     }
 
     public function download(
