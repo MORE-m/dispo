@@ -29,3 +29,4 @@ ohne die Entscheidung zu ersetzen.
 | [AT-13 CC-Invalidierung](AT-13-freigabeinvalidierung-kundenbestaetigung.md) | Freigabeinvalidierung Kundenbestätigung (PO-AT13-CC-1) | Akzeptiert |
 | [PO-BLP202A-1](PO-BLP202A-1-kombinationstabelle-admin-gate-anfrage.md) | UX-GATE-D Teilfreigabe Kombinationstabellen-Admin | Akzeptiert |
 | [PO-MAT-BOOKING-VIS-1](PO-MAT-BOOKING-VIS-1-buchungskennzeichen-sichtbarkeit.md) | Buchungskennzeichen nur Dispo (Option A) | Akzeptiert |
+| [PO-MAT-CORE-MATRIX-1](PO-MAT-CORE-MATRIX-1-produktivmatrix-importvertrag.md) | Produktivmatrix Importvertrag (BL-P2-02b) | Akzeptiert |
