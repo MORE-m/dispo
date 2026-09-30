@@ -14,6 +14,7 @@ use App\Models\PriceListItem;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
+use App\Support\InventoryMediumRule\InventoryMediumRuleOperativeContract;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Collection;
@@ -263,6 +264,7 @@ final class CatalogResolver
             'inventory_medium_rule_id' => $existing->inventory_medium_rule_id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
+            ...$this->storedCombinationFreeze($existing),
         ];
     }
 
@@ -368,6 +370,7 @@ final class CatalogResolver
             'inventory_medium_rule_id' => $rule->id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
+            ...$this->liveCombinationFreeze($rule),
         ];
     }
 
@@ -478,6 +481,7 @@ final class CatalogResolver
             'inventory_medium_rule_id' => $existing->inventory_medium_rule_id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
+            ...$this->storedCombinationFreeze($existing),
         ];
     }
 
@@ -582,6 +586,7 @@ final class CatalogResolver
             'inventory_medium_rule_id' => $rule->id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
+            ...$this->liveCombinationFreeze($rule),
         ];
     }
 
@@ -704,6 +709,7 @@ final class CatalogResolver
             'inventory_medium_rule_id' => $rule->id,
             'inventory_changed' => $inventoryChanged,
             'medium_changed' => $mediumChanged,
+            ...$this->liveCombinationFreeze($rule),
         ];
     }
 
@@ -781,6 +787,44 @@ final class CatalogResolver
     private function missingYearPriceListMessage(string $inventoryName, int $year): string
     {
         return PriceListYearSelection::missingYearPriceListMessage($inventoryName, $year);
+    }
+
+    /**
+     * Live-Pfad: Pflichtwerte prüfen und Freeze aus Regel ableiten (nicht Client).
+     *
+     * @return array{
+     *     booking_code: string,
+     *     planning_responsibility_key: string,
+     *     planning_responsibility_label: string,
+     *     combination_hint_text: string|null
+     * }
+     */
+    private function liveCombinationFreeze(InventoryMediumRule $rule): array
+    {
+        InventoryMediumRuleOperativeContract::assertCompleteForActiveUse($rule);
+        InventoryMediumRuleOperativeContract::assertAllowedForPlanning($rule);
+
+        return InventoryMediumRuleOperativeContract::freezeFromRule($rule);
+    }
+
+    /**
+     * Snapshot-Pfad: gespeicherte Positions-Freeze-Werte (Legacy null erlaubt).
+     *
+     * @return array{
+     *     booking_code: string|null,
+     *     planning_responsibility_key: string|null,
+     *     planning_responsibility_label: string|null,
+     *     combination_hint_text: string|null
+     * }
+     */
+    private function storedCombinationFreeze(CalculationPosition $existing): array
+    {
+        return InventoryMediumRuleOperativeContract::freezeFromStoredPosition(
+            $existing->booking_code ?? null,
+            $existing->planning_responsibility_key ?? null,
+            $existing->planning_responsibility_label ?? null,
+            $existing->combination_hint_text ?? null,
+        );
     }
 
     /**
@@ -1341,6 +1385,7 @@ final class CatalogResolver
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
+            ...$this->liveCombinationFreeze($rule),
         ];
     }
 }

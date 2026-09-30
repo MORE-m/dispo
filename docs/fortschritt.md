@@ -1,13 +1,44 @@
 # Fortschritt V1
 
-Stand: 29. September 2026 – **PO-AT13-CC-1 / BL-P7-02a** Freigabeinvalidierung
-Kundenbestätigung (Archiv bei `at_disposition` → `draft`) freigegeben und in Umsetzung
-in PR #106. Entscheidungsdok:
+Stand: 30. September 2026 – **BL-P2-02a / MAT-CORE-1** Kombinationstabellen-Admin
+(PO-BLP202A-1) und Dispo-Freeze Buchungskennzeichen/Einplanung/Hinweis
+(PO-MAT-BOOKING-VIS-1 Option A) auf Feature-Branch.  
+**Kein** Produktivmatrix-Seed; vollständige operative Abnahme der Startdaten
+bleibt aus. PO-AT13-CC-1 / BL-P7-02a (PR #106) ist auf `main`
+(`d344540abb48f85551c1c615c647ba9d38e713fc`).
+
+## BL-P2-02a – Kombinationstabelle operativ (MAT-CORE-1)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe PO-BLP202A-1 | **freigegeben / umgesetzt** |
+| PO-MAT-BOOKING-VIS-1 Option A (kein Calc-UI) | **akzeptiert / umgesetzt** |
+| Admin Liste/Detail/Create/Edit/Deakt./Reakt. | **umgesetzt** |
+| Filter Inventar/Medium/Kategorie/Einplanung/Kennzeichen | **umgesetzt** |
+| Freeze Calc → Dispo read-only | **umgesetzt** |
+| Unvollständige aktive Regeln / Planungsverbot fail-closed | **umgesetzt** |
+| Legacy ohne Freeze ohne Backfill | **umgesetzt** |
+| Produktivmatrix / MAT-003 Vollabnahme | **offen** (Lieferdaten) |
+| MAT-004 Massenimport | **bewusst nicht** |
+| `disposition_abbinder` als Einplanungs-Wert | **behalten** (Stammdatum laut §6.3; keine SPT-013-Funktion) |
+
+---
+
+Stand zuvor: 29. September 2026 – **PO-AT13-CC-1 / BL-P7-02a** Freigabeinvalidierung
+Kundenbestätigung (Archiv bei `at_disposition` → `draft`) gemerged in PR #106
+(`d344540`). Entscheidungsdok:
 `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
 
-Basis `main` `363def9932e6473904cfe09a02fa4a8193804c68` (PR #104). Post-Merge-CI
-[36630845368](https://github.com/MORE-m/dispo/actions/runs/36630845368) SUCCESS.
-Vorher: **BL-P9-02c** Ask/Answer-SMTP (PR #103).
+Vorher: **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
+auf `main` abgeschlossen (Merge-Commit
+`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
+`2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
+[36602377339](https://github.com/MORE-m/dispo/actions/runs/36602377339) grün;
+Post-Merge-CI
+[36609997929](https://github.com/MORE-m/dispo/actions/runs/36609997929) grün
+`ci`/`mysql`/`e2e-spt008`). Ask/Answer-Enqueue **erledigt in 02b**; SMTP-Zustellung
+**nur** asked/answered **erledigt in 02c**; weitere Status-Mails/In-App
+**weiter offen**.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).

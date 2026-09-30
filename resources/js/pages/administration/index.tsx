@@ -24,7 +24,7 @@ export default function AdministrationIndex({
             <div className="flex flex-1 flex-col gap-6 p-6">
                 <PageHeader
                     title="Administration"
-                    description="UX-GATE-D Teilfreigabe: Dynamische Felder, Katalog, Inventar-Admin, Preislisten-Lifecycle und Excel-Import (Draft). Kombinationstabellen bleiben gesperrt."
+                    description="UX-GATE-D Teilfreigabe: Dynamische Felder, Katalog, Inventar-Admin, Kombinationstabelle (MAT-CORE), Preislisten-Lifecycle und Excel-Import (Draft)."
                 />
                 {flash.success ? (
                     <SuccessState message={flash.success} />

@@ -198,17 +198,21 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** teilweise (`ADV-001a` Datenbasis; `ADV-001b` Katalog-Admin; `ADV-001c1` Methoden-Schema; `ADV-001c2` Dual-Read/Write + Freeze; `ADV-001c3a` engine-unabhängige Medienpflege; `ADV-001c3b1` Methoden-Lifecycle; `ADV-001c3b2` Kategorie-Desired-State; `ADV-001c3c` Medium-Overrides/Mode/Default; `ADV-001c4a` Methodenoptions-/Freeze-Persistenz; `ADV-001c4b` sichtbare Wizard-Methodenauswahl; weitere Defaults offen)
+- **Status:** teilweise (`ADV-001a`…`ADV-001c4b`; **`BL-P2-02a` / MAT-CORE-1** Kombinationstabellen-Admin + Freeze/Dispo umgesetzt unter PO-BLP202A-1 / PO-MAT-BOOKING-VIS-1 A; Produktivmatrix und MAT-003-Vollabnahme offen; ADV-001 Defaults weiter offen)
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
 - **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a/b/c1 braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern
 - **Akzeptanz:** nur aktive erlaubte Kombinationen auswählbar; `MAT-004` nicht umsetzen
-- **Tests:** Pest Filter, Planungsverbot, eindeutiger fachlicher Schlüssel
+- **Tests:** Pest Filter, Planungsverbot, eindeutiger fachlicher Schlüssel; BL-P2-02a: `CombinationAdminMatCoreTest`, Playwright `playwright.blp202a.config.ts`
 - **ADV-001a erledigt:** `advertising_categories` + `advertising_media.category_id`
   NOT NULL; sechs kanonische Keys; explizite Bestands-Map
 - **ADV-001b erledigt:** Katalog-Admin CRUD/Lifecycle/Impact-Preview; Key/Code
   immutable; kein Hard Delete; `spot_classic`↔`spots`. **ADV-001 nicht vollständig**
-  (Defaults fehlen). Kombinationstabelle-Admin (`MAT-*`) offen.
+  (Defaults fehlen).
+- **BL-P2-02a erledigt (Admin/Verarbeitung):** Kombinationstabellen-Admin; Freeze
+  booking/planning/hint auf Calc- und Dispo-Positionen; Dispo read-only Anzeige;
+  keine Calc-Anzeige (PO-MAT-BOOKING-VIS-1 A). **Produktivmatrix-Seed bewusst nicht** –
+  Fixtures nur in Tests/E2E.
 
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 

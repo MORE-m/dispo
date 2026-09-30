@@ -9,7 +9,8 @@ use Inertia\Response;
 
 /**
  * UX-GATE-D Teilfreigabe: Dyn-Felder + Katalog (ADV-001b) + Inventar-Admin (BL-P2-01a)
- * + Preislisten-Admin-Lifecycle (BL-P4-01a) und Excel-Import (BL-P4-01b, ohne Auto-Aktivierung).
+ * + Preislisten-Admin-Lifecycle (BL-P4-01a) und Excel-Import (BL-P4-01b, ohne Auto-Aktivierung)
+ * + Kombinationstabellen-Admin (BL-P2-02a / PO-BLP202A-1).
  */
 class AdministrationHubController extends Controller
 {
@@ -31,6 +32,13 @@ class AdministrationHubController extends Controller
                     'title' => 'Inventare / Kombis',
                     'description' => 'Inventare und Kombis anlegen, bearbeiten und aktivieren.',
                     'href' => '/administration/inventare',
+                    'available' => true,
+                ],
+                [
+                    'key' => 'combinations',
+                    'title' => 'Kombinationstabelle',
+                    'description' => 'Inventar × Werbemittel: Buchungskennzeichen, Einplanung und Hinweise (MAT-CORE).',
+                    'href' => '/administration/kombinationen',
                     'available' => true,
                 ],
                 [

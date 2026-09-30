@@ -5,6 +5,7 @@ use App\Http\Controllers\Administration\AdvertisingCategoryAdminController;
 use App\Http\Controllers\Administration\AdvertisingMediumAdminController;
 use App\Http\Controllers\Administration\CalculationMethodAdminController;
 use App\Http\Controllers\Administration\CatalogHubController;
+use App\Http\Controllers\Administration\CombinationAdminController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
@@ -194,6 +195,22 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.dynamic-fields.assignments.activate');
         Route::post('administration/dynamische-felder/assignments/{assignment}/deaktivieren', [FieldSetAssignmentAdminController::class, 'deactivate'])
             ->name('administration.dynamic-fields.assignments.deactivate');
+
+        // BL-P2-02a / MAT-CORE-1 Kombinationstabellen-Admin (UX-GATE-D Teilfreigabe PO-BLP202A-1)
+        Route::get('administration/kombinationen', [CombinationAdminController::class, 'index'])
+            ->name('administration.combinations.index');
+        Route::get('administration/kombinationen/neu', [CombinationAdminController::class, 'create'])
+            ->name('administration.combinations.create');
+        Route::post('administration/kombinationen', [CombinationAdminController::class, 'store'])
+            ->name('administration.combinations.store');
+        Route::get('administration/kombinationen/{rule}', [CombinationAdminController::class, 'show'])
+            ->name('administration.combinations.show');
+        Route::put('administration/kombinationen/{rule}', [CombinationAdminController::class, 'update'])
+            ->name('administration.combinations.update');
+        Route::post('administration/kombinationen/{rule}/deaktivieren', [CombinationAdminController::class, 'deactivate'])
+            ->name('administration.combinations.deactivate');
+        Route::post('administration/kombinationen/{rule}/reaktivieren', [CombinationAdminController::class, 'reactivate'])
+            ->name('administration.combinations.reactivate');
 
         // BL-P2-01a Inventar-Admin-Lifecycle (UX-GATE-D Teilfreigabe; ohne Memberships)
         Route::get('administration/inventare', [InventoryAdminController::class, 'index'])

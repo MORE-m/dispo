@@ -94,6 +94,11 @@ final class DispoOrderSnapshotMapper
             'advertising_medium_id' => $position->advertising_medium_id,
             'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
             'advertising_medium_code' => $position->advertisingMedium->code ?? null,
+            // MAT-CORE-1 / PO-MAT-BOOKING-VIS-1 A: Freeze aus Calc, kein Live-Nachziehen.
+            'booking_code' => $position->booking_code,
+            'planning_responsibility_key' => $position->planning_responsibility_key,
+            'planning_responsibility_label' => $position->planning_responsibility_label,
+            'combination_hint_text' => $position->combination_hint_text,
             'kind' => $freeze->legacyKind()->value,
             'spot_method' => $freeze->legacySpotMethod()->value,
             'engine_profile_key' => $freeze->engineProfileKey,

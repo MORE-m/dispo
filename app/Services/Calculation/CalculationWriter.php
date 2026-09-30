@@ -298,6 +298,11 @@ final class CalculationWriter
                 'inventory_id' => $item['inventory']->id,
                 'advertising_medium_id' => $item['medium']->id,
                 'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
+                // MAT-CORE-1: serverseitiger Kombinations-Freeze (nie aus Client-Payload).
+                'booking_code' => $item['booking_code'] ?? null,
+                'planning_responsibility_key' => $item['planning_responsibility_key'] ?? null,
+                'planning_responsibility_label' => $item['planning_responsibility_label'] ?? null,
+                'combination_hint_text' => $item['combination_hint_text'] ?? null,
                 'price_list_id' => $item['priceList']->id,
                 'kind' => $item['freeze']->legacyKind(),
                 'spot_method' => $item['freeze']->legacySpotMethod(),

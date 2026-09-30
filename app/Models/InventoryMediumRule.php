@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
+ * @property string|null $booking_code
+ * @property string|null $planning_responsibility_key
+ * @property string|null $hint_text
+ * @property int $sort
+ * @property int $lock_version
  * @property string $surcharge_percent
  * @property int|null $default_length_seconds
  * @property bool $is_discountable
@@ -24,11 +29,16 @@ class InventoryMediumRule extends Model
         'inventory_id',
         'advertising_medium_id',
         'is_active',
+        'booking_code',
+        'planning_responsibility_key',
+        'hint_text',
+        'sort',
         'default_length_seconds',
         'surcharge_percent',
         'is_discountable',
         'is_ae_eligible',
         'component_calculation_strategy',
+        'lock_version',
     ];
 
     /**
@@ -42,6 +52,8 @@ class InventoryMediumRule extends Model
             'is_ae_eligible' => 'boolean',
             'surcharge_percent' => 'decimal:4',
             'component_calculation_strategy' => ComponentCalculationStrategy::class,
+            'sort' => 'integer',
+            'lock_version' => 'integer',
         ];
     }
 
