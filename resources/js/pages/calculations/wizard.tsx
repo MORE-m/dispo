@@ -1,8 +1,9 @@
 import type { HttpExceptionResponse } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Check, SlidersHorizontal, Wallet } from 'lucide-react';
+import { SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationMethodSelector } from '@/components/calculation-method-selector';
+import { WizardInventorySelection } from '@/components/wizard-inventory-selection';
 import { PricingSettlementSection } from '@/components/pricing-settlement-section';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
@@ -1990,6 +1991,36 @@ export default function CalculationWizard({
         );
     }
 
+    const unplannableInventoryIds = useMemo(() => {
+        const ids = new Set<number>();
+        for (const inventory of catalog.inventories) {
+            if (allowedMediaFor(inventory.id).length === 0) {
+                ids.add(inventory.id);
+            }
+        }
+        return ids;
+        // catalog is the reactive source; allowedMediaFor closes over it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [catalog]);
+
+    function selectInventoryForPosition(
+        index: number,
+        inventoryId: number,
+    ): boolean {
+        const current = positions[index];
+        if (current === undefined) {
+            return false;
+        }
+        if (current.inventory_id === inventoryId) {
+            return true;
+        }
+        if (allowedMediaFor(inventoryId).length === 0) {
+            return false;
+        }
+        updatePosition(index, { inventory_id: inventoryId });
+        return true;
+    }
+
     function updatePosition(index: number, patch: Partial<PositionDraft>) {
         if (usesRegularPlanningEditorView && planningMode === 'budget') {
             setBudgetProposalManual(true);
@@ -3272,132 +3303,30 @@ export default function CalculationWizard({
                                                     <CardContent
                                                         className={`${wizardCardContentClass} space-y-6`}
                                                     >
-                                                        <div className="space-y-3">
-                                                            <p className="text-sm font-medium">
-                                                                Sender / Kombi
-                                                            </p>
-                                                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                                                {catalog.inventories.map(
-                                                                    (item) => {
-                                                                        const selected =
-                                                                            position.inventory_id ===
-                                                                            item.id;
-                                                                        const disabled =
-                                                                            !canEdit ||
-                                                                            (!item.is_active &&
-                                                                                item.id !==
-                                                                                    position.inventory_id);
-
-                                                                        return (
-                                                                            <button
-                                                                                key={
-                                                                                    item.id
-                                                                                }
-                                                                                type="button"
-                                                                                disabled={
-                                                                                    disabled
-                                                                                }
-                                                                                aria-pressed={
-                                                                                    selected
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    updatePosition(
-                                                                                        index,
-                                                                                        {
-                                                                                            inventory_id:
-                                                                                                item.id,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                                className={cn(
-                                                                                    'focus-visible:ring-primary/25 relative flex w-full flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all outline-none focus-visible:ring-[3px]',
-                                                                                    selected
-                                                                                        ? 'border-primary bg-accent/70 ring-primary/15 shadow-xs ring-1'
-                                                                                        : 'border-border/80 bg-card hover:border-primary/45 hover:bg-muted/20',
-                                                                                    disabled &&
-                                                                                        'cursor-not-allowed opacity-50',
-                                                                                )}
-                                                                            >
-                                                                                {selected ? (
-                                                                                    <span className="bg-primary text-primary-foreground pointer-events-none absolute top-3 right-3 flex size-5 items-center justify-center rounded-full">
-                                                                                        <Check
-                                                                                            className="size-3"
-                                                                                            aria-hidden="true"
-                                                                                        />
-                                                                                    </span>
-                                                                                ) : null}
-                                                                                <LogoSlot
-                                                                                    name={catalogLabel(
-                                                                                        item.name,
-                                                                                        item.is_active,
-                                                                                    )}
-                                                                                    logoPath={
-                                                                                        item.logo_path
-                                                                                    }
-                                                                                    variant="card"
-                                                                                />
-                                                                                <span className="pr-6 text-sm leading-snug font-semibold">
-                                                                                    {catalogLabel(
-                                                                                        item.name,
-                                                                                        item.is_active,
-                                                                                    )}
-                                                                                </span>
-                                                                            </button>
-                                                                        );
-                                                                    },
-                                                                )}
-                                                            </div>
-                                                            <select
-                                                                className="sr-only"
-                                                                data-test={`position-inventory-${index}`}
-                                                                value={
-                                                                    position.inventory_id
-                                                                }
-                                                                disabled={
-                                                                    !canEdit
-                                                                }
-                                                                onChange={(
-                                                                    event,
-                                                                ) =>
-                                                                    updatePosition(
-                                                                        index,
-                                                                        {
-                                                                            inventory_id:
-                                                                                Number(
-                                                                                    event
-                                                                                        .target
-                                                                                        .value,
-                                                                                ),
-                                                                        },
-                                                                    )
-                                                                }
-                                                                tabIndex={-1}
-                                                                aria-hidden="true"
-                                                            >
-                                                                {catalog.inventories.map(
-                                                                    (item) => (
-                                                                        <option
-                                                                            key={
-                                                                                item.id
-                                                                            }
-                                                                            value={
-                                                                                item.id
-                                                                            }
-                                                                            disabled={
-                                                                                !item.is_active &&
-                                                                                item.id !==
-                                                                                    position.inventory_id
-                                                                            }
-                                                                        >
-                                                                            {catalogLabel(
-                                                                                item.name,
-                                                                                item.is_active,
-                                                                            )}
-                                                                        </option>
-                                                                    ),
-                                                                )}
-                                                            </select>
-                                                        </div>
+                                                        <WizardInventorySelection
+                                                            positionIndex={index}
+                                                            inventories={
+                                                                catalog.inventories
+                                                            }
+                                                            selectedInventoryId={
+                                                                position.inventory_id
+                                                            }
+                                                            canEdit={canEdit}
+                                                            unplannableInventoryIds={
+                                                                unplannableInventoryIds
+                                                            }
+                                                            catalogLabel={
+                                                                catalogLabel
+                                                            }
+                                                            onSelectInventory={(
+                                                                inventoryId,
+                                                            ) =>
+                                                                selectInventoryForPosition(
+                                                                    index,
+                                                                    inventoryId,
+                                                                )
+                                                            }
+                                                        />
 
                                                         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                                             <FormField
