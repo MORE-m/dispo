@@ -165,7 +165,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { WizardStepper } from '@/components/wizard-stepper';
-import { cn } from '@/lib/utils';
 
 type PlanRow = {
     hour: number;
@@ -3304,7 +3303,9 @@ export default function CalculationWizard({
                                                         className={`${wizardCardContentClass} space-y-6`}
                                                     >
                                                         <WizardInventorySelection
-                                                            positionIndex={index}
+                                                            positionIndex={
+                                                                index
+                                                            }
                                                             inventories={
                                                                 catalog.inventories
                                                             }

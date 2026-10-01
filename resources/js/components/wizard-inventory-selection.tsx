@@ -37,7 +37,9 @@ export function WizardInventorySelection({
     onSelectInventory,
 }: WizardInventorySelectionProps) {
     const listId = useId();
-    const selected = inventories.find((item) => item.id === selectedInventoryId);
+    const selected = inventories.find(
+        (item) => item.id === selectedInventoryId,
+    );
     const [expanded, setExpanded] = useState(() => selected === undefined);
 
     useEffect(() => {
@@ -145,7 +147,10 @@ export function WizardInventorySelection({
                                 !canEdit ||
                                 (!item.is_active && !isSelected) ||
                                 (unplannable && !isSelected);
-                            const label = catalogLabel(item.name, item.is_active);
+                            const label = catalogLabel(
+                                item.name,
+                                item.is_active,
+                            );
 
                             return (
                                 <button
@@ -162,12 +167,12 @@ export function WizardInventorySelection({
                                     data-test={`position-inventory-tile-${positionIndex}-${item.code}`}
                                     onClick={() => selectInventory(item.id)}
                                     className={cn(
-                                        'focus-visible:ring-primary/25 relative flex w-full flex-col gap-3 rounded-xl border-2 p-4 text-left outline-none transition-all focus-visible:ring-[3px] motion-reduce:transition-none',
+                                        'focus-visible:ring-primary/25 relative flex w-full flex-col gap-3 rounded-xl border-2 p-4 text-left transition-all outline-none focus-visible:ring-[3px] motion-reduce:transition-none',
                                         isSelected
                                             ? 'border-primary bg-accent/70 ring-primary/15 shadow-xs ring-1'
                                             : 'border-border/80 bg-card hover:border-primary/45 hover:bg-muted/20',
                                         disabled &&
-                                            'cursor-not-allowed opacity-50 hover:border-border/80 hover:bg-card',
+                                            'hover:border-border/80 hover:bg-card cursor-not-allowed opacity-50',
                                     )}
                                 >
                                     {isSelected ? (
