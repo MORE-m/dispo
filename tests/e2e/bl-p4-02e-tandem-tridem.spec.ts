@@ -28,6 +28,10 @@ async function waitForCalculationPreview(page: Page) {
 }
 
 async function selectInventory(page: Page, name = 'Radio Hamburg') {
+    const expand = page.locator('[data-test="position-inventory-expand-0"]');
+    if (await expand.isVisible()) {
+        await expand.click();
+    }
     await page.getByRole('button', { name, exact: true }).click();
 }
 
