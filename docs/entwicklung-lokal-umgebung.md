@@ -166,14 +166,25 @@ Objekts jenseits erfolgreicher Tar-Lesbarkeit.
 5. Hinweis: Katalog/Preise dann wieder der alte 3-Inventar-Bestand; die MAT-Dev-DB
    bleibt unberührt.
 
-### Rückkehr aus Dump (nur in neue Temp-DB)
+### Rückkehr aus Dump (sicheres Vorgehen, kein Copy-Paste-Skript)
 
-```bash
-# Beispiel – nur in eine NEUE Temp-DB, nie blind über Dev-DBs
-gunzip -c ~/dispo-local-backups/env-consolidation-20261002-194636/mysql/dispo_mat_core.sql.gz \
-  | sed 's/`dispo_mat_core`/`dispo_restore_tmp`/g; s/USE `dispo_mat_core`/USE `dispo_restore_tmp`/g' \
-  | mysql -u root
-```
+Restore **ausschließlich** in eine eindeutig neue, isolierte Datenbank – niemals
+in `dispo_mat_core`, `dispo`, `dispo_test` oder eine andere bestehende
+Entwicklungsdatenbank.
+
+1. Zielnamen wählen, der lokal noch **nicht** existiert; vor dem Import prüfen,
+   dass diese Datenbank fehlt.
+2. Dump-Struktur lesen (Header/`USE`/Objekte) und einen dazu passenden Importweg
+   wählen. **Keine** globale Textersetzung über den Dump, die auch SQL-Dateninhalte
+   verändern kann.
+3. Import ausführen; bei Fehlern abbrechen und den ggf. teilweise
+   wiederhergestellten Bestand nicht als gültig verwenden.
+4. Vollständigkeit prüfen (u. a. erwartete Tabellen und zentrale Zeilenzahlen),
+   bevor die wiederhergestellte DB genutzt wird.
+
+Die oben dokumentierte Restore-Probe bleibt nur historischer Prüfbeleg der
+Tabellen-/Daten-Sicherung (mit den dort genannten Grenzen), kein laufendes
+Restore-Rezept.
 
 ## Testisolation (unverändert maßgeblich)
 
