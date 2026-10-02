@@ -5,6 +5,7 @@ namespace Tests\Feature\Calculation;
 use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\InventoryMediumRule;
+use App\Models\PriceList;
 use App\Models\User;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
@@ -291,7 +292,7 @@ class EightSpotInventoryCalculabilitySmokeTest extends TestCase
         }
 
         // Expected-Token wenn price_year gesetzt und Liste existiert
-        $listId = \App\Models\PriceList::query()
+        $listId = PriceList::query()
             ->where('inventory_id', $inventoryId)
             ->where('year', $catalog['year'])
             ->where('status', 'active')
