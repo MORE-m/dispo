@@ -190,17 +190,23 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
 
 ## Vor Produktivsetzung noch zu liefern
 
-- vollständige Kombinationstabelle mit Buchungskennzeichen, Zuständigkeit und Hinweisen
-  (**Admin-/Freeze BL-P2-02a; Matrix-Import BL-P2-02b; Initialkatalog BL-P2-02c /
-  PO-MAT-CORE-CATALOG-1 – Reihenfolge Katalog-Seeder → Matrix-Seeder; Hinweise weiter
-  separat**),
-- Jahrespreislisten je Inventar im vereinbarten Excel-Format,
+- Kombinationstabelle Buchungskennzeichen / Einplanung / Hinweise:
+  **Code + Seeder auf `main`** (Admin/Freeze PR **#108**, Matrix Desired-State
+  ~201 Regeln PR **#109**, Initialkatalog 14/42 PR **#110**). Explizite Seeder,
+  kein Auto-Lauf durch Deploy. Hinweistexte aus Matrix und MAT-003-Vollabnahme
+  weiter offen. Matrix-Zulässigkeit bedeutet nicht automatische Kalkulierbarkeit.
+- Jahrespreislisten Spot Classic 2026:
+  **Adapter + Workbook auf `main`** (PRI-OPS-1 / PR **#111**). Lokaler Import nur
+  auf `dispo_mat_core`: 8 aktive Listen, 501 Einzelstundenpreise (Zeilen 13–36,
+  Spalten B/D/F); Durchschnittszeilen/Formelspalten und 75 fehlende Basiszellen
+  unverändert fail-closed. `.env` / DB `dispo` nicht umgestellt; Merge importiert
+  nicht. Weitere Inventar-/Produktlisten und digitale Festpreise weiter zu liefern.
 - Festpreise für Online Audio, Podcast, Events und weitere digitale Produkte,
 - Produktionspreise je Inventar und Typ,
 - finale technische und DMP-Targetings einschließlich Aufschlägen,
 - erforderliche Kunden-, Agentur- und Kontaktstammdaten,
 - Nutzer, Rollen, Rabattgrenzen und Sonderfreigaberechte,
 - genaue Texte der Sonderhinweise,
-- freigegebene PDF-Layouts,
+- freigegebene PDF-Layouts (REP-007 Dispo-PDF weiter offen),
 - Browsermatrix, E-Mail-Absender, Domain, Backup- und Aufbewahrungsparameter.
 

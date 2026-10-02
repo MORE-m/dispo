@@ -328,6 +328,7 @@ Excel-Import für Spot-Stundenpreislisten freigegeben: Upload XLSX/XLS, Prüfung
 Preview mit Fingerprint, Bestätigung, atomare Draft-Erzeugung, privater Storage
 und Report. **Keine Auto-Aktivierung.** Kanonischer V1-Spaltenvertrag; Adapter für
 eine echte MORE-Produktivdatei bleibt bis Beispieldatei offen.
+*(Nachzug 02.10.2026: MORE-Spotkalkulation-Adapter **PRI-OPS-1** / PR **#111** auf `main`; siehe `fortschritt.md`.)*
 
 **Product-Owner-Teilfreigabe (15. September 2026, UX-GATE-D / BL-P4-01c / PO-PRI-YEAR-1):**
 Explizite Preisjahrwahl im Kalkulationswizard freigegeben: je Position aktuelles
@@ -336,6 +337,7 @@ des Inventars; keine Quartals-Hardcodierung; Rebind nur bei tatsächlichem Jahrw
 und bewusstem Speichern; historische Pins stabil; Budget denselben Jahresvertrag;
 `expected_price_list_id` mit HTTP 409 bei Active-Drift. `BL-P4-01` ist damit
 abgeschlossen. MORE-Produktiv-Workbook-Mapping bleibt Lieferdaten-/Adapterpunkt.
+*(Nachzug 02.10.2026: Adapter **PRI-OPS-1** gemergt; Grenzen und lokaler Import siehe `fortschritt.md`.)*
 
 **Product-Owner-Teilfreigabe (23. September 2026, UX-GATE-D / BL-P8-02a / PO-BLP802A-1):**
 Ausschließlich der **operative Statuskern** freigegeben:
@@ -489,11 +491,13 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
 - Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a–03f (Calendar,
   Budget-auf-Vorlage, Abbinder-auf-Vorlage, erweiterte REP-Listen)
 - Administration der übrigen Initialkataloge – Kombinationstabellen-Admin
-  (**BL-P2-02a / PO-BLP202A-1** teilfreigegeben); Oberkategorien/Werbemittel
-  (ADV-001b), Inventar-Admin (BL-P2-01a), Preislisten-Lifecycle (BL-P4-01a),
-  Excel-Import (BL-P4-01b) und Wizard-Jahreswahl (BL-P4-01c) sind teilfreigegeben;
-  Kombi-Mitgliedschaften entfallen (PO-BL-P2-01-KOMBI); **Produktivmatrix-Seed
-  weiterhin offen**
+  (**BL-P2-02a / PO-BLP202A-1** auf `main`, PR #108); Matrix Desired-State
+  (**BL-P2-02b**, PR #109) und Initialkatalog (**BL-P2-02c**, PR #110) auf `main`;
+  Oberkategorien/Werbemittel (ADV-001b), Inventar-Admin (BL-P2-01a),
+  Preislisten-Lifecycle (BL-P4-01a), Excel-Import (BL-P4-01b), Wizard-Jahreswahl
+  (BL-P4-01c) und MORE-Adapter (PRI-OPS-1 / PR #111) sind teilfreigegeben;
+  Kombi-Mitgliedschaften entfallen (PO-BL-P2-01-KOMBI); Hinweistexte / MAT-003 /
+  Nicht-Spot-Methoden **weiter offen**
 - Auswertungen und abschließende Fachoberflächen
 - Freigabe-Administration außerhalb der bereits freigegebenen Vier-Augen-Kette
 
@@ -559,7 +563,7 @@ BL-P9-01c.
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
 | C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + Calc→Standardangebot-Vorschlag (BL-P4-03b / PO-BLP403B-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1) + Ask/Answer→Outbox (BL-P9-02b / PO-BLP902B-1) + Ask/Answer-SMTP (BL-P9-02c / PO-BLP902C-1); Kombinationstabellen-Admin (BL-P2-02a / PO-BLP202A-1) teilfreigegeben; weitere Status-Mails/In-App/Admin-Outbox weiterhin gesperrt; Kombi-Mitgliedschaften entfallen; Produktivmatrix-Seed offen |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + MORE-Spotkalkulation-Adapter (PRI-OPS-1 / PR #111) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + Calc→Standardangebot-Vorschlag (BL-P4-03b / PO-BLP403B-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1) + Ask/Answer→Outbox (BL-P9-02b / PO-BLP902B-1) + Ask/Answer-SMTP (BL-P9-02c / PO-BLP902C-1) + CC-Archiv-Invalidierung (PO-AT13-CC-1 / PR #106); Kombinationstabellen-Admin (BL-P2-02a / PO-BLP202A-1) + Matrix-Seed (BL-P2-02b / PR #109) + Initialkatalog (BL-P2-02c / PR #110) auf `main`; Inventarauswahl einklappbar (PR #112); weitere Status-Mails/In-App/Admin-Outbox weiterhin gesperrt; Kombi-Mitgliedschaften entfallen; Nicht-Spot-Methoden / REP-007 / Abbinder weiter offen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

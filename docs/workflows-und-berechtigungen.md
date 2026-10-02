@@ -159,6 +159,12 @@ Folgende Änderungen setzen bereits erteilte betroffene Freigaben zurück:
 - Pflichtfelder oder freigaberelevante dynamische Werte,
 - Ersetzen oder Archivieren der Kundenbestätigung.
 
+**Umgesetzt (PO-AT13-CC-1 / PR #106):** Archivieren der aktiven Kundenbestätigung
+bei Status `at_disposition` setzt den Auftrag auf `draft` und erfordert den vollen
+Freigabezyklus erneut. Replace nach Approve und andere Quellstatus sind
+ausgeschlossen. Weitere Invalidierungsauslöser (Preis etc.) bleiben separater
+offener Scope.
+
 Kommentare sowie zusätzliche, nicht ersetzende Uploads invalidieren keine
 Freigabe. Ursache, alte Freigaben und auslösende Person werden protokolliert.
 
