@@ -92,7 +92,7 @@ Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswa
 MORE-Spotkalkulation-Adapter (PR **#111**) auf `main`: Einzelstunden €/SEK
 Zeilen 13–36 / B·D·F; kein Durchschnitt/Formelspalten; fail-closed bei fehlenden
 Stunden; lokaler Import nur `dispo_mat_core`; `.env`/`dispo` unberührt. Offen
-außerhalb: weitere digitale/Festpreis-Listen, kein Auto-Import in `dispo`.
+außerhalb: **ADV-002**; weitere digitale/Festpreis-Listen; kein Auto-Import in `dispo`.
 Hauptblock **BL-P4-02 teilweise**
 (`02a`–`02e` auf `main`; Inventar-Einklapp-UI PR **#112**; Rest: Abbinder/SPT-013, operative Blockplanung):
 **02a–02e** und **SPT-008** siehe [`backlog-v1.md`](backlog-v1.md) /

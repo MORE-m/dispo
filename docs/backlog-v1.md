@@ -393,7 +393,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02a – CC-Archiv-Invalidierung (PO-AT13-CC-1)
 
 - **Phase:** 7
-- **Status:** in Umsetzung (PR #106; PO bestätigt 29.09.2026)
+- **Status:** erledigt (`main`, PR **#106**, Merge `d344540abb48f85551c1c615c647ba9d38e713fc`; PO bestätigt 29.09.2026)
 - **Kennung:** PO-AT13-CC-1 / UX-GATE-D Teilfreigabe ausschließlich dieser Scope
 - **Anforderungen:** `AT-13` (Teil: CC-Archiv), `APR-004`
 - **Abhängigkeiten:** BL-P8-01b / BL-P9-01a (Approval + CC-Upload)
@@ -407,12 +407,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; **CC-Archiv-Invalidierung** über **BL-P7-02a / PO-AT13-CC-1** (nicht mehr Design-Gate)
+- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; **CC-Archiv-Invalidierung** über **BL-P7-02a / PO-AT13-CC-1** (**erledigt**, PR #106); Rest weiter offen
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
 - **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
 - **Offen:** weitere Invalidierungsauslöser (AT-13 Rest), Rückzug, AUTH-005 als zwei getrennte Ereignisse
-- **AT-13 Teil:** siehe **BL-P7-02a / PO-AT13-CC-1** (CC-Archiv bei `at_disposition`). Weitere Invalidierungsauslöser offen.
+- **AT-13 Teil:** siehe **BL-P7-02a / PO-AT13-CC-1** (CC-Archiv bei `at_disposition`, gemergt). Weitere Invalidierungsauslöser offen.
 - **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` teilweise über 02a
 - **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright (nach Gate)
 
