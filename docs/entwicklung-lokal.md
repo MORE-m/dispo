@@ -3,6 +3,30 @@
 Voraussetzungen: PHP 8.3 oder neuer (lokal darf 8.4/8.5 sein), Composer 2,
 Node.js 22+, MySQL 8 mit InnoDB/utf8mb4 **oder** SQLite für den Schnellstart.
 
+## Kanonische lokale Umgebung (Workspace)
+
+Nach der Konsolidierung vom 2026-10-02 gilt für die **manuelle tägliche Arbeit in
+dieser lokalen Einrichtung** (Details: [`entwicklung-lokal-umgebung.md`](entwicklung-lokal-umgebung.md)):
+
+| Rolle | Festlegung |
+|---|---|
+| Checkout | `dispo-main` auf Branch `main` (tracking `origin/main`) |
+| App-Port / URL | **8000** → `http://127.0.0.1:8000` bzw. `http://localhost:8000` |
+| Entwicklungs-DB | MySQL **`dispo_mat_core`** (vollständiger MAT-/Katalog-/Preislistenbestand) |
+| Storage | `dispo-main/storage/app` (u. a. `private/price-list-imports`) |
+| Start | `./scripts/start-dev.sh` (existiert; liest `DB_DATABASE` aus `.env`), `Dispo starten.command` oder `php artisan serve --host=127.0.0.1 --port=8000` |
+| Test-MySQL | ausschließlich **`dispo_test`** (`phpunit.mysql.xml` + `MysqlTestDatabaseGuard`) |
+| Pest/PHPUnit Standard | SQLite `:memory:` (`phpunit.xml`) |
+| Playwright/E2E | eigene SQLite-Dateien und Ports – niemals die Dev-DB |
+
+**Stillgelegt (nicht löschen):** Checkout `dispo` und MySQL-DB `dispo` (älterer
+3-Inventar-Bestand mit inkompatiblen Inventar-IDs). Alte Arbeitsdaten dort sind
+**erhalten**, wurden aber **nicht** nach `dispo_mat_core` übernommen und sind in
+der neuen Dev-DB **nicht sichtbar**. Keine Tabellenzusammenführung.
+
+Feature- und Docs-Worktrees nur für aktive oder begründet aufzubewahrende Arbeiten;
+verbliebene Worktrees sind **nicht automatisch gefahrlos löschbar**.
+
 ## Erstes Setup (vollständige Befehle)
 
 ```bash
@@ -19,10 +43,16 @@ Datenbank anlegen, danach in `.env` setzen (keine produktiven Passwörter):
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=dispo
+DB_DATABASE=dispo_mat_core
 DB_USERNAME=root
 DB_PASSWORD=
 ```
+
+Greenfield-Setups dürfen einen eigenen DB-Namen wählen. `.env.example` nennt
+weiterhin `dispo` als Vorlage – das ist **kein** automatischer Zeiger der
+laufenden Workspace-App; maßgeblich ist die Checkout-`.env`. Im konsolidierten
+Workspace ist **`dispo_mat_core`** die Entwicklungsdatenbank – nicht die
+stillgelegte DB `dispo`.
 
 ```bash
 php artisan migrate
@@ -57,9 +87,12 @@ Anwendung: http://localhost:8000 – Health: `/health` und `/up`.
 
 ### Sicherer lokaler Start (`Dispo starten.command` / `scripts/start-dev.sh`)
 
-Der normale Start prüft PHP/MySQL, führt `php artisan migrate --force` aus und
-startet den Dev-Server. **Keine automatischen Seeder** gegen die Dev-DB
-`dispo` – weder `DevUserSeeder` noch `E2ECalculationSeeder`.
+`scripts/start-dev.sh` existiert und ist der dokumentierte Startweg.
+`Dispo starten.command` ist nur ein Finder-Wrapper darauf. Der Start prüft
+PHP/MySQL, liest `DB_DATABASE` aus `.env` (Workspace: `dispo_mat_core`), führt
+`php artisan migrate --force` aus und startet den Dev-Server auf Port **8000**
+(oder `DISPO_PORT`). **Keine automatischen Seeder** gegen die maßgebliche
+Dev-DB – weder `DevUserSeeder` noch `E2ECalculationSeeder`.
 
 - Migrationsfehler beenden den Start (`set -e`).
 - Erfolgreicher Migrations-No-op erlaubt den Start.
@@ -73,8 +106,8 @@ php artisan db:seed --class=DevUserSeeder --force
 `DevUserSeeder` setzt per `updateOrCreate` fest definierte `*@example.com`-Konten
 (Name, Rolle, Passwort `password`) – deshalb nicht bei jedem Start automatisch.
 E2E-Katalog-Seeder laufen **nur** über isolierte Playwright-Configs
-(`APP_ENV=testing`, `E2E_SERVER=1`, eigene SQLite-Datei – niemals `dispo`) und
-sind fail-closed gegen die Dev-DB abgesichert.
+(`APP_ENV=testing`, `E2E_SERVER=1`, eigene SQLite-Datei – niemals Dev-DB
+`dispo_mat_core` / stillgelegtes `dispo`) und sind fail-closed abgesichert.
 
 Öffentliche Registrierung ist deaktiviert. Benutzer werden administrativ angelegt.
 Passwort-Reset nutzt lokal `MAIL_MAILER=log` (`storage/logs`).
@@ -103,11 +136,12 @@ npm audit --omit=dev
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
 MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
 (benötigt eine Datenbank `dispo_test` und die Zugangsdaten aus `phpunit.mysql.xml`).
-`phpunit.mysql.xml` erzwingt `DB_DATABASE=dispo_test` per `force="true"` – eine äußere
-Shell-Variable wie `DB_DATABASE=dispo` darf die Entwicklungsdatenbank nicht treffen.
+`phpunit.mysql.xml` erzwingt `DB_DATABASE=dispo_test` per `force="true"` – äußere
+Shell-Variablen wie `DB_DATABASE=dispo` oder `DB_DATABASE=dispo_mat_core` dürfen die
+Entwicklungsdatenbank nicht treffen.
 Zusätzlich bricht `Tests\Support\MysqlTestDatabaseGuard` vor `RefreshDatabase` /
 `DatabaseMigrations` und in MySQL-Parallelworkern ab, wenn nicht exakt `dispo_test`
-aktiv ist.
+aktiv ist. **Tests dürfen `dispo_mat_core` weder lesen noch zurücksetzen.**
 
 ## DF-3.3a2β – historische Dispo-Origin-Retention
 

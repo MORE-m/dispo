@@ -32,6 +32,7 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`backlog-v1.md`](backlog-v1.md) | Paket-/Slice-Status (`offen` / `erledigt` / `teilweise` / `blockiert`) |
 | [`fortschritt.md`](fortschritt.md) | Aktueller Arbeits-/Umsetzungsstand |
 | [`entwicklung-lokal.md`](entwicklung-lokal.md) | Lokales Setup, Prüfungen, Produktionshinweise |
+| [`entwicklung-lokal-umgebung.md`](entwicklung-lokal-umgebung.md) | Kanonische lokale Workspace-Umgebung, Stilllegungen, Sicherungen |
 | [`blocker-und-entscheidungslog.md`](blocker-und-entscheidungslog.md) | Blocker und technische Detailentscheidungen |
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |
 
