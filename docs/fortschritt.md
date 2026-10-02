@@ -1,20 +1,24 @@
 # Fortschritt V1
 
-Stand: 2. Oktober 2026 – **PRI-OPS-1** MORE-Spotkalkulation-2026-Preislisten-Adapter
-(PR **#111**) und **Wizard-Inventarauswahl einklappbar** (PR **#112**) auf `main`.
-Letzter Merge: PR #111
-(`c75f92e7981482e963990047ab5d2af5d3b7c2c1`); davor PR #112
-(`012e125972b792f283f52005e342c03843bab059`).  
-Post-Merge-CI #111
-[36998845471](https://github.com/MORE-m/dispo/actions/runs/36998845471) und #112
-[36924662513](https://github.com/MORE-m/dispo/actions/runs/36924662513) grün
-(`ci`/`mysql`/`e2e-spt008`; #112 inkl. isoliertem Inventar-Smoke).  
-**Kein** Deploy. Merge löst **keinen** Preislisten-Import aus; `.env` / DB `dispo`
-unverändert. Lokaler Import nur gezielt auf `dispo_mat_core` (siehe PRI-OPS-1).
+Stand: 2. Oktober 2026 – Docs **lokale Dev-Umgebung** (PR **#114**) auf `main`;
+Audit-Nachzug (Kalkulierbarkeit / Invalidierung / H–K) im Docs-Worktree.
+Letzter Merge: PR #114
+(`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`); davor PR #113
+(`8011cc37eff7c595e3fe096661b5547b4f7dc9dc`), davor Feature PR #111 / #112.  
+Post-Merge-CI #114
+[37050401271](https://github.com/MORE-m/dispo/actions/runs/37050401271)
+**SUCCESS** (`ci`/`mysql`/`e2e-spt008`).  
+Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
+Alt-`dispo` stillgelegt. **Kein** Deploy; **kein** Preislisten-Import durch Merge.
 
-Davor auf `main` (30.09.2026): **BL-P2-02a/b/c** (PRs **#108** / **#109** / **#110**)
-und **PO-AT13-CC-1** (PR **#106**). Matrix-Zulässigkeit ≠ automatische
-Kalkulierbarkeit; Nicht-Spot-Methoden bleiben offen.
+Audit-Bericht (nicht rückwirkend in ältere Reviews geschrieben):
+`docs/reviews/audit-nachzug-after-pr114/README.md`.
+Empfohlene Readiness:
+`docs/readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`.
+
+Davor auf `main`: **PRI-OPS-1** (#111), Inventar-Einklapp (#112), Status #113,
+**BL-P2-02a/b/c** (#108–#110), **PO-AT13-CC-1** (#106). Matrix-Zulässigkeit ≠
+automatische Kalkulierbarkeit; Nicht-Spot-Methoden bleiben offen.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -34,12 +38,17 @@ Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
 
 ## Aktuelle Aufgabe
 
-Kein freigegebener Folgeslice ohne neues PO-Gate. Offen / zurückgestellt u. a.:
+Isolierter 8-Inventar-Kalkulierbarkeits-Smoke umgesetzt (Test-Branch; siehe
+Readiness). Offen: PO-Klärung Rechte-Soll vs. Ist; DSP-DCP-001
+**Abnahmebeleg ungeklärt**; Calc-Edit nach Dispo-Create als Lifecycle-Entscheidung.
+
+Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
 Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
 Status-Mails / In-App / Admin-Outbox-UI, weitere Freigabeinvalidierungs-Auslöser
-(Preis etc.), Nicht-Spot-Methoden / Engines, ADV-001 Defaults, Hinweistexte aus
-Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10). **Kein** REP-007 in
-diesem Docs-Schritt.
+nur mit neuem Edit-Pfad (Dispo-Kaufmännisch bereits gesperrt), Nicht-Spot /
+CRM / REP (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002
+Systemfeld-Overrides, Hinweistexte aus Matrix, MAT-003-Vollabnahme,
+REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
@@ -456,7 +465,7 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | UI getrennt + Konflikt-Hinweis (nicht blockierend) | **umgesetzt** |
 | Rechnung nur bei `complete` vorbereitet, Automatik **nicht** | **dokumentiert** |
 | Abbinder / Kunden-Calc-Export | **bewusst nicht** |
-| Manuelle Abnahme | **offen** (laut PR #69 / Repo-Doku; nicht als abgenommen geführt) |
+| Manuelle Abnahme | **Abnahmebeleg ungeklärt** (PR #69 Body „offen“ vs. früherer Abschlussbericht „bestätigt“ – ohne vorliegenden Protokollbeleg weder als abgenommen noch allein wegen Checkboxen als widerlegt führen) |
 
 ## SPT-008 – Dispo Spotplanungs-XLSX (September 2026)
 

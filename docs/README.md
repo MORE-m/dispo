@@ -35,6 +35,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entwicklung-lokal-umgebung.md`](entwicklung-lokal-umgebung.md) | Kanonische lokale Workspace-Umgebung, Stilllegungen, Sicherungen |
 | [`blocker-und-entscheidungslog.md`](blocker-und-entscheidungslog.md) | Blocker und technische Detailentscheidungen |
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |
+| [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
+| [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 
 ## Pflegeprozess
 
