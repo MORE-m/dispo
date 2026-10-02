@@ -1,85 +1,20 @@
 # Fortschritt V1
 
-Stand: 30. September 2026 – **BL-P2-02c / Initialkatalog** (PO-MAT-CORE-CATALOG-1)
-auf Feature-Branch (Draft-PR), Basis `main` inkl. gemergtem PR #109
-(`124026f51440aee2d6e46254b66a6b2a3277c426`).  
-**Kein** Deploy; Seeder nur explizit/isoliert.
+Stand: 2. Oktober 2026 – **PRI-OPS-1** MORE-Spotkalkulation-2026-Preislisten-Adapter
+(PR **#111**) und **Wizard-Inventarauswahl einklappbar** (PR **#112**) auf `main`.
+Letzter Merge: PR #111
+(`c75f92e7981482e963990047ab5d2af5d3b7c2c1`); davor PR #112
+(`012e125972b792f283f52005e342c03843bab059`).  
+Post-Merge-CI #111
+[36998845471](https://github.com/MORE-m/dispo/actions/runs/36998845471) und #112
+[36924662513](https://github.com/MORE-m/dispo/actions/runs/36924662513) grün
+(`ci`/`mysql`/`e2e-spt008`; #112 inkl. isoliertem Inventar-Smoke).  
+**Kein** Deploy. Merge löst **keinen** Preislisten-Import aus; `.env` / DB `dispo`
+unverändert. Lokaler Import nur gezielt auf `dispo_mat_core` (siehe PRI-OPS-1).
 
-## BL-P2-02c – Initialkatalog 14 Inventare / 42 Werbemittel
-
-| Thema | Status |
-|---|---|
-| PO-MAT-CORE-CATALOG-1 Mapping | **akzeptiert / dokumentiert** |
-| Idempotenter Bootstrap `InitialCatalogMatCoreSeeder` | **umgesetzt** |
-| Excel-Namen für Matrix-Match | **umgesetzt** |
-| Fail-closed bei Identitätskonflikten | **umgesetzt** |
-| Explizit, nicht in DatabaseSeeder | **umgesetzt** |
-| Kombinationstabellen-Regeln | **bewusst nicht** (weiter #109 / Matrix-Seeder) |
-
-Aufruf: `php artisan db:seed --class=InitialCatalogMatCoreSeeder`  
-danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
-
----
-
-Stand zuvor: 30. September 2026 – **BL-P2-02b / MAT-CORE-Matrix-Seed** (PO-MAT-CORE-MATRIX-1)
-gemerged in PR #109 (`124026f`). Basis war `main` inkl. PR #108
-(`d6aed2fe75fb5e18a83af91de063cfaf10689049`).  
-**Kein** Deploy; Inventar-/Medien-Katalog muss vor Seed existieren.
-
-## BL-P2-02b – Produktivmatrix-Import (PO-MAT-CORE-MATRIX-1)
-
-| Thema | Status |
-|---|---|
-| Importvertrag PO-MAT-CORE-MATRIX-1 | **akzeptiert / dokumentiert** |
-| Workbook in `database/data/…xlsx` | **umgesetzt** |
-| Parser + idempotenter Importer | **umgesetzt** |
-| Seeder `CombinationMatrixMatCoreSeeder` | **umgesetzt** (explizit, nicht DatabaseSeeder) |
-| Desired-State ca. 201 aktive Regeln | **umgesetzt** |
-| MAT-003 / leere Zellen / must-not / Pre-/In-Stream | **kein Anlegen** |
-| Hinweistexte aus Matrix | **bewusst nicht** |
-| MAT-004 Admin-Matrixwerkzeuge | **bewusst nicht** |
-
----
-
-Stand zuvor: 30. September 2026 – **BL-P2-02a / MAT-CORE-1** Kombinationstabellen-Admin
-(PO-BLP202A-1) und Dispo-Freeze Buchungskennzeichen/Einplanung/Hinweis
-(PO-MAT-BOOKING-VIS-1 Option A) auf Feature-Branch.  
-**Kein** Produktivmatrix-Seed; vollständige operative Abnahme der Startdaten
-bleibt aus. PO-AT13-CC-1 / BL-P7-02a (PR #106) ist auf `main`
-(`d344540abb48f85551c1c615c647ba9d38e713fc`).
-
-## BL-P2-02a – Kombinationstabelle operativ (MAT-CORE-1)
-
-| Thema | Status |
-|---|---|
-| UX-GATE-D Teilfreigabe PO-BLP202A-1 | **freigegeben / umgesetzt** |
-| PO-MAT-BOOKING-VIS-1 Option A (kein Calc-UI) | **akzeptiert / umgesetzt** |
-| Admin Liste/Detail/Create/Edit/Deakt./Reakt. | **umgesetzt** |
-| Filter Inventar/Medium/Kategorie/Einplanung/Kennzeichen | **umgesetzt** |
-| Freeze Calc → Dispo read-only | **umgesetzt** |
-| Unvollständige aktive Regeln / Planungsverbot fail-closed | **umgesetzt** |
-| Legacy ohne Freeze ohne Backfill | **umgesetzt** |
-| Produktivmatrix / MAT-003 Vollabnahme | **offen** (Importvertrag **PO-MAT-CORE-MATRIX-1** akzeptiert; Seed/Import in BL-P2-02b) |
-| MAT-004 Massenimport | **bewusst nicht** |
-| `disposition_abbinder` als Einplanungs-Wert | **behalten** (Stammdatum laut §6.3; keine SPT-013-Funktion) |
-
----
-
-Stand zuvor: 29. September 2026 – **PO-AT13-CC-1 / BL-P7-02a** Freigabeinvalidierung
-Kundenbestätigung (Archiv bei `at_disposition` → `draft`) gemerged in PR #106
-(`d344540`). Entscheidungsdok:
-`docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md`.
-
-Vorher: **BL-P9-02c** Ask/Answer-SMTP-Delivery (PO-BLP902C-1)
-auf `main` abgeschlossen (Merge-Commit
-`5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`, PR #103; Feature-HEAD
-`2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
-[36602377339](https://github.com/MORE-m/dispo/actions/runs/36602377339) grün;
-Post-Merge-CI
-[36609997929](https://github.com/MORE-m/dispo/actions/runs/36609997929) grün
-`ci`/`mysql`/`e2e-spt008`). Ask/Answer-Enqueue **erledigt in 02b**; SMTP-Zustellung
-**nur** asked/answered **erledigt in 02c**; weitere Status-Mails/In-App
-**weiter offen**.
+Davor auf `main` (30.09.2026): **BL-P2-02a/b/c** (PRs **#108** / **#109** / **#110**)
+und **PO-AT13-CC-1** (PR **#106**). Matrix-Zulässigkeit ≠ automatische
+Kalkulierbarkeit; Nicht-Spot-Methoden bleiben offen.
 
 Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
 Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
@@ -92,24 +27,98 @@ Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
 
 ## Aktuelle Phase
 
-Phase 9 / Notifications (**02a/02b/02c** auf `main`; weitere Status-Mails/In-App offen);
-Phase 4 Standardangebote (**03a–03f** auf `main`).
+Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`);
+Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
+(**02a/02b/02c** auf `main`; weitere Status-Mails/In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-AT13-CC-1 / BL-P7-02a:** CC-Archiv bei `at_disposition` → Invalidierung nach
-`draft` + voller Freigabezyklus (APR-004). Replace und spätere Quellstatus
-ausgeschlossen. Feature-Code + Tests in PR #106.
-
-Weiter PO-gesperrt / zurückgestellt: Calendar-/Budget-Vorlagen, weitere
-Status-Mails / In-App / Admin-Outbox-UI, SPT-013 Abbinder; weitere
-Invalidierungsauslöser (Preis etc.).
+Kein freigegebener Folgeslice ohne neues PO-Gate. Offen / zurückgestellt u. a.:
+Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
+Status-Mails / In-App / Admin-Outbox-UI, weitere Freigabeinvalidierungs-Auslöser
+(Preis etc.), Nicht-Spot-Methoden / Engines, ADV-001 Defaults, Hinweistexte aus
+Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10). **Kein** REP-007 in
+diesem Docs-Schritt.
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P9-02c** Ask/Answer Outbox → SMTP (PO-BLP902C-1); nur asked/answered;
-DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
-(**auf `main`**, PR #103).
+**PRI-OPS-1** MORE Spotkalkulation-2026-Adapter (PR **#111**) und
+**Inventarauswahl einklappen** im Wizard (PR **#112**) auf `main`.
+
+## PRI-OPS-1 – MORE Spotkalkulation 2026 / Preislisten-Adapter (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| Workbook-Adapter `Spotkalkulation_2026.xlsx` | **umgesetzt** (`main`, PR #111) |
+| Nur Einzelstunden €/SEK Zeilen 13–36, Spalten B/D/F (Mo–Fr/Sa/So) | **umgesetzt** |
+| Durchschnittszeiträume ab Zeile 37; Formelspalten H/J | **nicht importiert** |
+| Tagesgruppenableitung | **bestehende Logik** (`DayGroupPrice` / PO-PRI-HOURS-1) |
+| Leere Basiszellen (75) | **fehlen bleiben**; keine Nullpreise / keine Ergänzung; fail-closed |
+| Artisan `pri-ops:import-more-spotkalkulation` + `--confirm-database` | **umgesetzt** (Block gegen shared `dispo`) |
+| Lokaler Import `dispo_mat_core` | **durchgeführt**: 8 aktive Listen 2026, 501 Items |
+| `.env` / DB `dispo` | **unberührt**; Merge **ohne** Import |
+| Deploy | **kein** |
+| Merge `main` | **PR #111** (`c75f92e7981482e963990047ab5d2af5d3b7c2c1`) |
+| Post-Merge CI | **`36998845471` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
+
+## Wizard – Inventarauswahl einklappen (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| Nach erfolgreicher Wahl übrige Kacheln einklappen | **umgesetzt** (`main`, PR #112) |
+| „Anderes Inventar wählen“ / erneutes Einklappen | **umgesetzt** |
+| Inventare ohne kalkulierbares Medium nicht wählbar | **umgesetzt** |
+| `prefers-reduced-motion` / a11y (`aria-expanded` u. a.) | **umgesetzt** |
+| Isolierter Playwright-Smoke (Port 8025 / eigene SQLite) | **umgesetzt** |
+| Merge `main` | **PR #112** (`012e125972b792f283f52005e342c03843bab059`) |
+| Post-Merge CI | **`36924662513` SUCCESS** (`ci`/`mysql`/`e2e-spt008` inkl. Inventar-Smoke) |
+
+## BL-P2-02c – Initialkatalog 14 Inventare / 42 Werbemittel
+
+| Thema | Status |
+|---|---|
+| PO-MAT-CORE-CATALOG-1 Mapping | **akzeptiert / dokumentiert** |
+| Idempotenter Bootstrap `InitialCatalogMatCoreSeeder` | **umgesetzt** (`main`, PR #110) |
+| Excel-Namen für Matrix-Match | **umgesetzt** |
+| Fail-closed bei Identitätskonflikten | **umgesetzt** |
+| Explizit, nicht in DatabaseSeeder | **umgesetzt** |
+| Kombinationstabellen-Regeln | **separater Slice** (BL-P2-02b / PR #109) |
+| Merge `main` | **PR #110** (`9e4fab030e3d8b0ff45ba104bbe54bc205f6f870`) |
+
+Aufruf: `php artisan db:seed --class=InitialCatalogMatCoreSeeder`  
+danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
+
+## BL-P2-02b – Produktivmatrix-Import (PO-MAT-CORE-MATRIX-1)
+
+| Thema | Status |
+|---|---|
+| Importvertrag PO-MAT-CORE-MATRIX-1 | **akzeptiert / dokumentiert** |
+| Workbook in `database/data/…xlsx` | **umgesetzt** |
+| Parser + idempotenter Importer | **umgesetzt** |
+| Seeder `CombinationMatrixMatCoreSeeder` | **umgesetzt** (explizit, nicht DatabaseSeeder) |
+| Desired-State ca. 201 aktive Regeln | **umgesetzt** (`main`, PR #109) |
+| MAT-003 / leere Zellen / must-not / Pre-/In-Stream | **kein Anlegen** |
+| Hinweistexte aus Matrix | **bewusst nicht** |
+| MAT-004 Admin-Matrixwerkzeuge | **bewusst nicht** |
+| Merge `main` | **PR #109** (`124026f51440aee2d6e46254b66a6b2a3277c426`) |
+
+## BL-P2-02a – Kombinationstabelle operativ (MAT-CORE-1)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe PO-BLP202A-1 | **freigegeben / umgesetzt** |
+| PO-MAT-BOOKING-VIS-1 Option A (kein Calc-UI) | **akzeptiert / umgesetzt** |
+| Admin Liste/Detail/Create/Edit/Deakt./Reakt. | **umgesetzt** (`main`, PR #108) |
+| Filter Inventar/Medium/Kategorie/Einplanung/Kennzeichen | **umgesetzt** |
+| Freeze Calc → Dispo read-only | **umgesetzt** |
+| Unvollständige aktive Regeln / Planungsverbot fail-closed | **umgesetzt** |
+| Legacy ohne Freeze ohne Backfill | **umgesetzt** |
+| Produktivmatrix-Seed / Desired-State | **umgesetzt** in BL-P2-02b (PR #109) |
+| MAT-003 Vollabnahme | **weiter offen** (kein Anlegen leerer/must-not-Zellen) |
+| MAT-004 Massenimport | **bewusst nicht** |
+| `disposition_abbinder` als Einplanungs-Wert | **behalten** (Stammdatum laut §6.3; keine SPT-013-Funktion) |
+| Merge `main` | **PR #108** (`d6aed2fe75fb5e18a83af91de063cfaf10689049`) |
 
 ## PO-AT13-CC-1 / BL-P7-02a – CC-Archiv-Invalidierung (September 2026)
 
@@ -121,6 +130,7 @@ DB-Queue tries=3/backoff=30/timeout=45; Stuck-Recovery 90s; At-least-once
 | Replace nach Approve; spätere Quellstatus | **ausgeschlossen** |
 | Approval-Historie append-only; Audit mit Freigabebezug | **umgesetzt** |
 | Entscheidungsdok | `docs/entscheidungen/AT-13-freigabeinvalidierung-kundenbestaetigung.md` |
+| Merge `main` | **PR #106** (`d344540abb48f85551c1c615c647ba9d38e713fc`) |
 
 ## BL-P9-02c – Ask/Answer SMTP-Delivery / PO-BLP902C-1 (September 2026)
 

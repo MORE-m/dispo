@@ -198,7 +198,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** teilweise (`ADV-001a`…`ADV-001c4b`; **`BL-P2-02a`** Admin/Freeze; **`BL-P2-02b`** Matrix-Import; **`BL-P2-02c`** Initialkatalog PO-MAT-CORE-CATALOG-1; MAT-003-Vollabnahme/operative Abnahme nach Merge-Zug; ADV-001 Defaults weiter offen)
+- **Status:** teilweise (`ADV-001a`…`ADV-001c4b`; **`BL-P2-02a`** Admin/Freeze PR **#108**; **`BL-P2-02b`** Matrix-Import PR **#109** (~201 aktive Regeln); **`BL-P2-02c`** Initialkatalog PR **#110** (14 Inventare / 42 Werbemittel); MAT-003-Vollabnahme und Hinweistexte weiter offen; ADV-001 Defaults weiter offen; Matrix-Zulässigkeit ≠ Kalkulierbarkeit)
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
 - **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a/b/c1 braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern
@@ -211,10 +211,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   (Defaults fehlen).
 - **BL-P2-02a erledigt (Admin/Verarbeitung):** Kombinationstabellen-Admin; Freeze
   booking/planning/hint auf Calc- und Dispo-Positionen; Dispo read-only Anzeige;
-  keine Calc-Anzeige (PO-MAT-BOOKING-VIS-1 A).
-- **BL-P2-02b erledigt (Matrix-Import):** Desired-State aus Excel laut PO-MAT-CORE-MATRIX-1.
+  keine Calc-Anzeige (PO-MAT-BOOKING-VIS-1 A); **Merge PR #108**.
+- **BL-P2-02b erledigt (Matrix-Import):** Desired-State aus Excel laut PO-MAT-CORE-MATRIX-1
+  (~201 aktive Regeln); **Merge PR #109**.
 - **BL-P2-02c erledigt (Initialkatalog):** 14 Inventare / 42 Werbemittel laut
-  PO-MAT-CORE-CATALOG-1; Reihenfolge Katalog → Matrix; explizite Seeder.
+  PO-MAT-CORE-CATALOG-1; Reihenfolge Katalog → Matrix; explizite Seeder; **Merge PR #110**.
+- **Weiter offen in BL-P2-02:** MAT-003-Vollabnahme; Hinweistexte; ADV-001 Defaults;
+  Nicht-Spot-Methoden/Engines.
 
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 
@@ -277,20 +280,21 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-01 – Preislisten, Import, Tagesgruppen
 
 - **Phase:** 4
-- **Status:** erledigt (`BL-P4-01a` Lifecycle, `BL-P4-01b` Excel-Import, `BL-P4-01c` Wizard-Jahreswahl / PO-PRI-YEAR-1)
+- **Status:** erledigt (`BL-P4-01a` Lifecycle, `BL-P4-01b` Excel-Import, `BL-P4-01c` Wizard-Jahreswahl / PO-PRI-YEAR-1; **PRI-OPS-1** MORE-Adapter PR **#111**)
 - **Anforderungen:** `PRI-001` bis `PRI-006`
 - **Abhängigkeiten:** BL-P3-02
 - **Ergebnis 01a:** Jahresversionen, Draft/Copy/Activate/Archive, atomare Aktivierung, abgeleitete Tagesgruppen, Jahresdefault, Budget-Fingerprint
 - **Ergebnis 01b:** Excel-Import XLSX/XLS, Preview/Fingerprint, atomare Drafts, privater Storage/Report (`AT-21`)
 - **Ergebnis 01c:** explizite Jahreswahl je Position und im Budget (aktuelles + Folgejahr), Rebind nur bei Jahrwechsel + Speichern, historische Pins stabil, 409 bei Active-Drift
-- **Offen außerhalb 01:** MORE-Produktiv-Workbook-Adapter nach Beispieldatei (Lieferdaten; macht `BL-P4-01` nicht unvollständig)
+- **Ergebnis PRI-OPS-1 (PR #111, `c75f92e…`; Post-Merge-CI `36998845471` grün):** MORE-Workbook-Adapter `Spotkalkulation_2026.xlsx`; nur Einzelstunden €/SEK Zeilen 13–36 / Spalten B·D·F; keine Durchschnittszeilen ab 37, keine Formelspalten H/J; 75 leere Basiszellen bleiben fehlend (fail-closed, keine Nullpreise); Import nur mit `--confirm-database`; lokaler Lauf auf `dispo_mat_core` (8 aktive Listen 2026, 501 Items); `.env`/`dispo` unberührt; Merge ohne Import/Deploy
+- **Offen außerhalb 01:** weitere Produkt-Festpreise/digitale Listen laut `initialdaten.md`; kein automatischer Import in `dispo`
 - **Akzeptanz 01a:** höchstens eine Active je Inventar/Jahr; historische Versionen unverändert; aktuelles Kalenderjahr als Default
-- **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017), `blp401b` (8018), `blp401c` (8019)
+- **Tests:** Feature-/Constraint-/Runtime-Tests; Playwright `blp401a` (8017), `blp401b` (8018), `blp401c` (8019); MORE: `MoreSpotkalkulationWorkbookParserTest` / `MoreSpotkalkulationMatCoreImportTest`
 
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; Rest offen: Abbinder/SPT-013, operative Blockplanung)
+- **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; **Inventarauswahl einklappbar** PR **#112**; Rest offen: Abbinder/SPT-013, operative Blockplanung; REP-007 Dispo-PDF = Phase 10)
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
@@ -299,6 +303,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 02d (`main`, PR #60, manuell abgenommen):** Preisabschluss `pricing_settlement_mode` `normal`|`fixed_price` auf Basis `average`|`calendar`; N/N-Festpreis (N/N unverändert); AE rückwärts; Payfaktor/Abschlag; Pin 02a; Dispo-Snapshot; Budget-Apply → `normal`. Registry-Methode **`fixed_price`** weiter **`planned`** (nicht der Live-Weg)
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
 - **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
+- **Ergebnis Inventar-UI (PR #112, `012e125…`; Post-Merge-CI `36924662513` grün inkl. Inventar-Smoke):** nach erfolgreicher Inventarwahl klappen übrige Kacheln ein; „Anderes Inventar wählen“ klappt auf; Inventare ohne kalkulierbares Medium nicht wählbar; a11y/`motion-reduce`
 - **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`

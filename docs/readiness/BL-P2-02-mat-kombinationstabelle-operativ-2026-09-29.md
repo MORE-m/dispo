@@ -1,6 +1,14 @@
 # Readiness: BL-P2-02 / MAT-* – Kombinationstabelle → operative Kalkulation
 
-**Status:** Readiness **nicht** erfüllt für Produktionscode  
+> **Nachzug 02.10.2026:** Dieser Bericht bleibt als **historischer Befund** vom
+> 29.09.2026 erhalten. Die Umsetzung ist seither auf `main` erfolgt:
+> Kombinationstabellen-Admin/Freeze (**PR #108**), Matrix Desired-State
+> (**PR #109**, ~201 aktive Regeln), Initialkatalog 14/42 (**PR #110**).
+> Aktueller Status: [`docs/fortschritt.md`](../fortschritt.md). Weiter offen u. a.
+> Hinweistexte, MAT-003-Vollabnahme, Nicht-Spot-Methoden; kein Deploy durch die
+> Merges. **Keine REP-007-Readiness** in diesem Nachzug.
+
+**Status (historisch):** Readiness **nicht** erfüllt für Produktionscode  
 **Stand:** 2026-09-29  
 **Basis-HEAD:** `origin/main` @ `363def9932e6473904cfe09a02fa4a8193804c68` (Merge PR #104)  
 **Arbeitsmodus:** read-only Analyse; **kein** Feature-Code in diesem Ergebnis  

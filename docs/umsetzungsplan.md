@@ -88,9 +88,13 @@ Choice-UI (DF-3-REST-A–C3); Regelvertrag/Evaluatoren (RULE-A), Runtime
 Visible/Required (RULE-B) und **Regel-Editor (RULE-C)** – **DF-3 Dyn-Feld-Pfad
 abgeschlossen**. Preislisten-Admin-Lifecycle: **BL-P4-01a** (gemergt).
 Excel-Import: **BL-P4-01b** (gemergt, atomare Draft-Übernahme). Wizard-Jahreswahl:
-**BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. Offen außerhalb:
-ADV-002; MORE-Produktiv-Workbook-Adapter. Hauptblock **BL-P4-02 teilweise**
-(`02a`–`02e` auf `main`; Rest: Abbinder/SPT-013, operative Blockplanung):
+**BL-P4-01c** / PO-PRI-YEAR-1 (umgesetzt). `BL-P4-01` **erledigt**. **PRI-OPS-1**
+MORE-Spotkalkulation-Adapter (PR **#111**) auf `main`: Einzelstunden €/SEK
+Zeilen 13–36 / B·D·F; kein Durchschnitt/Formelspalten; fail-closed bei fehlenden
+Stunden; lokaler Import nur `dispo_mat_core`; `.env`/`dispo` unberührt. Offen
+außerhalb: weitere digitale/Festpreis-Listen, kein Auto-Import in `dispo`.
+Hauptblock **BL-P4-02 teilweise**
+(`02a`–`02e` auf `main`; Inventar-Einklapp-UI PR **#112**; Rest: Abbinder/SPT-013, operative Blockplanung):
 **02a–02e** und **SPT-008** siehe [`backlog-v1.md`](backlog-v1.md) /
 [`fortschritt.md`](fortschritt.md). **SPT-008 Dateiexport** (PR **#68**): XLSX mit
 zwei Blättern `Spotverteilung` (Calendar) und `Planungsvorschlag` (Average,
