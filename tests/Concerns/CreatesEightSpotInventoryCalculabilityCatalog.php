@@ -15,13 +15,14 @@ use App\Models\PriceListItem;
 /**
  * Isolierte Fixture für den 8-Inventar-Kalkulierbarkeits-Smoke (PRI-OPS-1-Raster).
  *
- * Reproduziert Abdeckungsmuster der MORE-Spotkalkulation 2026 ohne Dev-DB:
+ * Synthetisches Abdeckungsmuster (nicht Workbook-Import, nicht Dev-DB-Kopie):
  * - 5 Inventare: Stunden 0–23 × mo_fr/sa/so (72 Zellen)
  * - Kombi+ / ffn: Stunden 5–18 (42 Zellen)
  * - Bollerwagen: Stunden 5–23 (57 Zellen)
+ * - Summe 501 Zellen / 75 Lücken = nachgebildetes Muster, keine Import-Validierung
  * - MAT-003: kein spot_single auf Kombi+, ffn, Bollerwagen
  *
- * Deterministische second_price je Inventar für unabhängige Erwartungswert-Ableitung.
+ * Deterministische second_price je Inventar (nur Fixture-Erwartungen).
  */
 trait CreatesEightSpotInventoryCalculabilityCatalog
 {
