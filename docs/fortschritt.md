@@ -1,19 +1,21 @@
 # Fortschritt V1
 
-Stand: 2. Oktober 2026 – Docs **lokale Dev-Umgebung** (PR **#114**) auf `main`;
-Audit-Nachzug (Kalkulierbarkeit / Invalidierung / H–K) im Docs-Worktree.
+Stand: 3. Oktober 2026 – Docs **lokale Dev-Umgebung** (PR **#114**) auf `main`;
+Audit-Nachzug (Kalkulierbarkeit / Invalidierung / H–K) im Docs-Draft-PR **#116**.
+Isolierter 8-Inventar-Smoke im Test-Draft-PR **#115**
+(`e6d4a8123d89751144c962ce3dc074c292458bd6`) — **nicht** auf `main`.
 Letzter Merge: PR #114
 (`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`); davor PR #113
-(`8011cc37eff7c595e3fe096661b5547b4f7dc9dc`), davor Feature PR #111 / #112.  
+(`8011cc37eff7c595e3fe096661b5547b4f7dc9dc`), davor Feature PR #111 / #112.
 Post-Merge-CI #114
 [37050401271](https://github.com/MORE-m/dispo/actions/runs/37050401271)
-**SUCCESS** (`ci`/`mysql`/`e2e-spt008`).  
+**SUCCESS** (`ci`/`mysql`/`e2e-spt008`).
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
 Alt-`dispo` stillgelegt. **Kein** Deploy; **kein** Preislisten-Import durch Merge.
 
 Audit-Bericht (nicht rückwirkend in ältere Reviews geschrieben):
 `docs/reviews/audit-nachzug-after-pr114/README.md`.
-Empfohlene Readiness:
+Readiness (READY = Vorbedingungen; Smoke-Implementierung auf Draft #115):
 `docs/readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`.
 
 Davor auf `main`: **PRI-OPS-1** (#111), Inventar-Einklapp (#112), Status #113,
@@ -38,8 +40,9 @@ Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
 
 ## Aktuelle Aufgabe
 
-Isolierter 8-Inventar-Kalkulierbarkeits-Smoke umgesetzt (Test-Branch; siehe
-Readiness). Offen: PO-Klärung Rechte-Soll vs. Ist; DSP-DCP-001
+Isolierter 8-Inventar-Kalkulierbarkeits-Smoke auf Draft-PR #115 umgesetzt/getestet
+(noch nicht auf `main`; Readiness **READY** = Vorbedingungen). Offen: PO-Klärung
+Rechte-Soll vs. Ist (**keine** Policy-Änderung hier); DSP-DCP-001
 **Abnahmebeleg ungeklärt**; Calc-Edit nach Dispo-Create als Lifecycle-Entscheidung.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
@@ -95,7 +98,7 @@ REP-007 Dispo-PDF (Phase 10).
 | Kombinationstabellen-Regeln | **separater Slice** (BL-P2-02b / PR #109) |
 | Merge `main` | **PR #110** (`9e4fab030e3d8b0ff45ba104bbe54bc205f6f870`) |
 
-Aufruf: `php artisan db:seed --class=InitialCatalogMatCoreSeeder`  
+Aufruf: `php artisan db:seed --class=InitialCatalogMatCoreSeeder`
 danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 
 ## BL-P2-02b – Produktivmatrix-Import (PO-MAT-CORE-MATRIX-1)
