@@ -1,19 +1,19 @@
 # Readiness: Isolierter 8-Inventar-Kalkulierbarkeits-Smoke
 
 Stand: 3. Oktober 2026
-Basis: `d7896aaf8e633f1e977a03e79af43290ac7c6ec3` (nach PR #114)
-Test-PR: [#115](https://github.com/MORE-m/dispo/pull/115) (Draft, **nicht** auf `main`)
-Test-HEAD: [`e6d4a8123d89751144c962ce3dc074c292458bd6`](https://github.com/MORE-m/dispo/commit/e6d4a8123d89751144c962ce3dc074c292458bd6)
-Branch: `test/eight-inventory-calculability-smoke` (nur Tests/Fixture)
+Auditbasis (historisch): `d7896aaf8e633f1e977a03e79af43290ac7c6ec3` (nach PR #114)
+Test-PR: [#115](https://github.com/MORE-m/dispo/pull/115) **MERGED**
+Feature-HEAD (vor Merge): [`e6d4a8123d89751144c962ce3dc074c292458bd6`](https://github.com/MORE-m/dispo/commit/e6d4a8123d89751144c962ce3dc074c292458bd6)
+Merge-Commit: [`34f7e535265652742fef67da58b959a1b62ee397`](https://github.com/MORE-m/dispo/commit/34f7e535265652742fef67da58b959a1b62ee397)
+Post-Merge-CI: Run [37119411451](https://github.com/MORE-m/dispo/actions/runs/37119411451) **SUCCESS** (`ci`/`mysql`/`e2e-spt008`)
 
 ## Urteil
 
 **READY** = Vorbedingungen für den isolierten Smoke sind erfüllt
 (Fixture + Guard + SQLite `:memory:` möglich).
 
-Das ist **nicht** dasselbe wie „Smoke bereits auf `main` integriert“ oder
-„Produktdaten/Workbook-Preise abgenommen“. Umsetzung und lokaler Testlauf
-liegen auf dem offenen Test-Branch / Draft-PR #115.
+Smoke ist auf `main` integriert (PR #115). Das ist **nicht** dasselbe wie
+„Produktdaten/Workbook-Preise abgenommen“.
 
 ## Vorbedingungen (Readiness)
 
@@ -54,7 +54,8 @@ liegen auf dem offenen Test-Branch / Draft-PR #115.
 - [x] Jahr ohne Liste
 - [x] Lokale Pest-Suite grün ohne `dispo_mat_core`
 - [x] CI `ci` / `mysql` / `e2e-spt008` auf finalem Test-HEAD `e6d4a812…`
-  (Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244) SUCCESS)
-- [ ] Test-PR auf `main` integriert (noch Draft / offen)
-- [ ] Docs-Merge separat (PR #116; Docs-CI Run
-  [37110725706](https://github.com/MORE-m/dispo/actions/runs/37110725706) SUCCESS @ `a8a6ee2…`)
+  (Pre-Merge Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244) SUCCESS)
+- [x] Test-PR #115 auf `main` integriert (Merge `34f7e535…`)
+- [ ] Docs-Merge separat (PR #116; historischer Docs-CI-Lauf
+  [37110725706](https://github.com/MORE-m/dispo/actions/runs/37110725706) SUCCESS @ `a8a6ee2…`;
+  finaler Docs-HEAD/CI im PR-Text)

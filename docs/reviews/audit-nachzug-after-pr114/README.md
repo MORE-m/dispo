@@ -1,14 +1,15 @@
 # Audit-Nachzug nach PR #114
 
 Stand: 3. Oktober 2026
-Auditbasis: Merge-Commit **`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`**
+Auditbasis (historisch): Merge-Commit **`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`**
 (`Merge pull request #114 from MORE-m/docs/local-env-consolidation`)
-Lokaler Main: `dispo-main` @ dieselbe SHA, Port **8000**, Dev-DB **`dispo_mat_core`**
+Lokaler Main / Port **8000** / Dev-DB **`dispo_mat_core`** (Dev-Umgebung unverändert)
 Docs-Worktree: `dispo-wt-docs-status-after-pr114` / Branch `docs/status-after-pr114`
-Test-Smoke (separater Draft): [#115](https://github.com/MORE-m/dispo/pull/115) HEAD
-[`e6d4a8123d89751144c962ce3dc074c292458bd6`](https://github.com/MORE-m/dispo/commit/e6d4a8123d89751144c962ce3dc074c292458bd6)
-— **nicht** auf `main`.
-Keine Feature-Implementierung, keine DB-Mutation (nur SELECT / Code-Read).
+Test-Smoke [#115](https://github.com/MORE-m/dispo/pull/115) **MERGED**:
+Feature-HEAD [`e6d4a8123d89751144c962ce3dc074c292458bd6`](https://github.com/MORE-m/dispo/commit/e6d4a8123d89751144c962ce3dc074c292458bd6),
+Merge [`34f7e535265652742fef67da58b959a1b62ee397`](https://github.com/MORE-m/dispo/commit/34f7e535265652742fef67da58b959a1b62ee397);
+Post-Merge-CI: Run [37119411451](https://github.com/MORE-m/dispo/actions/runs/37119411451) **SUCCESS** (`ci`/`mysql`/`e2e-spt008`).
+Keine Feature-Implementierung in diesem Docs-PR, keine DB-Mutation (nur SELECT / Code-Read).
 
 Historische Berichte werden **nicht** rückwirkend umgeschrieben; dieses Dokument
 ist die korrigierte Neubewertung.
@@ -55,9 +56,9 @@ Methoden: Kategorie `spots` → Inherit für `spot_classic`; **average** + **cal
 `fixed_price` Method-Key weiter `Planned`; N/N-Festpreis = Settlement-Pfad BL-P4-02d.
 
 Isolierter Feature-Smoke (SQLite `:memory:`, Fixture, **ohne** `dispo_mat_core`/`dispo`):
-[#115](https://github.com/MORE-m/dispo/pull/115) /
-`EightSpotInventoryCalculabilitySmokeTest` @ `e6d4a8123d89751144c962ce3dc074c292458bd6`
-(Draft-Branch, **nicht** auf `main`). Fixture-Ergebnisbeträge (300/330 € …) sind
+[#115](https://github.com/MORE-m/dispo/pull/115) **MERGED** /
+`EightSpotInventoryCalculabilitySmokeTest` @ Feature-HEAD `e6d4a8123d89751144c962ce3dc074c292458bd6`
+(auf `main` via Merge `34f7e535…`). Fixture-Ergebnisbeträge (300/330 € …) sind
 ausschließlich synthetische Erwartungen. Import-Belege separat:
 `MoreSpotkalkulationMatCoreImportTest`, `MoreSpotkalkulationWorkbookParserTest`.
 
@@ -163,39 +164,42 @@ Ungecheckte Checkboxen allein sind kein Gegenbeleg.
 ### 1) PO-Klärung Rechte-Soll vs. Ist
 
 - **Ziel:** Kanonische Quelle für Sonderfreigabe-Flag, Force-Complete-Rollen,
-  PM-Freigabe und Disposition-Draft festlegen; Docs/Policy angleichen.
-- **Scope:** nur Entscheidung + Docs/Policy-Nachzug; keine neuen Features.
-- **Ausschlüsse:** AUTH-005 Rückzug; weitere AT-13-Auslöser.
+  PM-Freigabe und Disposition-Draft festlegen (offene fachliche Entscheidung).
+- **Scope:** zunächst nur Entscheidungsnotiz / Docs-Klärung; **keine** autorisierte
+  Rechteimplementierung und kein vorgezogener Policy-Code-Change.
+- **Ausschlüsse:** AUTH-005 Rückzug; weitere AT-13-Auslöser; Policy-Änderung ohne PO-Freigabe.
 - **Abhängigkeiten:** keine Code-Blocker.
 - **Entscheidungen:** Option A Flag+Vertrieb laut Matrix; Option B Rollenmodell
   wie aktueller Slice/`STA-006` (Empfehlung: **B** für Force-Complete Admin-only
   und Sonderfreigabe Admin/GF; Flag deprecaten oder verdrahten in eigenem Slice;
   Disposition-Draft bewusst Sales-geführt belassen oder Matrix korrigieren).
 - **DoD:** Entscheidungsnotiz; widersprüchliche Matrixzeilen markiert/ersetzt;
-  Policy/Tests unverändert oder bewusst angepasst.
+  Policy/Tests nur nach ausdrücklicher PO-Freigabe anfassen.
 - **Tests:** bestehende Approval-/Completion-Matrix-Tests als Regression.
 
-### 2) DSP-DCP-001 manuelle Abnahme A–F
+### 2) DSP-DCP-001 – zuerst Abnahmebeleg klären
 
-- **Ziel:** Manuelle Abnahme dokumentieren oder PO-Verzicht beschließen.
-- **Scope:** isolierte Umgebung Port 8034; Protokoll complete/partial/open/conflict/identical/legacy.
-- **Ausschlüsse:** Abbinder, Rechnungsautomatik, Calc-Export.
+- **Ziel:** Vorliegenden Abnahmebeleg klären (Protokoll A–F / Timeline) **oder**
+  PO-Verzicht beschließen. Status bleibt **Abnahmebeleg ungeklärt**; eine erneute
+  manuelle Abnahme wird **nicht** automatisch vorausgesetzt.
+- **Scope:** Belegsuche/Dokumentation; ggf. isolierte Umgebung Port 8034 nur nach PO-Auftrag.
+- **Ausschlüsse:** Abbinder, Rechnungsautomatik, Calc-Export; automatische Neu-Abnahme.
 - **Abhängigkeiten:** E2E/Seed vorhanden.
-- **Entscheidungen:** Abnahme vs. formeller Verzicht.
-- **DoD:** Eintrag in Fortschritt/Blocker-Log; PR-Nachzug oder neuer Docs-Eintrag.
+- **Entscheidungen:** Beleg bestätigt / Verzicht / (nur bei Auftrag) Neu-Abnahme.
+- **DoD:** Eintrag in Fortschritt/Blocker-Log; Status nicht länger „ungeklärt“ ohne Begründung.
 - **Tests:** vorhandene automatisierte Suite bleibt grün.
 
-### 3) Isolierter 8-Inventar-Kalkulierbarkeits-Smoke
+### 3) Isolierter 8-Inventar-Kalkulierbarkeits-Smoke — **abgeschlossen**
 
-- **Status:** umgesetzt auf offenem Draft-PR [#115](https://github.com/MORE-m/dispo/pull/115)
-  HEAD `e6d4a8123d89751144c962ce3dc074c292458bd6`
-  (`EightSpotInventoryCalculabilitySmokeTest` + Fixture-Concern); **kein** Produktcode;
-  **noch nicht** auf `main`.
+- **Status:** [#115](https://github.com/MORE-m/dispo/pull/115) **MERGED** auf `main`
+  (Feature-HEAD `e6d4a8123d89751144c962ce3dc074c292458bd6`,
+  Merge `34f7e535265652742fef67da58b959a1b62ee397`); **kein** Produktcode.
 - **DoD lokal:** 13 Tests grün unter SQLite `:memory:` (Guard blockiert `dispo_mat_core`/`dispo`).
-- **CI (Draft-HEAD):** Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244)
-  SUCCESS (`ci` / `mysql` / `e2e-spt008`) — **nicht** Post-Merge/`main`.
+- **CI Pre-Merge:** Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244)
+  SUCCESS (`ci` / `mysql` / `e2e-spt008`) auf Feature-HEAD.
+- **CI Post-Merge:** Run [37119411451](https://github.com/MORE-m/dispo/actions/runs/37119411451) SUCCESS (`ci` / `mysql` / `e2e-spt008`).
 - **Readiness:** `docs/readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md` →
-  **READY** = Vorbedingungen erfüllt; getrennt von „Smoke getestet / auf Main integriert“.
+  **READY** (Vorbedingungen); Smoke nun auf `main`.
 
 ### 4) Calc-Edit nach Dispo-Create: Freeze vs. bewusste Isolation
 

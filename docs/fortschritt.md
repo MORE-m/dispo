@@ -1,21 +1,17 @@
 # Fortschritt V1
 
-Stand: 3. Oktober 2026 – Docs **lokale Dev-Umgebung** (PR **#114**) auf `main`;
+Stand: 3. Oktober 2026 – Isolierter 8-Inventar-Smoke (PR **#115**) auf `main`
+(Merge `34f7e535265652742fef67da58b959a1b62ee397`; Feature-HEAD
+`e6d4a8123d89751144c962ce3dc074c292458bd6`).
 Audit-Nachzug (Kalkulierbarkeit / Invalidierung / H–K) im Docs-Draft-PR **#116**.
-Isolierter 8-Inventar-Smoke im Test-Draft-PR **#115**
-(`e6d4a8123d89751144c962ce3dc074c292458bd6`) — **nicht** auf `main`.
-Letzter Merge: PR #114
-(`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`); davor PR #113
-(`8011cc37eff7c595e3fe096661b5547b4f7dc9dc`), davor Feature PR #111 / #112.
-Post-Merge-CI #114
-[37050401271](https://github.com/MORE-m/dispo/actions/runs/37050401271)
-**SUCCESS** (`ci`/`mysql`/`e2e-spt008`).
+Davor: PR #114 (`d7896aaf8e633f1e977a03e79af43290ac7c6ec3`), #113, #111 / #112.
+Post-Merge-CI #115: Run [37119411451](https://github.com/MORE-m/dispo/actions/runs/37119411451) **SUCCESS** (`ci`/`mysql`/`e2e-spt008`).
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
 Alt-`dispo` stillgelegt. **Kein** Deploy; **kein** Preislisten-Import durch Merge.
 
 Audit-Bericht (nicht rückwirkend in ältere Reviews geschrieben):
 `docs/reviews/audit-nachzug-after-pr114/README.md`.
-Readiness (READY = Vorbedingungen; Smoke-Implementierung auf Draft #115):
+Readiness (READY = Vorbedingungen; Smoke auf `main` via #115):
 `docs/readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`.
 
 Davor auf `main`: **PRI-OPS-1** (#111), Inventar-Einklapp (#112), Status #113,
@@ -40,10 +36,11 @@ Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
 
 ## Aktuelle Aufgabe
 
-Isolierter 8-Inventar-Kalkulierbarkeits-Smoke auf Draft-PR #115 umgesetzt/getestet
-(noch nicht auf `main`; Readiness **READY** = Vorbedingungen). Offen: PO-Klärung
-Rechte-Soll vs. Ist (**keine** Policy-Änderung hier); DSP-DCP-001
-**Abnahmebeleg ungeklärt**; Calc-Edit nach Dispo-Create als Lifecycle-Entscheidung.
+Isolierter 8-Inventar-Kalkulierbarkeits-Smoke auf `main` (PR #115) abgeschlossen.
+Offen: PO-Klärung Rechte-Soll vs. Ist (offene fachliche Entscheidung; keine
+Rechteimplementierung autorisiert); DSP-DCP-001 **Abnahmebeleg ungeklärt**
+(zuerst Beleg klären, keine automatische Neu-Abnahme); Calc-Edit nach
+Dispo-Create als Lifecycle-Entscheidung.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
 Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
