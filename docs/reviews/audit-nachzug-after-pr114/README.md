@@ -192,6 +192,8 @@ Ungecheckte Checkboxen allein sind kein Gegenbeleg.
   (`EightSpotInventoryCalculabilitySmokeTest` + Fixture-Concern); **kein** Produktcode;
   **noch nicht** auf `main`.
 - **DoD lokal:** 13 Tests grün unter SQLite `:memory:` (Guard blockiert `dispo_mat_core`/`dispo`).
+- **CI (Draft-HEAD):** Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244)
+  SUCCESS (`ci` / `mysql` / `e2e-spt008`) — **nicht** Post-Merge/`main`.
 - **Readiness:** `docs/readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md` →
   **READY** = Vorbedingungen erfüllt; getrennt von „Smoke getestet / auf Main integriert“.
 

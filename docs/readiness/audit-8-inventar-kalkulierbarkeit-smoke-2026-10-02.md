@@ -53,6 +53,8 @@ liegen auf dem offenen Test-Branch / Draft-PR #115.
 - [x] MAT-003 Single-Ausschluss
 - [x] Jahr ohne Liste
 - [x] Lokale Pest-Suite grün ohne `dispo_mat_core`
-- [ ] CI `ci` / `mysql` / `e2e-spt008` auf finalem Test-HEAD (PR #115)
+- [x] CI `ci` / `mysql` / `e2e-spt008` auf finalem Test-HEAD `e6d4a812…`
+  (Run [37110685244](https://github.com/MORE-m/dispo/actions/runs/37110685244) SUCCESS)
 - [ ] Test-PR auf `main` integriert (noch Draft / offen)
-- [ ] Docs-Merge separat (PR #116)
+- [ ] Docs-Merge separat (PR #116; Docs-CI Run
+  [37110725706](https://github.com/MORE-m/dispo/actions/runs/37110725706) SUCCESS @ `a8a6ee2…`)
