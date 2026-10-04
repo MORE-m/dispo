@@ -138,6 +138,8 @@ class DispoOrderController extends Controller
 
         /** @var User|null $user */
         $user = $request->user();
+        // Frischer Flag-Stand für UI-Capabilities (Entzug in derselben Session).
+        $user?->refresh();
 
         $canViewCalculation = $dispoOrder->calculation !== null
             && ($user?->can('view', $dispoOrder->calculation) ?? false);

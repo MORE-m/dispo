@@ -13,6 +13,7 @@ use App\Http\Controllers\Administration\InventoryAdminController;
 use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\Administration\PriceListImportController;
+use App\Http\Controllers\Administration\SpecialApproveRightAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\DispoOrderController;
@@ -264,6 +265,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.price-lists.archive');
         Route::delete('administration/preislisten/{priceList}', [PriceListAdminController::class, 'destroy'])
             ->name('administration.price-lists.destroy');
+
+        // PO-AUTH-SPECIAL-APPROVE-1: Sonderfreigaberecht (nur Admin, Gate im Controller)
+        Route::get('administration/sonderfreigaben', [SpecialApproveRightAdminController::class, 'index'])
+            ->name('administration.special-approve-rights.index');
+        Route::put('administration/sonderfreigaben/{user}', [SpecialApproveRightAdminController::class, 'update'])
+            ->name('administration.special-approve-rights.update');
 
         // ADV-001b Katalog-Admin (PO-ADV001b-1 UX-GATE-D Teilfreigabe)
         Route::get('administration/katalog', CatalogHubController::class)

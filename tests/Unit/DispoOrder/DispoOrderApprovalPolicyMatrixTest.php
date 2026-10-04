@@ -49,7 +49,7 @@ class DispoOrderApprovalPolicyMatrixTest extends TestCase
         $this->assertFalse($this->policy->approveRegular($creator, $order));
     }
 
-    public function test_special_approval_roles(): void
+    public function test_special_approval_roles_and_flag(): void
     {
         $order = new DispoOrder([
             'created_by_id' => 1,
@@ -59,19 +59,39 @@ class DispoOrderApprovalPolicyMatrixTest extends TestCase
         ]);
 
         $this->assertFalse($this->policy->approveSpecial(
-            User::factory()->role(Role::Sales)->make(['id' => 2]),
+            User::factory()->role(Role::Sales)->make(['id' => 2, 'can_special_approve' => false]),
             $order,
         ));
         $this->assertTrue($this->policy->approveSpecial(
-            User::factory()->role(Role::Admin)->make(['id' => 3]),
+            User::factory()->role(Role::Sales)->make(['id' => 3, 'can_special_approve' => true]),
+            $order,
+        ));
+        $this->assertTrue($this->policy->rejectSpecial(
+            User::factory()->role(Role::Sales)->make(['id' => 4, 'can_special_approve' => true]),
             $order,
         ));
         $this->assertTrue($this->policy->approveSpecial(
-            User::factory()->role(Role::Management)->make(['id' => 4]),
+            User::factory()->role(Role::Admin)->make(['id' => 5]),
+            $order,
+        ));
+        $this->assertTrue($this->policy->approveSpecial(
+            User::factory()->role(Role::Management)->make(['id' => 6]),
+            $order,
+        ));
+        $this->assertFalse($this->policy->approveSpecial(
+            User::factory()->role(Role::Disposition)->make(['id' => 7, 'can_special_approve' => true]),
+            $order,
+        ));
+        $this->assertFalse($this->policy->approveSpecial(
+            User::factory()->role(Role::ProductManagement)->make(['id' => 8, 'can_special_approve' => true]),
             $order,
         ));
         $this->assertFalse($this->policy->approve(
             User::factory()->role(Role::Admin)->make(['id' => 1]),
+            $order,
+        ));
+        $this->assertFalse($this->policy->approveSpecial(
+            User::factory()->role(Role::Sales)->make(['id' => 1, 'can_special_approve' => true]),
             $order,
         ));
     }

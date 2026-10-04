@@ -131,12 +131,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P1-03 – Rabattgrenze und Sonderfreigaberecht
 
 - **Phase:** 1
-- **Status:** erledigt (Datenfelder und Erkennung; Freigabe-UI bleibt UX-GATE-D)
-- **Anforderungen:** `AUTH-001`, `COM-002`, `COM-003`
-- **Abhängigkeiten:** BL-P1-02
+- **Status:** erledigt (Datenfelder/Erkennung); Flag-Wirksamkeit in Freigabe → **PO-AUTH-SPECIAL-APPROVE-1**
+- **Anforderungen:** `AUTH-001`, `COM-002`, `COM-003`, Katalog §4.2
+- **Abhängigkeiten:** BL-P1-02; Freigabe-Slice BL-P8-01b
 - **Ergebnis:** nutzerbezogene Rabattgrenze und Sonderfreigabe-Flag; Überschreitung wird markiert, nicht umgangen
 - **Akzeptanz:** keine erfundenen Default-Grenzen; `null` bedeutet keine persönliche Grenze
-- **Tests:** Pest Lesen der Markierung berechtigt vs. Grenze überschritten
+- **Tests:** Pest Lesen der Markierung berechtigt vs. Grenze überschritten; Flag-Policy siehe PO-AUTH-SPECIAL-APPROVE-1
 
 ### BL-P1-04 – Append-only-Audit
 
@@ -446,8 +446,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Anforderungen:** `AUTH-004`, `APR-001` (Teil), Statusübergänge Entwurf/Freigabe
 - **Abhängigkeiten:** BL-P8-01
 - **Ergebnis:** Einreichen → Genehmigen/Ablehnen; Status `Liegt bei Disposition` bzw. `Freigabe abgelehnt`; persistente Freigabehistorie; Nachbesserung über neuen verknüpften Entwurf; Listenstatus ohne Browser-Reload
-- **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe nur Admin/GF; Ersteller bessert abgelehnte Aufträge nach
+- **Akzeptanz:** jeder Auftrag braucht Freigabe; Ersteller entscheidet nie; Sonderfreigabe Admin/GF (+ Vertrieb mit Flag ab PO-AUTH-SPECIAL-APPROVE-1); Ersteller bessert abgelehnte Aufträge nach
 - **Tests:** Pest, Vitest, Playwright, MySQL-Concurrency
+
+### PO-AUTH-SPECIAL-APPROVE-1 – Sonderfreigabe-Flag verdrahten
+
+- **Phase:** 1/8 Nachzug
+- **Status:** Umsetzung auf Feature-Branch (Draft-PR **#119**, CI grün)
+- **Anforderungen:** Katalog §4.2, `AUTH-001`, `AUTH-004`; Entscheidung PO-AUTH-RIGHTS-1 Option A1
+- **Ergebnis:** `approveSpecial`/`rejectSpecial` lesen Flag für Sales; schmale Admin-UI Vergabe/Entzug; Audit; Docs B/C/D präzisiert
+- **Ausschluss:** `AUTH-005`, Permission-Engine, Flag-Löschung, Dev-Rechteaktivierung
+- **Tests:** Pest Policy/Feature/Admin; Playwright Port 8026
 
 ### BL-P8-01c / DSP-DCP-001 – Abgeleiteter Kampagnenzeitraum (Dispo)
 

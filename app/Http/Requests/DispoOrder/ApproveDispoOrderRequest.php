@@ -9,10 +9,18 @@ class ApproveDispoOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        $user = $this->user();
+        if ($user === null) {
+            return false;
+        }
+
+        // Frischer Flag-Stand (Entzug in derselben Session muss greifen).
+        $user->refresh();
+
         /** @var DispoOrder $order */
         $order = $this->route('dispoOrder');
 
-        return $this->user()?->can('approve', $order) ?? false;
+        return $user->can('approve', $order);
     }
 
     /**

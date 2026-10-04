@@ -31,3 +31,4 @@ ohne die Entscheidung zu ersetzen.
 | [PO-MAT-BOOKING-VIS-1](PO-MAT-BOOKING-VIS-1-buchungskennzeichen-sichtbarkeit.md) | Buchungskennzeichen nur Dispo (Option A) | Akzeptiert |
 | [PO-MAT-CORE-MATRIX-1](PO-MAT-CORE-MATRIX-1-produktivmatrix-importvertrag.md) | Produktivmatrix Importvertrag (BL-P2-02b) | Akzeptiert |
 | [PO-MAT-CORE-CATALOG-1](PO-MAT-CORE-CATALOG-1-initialkatalog.md) | Initialkatalog 14 Inventare / 42 Werbemittel | Akzeptiert |
+| [PO-AUTH-RIGHTS-1](PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | Rechtekonflikte Sonderfreigabe / PM / Draft / Force-Complete | **Akzeptiert** |

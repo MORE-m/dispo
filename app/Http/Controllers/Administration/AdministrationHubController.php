@@ -18,6 +18,8 @@ class AdministrationHubController extends Controller
     {
         $this->authorize('access-administration');
 
+        $canManageSpecialApprove = $request->user()?->can('manage-special-approve-rights') ?? false;
+
         return Inertia::render('administration/index', [
             'modules' => [
                 [
@@ -54,6 +56,15 @@ class AdministrationHubController extends Controller
                     'description' => 'Jahresversionen anlegen, kopieren, Excel importieren und veröffentlichen.',
                     'href' => '/administration/preislisten',
                     'available' => true,
+                ],
+                [
+                    'key' => 'special-approve-rights',
+                    'title' => 'Sonderfreigaberechte',
+                    'description' => 'Kaufmännisches Sonderfreigaberecht für Vertrieb vergeben oder entziehen (nur Admin).',
+                    'href' => $canManageSpecialApprove
+                        ? '/administration/sonderfreigaben'
+                        : null,
+                    'available' => $canManageSpecialApprove,
                 ],
             ],
         ]);

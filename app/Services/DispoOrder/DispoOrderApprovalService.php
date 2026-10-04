@@ -12,8 +12,10 @@ use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 final class DispoOrderApprovalService
@@ -160,8 +162,12 @@ final class DispoOrderApprovalService
             $note,
             $customerConfirmationExceptionAcknowledged,
         ): DispoOrder {
+            // Reihenfolge bei parallelem Entzug: Actor zuerst sperren/neu laden,
+            // dann Order – damit can_special_approve vor der Entscheidung gilt.
+            $actor = $this->lockActor($user);
             $locked = $this->lockOrder($order);
             $this->assertLockVersion($locked, $expectedLockVersion);
+            $this->assertMayDecide($actor, $locked, 'approve');
             DispoOrderStatusTransition::assertCanTransition(
                 $locked->status,
                 DispoOrderStatus::AtDisposition,
@@ -182,14 +188,14 @@ final class DispoOrderApprovalService
                 }
 
                 $request->customer_confirmation_exception_acknowledged = true;
-                $request->customer_confirmation_exception_acknowledged_by_id = $user->id;
-                $request->customer_confirmation_exception_acknowledged_by_name = $user->name;
+                $request->customer_confirmation_exception_acknowledged_by_id = $actor->id;
+                $request->customer_confirmation_exception_acknowledged_by_name = $actor->name;
                 $request->customer_confirmation_exception_acknowledged_at = CarbonImmutable::now();
             }
 
             $request->status = DispoOrderApprovalStatus::Approved;
-            $request->decided_by_id = $user->id;
-            $request->decided_by_name = $user->name;
+            $request->decided_by_id = $actor->id;
+            $request->decided_by_name = $actor->name;
             $request->decided_at = now();
             $request->decision_note = $trimmedNote;
             $request->open_guard = null;
@@ -221,7 +227,7 @@ final class DispoOrderApprovalService
             $this->audit->record(
                 $fresh,
                 'dispo_order.approved',
-                $user,
+                $actor,
                 [
                     'status' => $previousStatus->value,
                     'lock_version' => $expectedLockVersion,
@@ -237,8 +243,10 @@ final class DispoOrderApprovalService
     public function reject(DispoOrder $order, User $user, int $expectedLockVersion, string $reason): DispoOrder
     {
         return DB::transaction(function () use ($order, $user, $expectedLockVersion, $reason): DispoOrder {
+            $actor = $this->lockActor($user);
             $locked = $this->lockOrder($order);
             $this->assertLockVersion($locked, $expectedLockVersion);
+            $this->assertMayDecide($actor, $locked, 'reject');
             DispoOrderStatusTransition::assertCanTransition(
                 $locked->status,
                 DispoOrderStatus::ApprovalRejected,
@@ -249,8 +257,8 @@ final class DispoOrderApprovalService
             $trimmedReason = trim($reason);
 
             $request->status = DispoOrderApprovalStatus::Rejected;
-            $request->decided_by_id = $user->id;
-            $request->decided_by_name = $user->name;
+            $request->decided_by_id = $actor->id;
+            $request->decided_by_name = $actor->name;
             $request->decided_at = now();
             $request->rejection_reason = $trimmedReason;
             $request->open_guard = null;
@@ -265,7 +273,7 @@ final class DispoOrderApprovalService
             $this->audit->record(
                 $fresh,
                 'dispo_order.rejected',
-                $user,
+                $actor,
                 [
                     'status' => $previousStatus->value,
                     'lock_version' => $expectedLockVersion,
@@ -283,6 +291,21 @@ final class DispoOrderApprovalService
 
             return $fresh;
         });
+    }
+
+    private function lockActor(User $user): User
+    {
+        return User::query()
+            ->whereKey($user->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+    }
+
+    private function assertMayDecide(User $actor, DispoOrder $order, string $ability): void
+    {
+        if (! Gate::forUser($actor)->allows($ability, $order)) {
+            throw new AuthorizationException('Diese Freigabeentscheidung ist nicht erlaubt.');
+        }
     }
 
     private function lockOrder(DispoOrder $order): DispoOrder

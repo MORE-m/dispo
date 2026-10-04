@@ -140,10 +140,22 @@ class DispoOrderPolicy
             && $user->hasAnyRole(Role::Admin, Role::Sales, Role::Management);
     }
 
+    /**
+     * Kaufmännische Sonderfreigabe (PO-AUTH-SPECIAL-APPROVE-1 / Katalog §4.2):
+     * Admin/GF immer; Vertrieb nur mit {@see User::$can_special_approve}.
+     * Disposition/PM auch mit Flag: nein. Ersteller: nie (AUTH-004).
+     */
     public function approveSpecial(User $user, DispoOrder $dispoOrder): bool
     {
-        return $this->isNotCreator($user, $dispoOrder)
-            && $user->hasAnyRole(Role::Admin, Role::Management);
+        if (! $this->isNotCreator($user, $dispoOrder)) {
+            return false;
+        }
+
+        if ($user->hasAnyRole(Role::Admin, Role::Management)) {
+            return true;
+        }
+
+        return $user->hasRole(Role::Sales) && $user->can_special_approve;
     }
 
     public function rejectRegular(User $user, DispoOrder $dispoOrder): bool

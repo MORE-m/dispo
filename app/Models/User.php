@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email', 'password', 'role', 'discount_limit_percent', 'can_special_approve', 'can_view_dispo_orders'])]
+#[Fillable(['name', 'email', 'password', 'role', 'discount_limit_percent', 'can_view_dispo_orders'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -159,5 +159,14 @@ class User extends Authenticatable
     public function canAccessAdministration(): bool
     {
         return $this->hasAnyRole(Role::Admin, Role::Management);
+    }
+
+    /**
+     * PO-AUTH-SPECIAL-APPROVE-1: Vergabe/Entzug von {@see $can_special_approve}
+     * ausschließlich Admin (nicht allein Management).
+     */
+    public function canManageSpecialApproveRights(): bool
+    {
+        return $this->hasRole(Role::Admin);
     }
 }

@@ -234,6 +234,157 @@ class DispoOrderApprovalTest extends TestCase
         ])->assertOk();
     }
 
+    public function test_sales_with_flag_can_approve_and_reject_special(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $creator = User::factory()->role(Role::Sales)->create([
+            'discount_limit_percent' => '10',
+        ]);
+        $approver = User::factory()->role(Role::Sales)->create([
+            'can_special_approve' => true,
+        ]);
+
+        ['order' => $order] = $this->draftOrder($creator, ['position_discount' => '20'], $catalog);
+        $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $order->refresh();
+
+        $this->actingAs($approver)
+            ->get(route('dispo-orders.show', $order))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canApprove', true)
+                ->where('canReject', true));
+
+        $this->actingAs($approver)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $this->assertSame(DispoOrderStatus::AtDisposition, $order->fresh()->status);
+
+        $creator2 = User::factory()->role(Role::Sales)->create([
+            'discount_limit_percent' => '10',
+        ]);
+        ['order' => $rejectOrder] = $this->draftOrder($creator2, ['position_discount' => '25'], $catalog);
+        $this->actingAs($creator2)->postJson(route('dispo-orders.submit', $rejectOrder), [
+            'lock_version' => $rejectOrder->lock_version,
+        ])->assertOk();
+        $rejectOrder->refresh();
+
+        $this->actingAs($approver)->postJson(route('dispo-orders.reject', $rejectOrder), [
+            'lock_version' => $rejectOrder->lock_version,
+            'reason' => 'Konditionen zu hoch',
+        ])->assertOk();
+        $this->assertSame(DispoOrderStatus::ApprovalRejected, $rejectOrder->fresh()->status);
+    }
+
+    public function test_creator_with_flag_and_disposition_pm_with_flag_cannot_decide_special(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $creator = User::factory()->role(Role::Sales)->create([
+            'discount_limit_percent' => '10',
+            'can_special_approve' => true,
+        ]);
+        ['order' => $order] = $this->draftOrder($creator, ['position_discount' => '20'], $catalog);
+        $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $order->refresh();
+        $pendingId = $order->pendingApprovalRequest?->id;
+        $statusBefore = $order->status;
+
+        $this->actingAs($creator)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertForbidden();
+
+        $disposition = User::factory()->role(Role::Disposition)->create([
+            'can_special_approve' => true,
+        ]);
+        $pm = User::factory()->role(Role::ProductManagement)->create([
+            'can_special_approve' => true,
+            'can_view_dispo_orders' => true,
+        ]);
+        $this->actingAs($disposition)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertForbidden();
+        $this->actingAs($pm)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertForbidden();
+
+        $order->refresh();
+        $this->assertSame($statusBefore, $order->status);
+        $this->assertSame($pendingId, $order->pendingApprovalRequest?->id);
+        $this->assertSame(
+            0,
+            DispoOrderApprovalRequest::query()
+                ->where('dispo_order_id', $order->id)
+                ->where('status', DispoOrderApprovalStatus::Approved->value)
+                ->count(),
+        );
+    }
+
+    public function test_revoke_blocks_subsequent_special_decision_in_same_session(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $creator = User::factory()->role(Role::Sales)->create([
+            'discount_limit_percent' => '10',
+        ]);
+        $approver = User::factory()->role(Role::Sales)->create([
+            'can_special_approve' => true,
+        ]);
+
+        ['order' => $order] = $this->draftOrder($creator, ['position_discount' => '20'], $catalog);
+        $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $order->refresh();
+
+        $this->actingAs($admin)->put(route('administration.special-approve-rights.update', $approver), [
+            'can_special_approve' => false,
+        ])->assertRedirect();
+        $this->assertFalse($approver->fresh()->can_special_approve);
+
+        $this->actingAs($approver)
+            ->get(route('dispo-orders.show', $order))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('canApprove', false)
+                ->where('canReject', false));
+
+        $this->actingAs($approver)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertForbidden();
+
+        $this->assertSame(DispoOrderStatus::AwaitingSalesApproval, $order->fresh()->status);
+    }
+
+    public function test_regular_approve_by_sales_without_flag_unchanged(): void
+    {
+        $creator = User::factory()->role(Role::Sales)->create();
+        $otherSales = User::factory()->role(Role::Sales)->create([
+            'can_special_approve' => false,
+        ]);
+        ['order' => $order] = $this->draftOrder($creator);
+        $this->assertFalse($order->requiresSpecialApproval());
+
+        $this->actingAs($creator)->postJson(route('dispo-orders.submit', $order), [
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $order->refresh();
+
+        $this->actingAs($otherSales)->postJson(route('dispo-orders.approve', $order), [
+            'customer_confirmation_exception_acknowledged' => true,
+            'lock_version' => $order->lock_version,
+        ])->assertOk();
+        $this->assertSame(DispoOrderStatus::AtDisposition, $order->fresh()->status);
+    }
+
     public function test_creator_cannot_decide_even_as_admin(): void
     {
         $creator = User::factory()->role(Role::Admin)->create();
