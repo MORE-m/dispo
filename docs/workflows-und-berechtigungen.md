@@ -44,6 +44,17 @@ flowchart TD
 Übernahme erzeugt einen Snapshot. Änderungen fließen nicht zurück (`STD-005`).
 Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
+### Calc ↔ Dispo nach Create (`PO-CALC-DISPO-LIFECYCLE-1`, Option A)
+
+- Die Kalkulation bleibt nach Dispo-Create bearbeitbar.
+- Jeder Dispoauftrag behält den bei seiner Erstellung übernommenen Stand;
+  spätere Calc-Änderungen synchronisieren ihn nicht (`DSP-003`).
+- Ein neuer Dispoauftrag übernimmt den aktuellen Stand der ausgewählten
+  Positionen (`DSP-002`) und ersetzt oder storniert bestehende Aufträge
+  nicht automatisch.
+- Nach Ablehnung: bestehender Nachbesserungs-/Revisionspfad.
+- UI-Hinweise: Create-Dialog und Dispo-Detail (`PO-CALC-DISPO-HINT-1`).
+
 ### Implementierter Slice BL-P4-03a / PO-BLP403A-1 (+ 03c / PO-BLP403C-1)
 
 - Spot Classic Average; optional Hauptspot+Allonge (03c, Semantik 02c);

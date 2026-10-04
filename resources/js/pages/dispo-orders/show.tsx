@@ -1398,22 +1398,30 @@ export default function DispoOrderShow({
                             label="Produkt / Titel"
                             value={order.product_title}
                         />
-                        <Detail
-                            label="Quellkalkulation"
-                            value={
-                                canViewCalculation ? (
-                                    <Link
-                                        href={`/kalkulationen/${order.calculation_id}`}
-                                        className="text-primary underline-offset-4 hover:underline"
-                                        data-test="dispo-order-source-calculation-link"
-                                    >
-                                        {order.source_calculation_number}
-                                    </Link>
-                                ) : (
-                                    order.source_calculation_number
-                                )
-                            }
-                        />
+                        <div data-test="dispo-order-source-calculation-isolation-hint">
+                            <Detail
+                                label="Quellkalkulation"
+                                value={
+                                    canViewCalculation ? (
+                                        <Link
+                                            href={`/kalkulationen/${order.calculation_id}`}
+                                            className="text-primary underline-offset-4 hover:underline"
+                                            data-test="dispo-order-source-calculation-link"
+                                        >
+                                            {order.source_calculation_number}
+                                        </Link>
+                                    ) : (
+                                        order.source_calculation_number
+                                    )
+                                }
+                            />
+                            <p className="text-muted-foreground mt-1 text-xs">
+                                Dieser Dispoauftrag enthält den
+                                Kalkulationsstand bei seiner Erstellung. Spätere
+                                Änderungen an der Kalkulation werden nicht
+                                übernommen.
+                            </p>
+                        </div>
                         <Detail
                             label="Mediaberater"
                             value={order.advisor_name}

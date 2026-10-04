@@ -36,9 +36,22 @@ test('Vertrieb legt Dispoauftrag aus Kalkulation an', async ({ page }) => {
 
     await openDispoOrderDialog(page);
     await expect(page.locator('[data-test="dispo-order-create-dialog"]')).toBeVisible();
+    await expect(
+        page.locator('[data-test="dispo-order-create-isolation-hint"]'),
+    ).toContainText(
+        'Der neue Dispoauftrag übernimmt den aktuellen Stand der ausgewählten Positionen.',
+    );
+    await expect(
+        page.locator('[data-test="dispo-order-create-no-replace-hint"]'),
+    ).toHaveCount(0);
     await page.locator('[data-test="dispo-order-submit"]').click();
 
     await expect(page).toHaveURL(/dispoauftraege\/\d+/, { timeout: 15_000 });
+    await expect(
+        page.locator('[data-test="dispo-order-source-calculation-isolation-hint"]'),
+    ).toContainText(
+        'Dieser Dispoauftrag enthält den Kalkulationsstand bei seiner Erstellung.',
+    );
     await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
         'Entwurf',
     );
@@ -73,6 +86,33 @@ test('Vertrieb legt Dispoauftrag aus Kalkulation an', async ({ page }) => {
     await page.goto('/dispoauftraege');
     await expect(page.locator('[data-test="dispo-orders-table"]')).toBeVisible();
     await expect(page.getByText(orderNumber ?? '')).toBeVisible();
+});
+
+test('Create-Dialog weist bei bestehenden Aufträgen auf keine automatische Ersetzung hin', async ({
+    page,
+}) => {
+    test.setTimeout(120_000);
+    await login(page, 'sales@example.com');
+    await saveSimpleCalculation(page);
+    const calculationUrl = page.url();
+
+    await openDispoOrderDialog(page);
+    await page.locator('[data-test="dispo-order-submit"]').click();
+    await expect(page).toHaveURL(/dispoauftraege\/\d+/, { timeout: 15_000 });
+
+    await page.goto(calculationUrl);
+    await openDispoOrderDialog(page);
+    await expect(
+        page.locator('[data-test="dispo-order-create-isolation-hint"]'),
+    ).toBeVisible();
+    await expect(
+        page.locator('[data-test="dispo-order-create-no-replace-hint"]'),
+    ).toContainText(
+        'Ein neuer Dispoauftrag ersetzt oder storniert bestehende Aufträge nicht automatisch.',
+    );
+    // Default wählt bereits übernommene Positionen ab; erneute Wahl bleibt möglich (DSP-001).
+    await page.locator('[data-test="dispo-order-select-all"]').click();
+    await expect(page.locator('[data-test="dispo-order-submit"]')).toBeEnabled();
 });
 
 test('Disposition sieht Liste und Detail ohne Anlageaktion', async ({ page }) => {

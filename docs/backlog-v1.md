@@ -439,6 +439,15 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Akzeptanz:** `AT-15`, `AT-29` (Entwurf); keine Sync zurück zur Kalkulation; kein Dispo aus Standardangebot
 - **Tests:** Pest (Anlage, Berechtigungen, Snapshot-Isolation, Nummern), Vitest (Dialog), Playwright (Happy Path)
 
+### PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 – Isolation verständlich machen
+
+- **Phase:** 8 Nachzug
+- **Status:** Umsetzung auf Feature-Branch (Draft-PR)
+- **Anforderungen:** `DSP-001`–`DSP-003`; Entscheidung Option A akzeptiert
+- **Ergebnis:** verbindlicher Lifecycle (Calc editierbar, Dispo-Stand unabhängig, neuer Create ohne Auto-Ersatz); UI-Hinweise Create-Dialog + Dispo-Show; Docs
+- **Ausschluss:** Calc-Sperre, Diff, Sync, neue Korrekturfunktion, Wizard-Hinweis ohne Linked-Order-Props, Persistenz-/Policy-Änderung
+- **Tests:** Vitest Dialog-Hinweise; Playwright `dispo-order.spec.ts`; Isolation-Pest als Regression
+
 ### BL-P8-01b – Vier-Augen-Freigabe (Vertical Slice)
 
 - **Phase:** 8
