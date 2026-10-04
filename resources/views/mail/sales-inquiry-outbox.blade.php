@@ -14,3 +14,7 @@ Zeitpunkt: {{ $payload['occurred_at'] }}
 
 Interner Link:
 {{ $payload['internal_url'] }}
+@if (($eventType ?? '') === 'dispo_order.approval.rejected')
+
+Die Ablehnungsbegründung ist in der Anwendung einsehbar. Bitte den Dispoauftrag über den internen Link öffnen.
+@endif

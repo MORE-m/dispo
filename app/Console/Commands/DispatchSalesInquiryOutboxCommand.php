@@ -6,14 +6,15 @@ use App\Services\Notification\NotificationOutboxDeliveryService;
 use Illuminate\Console\Command;
 
 /**
- * Stuck-Recovery + Dispatch fälliger Ask/Answer-Outbox-Jobs (BL-P9-02c).
+ * Stuck-Recovery + Dispatch fälliger Outbox-Jobs (Ask/Answer + Freigabe-Entscheidung).
+ * Signatur unverändert, damit Scheduler und Betrieb kompatibel bleiben.
  */
 class DispatchSalesInquiryOutboxCommand extends Command
 {
     protected $signature = 'notification-outbox:dispatch-sales-inquiry
                             {--limit=100 : Max. neue Jobs pro Lauf}';
 
-    protected $description = 'Ask/Answer-Outbox: Stuck-Recovery und Dispatch fälliger E-Mail-Jobs';
+    protected $description = 'Outbox (Ask/Answer + Freigabe erteilt/abgelehnt): Stuck-Recovery und Dispatch fälliger E-Mail-Jobs';
 
     public function handle(NotificationOutboxDeliveryService $delivery): int
     {

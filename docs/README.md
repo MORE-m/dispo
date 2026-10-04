@@ -37,7 +37,7 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
-| [`readiness/PO-AUTH-SPECIAL-APPROVE-1-sonderfreigabe-flag-2026-10-03.md`](readiness/PO-AUTH-SPECIAL-APPROVE-1-sonderfreigabe-flag-2026-10-03.md) | Readiness Sonderfreigabe-Flag (PO-AUTH-SPECIAL-APPROVE-1) |
+| [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |
 | [`entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md`](entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | PO-Entscheidung Rechtekonflikte A–D |
 
 ## Pflegeprozess

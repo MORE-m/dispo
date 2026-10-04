@@ -96,7 +96,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
             ->where('type', DispoOrderCommentType::SalesInquiry)
             ->firstOrFail();
 
-        $row = NotificationOutbox::query()->sole();
+        $row = NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->sole();
         $this->assertSame(DispoOrderSalesInquiryService::EVENT_ASKED, $row->event_type);
         $this->assertSame(DispoOrderSalesInquiryService::SOURCE_TYPE_COMMENT, $row->source_type);
         $this->assertSame($comment->id, (int) $row->source_id);
@@ -134,7 +136,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
             ->where('type', DispoOrderCommentType::SalesInquiry)
             ->firstOrFail();
 
-        $askOutboxId = NotificationOutbox::query()->value('id');
+        $askOutboxId = NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->value('id');
         $this->assertNotNull($askOutboxId);
 
         $sales = User::factory()->role(Role::Sales)->create([
@@ -187,7 +191,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         );
 
         $this->assertSame(DispoOrderStatus::SalesInquiry, $asked->status);
-        $this->assertSame(0, NotificationOutbox::query()->count());
+        $this->assertSame(0, NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->count());
 
         $audit = AuditEvent::query()
             ->where('action', DispoOrderSalesInquiryService::AUDIT_NOTIFICATION_SUPPRESSED)
@@ -211,7 +217,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
 
         $this->assertSame(DispoOrderStatus::SalesInquiry, $asked->status);
         $this->assertSame(1, DispoOrderComment::query()->where('dispo_order_id', $asked->id)->count());
-        $this->assertSame(0, NotificationOutbox::query()->count());
+        $this->assertSame(0, NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->count());
         $audit = AuditEvent::query()
             ->where('action', DispoOrderSalesInquiryService::AUDIT_NOTIFICATION_SUPPRESSED)
             ->sole();
@@ -233,7 +241,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         );
 
         $this->assertSame(DispoOrderStatus::SalesInquiry, $asked->status);
-        $this->assertSame(0, NotificationOutbox::query()->count());
+        $this->assertSame(0, NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->count());
         $audit = AuditEvent::query()
             ->where('action', DispoOrderSalesInquiryService::AUDIT_NOTIFICATION_SUPPRESSED)
             ->sole();
@@ -247,6 +257,7 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         $beforeLock = $order->lock_version;
         $beforeComments = DispoOrderComment::query()->count();
         $beforeAudits = AuditEvent::query()->count();
+        $beforeOutbox = NotificationOutbox::query()->count();
 
         $failOnce = true;
         NotificationOutbox::saving(function () use (&$failOnce): void {
@@ -272,7 +283,7 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
         $this->assertSame($beforeStatus, $order->status);
         $this->assertSame($beforeLock, $order->lock_version);
         $this->assertSame($beforeComments, DispoOrderComment::query()->count());
-        $this->assertSame(0, NotificationOutbox::query()->count());
+        $this->assertSame($beforeOutbox, NotificationOutbox::query()->count());
         $this->assertSame($beforeAudits, AuditEvent::query()->count());
     }
 
@@ -291,7 +302,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
             ->where('type', DispoOrderCommentType::SalesInquiry)
             ->firstOrFail();
 
-        $first = NotificationOutbox::query()->sole();
+        $first = NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->sole();
 
         $intent = NotificationOutboxTestFactory::intent([
             'eventType' => DispoOrderSalesInquiryService::EVENT_ASKED,
@@ -314,7 +327,9 @@ class DispoOrderSalesInquiryOutboxTest extends TestCase
 
         $second = app(NotificationOutboxWriter::class)->enqueue($intent);
         $this->assertSame($first->id, $second->id);
-        $this->assertSame(1, NotificationOutbox::query()->count());
+        $this->assertSame(1, NotificationOutbox::query()
+            ->where('event_type', DispoOrderSalesInquiryService::EVENT_ASKED)
+            ->count());
         $this->assertSame($first->payload_json, $second->payload_json);
     }
 }

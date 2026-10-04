@@ -214,6 +214,15 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Feature `DispoOrderGeneralCommentTest`; Vitest Historie/Formular;
   E2E `npm run test:e2e:blp902a` (Port **8043**, `e2e-bl-p9-02a.sqlite`)
 
+### BL-P9-02d (Freigabe-Mails / PO-APPROVAL-NOTIFY-1)
+
+- Approve/Reject → Outbox in Fach-TX; Empfänger `submitted_by_id`
+- Regular/Special; Label im `event_label`; keine Begründung in Payload/Mail
+- Suppress-Audit; Outbox-Write-Fail rollt Entscheidung; SMTP-Fail nicht
+- Delivery-Whitelist erweitert; Ask/Answer unverändert
+- Feature `DispoOrderApprovalOutboxTest`; isolierter Mail-Fake-Smoke
+- **Nicht** enthalten: Submit, Invalidierung, Admin-Outbox-UI, In-App
+
 ### BL-P4-02d (Preisabschluss Festpreis / N/N)
 
 - **Auf `main` (PR #60), getestet und manuell abgenommen**

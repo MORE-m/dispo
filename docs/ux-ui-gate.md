@@ -16,12 +16,18 @@
   + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1**
   + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**
   + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**
+  + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1**
   + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
+- **Hinweis Stand 4.10.2026 (PO-APPROVAL-NOTIFY-1):** zusätzlich freigegeben ist
+  ausschließlich **Freigabe erteilt/abgelehnt** über Outbox+SMTP: Empfänger
+  `submitted_by_id`; Regular/Special; keine Begründung in der Mail; kein Submit;
+  keine Invalidierung; keine Admin-Outbox-UI. Ask/Answer unverändert.
+  Dok: `docs/entscheidungen/PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md`.
 - **Hinweis Stand 29.09.2026 (PO-BLP902C-1):** zusätzlich freigegeben und auf
   `main` abgeschlossen (PR **#103** MERGED `5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`;
   Feature-HEAD `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI
@@ -89,7 +95,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -351,6 +357,21 @@ Ausschließlich der **operative Statuskern** freigegeben:
 - bestehende Vier-Augen-Freigabe unverändert
 
 Diese Entscheidung gibt **nicht** die gesamte operative Disposition frei.
+
+**Product-Owner-Teilfreigabe (4. Oktober 2026, UX-GATE-D / BL-P9-02d / PO-APPROVAL-NOTIFY-1):**
+Ausschließlich **Freigabe erteilt** und **Freigabe abgelehnt** (Regular und Special):
+
+- Empfänger 1:1: `submitted_by_id` des entschiedenen Zyklus; kein Fallback
+- Suppress bei Self / fehlendem Nutzer / ungültiger Mail mit Audit ohne Nutzer-UI
+- Outbox in Fach-TX; SMTP after Commit; bestehende Delivery/Job/Command
+- Mail nur NOT-001; Begründung und Sondergründe nicht in der Mail
+- At-least-once inkl. möglicher Doppelsendung wie 02c
+
+Ausdrücklich **nicht** freigegeben bleiben u. a.:
+
+- Submit-Mails, Invalidierungsmails, weitere Status-Mails
+- In-App, Empfängerwahl, Admin-Outbox-UI (`NOT-002` vollständig)
+- Permission-Änderung, allgemeine Notification-Engine
 
 **Product-Owner-Teilfreigabe (29. September 2026, UX-GATE-D / BL-P9-02c / PO-BLP902C-1):**
 Ausschließlich **SMTP-Zustellung** bereits persistierter Ask/Answer-Outbox-Zeilen:
