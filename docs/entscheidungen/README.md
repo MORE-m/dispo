@@ -32,4 +32,4 @@ ohne die Entscheidung zu ersetzen.
 | [PO-MAT-CORE-MATRIX-1](PO-MAT-CORE-MATRIX-1-produktivmatrix-importvertrag.md) | Produktivmatrix Importvertrag (BL-P2-02b) | Akzeptiert |
 | [PO-MAT-CORE-CATALOG-1](PO-MAT-CORE-CATALOG-1-initialkatalog.md) | Initialkatalog 14 Inventare / 42 Werbemittel | Akzeptiert |
 | [PO-AUTH-RIGHTS-1](PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | Rechtekonflikte Sonderfreigabe / PM / Draft / Force-Complete | **Akzeptiert** |
-| [PO-CALC-DISPO-LIFECYCLE-1](PO-CALC-DISPO-LIFECYCLE-1-calc-edit-nach-dispo-create.md) | Calc-Edit nach Dispo-Create (Option A Isolation + Hinweis) | **Akzeptiert** |
+| [PO-APPROVAL-NOTIFY-1](PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md) | Freigabe erteilt/abgelehnt per Outbox/SMTP | **Akzeptiert** |

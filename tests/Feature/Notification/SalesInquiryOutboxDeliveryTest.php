@@ -6,6 +6,7 @@ use App\Enums\NotificationOutboxStatus;
 use App\Jobs\DeliverSalesInquiryOutboxJob;
 use App\Mail\SalesInquiryOutboxMail;
 use App\Models\NotificationOutbox;
+use App\Services\DispoOrder\DispoOrderApprovalNotificationPublisher;
 use App\Services\DispoOrder\DispoOrderSalesInquiryService;
 use App\Services\Notification\NotificationOutboxDeliveryService;
 use App\Services\Notification\NotificationOutboxStateMachine;
@@ -64,10 +65,26 @@ class SalesInquiryOutboxDeliveryTest extends TestCase
         });
     }
 
-    public function test_dispatch_ignores_non_ask_answer_events(): void
+    public function test_dispatch_delivers_approval_events_and_still_ignores_other_events(): void
     {
         Queue::fake();
-        app(NotificationOutboxWriter::class)->enqueue(
+        $approved = $this->enqueueAsk([
+            'eventType' => DispoOrderApprovalNotificationPublisher::EVENT_APPROVED,
+            'sourceType' => DispoOrderApprovalNotificationPublisher::SOURCE_TYPE,
+            'sourceId' => 801,
+        ]);
+        $rejected = $this->enqueueAsk([
+            'eventType' => DispoOrderApprovalNotificationPublisher::EVENT_REJECTED,
+            'sourceType' => DispoOrderApprovalNotificationPublisher::SOURCE_TYPE,
+            'sourceId' => 802,
+        ]);
+        $submitted = app(NotificationOutboxWriter::class)->enqueue(
+            NotificationOutboxTestFactory::intent([
+                'eventType' => 'dispo_order.approval.submitted',
+                'sourceId' => 803,
+            ]),
+        );
+        $other = app(NotificationOutboxWriter::class)->enqueue(
             NotificationOutboxTestFactory::intent([
                 'eventType' => 'other.event',
                 'sourceId' => 99,
@@ -76,12 +93,12 @@ class SalesInquiryOutboxDeliveryTest extends TestCase
 
         $dispatched = app(NotificationOutboxDeliveryService::class)->dispatchDue();
 
-        $this->assertSame(0, $dispatched);
-        Queue::assertNothingPushed();
-        $this->assertSame(
-            NotificationOutboxStatus::Pending,
-            NotificationOutbox::query()->sole()->status,
-        );
+        $this->assertSame(2, $dispatched);
+        $this->assertSame(NotificationOutboxStatus::Queued, $approved->fresh()->status);
+        $this->assertSame(NotificationOutboxStatus::Queued, $rejected->fresh()->status);
+        $this->assertSame(NotificationOutboxStatus::Pending, $submitted->fresh()->status);
+        $this->assertSame(NotificationOutboxStatus::Pending, $other->fresh()->status);
+        Queue::assertPushed(DeliverSalesInquiryOutboxJob::class, 2);
     }
 
     public function test_deliver_sends_mail_with_not001_payload_only_and_marks_sent(): void

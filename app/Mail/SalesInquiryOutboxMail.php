@@ -10,8 +10,9 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Ask/Answer-Outbox-Mail (BL-P9-02c / PO-BLP902C-1).
- * Inhalt ausschließlich NOT-001-Felder – keine Rückfrage-/Antworttexte.
+ * Dispo-Outbox-Mail (Ask/Answer BL-P9-02c, Freigabe PO-APPROVAL-NOTIFY-1).
+ * Klasse und Serialisierung unverändert für bereits gequeuete Jobs.
+ * Inhalt ausschließlich NOT-001-Felder – keine Rückfrage-/Antwort-/Ablehnungstexte.
  */
 class SalesInquiryOutboxMail extends Mailable
 {
@@ -46,6 +47,7 @@ class SalesInquiryOutboxMail extends Mailable
             with: [
                 'recipientName' => $this->outbox->recipient_name,
                 'payload' => $this->outbox->payload_json,
+                'eventType' => $this->outbox->event_type,
             ],
         );
     }

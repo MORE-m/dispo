@@ -8,7 +8,9 @@ use App\Enums\Role;
 use App\Exceptions\DispoOrderConflictException;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderApprovalRequest;
+use App\Models\NotificationOutbox;
 use App\Models\User;
+use App\Services\DispoOrder\DispoOrderApprovalNotificationPublisher;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Support\Facades\DB;
@@ -77,6 +79,12 @@ class DispoOrderApprovalConcurrencyTest extends TestCase
             ->where('dispo_order_id', $order->id)
             ->where('status', DispoOrderApprovalStatus::Pending->value)
             ->count());
+        $this->assertSame(1, NotificationOutbox::query()
+            ->where('event_type', DispoOrderApprovalNotificationPublisher::EVENT_APPROVED)
+            ->count());
+        $this->assertSame(0, NotificationOutbox::query()
+            ->where('event_type', DispoOrderApprovalNotificationPublisher::EVENT_REJECTED)
+            ->count());
     }
 
     public function test_mysql_approve_versus_reject_yields_one_final_decision(): void
@@ -129,6 +137,12 @@ class DispoOrderApprovalConcurrencyTest extends TestCase
             ->whereIn('status', [
                 DispoOrderApprovalStatus::Approved->value,
                 DispoOrderApprovalStatus::Rejected->value,
+            ])
+            ->count());
+        $this->assertSame(1, NotificationOutbox::query()
+            ->whereIn('event_type', [
+                DispoOrderApprovalNotificationPublisher::EVENT_APPROVED,
+                DispoOrderApprovalNotificationPublisher::EVENT_REJECTED,
             ])
             ->count());
     }

@@ -18,12 +18,17 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Vier-Augen-Freigabe für Dispoaufträge plus Entscheidungs-Outbox
+ * (PO-APPROVAL-NOTIFY-1 / BL-P9-02d) in derselben Fachtransaktion.
+ */
 final class DispoOrderApprovalService
 {
     public function __construct(
         private readonly AuditLogger $audit,
         private readonly DispoOrderDynamicFieldWriter $dynamicFields,
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
+        private readonly DispoOrderApprovalNotificationPublisher $notifications,
     ) {}
 
     public function submit(DispoOrder $order, User $user, int $expectedLockVersion): DispoOrder
@@ -236,6 +241,13 @@ final class DispoOrderApprovalService
                 $newValues,
             );
 
+            $this->notifications->publishDecision(
+                $fresh,
+                $request,
+                $actor,
+                DispoOrderApprovalNotificationPublisher::EVENT_APPROVED,
+            );
+
             return $fresh;
         });
     }
@@ -287,6 +299,13 @@ final class DispoOrderApprovalService
                     'rejection_reason' => $trimmedReason,
                     'decided_at' => $request->decided_at->toIso8601String(),
                 ],
+            );
+
+            $this->notifications->publishDecision(
+                $fresh,
+                $request,
+                $actor,
+                DispoOrderApprovalNotificationPublisher::EVENT_REJECTED,
             );
 
             return $fresh;

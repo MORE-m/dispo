@@ -370,6 +370,25 @@ Feature-HEAD `2f5be48e9a96c881ddcc79df43cbd598f32f15ee`; Feature-CI Run
 Bewusst **nicht** in 02c: weitere Status-Mails, In-App, Admin-/Audit-UI,
 Empfängerwahl, Freigabeinvalidierung.
 
+## Ist-Stand BL-P9-02d (PO-APPROVAL-NOTIFY-1)
+
+**IN ARBEIT** (dieser Branch). Freigabe erteilt/abgelehnt → Outbox + SMTP über die
+bestehende Delivery. Submit und Invalidierung senden **keine** Mail.
+
+- Empfänger ausschließlich `submitted_by_id` des entschiedenen Zyklus; kein Fallback
+- Regular und Special; Freigabeart nur im `event_label`
+- Suppress: Self / nicht ladbarer Empfänger / ungültige Mail → Audit
+  `dispo_order.approval.notification_suppressed` (ohne Nutzer-UI)
+- Outbox-Write in Fach-TX; Write-Fail → Rollback der Entscheidung
+- SMTP-Fail nach Commit: Entscheidung bleibt; Retry/Failed wie 02c
+- Mail nur NOT-001; keine Ablehnungsbegründung, keine Sondergründe
+- `source_id` = ApprovalRequest-ID; neuer Zyklus = eigene Ereignisidentität
+- Ask/Answer unverändert; Job/Command-Signaturen unverändert
+- At-least-once inkl. möglicher Doppelsendung wie 02c
+
+Bewusst **nicht** in 02d: Submit-Mails, Invalidierungsmails, In-App, Admin-Outbox-UI,
+Empfängerwahl, Permission-Änderung. `NOT-002` bleibt ohne Admin-Sicht unvollständig.
+
 ## Abschlussbedingungen
 
 Ein Abschluss ist nur zulässig, wenn:
@@ -403,9 +422,10 @@ E-Mail und In-App werden mindestens ausgelöst bei:
 - Material fehlt oder erhalten,
 - disponiert, abgeschlossen oder storniert.
 
-**Ist BL-P9-02b/02c:** Für Rückfrage und Antwort wird eine Outbox-Zeile (Kanal `email`,
-NOT-001-Payload) persistiert bzw. bei fehlendem Empfänger unterdrückt und in
-`audit_events` protokolliert. SMTP-Versand für Ask/Answer erfolgt über die DB-Queue
-(BL-P9-02c). Übrige Ereignisse folgen späteren Slices. Ein E-Mail-Fehler nach Commit
-darf den fachlichen Statusübergang nicht zurückrollen (`NOT-002`); ein Outbox-DB-Write-
-Fehler in der Fach-TX rollt mit.
+**Ist BL-P9-02b/02c/02d:** Für Rückfrage, Antwort sowie Freigabe erteilt/abgelehnt
+wird eine Outbox-Zeile (Kanal `email`, NOT-001-Payload) persistiert bzw. bei
+fehlendem Empfänger unterdrückt und in `audit_events` protokolliert. SMTP-Versand
+läuft über die DB-Queue. Submit, Invalidierung und übrige Status-Ereignisse folgen
+späteren Slices. Ein E-Mail-Fehler nach Commit darf den fachlichen Statusübergang
+nicht zurückrollen (`NOT-002` Versand); ein Outbox-DB-Write-Fehler in der Fach-TX
+rollt mit. Die Admin-Fehleransicht (`NOT-002` vollständig) bleibt offen.

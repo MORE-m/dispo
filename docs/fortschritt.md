@@ -1,46 +1,33 @@
 # Fortschritt V1
 
-Stand: 4. Oktober 2026 – Feature-Branch **PO-AUTH-SPECIAL-APPROVE-1**
-(Sonderfreigabe-Flag für Vertrieb + Admin-Vergabe); Basis `main` nach PR #116
-(`4e975a347754235208cd56114d9da5fe9fa6045e`). Davor auf `main`: #115/#116,
-#114, #113, #111/#112.
+Stand: 4. Oktober 2026 – Feature-Branch **PO-APPROVAL-NOTIFY-1**
+(Freigabe erteilt/abgelehnt per Outbox/SMTP); Basis `main` nach PR #120
+(`9962924303fb878dec99870d0c06cdfa9b937037`). Davor auf `main`: #119, #116,
+#115/#114, #113, #111/#112.
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
 Alt-`dispo` stillgelegt. **Kein** Deploy.
 
-Entscheidung: `docs/entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md`
+Entscheidung: `docs/entscheidungen/PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md`
 (**Akzeptiert**). Readiness:
-`docs/readiness/PO-AUTH-SPECIAL-APPROVE-1-sonderfreigabe-flag-2026-10-03.md`.
-
-Davor auf `main`: **PRI-OPS-1** (#111), Inventar-Einklapp (#112), Status #113,
-**BL-P2-02a/b/c** (#108–#110), **PO-AT13-CC-1** (#106). Matrix-Zulässigkeit ≠
-automatische Kalkulierbarkeit; Nicht-Spot-Methoden bleiben offen.
-
-Vorlagen-Editor: Kalkulations-Wizard im Template-Modus (**Spot Classic Average**,
-Mehrfachpositionen, optional Hauptspot+Allonge, **Tandem/Tridem**, **N/N-Festpreis**).
-Feldmatrix: `docs/entscheidungen/BL-P4-03a-vorlagen-feldmatrix.md`. Persistenzvertrag:
-`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md` (+ ADR 03e/03f).
-**Vertragsgrenze:** Freeze (`StandardOfferMaterializer`) und Hydrate
-(`FrozenCalculationPersistenceContract`) sind zwei ausdrücklich gepflegte Seiten;
-v1/v2/v3 lesbar je Version; neue Methoden werden nicht automatisch übernommen.
-Calendar/Budget-auf-Vorlage/Abbinder = Folgeslices.
+`docs/readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
 (**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`);
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
-(**02a/02b/02c** auf `main`; weitere Status-Mails/In-App offen).
+(**02a/02b/02c** auf `main`; **02d** dieser Branch; Submit-/Invalidierungsmails,
+In-App, Admin-Outbox-UI offen).
 
 ## Aktuelle Aufgabe
 
-**PO-CALC-DISPO-HINT-1** – UI-/Doku-Hinweise zur Calc↔Dispo-Isolation
-(Option A aus **PO-CALC-DISPO-LIFECYCLE-1** akzeptiert). Kein Merge/Deploy
-in diesem Auftrag. Weiter offen: DSP-DCP-001 **Abnahmebeleg ungeklärt**;
-`AUTH-005` unberührt. Staging-/Prod-Inventur vor Deploy Sonderfreigabe.
+**PO-APPROVAL-NOTIFY-1** – Freigabe erteilt/abgelehnt benachrichtigen
+(Outbox in Fach-TX + bestehende SMTP-Delivery). Kein Merge/Deploy in diesem Auftrag.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
+Submit-Empfänger, Invalidierungsmails, Admin-Outbox-UI (`NOT-002` vollständig),
 Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
-Status-Mails / In-App / Admin-Outbox-UI, weitere Freigabeinvalidierungs-Auslöser
+Status-Mails / In-App, weitere Freigabeinvalidierungs-Auslöser
 nur mit neuem Edit-Pfad (Dispo-Kaufmännisch bereits gesperrt), Nicht-Spot /
 CRM / REP (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002
 Systemfeld-Overrides, Hinweistexte aus Matrix, MAT-003-Vollabnahme,
@@ -48,8 +35,22 @@ REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-AUTH-SPECIAL-APPROVE-1** Sonderfreigabe-Flag + Admin-Vergabe
-(PR **#119**) auf `main`. Davor: **PRI-OPS-1** / Inventarauswahl einklappen.
+**PO-CALC-DISPO-HINT-1** Calc-/Dispo-Isolation-Hinweise (PR **#120**) auf `main`.
+Davor: **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
+
+## PO-APPROVAL-NOTIFY-1 / BL-P9-02d (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe PO-APPROVAL-NOTIFY-1 | **freigegeben** (nur Approve/Reject-Mail) |
+| Empfänger nur `submitted_by_id`; kein Fallback | **umgesetzt** |
+| Regular + Special; Label ohne neues Payload-Feld | **umgesetzt** |
+| Suppress Self / ungültige Mail / nicht ladbar | **umgesetzt** |
+| Begründung nicht in Mail/Payload | **umgesetzt** |
+| Outbox-Write in Fach-TX; SMTP ohne Fach-Rollback | **umgesetzt** |
+| Submit / Invalidierung / Admin-Outbox-UI | **bewusst nicht** |
+| NOT-002 vollständig (Admin-Sicht) | **nein** |
+| Merge / Deploy | **offen** (Draft-PR) |
 
 ## PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 (Oktober 2026)
 

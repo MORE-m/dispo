@@ -8,7 +8,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
 /**
- * Zustellung einer Ask/Answer-Outbox-Zeile (BL-P9-02c / PO-BLP902C-1).
+ * Zustellung einer Outbox-Zeile (Ask/Answer BL-P9-02c, Freigabe PO-APPROVAL-NOTIFY-1).
+ * uniqueId-Präfix unverändert, damit bereits gequeuete Jobs kompatibel bleiben.
  *
  * Queue-Parameter aligniert mit Speedit-Worker:
  * tries=3, backoff=30, timeout=45 (retry_after=90 am Connection).

@@ -8,15 +8,17 @@ use App\Exceptions\NotificationOutboxConflictException;
 use App\Jobs\DeliverSalesInquiryOutboxJob;
 use App\Mail\SalesInquiryOutboxMail;
 use App\Models\NotificationOutbox;
+use App\Services\DispoOrder\DispoOrderApprovalNotificationPublisher;
 use App\Services\DispoOrder\DispoOrderSalesInquiryService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 /**
- * SMTP-Zustellung nur für Ask/Answer-Outbox (BL-P9-02c / PO-BLP902C-1).
+ * SMTP-Zustellung für Ask/Answer- und Freigabe-Outbox
+ * (BL-P9-02c / PO-BLP902C-1, BL-P9-02d / PO-APPROVAL-NOTIFY-1).
  *
- * Scope: event_type asked|answered, channel email.
+ * Scope: Whitelist-Events, channel email. Kein Submit-/Invalidierungsversand.
  * Max. {@see self::MAX_ATTEMPTS} Zustellversuche → `failed`.
  * At-least-once: Abbruch nach SMTP-Annahme vor markSent kann Doppelsendung erzeugen.
  */
@@ -34,6 +36,8 @@ final class NotificationOutboxDeliveryService
     public const array DELIVERABLE_EVENT_TYPES = [
         DispoOrderSalesInquiryService::EVENT_ASKED,
         DispoOrderSalesInquiryService::EVENT_ANSWERED,
+        DispoOrderApprovalNotificationPublisher::EVENT_APPROVED,
+        DispoOrderApprovalNotificationPublisher::EVENT_REJECTED,
     ];
 
     public function __construct(
