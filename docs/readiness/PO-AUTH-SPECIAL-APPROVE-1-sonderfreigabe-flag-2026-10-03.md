@@ -64,5 +64,5 @@ Bereits abgeschlossene Freigaben bleiben historisch unverändert.
 - [x] Positiv-/Negativtests
 - [x] Isolierter Browser-Smoke (Port 8026)
 - [x] Docs Matrix/Entscheidung nachgezogen
-- [ ] CI auf Feature-HEAD
-- [ ] Review/Merge (nicht Teil der Readiness-Umsetzung allein)
+- [x] CI auf Feature-HEAD (`ci`/`mysql`/`e2e-spt008` grün @ `9809a05`)
+- [ ] Review/Merge (nicht Teil dieses Auftrags)

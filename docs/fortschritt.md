@@ -34,9 +34,10 @@ Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
 ## Aktuelle Aufgabe
 
 **PO-AUTH-SPECIAL-APPROVE-1** – Sonderfreigabe-Flag verdrahten + schmale
-Admin-Vergabe (Feature-Branch; Draft-PR). PO-AUTH-RIGHTS-1 A–D akzeptiert.
-Weiter offen: DSP-DCP-001 **Abnahmebeleg ungeklärt**; Calc-Edit nach
-Dispo-Create als Lifecycle-Entscheidung; `AUTH-005` unberührt.
+Admin-Vergabe (Draft-PR **#119**; CI `ci`/`mysql`/`e2e-spt008` grün).
+PO-AUTH-RIGHTS-1 A–D akzeptiert. Weiter offen: DSP-DCP-001 **Abnahmebeleg
+ungeklärt**; Calc-Edit nach Dispo-Create als Lifecycle-Entscheidung;
+`AUTH-005` unberührt.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
 Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere

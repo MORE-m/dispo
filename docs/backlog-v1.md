@@ -452,7 +452,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### PO-AUTH-SPECIAL-APPROVE-1 – Sonderfreigabe-Flag verdrahten
 
 - **Phase:** 1/8 Nachzug
-- **Status:** Umsetzung auf Feature-Branch (Draft-PR)
+- **Status:** Umsetzung auf Feature-Branch (Draft-PR **#119**, CI grün)
 - **Anforderungen:** Katalog §4.2, `AUTH-001`, `AUTH-004`; Entscheidung PO-AUTH-RIGHTS-1 Option A1
 - **Ergebnis:** `approveSpecial`/`rejectSpecial` lesen Flag für Sales; schmale Admin-UI Vergabe/Entzug; Audit; Docs B/C/D präzisiert
 - **Ausschluss:** `AUTH-005`, Permission-Engine, Flag-Löschung, Dev-Rechteaktivierung
