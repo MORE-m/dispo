@@ -54,11 +54,15 @@ export default function SpecialApproveRightsIndex({
                         <thead className="bg-muted/40">
                             <tr>
                                 <th className="px-3 py-2 font-medium">Name</th>
-                                <th className="px-3 py-2 font-medium">E-Mail</th>
+                                <th className="px-3 py-2 font-medium">
+                                    E-Mail
+                                </th>
                                 <th className="px-3 py-2 font-medium">
                                     Sonderfreigabe
                                 </th>
-                                <th className="px-3 py-2 font-medium">Aktion</th>
+                                <th className="px-3 py-2 font-medium">
+                                    Aktion
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
