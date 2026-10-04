@@ -33,12 +33,10 @@ Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
 
 ## Aktuelle Aufgabe
 
-**PO-AUTH-SPECIAL-APPROVE-1** – Sonderfreigabe-Flag verdrahten + schmale
-Admin-Vergabe (Draft-PR **#119**). Nachzug: Sitzungs-Smoke ohne Relogin,
-MySQL-Parallelität Entzug↔Entscheidung, Admin-Negativfälle.
-PO-AUTH-RIGHTS-1 A–D akzeptiert. Weiter offen: DSP-DCP-001 **Abnahmebeleg
-ungeklärt**; Calc-Edit nach Dispo-Create als Lifecycle-Entscheidung;
-`AUTH-005` unberührt. Staging-/Prod-Inventur vor Deploy.
+**PO-CALC-DISPO-HINT-1** – UI-/Doku-Hinweise zur Calc↔Dispo-Isolation
+(Option A aus **PO-CALC-DISPO-LIFECYCLE-1** akzeptiert). Kein Merge/Deploy
+in diesem Auftrag. Weiter offen: DSP-DCP-001 **Abnahmebeleg ungeklärt**;
+`AUTH-005` unberührt. Staging-/Prod-Inventur vor Deploy Sonderfreigabe.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
 Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
@@ -50,8 +48,19 @@ REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PRI-OPS-1** MORE Spotkalkulation-2026-Adapter (PR **#111**) und
-**Inventarauswahl einklappen** im Wizard (PR **#112**) auf `main`.
+**PO-AUTH-SPECIAL-APPROVE-1** Sonderfreigabe-Flag + Admin-Vergabe
+(PR **#119**) auf `main`. Davor: **PRI-OPS-1** / Inventarauswahl einklappen.
+
+## PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| Option A: Calc editierbar, Dispo-Stand unabhängig | **akzeptiert** |
+| Neuer Create = Übernahmeweg, kein Auto-Ersatz/Storno | **akzeptiert** |
+| UI-Hinweis Create-Dialog + Dispo-Show | **umgesetzt** (dieser Branch) |
+| Wizard-Hinweis | **nicht** (keine Linked-Order-Props ohne neue Abfrage) |
+| Lifecycle-/Persistenz-/Policy-Änderung | **nein** |
+| Merge / Deploy | **offen** (Draft-PR) |
 
 ## PRI-OPS-1 – MORE Spotkalkulation 2026 / Preislisten-Adapter (Oktober 2026)
 

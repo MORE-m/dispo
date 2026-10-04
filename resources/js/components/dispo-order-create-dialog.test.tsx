@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+    cleanup,
+    fireEvent,
+    render,
+    screen,
+    waitFor,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DispoOrderCreateDialog } from '@/components/dispo-order-create-dialog';
 
@@ -15,7 +21,9 @@ vi.mock('@inertiajs/react', () => ({
 
 vi.mock('@/lib/dispo-order-inertia-cache', async (importOriginal) => {
     const actual =
-        await importOriginal<typeof import('@/lib/dispo-order-inertia-cache')>();
+        await importOriginal<
+            typeof import('@/lib/dispo-order-inertia-cache')
+        >();
 
     return {
         ...actual,
@@ -97,6 +105,75 @@ describe('DispoOrderCreateDialog', () => {
         expect(
             screen.getAllByTestId('dispo-order-position-adopted-2')[0],
         ).toHaveTextContent('Bereits übernommen');
+    });
+
+    it('shows isolation hint and no-replace hint when orders already exist', async () => {
+        render(
+            <DispoOrderCreateDialog
+                calculationId={42}
+                open
+                onOpenChange={() => undefined}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.getByTestId('dispo-order-create-isolation-hint'),
+            ).toBeInTheDocument();
+        });
+
+        expect(
+            screen.getByTestId('dispo-order-create-isolation-hint'),
+        ).toHaveTextContent(
+            'Der neue Dispoauftrag übernimmt den aktuellen Stand der ausgewählten Positionen. Spätere Änderungen an der Kalkulation ändern diesen Auftrag nicht.',
+        );
+        expect(
+            screen.getByTestId('dispo-order-create-no-replace-hint'),
+        ).toHaveTextContent(
+            'Ein neuer Dispoauftrag ersetzt oder storniert bestehende Aufträge nicht automatisch.',
+        );
+    });
+
+    it('hides no-replace hint when no positions are adopted yet', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    positions: [
+                        {
+                            id: 1,
+                            inventory_name: 'Radio Hamburg',
+                            advertising_medium_name: 'Spot',
+                            length_seconds: 30,
+                            total_spot_count: 10,
+                            nn_invest: '210.00',
+                            time_ranges: [],
+                            already_adopted: false,
+                            adoptions: [],
+                        },
+                    ],
+                }),
+            }),
+        );
+
+        render(
+            <DispoOrderCreateDialog
+                calculationId={42}
+                open
+                onOpenChange={() => undefined}
+            />,
+        );
+
+        await waitFor(() => {
+            expect(
+                screen.getByTestId('dispo-order-create-isolation-hint'),
+            ).toBeInTheDocument();
+        });
+
+        expect(
+            screen.queryByTestId('dispo-order-create-no-replace-hint'),
+        ).not.toBeInTheDocument();
     });
 
     it('submits selected positions via router post', async () => {

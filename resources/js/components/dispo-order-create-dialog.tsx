@@ -188,6 +188,15 @@ export function DispoOrderCreateDialog({
         [positions.length, selectedIds.length],
     );
 
+    const hasExistingDispoOrders = useMemo(
+        () =>
+            positions.some(
+                (position) =>
+                    position.already_adopted || position.adoptions.length > 0,
+            ),
+        [positions],
+    );
+
     function togglePosition(id: number, checked: boolean) {
         setSelectedIds((current) =>
             checked
@@ -259,6 +268,26 @@ export function DispoOrderCreateDialog({
                             : 'Wählen Sie die Kalkulationspositionen, die in den Dispoauftrag übernommen werden sollen.'}
                     </DialogDescription>
                 </DialogHeader>
+
+                {!loading && positions.length > 0 ? (
+                    <aside
+                        className="border-border/70 bg-muted/30 space-y-2 rounded-lg border px-4 py-3 text-sm"
+                        data-test="dispo-order-create-isolation-hint"
+                        role="note"
+                    >
+                        <p>
+                            Der neue Dispoauftrag übernimmt den aktuellen Stand
+                            der ausgewählten Positionen. Spätere Änderungen an
+                            der Kalkulation ändern diesen Auftrag nicht.
+                        </p>
+                        {hasExistingDispoOrders ? (
+                            <p data-test="dispo-order-create-no-replace-hint">
+                                Ein neuer Dispoauftrag ersetzt oder storniert
+                                bestehende Aufträge nicht automatisch.
+                            </p>
+                        ) : null}
+                    </aside>
+                ) : null}
 
                 {loading ? (
                     <LoadingState label="Positionen werden geladen …" />
