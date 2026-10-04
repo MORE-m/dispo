@@ -11,12 +11,12 @@
 | Standardangebote veröffentlichen/archivieren | ✓ | – | – | ✓ | ✓ |
 | Aus Calc Vorschlags-Draft erzeugen (BL-P4-03b) | ✓ | ✓ | – | ✓ | – |
 | Standardangebot in Kundenkalkulation übernehmen | ✓ | ✓ | – | ✓ | nur mit Extra-Recht |
-| Dispoentwurf anlegen/bearbeiten | ✓ | ✓ | operativ | ✓ | nur mit Extra-Recht |
-| Vier-Augen-Freigabe | ✓ | berechtigt, nie eigener Auftrag | – | ✓ | nur mit Extra-Recht |
-| Kaufmännische Sonderfreigabe | mit Sonderrecht | nur mit Sonderrecht | – | ✓ | nur mit Extra-Recht |
+| Dispoentwurf anlegen/bearbeiten | ✓ | ✓ | nein (operativ nach Freigabe) | ✓ | nein |
+| Vier-Augen-Freigabe | ✓ | berechtigt, nie eigener Auftrag | – | ✓ | nein (Extra-Recht = nur Ansicht) |
+| Kaufmännische Sonderfreigabe | ✓ | nur mit `can_special_approve` | – | ✓ | nein |
 | Operative Disposition | optional | – | ✓ | ✓ | – |
 | Stammdaten und Regeln administrieren | ✓ | – | – | ✓ | Preis-/Produkt-Snapshots für Standardangebote |
-| Abschluss erzwingen | ✓ | – | – | ✓ | – |
+| Abschluss erzwingen (Force-Complete) | ✓ | – | – | – | – |
 | Auswerten/exportieren | ✓ | ✓ | rollenbezogen | ✓ | rollenbezogen |
 
 Berechtigungen werden serverseitig über Rollen und zusätzliche Nutzerrechte
@@ -104,12 +104,16 @@ Jeder Dispoauftrag benötigt vor Disposition eine Freigabe. Es gibt keinen
 | Art | Genehmigen / Ablehnen |
 |---|---|
 | Regulär | anderer Vertrieb, Admin, Geschäftsführung |
-| Sonderfreigabe | ausschließlich Admin, Geschäftsführung |
+| Sonderfreigabe | Admin, Geschäftsführung; Vertrieb nur mit `can_special_approve` (PO-AUTH-SPECIAL-APPROVE-1) |
 
-Disposition und Produktmanagement entscheiden nicht. Der abgelehnte Dispoauftrag
+Disposition und Produktmanagement entscheiden nicht (auch nicht mit
+`can_view_dispo_orders` oder gesetztem Sonderflag). Der abgelehnte Dispoauftrag
 bleibt als unveränderbarer, terminaler Snapshot erhalten. Der Ersteller kann die
 zugrunde liegende Kalkulation nachbessern und daraus einen neuen, verknüpften
 Dispoauftrag im Status Entwurf erzeugen.
+
+Vergabe/Entzug von `can_special_approve`: ausschließlich Admin unter
+`/administration/sonderfreigaben` (kein Self-Service; Zielrolle nur Vertrieb).
 
 Freigabeart und Gründe werden beim Anlegen des Dispoauftrags aus der kanonischen
 Sonderfreigabelogik als Snapshot gespeichert; spätere Änderungen an

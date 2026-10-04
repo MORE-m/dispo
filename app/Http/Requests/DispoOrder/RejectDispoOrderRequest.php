@@ -9,10 +9,17 @@ class RejectDispoOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
+        $user = $this->user();
+        if ($user === null) {
+            return false;
+        }
+
+        $user->refresh();
+
         /** @var DispoOrder $order */
         $order = $this->route('dispoOrder');
 
-        return $this->user()?->can('reject', $order) ?? false;
+        return $user->can('reject', $order);
     }
 
     /**

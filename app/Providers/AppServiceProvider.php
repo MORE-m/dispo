@@ -67,6 +67,10 @@ class AppServiceProvider extends ServiceProvider
             return $user->canAccessAdministration();
         });
 
+        Gate::define('manage-special-approve-rights', function (User $user): bool {
+            return $user->canManageSpecialApproveRights();
+        });
+
         Gate::policy(Calculation::class, CalculationPolicy::class);
         Gate::policy(DispoOrder::class, DispoOrderPolicy::class);
         Gate::policy(StandardOffer::class, StandardOfferPolicy::class);
