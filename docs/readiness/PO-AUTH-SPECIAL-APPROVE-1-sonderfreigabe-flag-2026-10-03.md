@@ -46,6 +46,16 @@ Entscheidung: `docs/entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidung
    dann Order; erneute Gate-Prüfung mit frischem Flag.  
 3. FormRequest/Show: `User::refresh()` vor Capability-Check.
 
+Geprüft (MySQL `dispo_test`, Barrier-Worker, keine Sleep-Sync):
+
+| Reihenfolge | Erwartung |
+|---|---|
+| Entzug hält Sales-Zeile → Entscheidung wartet → nach Commit abgewiesen | Auftrag/Approval/Entscheidungs-Audit unverändert |
+| Entscheidung hält Sales-Zeile → Entzug wartet → Entscheidung ok, dann Entzug | Historie gültig; weitere Entscheidungen mit stale Actor scheitern |
+
+Browser-Smoke Port 8026: getrennte Contexts Admin/Sales; nach Entzug **keine** Neuanmeldung;
+staler Approve-Dialog wird serverseitig abgewiesen; Reload ohne Approve/Reject-Capabilities.
+
 Bereits abgeschlossene Freigaben bleiben historisch unverändert.
 
 ## 2. Migration / Bestand
@@ -62,7 +72,8 @@ Bereits abgeschlossene Freigaben bleiben historisch unverändert.
 - [x] Approve/Reject/UI konsistent
 - [x] Admin-Vergabe/Entzug + Audit + Selbstschutz
 - [x] Positiv-/Negativtests
-- [x] Isolierter Browser-Smoke (Port 8026)
+- [x] Isolierter Browser-Smoke (Port 8026, getrennte Contexts, Sitzung ohne Relogin)
+- [x] MySQL-Parallelität Entzug↔Entscheidung (beide Reihenfolgen) + Service-Stale-Actor
 - [x] Docs Matrix/Entscheidung nachgezogen
-- [x] CI auf Feature-HEAD (`ci`/`mysql`/`e2e-spt008` grün @ `9809a05`)
-- [ ] Review/Merge (nicht Teil dieses Auftrags)
+- [x] CI auf Feature-HEAD (`ci`/`mysql`/`e2e-spt008`)
+- [ ] Review/Merge (nicht Teil dieses Auftrags); Staging-/Prod-Inventur vor Deploy

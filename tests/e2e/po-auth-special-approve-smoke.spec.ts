@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 import {
     approveWithExceptionAcknowledgement,
     setCustomerConfirmationException,
@@ -7,6 +7,7 @@ import {
 /**
  * PO-AUTH-SPECIAL-APPROVE-1 Browser-Smoke.
  * Nur über playwright.po-auth-special-approve.config.ts (SQLite, Port 8026).
+ * Admin und Sales in getrennten BrowserContexts (keine Neuanmeldung nach Entzug).
  */
 
 async function login(page: Page, email: string) {
@@ -29,7 +30,9 @@ async function openCampaign(page: Page, campaign: string) {
         .getByRole('link')
         .first()
         .click();
-    await expect(page.locator('[data-test="dispo-order-special-approval-hint"]')).toBeVisible({
+    await expect(
+        page.locator('[data-test="dispo-order-special-approval-hint"]'),
+    ).toBeVisible({
         timeout: 15_000,
     });
 }
@@ -37,85 +40,158 @@ async function openCampaign(page: Page, campaign: string) {
 async function submitForApproval(page: Page) {
     await setCustomerConfirmationException(page);
     await page.locator('[data-test="dispo-order-submit-open"]').click();
-    await expect(page.locator('[data-test="dispo-order-submit-dialog"]')).toBeVisible();
+    await expect(
+        page.locator('[data-test="dispo-order-submit-dialog"]'),
+    ).toBeVisible();
     await page.locator('[data-test="dispo-order-submit-confirm"]').click();
-    await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
-        'Wartet auf Vertriebsfreigabe',
-        { timeout: 15_000 },
+    await expect(
+        page.locator('[data-test="dispo-order-status-badge"]'),
+    ).toHaveText('Wartet auf Vertriebsfreigabe', { timeout: 15_000 });
+}
+
+async function openApproveDialogReady(page: Page) {
+    await page.locator('[data-test="dispo-order-approve-open"]').click();
+    await expect(
+        page.locator('[data-test="dispo-order-approve-dialog"]'),
+    ).toBeVisible();
+    const ack = page.locator(
+        '[data-test="customer-confirmation-exception-ack"]',
     );
+    if ((await ack.count()) > 0) {
+        await expect(
+            page.locator('[data-test="dispo-order-approve-confirm"]'),
+        ).toBeDisabled();
+        await ack.click();
+    }
+    await expect(
+        page.locator('[data-test="dispo-order-approve-confirm"]'),
+    ).toBeEnabled();
 }
 
 test.describe.serial('PO-AUTH-SPECIAL-APPROVE-1 Smoke', () => {
-    test('Vergabe → Sales entscheidet Sonderfreigabe → Entzug → Entscheidung gesperrt', async ({
-        page,
+    test('Vergabe → Sales entscheidet → Entzug in fremdem Context → Sitzung gesperrt', async ({
+        browser,
+    }: {
+        browser: Browser;
     }) => {
-        test.setTimeout(240_000);
+        test.setTimeout(300_000);
 
-        await login(page, 'admin@example.com');
-        await page.goto('/administration');
-        await expect(
-            page.getByRole('heading', { name: 'Administration' }),
-        ).toBeVisible();
-        await page.goto('/administration/sonderfreigaben');
-        await expect(
-            page.getByRole('heading', { name: 'Sonderfreigaberechte' }),
-        ).toBeVisible();
-        await expect(
-            page.locator('[data-test="special-approve-rights-table"]'),
-        ).toBeVisible();
+        const adminContext = await browser.newContext();
+        const limitedContext = await browser.newContext();
+        const salesBContext = await browser.newContext();
+        const adminPage = await adminContext.newPage();
+        const limitedPage = await limitedContext.newPage();
+        const salesBPage = await salesBContext.newPage();
 
-        const salesBRow = page.locator('[data-email="sales-b@example.com"]');
-        await expect(salesBRow).toBeVisible();
-        const salesBId = await salesBRow.getAttribute('data-test');
-        const id = salesBId?.replace('special-approve-row-', '') ?? '';
-        expect(id).not.toBe('');
+        try {
+            await login(adminPage, 'admin@example.com');
+            await adminPage.goto('/administration');
+            await expect(
+                adminPage.getByRole('heading', { name: 'Administration' }),
+            ).toBeVisible();
+            await adminPage.goto('/administration/sonderfreigaben');
+            await expect(
+                adminPage.getByRole('heading', {
+                    name: 'Sonderfreigaberechte',
+                }),
+            ).toBeVisible();
+            await expect(
+                adminPage.locator(
+                    '[data-test="special-approve-rights-table"]',
+                ),
+            ).toBeVisible();
 
-        await page.locator(`[data-test="special-approve-grant-${id}"]`).click();
-        await expect(
-            page.locator('[data-test="special-approve-rights-success"]'),
-        ).toBeVisible({ timeout: 15_000 });
-        await expect(
-            page.locator(`[data-test="special-approve-status-${id}"]`),
-        ).toHaveText('Ja');
+            const salesBRow = adminPage.locator(
+                '[data-email="sales-b@example.com"]',
+            );
+            await expect(salesBRow).toBeVisible();
+            const salesBId = await salesBRow.getAttribute('data-test');
+            const id = salesBId?.replace('special-approve-row-', '') ?? '';
+            expect(id).not.toBe('');
 
-        await page.context().clearCookies();
-        await login(page, 'sales-limited@example.com');
-        await openCampaign(page, 'Sonderfreigabe-Smoke-A');
-        await submitForApproval(page);
+            await adminPage
+                .locator(`[data-test="special-approve-grant-${id}"]`)
+                .click();
+            await expect(
+                adminPage.locator(
+                    '[data-test="special-approve-rights-success"]',
+                ),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(
+                adminPage.locator(
+                    `[data-test="special-approve-status-${id}"]`,
+                ),
+            ).toHaveText('Ja');
 
-        await page.context().clearCookies();
-        await login(page, 'sales-b@example.com');
-        await openCampaign(page, 'Sonderfreigabe-Smoke-A');
-        await expect(page.locator('[data-test="dispo-order-approve-open"]')).toBeVisible();
-        await approveWithExceptionAcknowledgement(page);
-        await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
-            'Liegt bei Disposition',
-            { timeout: 15_000 },
-        );
+            await login(limitedPage, 'sales-limited@example.com');
+            await openCampaign(limitedPage, 'Sonderfreigabe-Smoke-A');
+            await submitForApproval(limitedPage);
 
-        await page.context().clearCookies();
-        await login(page, 'admin@example.com');
-        await page.goto('/administration/sonderfreigaben');
-        await page.locator(`[data-test="special-approve-revoke-${id}"]`).click();
-        await expect(
-            page.locator('[data-test="special-approve-rights-success"]'),
-        ).toBeVisible({ timeout: 15_000 });
-        await expect(
-            page.locator(`[data-test="special-approve-status-${id}"]`),
-        ).toHaveText('Nein');
+            await login(salesBPage, 'sales-b@example.com');
+            await openCampaign(salesBPage, 'Sonderfreigabe-Smoke-A');
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-approve-open"]'),
+            ).toBeVisible();
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-reject-open"]'),
+            ).toBeVisible();
+            await approveWithExceptionAcknowledgement(salesBPage);
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-status-badge"]'),
+            ).toHaveText('Liegt bei Disposition', { timeout: 15_000 });
 
-        await page.context().clearCookies();
-        await login(page, 'sales-limited@example.com');
-        await openCampaign(page, 'Sonderfreigabe-Smoke-B');
-        await submitForApproval(page);
+            await openCampaign(limitedPage, 'Sonderfreigabe-Smoke-B');
+            await submitForApproval(limitedPage);
 
-        await page.context().clearCookies();
-        await login(page, 'sales-b@example.com');
-        await openCampaign(page, 'Sonderfreigabe-Smoke-B');
-        await expect(page.locator('[data-test="dispo-order-approve-open"]')).toHaveCount(0);
-        await expect(page.locator('[data-test="dispo-order-reject-open"]')).toHaveCount(0);
-        await expect(page.locator('[data-test="dispo-order-status-badge"]')).toHaveText(
-            'Wartet auf Vertriebsfreigabe',
-        );
+            await openCampaign(salesBPage, 'Sonderfreigabe-Smoke-B');
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-approve-open"]'),
+            ).toBeVisible();
+            await openApproveDialogReady(salesBPage);
+
+            await adminPage
+                .locator(`[data-test="special-approve-revoke-${id}"]`)
+                .click();
+            await expect(
+                adminPage.locator(
+                    '[data-test="special-approve-rights-success"]',
+                ),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(
+                adminPage.locator(
+                    `[data-test="special-approve-status-${id}"]`,
+                ),
+            ).toHaveText('Nein');
+
+            await salesBPage
+                .locator('[data-test="dispo-order-approve-confirm"]')
+                .click();
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-approve-error"]'),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-status-badge"]'),
+            ).toHaveText('Wartet auf Vertriebsfreigabe');
+
+            await salesBPage.reload();
+            await expect(
+                salesBPage.locator(
+                    '[data-test="dispo-order-special-approval-hint"]',
+                ),
+            ).toBeVisible({ timeout: 15_000 });
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-approve-open"]'),
+            ).toHaveCount(0);
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-reject-open"]'),
+            ).toHaveCount(0);
+            await expect(
+                salesBPage.locator('[data-test="dispo-order-status-badge"]'),
+            ).toHaveText('Wartet auf Vertriebsfreigabe');
+        } finally {
+            await adminContext.close();
+            await limitedContext.close();
+            await salesBContext.close();
+        }
     });
 });
