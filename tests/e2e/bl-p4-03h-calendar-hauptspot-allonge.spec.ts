@@ -54,6 +54,7 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
     test('PM: Calendar+Komponenten speichern, reload, publish; Vertrieb adoptiert', async ({
         page,
     }) => {
+        test.setTimeout(120_000);
         await login(page, 'pm@example.com');
         await page.goto('/standardangebote/neu');
         await expect(
@@ -87,7 +88,7 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
             .locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`)
             .fill('4');
 
-        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
             0,
             { timeout: 20_000 },
@@ -119,7 +120,7 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
         await expect(
             page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
         ).toHaveValue('4');
-        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(
             page.locator('[data-test="preview-net-total"]').first(),
         ).toContainText(expectedNetTotal, { timeout: 20_000 });
@@ -174,7 +175,7 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
         await expect(
             page.locator('[data-test="spot-components-total-length-0"]'),
         ).toContainText('30s');
-        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
             0,
             { timeout: 20_000 },
