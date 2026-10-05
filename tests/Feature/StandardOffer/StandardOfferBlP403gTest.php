@@ -347,44 +347,69 @@ class StandardOfferBlP403gTest extends TestCase
             ['date' => '2026-03-03', 'hour' => 8, 'spot_count' => 2],
         ]);
 
+        /** @var array<string, mixed> $baseline */
+        $baseline = json_decode(json_encode($published->frozen_materialization, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR);
+        app(FrozenCalculationPersistenceContract::class)->assertHydratable($baseline);
+
         $cases = [
-            'empty planner with positive total' => static function (array $mat): array {
-                $mat['positions'][0]['planner_entries'] = [];
-                $mat['positions'][0]['total_spot_count'] = 5;
+            'empty planner with positive total' => [
+                'needle' => 'planner_entries leer trotz total_spot_count',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['planner_entries'] = [];
+                    $mat['positions'][0]['total_spot_count'] = 5;
 
-                return $mat;
-            },
-            'spot sum mismatch' => static function (array $mat): array {
-                $mat['positions'][0]['total_spot_count'] = 99;
+                    return $mat;
+                },
+            ],
+            'spot sum mismatch' => [
+                'needle' => 'Spot-Summe',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['total_spot_count'] = 99;
 
-                return $mat;
-            },
-            'day_group mismatch' => static function (array $mat): array {
-                // 2026-03-02 = Montag → mo_fr; sa ist widersprüchlich.
-                $mat['positions'][0]['planner_entries'][0]['day_group'] = 'sa';
+                    return $mat;
+                },
+            ],
+            'day_group mismatch' => [
+                'needle' => 'day_group passt nicht zum Datum',
+                'mutate' => static function (array $mat): array {
+                    // 2026-03-02 = Montag → mo_fr; sa ist widersprüchlich.
+                    $mat['positions'][0]['planner_entries'][0]['day_group'] = 'sa';
 
-                return $mat;
-            },
-            'duplicate date/hour' => static function (array $mat): array {
-                $mat['positions'][0]['planner_entries'][] = $mat['positions'][0]['planner_entries'][0];
-                $mat['positions'][0]['total_spot_count'] = 8;
+                    return $mat;
+                },
+            ],
+            'duplicate date/hour' => [
+                'needle' => 'doppelte planner_entries-Zelle',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['planner_entries'][] = $mat['positions'][0]['planner_entries'][0];
+                    $mat['positions'][0]['total_spot_count'] = 8;
 
-                return $mat;
-            },
-            'non-numeric second_price' => static function (array $mat): array {
-                $mat['positions'][0]['planner_entries'][0]['second_price'] = 'not-a-price';
+                    return $mat;
+                },
+            ],
+            'non-numeric second_price' => [
+                'needle' => 'planner_entries.0.second_price',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['planner_entries'][0]['second_price'] = 'not-a-price';
 
-                return $mat;
-            },
-            'structurally invalid line_gross' => static function (array $mat): array {
-                $mat['positions'][0]['planner_entries'][0]['line_gross'] = ['nested' => true];
+                    return $mat;
+                },
+            ],
+            'structurally invalid line_gross' => [
+                'needle' => 'planner_entries.0.line_gross',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['planner_entries'][0]['line_gross'] = ['nested' => true];
 
-                return $mat;
-            },
+                    return $mat;
+                },
+            ],
         ];
 
-        foreach ($cases as $label => $mutate) {
-            $mat = $mutate($published->frozen_materialization);
+        foreach ($cases as $label => $case) {
+            /** @var array<string, mixed> $mat */
+            $mat = $case['mutate'](
+                json_decode(json_encode($baseline, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR),
+            );
             $published->forceFill(['frozen_materialization' => $mat])->save();
 
             $beforeCalcs = Calculation::query()->count();
@@ -396,6 +421,8 @@ class StandardOfferBlP403gTest extends TestCase
                 $this->fail("Fall „{$label}“ hätte als ValidationException scheitern müssen.");
             } catch (ValidationException $exception) {
                 $this->assertArrayHasKey('frozen_materialization', $exception->errors(), $label);
+                $message = implode(' ', $exception->errors()['frozen_materialization']);
+                $this->assertStringContainsString($case['needle'], $message, $label);
             }
 
             $this->assertSame($beforeCalcs, Calculation::query()->count(), $label);
