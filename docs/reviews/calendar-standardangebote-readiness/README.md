@@ -20,9 +20,10 @@ Worktree: `dispo-wt-feat-bl-p4-03g` (Branch `feat/bl-p4-03g-calendar-standard-of
 
 ## Tests
 
-- Feature: `StandardOfferBlP403gTest` + Regression `StandardOfferBlP403*`
-- Browser isoliert: `playwright.blp403g.config.ts`, Port **8050**
+- Feature: `StandardOfferBlP403gTest` (inkl. Frozen-Konsistenz, SA-Pfad Preis/Jahr, A1 Komponenten/Tandem, Legacy v1–v3 + Average-v4)
+- Browser isoliert: `playwright.blp403g.config.ts`, Port **8050** (Adopt → Calc-Reload)
 - CI-Job: Browser BL-P4-03g isolated tests
+- Vorheriger CI-Run auf `64a8785`: `37315709921` vollständig grün
 
 ## Offen
 

@@ -38,7 +38,9 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`](
 ## 3. Abnahme (Kurz)
 
 Synthetisch: `StandardOfferBlP403gTest` (+ Regression 03a–03f).  
-Browser-Smoke isoliert: `playwright.blp403g.config.ts` / Port **8050**, Spec `bl-p4-03g-*.spec.ts` (**BESTANDEN** lokal 3/3: Calendar Adopt, Average-Regression, Negativ Spotanzahl 0).  
+Browser-Smoke isoliert: `playwright.blp403g.config.ts` / Port **8050**, Spec `bl-p4-03g-*.spec.ts` (**BESTANDEN** lokal 3/3: Calendar Adopt inkl. Calc-Reload, Average-Regression, Negativ Spotanzahl 0 – UI-Validierung, kein Jahres-/Preisfehlerbeleg).
+
+Preis-/Jahresfehler und A1-Ausschluss (Komponenten/Tandem/Tridem/Festpreis) über Standardangebote-Pfade (Create/Preview/Publish) und Frozen-Hydrate-Asserts belegt. Create scheitert bei fehlender Preiszelle bereits über `assertResolvable`; korrumpierter Draft-Publish ohne Published-Freeze.  
 Keine Dev-DB-Tests.
 
 ## 4. Bewusst offen

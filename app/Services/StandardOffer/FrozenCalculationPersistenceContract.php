@@ -4,6 +4,7 @@ namespace App\Services\StandardOffer;
 
 use App\Enums\CalculationStatus;
 use App\Enums\ComponentCalculationStrategy;
+use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
@@ -23,6 +24,8 @@ use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\Calculation\DayGroupFromDate;
+use App\Services\Calculation\Decimal;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
 use App\Support\Advertising\SpotComponentProfileContract;
@@ -81,6 +84,8 @@ use Illuminate\Validation\ValidationException;
  * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1):
  * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
  * - Calendar nur `pricing_settlement_mode=normal`; keine Komponenten/Profil/Festpreis
+ * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
+ *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
  * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
  * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen ohne Live-Preisauflösung
  * - Legacy v1–v3 Average weiter lesbar; unbekannte Versionen fail-closed
@@ -435,8 +440,41 @@ final class FrozenCalculationPersistenceContract
             'planner_entries',
             self::CHILD_LIST_REQUIRED,
         );
+
+        $totalSpotCount = $position['total_spot_count'];
+        if ((! is_int($totalSpotCount) && ! (is_string($totalSpotCount) && ctype_digit($totalSpotCount)))
+            || (int) $totalSpotCount < 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: total_spot_count).",
+            ]);
+        }
+        $expectedTotal = (int) $totalSpotCount;
+
+        if ($plannerEntries === []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: planner_entries leer trotz total_spot_count {$expectedTotal}).",
+            ]);
+        }
+
+        $spotSum = 0;
+        /** @var array<string, true> $seenCells */
+        $seenCells = [];
         foreach ($plannerEntries as $childIndex => $entry) {
             $this->assertPlannerEntryRow($entry, $index, $childIndex);
+            $cellKey = ((string) $entry['date']).'|'.((int) $entry['hour']);
+            if (array_key_exists($cellKey, $seenCells)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte planner_entries-Zelle {$cellKey}).",
+                ]);
+            }
+            $seenCells[$cellKey] = true;
+            $spotSum += (int) $entry['spot_count'];
+        }
+
+        if ($spotSum !== $expectedTotal) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Spot-Summe {$spotSum} ≠ total_spot_count {$expectedTotal}).",
+            ]);
         }
 
         $discounts = $this->assertChildList(
@@ -493,6 +531,66 @@ final class FrozenCalculationPersistenceContract
         if (! is_string($entry['day_group'])) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group).",
+            ]);
+        }
+
+        $dayGroup = DayGroup::tryFrom($entry['day_group']);
+        if ($dayGroup === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group).",
+            ]);
+        }
+
+        $expectedDayGroup = DayGroupFromDate::resolve($date);
+        if ($dayGroup !== $expectedDayGroup) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group passt nicht zum Datum).",
+            ]);
+        }
+
+        $this->assertFrozenPlannerDecimal(
+            $entry['second_price'],
+            $positionIndex,
+            $childIndex,
+            'second_price',
+            Decimal::PRICE_SCALE,
+            mustBePositive: true,
+        );
+        $this->assertFrozenPlannerDecimal(
+            $entry['line_gross'],
+            $positionIndex,
+            $childIndex,
+            'line_gross',
+            Decimal::MONEY_SCALE,
+            mustBePositive: true,
+        );
+    }
+
+    private function assertFrozenPlannerDecimal(
+        mixed $value,
+        int $positionIndex,
+        int $childIndex,
+        string $field,
+        int $maxScale,
+        bool $mustBePositive,
+    ): void {
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
+            ]);
+        }
+
+        $raw = is_int($value) ? (string) $value : trim($value);
+        $pattern = '/^\d+(\.\d{1,'.$maxScale.'})?$/';
+        if ($raw === '' || preg_match($pattern, $raw) !== 1 || ! is_numeric($raw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
+            ]);
+        }
+
+        if ($mustBePositive && bccomp($raw, '0', $maxScale) !== 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
             ]);
         }
     }

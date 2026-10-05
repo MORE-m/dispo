@@ -66,6 +66,11 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
 
 ## v4 (BL-P4-03g / PO-BLP403G-1)
 
+Calendar-Hydrate prüft vor Persistenz zusätzlich: nicht-leere `planner_entries` bei
+positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Zellen
+(Datum+Stunde), `day_group` passend zum Datum, gültige positive `second_price`/
+`line_gross`. Widersprüche → `ValidationException`, keine Teilanlage.
+
 - Optional `spot_method=calendar` mit Pflicht-Key `planner_entries` (konkrete ISO-Daten,
   eingefrorene Sekundenpreise/Summen); Settlement nur `normal`; keine Komponenten/Profil.
 - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed).

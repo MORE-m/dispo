@@ -107,6 +107,11 @@ test.describe.serial('BL-P4-03g Calendar-Standardangebote', () => {
             timeout: 30_000,
         });
 
+        // Expliziter Reload der Kundenkalkulation nach Adopt (Persistenz-/Hydrate-Beleg).
+        await page.reload();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+/, {
+            timeout: 30_000,
+        });
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
