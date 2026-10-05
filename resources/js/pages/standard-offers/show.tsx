@@ -56,6 +56,7 @@ export default function StandardOfferShow({
     canAdopt,
     catalog,
     schemaFingerprint,
+    scopeNote,
 }: {
     offer: OfferSummary;
     version: VersionDetail;
@@ -64,6 +65,7 @@ export default function StandardOfferShow({
     canAdopt: boolean;
     catalog: Catalog | null;
     schemaFingerprint: string | null;
+    scopeNote?: string | null;
 }) {
     const flash = usePage().props.flash;
     const [customerName, setCustomerName] = useState('');
@@ -272,10 +274,21 @@ export default function StandardOfferShow({
                         <h2 className="font-medium">
                             In Kundenkalkulation übernehmen
                         </h2>
-                        <p className="text-muted-foreground text-xs">
-                            Kunde ist Pflicht (Freitext bis CRM-Slice). Die
-                            Vorlage bleibt unverändert.
+                        <p
+                            className="text-muted-foreground text-xs"
+                            data-test="standard-offer-adopt-hint"
+                        >
+                            Die Vorlage übernimmt die gespeicherten Termine und
+                            Preise. Für einen neuen Kampagnenzeitraum passe die
+                            Kundenkalkulation anschließend an. Kunde ist Pflicht
+                            (Freitext bis CRM-Slice). Die Vorlage bleibt
+                            unverändert.
                         </p>
+                        {scopeNote ? (
+                            <p className="text-muted-foreground text-xs">
+                                {scopeNote}
+                            </p>
+                        ) : null}
                         <div className="space-y-2">
                             <Label htmlFor="customer">Kunde</Label>
                             <Input

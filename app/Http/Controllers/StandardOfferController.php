@@ -195,7 +195,7 @@ class StandardOfferController extends Controller
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
             'catalog' => null,
             'schemaFingerprint' => null,
-            'scopeNote' => 'BL-P4-03f: Spot Classic Average mit optional Hauptspot+Allonge, Tandem/Tridem und N/N-Festpreis. Calendar/Budget/Abbinder: Folgeslices.',
+            'scopeNote' => 'BL-P4-03g / PO-BLP403G-1: Spot Classic Average (Komponenten/Festpreis/Tandem) und Calendar × normal. Adopt klont eingefrorene Termine/Preise/Pins (B1+C1); kein Auto-Shift. Budget/Abbinder und Calendar×Festpreis/Tandem: Folgeslices.',
         ]);
     }
 
@@ -334,7 +334,7 @@ class StandardOfferController extends Controller
             'positions.*.client_key' => ['nullable', 'string', 'max:64'],
             'positions.*.inventory_id' => ['required', 'integer'],
             'positions.*.advertising_medium_id' => ['required', 'integer'],
-            'positions.*.spot_method' => ['required', 'in:average'],
+            'positions.*.spot_method' => ['required', 'in:average,calendar'],
             'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'positions.*.total_spot_count' => ['nullable', 'integer', 'min:0'],
             'positions.*.price_year' => ['nullable', 'integer', 'min:2000', 'max:2100'],
@@ -361,11 +361,14 @@ class StandardOfferController extends Controller
             'positions.*.components.*.label' => ['nullable', 'string', 'max:120'],
             'positions.*.components.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
             'positions.*.components.*.sort' => ['nullable', 'integer', 'min:0'],
-            'positions.*.planner_entries' => ['sometimes', 'array', 'max:0'],
+            'positions.*.planner_entries' => ['sometimes', 'array'],
+            'positions.*.planner_entries.*.date' => ['required', 'date_format:Y-m-d'],
+            'positions.*.planner_entries.*.hour' => ['required', 'integer', 'min:0', 'max:23'],
+            'positions.*.planner_entries.*.spot_count' => ['required', 'integer', 'min:1'],
             'positions.*.component_profile' => ['sometimes', 'nullable', 'in:tandem,tridem'],
             'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', 'in:normal,fixed_price'],
             'positions.*.fixed_price_nn' => ['sometimes', 'nullable', 'numeric', 'gt:0'],
-            'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average'],
+            'positions.*.calculation_method_key' => ['sometimes', 'nullable', 'in:average,calendar'],
             'positions.*.component_calculation_strategy' => [
                 'sometimes',
                 'nullable',
@@ -466,8 +469,8 @@ class StandardOfferController extends Controller
             'lock_version' => $version !== null ? $version->lock_version : 1,
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
-            'allowed_spot_methods' => ['average'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03f / PO-BLP403F-1: Spot Classic Average mit optional Hauptspot+Allonge, Tandem/Tridem und N/N-Festpreis. Keine Kundendaten. Calendar und Budgetplanung sind nicht wählbar.',
+            'allowed_spot_methods' => ['average', 'calendar'],
+            'scope_note' => 'Vorlagen-Editor BL-P4-03g / PO-BLP403G-1: Spot Classic Average (inkl. Komponenten/Festpreis/Tandem) und Calendar × normal ohne Komponenten/Festpreis/Tandem. Keine Kundendaten. Budgetplanung ist nicht wählbar.',
             'proposal_review' => $this->proposalReviewProp($version),
         ];
 
@@ -508,16 +511,22 @@ class StandardOfferController extends Controller
             if (! is_array($position)) {
                 continue;
             }
+            $spotMethod = is_string($position['spot_method'] ?? null) && $position['spot_method'] !== ''
+                ? $position['spot_method']
+                : (is_string($position['calculation_method_key'] ?? null) && $position['calculation_method_key'] !== ''
+                    ? $position['calculation_method_key']
+                    : 'average');
             $positions[] = [
                 ...$position,
                 'id' => $position['id'] ?? null,
                 'client_key' => $position['client_key'] ?? ('draft-'.$index),
-                'spot_method' => 'average',
+                'spot_method' => $spotMethod,
+                'calculation_method_key' => $position['calculation_method_key'] ?? $spotMethod,
                 'pricing_settlement_mode' => $position['pricing_settlement_mode'] ?? 'normal',
                 'fixed_price_nn' => $position['fixed_price_nn'] ?? null,
                 'components' => is_array($position['components'] ?? null) ? $position['components'] : [],
                 'component_calculation_strategy' => $position['component_calculation_strategy'] ?? null,
-                'planner_entries' => [],
+                'planner_entries' => is_array($position['planner_entries'] ?? null) ? $position['planner_entries'] : [],
                 'component_profile' => $position['component_profile'] ?? null,
                 'plan_rows' => $position['plan_rows'] ?? [],
                 'time_ranges' => $position['time_ranges'] ?? [],

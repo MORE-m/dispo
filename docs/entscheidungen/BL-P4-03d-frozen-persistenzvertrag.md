@@ -35,13 +35,13 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
 
 ## Versionierung
 
-- Unterstützt: **Version 1** und **Version 2** (`SUPPORTED_VERSIONS = [1, 2]`).
+- Unterstützt: **Version 1–4** (`SUPPORTED_VERSIONS = [1, 2, 3, 4]`).
 - Fehlendes `materialization_version` = Legacy **implizit 1** (03a/03c-Stände).
-- Aktuelle Freeze-Schreibversion: **2** (ab BL-P4-03e; Festpreis-fähiges Settlement).
+- Aktuelle Freeze-Schreibversion: **4** (ab BL-P4-03g; Calendar×normal + Average-Varianten).
 - Unbekannte künftige Versionen → verständlicher Fehler, **keine** teilweise
   angelegte Kalkulation (Assert vor Persistenz + Transaktion).
 - Unvollständige/ungültige Frozen-Struktur (Methoden-/Abrechnungskennzeichen,
-  Strategie/Profil, Kindzeilen) → Fail-closed mit Validation-Meldung.
+  Strategie/Profil, Kindzeilen, Calendar-`planner_entries`) → Fail-closed.
 
 ## Average – Prüfungen vor Persistenz
 
@@ -64,9 +64,16 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
     aus Legacy-Gründen = leer; `null` ungültig; `[]` = gültige leere Liste
   (Draft-Semantik 03c: Komponenten absent/`[]` = aus, `null` abgelehnt)
 
-## Verbleibende Pflege bei neuen Methoden
+## v4 (BL-P4-03g / PO-BLP403G-1)
 
-Bei Calendar/Festpreis/Tandem/Abbinder (oder anderer Methodik) ausdrücklich:
+- Optional `spot_method=calendar` mit Pflicht-Key `planner_entries` (konkrete ISO-Daten,
+  eingefrorene Sekundenpreise/Summen); Settlement nur `normal`; keine Komponenten/Profil.
+- Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed).
+- Hydrate persistiert Planner-Entries ohne Live-Preisauflösung (B1+C1).
+
+## Verbleibende Pflege bei weiteren Methoden
+
+Bei Calendar×Festpreis/Tandem, Budget-Vorlagen, Abbinder (oder anderer Methodik):
 
 1. neue `materialization_version` **oder** explizite Contract-Erweiterung,
 2. Freeze-Seite (`StandardOfferMaterializer` bzw. Nachfolger) erweitern,
@@ -74,7 +81,7 @@ Bei Calendar/Festpreis/Tandem/Abbinder (oder anderer Methodik) ausdrücklich:
    erweitern,
 4. Parity- und Fail-closed-Tests ergänzen.
 
-Dieser Slice allein unterstützt neue Methoden **nicht** automatisch.
+Neue Methoden werden **nicht** automatisch übernommen.
 
 ## Entfernter Doppelcode
 

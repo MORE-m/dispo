@@ -59,7 +59,8 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
 - Spot Classic Average; optional Hauptspot+Allonge (03c, Semantik 02c);
   optional N/N-Festpreis (03e, Semantik 02d).
-  Calendar/Tandem/Budget-auf-Vorlage serverseitig abgewiesen.
+  Calendar×normal (BL-P4-03g / A1) wählbar; Calendar×Festpreis/Tandem/Komponenten
+  sowie Budget-auf-Vorlage serverseitig abgewiesen.
 - Published immutable; paralleler Draft erlaubt; Publish archiviert vorherige
   Published atomar (Lock + Konkurrenz über `lock_version`).
 - Übernahme: Vertrieb/Admin/GF; Kunde Freitext Pflicht, Agentur optional
@@ -88,18 +89,26 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
   nicht eine automatisch synchrone Abbildung. Neue Methoden (Calendar/Tandem/…)
   werden **nicht** automatisch übernommen; sie brauchen Version oder
   Contract-Erweiterung plus Freeze-, Hydrate- und Testpflege (Festpreis Average
-  in **BL-P4-03e** als bewusste Contract-Erweiterung auf Materialisierung v2).
+  in **BL-P4-03e**/v2; Tandem in **03f**/v3; Calendar×normal in **03g**/v4).
 - Adopt ohne Live-`CalculationWriter::create()`.
 - Legacy ohne `materialization_version` bleibt übernehmbar; unbekannte Versionen
   und unvollständige Frozen-Daten scheitern ohne Teilanlage.
 - ADR: `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`.
+
+### Slice BL-P4-03g – Calendar in Vorlagen (PO-BLP403G-1)
+
+- Calendar × Spot Classic × `normal` (A1); konkrete Termine (B1); Adopt Frozen-Parity (C1).
+- Materialisierung **v4**; Legacy v1–v3 + Average-v4 lesbar.
+- Adopt-Hinweis: gespeicherte Termine/Preise; neuer Zeitraum per Calc-Edit.
+- Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder weiter abgewiesen.
+- Dok: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`.
 
 ### Slice BL-P4-03e – Festpreis in Average-Vorlagen
 
 - N/N-Festpreis (02d-Semantik) in Spot-Classic-Average-Standardangeboten.
 - Materialisierung **v2**; Legacy v1 weiter übernehmbar.
 - Calc→Draft, Vorlagen-Wizard, Preview, Publish-Freeze, Adopt-Hydrate, Weiterbearbeitung.
-- Calendar/Tandem/Budget/Abbinder weiter abgewiesen; Rechte wie 03b.
+- Calendar/Tandem/Budget/Abbinder damals abgewiesen (Calendar nachgezogen in 03g).
 - ADR: `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`.
 
 ## Vier-Augen-Prinzip

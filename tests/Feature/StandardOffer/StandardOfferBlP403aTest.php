@@ -217,15 +217,23 @@ class StandardOfferBlP403aTest extends TestCase
         ]);
     }
 
-    public function test_rejects_non_average_content(): void
+    public function test_rejects_calendar_with_fixed_price_in_draft(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $payload = $this->draftPayload($catalog);
         $payload['positions'][0]['spot_method'] = 'calendar';
+        $payload['positions'][0]['calculation_method_key'] = 'calendar';
+        $payload['positions'][0]['planner_entries'] = [[
+            'date' => '2026-03-02',
+            'hour' => 8,
+            'spot_count' => 1,
+        ]];
+        $payload['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
+        $payload['positions'][0]['fixed_price_nn'] = '100.00';
 
         $this->expectException(ValidationException::class);
-        $this->writer()->create('Ungültig', $payload, $pm);
+        $this->writer()->create('Ungültig Calendar Festpreis', $payload, $pm);
     }
 
     public function test_http_rejects_unsupported_options_without_coercion(): void
@@ -240,8 +248,16 @@ class StandardOfferBlP403aTest extends TestCase
             'positions' => [[
                 ...$base['positions'][0],
                 'spot_method' => 'calendar',
+                'calculation_method_key' => 'calendar',
+                'planner_entries' => [[
+                    'date' => '2026-03-02',
+                    'hour' => 8,
+                    'spot_count' => 1,
+                ]],
+                'pricing_settlement_mode' => 'fixed_price',
+                'fixed_price_nn' => '100.00',
             ]],
-        ])->assertSessionHasErrors('positions.0.spot_method');
+        ])->assertSessionHasErrors('positions.0.pricing_settlement_mode');
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,

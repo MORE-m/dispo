@@ -72,7 +72,7 @@ class StandardOfferBlP403fTest extends TestCase
 
             $published = $this->writer()->publish($draft, (int) $draft->lock_version, $pm);
             $this->assertSame(StandardOfferVersionStatus::Published, $published->status);
-            $this->assertSame(3, (int) ($published->frozen_materialization['materialization_version'] ?? 0));
+            $this->assertSame(FrozenCalculationPersistenceContract::CURRENT_WRITE_VERSION, (int) ($published->frozen_materialization['materialization_version'] ?? 0));
             $frozen = $published->frozen_materialization['positions'][0];
             $this->assertSame($case['profile'], $frozen['component_profile'] ?? null);
             $this->assertSame('shared_total_length', $frozen['component_calculation_strategy'] ?? null);
@@ -267,7 +267,7 @@ class StandardOfferBlP403fTest extends TestCase
         $this->assertNotNull($draft);
         $published = $this->writer()->publish($draft, (int) $draft->lock_version, $pm);
         $baseMat = $published->frozen_materialization;
-        $this->assertSame(3, (int) ($baseMat['materialization_version'] ?? 0));
+        $this->assertSame(FrozenCalculationPersistenceContract::CURRENT_WRITE_VERSION, (int) ($baseMat['materialization_version'] ?? 0));
         $this->assertSame('tandem', $baseMat['positions'][0]['component_profile'] ?? null);
 
         $cases = [
@@ -443,11 +443,11 @@ class StandardOfferBlP403fTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_write_version_is_three(): void
+    public function test_write_version_is_four(): void
     {
-        $this->assertSame(3, FrozenCalculationPersistenceContract::CURRENT_WRITE_VERSION);
-        $this->assertSame(3, StandardOfferMaterializer::MATERIALIZATION_VERSION);
-        $this->assertSame([1, 2, 3], FrozenCalculationPersistenceContract::SUPPORTED_VERSIONS);
+        $this->assertSame(4, FrozenCalculationPersistenceContract::CURRENT_WRITE_VERSION);
+        $this->assertSame(4, StandardOfferMaterializer::MATERIALIZATION_VERSION);
+        $this->assertSame([1, 2, 3, 4], FrozenCalculationPersistenceContract::SUPPORTED_VERSIONS);
     }
 
     /**

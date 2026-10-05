@@ -11,9 +11,9 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03e/03f: Spot Classic Average; optional Hauptspot+Allonge (02c);
- * optional N/N-Festpreis (02d); optional Tandem/Tridem (02e) auf Average-Basis.
- * Calendar/Budget bleiben abgewiesen.
+ * BL-P4-03a/03c/03e/03f/03g: Spot Classic Average (optional Hauptspot+Allonge,
+ * N/N-Festpreis, Tandem/Tridem) und Spot Classic Calendar × `normal` ohne
+ * Komponenten/Festpreis/Tandem (PO-BLP403G-1 / A1). Budget bleibt abgewiesen.
  */
 final class StandardOfferAverageContract
 {
@@ -44,7 +44,7 @@ final class StandardOfferAverageContract
         $positions = $payload['positions'] ?? null;
         if (! is_array($positions) || $positions === []) {
             throw ValidationException::withMessages([
-                'positions' => 'Mindestens eine Spot-Classic-Average-Position ist erforderlich.',
+                'positions' => 'Mindestens eine Spot-Classic-Position (Average oder Calendar) ist erforderlich.',
             ]);
         }
 
@@ -59,89 +59,26 @@ final class StandardOfferAverageContract
             $method = array_key_exists('spot_method', $position)
                 ? (string) $position['spot_method']
                 : SpotCalculationMethod::Average->value;
+
+            if ($method === SpotCalculationMethod::Calendar->value) {
+                $normalizedPositions[] = $this->normalizeCalendarPosition($position, (int) $index);
+
+                continue;
+            }
+
             if ($method !== SpotCalculationMethod::Average->value) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.spot_method" => 'BL-P4-03a/03c/03e/03f erlaubt nur Spot Classic Average.',
+                    "positions.{$index}.spot_method" => 'BL-P4-03g erlaubt nur Spot Classic Average oder Calendar.',
                 ]);
             }
 
-            $calculationMethodKey = $position['calculation_method_key'] ?? null;
-            if ($calculationMethodKey !== null && $calculationMethodKey !== ''
-                && (string) $calculationMethodKey !== SpotCalculationMethod::Average->value) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.calculation_method_key" => 'BL-P4-03a/03c/03e/03f erlaubt nur Spot Classic Average.',
-                ]);
-            }
-
-            if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.planner_entries" => 'Kalenderplaner ist in BL-P4-03a/03c/03e/03f nicht erlaubt.',
-                ]);
-            }
-
-            $profile = $this->normalizeProfile($position, (int) $index);
-            $settlement = $this->normalizeSettlement($position, (int) $index);
-
-            if (array_key_exists('components', $position) && $position['components'] === null) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.components" => 'Komponenten dürfen nicht null sein. Fehlendes Feld oder [] deaktiviert sie; gefüllte Liste aktiviert Komponenten.',
-                ]);
-            }
-
-            $normalizedComponents = $this->components->validateAndNormalize(
-                $position,
-                (int) $index,
-                SpotCalculationMethod::Average,
-                null,
-                $profile,
-            );
-
-            $strategy = $position['component_calculation_strategy'] ?? null;
-            if ($profile !== null) {
-                $required = SpotComponentProfileContract::requiredStrategy($profile);
-                if ($strategy !== null && $strategy !== ''
-                    && (string) $strategy !== $required->value) {
-                    throw ValidationException::withMessages([
-                        "positions.{$index}.component_calculation_strategy" => 'Tandem/Tridem erfordert shared_total_length.',
-                    ]);
-                }
-                $strategy = $required->value;
-            } elseif ($normalizedComponents === []) {
-                if ($strategy !== null && $strategy !== '') {
-                    throw ValidationException::withMessages([
-                        "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
-                    ]);
-                }
-                $strategy = null;
-            } else {
-                if ($strategy === null || $strategy === '') {
-                    throw ValidationException::withMessages([
-                        "positions.{$index}.component_calculation_strategy" => 'Strategie ist für Komponenten erforderlich.',
-                    ]);
-                }
-                if (ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
-                    throw ValidationException::withMessages([
-                        "positions.{$index}.component_calculation_strategy" => 'Ungültige Komponentenstrategie.',
-                    ]);
-                }
-            }
-
-            $normalizedPositions[] = [
-                ...$position,
-                'spot_method' => SpotCalculationMethod::Average->value,
-                'pricing_settlement_mode' => $settlement['mode']->value,
-                'fixed_price_nn' => $settlement['fixed_price_nn'],
-                'components' => $normalizedComponents,
-                'planner_entries' => [],
-                'component_profile' => $profile?->value,
-                'component_calculation_strategy' => $strategy,
-            ];
+            $normalizedPositions[] = $this->normalizeAveragePosition($position, (int) $index);
         }
 
         $planningMode = (string) ($payload['planning_mode'] ?? 'manual');
         if ($planningMode !== 'manual') {
             throw ValidationException::withMessages([
-                'planning_mode' => 'Budgetplanung ist in BL-P4-03a/03c/03e/03f nicht erlaubt.',
+                'planning_mode' => 'Budgetplanung ist in BL-P4-03a/03c/03e/03f/03g nicht erlaubt.',
             ]);
         }
 
@@ -158,6 +95,161 @@ final class StandardOfferAverageContract
                 ? $payload['dynamic_field_values']
                 : [],
             'positions' => $normalizedPositions,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @return array<string, mixed>
+     */
+    private function normalizeAveragePosition(array $position, int $index): array
+    {
+        $calculationMethodKey = $position['calculation_method_key'] ?? null;
+        if ($calculationMethodKey !== null && $calculationMethodKey !== ''
+            && (string) $calculationMethodKey !== SpotCalculationMethod::Average->value) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.calculation_method_key" => 'Average-Positionen erfordern calculation_method_key average.',
+            ]);
+        }
+
+        if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.planner_entries" => 'Kalenderplaner ist nur für Calendar-Positionen erlaubt.',
+            ]);
+        }
+
+        $profile = $this->normalizeProfile($position, $index);
+        $settlement = $this->normalizeSettlement($position, $index);
+
+        if (array_key_exists('components', $position) && $position['components'] === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.components" => 'Komponenten dürfen nicht null sein. Fehlendes Feld oder [] deaktiviert sie; gefüllte Liste aktiviert Komponenten.',
+            ]);
+        }
+
+        $normalizedComponents = $this->components->validateAndNormalize(
+            $position,
+            $index,
+            SpotCalculationMethod::Average,
+            null,
+            $profile,
+        );
+
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if ($profile !== null) {
+            $required = SpotComponentProfileContract::requiredStrategy($profile);
+            if ($strategy !== null && $strategy !== ''
+                && (string) $strategy !== $required->value) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.component_calculation_strategy" => 'Tandem/Tridem erfordert shared_total_length.',
+                ]);
+            }
+            $strategy = $required->value;
+        } elseif ($normalizedComponents === []) {
+            if ($strategy !== null && $strategy !== '') {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
+                ]);
+            }
+            $strategy = null;
+        } else {
+            if ($strategy === null || $strategy === '') {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.component_calculation_strategy" => 'Strategie ist für Komponenten erforderlich.',
+                ]);
+            }
+            if (ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.component_calculation_strategy" => 'Ungültige Komponentenstrategie.',
+                ]);
+            }
+        }
+
+        return [
+            ...$position,
+            'spot_method' => SpotCalculationMethod::Average->value,
+            'calculation_method_key' => SpotCalculationMethod::Average->value,
+            'pricing_settlement_mode' => $settlement['mode']->value,
+            'fixed_price_nn' => $settlement['fixed_price_nn'],
+            'components' => $normalizedComponents,
+            'planner_entries' => [],
+            'component_profile' => $profile?->value,
+            'component_calculation_strategy' => $strategy,
+        ];
+    }
+
+    /**
+     * PO-BLP403G-1 / A1: Calendar × normal, Einzelspot ohne Komponenten/Festpreis/Tandem.
+     *
+     * @param  array<string, mixed>  $position
+     * @return array<string, mixed>
+     */
+    private function normalizeCalendarPosition(array $position, int $index): array
+    {
+        $calculationMethodKey = $position['calculation_method_key'] ?? null;
+        if ($calculationMethodKey !== null && $calculationMethodKey !== ''
+            && (string) $calculationMethodKey !== SpotCalculationMethod::Calendar->value) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.calculation_method_key" => 'Calendar-Positionen erfordern calculation_method_key calendar.',
+            ]);
+        }
+
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($profileRaw !== null && $profileRaw !== '') {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_profile" => 'Tandem/Tridem ist in Calendar-Vorlagen (BL-P4-03g) nicht erlaubt.',
+            ]);
+        }
+
+        if (array_key_exists('components', $position) && $position['components'] === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.components" => 'Komponenten dürfen nicht null sein.',
+            ]);
+        }
+
+        $components = $position['components'] ?? [];
+        if (! is_array($components)) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.components" => 'Komponenten sind ungültig.',
+            ]);
+        }
+        if ($components !== []) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.components" => 'Komponenten sind in Calendar-Vorlagen (BL-P4-03g / A1) nicht erlaubt.',
+            ]);
+        }
+
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if ($strategy !== null && $strategy !== '') {
+            throw ValidationException::withMessages([
+                "positions.{$index}.component_calculation_strategy" => 'Komponentenstrategie ist in Calendar-Vorlagen (BL-P4-03g) nicht erlaubt.',
+            ]);
+        }
+
+        $settlement = $this->normalizeSettlement($position, $index);
+        if ($settlement['mode'] !== PricingSettlementMode::Normal) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.pricing_settlement_mode" => 'Festpreis ist in Calendar-Vorlagen (BL-P4-03g / A1) nicht erlaubt.',
+            ]);
+        }
+
+        $plannerEntries = $position['planner_entries'] ?? [];
+        if (! is_array($plannerEntries)) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.planner_entries" => 'Kalenderplaner-Einträge sind ungültig.',
+            ]);
+        }
+
+        return [
+            ...$position,
+            'spot_method' => SpotCalculationMethod::Calendar->value,
+            'calculation_method_key' => SpotCalculationMethod::Calendar->value,
+            'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
+            'fixed_price_nn' => null,
+            'components' => [],
+            'planner_entries' => $plannerEntries,
+            'component_profile' => null,
+            'component_calculation_strategy' => null,
         ];
     }
 
