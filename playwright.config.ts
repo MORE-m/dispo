@@ -58,6 +58,7 @@ export default defineConfig({
         '**/bl-p9-02a-*.spec.ts',
         '**/wizard-inventory-collapse.spec.ts',
         '**/po-auth-special-approve-*.spec.ts',
+        '**/po-not002-admin-*.spec.ts',
     ],
     // Hauptsuite: seriell (u. a. DF-3.2a mutiert Feldsets). DF-3.2b / DF-3.3-fs /
     // DF-3.3a2α / DF-3.3a2β / DF-3.3b / ADV-001b / ADV-001c3a / ADV-001c3b1 /
@@ -66,7 +67,7 @@ export default defineConfig({
     // BL-P4-01c / BL-P4-02b / BL-P4-02c / BL-P4-02d / BL-P4-02e / SPT-008 /
     // DSP-DCP-001 / BL-P8-02a / BL-P8-02b / BL-P8-02c / BL-P8-02d / BL-P8-02e /
     // BL-P9-01a / BL-P9-01b / BL-P9-01c / BL-P9-02a / wizard-inventory-collapse /
-    // PO-AUTH-SPECIAL-APPROVE-1 laufen separat mit eigener DB/Port.
+    // PO-AUTH-SPECIAL-APPROVE-1 / PO-NOT002-ADMIN-1 laufen separat mit eigener DB/Port.
     // BL-P2-01a darf nicht in der Hauptsuite laufen: der Freeze-Test benennt
     // das Seed-Inventar „Radio Hamburg“ um und würde sonst CAL-001/BUD-00*
     // (Label-Select) zerstören.

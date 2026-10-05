@@ -2,9 +2,21 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
+/**
+ * @property int $id
+ * @property string $auditable_type
+ * @property int $auditable_id
+ * @property string $action
+ * @property array<string, mixed>|null $old_values
+ * @property array<string, mixed>|null $new_values
+ * @property int|null $user_id
+ * @property string|null $correlation_id
+ * @property CarbonInterface $created_at
+ */
 class AuditEvent extends Model
 {
     public $timestamps = false;

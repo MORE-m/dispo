@@ -71,6 +71,10 @@ class AppServiceProvider extends ServiceProvider
             return $user->canManageSpecialApproveRights();
         });
 
+        Gate::define('view-notification-outbox', function (User $user): bool {
+            return $user->canViewNotificationOutbox();
+        });
+
         Gate::policy(Calculation::class, CalculationPolicy::class);
         Gate::policy(DispoOrder::class, DispoOrderPolicy::class);
         Gate::policy(StandardOffer::class, StandardOfferPolicy::class);

@@ -11,6 +11,7 @@ use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\Administration\InventoryAdminController;
 use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
+use App\Http\Controllers\Administration\NotificationOutboxAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\Administration\PriceListImportController;
 use App\Http\Controllers\Administration\SpecialApproveRightAdminController;
@@ -271,6 +272,15 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.special-approve-rights.index');
         Route::put('administration/sonderfreigaben/{user}', [SpecialApproveRightAdminController::class, 'update'])
             ->name('administration.special-approve-rights.update');
+
+        // PO-NOT002-ADMIN-1: lesende Outbox-/Suppress-Sicht (nur Admin)
+        Route::get('administration/benachrichtigungen', [NotificationOutboxAdminController::class, 'index'])
+            ->name('administration.notification-outbox.index');
+        Route::get('administration/benachrichtigungen/unterdrueckt', [NotificationOutboxAdminController::class, 'suppressed'])
+            ->name('administration.notification-outbox.suppressed');
+        Route::get('administration/benachrichtigungen/{outbox}', [NotificationOutboxAdminController::class, 'show'])
+            ->whereNumber('outbox')
+            ->name('administration.notification-outbox.show');
 
         // ADV-001b Katalog-Admin (PO-ADV001b-1 UX-GATE-D Teilfreigabe)
         Route::get('administration/katalog', CatalogHubController::class)

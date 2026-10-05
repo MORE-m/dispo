@@ -1,33 +1,32 @@
 # Fortschritt V1
 
-Stand: 4. Oktober 2026 – Feature-Branch **PO-APPROVAL-NOTIFY-1**
-(Freigabe erteilt/abgelehnt per Outbox/SMTP); Basis `main` nach PR #120
-(`9962924303fb878dec99870d0c06cdfa9b937037`). Davor auf `main`: #119, #116,
-#115/#114, #113, #111/#112.
+Stand: 5. Oktober 2026 – Feature-Branch **PO-NOT002-ADMIN-1 / BL-P9-02e**
+(Admin-Sicht Outbox+Suppress, lesend); Basis `main` nach PR #121
+(`a4ba38cc7193ac1cb3eec6307659bd27abf292be`). Davor auf `main`: #120, #119, #116.
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
-Alt-`dispo` stillgelegt. **Kein** Deploy.
+Alt-`dispo` stillgelegt. **Kein** Deploy. **Kein** Merge dieses Slices in diesem Auftrag.
 
-Entscheidung: `docs/entscheidungen/PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md`
+Entscheidung: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md`
 (**Akzeptiert**). Readiness:
-`docs/readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`.
+`docs/readiness/BL-P9-02e-admin-notification-outbox-read-2026-10-05.md`.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
 (**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`);
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
-(**02a/02b/02c** auf `main`; **02d** dieser Branch; Submit-/Invalidierungsmails,
-In-App, Admin-Outbox-UI offen).
+(**02a/02b/02c/02d** auf `main`; **02e** dieser Draft-PR-Branch; Submit-/Invalidierungsmails,
+In-App offen). **NOT-002** Admin-Sicht: implementiert auf Draft-PR, **nicht** auf `main`
+abgeschlossen.
 
 ## Aktuelle Aufgabe
 
-**PO-APPROVAL-NOTIFY-1** – Freigabe erteilt/abgelehnt benachrichtigen
-(Outbox in Fach-TX + bestehende SMTP-Delivery). Kein Merge/Deploy in diesem Auftrag.
+**PO-NOT002-ADMIN-1** – lesende Admin-Sicht auf Benachrichtigungs-Outbox und
+unterdrückte Benachrichtigungen. Kein Merge/Deploy in diesem Auftrag.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
-Submit-Empfänger, Invalidierungsmails, Admin-Outbox-UI (`NOT-002` vollständig),
-Calendar-/Budget-Vorlagen (BL-P4-03 Rest), SPT-013 Abbinder, weitere
-Status-Mails / In-App, weitere Freigabeinvalidierungs-Auslöser
+Submit-Empfänger, Invalidierungsmails, Calendar-/Budget-Vorlagen (BL-P4-03 Rest),
+SPT-013 Abbinder, weitere Status-Mails / In-App, weitere Freigabeinvalidierungs-Auslöser
 nur mit neuem Edit-Pfad (Dispo-Kaufmännisch bereits gesperrt), Nicht-Spot /
 CRM / REP (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002
 Systemfeld-Overrides, Hinweistexte aus Matrix, MAT-003-Vollabnahme,
@@ -35,8 +34,22 @@ REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-CALC-DISPO-HINT-1** Calc-/Dispo-Isolation-Hinweise (PR **#120**) auf `main`.
-Davor: **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
+**PO-APPROVAL-NOTIFY-1** Freigabe erteilt/abgelehnt Outbox+SMTP (PR **#121**) auf `main`.
+Davor: **PO-CALC-DISPO-HINT-1** (PR **#120**), **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
+
+## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D / PO-NOT002-ADMIN-1 | **freigegeben** (nur Admin, lesend) |
+| Outbox Liste+Detail, Default-Filter `failed` | **umgesetzt** (Draft-PR) |
+| Suppress-Tab getrennt von SMTP-`failed` | **umgesetzt** (Draft-PR) |
+| Fehler maskieren/kürzen vor Inertia | **umgesetzt** (Draft-PR) |
+| Quellen Comment/ApprovalRequest → Auftrag | **umgesetzt** (Draft-PR) |
+| Retry/Resend/Dispatch/Mutation | **bewusst nicht** |
+| Submit-/Invalidierungsmails | **offen** |
+| NOT-002 auf `main` abgeschlossen | **nein** (erst nach Merge) |
+| Merge / Deploy | **offen** (Draft-PR) |
 
 ## PO-APPROVAL-NOTIFY-1 / BL-P9-02d (Oktober 2026)
 
@@ -48,9 +61,11 @@ Davor: **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
 | Suppress Self / ungültige Mail / nicht ladbar | **umgesetzt** |
 | Begründung nicht in Mail/Payload | **umgesetzt** |
 | Outbox-Write in Fach-TX; SMTP ohne Fach-Rollback | **umgesetzt** |
-| Submit / Invalidierung / Admin-Outbox-UI | **bewusst nicht** |
-| NOT-002 vollständig (Admin-Sicht) | **nein** |
-| Merge / Deploy | **offen** (Draft-PR) |
+| Submit / Invalidierung | **bewusst nicht** |
+| Admin-Outbox-UI | **in BL-P9-02e** (Draft-PR #122) |
+| NOT-002 vollständig auf `main` | **nein** |
+| Merge | **erledigt** (PR #121 auf `main`) |
+| Deploy | **nicht erfolgt** / nicht beauftragt |
 
 ## PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 (Oktober 2026)
 

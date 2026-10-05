@@ -169,4 +169,12 @@ class User extends Authenticatable
     {
         return $this->hasRole(Role::Admin);
     }
+
+    /**
+     * PO-NOT002-ADMIN-1: lesende Outbox-/Suppress-Sicht ausschließlich Admin.
+     */
+    public function canViewNotificationOutbox(): bool
+    {
+        return $this->hasRole(Role::Admin);
+    }
 }
