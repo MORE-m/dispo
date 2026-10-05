@@ -329,7 +329,7 @@ final class StandardOfferFromCalculationSanitizer
             $safe['component_profile'] = null;
             $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
             $safe['fixed_price_nn'] = null;
-            if (($safe['components'] ?? []) === []) {
+            if ($safe['components'] === []) {
                 $safe['component_calculation_strategy'] = null;
             }
 
