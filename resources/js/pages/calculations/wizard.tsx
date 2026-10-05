@@ -4133,7 +4133,8 @@ export default function CalculationWizard({
                                                                 !calendarTemplate;
                                                             const showOptionalComponentsUi =
                                                                 !forcedProfile &&
-                                                                position.components
+                                                                position
+                                                                    .components
                                                                     .length > 0;
 
                                                             return (
