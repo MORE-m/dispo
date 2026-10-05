@@ -2,6 +2,8 @@ import { expect, test, type Page } from '@playwright/test';
 
 const monday = '2026-03-02';
 const hour8 = 8;
+/** Fixture: 30s × 4 Spots × 2,00 €/s (Seeder Stunde 8) = 240,00 */
+const expectedNetTotal = '240,00';
 
 async function login(page: Page, email: string) {
     await page.goto('/login');
@@ -85,6 +87,15 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
             .locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`)
             .fill('4');
 
+        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
+            0,
+            { timeout: 20_000 },
+        );
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(expectedNetTotal, { timeout: 20_000 });
+
         await page.locator('[data-test="wizard-save"]').click();
         await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
             timeout: 30_000,
@@ -108,6 +119,10 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
         await expect(
             page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
         ).toHaveValue('4');
+        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(expectedNetTotal, { timeout: 20_000 });
 
         await page.locator('[data-test="standard-offer-publish"]').click();
         await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
@@ -157,13 +172,15 @@ test.describe.serial('BL-P4-03h Calendar × Hauptspot+Allonge', () => {
             page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
         ).toHaveValue('4');
         await expect(
-            page.locator('[data-test="spot-components-strategy-hint-0"]'),
-        ).toContainText('Gemeinsame Gesamtlänge');
-        await expect(
             page.locator('[data-test="spot-components-total-length-0"]'),
         ).toContainText('30s');
+        await page.getByRole('button', { name: '3. Zusammenfassung' }).click();
+        await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
+            0,
+            { timeout: 20_000 },
+        );
         await expect(
-            page.locator('[data-test="preview-net-total"]'),
-        ).toBeVisible({ timeout: 20_000 });
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(expectedNetTotal, { timeout: 20_000 });
     });
 });

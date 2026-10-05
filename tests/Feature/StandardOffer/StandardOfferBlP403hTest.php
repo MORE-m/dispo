@@ -79,23 +79,39 @@ class StandardOfferBlP403hTest extends TestCase
             ComponentCalculationStrategy::SharedTotalLength,
             [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 5]],
         );
-        $nnFrozen = (string) ($published->frozen_materialization['nn_invest'] ?? '');
-        $componentsFrozen = $published->frozen_materialization['positions'][0]['components'] ?? [];
+        $frozen = $published->frozen_materialization;
+        $nnFrozen = (string) ($frozen['nn_invest'] ?? '');
+        $componentsFrozen = $frozen['positions'][0]['components'] ?? [];
+        $plannerFrozen = $frozen['positions'][0]['planner_entries'] ?? [];
+        $this->assertSame('2.4000', (string) ($plannerFrozen[0]['second_price'] ?? ''));
 
-        $adopted = $this->writer()->adopt($published, 'Parity Kunde', null, null, $sales);
-        $nnAdopted = (string) $adopted->nn_invest;
-        $this->assertSame($nnFrozen, $nnAdopted);
-        $this->assertCount(2, $adopted->positions->first()->components);
-
+        // Publish → Live-Preise ändern → erst danach Adopt (kein Live-Rebind).
         $this->setSecondPrice($catalog, '9.0000');
         $this->assertSame($nnFrozen, (string) ($published->fresh()->frozen_materialization['nn_invest'] ?? ''));
-        $this->assertSame($nnAdopted, (string) $adopted->fresh()->nn_invest);
         $this->assertSame(
             $componentsFrozen[0]['media_gross'] ?? null,
             $published->fresh()->frozen_materialization['positions'][0]['components'][0]['media_gross'] ?? null,
         );
+        $this->assertSame(
+            '2.4000',
+            (string) ($published->fresh()->frozen_materialization['positions'][0]['planner_entries'][0]['second_price'] ?? ''),
+        );
 
-        $payload = app(CalculationWriter::class)->payloadFromCalculation($adopted->fresh([
+        $adopted = $this->writer()->adopt($published->fresh(), 'Parity Kunde', null, null, $sales);
+        $position = $adopted->positions->first();
+        $this->assertSame($nnFrozen, (string) $adopted->nn_invest);
+        $this->assertCount(2, $position->components);
+        $this->assertSame('2.4000', (string) $position->plannerEntries->first()->second_price);
+        $this->assertSame(
+            (string) ($plannerFrozen[0]['line_gross'] ?? ''),
+            (string) $position->plannerEntries->first()->line_gross,
+        );
+        $this->assertSame(
+            collect($componentsFrozen)->pluck('media_gross')->map(fn ($v) => (string) $v)->all(),
+            $position->components->sortBy('sort')->values()->map(fn ($c) => (string) $c->media_gross)->all(),
+        );
+
+        $reloaded = app(CalculationWriter::class)->payloadFromCalculation($adopted->fresh([
             'positions',
             'positions.components',
             'positions.plannerEntries',
@@ -104,14 +120,66 @@ class StandardOfferBlP403hTest extends TestCase
             'positions.discounts',
             'orderDiscounts',
         ]));
+        $this->assertSame($nnFrozen, (string) $adopted->fresh()->nn_invest);
+        $this->assertSame(
+            '2.4000',
+            (string) $adopted->fresh(['positions.plannerEntries'])->positions->first()->plannerEntries->first()->second_price,
+        );
+
+        // Calc-Edit mit neuer Zelle → Live-Rebind gegen 9.0000.
+        $payload = $reloaded;
         $payload['lock_version'] = $adopted->fresh()->lock_version;
-        // Neue Zelle ohne Snapshot-Pin → Live-Auflösung gegen aktualisierte Preisliste.
         $payload['positions'][0]['planner_entries'] = [
             ['date' => '2026-03-02', 'hour' => 9, 'spot_count' => 5],
         ];
         $updated = app(CalculationWriter::class)->update($adopted->fresh(), $payload, $sales);
-        $this->assertNotSame($nnAdopted, (string) $updated->nn_invest);
+        $this->assertNotSame($nnFrozen, (string) $updated->nn_invest);
         $this->assertSame('9.0000', (string) $updated->positions->first()->plannerEntries->first()->second_price);
+    }
+
+    public function test_inventory_strategy_change_after_draft_blocks_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $offer = $this->writer()->create(
+            'Draft vor Regelwechsel',
+            $this->calendarComponentsDraftPayload(
+                $catalog,
+                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 2]],
+                ComponentCalculationStrategy::SharedTotalLength,
+            ),
+            $pm,
+        );
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $draftId = $draft->id;
+        $lock = (int) $draft->lock_version;
+
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+
+        try {
+            $this->writer()->publish($draft->fresh(), $lock, $pm);
+            $this->fail('Publish nach Inventarstrategie-Wechsel hätte scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertTrue(
+                collect($exception->errors())->keys()->contains(
+                    fn ($key) => str_contains((string) $key, 'component_calculation_strategy')
+                        || str_contains((string) $key, 'components'),
+                ),
+                json_encode($exception->errors()),
+            );
+        }
+
+        $stillDraft = StandardOfferVersion::query()->findOrFail($draftId);
+        $this->assertSame(StandardOfferVersionStatus::Draft, $stillDraft->status);
+        $this->assertNull($stillDraft->frozen_materialization);
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $offer->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
     }
 
     public function test_wrong_inventory_strategy_fails_on_create_preview_publish(): void
@@ -338,6 +406,68 @@ class StandardOfferBlP403hTest extends TestCase
         app(FrozenCalculationPersistenceContract::class)->assertHydratable($baseline);
 
         $cases = [
+            'empty components with valid strategy' => [
+                'needle' => 'component_calculation_strategy ohne Komponenten',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'] = [];
+                    $mat['positions'][0]['component_calculation_strategy'] = ComponentCalculationStrategy::SharedTotalLength->value;
+
+                    return $mat;
+                },
+            ],
+            'missing main spot' => [
+                'needle' => 'Hauptspot fehlt',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'] = [
+                        $mat['positions'][0]['components'][1],
+                    ];
+                    $mat['positions'][0]['components'][0]['sort'] = 0;
+                    $mat['positions'][0]['components'][0]['length_index'] = 0;
+
+                    return $mat;
+                },
+            ],
+            'duplicate main role' => [
+                'needle' => 'doppelte Komponentenrollen',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'][1]['role'] = 'main_spot';
+                    $mat['positions'][0]['components'][1]['label'] = 'Hauptspot';
+
+                    return $mat;
+                },
+            ],
+            'non-positive length' => [
+                'needle' => 'components.0.length_seconds',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'][0]['length_seconds'] = 0;
+
+                    return $mat;
+                },
+            ],
+            'duplicate sort' => [
+                'needle' => 'components.1.sort',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'][1]['sort'] = $mat['positions'][0]['components'][0]['sort'];
+
+                    return $mat;
+                },
+            ],
+            'invalid length_index' => [
+                'needle' => 'components.0.length_index',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'][0]['length_index'] = 'not-an-index';
+
+                    return $mat;
+                },
+            ],
+            'non-decimal component media_gross' => [
+                'needle' => 'components.0.media_gross',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['components'][0]['media_gross'] = 'not-a-decimal';
+
+                    return $mat;
+                },
+            ],
             'missing component media_gross' => [
                 'needle' => 'components.0.media_gross',
                 'mutate' => static function (array $mat): array {
@@ -354,8 +484,8 @@ class StandardOfferBlP403hTest extends TestCase
                     return $mat;
                 },
             ],
-            'strategy without components' => [
-                'needle' => 'component_calculation_strategy',
+            'strategy without components invalid enum' => [
+                'needle' => 'component_calculation_strategy ohne Komponenten',
                 'mutate' => static function (array $mat): array {
                     $mat['positions'][0]['components'] = [];
                     $mat['positions'][0]['component_calculation_strategy'] = 'not-a-strategy';
@@ -541,8 +671,34 @@ class StandardOfferBlP403hTest extends TestCase
         $this->assertSame($strategy->value, $frozenPos['component_calculation_strategy']);
         $this->assertCount(2, $frozenPos['components']);
         $this->assertCount(2, $frozenPos['planner_entries']);
+        $this->assertSame(
+            ['main_spot', 'allonge'],
+            collect($frozenPos['components'])->sortBy('sort')->pluck('role')->values()->all(),
+        );
+        $this->assertSame(
+            [20, 10],
+            collect($frozenPos['components'])->sortBy('sort')->pluck('length_seconds')->map(fn ($v) => (int) $v)->values()->all(),
+        );
+        $this->assertSame(
+            [0, 1],
+            collect($frozenPos['components'])->sortBy('sort')->pluck('sort')->map(fn ($v) => (int) $v)->values()->all(),
+        );
+        $this->assertTrue(
+            collect($frozenPos['components'])->every(fn ($c) => array_key_exists('length_index', $c)),
+        );
         $this->assertArrayHasKey('media_gross', $frozenPos['components'][0]);
         $nnFrozen = (string) ($published->frozen_materialization['nn_invest'] ?? '');
+        $normalizeDate = static fn (mixed $date): string => substr((string) $date, 0, 10);
+        $plannerFrozen = collect($frozenPos['planner_entries'])
+            ->map(fn ($e) => [
+                'date' => $normalizeDate($e['date']),
+                'hour' => (int) $e['hour'],
+                'spot_count' => (int) $e['spot_count'],
+                'second_price' => (string) $e['second_price'],
+                'line_gross' => (string) $e['line_gross'],
+            ])
+            ->values()
+            ->all();
 
         $adopted = $this->writer()->adopt($published, 'Adopt '.$strategy->value, null, null, $sales);
         $position = $adopted->positions->first();
@@ -551,6 +707,30 @@ class StandardOfferBlP403hTest extends TestCase
         $this->assertCount(2, $position->components);
         $this->assertCount(2, $position->plannerEntries);
         $this->assertSame($nnFrozen, (string) $adopted->nn_invest);
+        $this->assertSame(
+            ['main_spot', 'allonge'],
+            $position->components->sortBy('sort')->pluck('role')->map(fn ($r) => $r instanceof \BackedEnum ? $r->value : (string) $r)->values()->all(),
+        );
+        $this->assertSame([20, 10], $position->components->sortBy('sort')->pluck('length_seconds')->map(fn ($v) => (int) $v)->values()->all());
+        $this->assertSame([0, 1], $position->components->sortBy('sort')->pluck('sort')->map(fn ($v) => (int) $v)->values()->all());
+        $this->assertSame(
+            collect($frozenPos['components'])->sortBy('sort')->pluck('length_index')->map(fn ($v) => (int) $v)->values()->all(),
+            $position->components->sortBy('sort')->pluck('length_index')->map(fn ($v) => (int) $v)->values()->all(),
+        );
+        $this->assertSame(
+            collect($frozenPos['components'])->sortBy('sort')->pluck('media_gross')->map(fn ($v) => (string) $v)->values()->all(),
+            $position->components->sortBy('sort')->pluck('media_gross')->map(fn ($v) => (string) $v)->values()->all(),
+        );
+        $this->assertSame(
+            $plannerFrozen,
+            $position->plannerEntries->sortBy([['date', 'asc'], ['hour', 'asc']])->values()->map(fn ($e) => [
+                'date' => $normalizeDate($e->date),
+                'hour' => (int) $e->hour,
+                'spot_count' => (int) $e->spot_count,
+                'second_price' => (string) $e->second_price,
+                'line_gross' => (string) $e->line_gross,
+            ])->all(),
+        );
         $this->assertSame($published->id, $adopted->origin_standard_offer_version_id);
         $this->assertSame(
             StandardOfferVersionStatus::Published,
@@ -570,6 +750,40 @@ class StandardOfferBlP403hTest extends TestCase
         $this->assertCount(2, $reloaded['positions'][0]['components']);
         $this->assertCount(2, $reloaded['positions'][0]['planner_entries']);
         $this->assertSame($strategy->value, $reloaded['positions'][0]['component_calculation_strategy']);
+        $this->assertSame(
+            ['main_spot', 'allonge'],
+            collect($reloaded['positions'][0]['components'])->sortBy('sort')->pluck('role')->values()->all(),
+        );
+        $this->assertSame(
+            [20, 10],
+            collect($reloaded['positions'][0]['components'])->sortBy('sort')->pluck('length_seconds')->map(fn ($v) => (int) $v)->values()->all(),
+        );
+        $this->assertSame(
+            collect($plannerFrozen)->map(fn ($e) => [
+                'date' => $e['date'],
+                'hour' => $e['hour'],
+                'spot_count' => $e['spot_count'],
+            ])->all(),
+            collect($reloaded['positions'][0]['planner_entries'])->sortBy([['date', 'asc'], ['hour', 'asc']])->values()->map(fn ($e) => [
+                'date' => $normalizeDate($e['date']),
+                'hour' => (int) $e['hour'],
+                'spot_count' => (int) $e['spot_count'],
+            ])->all(),
+        );
+
+        // Persistierte Preise bleiben nach Reload am Modell (Edit-Payload trägt sie bewusst nicht).
+        $afterReload = $adopted->fresh(['positions.plannerEntries', 'positions.components']);
+        $this->assertSame($nnFrozen, (string) $afterReload->nn_invest);
+        $this->assertSame(
+            $plannerFrozen,
+            $afterReload->positions->first()->plannerEntries->sortBy([['date', 'asc'], ['hour', 'asc']])->values()->map(fn ($e) => [
+                'date' => $normalizeDate($e->date),
+                'hour' => (int) $e->hour,
+                'spot_count' => (int) $e->spot_count,
+                'second_price' => (string) $e->second_price,
+                'line_gross' => (string) $e->line_gross,
+            ])->all(),
+        );
     }
 
     private function writer(): StandardOfferWriter

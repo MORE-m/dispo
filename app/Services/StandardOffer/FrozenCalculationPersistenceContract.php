@@ -341,6 +341,10 @@ final class FrozenCalculationPersistenceContract
         foreach ($components as $childIndex => $component) {
             $this->assertComponentRow($component, $index, $childIndex, $position);
         }
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($components !== [] && ($profileRaw === null || $profileRaw === '' || $profileRaw === [])) {
+            $this->assertOptionalAllongeComponentStructure($components, $index);
+        }
 
         $ranges = $this->assertChildList(
             $position,
@@ -408,6 +412,9 @@ final class FrozenCalculationPersistenceContract
         $this->assertOptionalAllongeStrategy($position, $index, $components);
         foreach ($components as $childIndex => $component) {
             $this->assertComponentRow($component, $index, $childIndex, $position);
+        }
+        if ($components !== []) {
+            $this->assertOptionalAllongeComponentStructure($components, $index);
         }
 
         $ranges = $this->assertChildList(
@@ -901,12 +908,86 @@ final class FrozenCalculationPersistenceContract
             return;
         }
 
+        // Draft-/Komponentenvertrag: Strategie ohne Komponenten ist unzulässig
+        // (auch bei gültigem Enum-Wert) – Legacy ohne Strategy-Key bleibt leer/OK.
         if ($strategy !== null && $strategy !== '') {
-            if (! is_string($strategy) || ComponentCalculationStrategy::tryFrom($strategy) === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy ohne Komponenten).",
+            ]);
+        }
+    }
+
+    /**
+     * Optional Hauptspot+Allonge laut ComponentValidator: genau ein Hauptspot,
+     * höchstens eine Allonge, positive Längen, eindeutige sort/length_index.
+     *
+     * @param  list<array<string, mixed>>  $components
+     */
+    private function assertOptionalAllongeComponentStructure(array $components, int $index): void
+    {
+        $mainCount = 0;
+        $allongeCount = 0;
+        /** @var array<int, true> $seenSorts */
+        $seenSorts = [];
+
+        foreach ($components as $childIndex => $component) {
+            $role = $component['role'] ?? null;
+            if ($role === SpotComponentRole::MainSpot->value) {
+                $mainCount++;
+            }
+            if ($role === SpotComponentRole::Allonge->value) {
+                $allongeCount++;
+            }
+
+            $length = $component['length_seconds'] ?? null;
+            if ((! is_int($length) && ! (is_string($length) && ctype_digit($length)))
+                || (int) $length < 1) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_seconds).",
                 ]);
             }
+
+            $sort = $component['sort'] ?? null;
+            if (! is_int($sort) && ! (is_string($sort) && ctype_digit($sort))) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            $sortInt = (int) $sort;
+            if (isset($seenSorts[$sortInt])) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            $seenSorts[$sortInt] = true;
+
+            $lengthIndex = $component['length_index'] ?? null;
+            if (! is_int($lengthIndex) && ! (is_string($lengthIndex) && ctype_digit($lengthIndex))) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_index).",
+                ]);
+            }
+            if ((int) $lengthIndex < 0) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_index).",
+                ]);
+            }
+        }
+
+        if ($mainCount < 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Hauptspot fehlt).",
+            ]);
+        }
+        if ($mainCount > 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte Komponentenrollen).",
+            ]);
+        }
+        if ($allongeCount > 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte Komponentenrollen).",
+            ]);
         }
     }
 
@@ -1006,11 +1087,11 @@ final class FrozenCalculationPersistenceContract
             ]);
         }
 
-        if (! is_string($component['media_gross']) && ! is_numeric($component['media_gross'])) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
-            ]);
-        }
+        $this->assertFrozenComponentMediaGross(
+            $component['media_gross'],
+            $positionIndex,
+            $childIndex,
+        );
 
         if (! array_key_exists('label', $component) || ! is_string($component['label'])) {
             throw ValidationException::withMessages([
@@ -1038,6 +1119,32 @@ final class FrozenCalculationPersistenceContract
         if (! is_numeric($component['length_seconds']) || (int) $component['length_seconds'] < 0) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.length_seconds).",
+            ]);
+        }
+    }
+
+    private function assertFrozenComponentMediaGross(
+        mixed $value,
+        int $positionIndex,
+        int|string $childIndex,
+    ): void {
+        // Shared-Total-Length friert Komponenten-media_gross als '' ein
+        // (Brutto nur positionsseitig); Individual liefert Dezimalbeträge.
+        if ($value === '') {
+            return;
+        }
+
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
+            ]);
+        }
+
+        $raw = is_int($value) ? (string) $value : trim($value);
+        $pattern = '/^\d+(\.\d{1,'.Decimal::MONEY_SCALE.'})?$/';
+        if ($raw === '' || preg_match($pattern, $raw) !== 1 || ! is_numeric($raw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
             ]);
         }
     }
