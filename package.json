@@ -27,7 +27,8 @@
         "test:e2e:blp901b": "playwright test -c playwright.blp901b.config.ts",
         "test:e2e:blp901c": "playwright test -c playwright.blp901c.config.ts",
         "test:e2e:blp902a": "playwright test -c playwright.blp902a.config.ts",
-        "test:e2e:po-auth-special-approve": "playwright test -c playwright.po-auth-special-approve.config.ts"
+        "test:e2e:po-auth-special-approve": "playwright test -c playwright.po-auth-special-approve.config.ts",
+        "test:e2e:po-not002-admin": "playwright test -c playwright.po-not002-admin.config.ts"
     },
     "dependencies": {
         "@inertiajs/react": "^3.0.0",

@@ -19,6 +19,7 @@ class AdministrationHubController extends Controller
         $this->authorize('access-administration');
 
         $canManageSpecialApprove = $request->user()?->can('manage-special-approve-rights') ?? false;
+        $canViewNotificationOutbox = $request->user()?->can('view-notification-outbox') ?? false;
 
         return Inertia::render('administration/index', [
             'modules' => [
@@ -65,6 +66,15 @@ class AdministrationHubController extends Controller
                         ? '/administration/sonderfreigaben'
                         : null,
                     'available' => $canManageSpecialApprove,
+                ],
+                [
+                    'key' => 'notification-outbox',
+                    'title' => 'Benachrichtigungen / Outbox',
+                    'description' => 'Lesende Sicht auf Versandstatus und unterdrückte Benachrichtigungen (nur Admin).',
+                    'href' => $canViewNotificationOutbox
+                        ? '/administration/benachrichtigungen'
+                        : null,
+                    'available' => $canViewNotificationOutbox,
                 ],
             ],
         ]);

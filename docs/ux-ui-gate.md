@@ -17,16 +17,23 @@
   + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**
   + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**
   + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1**
+  + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (Draft-PR)**
   + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 4.10.2026 (PO-APPROVAL-NOTIFY-1):** zusätzlich freigegeben ist
-  ausschließlich **Freigabe erteilt/abgelehnt** über Outbox+SMTP: Empfänger
-  `submitted_by_id`; Regular/Special; keine Begründung in der Mail; kein Submit;
-  keine Invalidierung; keine Admin-Outbox-UI. Ask/Answer unverändert.
+- **Hinweis Stand 5.10.2026 (PO-NOT002-ADMIN-1):** zusätzlich freigegeben und auf
+  Draft-PR umgesetzt ist die **lesende Admin-Sicht** auf Outbox + Suppression:
+  nur Rolle Admin; Default-Filter `failed`; Suppress-Tab getrennt von SMTP-Fehlern;
+  keine Versandaktionen. **Nicht** auf `main` abgeschlossen; Submit-/Invalidierungsmails
+  und In-App bleiben offen.
+  Dok: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md`.
+- **Hinweis Stand 4.10.2026 (PO-APPROVAL-NOTIFY-1):** zusätzlich freigegeben und auf
+  `main` (PR #121) ist ausschließlich **Freigabe erteilt/abgelehnt** über Outbox+SMTP:
+  Empfänger `submitted_by_id`; Regular/Special; keine Begründung in der Mail; kein Submit;
+  keine Invalidierung. Admin-Outbox-UI → **PO-NOT002-ADMIN-1**. Ask/Answer unverändert.
   Dok: `docs/entscheidungen/PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md`.
 - **Hinweis Stand 29.09.2026 (PO-BLP902C-1):** zusätzlich freigegeben und auf
   `main` abgeschlossen (PR **#103** MERGED `5dabeefed9a2fb84b6aa373499ff64cc43f9edaf`;
@@ -370,7 +377,8 @@ Ausschließlich **Freigabe erteilt** und **Freigabe abgelehnt** (Regular und Spe
 Ausdrücklich **nicht** freigegeben bleiben u. a.:
 
 - Submit-Mails, Invalidierungsmails, weitere Status-Mails
-- In-App, Empfängerwahl, Admin-Outbox-UI (`NOT-002` vollständig)
+- In-App, Empfängerwahl; Submit-/Invalidierungsmails
+- Admin-Outbox-UI: freigegeben als **PO-NOT002-ADMIN-1 / BL-P9-02e** (Draft-PR; nicht auf `main`)
 - Permission-Änderung, allgemeine Notification-Engine
 
 **Product-Owner-Teilfreigabe (29. September 2026, UX-GATE-D / BL-P9-02c / PO-BLP902C-1):**

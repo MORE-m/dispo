@@ -112,6 +112,9 @@ jobs:
       - name: Browser PO-AUTH-SPECIAL-APPROVE-1 isolated tests
         run: npx playwright test -c playwright.po-auth-special-approve.config.ts
 
+      - name: Browser PO-NOT002-ADMIN-1 isolated tests
+        run: npx playwright test -c playwright.po-not002-admin.config.ts
+
       - name: Browser DSP-DCP-001 isolated tests
         run: npx playwright test -c playwright.dspdcp001.config.ts
 

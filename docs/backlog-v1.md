@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App / Admin-Outbox-UI; weitere Invalidierungsauslöser)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (Draft-PR)** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App; weitere Invalidierungsauslöser)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -738,11 +738,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02d – Freigabe erteilt/abgelehnt Outbox+SMTP (PO-APPROVAL-NOTIFY-1)
 
 - **Phase:** 9
-- **Status:** in Arbeit (dieser Branch; nicht gemergt)
+- **Status:** erledigt auf `main` (PR #121)
 - **Kennung:** PO-APPROVAL-NOTIFY-1 / UX-GATE-D Teilfreigabe ausschließlich
   Freigabe erteilt und Freigabe abgelehnt (Regular + Special)
 - **Anforderungen:** `NOT-001` (Mail-Inhalt), `NOT-002` (Versandfehler ohne Fach-Rollback;
-  Admin-UI bewusst **nicht** in diesem Slice → NOT-002 nicht vollständig)
+  Admin-UI bewusst **nicht** in diesem Slice → NOT-002 Admin-Sicht in **BL-P9-02e**)
 - **Abhängigkeiten:** BL-P9-02b, BL-P9-02c, BL-P1-05a, Freigabe-Services
 - **Ergebnis:** Enqueue in `DispoOrderApprovalService::approve/reject`; Empfänger nur
   `submitted_by_id`; Suppress-Audit `dispo_order.approval.notification_suppressed`;
@@ -755,21 +755,38 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `SalesInquiryOutboxDeliveryTest`; MySQL parallele Approve-Outbox in
   `DispoOrderApprovalConcurrencyTest`
 
+### BL-P9-02e – Admin-Sicht Outbox + Suppression (PO-NOT002-ADMIN-1)
+
+- **Phase:** 9
+- **Status:** implementiert auf Draft-PR (`feat/po-not002-admin-1`); **nicht** auf `main`
+- **Kennung:** PO-NOT002-ADMIN-1 / UX-GATE-D Teilfreigabe lesende Admin-Outbox
+- **Anforderungen:** `NOT-002` (Admin-Protokollsicht); Lesekontext `NOT-001`
+- **Abhängigkeiten:** BL-P9-02b/02c/02d, Admin-Hub, Outbox-Fundament
+- **Ergebnis:** Admin-Hub-Modul; paginierte Outbox-Liste (Default `failed`) + Detail;
+  Suppress-Tab aus beiden `notification_suppressed`-Audits; Gate nur Admin;
+  Fehler maskiert/gekürzt vor Inertia; Auftragslinks nur aus bekannten Quellen
+- **Bewusst nicht:** Retry/Resend/Dispatch, Mutationen, Submit-/Invalidierungsmails,
+  In-App, Empfängerwahl, allgemeine Audit-Explorer-UI, Migration ohne Bedarf
+- **Tests:** `NotificationOutboxAdminTest`, `NotificationErrorDisplayTest`;
+  isolierter Browser-Smoke `playwright.po-not002-admin.config.ts`
+- **Hinweis:** NOT-002 erst nach Merge dieses Slices als auf `main` abgeschlossen führen
+
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a Kommentare; 02b Outbox; **02c Ask/Answer-SMTP** auf `main`;
-  **02d Freigabe-Mails** dieser Branch); Submit-/Invalidierungsmails/In-App/Admin-UI **offen**
+- **Status:** teilweise (02a–02d auf `main`; **02e** Draft-PR); Submit-/Invalidierungsmails/In-App **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
 - **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
 - **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
 - **Erledigt in 02c (`main`, PR #103):** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
-- **In Arbeit in 02d:** Freigabe erteilt/abgelehnt → Outbox+SMTP (PO-APPROVAL-NOTIFY-1)
-- **Offen:** Submit-Mail, Invalidierungsmails, weitere Status-Ereignis-Mails, In-App; Admin-Outbox-UI
-- **Akzeptanz (Rest):** Admin-Protokollsicht (NOT-002 vollständig)
-- **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c); Freigabe-Outbox (02d)
+- **Erledigt in 02d (`main`, PR #121):** Freigabe erteilt/abgelehnt → Outbox+SMTP
+- **In Arbeit in 02e (Draft-PR):** Admin-Outbox-/Suppress-Sicht (PO-NOT002-ADMIN-1)
+- **Offen:** Submit-Mail, Invalidierungsmails, weitere Status-Ereignis-Mails, In-App
+- **Akzeptanz (Rest):** NOT-002 auf `main` nach Merge von 02e; Submit/Invalidierung weiter offen
+- **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c); Freigabe-Outbox (02d);
+  Admin-Outbox (02e)
 
 ## Phase 10 – Listen, Reports und Exporte
 

@@ -372,7 +372,7 @@ Empfängerwahl, Freigabeinvalidierung.
 
 ## Ist-Stand BL-P9-02d (PO-APPROVAL-NOTIFY-1)
 
-**IN ARBEIT** (dieser Branch). Freigabe erteilt/abgelehnt → Outbox + SMTP über die
+**ERLEDIGT auf `main` (PR #121).** Freigabe erteilt/abgelehnt → Outbox + SMTP über die
 bestehende Delivery. Submit und Invalidierung senden **keine** Mail.
 
 - Empfänger ausschließlich `submitted_by_id` des entschiedenen Zyklus; kein Fallback
@@ -387,7 +387,25 @@ bestehende Delivery. Submit und Invalidierung senden **keine** Mail.
 - At-least-once inkl. möglicher Doppelsendung wie 02c
 
 Bewusst **nicht** in 02d: Submit-Mails, Invalidierungsmails, In-App, Admin-Outbox-UI,
-Empfängerwahl, Permission-Änderung. `NOT-002` bleibt ohne Admin-Sicht unvollständig.
+Empfängerwahl, Permission-Änderung.
+
+## Ist-Stand BL-P9-02e (PO-NOT002-ADMIN-1)
+
+**IMPLEMENTIERT AUF DRAFT-PR** (`feat/po-not002-admin-1`); **nicht** auf `main`.
+Lesende Admin-Sicht auf Outbox und unterdrückte Benachrichtigungen.
+
+- Zugriff ausschließlich Rolle **Admin** (Gate `view-notification-outbox`);
+  Management allein **nein**
+- Outbox: Pagination 25, Sortierung `id` DESC, Default-Filter Status `failed`
+- Sichtbare Events: Ask, Answer, Approved, Rejected; Kanal `email`
+- Suppress-Tab aus beiden `notification_suppressed`-Audits; getrennt von SMTP-`failed`
+- Fehlertexte serverseitig maskieren/kürzen vor Inertia; gespeicherte Daten unverändert
+- Auftragslinks nur aus aufgelösten Comment-/ApprovalRequest-Quellen
+- Rein lesend: keine Retry-/Resend-/Dispatch-/Mutationsaktionen
+
+Bewusst **nicht** in 02e: Submit-/Invalidierungsmails, In-App, Empfängerwahl,
+allgemeine Audit-Explorer-UI, Worker/Dispatch. `NOT-002` erst nach Merge auf `main`
+als abgeschlossen führen.
 
 ## Abschlussbedingungen
 
@@ -428,4 +446,5 @@ fehlendem Empfänger unterdrückt und in `audit_events` protokolliert. SMTP-Vers
 läuft über die DB-Queue. Submit, Invalidierung und übrige Status-Ereignisse folgen
 späteren Slices. Ein E-Mail-Fehler nach Commit darf den fachlichen Statusübergang
 nicht zurückrollen (`NOT-002` Versand); ein Outbox-DB-Write-Fehler in der Fach-TX
-rollt mit. Die Admin-Fehleransicht (`NOT-002` vollständig) bleibt offen.
+rollt mit. Die Admin-Fehleransicht ist in **BL-P9-02e / PO-NOT002-ADMIN-1** auf
+Draft-PR umgesetzt und erst nach Merge auf `main` als abgeschlossen zu führen.
