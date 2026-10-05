@@ -195,7 +195,7 @@ class StandardOfferController extends Controller
             'canAdopt' => $user->canAdoptStandardOffers() && $version->status->isAdoptable(),
             'catalog' => null,
             'schemaFingerprint' => null,
-            'scopeNote' => 'BL-P4-03g / PO-BLP403G-1: Spot Classic Average (Komponenten/Festpreis/Tandem) und Calendar × normal. Adopt klont eingefrorene Termine/Preise/Pins (B1+C1); kein Auto-Shift. Budget/Abbinder und Calendar×Festpreis/Tandem: Folgeslices.',
+            'scopeNote' => 'BL-P4-03h / PO-BLP403H-1: Spot Classic Average (Komponenten/Festpreis/Tandem) und Calendar × normal (optional Hauptspot+Allonge). Adopt klont eingefrorene Termine/Preise/Pins/Komponenten (B1+C1); kein Auto-Shift. Budget/Abbinder und Calendar×Festpreis/Tandem: Folgeslices.',
         ]);
     }
 
@@ -470,7 +470,7 @@ class StandardOfferController extends Controller
             'status' => $version !== null ? $version->status->value : 'draft',
             'status_label' => $version !== null ? $version->status->label() : 'Entwurf',
             'allowed_spot_methods' => ['average', 'calendar'],
-            'scope_note' => 'Vorlagen-Editor BL-P4-03g / PO-BLP403G-1: Spot Classic Average (inkl. Komponenten/Festpreis/Tandem) und Calendar × normal ohne Komponenten/Festpreis/Tandem. Keine Kundendaten. Budgetplanung ist nicht wählbar.',
+            'scope_note' => 'Vorlagen-Editor BL-P4-03h / PO-BLP403H-1: Spot Classic Average (inkl. Komponenten/Festpreis/Tandem) und Calendar × normal mit optionaler Hauptspot+Allonge. Keine Kundendaten. Budgetplanung und Calendar×Festpreis/Tandem sind nicht wählbar.',
             'proposal_review' => $this->proposalReviewProp($version),
         ];
 

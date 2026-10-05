@@ -450,24 +450,7 @@ class StandardOfferBlP403gTest extends TestCase
             $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
         }
 
-        try {
-            $this->writer()->create('Cal Komponenten', $this->calendarDraftPayload($catalog, [
-                ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1],
-            ], [
-                'components' => [
-                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
-                    ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
-                ],
-                'component_calculation_strategy' => 'shared_total_length',
-            ]), $pm);
-            $this->fail('Calendar+Komponenten hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $errors = $exception->errors();
-            $this->assertTrue(
-                array_key_exists('positions.0.components', $errors)
-                || array_key_exists('positions.0.component_calculation_strategy', $errors),
-            );
-        }
+        // Calendar+Komponenten: freigegeben in BL-P4-03h – Negativfälle dort.
 
         try {
             $this->writer()->create('Cal Tandem', $this->calendarDraftPayload($catalog, [

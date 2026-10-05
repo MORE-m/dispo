@@ -2,6 +2,7 @@
 
 namespace App\Services\StandardOffer;
 
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Enums\SpotComponentProfile;
@@ -9,12 +10,12 @@ use App\Models\Calculation;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / STD-001:
+ * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / BL-P4-03h / PO-BLP403H-1 / STD-001:
  * Calc-Payload → kundenloser Vorlagen-Draft plus Prüfstufe
  * (nur Feldnamen, keine Quell-Freitextwerte).
  *
  * From-Calc: reine Average-Quellen (inkl. freigegebene Varianten) oder reine
- * Calendar×normal-Quellen (A1). Mix Average+Calendar → komplette Ablehnung.
+ * Calendar×normal-Quellen (optional Hauptspot+Allonge). Mix Average+Calendar → komplette Ablehnung.
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -208,23 +209,26 @@ final class StandardOfferFromCalculationSanitizer
 
         $profileRaw = $position['component_profile'] ?? null;
         if ($profileRaw !== null && $profileRaw !== '') {
-            $errors["positions.{$index}.component_profile"] = "{$label}: Tandem/Tridem kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+            $errors["positions.{$index}.component_profile"] = "{$label}: Tandem/Tridem kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03h).";
         }
 
         if (array_key_exists('components', $position) && $position['components'] === null) {
             $errors["positions.{$index}.components"] = "{$label}: Komponenten dürfen nicht null sein.";
+        } elseif (array_key_exists('components', $position) && ! is_array($position['components'])) {
+            $errors["positions.{$index}.components"] = "{$label}: Komponenten sind ungültig.";
         } else {
-            $components = $position['components'] ?? [];
-            if (! is_array($components)) {
-                $errors["positions.{$index}.components"] = "{$label}: Komponenten sind ungültig.";
-            } elseif ($components !== []) {
-                $errors["positions.{$index}.components"] = "{$label}: Komponenten können nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+            $components = is_array($position['components'] ?? null) ? $position['components'] : [];
+            $strategy = $position['component_calculation_strategy'] ?? null;
+            if ($components !== [] && ($strategy === null || $strategy === '')) {
+                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ist für Komponenten erforderlich.";
             }
-        }
-
-        $strategy = $position['component_calculation_strategy'] ?? null;
-        if ($strategy !== null && $strategy !== '') {
-            $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Komponentenstrategie ist für Calendar-Vorlagen nicht erlaubt.";
+            if ($components === [] && $strategy !== null && $strategy !== '') {
+                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ohne Komponenten ist unzulässig.";
+            }
+            if ($strategy !== null && $strategy !== ''
+                && ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
+                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Ungültige Komponentenstrategie.";
+            }
         }
 
         $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: false);
@@ -258,7 +262,7 @@ final class StandardOfferFromCalculationSanitizer
 
         if ($settlement === PricingSettlementMode::FixedPrice) {
             if (! $allowFixedPrice) {
-                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03h).";
 
                 return;
             }
@@ -319,11 +323,15 @@ final class StandardOfferFromCalculationSanitizer
             $safe['planner_entries'] = is_array($position['planner_entries'] ?? null)
                 ? $position['planner_entries']
                 : [];
-            $safe['components'] = [];
+            if (! array_key_exists('components', $safe) || $safe['components'] === null) {
+                $safe['components'] = [];
+            }
             $safe['component_profile'] = null;
-            $safe['component_calculation_strategy'] = null;
             $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
             $safe['fixed_price_nn'] = null;
+            if (($safe['components'] ?? []) === []) {
+                $safe['component_calculation_strategy'] = null;
+            }
 
             return [$safe, $reviewKeys];
         }

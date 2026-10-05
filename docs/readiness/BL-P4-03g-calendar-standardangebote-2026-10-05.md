@@ -1,22 +1,25 @@
 # Readiness: BL-P4-03g – Calendar in Spot-Classic-Standardangeboten
 
-Status: **READY** (PO-BLP403G-1 akzeptiert A1+B1+C1; Implementierung auf Draft-PR)  
-Stand: 5. Oktober 2026  
-Audit-/Implementierungsbasis: `origin/main` @ `68b7d8bf2dd604c44f703374b47d9815c73284ac`  
+Status: **READY / AUF MAIN ABGESCHLOSSEN** (PO-BLP403G-1 akzeptiert A1+B1+C1)
+Stand: 5. Oktober 2026
+Merge-Basis: `origin/main` @ `ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `PRI-002`/`PO-PRI-YEAR-1`,
-`AUTH-006`/`AUTH-007`, **PO-BLP403G-1**, Slice **BL-P4-03g**  
+`AUTH-006`/`AUTH-007`, **PO-BLP403G-1**, Slice **BL-P4-03g**
 Entscheidung: [`docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`](../entscheidungen/PO-BLP403G-1-calendar-standardangebote.md)
 
-## 0. Gate / Urteil
+## 0. Gate / Ergebnis
 
 | Voraussetzung | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe Calendar-Vorlagen | **akzeptiert** (A1+B1+C1) |
 | Calc Calendar + SA-Lifecycle 03a–03f | vorhanden |
 | Materialisierung v4 Freeze↔Hydrate | umgesetzt |
-| Budget / Abbinder / Calendar×Festpreis/Tandem | bewusst außerhalb |
+| Merge `main` | **PR #123** (`ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`) |
+| Post-Merge CI | **`37338293392` SUCCESS** |
+| Deploy | **kein** Deploy |
+| Budget / Abbinder / Calendar×Festpreis/Tandem/Komponenten | bewusst außerhalb |
 
-**Readiness-Urteil: READY** für den freigegebenen Slice (Draft-PR).
+**Readiness-Urteil: READY** – Slice auf `main` gemergt; **kein** Deploy.
 
 ## 1. Akzeptierter Adoption-Vertrag
 
@@ -37,13 +40,17 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`](
 
 ## 3. Abnahme (Kurz)
 
-Synthetisch: `StandardOfferBlP403gTest` (+ Regression 03a–03f).  
+Synthetisch: `StandardOfferBlP403gTest` (+ Regression 03a–03f).
 Browser-Smoke isoliert: `playwright.blp403g.config.ts` / Port **8050**, Spec `bl-p4-03g-*.spec.ts` (**BESTANDEN** lokal 3/3: Calendar Adopt inkl. Calc-Reload, Average-Regression, Negativ Spotanzahl 0 – UI-Validierung, kein Jahres-/Preisfehlerbeleg).
 
-Preis-/Jahresfehler und A1-Ausschluss (Komponenten/Tandem/Tridem/Festpreis) über Standardangebote-Pfade (Create/Preview/Publish) und Frozen-Hydrate-Asserts belegt. Create scheitert bei fehlender Preiszelle bereits über `assertResolvable`; korrumpierter Draft-Publish ohne Published-Freeze.  
+Preis-/Jahresfehler und A1-Ausschluss (Komponenten/Tandem/Tridem/Festpreis) über Standardangebote-Pfade (Create/Preview/Publish) und Frozen-Hydrate-Asserts belegt. Create scheitert bei fehlender Preiszelle bereits über `assertResolvable`; korrumpierter Draft-Publish ohne Published-Freeze.
 Keine Dev-DB-Tests.
 
 ## 4. Bewusst offen
 
 Calendar×Komponenten/Festpreis/Tandem, Budget-Vorlagen, Abbinder/SPT-013,
 Auto-Shift/Adopt-Rebind.
+
+Folgevorschlag (Docs, nicht freigegeben):
+[`BL-P4-03h` / `PO-BLP403H-1`](../entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md)
+für Calendar × normal × optional Hauptspot+Allonge.

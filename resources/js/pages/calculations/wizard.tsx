@@ -4105,7 +4105,8 @@ export default function CalculationWizard({
                                                         </div>
 
                                                         {(() => {
-                                                            // BL-P4-03c/03f: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                            // BL-P4-03c/03f/03h: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                            // Calendar-Vorlagen: optionale Allonge erlaubt; Tandem/Tridem weiter ausgeblendet.
                                                             const positionProfile =
                                                                 profileForMedium(
                                                                     catalog,
@@ -4127,11 +4128,17 @@ export default function CalculationWizard({
                                                                 isCalendarCalculationMethod(
                                                                     position.calculation_method_key,
                                                                 );
+                                                            const showForcedProfileUi =
+                                                                forcedProfile &&
+                                                                !calendarTemplate;
+                                                            const showOptionalComponentsUi =
+                                                                !forcedProfile &&
+                                                                position.components
+                                                                    .length > 0;
 
                                                             return (
                                                                 <div className="space-y-2">
-                                                                    {!calendarTemplate &&
-                                                                    !forcedProfile &&
+                                                                    {!forcedProfile &&
                                                                     position
                                                                         .components
                                                                         .length ===
@@ -4175,23 +4182,24 @@ export default function CalculationWizard({
                                                                             aktivieren
                                                                         </Button>
                                                                     ) : null}
-                                                                    {!calendarTemplate &&
-                                                                    (forcedProfile ||
-                                                                        position
-                                                                            .components
-                                                                            .length >
-                                                                            0) ? (
+                                                                    {showForcedProfileUi ||
+                                                                    showOptionalComponentsUi ? (
                                                                         <SpotComponentsSection
                                                                             positionIndex={
                                                                                 index
                                                                             }
                                                                             profile={
-                                                                                positionProfile
+                                                                                showForcedProfileUi
+                                                                                    ? positionProfile
+                                                                                    : null
                                                                             }
                                                                             profileLabel={
-                                                                                profileMeta?.label
+                                                                                showForcedProfileUi
+                                                                                    ? profileMeta?.label
+                                                                                    : undefined
                                                                             }
                                                                             profileMeta={
+                                                                                showForcedProfileUi &&
                                                                                 profileMeta
                                                                                     ? {
                                                                                           unit_label:

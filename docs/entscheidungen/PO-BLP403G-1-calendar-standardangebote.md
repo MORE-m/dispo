@@ -1,11 +1,11 @@
 # PO-BLP403G-1 – Calendar in Spot-Classic-Standardangeboten
 
-Status: **Akzeptiert** (A1 + B1 + C1)  
-Stand: 5. Oktober 2026  
-Basis: `origin/main` @ `68b7d8bf2dd604c44f703374b47d9815c73284ac` (nach PR #122)  
+Status: **Akzeptiert** (A1 + B1 + C1)
+Stand: 5. Oktober 2026
+Basis: `origin/main` @ `ff42723e5bdb1d11dccbac5e762b58b001fbd1cb` (nach PR #123)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `PRI-002` / `PO-PRI-YEAR-1`,
-`AUTH-006`/`AUTH-007`, Vorgänger `PO-BLP403A-1` … `PO-BLP403F-1`  
-Slice-Kennung: **`BL-P4-03g`**  
+`AUTH-006`/`AUTH-007`, Vorgänger `PO-BLP403A-1` … `PO-BLP403F-1`
+Slice-Kennung: **`BL-P4-03g`**
 Readiness: [`docs/readiness/BL-P4-03g-calendar-standardangebote-2026-10-05.md`](../readiness/BL-P4-03g-calendar-standardangebote-2026-10-05.md)
 
 ## Entscheidung / UX-GATE-D Teilfreigabe
@@ -60,5 +60,7 @@ Freeze und Hydrate bleiben zwei gepflegte Seiten (ADR 03d).
 
 ## Implementierungsstand
 
-Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03g`). **Kein** pauschales
-„Standardangebote vollständig“ – Restpunkte bleiben offen.
+Auf `main` gemergt: **PR #123**, Merge-Commit
+`ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`, Post-Merge-CI `37338293392` SUCCESS.
+**Kein** Deploy. **Kein** pauschales „Standardangebote vollständig“ –
+Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder bleiben offen.

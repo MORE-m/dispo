@@ -1,15 +1,14 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 5. Oktober 2026 · **BL-P4-03g** Draft-PR (PO-BLP403G-1 A1+B1+C1).
+Stand: 5. Oktober 2026 · **BL-P4-03h** Draft-PR (PO-BLP403H-1 A1); **BL-P4-03g** auf `main` (PR #123).
 **BL-P4-03f** auf `main` (PR #99). **BL-P4-03e** (PR #97). **BL-P4-03d** (PR #95).
-PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / UX-GATE-D
+PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / PO-BLP403H-1 / UX-GATE-D
 
 **03a–03f:** Spot Classic **Average** inkl. Komponenten/Festpreis/Tandem (siehe
-unten). **03g:** zusätzlich Spot Classic **Calendar** × `normal` (Einzelspot,
-ohne Komponenten/Festpreis/Tandem); konkrete Termine; Adopt Frozen-Parity;
-Materialisierung **v4**; Legacy v1–v3 lesbar. Budget/Abbinder und
-Calendar×Festpreis/Tandem weiter Folgeslices. Keine vollständige
-Standardangebotsfunktion über alle Kalkulationsmethoden.
+unten). **03g:** Spot Classic **Calendar** × `normal` (Einzelspot). **03h:** Calendar ×
+`normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; konkrete Termine;
+Adopt Frozen-Parity; Materialisierung **v4-Vertragserweiterung**; Legacy v1–v3 und
+Calendar-Einzelspot lesbar. Budget/Abbinder und Calendar×Festpreis/Tandem weiter Folgeslices.
 
 ## Gruppen
 
@@ -48,7 +47,7 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 | Herkunft `origin_standard_offer_version_id` | 3 | STD-005 Nachvollziehbarkeit | Keine Sync |
 | `campaign_period` (Header-Dyn-Feld) | 1* | Wizard-Payload unverändert zu 03a | *keine neue Datums-/Shift-Logik in 03c; Werte wie bisher mitspeicherbar; fachliche Klärung Folgeslice möglich |
 | `period_open` / `position_flight_period` | 1* | Positions-Dyn-Felder unverändert zu 03a | *stabil; keine Calendar-/Kampagnenverschiebung in 03c |
-| Calendar / `planner_entries` | 1 | **BL-P4-03g** / PO-BLP403G-1 / A1+B1+C1 | Calendar×`normal` Einzelspot; konkrete ISO-Daten; Freeze v4; Adopt ohne Shift/Rebind |
+| Calendar / `planner_entries` | 1 | **BL-P4-03g**/`03h` / PO-BLP403G-1 / PO-BLP403H-1 | Calendar×`normal`; optional Hauptspot+Allonge (03h); konkrete ISO-Daten; Freeze v4; Adopt ohne Shift/Rebind |
 | Tandem/Tridem (`component_profile`) | 1 | **BL-P4-03f** / PO-BLP403F-1 / 02e-Semantik | Medium wählbar; Reminder-Rollen; `shared_total_length`; Freeze v3 |
 | Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 1 | **BL-P4-03e** / 02d-Semantik (+ 03f mit Profil) | UI wählbar; serverseitig validiert; Freeze v2+; kein stilles Zurücksetzen |
 | Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
@@ -75,6 +74,16 @@ Standardangebotsfunktion über alle Kalkulationsmethoden.
 - Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder weiter abgewiesen
 - ADR/PO: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
 - Isolierter Browser-Smoke Port **8050** (`playwright.blp403g.config.ts`)
+- Merge `main`: **PR #123** (`ff42723…`); Post-Merge-CI `37338293392` SUCCESS; **kein** Deploy
+
+## Geliefert in BL-P4-03h
+
+- Calendar × Spot Classic × `normal` × optional Hauptspot+Allonge
+- Strategien laut Inventarregel; Contract/Sanitize/Freeze/Hydrate/UI
+- Explizite v4-Vertragserweiterung (kein v5); Reader-#123-Hinweis dokumentiert
+- From-Calc reine Calendar-Quellen inkl. Komponenten; Mix weiter abgewiesen
+- ADR/PO: `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
+- Isolierter Browser-Smoke Port **8051** (`playwright.blp403h.config.ts`)
 
 ## Geliefert in BL-P4-03b
 

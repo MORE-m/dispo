@@ -1,29 +1,30 @@
 # Fortschritt V1
 
-Stand: 5. Oktober 2026 – Feature-Branch **BL-P4-03g / PO-BLP403G-1**
-(Calendar-Standardangebote × `normal`); Basis `origin/main` @
-`68b7d8bf2dd604c44f703374b47d9815c73284ac` (nach PR #122).
+Stand: 5. Oktober 2026 – Feature-Branch **BL-P4-03h / PO-BLP403H-1**
+(Calendar × Hauptspot+Allonge); Basis `origin/main` @
+`ff42723e5bdb1d11dccbac5e762b58b001fbd1cb` (PR #123).
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
 Alt-`dispo` stillgelegt. **Kein** Deploy. **Kein** Merge dieses Slices in diesem Auftrag.
 
-Entscheidung: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
-(**Akzeptiert** A1+B1+C1). Readiness:
-`docs/readiness/BL-P4-03g-calendar-standardangebote-2026-10-05.md`.
+Entscheidung 03h: `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
+(**Akzeptiert** A1; B1+C1 übernommen). Readiness:
+`docs/readiness/BL-P4-03h-calendar-hauptspot-allonge-2026-10-05.md`.
+03g auf `main`: PR #123 / CI `37338293392` / kein Deploy.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`;
-**03g** dieser Draft-PR-Branch); Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03g** auf `main`;
+**03h** dieser Draft-PR-Branch); Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP403G-1 / BL-P4-03g** – Calendar × Spot Classic × `normal` in Standardangeboten
-(A1+B1+C1). Kein Merge/Deploy in diesem Auftrag.
+**PO-BLP403H-1 / BL-P4-03h** – Calendar × Spot Classic × `normal` × optional
+Hauptspot+Allonge. Kein Merge/Deploy in diesem Auftrag.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
-Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen / Calendar×Festpreis/Tandem/Komponenten
+Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen / Calendar×Festpreis/Tandem
 (BL-P4-03 Rest), SPT-013 Abbinder, weitere Status-Mails / In-App, weitere
 Freigabeinvalidierungs-Auslöser nur mit neuem Edit-Pfad, Nicht-Spot / CRM / REP
 (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002 Systemfeld-Overrides,
@@ -31,8 +32,11 @@ Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-APPROVAL-NOTIFY-1** Freigabe erteilt/abgelehnt Outbox+SMTP (PR **#121**) auf `main`.
-Davor: **PO-CALC-DISPO-HINT-1** (PR **#120**), **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
+**PO-BLP403G-1 / BL-P4-03g** Calendar × Spot Classic × `normal` (Einzelspot) –
+**PR #123**, Merge `ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`, Post-Merge-CI
+`37338293392` SUCCESS; **kein** Deploy.
+Davor: **PO-APPROVAL-NOTIFY-1** (PR **#121**), **PO-CALC-DISPO-HINT-1** (PR **#120**),
+**PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
@@ -191,15 +195,30 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Merge `main` | **PR #101** (`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`) |
 | Post-Merge CI | **`36547798359` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
 
+## BL-P4-03h – Calendar × Hauptspot+Allonge / PO-BLP403H-1 (Oktober 2026)
+
+| Prüfpunkt | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
+| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Komponenten | **umgesetzt** (Draft-PR) |
+| Adopt Frozen-Parity inkl. Komponenten | **umgesetzt** |
+| Legacy Average v1–v3 + Calendar-v4-Einzelspot + Average-v4 | **Regressionstests** |
+| Isolierter Browser-Smoke Port 8051 | **BESTANDEN** (`playwright.blp403h.config.ts`) |
+| Calendar×Festpreis/Tandem, Budget, Abbinder | **bewusst nicht** |
+| Merge / Deploy | **offen** (Draft-PR) |
+
 ## BL-P4-03g – Calendar in Standardangeboten / PO-BLP403G-1 (Oktober 2026)
 
 | Prüfpunkt | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe A1+B1+C1 | **akzeptiert** |
-| Draft/Sanitize/Freeze v4/Hydrate Calendar×normal | **umgesetzt** (Draft-PR) |
+| Draft/Sanitize/Freeze v4/Hydrate Calendar×normal | **umgesetzt** (`main`) |
 | Adopt Frozen-Parity, kein Auto-Shift/Rebind | **umgesetzt** |
 | Legacy Average v1–v3 + Average-v4 | **Regressionstests** |
 | Isolierter Browser-Smoke Port 8050 | **BESTANDEN** (`playwright.blp403g.config.ts`, 3/3) |
+| Merge `main` | **PR #123** (`ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`) |
+| Post-Merge CI | **`37338293392` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
+| Deploy | **kein** Deploy |
 | Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder | **bewusst nicht** |
 
 ## BL-P4-03f – Tandem/Tridem in Average-Standardangeboten / PO-BLP403F-1 (September 2026)

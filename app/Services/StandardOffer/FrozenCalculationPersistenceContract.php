@@ -81,14 +81,18 @@ use Illuminate\Validation\ValidationException;
  * - v1/v2 ohne Profil bleiben übernehmbar (bisheriges Leseverhalten inkl. Legacy
  *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
- * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1):
+ * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1; erweitert BL-P4-03h / PO-BLP403H-1):
  * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
- * - Calendar nur `pricing_settlement_mode=normal`; keine Komponenten/Profil/Festpreis
+ * - Calendar nur `pricing_settlement_mode=normal`; kein `component_profile`/Festpreis
+ * - **03h Vertragserweiterung:** Calendar darf optional Hauptspot+Allonge
+ *   (`components` + `component_calculation_strategy`) wie Average-Allonge;
+ *   Reader vor #123/ohne 03h-Deploy weist Calendar-Komponenten ab – erweiterte
+ *   Snapshots brauchen diesen erweiterten Reader (Keys allein ≠ Kompatibilität)
  * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
  *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
  * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
- * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen ohne Live-Preisauflösung
- * - Legacy v1–v3 Average weiter lesbar; unbekannte Versionen fail-closed
+ * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten ohne Live-Preisauflösung
+ * - Legacy v1–v3 Average und v4 Calendar-Einzelspot weiter lesbar; unbekannte Versionen fail-closed
  *
  * Verbleibende Pflege bei weiteren Methoden (Calendar×Festpreis/Tandem, Abbinder, Budget):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
@@ -108,7 +112,7 @@ final class FrozenCalculationPersistenceContract
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Calendar×normal + Average-Varianten). */
+    /** Aktuelle Freeze-Schreibversion (Calendar×normal inkl. optionaler Komponenten + Average-Varianten). */
     public const CURRENT_WRITE_VERSION = 4;
 
     /**
@@ -382,7 +386,7 @@ final class FrozenCalculationPersistenceContract
     }
 
     /**
-     * BL-P4-03g / A1: Calendar×normal ohne Komponenten/Profil/Festpreis.
+     * BL-P4-03g/03h: Calendar×normal; optional Hauptspot+Allonge (ohne Profil/Festpreis).
      *
      * @param  array<string, mixed>  $position
      */
@@ -401,17 +405,9 @@ final class FrozenCalculationPersistenceContract
             'components',
             self::CHILD_LIST_OPTIONAL_ABSENT,
         );
-        if ($components !== []) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components sind für Calendar-A1 nicht erlaubt).",
-            ]);
-        }
-
-        $strategy = $position['component_calculation_strategy'] ?? null;
-        if ($strategy !== null && $strategy !== '') {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy für Calendar nicht erlaubt).",
-            ]);
+        $this->assertOptionalAllongeStrategy($position, $index, $components);
+        foreach ($components as $childIndex => $component) {
+            $this->assertComponentRow($component, $index, $childIndex, $position);
         }
 
         $ranges = $this->assertChildList(
