@@ -46,6 +46,7 @@ export default defineConfig({
         '**/bl-p4-02d-*.spec.ts',
         '**/bl-p4-02e-*.spec.ts',
         '**/bl-p4-03g-*.spec.ts',
+        '**/bl-p4-03h-*.spec.ts',
         '**/spt-008-*.spec.ts',
         '**/dsp-dcp-001-*.spec.ts',
         '**/bl-p8-02a-*.spec.ts',
@@ -65,10 +66,11 @@ export default defineConfig({
     // DF-3.3a2α / DF-3.3a2β / DF-3.3b / ADV-001b / ADV-001c3a / ADV-001c3b1 /
     // ADV-001c3b2 / ADV-001c3c / ADV-001c4b / DF-3-REST-B / DF-3-REST-C /
     // DF-3-RULE-C / BL-P2-01a / BL-P2-02a / BL-P2-02c / BL-P4-01a / BL-P4-01b /
-    // BL-P4-01c / BL-P4-02b / BL-P4-02c / BL-P4-02d / BL-P4-02e / SPT-008 /
-    // DSP-DCP-001 / BL-P8-02a / BL-P8-02b / BL-P8-02c / BL-P8-02d / BL-P8-02e /
-    // BL-P9-01a / BL-P9-01b / BL-P9-01c / BL-P9-02a / wizard-inventory-collapse /
-    // PO-AUTH-SPECIAL-APPROVE-1 / PO-NOT002-ADMIN-1 laufen separat mit eigener DB/Port.
+    // BL-P4-01c / BL-P4-02b / BL-P4-02c / BL-P4-02d / BL-P4-02e / BL-P4-03g /
+    // BL-P4-03h / SPT-008 / DSP-DCP-001 / BL-P8-02a / BL-P8-02b / BL-P8-02c /
+    // BL-P8-02d / BL-P8-02e / BL-P9-01a / BL-P9-01b / BL-P9-01c / BL-P9-02a /
+    // wizard-inventory-collapse / PO-AUTH-SPECIAL-APPROVE-1 / PO-NOT002-ADMIN-1
+    // laufen separat mit eigener DB/Port.
     // BL-P2-01a darf nicht in der Hauptsuite laufen: der Freeze-Test benennt
     // das Seed-Inventar „Radio Hamburg“ um und würde sonst CAL-001/BUD-00*
     // (Label-Select) zerstören.
