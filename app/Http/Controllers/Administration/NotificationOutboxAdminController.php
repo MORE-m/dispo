@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Notification\NotificationOutboxAdminQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -23,11 +24,11 @@ class NotificationOutboxAdminController extends Controller
         $this->authorize('view-notification-outbox');
 
         $filters = $this->query->normalizeOutboxFilters(
-            $request->query('status'),
-            $request->query('event_type'),
+            $this->optionalStringQuery($request, 'status'),
+            $this->optionalStringQuery($request, 'event_type'),
         );
 
-        $page = max(1, (int) $request->query('page', 1));
+        $page = $this->pageQuery($request);
         $paginator = $this->query->paginateOutbox($filters, $page);
 
         return Inertia::render('administration/notification-outbox/index', [
@@ -56,7 +57,7 @@ class NotificationOutboxAdminController extends Controller
     {
         $this->authorize('view-notification-outbox');
 
-        $page = max(1, (int) $request->query('page', 1));
+        $page = $this->pageQuery($request);
         $paginator = $this->query->paginateSuppressions($page);
 
         return Inertia::render('administration/notification-outbox/suppressed', [
@@ -81,5 +82,50 @@ class NotificationOutboxAdminController extends Controller
             'from' => $paginator->firstItem(),
             'to' => $paginator->lastItem(),
         ];
+    }
+
+    private function optionalStringQuery(Request $request, string $key): ?string
+    {
+        $all = $request->query->all();
+        if (! array_key_exists($key, $all)) {
+            return null;
+        }
+
+        $value = $all[$key];
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw ValidationException::withMessages([
+                $key => 'Ungültiger Filterwert.',
+            ]);
+        }
+
+        return $value;
+    }
+
+    private function pageQuery(Request $request): int
+    {
+        $all = $request->query->all();
+        if (! array_key_exists('page', $all)) {
+            return 1;
+        }
+
+        $value = $all['page'];
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'page' => 'Ungültige Seite.',
+            ]);
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '' || ! ctype_digit($normalized)) {
+            throw ValidationException::withMessages([
+                'page' => 'Ungültige Seite.',
+            ]);
+        }
+
+        return max(1, (int) $normalized);
     }
 }

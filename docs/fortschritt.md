@@ -62,9 +62,10 @@ Davor: **PO-CALC-DISPO-HINT-1** (PR **#120**), **PO-AUTH-SPECIAL-APPROVE-1** (PR
 | Begründung nicht in Mail/Payload | **umgesetzt** |
 | Outbox-Write in Fach-TX; SMTP ohne Fach-Rollback | **umgesetzt** |
 | Submit / Invalidierung | **bewusst nicht** |
-| Admin-Outbox-UI | **in BL-P9-02e** (Draft-PR) |
+| Admin-Outbox-UI | **in BL-P9-02e** (Draft-PR #122) |
 | NOT-002 vollständig auf `main` | **nein** |
-| Merge / Deploy | **erledigt** (PR #121 auf `main`) |
+| Merge | **erledigt** (PR #121 auf `main`) |
+| Deploy | **nicht erfolgt** / nicht beauftragt |
 
 ## PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 (Oktober 2026)
 

@@ -61,22 +61,26 @@ final class NotificationErrorDisplay
 
     private function maskSecrets(string $text): ?string
     {
+        // Reihenfolge: vollständige Authorization-Werte zuerst (Scheme + Credentials),
+        // danach URL-Userinfo, JSON-Felder und key=value/token-Felder.
         $patterns = [
-            '/(?i)(password|passwd|pwd)\s*[=:]\s*\S+/u',
-            '/(?i)(secret|api[_-]?key|access[_-]?key|client[_-]?secret)\s*[=:]\s*\S+/u',
-            '/(?i)authorization\s*[=:]\s*\S+/u',
+            '/(?i)\bauthorization\s*[=:]\s*(?:"[^"]*"|\'[^\']*\'|(?:Bearer|Basic)\s+\S+|\S+)/u',
             '/(?i)\bbearer\s+[A-Za-z0-9\-._~+\/=]+/u',
             '/(?i)\bbasic\s+[A-Za-z0-9+\/=]+/u',
-            '#(?i)(https?://)([^:\s/@]+):([^@\s/]+)@#u',
+            '#(?i)((?:https?|smtps?)://)([^:\s/@]+):([^@\s/]+)@#u',
+            '/(?i)("(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)"\s*:\s*)"(?:\\\\.|[^"\\\\])*"/u',
+            '/(?i)(\'(?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)\'\s*:\s*)\'(?:\\\\.|[^\'\\\\])*\'/u',
+            '/(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)\s*[=:]\s*(?:"[^"]*"|\'[^\']*\'|\S+)/u',
         ];
 
         $replacements = [
-            '$1=[redacted]',
-            '$1=[redacted]',
             'Authorization=[redacted]',
             'Bearer [redacted]',
             'Basic [redacted]',
             '$1$2:[redacted]@',
+            '$1"[redacted]"',
+            '$1\'[redacted]\'',
+            '$1=[redacted]',
         ];
 
         $masked = preg_replace($patterns, $replacements, $text);
@@ -84,11 +88,29 @@ final class NotificationErrorDisplay
             return null;
         }
 
-        // Residual credential-like tokens after masking → fail closed for display.
-        if (preg_match('/(?i)\b(password|passwd|secret|api[_-]?key|bearer|authorization)\b\s*[=:]\s*(?!\[redacted\])\S+/u', $masked) === 1) {
+        if ($this->hasResidualSecrets($masked)) {
             return null;
         }
 
         return $masked;
+    }
+
+    private function hasResidualSecrets(string $text): bool
+    {
+        $residualPatterns = [
+            '/(?i)\bauthorization\s*[=:]\s*(?!\[redacted\])/u',
+            '/(?i)\b(bearer|basic)\s+(?!\[redacted\])\S+/u',
+            '#(?i)(?:https?|smtps?)://[^:\s/@]+:(?!\[redacted\])[^@\s/]+@#u',
+            '/(?i)["\'](?:password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)["\']\s*:\s*["\'](?!\[redacted\])/u',
+            '/(?i)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|client[_-]?secret)\s*[=:]\s*(?!\[redacted\])/u',
+        ];
+
+        foreach ($residualPatterns as $pattern) {
+            if (preg_match($pattern, $text) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

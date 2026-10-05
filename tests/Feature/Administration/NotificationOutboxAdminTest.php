@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\DispoOrder\DispoOrderApprovalNotificationPublisher;
 use App\Services\DispoOrder\DispoOrderSalesInquiryService;
 use App\Services\DispoOrder\DispoOrderWriter;
+use App\Services\Notification\NotificationErrorDisplay;
 use App\Services\Notification\NotificationOutboxAdminQuery;
 use App\Services\Notification\NotificationOutboxWriter;
 use Carbon\CarbonImmutable;
@@ -257,6 +258,55 @@ class NotificationOutboxAdminTest extends TestCase
             ->assertSessionHasErrors('event_type');
     }
 
+    public function test_array_and_invalid_query_values_are_rejected_without_server_error(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $failed = $this->enqueueVisible([
+            'sourceId' => 77,
+            'idempotencyKey' => 'query-array-guard',
+        ]);
+        $this->setOutboxState($failed, [
+            'status' => NotificationOutboxStatus::Failed->value,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/administration/benachrichtigungen?status[]=failed')
+            ->assertSessionHasErrors('status')
+            ->assertStatus(302);
+
+        $this->actingAs($admin)
+            ->get('/administration/benachrichtigungen?event_type[]=dispo_order.approval.approved')
+            ->assertSessionHasErrors('event_type')
+            ->assertStatus(302);
+
+        $this->actingAs($admin)
+            ->get('/administration/benachrichtigungen?page[]=2')
+            ->assertSessionHasErrors('page')
+            ->assertStatus(302);
+
+        $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.index', [
+                'page' => 'abc',
+            ]))
+            ->assertSessionHasErrors('page')
+            ->assertStatus(302);
+
+        $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.suppressed', [
+                'page' => '1.5',
+            ]))
+            ->assertSessionHasErrors('page')
+            ->assertStatus(302);
+
+        $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.status', 'failed')
+                ->has('rows', 1)
+                ->where('rows.0.id', $failed->id));
+    }
+
     public function test_all_five_outbox_statuses_appear_under_all_filter(): void
     {
         $admin = User::factory()->role(Role::Admin)->create();
@@ -383,6 +433,86 @@ class NotificationOutboxAdminTest extends TestCase
         $this->assertStringNotContainsString('mailpass', $propsJson);
         $this->assertStringNotContainsString('https://evil.example.test/hijack', $propsJson);
         $this->assertStringContainsString($secret, (string) DB::table('notification_outbox')->where('id', $row->id)->value('last_error'));
+    }
+
+    public function test_list_and_detail_props_never_contain_synthetic_secrets(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+        $secrets = [
+            'SYNTHETIC_TOKEN',
+            'SYNTHETIC_BASE64',
+            'SYNTHETIC_PASSWORD',
+            'SYNTHETIC_JSON_SECRET',
+        ];
+        $raw = implode(' | ', [
+            'Authorization: Bearer SYNTHETIC_TOKEN',
+            'Authorization: Basic SYNTHETIC_BASE64',
+            'smtp://user:SYNTHETIC_PASSWORD@mail.example.test',
+            'smtps://user:SYNTHETIC_PASSWORD@mail.example.test',
+            '{"password":"SYNTHETIC_JSON_SECRET"}',
+            'token=SYNTHETIC_TOKEN',
+            'SMTP timeout',
+        ]);
+
+        $row = $this->enqueueVisible([
+            'sourceId' => 56,
+            'idempotencyKey' => 'synthetic-secrets-props',
+        ]);
+        $this->setOutboxState($row, [
+            'status' => NotificationOutboxStatus::Failed->value,
+            'last_error' => $raw,
+        ]);
+        $stored = (string) DB::table('notification_outbox')->where('id', $row->id)->value('last_error');
+        foreach ($secrets as $secret) {
+            $this->assertStringContainsString($secret, $stored);
+        }
+
+        $listResponse = $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.index'))
+            ->assertOk();
+        $listProps = json_encode($listResponse->viewData('page')['props'] ?? []);
+        $this->assertIsString($listProps);
+        foreach ($secrets as $secret) {
+            $this->assertStringNotContainsString($secret, $listProps);
+        }
+        $listResponse->assertInertia(fn (Assert $page) => $page
+            ->where('rows.0.id', $row->id)
+            ->where('rows.0.error_text', function (?string $text): bool {
+                return is_string($text)
+                    && (str_contains($text, '[redacted]')
+                        || $text === NotificationErrorDisplay::UNSAFE_FALLBACK);
+            }));
+
+        $detailResponse = $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.show', $row))
+            ->assertOk();
+        $detailProps = json_encode($detailResponse->viewData('page')['props'] ?? []);
+        $this->assertIsString($detailProps);
+        foreach ($secrets as $secret) {
+            $this->assertStringNotContainsString($secret, $detailProps);
+        }
+
+        $readable = $this->enqueueVisible([
+            'sourceId' => 57,
+            'idempotencyKey' => 'plain-smtp-timeout',
+        ]);
+        $this->setOutboxState($readable, [
+            'status' => NotificationOutboxStatus::Failed->value,
+            'last_error' => 'SMTP timeout',
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('administration.notification-outbox.show', $readable))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('row.error_text', 'SMTP timeout'));
+
+        foreach ($secrets as $secret) {
+            $this->assertStringContainsString(
+                $secret,
+                (string) DB::table('notification_outbox')->where('id', $row->id)->value('last_error'),
+            );
+        }
     }
 
     public function test_source_resolution_for_comment_and_approval_request_and_fallbacks(): void
