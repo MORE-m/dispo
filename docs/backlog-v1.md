@@ -316,16 +316,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`–`03f` auf `main`; Calendar/Budget/Abbinder offen)
-- **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**
-- **Abhängigkeiten:** BL-P4-02 (Average + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**; 03d ohne neue Oberfläche
+- **Status:** teilweise (`BL-P4-03a`–`03f` auf `main`; **`BL-P4-03g` Calendar×normal Draft-PR**; Budget/Abbinder und Calendar×Festpreis/Tandem/Komponenten offen)
+- **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**; 03g `SPT-005`–`007` + **PO-BLP403G-1**
+- **Abhängigkeiten:** BL-P4-02 (Average + Calendar 02b + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**, **PO-BLP403G-1**; 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
 - **Ergebnis 03c:** optionale Hauptspot+Allonge in Average-Vorlagen; Strategien laut Inventarregel; Freeze/Adopt/Dispo-Snapshot; Calc-Update nach Übernahme; **Merge PR #92** `392aa7d…`
 - **Ergebnis 03b:** Calc → „Als Standardangebot speichern“ → kundenloser Draft → PM-Prüfung → Publish → Adopt; Sanitize; Freeze zentral (`StandardOfferMaterializer`); Vertrieb nur Vorschlags-Draft; **Merge PR #93** `a850d52…`; Post-Merge-CI grün
 - **Ergebnis 03d (`main`, PR #95, `6af849a…`; Post-Merge-CI `36398695877` grün; Status PR #96):** `FrozenCalculationPersistenceContract` (versioniert); Adopt hydratisiert ausschließlich aus Published-Frozen; Legacy ohne Version; Fail-closed; zentrale Feldabbildung; Freeze und Hydrate als **zwei gepflegte Seiten** (keine automatische Übernahme neuer Methoden); ADR `docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`
 - **Ergebnis 03e (`main`, PR #97, `4eddc94…`; Post-Merge-CI `36435981330` grün; Status PR #98):** N/N-Festpreis in Average-Vorlagen (02d-Semantik, keine Vorlagenformel); Materialisierung **v2**; Draft/UI/Sanitize/Freeze/Hydrate; Normal+Festpreis nebeneinander; Snapshot-Isolation; Freeze/Hydrate weiter zwei gepflegte Seiten; Legacy v1 lesbar; ADR `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
 - **Ergebnis 03f (`main`, PR #99, `6737026…`; Post-Merge-CI `36480624574` grün):** Tandem/Tridem × Average × normal/Festpreis (02e-Semantik, keine Vorlagenformel); Materialisierung **v3**; gemischte Vorlagen mit Average/Allonge; Freeze schreibt v3; Hydrate Slot-/Sort-/Längen-Asserts; Legacy v1/v2 lesbar; Calendar/Budget/Abbinder weiter außerhalb; ADR `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
-- **Grenzen:** kein Calendar/Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
+- **Ergebnis 03g (Draft-PR, PO-BLP403G-1 A1+B1+C1):** Calendar × Spot Classic × `normal` (Einzelspot); konkrete Termine; Adopt Frozen-Parity (kein Auto-Shift/Rebind); Materialisierung **v4**; Freeze/Hydrate zwei Seiten; Legacy v1–v3 + Average-v4 lesbar; From-Calc reine Calendar-Quellen; Mix Average+Calendar weiter abgewiesen; isolierter Smoke Port **8050**; ADR `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
+- **Grenzen:** kein Calendar×Festpreis/Tandem/Komponenten; kein Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
 - **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f Feature-Tests; 03f Smoke
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
 - **Tests 03c:** `tests/Feature/StandardOffer/StandardOfferBlP403cTest.php`

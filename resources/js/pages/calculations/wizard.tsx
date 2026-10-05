@@ -770,25 +770,30 @@ function methodOptionsForMedium(
     );
 }
 
-/** BL-P4-03a: in Vorlagen nur Average anbieten. */
+/** BL-P4-03g: in Vorlagen Average und Calendar (laut Backend-Vertrag). */
 function methodOptionsForTemplate(
     options: CalculationMethodOptions | null,
     templateMode: boolean,
+    allowedSpotMethods: string[] = ['average', 'calendar'],
 ): CalculationMethodOptions | null {
     if (!templateMode || options === null) {
         return options;
     }
 
-    const methods = (options.methods ?? []).filter(
-        (method) => method.key === 'average',
+    const allowed = new Set(allowedSpotMethods);
+    const methods = (options.methods ?? []).filter((method) =>
+        allowed.has(method.key),
     );
+    const defaultKey = allowed.has('average')
+        ? 'average'
+        : (methods[0]?.key ?? 'average');
 
     return {
         ...options,
-        default_calculation_method_key: 'average',
+        default_calculation_method_key: defaultKey,
         methods: methods.map((method) => ({
             ...method,
-            is_default: true,
+            is_default: method.key === defaultKey,
         })),
     };
 }
@@ -1905,23 +1910,28 @@ export default function CalculationWizard({
             positions: (
                 (rest.positions as Array<Record<string, unknown>>) ?? []
             ).map((position) => {
-                const { planner_entries: _plan, ...posRest } = position;
-
-                // BL-P4-03f: Komponenten + Strategie + Profil + Festpreis mitsenden;
-                // Calendar weiter weglassen.
+                // BL-P4-03g: Calendar-planner_entries mitsenden; Average ohne Planner.
                 // spot_method aus calculation_method_key spiegeln (Wizard sendet sonst nur den Key).
                 const methodKey =
-                    typeof posRest.calculation_method_key === 'string'
-                        ? posRest.calculation_method_key
-                        : typeof posRest.spot_method === 'string'
-                          ? posRest.spot_method
+                    typeof position.calculation_method_key === 'string'
+                        ? position.calculation_method_key
+                        : typeof position.spot_method === 'string'
+                          ? position.spot_method
                           : undefined;
+                const isCalendar = methodKey === 'calendar';
+                const { planner_entries: plannerEntries, ...posRest } =
+                    position;
 
                 return {
                     ...posRest,
                     ...(methodKey !== undefined
                         ? { spot_method: methodKey }
                         : {}),
+                    planner_entries: isCalendar
+                        ? Array.isArray(plannerEntries)
+                            ? plannerEntries
+                            : []
+                        : [],
                 };
             }),
         };
@@ -3726,6 +3736,7 @@ export default function CalculationWizard({
                                                                     position.advertising_medium_id,
                                                                 ),
                                                                 isStandardOffer,
+                                                                standardOffer?.allowed_spot_methods,
                                                             )}
                                                             state={{
                                                                 calculation_method_key:
@@ -3748,8 +3759,14 @@ export default function CalculationWizard({
                                                             ) => {
                                                                 if (
                                                                     isStandardOffer &&
-                                                                    key !==
-                                                                        'average'
+                                                                    !(
+                                                                        standardOffer?.allowed_spot_methods ?? [
+                                                                            'average',
+                                                                            'calendar',
+                                                                        ]
+                                                                    ).includes(
+                                                                        key,
+                                                                    )
                                                                 ) {
                                                                     return;
                                                                 }
@@ -3771,6 +3788,7 @@ export default function CalculationWizard({
                                                                                 position.advertising_medium_id,
                                                                             ),
                                                                             isStandardOffer,
+                                                                            standardOffer?.allowed_spot_methods,
                                                                         ),
                                                                         key,
                                                                     );
@@ -3815,7 +3833,10 @@ export default function CalculationWizard({
                                                             }
                                                             disabled={!canEdit}
                                                             hideFixedPrice={
-                                                                false
+                                                                isStandardOffer &&
+                                                                isCalendarCalculationMethod(
+                                                                    position.calculation_method_key,
+                                                                )
                                                             }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
@@ -4101,9 +4122,16 @@ export default function CalculationWizard({
                                                                       ]
                                                                     : undefined;
 
+                                                            const calendarTemplate =
+                                                                isStandardOffer &&
+                                                                isCalendarCalculationMethod(
+                                                                    position.calculation_method_key,
+                                                                );
+
                                                             return (
                                                                 <div className="space-y-2">
-                                                                    {!forcedProfile &&
+                                                                    {!calendarTemplate &&
+                                                                    !forcedProfile &&
                                                                     position
                                                                         .components
                                                                         .length ===
@@ -4147,11 +4175,12 @@ export default function CalculationWizard({
                                                                             aktivieren
                                                                         </Button>
                                                                     ) : null}
-                                                                    {forcedProfile ||
-                                                                    position
-                                                                        .components
-                                                                        .length >
-                                                                        0 ? (
+                                                                    {!calendarTemplate &&
+                                                                    (forcedProfile ||
+                                                                        position
+                                                                            .components
+                                                                            .length >
+                                                                            0) ? (
                                                                         <SpotComponentsSection
                                                                             positionIndex={
                                                                                 index

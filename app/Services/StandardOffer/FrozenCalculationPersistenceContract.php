@@ -4,6 +4,7 @@ namespace App\Services\StandardOffer;
 
 use App\Enums\CalculationStatus;
 use App\Enums\ComponentCalculationStrategy;
+use App\Enums\DayGroup;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
@@ -15,6 +16,7 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\SpotClassicPlanRow;
@@ -22,6 +24,8 @@ use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\Calculation\DayGroupFromDate;
+use App\Services\Calculation\Decimal;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
 use App\Support\Advertising\SpotComponentProfileContract;
@@ -77,11 +81,20 @@ use Illuminate\Validation\ValidationException;
  * - v1/v2 ohne Profil bleiben übernehmbar (bisheriges Leseverhalten inkl. Legacy
  *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
- * Verbleibende Pflege bei neuen Methoden (Calendar/Abbinder/…):
+ * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1):
+ * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
+ * - Calendar nur `pricing_settlement_mode=normal`; keine Komponenten/Profil/Festpreis
+ * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
+ *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
+ * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
+ * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen ohne Live-Preisauflösung
+ * - Legacy v1–v3 Average weiter lesbar; unbekannte Versionen fail-closed
+ *
+ * Verbleibende Pflege bei weiteren Methoden (Calendar×Festpreis/Tandem, Abbinder, Budget):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
- * 2) Freeze-Seite im Materializer (oder Nachfolger) erweitern,
+ * 2) Freeze-Seite im Materializer erweitern,
  * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
- * 4) Tests für Parity und Fail-closed. Dieser Slice allein unterstützt sie nicht.
+ * 4) Tests für Parity und Fail-closed.
  */
 final class FrozenCalculationPersistenceContract
 {
@@ -91,12 +104,12 @@ final class FrozenCalculationPersistenceContract
      *
      * @var list<int>
      */
-    public const SUPPORTED_VERSIONS = [1, 2, 3];
+    public const SUPPORTED_VERSIONS = [1, 2, 3, 4];
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Tandem/Tridem + Festpreis-fähiges Schema). */
-    public const CURRENT_WRITE_VERSION = 3;
+    /** Aktuelle Freeze-Schreibversion (Calendar×normal + Average-Varianten). */
+    public const CURRENT_WRITE_VERSION = 4;
 
     /**
      * Kindliste muss als Array-Schlüssel vorhanden sein (auch `[]` erlaubt).
@@ -225,6 +238,7 @@ final class FrozenCalculationPersistenceContract
         return $calculation->fresh([
             'positions.timeRanges',
             'positions.planRows',
+            'positions.plannerEntries',
             'positions.components',
             'positions.discounts',
             'orderDiscounts',
@@ -294,49 +308,290 @@ final class FrozenCalculationPersistenceContract
 
             $this->assertAverageMethodAndSettlement($position, $index, $version);
 
-            // Kindlisten (03a/03c-Freeze): time_ranges/plan_rows immer geschrieben und
-            // Pflicht; components/position_discounts dürfen aus Legacy fehlen (= leer),
-            // [] ist gültige leere Liste, null ist ungültig.
-            $components = $this->assertChildList(
-                $position,
-                $index,
-                'components',
-                self::CHILD_LIST_OPTIONAL_ABSENT,
-            );
-            $this->assertComponentStrategyAndProfile($position, $index, $components, $version);
-            foreach ($components as $childIndex => $component) {
-                $this->assertComponentRow($component, $index, $childIndex, $position);
-            }
+            $spotMethod = array_key_exists('spot_method', $position) && is_string($position['spot_method'])
+                ? $position['spot_method']
+                : SpotCalculationMethod::Average->value;
 
-            $ranges = $this->assertChildList(
-                $position,
-                $index,
-                'time_ranges',
-                self::CHILD_LIST_REQUIRED,
-            );
-            foreach ($ranges as $childIndex => $range) {
-                $this->assertTimeRangeRow($range, $index, $childIndex);
+            if ($spotMethod === SpotCalculationMethod::Calendar->value) {
+                $this->assertCalendarPositionChildren($position, $index, $version);
+            } else {
+                $this->assertAveragePositionChildren($position, $index, $version);
             }
+        }
+    }
 
-            $planRows = $this->assertChildList(
-                $position,
-                $index,
-                'plan_rows',
-                self::CHILD_LIST_REQUIRED,
-            );
-            foreach ($planRows as $childIndex => $row) {
-                $this->assertPlanRow($row, $index, $childIndex);
-            }
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function assertAveragePositionChildren(array $position, int $index, int $version): void
+    {
+        // Kindlisten (03a/03c-Freeze): time_ranges/plan_rows immer geschrieben und
+        // Pflicht; components/position_discounts dürfen aus Legacy fehlen (= leer).
+        $components = $this->assertChildList(
+            $position,
+            $index,
+            'components',
+            self::CHILD_LIST_OPTIONAL_ABSENT,
+        );
+        $this->assertComponentStrategyAndProfile($position, $index, $components, $version);
+        foreach ($components as $childIndex => $component) {
+            $this->assertComponentRow($component, $index, $childIndex, $position);
+        }
 
-            $discounts = $this->assertChildList(
-                $position,
-                $index,
-                'position_discounts',
-                self::CHILD_LIST_OPTIONAL_ABSENT,
-            );
-            foreach ($discounts as $childIndex => $discount) {
-                $this->assertDiscountRow($discount, "Position {$index}: position_discounts.{$childIndex}");
+        $ranges = $this->assertChildList(
+            $position,
+            $index,
+            'time_ranges',
+            self::CHILD_LIST_REQUIRED,
+        );
+        foreach ($ranges as $childIndex => $range) {
+            $this->assertTimeRangeRow($range, $index, $childIndex);
+        }
+
+        $planRows = $this->assertChildList(
+            $position,
+            $index,
+            'plan_rows',
+            self::CHILD_LIST_REQUIRED,
+        );
+        foreach ($planRows as $childIndex => $row) {
+            $this->assertPlanRow($row, $index, $childIndex);
+        }
+
+        $plannerEntries = $this->assertChildList(
+            $position,
+            $index,
+            'planner_entries',
+            self::CHILD_LIST_OPTIONAL_ABSENT,
+        );
+        if ($plannerEntries !== []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: planner_entries nur für calendar).",
+            ]);
+        }
+
+        $discounts = $this->assertChildList(
+            $position,
+            $index,
+            'position_discounts',
+            self::CHILD_LIST_OPTIONAL_ABSENT,
+        );
+        foreach ($discounts as $childIndex => $discount) {
+            $this->assertDiscountRow($discount, "Position {$index}: position_discounts.{$childIndex}");
+        }
+    }
+
+    /**
+     * BL-P4-03g / A1: Calendar×normal ohne Komponenten/Profil/Festpreis.
+     *
+     * @param  array<string, mixed>  $position
+     */
+    private function assertCalendarPositionChildren(array $position, int $index, int $version): void
+    {
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($profileRaw !== null && $profileRaw !== '' && $profileRaw !== []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Calendar nicht erlaubt).",
+            ]);
+        }
+
+        $components = $this->assertChildList(
+            $position,
+            $index,
+            'components',
+            self::CHILD_LIST_OPTIONAL_ABSENT,
+        );
+        if ($components !== []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components sind für Calendar-A1 nicht erlaubt).",
+            ]);
+        }
+
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if ($strategy !== null && $strategy !== '') {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy für Calendar nicht erlaubt).",
+            ]);
+        }
+
+        $ranges = $this->assertChildList(
+            $position,
+            $index,
+            'time_ranges',
+            self::CHILD_LIST_REQUIRED,
+        );
+        foreach ($ranges as $childIndex => $range) {
+            $this->assertTimeRangeRow($range, $index, $childIndex);
+        }
+
+        $planRows = $this->assertChildList(
+            $position,
+            $index,
+            'plan_rows',
+            self::CHILD_LIST_REQUIRED,
+        );
+        foreach ($planRows as $childIndex => $row) {
+            $this->assertPlanRow($row, $index, $childIndex);
+        }
+
+        $plannerEntries = $this->assertChildList(
+            $position,
+            $index,
+            'planner_entries',
+            self::CHILD_LIST_REQUIRED,
+        );
+
+        $totalSpotCount = $position['total_spot_count'];
+        if ((! is_int($totalSpotCount) && ! (is_string($totalSpotCount) && ctype_digit($totalSpotCount)))
+            || (int) $totalSpotCount < 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: total_spot_count).",
+            ]);
+        }
+        $expectedTotal = (int) $totalSpotCount;
+
+        if ($plannerEntries === []) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: planner_entries leer trotz total_spot_count {$expectedTotal}).",
+            ]);
+        }
+
+        $spotSum = 0;
+        /** @var array<string, true> $seenCells */
+        $seenCells = [];
+        foreach ($plannerEntries as $childIndex => $entry) {
+            $this->assertPlannerEntryRow($entry, $index, $childIndex);
+            $cellKey = ((string) $entry['date']).'|'.((int) $entry['hour']);
+            if (array_key_exists($cellKey, $seenCells)) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte planner_entries-Zelle {$cellKey}).",
+                ]);
             }
+            $seenCells[$cellKey] = true;
+            $spotSum += (int) $entry['spot_count'];
+        }
+
+        if ($spotSum !== $expectedTotal) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Spot-Summe {$spotSum} ≠ total_spot_count {$expectedTotal}).",
+            ]);
+        }
+
+        $discounts = $this->assertChildList(
+            $position,
+            $index,
+            'position_discounts',
+            self::CHILD_LIST_OPTIONAL_ABSENT,
+        );
+        foreach ($discounts as $childIndex => $discount) {
+            $this->assertDiscountRow($discount, "Position {$index}: position_discounts.{$childIndex}");
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function assertPlannerEntryRow(array $entry, int $positionIndex, int $childIndex): void
+    {
+        foreach (['date', 'hour', 'day_group', 'spot_count', 'second_price', 'line_gross'] as $required) {
+            if (! array_key_exists($required, $entry) || $entry[$required] === null || $entry[$required] === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$positionIndex}: planner_entries.{$childIndex}.{$required}).",
+                ]);
+            }
+        }
+
+        $date = $entry['date'];
+        if (! is_string($date) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) !== 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.date).",
+            ]);
+        }
+        $parts = explode('-', $date);
+        if (! checkdate((int) $parts[1], (int) $parts[2], (int) $parts[0])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.date).",
+            ]);
+        }
+
+        $hour = $entry['hour'];
+        if ((! is_int($hour) && ! (is_string($hour) && ctype_digit($hour))) || (int) $hour < 0 || (int) $hour > 23) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.hour).",
+            ]);
+        }
+
+        $spots = $entry['spot_count'];
+        if ((! is_int($spots) && ! (is_string($spots) && ctype_digit($spots))) || (int) $spots < 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.spot_count).",
+            ]);
+        }
+
+        if (! is_string($entry['day_group'])) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group).",
+            ]);
+        }
+
+        $dayGroup = DayGroup::tryFrom($entry['day_group']);
+        if ($dayGroup === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group).",
+            ]);
+        }
+
+        $expectedDayGroup = DayGroupFromDate::resolve($date);
+        if ($dayGroup !== $expectedDayGroup) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.day_group passt nicht zum Datum).",
+            ]);
+        }
+
+        $this->assertFrozenPlannerDecimal(
+            $entry['second_price'],
+            $positionIndex,
+            $childIndex,
+            'second_price',
+            Decimal::PRICE_SCALE,
+            mustBePositive: true,
+        );
+        $this->assertFrozenPlannerDecimal(
+            $entry['line_gross'],
+            $positionIndex,
+            $childIndex,
+            'line_gross',
+            Decimal::MONEY_SCALE,
+            mustBePositive: true,
+        );
+    }
+
+    private function assertFrozenPlannerDecimal(
+        mixed $value,
+        int $positionIndex,
+        int $childIndex,
+        string $field,
+        int $maxScale,
+        bool $mustBePositive,
+    ): void {
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
+            ]);
+        }
+
+        $raw = is_int($value) ? (string) $value : trim($value);
+        $pattern = '/^\d+(\.\d{1,'.$maxScale.'})?$/';
+        if ($raw === '' || preg_match($pattern, $raw) !== 1 || ! is_numeric($raw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
+            ]);
+        }
+
+        if ($mustBePositive && bccomp($raw, '0', $maxScale) !== 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: planner_entries.{$childIndex}.{$field}).",
+            ]);
         }
     }
 
@@ -345,13 +600,50 @@ final class FrozenCalculationPersistenceContract
      */
     private function assertAverageMethodAndSettlement(array $position, int $index, int $version): void
     {
+        $spotMethod = SpotCalculationMethod::Average->value;
         if (array_key_exists('spot_method', $position) && $position['spot_method'] !== null) {
-            if (! is_string($position['spot_method'])
-                || $position['spot_method'] !== SpotCalculationMethod::Average->value) {
+            if (! is_string($position['spot_method'])) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: spot_method muss average sein).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: spot_method).",
                 ]);
             }
+            $spotMethod = $position['spot_method'];
+        }
+
+        if ($spotMethod === SpotCalculationMethod::Calendar->value) {
+            if ($version < 4) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: calendar erfordert Materialisierung v4).",
+                ]);
+            }
+
+            $modeRaw = $position['pricing_settlement_mode'] ?? null;
+            $hasFixedNn = array_key_exists('fixed_price_nn', $position)
+                && $position['fixed_price_nn'] !== null
+                && $position['fixed_price_nn'] !== '';
+            if ($modeRaw === null || $modeRaw === '') {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: pricing_settlement_mode).",
+                ]);
+            }
+            if (! is_string($modeRaw) || $modeRaw !== PricingSettlementMode::Normal->value) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Calendar erlaubt nur pricing_settlement_mode=normal).",
+                ]);
+            }
+            if ($hasFixedNn) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ist für Calendar nicht erlaubt).",
+                ]);
+            }
+
+            return;
+        }
+
+        if ($spotMethod !== SpotCalculationMethod::Average->value) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: spot_method muss average oder calendar sein).",
+            ]);
         }
 
         $modeRaw = $position['pricing_settlement_mode'] ?? null;
@@ -929,6 +1221,7 @@ final class FrozenCalculationPersistenceContract
             $this->persistComponents($position, $frozenPosition['components'] ?? []);
             $this->persistTimeRanges($position, $frozenPosition['time_ranges'] ?? []);
             $this->persistPlanRows($position, $frozenPosition['plan_rows'] ?? []);
+            $this->persistPlannerEntries($position, $frozenPosition['planner_entries'] ?? []);
             $this->persistPositionDiscounts($position, $frozenPosition['position_discounts'] ?? []);
         }
     }
@@ -992,6 +1285,26 @@ final class FrozenCalculationPersistenceContract
             ]);
             $planRow->position()->associate($position);
             $planRow->save();
+        }
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $entries
+     */
+    private function persistPlannerEntries(CalculationPosition $position, array $entries): void
+    {
+        foreach ($entries as $entry) {
+            $model = new CalculationPositionPlannerEntry;
+            $model->fill([
+                'date' => (string) $entry['date'],
+                'hour' => (int) $entry['hour'],
+                'day_group' => $entry['day_group'],
+                'spot_count' => (int) $entry['spot_count'],
+                'second_price' => (string) $entry['second_price'],
+                'line_gross' => (string) ($entry['line_gross'] ?? '0.00'),
+            ]);
+            $model->position()->associate($position);
+            $model->save();
         }
     }
 

@@ -14,14 +14,14 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b/03d/03e/03f / VER-004: Freeze-Seite des versionierten Persistenzvertrags
+ * BL-P4-03b/03d/03e/03f/03g / VER-004: Freeze-Seite des versionierten Persistenzvertrags
  * {@see FrozenCalculationPersistenceContract} für Spot-Classic-Average-Vorlagen
- * inkl. optionalem N/N-Festpreis (02d) und optionalem Tandem/Tridem (02e).
+ * inkl. optionalem N/N-Festpreis (02d), Tandem/Tridem (02e) sowie Calendar×normal (03g / A1).
  *
  * Adopt hydratisiert über denselben Vertrag (nicht über CalculationWriter::create()).
  * Altstände ohne materialization_version bleiben lesbar (implizit Version 1).
- * Neue Freezes schreiben Version 3 (Profil + Festpreis-fähiges Settlement).
- * Feldabbildung Average v1/v2/v3 wird im Persistenzvertrag zentral dokumentiert/gepflegt.
+ * Neue Freezes schreiben Version 4 (Calendar-fähig; Average-Varianten unverändert).
+ * Freeze und Hydrate bleiben zwei gepflegte Seiten.
  */
 final class StandardOfferMaterializer
 {
@@ -91,6 +91,10 @@ final class StandardOfferMaterializer
                 ? $profile->value
                 : (is_string($profile) && $profile !== '' ? $profile : null);
 
+            $spotMethod = $item['spot_method'] instanceof SpotCalculationMethod
+                ? $item['spot_method']->value
+                : (string) ($item['spot_method'] ?? SpotCalculationMethod::Average->value);
+
             $positions[] = [
                 'client_key' => (string) Str::uuid(),
                 'inventory_id' => (int) $item['inventory']->id,
@@ -107,7 +111,7 @@ final class StandardOfferMaterializer
                 'price_list_id' => (int) $item['priceList']->id,
                 'price_list_version' => $item['priceList']->version,
                 'kind' => $item['freeze']->legacyKind()->value,
-                'spot_method' => SpotCalculationMethod::Average->value,
+                'spot_method' => $spotMethod,
                 'length_seconds' => (int) $item['length_seconds'],
                 'component_calculation_strategy' => $result->componentCalculationStrategy instanceof ComponentCalculationStrategy
                     ? $result->componentCalculationStrategy->value
@@ -154,6 +158,17 @@ final class StandardOfferMaterializer
                 'algorithm_version' => $item['freeze']->algorithmVersion,
                 'time_ranges' => $result->timeRanges,
                 'plan_rows' => $result->rows,
+                'planner_entries' => array_map(
+                    static fn (array $entry): array => [
+                        'date' => (string) $entry['date'],
+                        'hour' => (int) $entry['hour'],
+                        'day_group' => (string) $entry['day_group'],
+                        'spot_count' => (int) $entry['spot_count'],
+                        'second_price' => (string) $entry['second_price'],
+                        'line_gross' => (string) $entry['line_gross'],
+                    ],
+                    $result->plannerEntries,
+                ),
                 'position_discounts' => array_map(
                     static fn (array $discount): array => [
                         'type' => $discount['type'],

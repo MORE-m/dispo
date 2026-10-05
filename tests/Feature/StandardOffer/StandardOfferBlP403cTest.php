@@ -224,12 +224,18 @@ class StandardOfferBlP403cTest extends TestCase
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
-            'title' => 'Calendar Reject',
+            'title' => 'Calendar+Komponenten Reject',
             'positions' => [[
                 ...$base['positions'][0],
                 'spot_method' => 'calendar',
+                'calculation_method_key' => 'calendar',
+                'planner_entries' => [[
+                    'date' => '2026-03-02',
+                    'hour' => 8,
+                    'spot_count' => 1,
+                ]],
             ]],
-        ])->assertSessionHasErrors('positions.0.spot_method');
+        ])->assertSessionHasErrors('positions.0.components');
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
@@ -290,7 +296,7 @@ class StandardOfferBlP403cTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('standardOffer.allowed_spot_methods.0', 'average')
-                ->where('standardOffer.scope_note', fn ($note) => is_string($note) && str_contains($note, 'Hauptspot+Allonge') && str_contains($note, 'Festpreis')));
+                ->where('standardOffer.scope_note', fn ($note) => is_string($note) && str_contains($note, 'Komponenten') && str_contains($note, 'Festpreis') && str_contains($note, 'Calendar')));
     }
 
     /**

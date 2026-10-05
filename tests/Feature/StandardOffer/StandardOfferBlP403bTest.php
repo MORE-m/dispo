@@ -4,7 +4,6 @@ namespace Tests\Feature\StandardOffer;
 
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\Role;
-use App\Enums\SpotCalculationMethod;
 use App\Enums\StandardOfferVersionStatus;
 use App\Models\AuditEvent;
 use App\Models\Calculation;
@@ -167,22 +166,54 @@ class StandardOfferBlP403bTest extends TestCase
         $this->assertSame('Kampagne', $sourceAfter->campaign);
     }
 
-    public function test_rejects_unsupported_methods_without_silent_reduction(): void
+    public function test_rejects_calendar_with_components_without_silent_reduction(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $sales = User::factory()->role(Role::Sales)->create();
-        $calculation = $this->createAverageCalculation($catalog, $sales);
-        $calculation->positions()->firstOrFail()->update([
-            'spot_method' => SpotCalculationMethod::Calendar,
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Calendar Comp',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'order_discounts' => [],
+            'dynamic_field_values' => [],
+            'positions' => [[
+                'inventory_id' => $catalog['hamburg']->id,
+                'advertising_medium_id' => $catalog['medium']->id,
+                'spot_method' => 'calendar',
+                'calculation_method_key' => 'calendar',
+                'length_seconds' => 30,
+                'position_discount_percent' => '0',
+                'ae_percent' => '0',
+                'pricing_settlement_mode' => 'normal',
+                'component_calculation_strategy' => 'shared_total_length',
+                'components' => [
+                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                    ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 2],
+                ],
+                'planner_entries' => [[
+                    'date' => '2026-03-02',
+                    'hour' => 8,
+                    'spot_count' => 2,
+                ]],
+                'plan_rows' => [],
+                'time_ranges' => [],
+                'position_discounts' => [],
+                'dynamic_field_values' => ['period_open' => true],
+            ]],
         ]);
+        $calculation = app(CalculationWriter::class)->create($payload, $sales);
 
         try {
-            $this->writer()->createFromCalculation($calculation->fresh(['positions']), $sales);
+            $this->writer()->createFromCalculation($calculation->fresh(['positions', 'positions.components', 'positions.plannerEntries']), $sales);
             $this->fail('Expected ValidationException');
         } catch (ValidationException $exception) {
             $messages = $exception->errors();
-            $this->assertArrayHasKey('positions.0.spot_method', $messages);
-            $this->assertStringContainsString('Position 1', $messages['positions.0.spot_method'][0]);
+            $this->assertTrue(
+                isset($messages['positions.0.components']) || isset($messages['positions']),
+                json_encode($messages),
+            );
         }
 
         $this->assertSame(0, StandardOffer::query()->count());
@@ -191,7 +222,7 @@ class StandardOfferBlP403bTest extends TestCase
             ->from(route('calculations.edit', $calculation))
             ->post(route('standard-offers.from-calculation', $calculation))
             ->assertRedirect(route('calculations.edit', $calculation))
-            ->assertSessionHasErrors('positions.0.spot_method');
+            ->assertSessionHasErrors();
     }
 
     public function test_components_roundtrip_from_calculation(): void

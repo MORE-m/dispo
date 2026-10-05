@@ -9,8 +9,12 @@ use App\Models\Calculation;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b / PO-BLP403B-1 / STD-001: Calc-Payload → kundenloser Vorlagen-Draft
- * plus Prüfstufe (nur Feldnamen, keine Quell-Freitextwerte).
+ * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / STD-001:
+ * Calc-Payload → kundenloser Vorlagen-Draft plus Prüfstufe
+ * (nur Feldnamen, keine Quell-Freitextwerte).
+ *
+ * From-Calc: reine Average-Quellen (inkl. freigegebene Varianten) oder reine
+ * Calendar×normal-Quellen (A1). Mix Average+Calendar → komplette Ablehnung.
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -92,7 +96,6 @@ final class StandardOfferFromCalculationSanitizer
         $reviewFieldKeys = array_values(array_unique($reviewFieldKeys));
 
         return [
-            // Neutrale Vorlage ohne Quell-Freitext; Nummernreferenz ist Vorgangs-ID, kein Kundeninhalt.
             'title' => 'Vorschlag aus '.$calculation->number,
             'draft_payload' => $draft,
             'proposal_review' => [
@@ -119,8 +122,11 @@ final class StandardOfferFromCalculationSanitizer
         $errors = [];
         $planningMode = (string) ($payload['planning_mode'] ?? 'manual');
         if ($planningMode !== 'manual') {
-            $errors['planning_mode'] = 'Budgetplanung kann nicht als Standardangebot gespeichert werden (nur Spot Classic Average).';
+            $errors['planning_mode'] = 'Budgetplanung kann nicht als Standardangebot gespeichert werden.';
         }
+
+        $hasAverage = false;
+        $hasCalendar = false;
 
         foreach ($positions as $index => $position) {
             if (! is_array($position)) {
@@ -133,51 +139,140 @@ final class StandardOfferFromCalculationSanitizer
             $method = array_key_exists('spot_method', $position)
                 ? (string) $position['spot_method']
                 : SpotCalculationMethod::Average->value;
-            if ($method !== SpotCalculationMethod::Average->value) {
-                $errors["positions.{$index}.spot_method"] = "{$label}: Methode „{$method}“ wird nicht unterstützt (nur Spot Classic Average).";
-            }
 
-            $calcMethod = $position['calculation_method_key'] ?? null;
-            if ($calcMethod !== null && $calcMethod !== ''
-                && (string) $calcMethod !== SpotCalculationMethod::Average->value) {
-                $errors["positions.{$index}.calculation_method_key"] = "{$label}: Berechnungsmethode „{$calcMethod}“ wird nicht unterstützt.";
+            if ($method === SpotCalculationMethod::Average->value) {
+                $hasAverage = true;
+                $this->assertCompatibleAveragePosition($position, (int) $index, $label, $errors);
+            } elseif ($method === SpotCalculationMethod::Calendar->value) {
+                $hasCalendar = true;
+                $this->assertCompatibleCalendarPosition($position, (int) $index, $label, $errors);
+            } else {
+                $errors["positions.{$index}.spot_method"] = "{$label}: Methode „{$method}“ wird nicht unterstützt (nur Spot Classic Average oder Calendar).";
             }
+        }
 
-            $profileRaw = $position['component_profile'] ?? null;
-            if ($profileRaw !== null && $profileRaw !== '') {
-                if (! is_string($profileRaw) || SpotComponentProfile::tryFrom($profileRaw) === null) {
-                    $errors["positions.{$index}.component_profile"] = "{$label}: Komponentenprofil ist ungültig.";
-                }
-            }
-
-            if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
-                $errors["positions.{$index}.planner_entries"] = "{$label}: Kalenderplaner kann nicht als Standardangebot gespeichert werden.";
-            }
-
-            $settlementRaw = array_key_exists('pricing_settlement_mode', $position)
-                ? $position['pricing_settlement_mode']
-                : PricingSettlementMode::Normal->value;
-            if ($settlementRaw === null || $settlementRaw === '') {
-                $settlementRaw = PricingSettlementMode::Normal->value;
-            }
-            $settlement = is_scalar($settlementRaw)
-                ? PricingSettlementMode::tryFrom((string) $settlementRaw)
-                : null;
-            if ($settlement === null) {
-                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Preisabschluss ist ungültig.";
-            } elseif ($settlement === PricingSettlementMode::FixedPrice) {
-                $nn = $position['fixed_price_nn'] ?? null;
-                if ($nn === null || $nn === '' || ! is_numeric(str_replace(',', '.', (string) $nn))
-                    || bccomp(str_replace(',', '.', (string) $nn), '0', 2) !== 1) {
-                    $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis erfordert einen N/N-Endbetrag größer 0.";
-                }
-            } elseif (($position['fixed_price_nn'] ?? null) !== null && $position['fixed_price_nn'] !== '') {
-                $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis-N/N ist nur im Festpreismodus erlaubt.";
-            }
+        if ($hasAverage && $hasCalendar) {
+            $errors['positions'] = 'Gemischte Average-/Calendar-Kalkulationen können nicht als Standardangebot gespeichert werden (keine stille Teilübernahme).';
         }
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  array<string, string>  $errors
+     */
+    private function assertCompatibleAveragePosition(
+        array $position,
+        int $index,
+        string $label,
+        array &$errors,
+    ): void {
+        $calcMethod = $position['calculation_method_key'] ?? null;
+        if ($calcMethod !== null && $calcMethod !== ''
+            && (string) $calcMethod !== SpotCalculationMethod::Average->value) {
+            $errors["positions.{$index}.calculation_method_key"] = "{$label}: Berechnungsmethode „{$calcMethod}“ wird nicht unterstützt.";
+        }
+
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($profileRaw !== null && $profileRaw !== '') {
+            if (! is_string($profileRaw) || SpotComponentProfile::tryFrom($profileRaw) === null) {
+                $errors["positions.{$index}.component_profile"] = "{$label}: Komponentenprofil ist ungültig.";
+            }
+        }
+
+        if (! empty($position['planner_entries']) && is_array($position['planner_entries'])) {
+            $errors["positions.{$index}.planner_entries"] = "{$label}: Kalenderplaner ist nur für Calendar-Positionen erlaubt.";
+        }
+
+        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: true);
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  array<string, string>  $errors
+     */
+    private function assertCompatibleCalendarPosition(
+        array $position,
+        int $index,
+        string $label,
+        array &$errors,
+    ): void {
+        $calcMethod = $position['calculation_method_key'] ?? null;
+        if ($calcMethod !== null && $calcMethod !== ''
+            && (string) $calcMethod !== SpotCalculationMethod::Calendar->value) {
+            $errors["positions.{$index}.calculation_method_key"] = "{$label}: Berechnungsmethode „{$calcMethod}“ wird nicht unterstützt.";
+        }
+
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($profileRaw !== null && $profileRaw !== '') {
+            $errors["positions.{$index}.component_profile"] = "{$label}: Tandem/Tridem kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+        }
+
+        if (array_key_exists('components', $position) && $position['components'] === null) {
+            $errors["positions.{$index}.components"] = "{$label}: Komponenten dürfen nicht null sein.";
+        } else {
+            $components = $position['components'] ?? [];
+            if (! is_array($components)) {
+                $errors["positions.{$index}.components"] = "{$label}: Komponenten sind ungültig.";
+            } elseif ($components !== []) {
+                $errors["positions.{$index}.components"] = "{$label}: Komponenten können nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+            }
+        }
+
+        $strategy = $position['component_calculation_strategy'] ?? null;
+        if ($strategy !== null && $strategy !== '') {
+            $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Komponentenstrategie ist für Calendar-Vorlagen nicht erlaubt.";
+        }
+
+        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  array<string, string>  $errors
+     */
+    private function assertSettlementCompatible(
+        array $position,
+        int $index,
+        string $label,
+        array &$errors,
+        bool $allowFixedPrice,
+    ): void {
+        $settlementRaw = array_key_exists('pricing_settlement_mode', $position)
+            ? $position['pricing_settlement_mode']
+            : PricingSettlementMode::Normal->value;
+        if ($settlementRaw === null || $settlementRaw === '') {
+            $settlementRaw = PricingSettlementMode::Normal->value;
+        }
+        $settlement = is_scalar($settlementRaw)
+            ? PricingSettlementMode::tryFrom((string) $settlementRaw)
+            : null;
+        if ($settlement === null) {
+            $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Preisabschluss ist ungültig.";
+
+            return;
+        }
+
+        if ($settlement === PricingSettlementMode::FixedPrice) {
+            if (! $allowFixedPrice) {
+                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03g / A1).";
+
+                return;
+            }
+            $nn = $position['fixed_price_nn'] ?? null;
+            if ($nn === null || $nn === '' || ! is_numeric(str_replace(',', '.', (string) $nn))
+                || bccomp(str_replace(',', '.', (string) $nn), '0', 2) !== 1) {
+                $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis erfordert einen N/N-Endbetrag größer 0.";
+            }
+
+            return;
+        }
+
+        if (($position['fixed_price_nn'] ?? null) !== null && $position['fixed_price_nn'] !== '') {
+            $errors["positions.{$index}.fixed_price_nn"] = "{$label}: Festpreis-N/N ist nur im Festpreismodus erlaubt.";
         }
     }
 
@@ -213,14 +308,34 @@ final class StandardOfferFromCalculationSanitizer
             }
         }
         $safe['dynamic_field_values'] = $posDyn === [] ? ['period_open' => true] : $posDyn;
+
+        $method = array_key_exists('spot_method', $position)
+            ? (string) $position['spot_method']
+            : SpotCalculationMethod::Average->value;
+
+        if ($method === SpotCalculationMethod::Calendar->value) {
+            $safe['spot_method'] = SpotCalculationMethod::Calendar->value;
+            $safe['calculation_method_key'] = SpotCalculationMethod::Calendar->value;
+            $safe['planner_entries'] = is_array($position['planner_entries'] ?? null)
+                ? $position['planner_entries']
+                : [];
+            $safe['components'] = [];
+            $safe['component_profile'] = null;
+            $safe['component_calculation_strategy'] = null;
+            $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
+            $safe['fixed_price_nn'] = null;
+
+            return [$safe, $reviewKeys];
+        }
+
         $safe['planner_entries'] = [];
         $profileRaw = $safe['component_profile'] ?? null;
         $safe['component_profile'] = is_string($profileRaw) && $profileRaw !== ''
             ? $profileRaw
             : null;
         $safe['spot_method'] = SpotCalculationMethod::Average->value;
+        $safe['calculation_method_key'] = SpotCalculationMethod::Average->value;
 
-        // BL-P4-03e: Festpreis unverändert übernehmen (kein stilles Zurücksetzen auf normal).
         $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
         if ($modeRaw === '') {
             $modeRaw = PricingSettlementMode::Normal->value;

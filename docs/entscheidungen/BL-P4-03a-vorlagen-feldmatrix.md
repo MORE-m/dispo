@@ -1,22 +1,15 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 28. September 2026 · **BL-P4-03f** auf `main` (PR #99, `6737026…`;
-PO-BLP403F-1). **BL-P4-03e** auf `main` (PR #97, `4eddc94…`; Status PR #98).
-**BL-P4-03d** auf `main` (PR #95). PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 /
-PO-BLP403F-1 / UX-GATE-D
+Stand: 5. Oktober 2026 · **BL-P4-03g** Draft-PR (PO-BLP403G-1 A1+B1+C1).
+**BL-P4-03f** auf `main` (PR #99). **BL-P4-03e** (PR #97). **BL-P4-03d** (PR #95).
+PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / UX-GATE-D
 
-**03a (PR #91):** Spot Classic **Average** mit mehrfach Positionen und den unten
-Gruppe‑1-Feldern. **03c (PR #92):** zusätzlich optionale **Hauptspot+Allonge**-
-Komponenten (Semantik BL-P4-02c / SPT-014). **03b (PR #93):** aus zugänglicher
-Kalkulation kundenlosen Draft erzeugen (nur Average + optionale Komponenten;
-sonst Ablehnung ohne stille Reduktion). **03d (PR #95):** gemeinsamer versionierter
-Persistenzvertrag Freeze↔Hydrate
-(`docs/entscheidungen/BL-P4-03d-frozen-persistenzvertrag.md`); Freeze und Hydrate
-sind zwei gepflegte Seiten ohne Auto-Support neuer Methoden. **03e (PR #97):**
-N/N-Festpreis (02d) in Average-Vorlagen; Materialisierung v2; Legacy v1 lesbar.
-**03f (PR #99):** Tandem/Tridem (02e) × Average × normal/Festpreis; Materialisierung
-v3; gemischt mit Average/Allonge; Calendar/Budget/Abbinder weiter Folgeslices. Keine
-vollständige Standardangebotsfunktion über alle Kalkulationsmethoden.
+**03a–03f:** Spot Classic **Average** inkl. Komponenten/Festpreis/Tandem (siehe
+unten). **03g:** zusätzlich Spot Classic **Calendar** × `normal` (Einzelspot,
+ohne Komponenten/Festpreis/Tandem); konkrete Termine; Adopt Frozen-Parity;
+Materialisierung **v4**; Legacy v1–v3 lesbar. Budget/Abbinder und
+Calendar×Festpreis/Tandem weiter Folgeslices. Keine vollständige
+Standardangebotsfunktion über alle Kalkulationsmethoden.
 
 ## Gruppen
 
@@ -55,12 +48,12 @@ vollständige Standardangebotsfunktion über alle Kalkulationsmethoden.
 | Herkunft `origin_standard_offer_version_id` | 3 | STD-005 Nachvollziehbarkeit | Keine Sync |
 | `campaign_period` (Header-Dyn-Feld) | 1* | Wizard-Payload unverändert zu 03a | *keine neue Datums-/Shift-Logik in 03c; Werte wie bisher mitspeicherbar; fachliche Klärung Folgeslice möglich |
 | `period_open` / `position_flight_period` | 1* | Positions-Dyn-Felder unverändert zu 03a | *stabil; keine Calendar-/Kampagnenverschiebung in 03c |
-| Calendar / `planner_entries` | 4 | Contract + Validierung lehnen ab | UI im Vorlagenmodus ausgeblendet |
+| Calendar / `planner_entries` | 1 | **BL-P4-03g** / PO-BLP403G-1 / A1+B1+C1 | Calendar×`normal` Einzelspot; konkrete ISO-Daten; Freeze v4; Adopt ohne Shift/Rebind |
 | Tandem/Tridem (`component_profile`) | 1 | **BL-P4-03f** / PO-BLP403F-1 / 02e-Semantik | Medium wählbar; Reminder-Rollen; `shared_total_length`; Freeze v3 |
 | Festpreis (`pricing_settlement_mode` / `fixed_price_nn`) | 1 | **BL-P4-03e** / 02d-Semantik (+ 03f mit Profil) | UI wählbar; serverseitig validiert; Freeze v2+; kein stilles Zurücksetzen |
 | Budget-Planungsmodus | 4 | Contract + Validierung lehnen ab | UI ausgeblendet |
 | Abbinder | 4 | zurückgestellt | Kein Scope |
-| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** (+ **03e**/**03f**) | *Average + optionale Komponenten/Tandem/Tridem + Festpreis; sonst Ablehnung; immer neuer `SA-`-Draft; keine Auto-Publish/Sync |
+| „Als Standardangebot speichern“ (aus Calc) | 1* | **BL-P4-03b** (+ **03e**/**03f**/**03g**) | *reine Average-Quelle (Komponenten/Tandem/Festpreis) **oder** reine Calendar×normal-Quelle; Mix Average+Calendar ganz abgewiesen; immer neuer `SA-`-Draft |
 
 ## Vertrags-IDs
 
@@ -72,6 +65,16 @@ vollständige Standardangebotsfunktion über alle Kalkulationsmethoden.
 - **UX-GATE-D / PO-BLP403A-1** Teilfreigabe Oberfläche 03a
 - **UX-GATE-D / PO-BLP403C-1** Teilfreigabe Komponentenbedienung im bestehenden Vorlageneditor
 - **UX-GATE-D / PO-BLP403B-1** Teilfreigabe From-Calc-Vorschlag
+- **UX-GATE-D / PO-BLP403G-1** Teilfreigabe Calendar×normal (A1+B1+C1)
+
+## Geliefert in BL-P4-03g
+
+- Calendar × Spot Classic × `normal` in Draft/UI/Sanitize/Freeze v4/Hydrate
+- Konkrete Termine; Adopt Frozen-Parity; Hinweistext bei Übernahme
+- Legacy Average v1–v3 und Average-v4 weiter übernehmbar
+- Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder weiter abgewiesen
+- ADR/PO: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
+- Isolierter Browser-Smoke Port **8050** (`playwright.blp403g.config.ts`)
 
 ## Geliefert in BL-P4-03b
 

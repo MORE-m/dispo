@@ -1,36 +1,33 @@
 # Fortschritt V1
 
-Stand: 5. Oktober 2026 – Feature-Branch **PO-NOT002-ADMIN-1 / BL-P9-02e**
-(Admin-Sicht Outbox+Suppress, lesend); Basis `main` nach PR #121
-(`a4ba38cc7193ac1cb3eec6307659bd27abf292be`). Davor auf `main`: #120, #119, #116.
+Stand: 5. Oktober 2026 – Feature-Branch **BL-P4-03g / PO-BLP403G-1**
+(Calendar-Standardangebote × `normal`); Basis `origin/main` @
+`68b7d8bf2dd604c44f703374b47d9815c73284ac` (nach PR #122).
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
 Alt-`dispo` stillgelegt. **Kein** Deploy. **Kein** Merge dieses Slices in diesem Auftrag.
 
-Entscheidung: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md`
-(**Akzeptiert**). Readiness:
-`docs/readiness/BL-P9-02e-admin-notification-outbox-read-2026-10-05.md`.
+Entscheidung: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
+(**Akzeptiert** A1+B1+C1). Readiness:
+`docs/readiness/BL-P4-03g-calendar-standardangebote-2026-10-05.md`.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`);
-Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`); Phase 9 Notifications
-(**02a/02b/02c/02d** auf `main`; **02e** dieser Draft-PR-Branch; Submit-/Invalidierungsmails,
-In-App offen). **NOT-002** Admin-Sicht: implementiert auf Draft-PR, **nicht** auf `main`
-abgeschlossen.
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03f** auf `main`;
+**03g** dieser Draft-PR-Branch); Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
+Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-NOT002-ADMIN-1** – lesende Admin-Sicht auf Benachrichtigungs-Outbox und
-unterdrückte Benachrichtigungen. Kein Merge/Deploy in diesem Auftrag.
+**PO-BLP403G-1 / BL-P4-03g** – Calendar × Spot Classic × `normal` in Standardangeboten
+(A1+B1+C1). Kein Merge/Deploy in diesem Auftrag.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
-Submit-Empfänger, Invalidierungsmails, Calendar-/Budget-Vorlagen (BL-P4-03 Rest),
-SPT-013 Abbinder, weitere Status-Mails / In-App, weitere Freigabeinvalidierungs-Auslöser
-nur mit neuem Edit-Pfad (Dispo-Kaufmännisch bereits gesperrt), Nicht-Spot /
-CRM / REP (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002
-Systemfeld-Overrides, Hinweistexte aus Matrix, MAT-003-Vollabnahme,
-REP-007 Dispo-PDF (Phase 10).
+Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen / Calendar×Festpreis/Tandem/Komponenten
+(BL-P4-03 Rest), SPT-013 Abbinder, weitere Status-Mails / In-App, weitere
+Freigabeinvalidierungs-Auslöser nur mit neuem Edit-Pfad, Nicht-Spot / CRM / REP
+(V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002 Systemfeld-Overrides,
+Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
@@ -193,6 +190,17 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | SMTP-Worker / weitere Status-Mails / Admin-UI / Freigabeinvalidierung | **bewusst nicht** (SMTP Ask/Answer → **BL-P9-02c**) |
 | Merge `main` | **PR #101** (`889c93197fef7ba328b1da1f0b7bbc2b1ba3219b`) |
 | Post-Merge CI | **`36547798359` SUCCESS** (`ci`/`mysql`/`e2e-spt008`) |
+
+## BL-P4-03g – Calendar in Standardangeboten / PO-BLP403G-1 (Oktober 2026)
+
+| Prüfpunkt | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe A1+B1+C1 | **akzeptiert** |
+| Draft/Sanitize/Freeze v4/Hydrate Calendar×normal | **umgesetzt** (Draft-PR) |
+| Adopt Frozen-Parity, kein Auto-Shift/Rebind | **umgesetzt** |
+| Legacy Average v1–v3 + Average-v4 | **Regressionstests** |
+| Isolierter Browser-Smoke Port 8050 | **BESTANDEN** (`playwright.blp403g.config.ts`, 3/3) |
+| Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder | **bewusst nicht** |
 
 ## BL-P4-03f – Tandem/Tridem in Average-Standardangeboten / PO-BLP403F-1 (September 2026)
 
