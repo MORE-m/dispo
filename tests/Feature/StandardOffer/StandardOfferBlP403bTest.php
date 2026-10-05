@@ -15,7 +15,6 @@ use App\Services\Calculation\CalculationWriter;
 use App\Services\StandardOffer\StandardOfferMaterializer;
 use App\Services\StandardOffer\StandardOfferWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
