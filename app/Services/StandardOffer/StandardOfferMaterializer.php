@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
  * BL-P4-03b/03d/03e/03f/03g / VER-004: Freeze-Seite des versionierten Persistenzvertrags
  * {@see FrozenCalculationPersistenceContract} für Spot-Classic-Average-Vorlagen
  * inkl. optionalem N/N-Festpreis (02d), Tandem/Tridem (02e) sowie Calendar×normal (03g/03h)
- * und Calendar×Festpreis Einzelspot (03i / A1).
+ * und Calendar×Festpreis mit optionaler Hauptspot+Allonge (03i/03j / A1).
  *
  * Adopt hydratisiert über denselben Vertrag (nicht über CalculationWriter::create()).
  * Altstände ohne materialization_version bleiben lesbar (implizit Version 1).

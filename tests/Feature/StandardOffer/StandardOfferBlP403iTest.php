@@ -379,6 +379,10 @@ class StandardOfferBlP403iTest extends TestCase
         $this->assertArrayNotHasKey('customer_name', $draft->draft_payload);
         $this->assertStringStartsWith('SA-', $offer->number);
 
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('advertising_medium_id', $catalog['medium']->id)
+            ->update(['component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength->value]);
         $fromCalcComponents = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
             'customer_name' => 'FP Komponenten',
@@ -397,19 +401,17 @@ class StandardOfferBlP403iTest extends TestCase
                 ],
             ]],
         ]);
-        InventoryMediumRule::query()
-            ->where('inventory_id', $catalog['hamburg']->id)
-            ->where('advertising_medium_id', $catalog['medium']->id)
-            ->update(['component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength->value]);
         $compCalc = app(CalculationWriter::class)->create($fromCalcComponents, $sales);
-        $beforeOffers = StandardOffer::query()->count();
-        try {
-            $this->writer()->createFromCalculation($compCalc->fresh(['positions', 'positions.components', 'positions.plannerEntries']), $sales);
-            $this->fail('From-Calc Calendar×Festpreis×Komponenten hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
-        }
-        $this->assertSame($beforeOffers, StandardOffer::query()->count());
+        $compOffer = $this->writer()->createFromCalculation(
+            $compCalc->fresh(['positions', 'positions.components', 'positions.plannerEntries']),
+            $sales,
+        );
+        $compDraft = $compOffer->draftVersion;
+        $this->assertNotNull($compDraft);
+        $this->assertSame('fixed_price', $compDraft->draft_payload['positions'][0]['pricing_settlement_mode']);
+        $this->assertSame('100.00', $compDraft->draft_payload['positions'][0]['fixed_price_nn']);
+        $this->assertCount(2, $compDraft->draft_payload['positions'][0]['components']);
+        $this->assertStringStartsWith('SA-', $compOffer->number);
 
         $mixed = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
@@ -613,24 +615,6 @@ class StandardOfferBlP403iTest extends TestCase
         }
 
         try {
-            $this->writer()->create('FP Komponenten', $this->calendarFestpreisPayload(
-                $catalog,
-                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
-                '100.00',
-                [
-                    'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength->value,
-                    'components' => [
-                        ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
-                        ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
-                    ],
-                ],
-            ), $pm);
-            $this->fail('Calendar×Festpreis×Komponenten hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
-        }
-
-        try {
             $this->writer()->create('Cal Tandem', $this->calendarFestpreisPayload(
                 $catalog,
                 [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
@@ -680,8 +664,8 @@ class StandardOfferBlP403iTest extends TestCase
                     return $mat;
                 },
             ],
-            'festpreis with components' => [
-                'needle' => 'Calendar erlaubt Festpreis nur ohne Komponenten',
+            'festpreis with components but empty nn' => [
+                'needle' => 'fixed_price_nn',
                 'mutate' => static function (array $mat): array {
                     $mat['positions'][0]['components'] = [
                         [
@@ -690,7 +674,7 @@ class StandardOfferBlP403iTest extends TestCase
                             'length_seconds' => 20,
                             'sort' => 0,
                             'length_index' => 0,
-                            'media_gross' => '400.00',
+                            'media_gross' => '',
                         ],
                         [
                             'role' => 'allonge',
@@ -698,10 +682,11 @@ class StandardOfferBlP403iTest extends TestCase
                             'length_seconds' => 10,
                             'sort' => 1,
                             'length_index' => 0,
-                            'media_gross' => '200.00',
+                            'media_gross' => '',
                         ],
                     ];
                     $mat['positions'][0]['component_calculation_strategy'] = ComponentCalculationStrategy::SharedTotalLength->value;
+                    $mat['positions'][0]['fixed_price_nn'] = null;
 
                     return $mat;
                 },
@@ -825,7 +810,7 @@ class StandardOfferBlP403iTest extends TestCase
                 ->where('standardOffer.allowed_spot_methods', ['average', 'calendar'])
                 ->where('standardOffer.scope_note', fn ($note) => is_string($note)
                     && str_contains($note, 'Festpreis')
-                    && str_contains($note, 'Einzelspot')));
+                    && str_contains($note, 'Hauptspot')));
     }
 
     private function writer(): StandardOfferWriter

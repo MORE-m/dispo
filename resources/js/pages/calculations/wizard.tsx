@@ -3832,15 +3832,7 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
-                                                            hideFixedPrice={
-                                                                isStandardOffer &&
-                                                                isCalendarCalculationMethod(
-                                                                    position.calculation_method_key,
-                                                                ) &&
-                                                                position
-                                                                    .components
-                                                                    .length > 0
-                                                            }
+                                                            hideFixedPrice={false}
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index

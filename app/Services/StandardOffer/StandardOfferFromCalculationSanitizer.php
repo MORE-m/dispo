@@ -10,13 +10,14 @@ use App\Models\Calculation;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / BL-P4-03h / PO-BLP403H-1 / STD-001:
+ * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / BL-P4-03h / PO-BLP403H-1 /
+ * BL-P4-03i / PO-BLP403I-1 / BL-P4-03j / PO-BLP403J-1 / STD-001:
  * Calc-Payload → kundenloser Vorlagen-Draft plus Prüfstufe
  * (nur Feldnamen, keine Quell-Freitextwerte).
  *
  * From-Calc: reine Average-Quellen (inkl. freigegebene Varianten) oder reine
- * Calendar-Quellen (×normal optional Allonge; ×Festpreis nur Einzelspot, PO-BLP403I-1 / A1).
- * Mix Average+Calendar → komplette Ablehnung.
+ * Calendar-Quellen (×normal/×Festpreis, optional Hauptspot+Allonge; PO-BLP403H-1 /
+ * PO-BLP403I-1 / PO-BLP403J-1 / A1). Mix Average+Calendar → komplette Ablehnung.
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -232,9 +233,8 @@ final class StandardOfferFromCalculationSanitizer
             }
         }
 
-        $components = is_array($position['components'] ?? null) ? $position['components'] : [];
-        $allowFixedPrice = $components === [];
-        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: $allowFixedPrice);
+        // PO-BLP403J-1 / A1: Calendar × Festpreis auch mit optionaler Hauptspot+Allonge.
+        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: true);
     }
 
     /**
@@ -265,7 +265,7 @@ final class StandardOfferFromCalculationSanitizer
 
         if ($settlement === PricingSettlementMode::FixedPrice) {
             if (! $allowFixedPrice) {
-                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis mit Hauptspot+Allonge kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03i / A1).";
+                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis ist für diese Position nicht erlaubt.";
 
                 return;
             }
@@ -332,19 +332,17 @@ final class StandardOfferFromCalculationSanitizer
             $safe['component_profile'] = null;
             if ($safe['components'] === []) {
                 $safe['component_calculation_strategy'] = null;
-                $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
-                if ($modeRaw === '') {
-                    $modeRaw = PricingSettlementMode::Normal->value;
-                }
-                $safe['pricing_settlement_mode'] = is_scalar($modeRaw)
-                    ? (string) $modeRaw
-                    : PricingSettlementMode::Normal->value;
-                if (array_key_exists('fixed_price_nn', $safe)
-                    && ($safe['fixed_price_nn'] === null || $safe['fixed_price_nn'] === '')) {
-                    $safe['fixed_price_nn'] = null;
-                }
-            } else {
-                $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
+            }
+            // PO-BLP403J-1 / A1: Calendar × Festpreis auch mit optionaler Hauptspot+Allonge.
+            $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
+            if ($modeRaw === '') {
+                $modeRaw = PricingSettlementMode::Normal->value;
+            }
+            $safe['pricing_settlement_mode'] = is_scalar($modeRaw)
+                ? (string) $modeRaw
+                : PricingSettlementMode::Normal->value;
+            if (array_key_exists('fixed_price_nn', $safe)
+                && ($safe['fixed_price_nn'] === null || $safe['fixed_price_nn'] === '')) {
                 $safe['fixed_price_nn'] = null;
             }
 
