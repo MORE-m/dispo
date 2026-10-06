@@ -19,6 +19,8 @@ use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\PriceList\Admin\PriceListAdminWriter;
+use App\Services\PriceList\Admin\PriceListImpactPreviewService;
 use App\Services\StandardOffer\FrozenCalculationPersistenceContract;
 use App\Services\StandardOffer\StandardOfferMaterializer;
 use App\Services\StandardOffer\StandardOfferWriter;
@@ -155,26 +157,44 @@ class StandardOfferBlP403iTest extends TestCase
         $this->assertSame('500.00', (string) $sorted[1]->nn_invest);
     }
 
-    public function test_price_list_change_after_publish_keeps_adopt_then_cell_edit_keeps_pin(): void
+    public function test_cell_edit_after_successor_list_keeps_pinned_list_a_prices(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $sales = User::factory()->role(Role::Sales)->create();
+        $admin = User::factory()->role(Role::Admin)->create();
         $this->setSecondPrice($catalog, '2.0000');
 
+        $listA = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+
         $published = $this->publishCalendarFestpreis($catalog, $pm);
-        $frozenPin = (int) $published->frozen_materialization['positions'][0]['price_list_id'];
+        $this->assertSame($listA->id, (int) $published->frozen_materialization['positions'][0]['price_list_id']);
         $frozenVersion = (string) $published->frozen_materialization['positions'][0]['price_list_version'];
 
-        $this->setSecondPrice($catalog, '9.0000');
-        $this->assertSame('500.00', (string) ($published->fresh()->frozen_materialization['nn_invest'] ?? ''));
-        $this->assertSame('2.0000', (string) ($published->fresh()->frozen_materialization['positions'][0]['planner_entries'][0]['second_price'] ?? ''));
-
-        $adopted = $this->writer()->adopt($published->fresh(), 'Parity Kunde', null, null, $sales);
+        $adopted = $this->writer()->adopt($published->fresh(), 'Pin Kunde', null, null, $sales);
         $position = $adopted->fresh(['positions.plannerEntries'])->positions->firstOrFail();
-        $this->assertSame('500.00', (string) $adopted->nn_invest);
+        $this->assertSame($listA->id, (int) $position->price_list_id);
         $this->assertSame('2.0000', (string) $position->plannerEntries->first()->second_price);
-        $this->assertSame($frozenPin, (int) $position->price_list_id);
+        $this->assertSame('500.00', (string) $adopted->nn_invest);
+
+        $listB = $this->activateSuccessorList($catalog['hamburg']->id, 2026, '9.0000', $admin);
+        $this->assertNotSame($listA->id, $listB->id);
+        $this->assertSame(PriceListStatus::Archived, $listA->fresh()->status);
+        $this->assertSame(PriceListStatus::Active, $listB->fresh()->status);
+        $this->assertSame('2.0000', (string) PriceListItem::query()
+            ->where('price_list_id', $listA->id)
+            ->where('hour', 9)
+            ->where('day_group', DayGroup::MoFr)
+            ->value('second_price'));
+        $this->assertSame('9.0000', (string) PriceListItem::query()
+            ->where('price_list_id', $listB->id)
+            ->where('hour', 9)
+            ->where('day_group', DayGroup::MoFr)
+            ->value('second_price'));
 
         $reloaded = app(CalculationWriter::class)->payloadFromCalculation($adopted->fresh([
             'positions.plannerEntries',
@@ -190,11 +210,13 @@ class StandardOfferBlP403iTest extends TestCase
         ];
         $updated = app(CalculationWriter::class)->update($adopted->fresh(), $reloaded, $sales);
         $edited = $updated->fresh(['positions.plannerEntries'])->positions->firstOrFail();
-        $this->assertSame($frozenPin, (int) $edited->price_list_id);
+        $this->assertSame($listA->id, (int) $edited->price_list_id);
+        $this->assertNotSame($listB->id, (int) $edited->price_list_id);
         $this->assertSame($frozenVersion, (string) $edited->price_list_version);
-        $this->assertSame('9.0000', (string) $edited->plannerEntries->first()->second_price);
+        $this->assertSame('2.0000', (string) $edited->plannerEntries->first()->second_price);
+        $this->assertSame(9, (int) $edited->plannerEntries->first()->hour);
         $this->assertSame('500.00', (string) $updated->nn_invest);
-        $this->assertNotSame('600.00', (string) $updated->media_gross);
+        $this->assertSame('600.00', (string) $updated->media_gross);
     }
 
     public function test_post_adopt_year_change_rebinds_price_list(): void
@@ -435,6 +457,70 @@ class StandardOfferBlP403iTest extends TestCase
             ->where('standard_offer_id', $valid->id)
             ->where('status', StandardOfferVersionStatus::Published)
             ->count());
+        $this->assertSame(StandardOfferVersionStatus::Draft, $draft->fresh()->status);
+        $this->assertTrue(
+            $draft->fresh()->frozen_materialization === null
+            || $draft->fresh()->frozen_materialization === [],
+        );
+    }
+
+    public function test_planner_date_outside_price_year_fail_on_create_preview_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $active2026 = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+
+        $invalid = $this->calendarFestpreisPayload($catalog, [
+            ['date' => '2027-03-01', 'hour' => 8, 'spot_count' => 1],
+        ], '50.00', [
+            'price_year' => 2026,
+            'expected_price_list_id' => $active2026->id,
+        ]);
+
+        $this->assertCalendarFestpreisRejectedOnCreatePreviewPublish(
+            $catalog,
+            $pm,
+            $invalid,
+            'positions.0.planner_entries.0.date',
+            'getrennte Position',
+            '2027-03-01',
+        );
+    }
+
+    public function test_cells_across_year_boundary_fail_on_create_preview_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $active2026 = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+
+        $invalid = $this->calendarFestpreisPayload($catalog, [
+            ['date' => '2026-12-31', 'hour' => 8, 'spot_count' => 1],
+            ['date' => '2027-01-01', 'hour' => 9, 'spot_count' => 1],
+        ], '50.00', [
+            'price_year' => 2026,
+            'expected_price_list_id' => $active2026->id,
+        ]);
+
+        $this->assertCalendarFestpreisRejectedOnCreatePreviewPublish(
+            $catalog,
+            $pm,
+            $invalid,
+            'positions.0.planner_entries.1.date',
+            'getrennte Position',
+            '2027-01-01',
+        );
     }
 
     public function test_rejects_invalid_settlement_components_tandem_budget(): void
@@ -689,6 +775,111 @@ class StandardOfferBlP403iTest extends TestCase
     private function writer(): StandardOfferWriter
     {
         return app(StandardOfferWriter::class);
+    }
+
+    /**
+     * @param  array{hamburg: Inventory, medium: AdvertisingMedium}  $catalog
+     * @param  array<string, mixed>  $invalidPayload
+     */
+    private function assertCalendarFestpreisRejectedOnCreatePreviewPublish(
+        array $catalog,
+        User $pm,
+        array $invalidPayload,
+        string $errorKey,
+        string $needle,
+        string $dateNeedle,
+    ): void {
+        $offersBefore = StandardOffer::query()->count();
+        try {
+            $this->writer()->create('Invalid year create', $invalidPayload, $pm);
+            $this->fail('Create hätte an der Jahresgrenze scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey($errorKey, $exception->errors());
+            $joined = implode(' ', $exception->errors()[$errorKey]);
+            $this->assertStringContainsString($needle, $joined);
+            $this->assertStringContainsString($dateNeedle, $joined);
+        }
+        $this->assertSame($offersBefore, StandardOffer::query()->count());
+
+        $this->actingAs($pm)
+            ->postJson(route('standard-offers.preview'), [...$invalidPayload, 'title' => 'Invalid year preview'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors($errorKey);
+        $this->assertSame($offersBefore, StandardOffer::query()->count());
+
+        $valid = $this->writer()->create(
+            'Year publish baseline',
+            $this->calendarFestpreisPayload($catalog, [
+                ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10],
+            ], '500.00'),
+            $pm,
+        );
+        $draft = $valid->draftVersion;
+        $this->assertNotNull($draft);
+        $this->assertSame(StandardOfferVersionStatus::Draft, $draft->status);
+        $this->assertTrue(
+            $draft->frozen_materialization === null
+            || $draft->frozen_materialization === [],
+        );
+
+        $corrupted = $draft->draft_payload;
+        $corrupted['positions'][0]['planner_entries'] = $invalidPayload['positions'][0]['planner_entries'];
+        if (array_key_exists('price_year', $invalidPayload['positions'][0])) {
+            $corrupted['positions'][0]['price_year'] = $invalidPayload['positions'][0]['price_year'];
+        }
+        if (array_key_exists('expected_price_list_id', $invalidPayload['positions'][0])) {
+            $corrupted['positions'][0]['expected_price_list_id'] = $invalidPayload['positions'][0]['expected_price_list_id'];
+        }
+        $draft->draft_payload = $corrupted;
+        $draft->save();
+
+        try {
+            $this->writer()->publish($draft->fresh(), (int) $draft->lock_version, $pm);
+            $this->fail('Publish hätte an der Jahresgrenze scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey($errorKey, $exception->errors());
+            $joined = implode(' ', $exception->errors()[$errorKey]);
+            $this->assertStringContainsString($needle, $joined);
+            $this->assertStringContainsString($dateNeedle, $joined);
+        }
+
+        $fresh = $draft->fresh();
+        $this->assertSame(StandardOfferVersionStatus::Draft, $fresh->status);
+        $this->assertTrue(
+            $fresh->frozen_materialization === null
+            || $fresh->frozen_materialization === [],
+        );
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $valid->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
+    }
+
+    private function activateSuccessorList(int $inventoryId, int $year, string $secondPrice, User $admin): PriceList
+    {
+        $items = [];
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                $items[] = [
+                    'hour' => $hour,
+                    'day_group' => $group->value,
+                    'second_price' => $secondPrice,
+                ];
+            }
+        }
+
+        $draft = app(PriceListAdminWriter::class)->createDraft([
+            'inventory_id' => $inventoryId,
+            'year' => $year,
+            'name' => 'Nachfolger '.$secondPrice,
+            'items' => $items,
+        ], $admin);
+        $preview = app(PriceListImpactPreviewService::class)->previewActivate($draft);
+
+        return app(PriceListAdminWriter::class)->activate($draft, [
+            'lock_version' => $draft->lock_version,
+            'fingerprint' => (string) $preview['fingerprint'],
+        ], $admin);
     }
 
     /**
