@@ -438,17 +438,7 @@ class StandardOfferBlP403gTest extends TestCase
         $sales = User::factory()->role(Role::Sales)->create();
         $this->setSecondPrice($catalog, '2.0000');
 
-        try {
-            $this->writer()->create('Cal FP', $this->calendarDraftPayload($catalog, [
-                ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1],
-            ], [
-                'pricing_settlement_mode' => 'fixed_price',
-                'fixed_price_nn' => '500.00',
-            ]), $pm);
-            $this->fail('Calendar+Festpreis hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
-        }
+        // Calendar×Festpreis Einzelspot: freigegeben in BL-P4-03i.
 
         // Calendar+Komponenten: freigegeben in BL-P4-03h – Negativfälle dort.
 

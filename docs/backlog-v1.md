@@ -316,7 +316,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`–`03h` auf `main`; Budget/Abbinder und Calendar×Festpreis/Tandem offen)
+- **Status:** teilweise (`BL-P4-03a`–`03h` auf `main`; **03i** Draft-PR; Budget/Abbinder und Calendar×Festpreis×Komponenten/Tandem offen)
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c/03h); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**; 03g `SPT-005`–`007` + **PO-BLP403G-1**; 03h **PO-BLP403H-1**
 - **Abhängigkeiten:** BL-P4-02 (Average + Calendar 02b + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**, **PO-BLP403G-1**, **PO-BLP403H-1**; 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
@@ -326,9 +326,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 03e (`main`, PR #97, `4eddc94…`; Post-Merge-CI `36435981330` grün; Status PR #98):** N/N-Festpreis in Average-Vorlagen (02d-Semantik, keine Vorlagenformel); Materialisierung **v2**; Draft/UI/Sanitize/Freeze/Hydrate; Normal+Festpreis nebeneinander; Snapshot-Isolation; Freeze/Hydrate weiter zwei gepflegte Seiten; Legacy v1 lesbar; ADR `docs/entscheidungen/BL-P4-03e-standardangebot-festpreis.md`
 - **Ergebnis 03f (`main`, PR #99, `6737026…`; Post-Merge-CI `36480624574` grün):** Tandem/Tridem × Average × normal/Festpreis (02e-Semantik, keine Vorlagenformel); Materialisierung **v3**; gemischte Vorlagen mit Average/Allonge; Freeze schreibt v3; Hydrate Slot-/Sort-/Längen-Asserts; Legacy v1/v2 lesbar; Calendar/Budget/Abbinder weiter außerhalb; ADR `docs/entscheidungen/BL-P4-03f-standardangebot-tandem-tridem.md`
 - **Ergebnis 03g (`main`, PR #123, `ff42723…`; Post-Merge-CI `37338293392` SUCCESS; kein Deploy; PO-BLP403G-1 A1+B1+C1):** Calendar × Spot Classic × `normal` (Einzelspot); konkrete Termine; Adopt Frozen-Parity (kein Auto-Shift/Rebind); Materialisierung **v4**; Freeze/Hydrate zwei Seiten; Legacy v1–v3 + Average-v4 lesbar; From-Calc reine Calendar-Quellen; Mix Average+Calendar weiter abgewiesen; isolierter Smoke Port **8050**; ADR `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`
-- **Ergebnis 03h (`main`, PR #124, `5f13499…`; historischer Post-Merge-Run `37421402438` FAILURE `npm audit --omit=dev`; kein Deploy; PO-BLP403H-1 A1 + B1+C1):** Calendar × `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; explizite **v4-Vertragserweiterung** (kein v5); From-Calc Calendar+Komponenten; Mix weiter abgewiesen; isolierter Smoke Port **8051**; ADR `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
-- **Grenzen:** kein Calendar×Festpreis/Tandem; kein Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
-- **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f/03g/03h Feature-Tests; 03f/03g/03h Smoke
+- **Ergebnis 03h (`main`, PR #124, `5f13499…`; historischer Post-Merge-Run `37421402438` FAILURE `npm audit --omit=dev`; Dependency-Fix PR #125 `1a4e72c…`, Post-Merge-CI `37446149806` SUCCESS; kein Deploy; PO-BLP403H-1 A1 + B1+C1):** Calendar × `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; explizite **v4-Vertragserweiterung** (kein v5); From-Calc Calendar+Komponenten; Mix weiter abgewiesen; isolierter Smoke Port **8051**; ADR `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
+- **Vorschlag 03i (Draft-PR, nicht auf main, nicht erledigt):** `PO-BLP403I-1` A1 Calendar × Festpreis Einzelspot; explizite **v4-Vertragserweiterung**; 03h Allonge×`normal` bleibt; Dok `docs/entscheidungen/PO-BLP403I-1-calendar-festpreis.md`
+- **Grenzen:** kein Calendar×Festpreis×Komponenten/Tandem; kein Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
+- **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f/03g/03h/03i Feature-Tests; 03f/03g/03h/03i Smoke
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
 - **Tests 03c:** `tests/Feature/StandardOffer/StandardOfferBlP403cTest.php`
 - **Tests 03b:** `tests/Feature/StandardOffer/StandardOfferBlP403bTest.php`
@@ -336,7 +337,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests 03e:** `tests/Feature/StandardOffer/StandardOfferBlP403eTest.php`
 - **Tests 03f:** `tests/Feature/StandardOffer/StandardOfferBlP403fTest.php`
 - **Tests 03g:** `tests/Feature/StandardOffer/StandardOfferBlP403gTest.php`; Playwright `playwright.blp403g.config.ts`
-- **Tests 03h:** `tests/Feature/StandardOffer/StandardOfferBlP403hTest.php`; Playwright `playwright.blp403h.config.ts`
+- **Tests 03h:** `tests/Feature/StandardOffer/StandardOfferBlP403hTest.php`
+- **Tests 03i:** `tests/Feature/StandardOffer/StandardOfferBlP403iTest.php`; Playwright `playwright.blp403h.config.ts`
 
 ## Phase 5 – SWF, Produktion und freie Preisbestandteile
 

@@ -81,20 +81,23 @@ use Illuminate\Validation\ValidationException;
  * - v1/v2 ohne Profil bleiben übernehmbar (bisheriges Leseverhalten inkl. Legacy
  *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
- * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1; erweitert BL-P4-03h / PO-BLP403H-1):
+ * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1; erweitert BL-P4-03h / PO-BLP403H-1;
+ * erweitert BL-P4-03i / PO-BLP403I-1 / A1):
  * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
- * - Calendar nur `pricing_settlement_mode=normal`; kein `component_profile`/Festpreis
- * - **03h Vertragserweiterung:** Calendar darf optional Hauptspot+Allonge
- *   (`components` + `component_calculation_strategy`) wie Average-Allonge;
- *   Reader vor #123/ohne 03h-Deploy weist Calendar-Komponenten ab – erweiterte
- *   Snapshots brauchen diesen erweiterten Reader (Keys allein ≠ Kompatibilität)
+ * - **03h:** Calendar × `normal` darf optional Hauptspot+Allonge
+ *   (`components` + `component_calculation_strategy`) wie Average-Allonge; kein `component_profile`
+ * - **03i Vertragserweiterung:** Calendar-Einzelspot (`components` leer/absent) darf
+ *   `pricing_settlement_mode` `normal`|`fixed_price` inkl. `fixed_price_nn` (02d/03e-Semantik).
+ *   Calendar × Festpreis × Komponenten bleibt fail-closed.
+ *   Reader vor dieser Erweiterung weist Calendar-Festpreis ab – neue Snapshots brauchen
+ *   den erweiterten Reader (Keys allein ≠ Kompatibilität mit #124-Code).
  * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
  *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
  * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
- * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten ohne Live-Preisauflösung
- * - Legacy v1–v3 Average und v4 Calendar-Einzelspot weiter lesbar; unbekannte Versionen fail-closed
+ * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten/`fixed_price_nn` ohne Live-Preisauflösung
+ * - Legacy v1–v3 Average, v4 Calendar×`normal` (inkl. 03h-Allonge) und Average-v4 weiter lesbar
  *
- * Verbleibende Pflege bei weiteren Methoden (Calendar×Festpreis/Tandem, Abbinder, Budget):
+ * Verbleibende Pflege bei weiteren Methoden (Calendar×Festpreis×Komponenten/Tandem, Abbinder, Budget):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
  * 2) Freeze-Seite im Materializer erweitern,
  * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
@@ -112,7 +115,7 @@ final class FrozenCalculationPersistenceContract
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Calendar×normal inkl. optionaler Komponenten + Average-Varianten). */
+    /** Aktuelle Freeze-Schreibversion (Calendar×normal inkl. Allonge, Calendar×Festpreis Einzelspot, Average-Varianten). */
     public const CURRENT_WRITE_VERSION = 4;
 
     /**
@@ -390,7 +393,8 @@ final class FrozenCalculationPersistenceContract
     }
 
     /**
-     * BL-P4-03g/03h: Calendar×normal; optional Hauptspot+Allonge (ohne Profil/Festpreis).
+     * BL-P4-03g/03h/03i: Calendar×normal optional Hauptspot+Allonge;
+     * Calendar×Festpreis nur Einzelspot (Settlement in assertAverageMethodAndSettlement).
      *
      * @param  array<string, mixed>  $position
      */
@@ -624,19 +628,66 @@ final class FrozenCalculationPersistenceContract
             $hasFixedNn = array_key_exists('fixed_price_nn', $position)
                 && $position['fixed_price_nn'] !== null
                 && $position['fixed_price_nn'] !== '';
+
+            $hasComponents = false;
+            if (array_key_exists('components', $position) && $position['components'] !== null) {
+                if (! is_array($position['components'])) {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components).",
+                    ]);
+                }
+                $hasComponents = $position['components'] !== [];
+            }
+
+            if ($hasComponents) {
+                if ($modeRaw === null || $modeRaw === '') {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: pricing_settlement_mode).",
+                    ]);
+                }
+                if (! is_string($modeRaw) || $modeRaw !== PricingSettlementMode::Normal->value) {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Calendar erlaubt Festpreis nur ohne Komponenten).",
+                    ]);
+                }
+                if ($hasFixedNn) {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Calendar erlaubt Festpreis nur ohne Komponenten).",
+                    ]);
+                }
+
+                return;
+            }
+
             if ($modeRaw === null || $modeRaw === '') {
                 throw ValidationException::withMessages([
                     'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: pricing_settlement_mode).",
                 ]);
             }
-            if (! is_string($modeRaw) || $modeRaw !== PricingSettlementMode::Normal->value) {
+            if (! is_string($modeRaw)) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Calendar erlaubt nur pricing_settlement_mode=normal).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode).",
                 ]);
+            }
+            $calendarMode = PricingSettlementMode::tryFrom($modeRaw);
+            if ($calendarMode === null) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: pricing_settlement_mode).",
+                ]);
+            }
+            if ($calendarMode === PricingSettlementMode::FixedPrice) {
+                if (! $hasFixedNn) {
+                    throw ValidationException::withMessages([
+                        'frozen_materialization' => "Eingefrorene Vorlagendaten sind unvollständig (Position {$index}: fixed_price_nn).",
+                    ]);
+                }
+                $this->assertFrozenFixedPriceNn($position['fixed_price_nn'], $index);
+
+                return;
             }
             if ($hasFixedNn) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ist für Calendar nicht erlaubt).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: fixed_price_nn ohne Festpreismodus).",
                 ]);
             }
 
