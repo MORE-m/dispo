@@ -163,7 +163,9 @@ class StandardOfferBlP403dTest extends TestCase
         $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
 
         $cases = [
-            ['path' => 'spot_method', 'mutate' => fn (array &$m) => $m['positions'][0]['spot_method'] = 'calendar', 'needle' => 'Calendar'],
+            // BL-P4-03h: Calendar ist gültige Methode; Average→Calendar ohne
+            // planner_entries bleibt fail-closed (nicht mehr Pauschal-Ablehnung).
+            ['path' => 'spot_method', 'mutate' => fn (array &$m) => $m['positions'][0]['spot_method'] = 'calendar', 'needle' => 'planner_entries'],
             ['path' => 'settlement_v1', 'mutate' => function (array &$m): void {
                 $m['materialization_version'] = 1;
                 $m['positions'][0]['pricing_settlement_mode'] = 'fixed_price';

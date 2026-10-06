@@ -15,7 +15,6 @@ use App\Services\Calculation\CalculationWriter;
 use App\Services\StandardOffer\StandardOfferMaterializer;
 use App\Services\StandardOffer\StandardOfferWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSpotClassicCatalog;
 use Tests\TestCase;
@@ -166,7 +165,7 @@ class StandardOfferBlP403bTest extends TestCase
         $this->assertSame('Kampagne', $sourceAfter->campaign);
     }
 
-    public function test_rejects_calendar_with_components_without_silent_reduction(): void
+    public function test_accepts_calendar_with_components_from_calculation(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $sales = User::factory()->role(Role::Sales)->create();
@@ -205,24 +204,20 @@ class StandardOfferBlP403bTest extends TestCase
         ]);
         $calculation = app(CalculationWriter::class)->create($payload, $sales);
 
-        try {
-            $this->writer()->createFromCalculation($calculation->fresh(['positions', 'positions.components', 'positions.plannerEntries']), $sales);
-            $this->fail('Expected ValidationException');
-        } catch (ValidationException $exception) {
-            $messages = $exception->errors();
-            $this->assertTrue(
-                isset($messages['positions.0.components']) || isset($messages['positions']),
-                json_encode($messages),
-            );
-        }
-
-        $this->assertSame(0, StandardOffer::query()->count());
+        $offer = $this->writer()->createFromCalculation(
+            $calculation->fresh(['positions', 'positions.components', 'positions.plannerEntries']),
+            $sales,
+        );
+        $this->assertNotNull($offer->draftVersion);
+        $this->assertSame('calendar', $offer->draftVersion->draft_payload['positions'][0]['spot_method']);
+        $this->assertCount(2, $offer->draftVersion->draft_payload['positions'][0]['components'] ?? []);
+        $this->assertSame(1, StandardOffer::query()->count());
 
         $this->actingAs($sales)
             ->from(route('calculations.edit', $calculation))
             ->post(route('standard-offers.from-calculation', $calculation))
-            ->assertRedirect(route('calculations.edit', $calculation))
-            ->assertSessionHasErrors();
+            ->assertRedirect();
+        $this->assertSame(2, StandardOffer::query()->count());
     }
 
     public function test_components_roundtrip_from_calculation(): void

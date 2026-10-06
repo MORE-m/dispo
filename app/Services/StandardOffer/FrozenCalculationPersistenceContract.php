@@ -81,14 +81,18 @@ use Illuminate\Validation\ValidationException;
  * - v1/v2 ohne Profil bleiben übernehmbar (bisheriges Leseverhalten inkl. Legacy
  *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
- * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1):
+ * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1; erweitert BL-P4-03h / PO-BLP403H-1):
  * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
- * - Calendar nur `pricing_settlement_mode=normal`; keine Komponenten/Profil/Festpreis
+ * - Calendar nur `pricing_settlement_mode=normal`; kein `component_profile`/Festpreis
+ * - **03h Vertragserweiterung:** Calendar darf optional Hauptspot+Allonge
+ *   (`components` + `component_calculation_strategy`) wie Average-Allonge;
+ *   Reader vor #123/ohne 03h-Deploy weist Calendar-Komponenten ab – erweiterte
+ *   Snapshots brauchen diesen erweiterten Reader (Keys allein ≠ Kompatibilität)
  * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
  *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
  * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
- * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen ohne Live-Preisauflösung
- * - Legacy v1–v3 Average weiter lesbar; unbekannte Versionen fail-closed
+ * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten ohne Live-Preisauflösung
+ * - Legacy v1–v3 Average und v4 Calendar-Einzelspot weiter lesbar; unbekannte Versionen fail-closed
  *
  * Verbleibende Pflege bei weiteren Methoden (Calendar×Festpreis/Tandem, Abbinder, Budget):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
@@ -108,7 +112,7 @@ final class FrozenCalculationPersistenceContract
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Calendar×normal + Average-Varianten). */
+    /** Aktuelle Freeze-Schreibversion (Calendar×normal inkl. optionaler Komponenten + Average-Varianten). */
     public const CURRENT_WRITE_VERSION = 4;
 
     /**
@@ -337,6 +341,10 @@ final class FrozenCalculationPersistenceContract
         foreach ($components as $childIndex => $component) {
             $this->assertComponentRow($component, $index, $childIndex, $position);
         }
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($components !== [] && ($profileRaw === null || $profileRaw === '' || $profileRaw === [])) {
+            $this->assertOptionalAllongeComponentStructure($components, $index);
+        }
 
         $ranges = $this->assertChildList(
             $position,
@@ -382,7 +390,7 @@ final class FrozenCalculationPersistenceContract
     }
 
     /**
-     * BL-P4-03g / A1: Calendar×normal ohne Komponenten/Profil/Festpreis.
+     * BL-P4-03g/03h: Calendar×normal; optional Hauptspot+Allonge (ohne Profil/Festpreis).
      *
      * @param  array<string, mixed>  $position
      */
@@ -401,17 +409,12 @@ final class FrozenCalculationPersistenceContract
             'components',
             self::CHILD_LIST_OPTIONAL_ABSENT,
         );
-        if ($components !== []) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components sind für Calendar-A1 nicht erlaubt).",
-            ]);
+        $this->assertOptionalAllongeStrategy($position, $index, $components);
+        foreach ($components as $childIndex => $component) {
+            $this->assertComponentRow($component, $index, $childIndex, $position);
         }
-
-        $strategy = $position['component_calculation_strategy'] ?? null;
-        if ($strategy !== null && $strategy !== '') {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy für Calendar nicht erlaubt).",
-            ]);
+        if ($components !== []) {
+            $this->assertOptionalAllongeComponentStructure($components, $index);
         }
 
         $ranges = $this->assertChildList(
@@ -905,12 +908,86 @@ final class FrozenCalculationPersistenceContract
             return;
         }
 
+        // Draft-/Komponentenvertrag: Strategie ohne Komponenten ist unzulässig
+        // (auch bei gültigem Enum-Wert) – Legacy ohne Strategy-Key bleibt leer/OK.
         if ($strategy !== null && $strategy !== '') {
-            if (! is_string($strategy) || ComponentCalculationStrategy::tryFrom($strategy) === null) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy ohne Komponenten).",
+            ]);
+        }
+    }
+
+    /**
+     * Optional Hauptspot+Allonge laut ComponentValidator: genau ein Hauptspot,
+     * höchstens eine Allonge, positive Längen, eindeutige sort/length_index.
+     *
+     * @param  list<array<string, mixed>>  $components
+     */
+    private function assertOptionalAllongeComponentStructure(array $components, int $index): void
+    {
+        $mainCount = 0;
+        $allongeCount = 0;
+        /** @var array<int, true> $seenSorts */
+        $seenSorts = [];
+
+        foreach ($components as $childIndex => $component) {
+            $role = $component['role'] ?? null;
+            if ($role === SpotComponentRole::MainSpot->value) {
+                $mainCount++;
+            }
+            if ($role === SpotComponentRole::Allonge->value) {
+                $allongeCount++;
+            }
+
+            $length = $component['length_seconds'] ?? null;
+            if ((! is_int($length) && ! (is_string($length) && ctype_digit($length)))
+                || (int) $length < 1) {
                 throw ValidationException::withMessages([
-                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_calculation_strategy).",
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_seconds).",
                 ]);
             }
+
+            $sort = $component['sort'] ?? null;
+            if (! is_int($sort) && ! (is_string($sort) && ctype_digit($sort))) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            $sortInt = (int) $sort;
+            if (isset($seenSorts[$sortInt])) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.sort).",
+                ]);
+            }
+            $seenSorts[$sortInt] = true;
+
+            $lengthIndex = $component['length_index'] ?? null;
+            if (! is_int($lengthIndex) && ! (is_string($lengthIndex) && ctype_digit($lengthIndex))) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_index).",
+                ]);
+            }
+            if ((int) $lengthIndex < 0) {
+                throw ValidationException::withMessages([
+                    'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: components.{$childIndex}.length_index).",
+                ]);
+            }
+        }
+
+        if ($mainCount < 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: Hauptspot fehlt).",
+            ]);
+        }
+        if ($mainCount > 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte Komponentenrollen).",
+            ]);
+        }
+        if ($allongeCount > 1) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: doppelte Komponentenrollen).",
+            ]);
         }
     }
 
@@ -1010,11 +1087,11 @@ final class FrozenCalculationPersistenceContract
             ]);
         }
 
-        if (! is_string($component['media_gross']) && ! is_numeric($component['media_gross'])) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
-            ]);
-        }
+        $this->assertFrozenComponentMediaGross(
+            $component['media_gross'],
+            $positionIndex,
+            $childIndex,
+        );
 
         if (! array_key_exists('label', $component) || ! is_string($component['label'])) {
             throw ValidationException::withMessages([
@@ -1042,6 +1119,32 @@ final class FrozenCalculationPersistenceContract
         if (! is_numeric($component['length_seconds']) || (int) $component['length_seconds'] < 0) {
             throw ValidationException::withMessages([
                 'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.length_seconds).",
+            ]);
+        }
+    }
+
+    private function assertFrozenComponentMediaGross(
+        mixed $value,
+        int $positionIndex,
+        int|string $childIndex,
+    ): void {
+        // Shared-Total-Length friert Komponenten-media_gross als '' ein
+        // (Brutto nur positionsseitig); Individual liefert Dezimalbeträge.
+        if ($value === '') {
+            return;
+        }
+
+        if (! is_string($value) && ! is_int($value)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
+            ]);
+        }
+
+        $raw = is_int($value) ? (string) $value : trim($value);
+        $pattern = '/^\d+(\.\d{1,'.Decimal::MONEY_SCALE.'})?$/';
+        if ($raw === '' || preg_match($pattern, $raw) !== 1 || ! is_numeric($raw)) {
+            throw ValidationException::withMessages([
+                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$positionIndex}: components.{$childIndex}.media_gross).",
             ]);
         }
     }

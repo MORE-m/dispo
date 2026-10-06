@@ -206,7 +206,7 @@ class StandardOfferBlP403cTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
-    public function test_http_accepts_valid_components_and_rejects_calendar_budget(): void
+    public function test_http_accepts_valid_components_and_rejects_budget(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
@@ -222,20 +222,24 @@ class StandardOfferBlP403cTest extends TestCase
         $this->assertNotNull($draft);
         $this->assertCount(2, $draft->draft_payload['positions'][0]['components'] ?? []);
 
+        // BL-P4-03h: Calendar + Komponenten ist erlaubt.
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
-            'title' => 'Calendar+Komponenten Reject',
+            'title' => 'Calendar+Komponenten OK',
             'positions' => [[
                 ...$base['positions'][0],
                 'spot_method' => 'calendar',
                 'calculation_method_key' => 'calendar',
+                'plan_rows' => [],
+                'time_ranges' => [],
                 'planner_entries' => [[
                     'date' => '2026-03-02',
                     'hour' => 8,
                     'spot_count' => 1,
                 ]],
             ]],
-        ])->assertSessionHasErrors('positions.0.components');
+        ])->assertRedirect();
+        $this->assertSame(2, StandardOffer::query()->count());
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
@@ -253,7 +257,7 @@ class StandardOfferBlP403cTest extends TestCase
                 'fixed_price_nn' => '100.00',
             ]],
         ])->assertRedirect();
-        $this->assertSame(2, StandardOffer::query()->count());
+        $this->assertSame(3, StandardOffer::query()->count());
     }
 
     public function test_price_list_change_after_publish_does_not_mutate_adopted_components(): void

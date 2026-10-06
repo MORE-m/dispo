@@ -59,7 +59,8 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 
 - Spot Classic Average; optional Hauptspot+Allonge (03c, Semantik 02c);
   optional N/N-Festpreis (03e, Semantik 02d).
-  Calendar×normal (BL-P4-03g / A1) wählbar; Calendar×Festpreis/Tandem/Komponenten
+  Calendar×normal (BL-P4-03g / A1; optional Hauptspot+Allonge in **03h**) wählbar;
+  Calendar×Festpreis/Tandem weiter abgewiesen;
   sowie Budget-auf-Vorlage serverseitig abgewiesen.
 - Published immutable; paralleler Draft erlaubt; Publish archiviert vorherige
   Published atomar (Lock + Konkurrenz über `lock_version`).
@@ -89,7 +90,8 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
   nicht eine automatisch synchrone Abbildung. Neue Methoden (Calendar/Tandem/…)
   werden **nicht** automatisch übernommen; sie brauchen Version oder
   Contract-Erweiterung plus Freeze-, Hydrate- und Testpflege (Festpreis Average
-  in **BL-P4-03e**/v2; Tandem in **03f**/v3; Calendar×normal in **03g**/v4).
+  in **BL-P4-03e**/v2; Tandem in **03f**/v3; Calendar×normal in **03g**/v4;
+  Calendar×Hauptspot+Allonge als **v4-Vertragserweiterung** in **03h**).
 - Adopt ohne Live-`CalculationWriter::create()`.
 - Legacy ohne `materialization_version` bleibt übernehmbar; unbekannte Versionen
   und unvollständige Frozen-Daten scheitern ohne Teilanlage.
@@ -100,8 +102,17 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Calendar × Spot Classic × `normal` (A1); konkrete Termine (B1); Adopt Frozen-Parity (C1).
 - Materialisierung **v4**; Legacy v1–v3 + Average-v4 lesbar.
 - Adopt-Hinweis: gespeicherte Termine/Preise; neuer Zeitraum per Calc-Edit.
-- Calendar×Festpreis/Tandem/Komponenten, Budget, Abbinder weiter abgewiesen.
+- Calendar×Festpreis/Tandem/Komponenten damals abgewiesen (Komponenten nachgezogen in 03h).
+- Auf `main`: **PR #123** (`ff42723…`), Post-Merge-CI `37338293392` SUCCESS; **kein** Deploy.
 - Dok: `docs/entscheidungen/PO-BLP403G-1-calendar-standardangebote.md`.
+
+### Slice BL-P4-03h – Calendar × Hauptspot+Allonge (PO-BLP403H-1)
+
+- Calendar × `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel.
+- B1+C1 übernommen; explizite v4-Vertragserweiterung (kein v5).
+- From-Calc Calendar+Komponenten; Mix Average+Calendar weiter abgewiesen.
+- Calendar×Festpreis/Tandem, Budget, Abbinder weiter abgewiesen.
+- Dok: `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`.
 
 ### Slice BL-P4-03e – Festpreis in Average-Vorlagen
 
