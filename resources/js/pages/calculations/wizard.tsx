@@ -3833,13 +3833,7 @@ export default function CalculationWizard({
                                                             }
                                                             disabled={!canEdit}
                                                             hideFixedPrice={
-                                                                isStandardOffer &&
-                                                                isCalendarCalculationMethod(
-                                                                    position.calculation_method_key,
-                                                                ) &&
-                                                                position
-                                                                    .components
-                                                                    .length > 0
+                                                                false
                                                             }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[

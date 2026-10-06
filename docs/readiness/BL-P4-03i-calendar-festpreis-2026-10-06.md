@@ -1,8 +1,9 @@
 # Readiness: BL-P4-03i – Calendar × Festpreis in Standardangeboten
 
-Status: **READY** (PO-BLP403I-1 akzeptiert A1; Feature-Branch / Draft-PR)
+Status: **READY** (PO-BLP403I-1 akzeptiert A1; auf `main`)
 Stand: 6. Oktober 2026
-Audit-/Implementierungsbasis: `origin/main` @ `1a4e72cd478a8edafa63c8c97722596169994b82` (PR #125)
+Audit-/Implementierungsbasis: `origin/main` @ `4a9dd4e518d123e01f61e932fc1b34b8e109a87f`
+(Merge PR #126; Post-Merge-CI [`37483249060`](https://github.com/MORE-m/dispo/actions/runs/37483249060) SUCCESS)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-014`, `COM-009`,
 `PRI-002`/`PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`, **PO-BLP403I-1**, Slice **BL-P4-03i**
 Entscheidung: [`docs/entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](../entscheidungen/PO-BLP403I-1-calendar-festpreis.md)
@@ -16,9 +17,11 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](../ents
 | Calc Calendar × N/N-Festpreis (02d) | vorhanden |
 | Materialisierung v4 Vertragserweiterung | umgesetzt (kein v5, keine Schema-Migration) |
 | Calendar×Festpreis×Komponenten / Tandem / Budget / Abbinder | bewusst außerhalb |
-| Merge / Deploy | **kein** Merge, **kein** Deploy |
+| Merge `main` | **PR #126** / `4a9dd4e…` |
+| Post-Merge-CI | **`37483249060` SUCCESS** |
+| Deploy | **kein** Deploy |
 
-**Readiness-Urteil: READY** – Slice auf Feature-Branch / Draft-PR. Reader vor dieser
+**Readiness-Urteil: READY** – Slice auf `main` (PR #126). Reader vor dieser
 Erweiterung (PR #124) weist Calendar-Festpreis ab; neue Snapshots brauchen den
 erweiterten Reader. **Keine** Deployment-Freigabe.
 
@@ -49,5 +52,5 @@ Browser-Smoke isoliert: `playwright.blp403i.config.ts` / Port **8052**.
 
 ## 4. Bewusst offen
 
-Calendar×Festpreis×Komponenten, Calendar×Tandem, Budget-Vorlagen, Abbinder/SPT-013,
-Merge/Deploy.
+Calendar×Festpreis×Komponenten (Folgeslice **PO-BLP403J-1** / **BL-P4-03j** vorgeschlagen),
+Calendar×Tandem, Budget-Vorlagen, Abbinder/SPT-013, Deploy.

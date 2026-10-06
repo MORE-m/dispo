@@ -215,27 +215,12 @@ class StandardOfferBlP403hTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
-    public function test_rejects_calendar_festpreis_tandem_budget_still(): void
+    public function test_rejects_calendar_tandem_budget_still(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
         $this->setSecondPrice($catalog, '2.0000');
-
-        try {
-            $this->writer()->create('Cal FP', $this->calendarComponentsDraftPayload(
-                $catalog,
-                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
-                ComponentCalculationStrategy::SharedTotalLength,
-                [
-                    'pricing_settlement_mode' => 'fixed_price',
-                    'fixed_price_nn' => '500.00',
-                ],
-            ), $pm);
-            $this->fail('Calendar+Festpreis+Komponenten hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
-        }
 
         try {
             $this->writer()->create('Cal Tandem', $this->calendarComponentsDraftPayload(

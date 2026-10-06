@@ -11,10 +11,10 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03e/03f/03g/03h/03i: Spot Classic Average (optional Hauptspot+Allonge,
- * N/N-Festpreis, Tandem/Tridem) und Spot Classic Calendar × `normal` mit optionaler
- * Hauptspot+Allonge (PO-BLP403H-1) sowie Calendar × Festpreis nur Einzelspot
- * (PO-BLP403I-1 / A1; ohne Festpreis×Komponenten/Tandem). Budget bleibt abgewiesen.
+ * BL-P4-03a/03c/03e/03f/03g/03h/03i/03j: Spot Classic Average (optional Hauptspot+Allonge,
+ * N/N-Festpreis, Tandem/Tridem) und Spot Classic Calendar × `normal`/`fixed_price` mit
+ * optionaler Hauptspot+Allonge (PO-BLP403H-1 / PO-BLP403I-1 / PO-BLP403J-1 / A1).
+ * Ohne Tandem am Calendar. Budget bleibt abgewiesen.
  */
 final class StandardOfferAverageContract
 {
@@ -181,7 +181,8 @@ final class StandardOfferAverageContract
 
     /**
      * PO-BLP403H-1 / A1: Calendar × normal, optional Hauptspot+Allonge.
-     * PO-BLP403I-1 / A1: Calendar × Festpreis nur Einzelspot (`components: []`).
+     * PO-BLP403I-1 / A1: Calendar × Festpreis Einzelspot.
+     * PO-BLP403J-1 / A1: Calendar × Festpreis × optional Hauptspot+Allonge.
      * Ohne Tandem. Strategien laut Inventarregel (über assertResolvable/preview).
      *
      * @param  array<string, mixed>  $position
@@ -240,11 +241,6 @@ final class StandardOfferAverageContract
         }
 
         $settlement = $this->normalizeSettlement($position, $index);
-        if ($settlement['mode'] === PricingSettlementMode::FixedPrice && $normalizedComponents !== []) {
-            throw ValidationException::withMessages([
-                "positions.{$index}.pricing_settlement_mode" => 'Festpreis mit Hauptspot+Allonge ist in Calendar-Vorlagen (BL-P4-03i / A1) nicht erlaubt.',
-            ]);
-        }
 
         $plannerEntries = $position['planner_entries'] ?? [];
         if (! is_array($plannerEntries)) {

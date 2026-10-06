@@ -53,7 +53,7 @@ test.describe.serial('BL-P4-03i Calendar × Festpreis Einzelspot', () => {
         ).toContainText('Festpreis');
         await expect(
             page.locator('[data-test="standard-offer-scope-note"]'),
-        ).toContainText('Einzelspot');
+        ).toContainText('Hauptspot');
 
         await page.locator('[data-test="standard-offer-title"]').fill(
             'E2E Calendar Festpreis März 2026',

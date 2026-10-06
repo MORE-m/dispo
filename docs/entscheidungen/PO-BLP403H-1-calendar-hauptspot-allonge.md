@@ -58,4 +58,4 @@ Auf `main` gemergt: **PR #124**, Merge-Commit
 `37421402438` FAILURE (`npm audit --omit=dev`). Dependency-Fix **PR #125**
 (`1a4e72c…`), Post-Merge-CI `37446149806` SUCCESS. **Kein** Deploy.
 Calendar×Festpreis/Tandem, Budget, Abbinder bleiben offen
-(Festpreis-Einzelspot: `PO-BLP403I-1` A1, Draft-PR).
+(Festpreis-Einzelspot: `PO-BLP403I-1` A1, PR #126 auf `main`).

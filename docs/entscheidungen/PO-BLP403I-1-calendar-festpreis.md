@@ -2,7 +2,7 @@
 
 Status: **Akzeptiert** (A1; B1+C1 übernommen aus PO-BLP403G-1)
 Stand: 6. Oktober 2026
-Basis: `origin/main` @ `1a4e72cd478a8edafa63c8c97722596169994b82` (nach PR #125)
+Basis: `origin/main` @ `4a9dd4e518d123e01f61e932fc1b34b8e109a87f` (nach PR #126)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-014`, `COM-009`,
 `PRI-002` / `PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`,
 Vorgänger `PO-BLP403A-1` … `PO-BLP403H-1`
@@ -60,5 +60,7 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 
 ## Implementierungsstand
 
-Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03i`). **Kein** Merge/Deploy in diesem Auftrag.
-Calendar×Festpreis×Komponenten/Tandem, Budget, Abbinder bleiben offen.
+Auf `main` gemergt: **PR #126** / `4a9dd4e…`; Post-Merge-CI
+[`37483249060`](https://github.com/MORE-m/dispo/actions/runs/37483249060) SUCCESS.
+**Kein** Deploy. Calendar×Festpreis×Komponenten/Tandem, Budget, Abbinder bleiben offen
+(Komponenten-Folgeslice: `PO-BLP403J-1` / `BL-P4-03j` vorgeschlagen).
