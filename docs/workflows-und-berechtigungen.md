@@ -112,6 +112,7 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - B1+C1 übernommen; explizite v4-Vertragserweiterung (kein v5).
 - From-Calc Calendar+Komponenten; Mix Average+Calendar weiter abgewiesen.
 - Calendar×Festpreis/Tandem, Budget, Abbinder weiter abgewiesen.
+- Auf `main`: **PR #124** (`5f13499…`); historischer Post-Merge-Run `37421402438` FAILURE (`npm audit --omit=dev`); **kein** Deploy.
 - Dok: `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`.
 
 ### Slice BL-P4-03e – Festpreis in Average-Vorlagen

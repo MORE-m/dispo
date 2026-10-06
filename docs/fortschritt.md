@@ -1,27 +1,26 @@
 # Fortschritt V1
 
-Stand: 5. Oktober 2026 – Feature-Branch **BL-P4-03h / PO-BLP403H-1**
-(Calendar × Hauptspot+Allonge); Basis `origin/main` @
-`ff42723e5bdb1d11dccbac5e762b58b001fbd1cb` (PR #123).
+Stand: 6. Oktober 2026 – Dependency-Slice **npm-audit `source-map-js`**
+(GHSA-68fv-2mgg-jv7q); Basis `origin/main` @
+`5f13499b451f1fd9037ce00761abc27b5244396f` (Merge PR #124).
 Lokale Arbeitsbasis: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
-Alt-`dispo` stillgelegt. **Kein** Deploy. **Kein** Merge dieses Slices in diesem Auftrag.
+Alt-`dispo` stillgelegt. **Kein** Deploy. **Kein** Merge dieses Fix-Slices in diesem Auftrag.
 
-Entscheidung 03h: `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
-(**Akzeptiert** A1; B1+C1 übernommen). Readiness:
-`docs/readiness/BL-P4-03h-calendar-hauptspot-allonge-2026-10-05.md`.
-03g auf `main`: PR #123 / CI `37338293392` / kein Deploy.
+03h auf `main`: PR #124 / Merge `5f13499…`; historischer Post-Merge-Run
+`37421402438` **FAILURE** (`npm audit --omit=dev`, `source-map-js`);
+Pint/PHPStan/Pest/mysql/e2e-spt008 waren dort grün. **Kein** Deploy.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03g** auf `main`;
-**03h** dieser Draft-PR-Branch); Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03h** auf `main`);
+Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP403H-1 / BL-P4-03h** – Calendar × Spot Classic × `normal` × optional
-Hauptspot+Allonge. Kein Merge/Deploy in diesem Auftrag.
+**npm-audit `source-map-js` (GHSA-68fv-2mgg-jv7q)** – Lockfile 1.2.1 → 1.2.2.
+Kein Merge/Deploy in diesem Auftrag. 03h ist auf `main` (PR #124).
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
 Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen / Calendar×Festpreis/Tandem
@@ -32,9 +31,10 @@ Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP403G-1 / BL-P4-03g** Calendar × Spot Classic × `normal` (Einzelspot) –
-**PR #123**, Merge `ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`, Post-Merge-CI
-`37338293392` SUCCESS; **kein** Deploy.
+**PO-BLP403H-1 / BL-P4-03h** Calendar × Spot Classic × `normal` × optional
+Hauptspot+Allonge – **PR #124**, Merge `5f13499b451f1fd9037ce00761abc27b5244396f`;
+Post-Merge-CI `37421402438` **FAILURE** (`npm audit --omit=dev`); **kein** Deploy.
+Davor: **PO-BLP403G-1 / BL-P4-03g** (PR **#123**, Post-Merge-CI `37338293392` SUCCESS).
 Davor: **PO-APPROVAL-NOTIFY-1** (PR **#121**), **PO-CALC-DISPO-HINT-1** (PR **#120**),
 **PO-AUTH-SPECIAL-APPROVE-1** (PR **#119**).
 
@@ -200,12 +200,23 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Prüfpunkt | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
-| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Komponenten | **umgesetzt** (Draft-PR) |
+| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Komponenten | **umgesetzt** (`main`) |
 | Adopt Frozen-Parity inkl. Komponenten | **umgesetzt** |
 | Legacy Average v1–v3 + Calendar-v4-Einzelspot + Average-v4 | **Regressionstests** |
 | Isolierter Browser-Smoke Port 8051 | **BESTANDEN** (`playwright.blp403h.config.ts`) |
 | Calendar×Festpreis/Tandem, Budget, Abbinder | **bewusst nicht** |
-| Merge / Deploy | **offen** (Draft-PR) |
+| Merge | **PR #124** `5f13499…` |
+| Post-Merge-CI `37421402438` | **FAILURE** (`npm audit --omit=dev`, GHSA-68fv-2mgg-jv7q); mysql/e2e-spt008 und Pint/PHPStan/Pest grün; Browser-Steps übersprungen |
+| Deploy | **kein** |
+
+## npm-audit source-map-js / GHSA-68fv-2mgg-jv7q (Oktober 2026)
+
+| Prüfpunkt | Status |
+|---|---|
+| Advisory `>= 1.0.0 < 1.2.2`, Patch **1.2.2** | bestätigt |
+| Production-Pfad `@tailwindcss/vite` → `@tailwindcss/node` → `source-map-js` | 1.2.1 → **1.2.2** (Lockfile) |
+| `npm audit --omit=dev` | lokal **0** Vulnerabilities |
+| Merge / Deploy | **offen** (dieser Draft-PR) |
 
 ## BL-P4-03g – Calendar in Standardangeboten / PO-BLP403G-1 (Oktober 2026)
 
