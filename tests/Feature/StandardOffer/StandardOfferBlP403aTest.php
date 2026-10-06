@@ -242,6 +242,7 @@ class StandardOfferBlP403aTest extends TestCase
         $base = $this->draftPayload($catalog);
         $base['title'] = 'Abgelehnte Vorlage';
 
+        // Calendar×Festpreis×Komponenten ist seit BL-P4-03j / A1 erlaubt; Tandem bleibt abgewiesen.
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
             'positions' => [[
@@ -255,13 +256,14 @@ class StandardOfferBlP403aTest extends TestCase
                 ]],
                 'pricing_settlement_mode' => 'fixed_price',
                 'fixed_price_nn' => '100.00',
+                'component_profile' => 'tandem',
                 'component_calculation_strategy' => 'shared_total_length',
                 'components' => [
                     ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
                     ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
                 ],
             ]],
-        ])->assertSessionHasErrors('positions.0.pricing_settlement_mode');
+        ])->assertSessionHasErrors('positions.0.component_profile');
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
