@@ -219,6 +219,62 @@ class StandardOfferBlP403iTest extends TestCase
         $this->assertSame('600.00', (string) $updated->media_gross);
     }
 
+    public function test_first_adopt_after_live_price_change_keeps_frozen_parity(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $published = $this->publishCalendarFestpreis($catalog, $pm);
+        $frozen = $published->frozen_materialization;
+        $frozenPin = (int) $frozen['positions'][0]['price_list_id'];
+        $frozenVersion = (string) ($frozen['positions'][0]['price_list_version'] ?? '');
+        $this->assertSame('600.00', (string) ($frozen['media_gross'] ?? ''));
+        $this->assertSame('500.00', (string) ($frozen['nn_invest'] ?? ''));
+        $this->assertSame('2.0000', (string) ($frozen['positions'][0]['planner_entries'][0]['second_price'] ?? ''));
+        $this->assertSame('2026-03-02', (string) ($frozen['positions'][0]['planner_entries'][0]['date'] ?? ''));
+        $this->assertSame(8, (int) ($frozen['positions'][0]['planner_entries'][0]['hour'] ?? 0));
+        $this->assertSame(10, (int) ($frozen['positions'][0]['planner_entries'][0]['spot_count'] ?? 0));
+
+        $this->setSecondPrice($catalog, '9.0000');
+        $this->assertSame('600.00', (string) ($published->fresh()->frozen_materialization['media_gross'] ?? ''));
+        $this->assertSame('500.00', (string) ($published->fresh()->frozen_materialization['nn_invest'] ?? ''));
+        $this->assertSame('2.0000', (string) ($published->fresh()->frozen_materialization['positions'][0]['planner_entries'][0]['second_price'] ?? ''));
+        $this->assertSame($frozenPin, (int) $published->fresh()->frozen_materialization['positions'][0]['price_list_id']);
+
+        $adopted = $this->writer()->adopt($published->fresh(), 'Adopt Freeze Kunde', null, null, $sales);
+        $position = $adopted->fresh(['positions.plannerEntries'])->positions->firstOrFail();
+        $this->assertSame($frozenPin, (int) $position->price_list_id);
+        $this->assertSame($frozenVersion, (string) $position->price_list_version);
+        $this->assertSame('2.0000', (string) $position->plannerEntries->first()->second_price);
+        $this->assertSame('2026-03-02', $this->entryDate($position->plannerEntries->first()));
+        $this->assertSame(8, (int) $position->plannerEntries->first()->hour);
+        $this->assertSame(10, (int) $position->plannerEntries->first()->spot_count);
+        $this->assertSame('600.00', (string) $adopted->media_gross);
+        $this->assertSame('500.00', (string) $adopted->nn_invest);
+        $this->assertSame('500.00', (string) $position->fixed_price_nn);
+
+        $reloaded = app(CalculationWriter::class)->payloadFromCalculation($adopted->fresh([
+            'positions',
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $this->assertSame('fixed_price', $reloaded['positions'][0]['pricing_settlement_mode']);
+        $this->assertSame('500.00', (string) $reloaded['positions'][0]['fixed_price_nn']);
+        $fresh = $adopted->fresh(['positions.plannerEntries']);
+        $this->assertSame('600.00', (string) $fresh->media_gross);
+        $this->assertSame('500.00', (string) $fresh->nn_invest);
+        $this->assertSame($frozenPin, (int) $fresh->positions->first()->price_list_id);
+        $this->assertSame('2.0000', (string) $fresh->positions->first()->plannerEntries->first()->second_price);
+        $this->assertSame('2026-03-02', $this->entryDate($fresh->positions->first()->plannerEntries->first()));
+        $this->assertSame(10, (int) $fresh->positions->first()->plannerEntries->first()->spot_count);
+    }
+
     public function test_post_adopt_year_change_rebinds_price_list(): void
     {
         $catalog = $this->createSpotClassicCatalog();
