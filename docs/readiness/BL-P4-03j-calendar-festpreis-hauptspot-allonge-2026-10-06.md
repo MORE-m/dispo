@@ -47,9 +47,15 @@ Zellpreise aus gepinnter Liste; Listen-Rebind nur bei Jahr-/Inventar-/Mediumwech
 
 Synthetisch: `StandardOfferBlP403jTest`, `SpotClassicCalendarFestpreisComponentsTest`
 (+ Regression 03e/03h/03i).
-Browser-Smoke isoliert: `playwright.blp403j.config.ts` / Port **8053**.
+Browser-Smoke isoliert: `playwright.blp403j.config.ts` / Port **8053** —
+Shared und Individual jeweils Save → Reload → Publish → Adopt → Calc-Reload.
 
 Fixture: Shared 600,00 / N/N 500,00 (`''`/`''`); Individual 640,00 / N/N 520,00 (420/220).
+
+Review-Nachzug (Feature-Tests, getrennt von Adopt-Freeze und Nachfolgerlisten-Pin):
+- Inventarstrategie-Wechsel nach Draft blockiert Publish (kein Freeze / unveröffentlicht).
+- Preisjahr 2026 mit ausschließlich 2027-Terminen scheitert Create/Preview/Publish.
+- Jahresübertritt 2026-12-31 / 2027-01-01 bleibt eigener Fall.
 
 ## 4. Bewusst offen
 

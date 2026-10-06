@@ -21,6 +21,12 @@ PO-BLP403J-1 **A1 akzeptiert**. 03i auf Main (PR #126 / CI `37483249060` SUCCESS
 - B1+C1; explizite v4-Vertragserweiterung
 - Fixture Shared 600/500; Individual 640/520 (420/220)
 
+## Review-Nachzug Abnahmebelege
+
+- Browser-Smoke Shared **und** Individual: Save → Reload → Publish → Adopt → Calc-Reload (Port 8053)
+- Publish nach Inventarstrategie-Wechsel: Strategiefehler, Draft unveröffentlicht, kein Freeze
+- Preisjahr 2026 / Termine nur 2027: Create/Preview/Publish scheitern; Jahresübertritt-Test getrennt
+
 ## Offen
 
 Calendar×Tandem, Budget, Abbinder. Kein Merge/Deploy.

@@ -237,9 +237,10 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 |---|---|
 | UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
 | Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Festpreis×Komponenten | **umgesetzt** (Draft-PR) |
-| Shared 600/500 (`''`) / Individual 640/520 (420/220) | **Feature-Tests** |
+| Shared 600/500 (`''`) / Individual 640/520 (420/220) | **Feature-Tests** (+ Komponentenbrutto 420/220) |
 | Calc-Triple Persistenz/Reload | **Feature-Tests** |
-| Isolierter Browser-Smoke Port 8053 | **BESTANDEN** (`playwright.blp403j.config.ts`) |
+| Isolierter Browser-Smoke Port 8053 (Shared + Individual Full-Flow) | **BESTANDEN** (`playwright.blp403j.config.ts`) |
+| Publish nach Inventarstrategie-Wechsel / Datum außerhalb Preisjahr | **Feature-Tests** (Jahresübertritt getrennt) |
 | Calendar×Tandem / Budget / Abbinder | **bewusst nicht** |
 | Merge / Deploy | **kein** |
 

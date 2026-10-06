@@ -392,6 +392,60 @@ class StandardOfferBlP403jTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
+    public function test_inventory_strategy_change_after_draft_blocks_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $offer = $this->writer()->create(
+            'Draft vor Regelwechsel 03j',
+            $this->calendarFestpreisComponentsPayload(
+                $catalog,
+                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+                ComponentCalculationStrategy::SharedTotalLength,
+                '500.00',
+            ),
+            $pm,
+        );
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $draftId = $draft->id;
+        $lock = (int) $draft->lock_version;
+        $this->assertSame(StandardOfferVersionStatus::Draft, $draft->status);
+        $this->assertTrue(
+            $draft->frozen_materialization === null
+            || $draft->frozen_materialization === [],
+        );
+
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::Individual);
+
+        try {
+            $this->writer()->publish($draft->fresh(), $lock, $pm);
+            $this->fail('Publish nach Inventarstrategie-Wechsel hätte scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertTrue(
+                collect($exception->errors())->keys()->contains(
+                    fn ($key) => str_contains((string) $key, 'component_calculation_strategy')
+                        || str_contains((string) $key, 'components'),
+                ),
+                json_encode($exception->errors()),
+            );
+        }
+
+        $stillDraft = StandardOfferVersion::query()->findOrFail($draftId);
+        $this->assertSame(StandardOfferVersionStatus::Draft, $stillDraft->status);
+        $this->assertTrue(
+            $stillDraft->frozen_materialization === null
+            || $stillDraft->frozen_materialization === [],
+        );
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $offer->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
+    }
+
     public function test_missing_price_and_year_mismatch_fail_on_create_preview_publish(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -462,6 +516,48 @@ class StandardOfferBlP403jTest extends TestCase
             $draft->fresh()->frozen_materialization === null
             || $draft->fresh()->frozen_materialization === [],
         );
+    }
+
+    public function test_planner_date_outside_price_year_fail_on_create_preview_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $active2026 = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+
+        $outsideYear = $this->calendarFestpreisComponentsPayload(
+            $catalog,
+            [['date' => '2027-03-01', 'hour' => 8, 'spot_count' => 10]],
+            ComponentCalculationStrategy::SharedTotalLength,
+            '50.00',
+            [
+                'price_year' => 2026,
+                'expected_price_list_id' => $active2026->id,
+            ],
+        );
+
+        $this->assertCalendarFestpreisComponentsRejectedOnCreatePreviewPublish(
+            $catalog,
+            $pm,
+            $outsideYear,
+            'positions.0.planner_entries.0.date',
+            'getrennte Position',
+            '2027-03-01',
+        );
+    }
+
+    public function test_cells_across_year_boundary_fail_on_create_preview_publish(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
+        $this->setSecondPrice($catalog, '2.0000');
 
         $active2026 = PriceList::query()
             ->where('inventory_id', $catalog['hamburg']->id)

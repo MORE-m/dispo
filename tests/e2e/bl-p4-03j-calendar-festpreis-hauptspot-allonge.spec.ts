@@ -238,7 +238,7 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
         ).toContainText(sharedNn, { timeout: 20_000 });
     });
 
-    test('Individual: Calendar-Festpreis+Allonge Preview 640,00 / 520,00', async ({
+    test('Individual: Calendar-Festpreis+Allonge speichern, reload, publish; Vertrieb adoptiert', async ({
         page,
     }) => {
         test.setTimeout(120_000);
@@ -256,8 +256,107 @@ test.describe.serial('BL-P4-03j Calendar × Festpreis × Hauptspot+Allonge', () 
         await expect(
             page.locator('[data-test="spot-components-strategy-hint-0"]'),
         ).toContainText('Komponenten einzeln berechnen');
+        await expect(
+            page.locator('[data-test="spot-components-total-length-0"]'),
+        ).toContainText('30s');
         await expectFixedPricePreview(page, individualGross, individualNn);
 
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
+            0,
+            { timeout: 20_000 },
+        );
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(individualNn, { timeout: 20_000 });
+
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeChecked();
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
+        ).toBeChecked();
+        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
+            /520/,
+        );
+        await expect(
+            page.locator('[data-test="spot-components-section-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-allonge-0"]'),
+        ).toHaveValue('10');
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
+        await expectFixedPricePreview(page, individualGross, individualNn);
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(individualNn, { timeout: 20_000 });
+
+        await page.locator('[data-test="standard-offer-publish"]').click();
+        await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
+            timeout: 30_000,
+        });
+
+        const offerUrl = page.url();
+
+        await page.context().clearCookies();
+        await login(page, 'sales@example.com');
+        await page.goto(offerUrl);
+
+        await expect(
+            page.locator('[data-test="standard-offer-adopt-hint"]'),
+        ).toContainText('gespeicherten Termine und Preise');
+
+        await page
+            .locator('[data-test="standard-offer-customer"]')
+            .fill('E2E Adopt Kunde 03j Individual GmbH');
+        await page.locator('[data-test="standard-offer-adopt"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+/, {
+            timeout: 30_000,
+        });
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeChecked();
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
+        ).toBeChecked();
+        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
+            /520/,
+        );
+        await expect(
+            page.locator('[data-test="spot-components-section-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-allonge-0"]'),
+        ).toHaveValue('10');
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
+        await expectFixedPricePreview(page, individualGross, individualNn);
         await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(page.locator('[data-test="preview-loading"]')).toHaveCount(
             0,
