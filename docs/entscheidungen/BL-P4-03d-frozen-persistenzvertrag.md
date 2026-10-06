@@ -64,7 +64,7 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
     aus Legacy-Gründen = leer; `null` ungültig; `[]` = gültige leere Liste
   (Draft-Semantik 03c: Komponenten absent/`[]` = aus, `null` abgelehnt)
 
-## v4 (BL-P4-03g / PO-BLP403G-1; erweitert BL-P4-03h / PO-BLP403H-1)
+## v4 (BL-P4-03g / PO-BLP403G-1; erweitert BL-P4-03h / PO-BLP403H-1; erweitert BL-P4-03i / PO-BLP403I-1)
 
 Calendar-Hydrate prüft vor Persistenz zusätzlich: nicht-leere `planner_entries` bei
 positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Zellen
@@ -72,18 +72,22 @@ positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Ze
 `line_gross`. Widersprüche → `ValidationException`, keine Teilanlage.
 
 - Optional `spot_method=calendar` mit Pflicht-Key `planner_entries` (konkrete ISO-Daten,
-  eingefrorene Sekundenpreise/Summen); Settlement nur `normal`; kein `component_profile`/Festpreis.
-- **03h Vertragserweiterung:** Calendar darf optional Hauptspot+Allonge
+  eingefrorene Sekundenpreise/Summen); kein `component_profile`.
+- **03h Vertragserweiterung:** Calendar × `normal` darf optional Hauptspot+Allonge
   (`components` + `component_calculation_strategy`) wie Average-Allonge.
   Reader-Stand PR #123 weist Calendar-Komponenten ab – erweiterte Snapshots brauchen
   den erweiterten Reader (JSON-Keys allein beweisen keine Kompatibilität mit altem Code).
   Bestehende v4-Einzelspot-Calendar (`components: []`) bleiben gültig.
+- **03i Vertragserweiterung:** Calendar-Einzelspot darf `pricing_settlement_mode`
+  `normal`|`fixed_price` inkl. `fixed_price_nn` (02d/03e-Semantik). Calendar × Festpreis
+  × Komponenten bleibt fail-closed. Reader-Stand PR #124 weist Calendar-Festpreis ab –
+  neue Snapshots brauchen den erweiterten Reader. Kein v5, keine Schema-Migration.
 - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed).
-- Hydrate persistiert Planner-Entries und Komponenten ohne Live-Preisauflösung (B1+C1).
+- Hydrate persistiert Planner-Entries, Komponenten und Festpreis-N/N ohne Live-Preisauflösung (B1+C1).
 
 ## Verbleibende Pflege bei weiteren Methoden
 
-Bei Calendar×Festpreis/Tandem, Budget-Vorlagen, Abbinder (oder anderer Methodik):
+Bei Calendar×Festpreis×Komponenten/Tandem, Budget-Vorlagen, Abbinder (oder anderer Methodik):
 
 1. neue `materialization_version` **oder** explizite Contract-Erweiterung,
 2. Freeze-Seite (`StandardOfferMaterializer` bzw. Nachfolger) erweitern,

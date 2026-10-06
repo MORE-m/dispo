@@ -1,6 +1,7 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 5. Oktober 2026 · **BL-P4-03h** Draft-PR (PO-BLP403H-1 A1); **BL-P4-03g** auf `main` (PR #123).
+Stand: 6. Oktober 2026 · **BL-P4-03i** Draft-PR (PO-BLP403I-1 A1); **BL-P4-03h** auf `main` (PR #124); Dependency-Fix PR #125.
+**BL-P4-03g** auf `main` (PR #123).
 **BL-P4-03f** auf `main` (PR #99). **BL-P4-03e** (PR #97). **BL-P4-03d** (PR #95).
 PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / PO-BLP403H-1 / UX-GATE-D
 
@@ -8,7 +9,8 @@ PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / PO-BL
 unten). **03g:** Spot Classic **Calendar** × `normal` (Einzelspot). **03h:** Calendar ×
 `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; konkrete Termine;
 Adopt Frozen-Parity; Materialisierung **v4-Vertragserweiterung**; Legacy v1–v3 und
-Calendar-Einzelspot lesbar. Budget/Abbinder und Calendar×Festpreis/Tandem weiter Folgeslices.
+Calendar-Einzelspot lesbar. **03i (Draft-PR):** Calendar × Festpreis nur Einzelspot.
+Budget/Abbinder und Calendar×Festpreis×Komponenten/Tandem weiter Folgeslices.
 
 ## Gruppen
 

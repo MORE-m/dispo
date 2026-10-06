@@ -17,7 +17,7 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`]
 | Materialisierung v4 Vertragserweiterung | umgesetzt |
 | Budget / Calendar×Festpreis / Tandem / Abbinder | bewusst außerhalb |
 
-**Readiness-Urteil: READY** – Slice auf `main` (PR #124). Historischer Post-Merge-Run `37421402438` FAILURE (`npm audit --omit=dev`); Advisory-Fix separat.
+**Readiness-Urteil: READY** – Slice auf `main` (PR #124). Historischer Post-Merge-Run `37421402438` FAILURE (`npm audit --omit=dev`); Advisory-Fix **PR #125** / `1a4e72c…`, Post-Merge-CI `37446149806` SUCCESS. **Kein** Deploy.
 
 ## 1. Akzeptierter Adoption-Vertrag
 

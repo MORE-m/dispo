@@ -15,7 +15,8 @@ use Illuminate\Validation\ValidationException;
  * (nur Feldnamen, keine Quell-Freitextwerte).
  *
  * From-Calc: reine Average-Quellen (inkl. freigegebene Varianten) oder reine
- * Calendar×normal-Quellen (optional Hauptspot+Allonge). Mix Average+Calendar → komplette Ablehnung.
+ * Calendar-Quellen (×normal optional Allonge; ×Festpreis nur Einzelspot, PO-BLP403I-1 / A1).
+ * Mix Average+Calendar → komplette Ablehnung.
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -231,7 +232,9 @@ final class StandardOfferFromCalculationSanitizer
             }
         }
 
-        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: false);
+        $components = is_array($position['components'] ?? null) ? $position['components'] : [];
+        $allowFixedPrice = $components === [];
+        $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: $allowFixedPrice);
     }
 
     /**
@@ -262,7 +265,7 @@ final class StandardOfferFromCalculationSanitizer
 
         if ($settlement === PricingSettlementMode::FixedPrice) {
             if (! $allowFixedPrice) {
-                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03h).";
+                $errors["positions.{$index}.pricing_settlement_mode"] = "{$label}: Festpreis mit Hauptspot+Allonge kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03i / A1).";
 
                 return;
             }
@@ -327,10 +330,22 @@ final class StandardOfferFromCalculationSanitizer
                 $safe['components'] = [];
             }
             $safe['component_profile'] = null;
-            $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
-            $safe['fixed_price_nn'] = null;
             if ($safe['components'] === []) {
                 $safe['component_calculation_strategy'] = null;
+                $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
+                if ($modeRaw === '') {
+                    $modeRaw = PricingSettlementMode::Normal->value;
+                }
+                $safe['pricing_settlement_mode'] = is_scalar($modeRaw)
+                    ? (string) $modeRaw
+                    : PricingSettlementMode::Normal->value;
+                if (array_key_exists('fixed_price_nn', $safe)
+                    && ($safe['fixed_price_nn'] === null || $safe['fixed_price_nn'] === '')) {
+                    $safe['fixed_price_nn'] = null;
+                }
+            } else {
+                $safe['pricing_settlement_mode'] = PricingSettlementMode::Normal->value;
+                $safe['fixed_price_nn'] = null;
             }
 
             return [$safe, $reviewKeys];

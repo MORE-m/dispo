@@ -3836,7 +3836,10 @@ export default function CalculationWizard({
                                                                 isStandardOffer &&
                                                                 isCalendarCalculationMethod(
                                                                     position.calculation_method_key,
-                                                                )
+                                                                ) &&
+                                                                position
+                                                                    .components
+                                                                    .length > 0
                                                             }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[

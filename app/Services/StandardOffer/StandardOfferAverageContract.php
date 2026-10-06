@@ -11,9 +11,10 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03e/03f/03g/03h: Spot Classic Average (optional Hauptspot+Allonge,
+ * BL-P4-03a/03c/03e/03f/03g/03h/03i: Spot Classic Average (optional Hauptspot+Allonge,
  * N/N-Festpreis, Tandem/Tridem) und Spot Classic Calendar × `normal` mit optionaler
- * Hauptspot+Allonge (PO-BLP403H-1 / A1; ohne Festpreis/Tandem). Budget bleibt abgewiesen.
+ * Hauptspot+Allonge (PO-BLP403H-1) sowie Calendar × Festpreis nur Einzelspot
+ * (PO-BLP403I-1 / A1; ohne Festpreis×Komponenten/Tandem). Budget bleibt abgewiesen.
  */
 final class StandardOfferAverageContract
 {
@@ -179,8 +180,9 @@ final class StandardOfferAverageContract
     }
 
     /**
-     * PO-BLP403H-1 / A1: Calendar × normal, optional Hauptspot+Allonge (02c/03c-Semantik);
-     * ohne Festpreis/Tandem. Strategien laut Inventarregel (über assertResolvable/preview).
+     * PO-BLP403H-1 / A1: Calendar × normal, optional Hauptspot+Allonge.
+     * PO-BLP403I-1 / A1: Calendar × Festpreis nur Einzelspot (`components: []`).
+     * Ohne Tandem. Strategien laut Inventarregel (über assertResolvable/preview).
      *
      * @param  array<string, mixed>  $position
      * @return array<string, mixed>
@@ -238,9 +240,9 @@ final class StandardOfferAverageContract
         }
 
         $settlement = $this->normalizeSettlement($position, $index);
-        if ($settlement['mode'] !== PricingSettlementMode::Normal) {
+        if ($settlement['mode'] === PricingSettlementMode::FixedPrice && $normalizedComponents !== []) {
             throw ValidationException::withMessages([
-                "positions.{$index}.pricing_settlement_mode" => 'Festpreis ist in Calendar-Vorlagen (BL-P4-03h) nicht erlaubt.',
+                "positions.{$index}.pricing_settlement_mode" => 'Festpreis mit Hauptspot+Allonge ist in Calendar-Vorlagen (BL-P4-03i / A1) nicht erlaubt.',
             ]);
         }
 
@@ -255,8 +257,8 @@ final class StandardOfferAverageContract
             ...$position,
             'spot_method' => SpotCalculationMethod::Calendar->value,
             'calculation_method_key' => SpotCalculationMethod::Calendar->value,
-            'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
-            'fixed_price_nn' => null,
+            'pricing_settlement_mode' => $settlement['mode']->value,
+            'fixed_price_nn' => $settlement['fixed_price_nn'],
             'components' => $normalizedComponents,
             'planner_entries' => $plannerEntries,
             'component_profile' => null,

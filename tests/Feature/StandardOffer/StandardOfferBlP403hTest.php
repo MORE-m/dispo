@@ -232,7 +232,7 @@ class StandardOfferBlP403hTest extends TestCase
                     'fixed_price_nn' => '500.00',
                 ],
             ), $pm);
-            $this->fail('Calendar+Festpreis hätte scheitern müssen.');
+            $this->fail('Calendar+Festpreis+Komponenten hätte scheitern müssen.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('positions.0.pricing_settlement_mode', $exception->errors());
         }

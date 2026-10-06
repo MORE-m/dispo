@@ -53,5 +53,9 @@ Keine neue Version, **kein** Schema-Migration. Explizite **v4-Vertragserweiterun
 
 ## Implementierungsstand
 
-Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03h`). **Kein** Merge/Deploy in diesem Auftrag.
-Calendar×Festpreis/Tandem, Budget, Abbinder bleiben offen.
+Auf `main` gemergt: **PR #124**, Merge-Commit
+`5f13499b451f1fd9037ce00761abc27b5244396f`. Historischer Post-Merge-Run
+`37421402438` FAILURE (`npm audit --omit=dev`). Dependency-Fix **PR #125**
+(`1a4e72c…`), Post-Merge-CI `37446149806` SUCCESS. **Kein** Deploy.
+Calendar×Festpreis/Tandem, Budget, Abbinder bleiben offen
+(Festpreis-Einzelspot: `PO-BLP403I-1` A1, Draft-PR).

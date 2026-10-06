@@ -217,7 +217,7 @@ class StandardOfferBlP403aTest extends TestCase
         ]);
     }
 
-    public function test_rejects_calendar_with_fixed_price_in_draft(): void
+    public function test_rejects_calendar_with_tandem_in_draft(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
@@ -229,11 +229,10 @@ class StandardOfferBlP403aTest extends TestCase
             'hour' => 8,
             'spot_count' => 1,
         ]];
-        $payload['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
-        $payload['positions'][0]['fixed_price_nn'] = '100.00';
+        $payload['positions'][0]['component_profile'] = 'tandem';
 
         $this->expectException(ValidationException::class);
-        $this->writer()->create('Ungültig Calendar Festpreis', $payload, $pm);
+        $this->writer()->create('Ungültig Calendar Tandem', $payload, $pm);
     }
 
     public function test_http_rejects_unsupported_options_without_coercion(): void
@@ -256,6 +255,11 @@ class StandardOfferBlP403aTest extends TestCase
                 ]],
                 'pricing_settlement_mode' => 'fixed_price',
                 'fixed_price_nn' => '100.00',
+                'component_calculation_strategy' => 'shared_total_length',
+                'components' => [
+                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
+                    ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
+                ],
             ]],
         ])->assertSessionHasErrors('positions.0.pricing_settlement_mode');
 
