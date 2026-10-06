@@ -1,8 +1,8 @@
 # Readiness: BL-P4-03h – Calendar × Hauptspot+Allonge in Standardangeboten
 
-Status: **READY** (PO-BLP403H-1 akzeptiert A1; Implementierung auf Draft-PR)
-Stand: 5. Oktober 2026
-Audit-/Implementierungsbasis: `origin/main` @ `ff42723e5bdb1d11dccbac5e762b58b001fbd1cb`
+Status: **READY** (PO-BLP403H-1 akzeptiert A1; auf `main` PR #124)
+Stand: 6. Oktober 2026
+Audit-/Implementierungsbasis: Merge `5f13499b451f1fd9037ce00761abc27b5244396f` (PR #124)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-014`,
 `PRI-002`/`PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`, **PO-BLP403H-1**, Slice **BL-P4-03h**
 Entscheidung: [`docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`](../entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md)
@@ -17,7 +17,7 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`]
 | Materialisierung v4 Vertragserweiterung | umgesetzt |
 | Budget / Calendar×Festpreis / Tandem / Abbinder | bewusst außerhalb |
 
-**Readiness-Urteil: READY** für den freigegebenen Slice (Draft-PR).
+**Readiness-Urteil: READY** – Slice auf `main` (PR #124). Historischer Post-Merge-Run `37421402438` FAILURE (`npm audit --omit=dev`); Advisory-Fix separat.
 
 ## 1. Akzeptierter Adoption-Vertrag
 
