@@ -110,43 +110,53 @@ return new class extends Migration
     }
 
     /**
-     * @return list<object{id: int|string, kind: mixed, default_length_seconds: mixed}>
+     * @return list<array{id: int|string, kind: mixed, default_length_seconds: mixed}>
      */
     private function trailerMediaRows(): array
     {
-        return DB::table('advertising_media')
+        /** @var list<array{id: int|string, kind: mixed, default_length_seconds: mixed}> $rows */
+        $rows = DB::table('advertising_media')
             ->where('code', self::TRAILER_MEDIUM_CODE)
             ->get(['id', 'kind', 'default_length_seconds'])
+            ->map(fn ($row): array => (array) $row)
             ->all();
+
+        return $rows;
     }
 
     private function trailerKindAlreadyActive(): bool
     {
         return collect($this->trailerMediaRows())->contains(
-            fn (object $row): bool => (string) ($row->kind ?? '') === self::KIND,
+            fn (array $row): bool => (string) ($row['kind'] ?? '') === self::KIND,
         );
     }
 
     /**
      * Unbestätigter Altdefault: Aufschlag ausdrücklich 0 und Länge NULL oder Medium-Default.
      * Bereits NULL/NULL zählt hier nicht als „zu nullen“, sondern als unkonfiguriert.
+     *
+     * @param  array{default_length_seconds?: mixed, surcharge_percent?: mixed}  $rule
      */
-    private function isPristineAltDefault(object $rule, ?int $mediumDefaultLength): bool
+    private function isPristineAltDefault(array $rule, ?int $mediumDefaultLength): bool
     {
-        $surcharge = $rule->surcharge_percent;
+        $surcharge = $rule['surcharge_percent'] ?? null;
         if ($surcharge === null || (float) $surcharge != 0.0) {
             return false;
         }
 
-        $length = $rule->default_length_seconds;
+        $length = $rule['default_length_seconds'] ?? null;
 
         return $length === null
             || ($mediumDefaultLength !== null && (int) $length === $mediumDefaultLength);
     }
 
-    private function isFullyUnconfigured(object $rule): bool
+    /**
+     * @param  array{default_length_seconds?: mixed, surcharge_percent?: mixed}  $rule
+     */
+    private function isFullyUnconfigured(array $rule): bool
     {
-        return $rule->surcharge_percent === null && $rule->default_length_seconds === null;
+        return ($rule['surcharge_percent'] ?? null) === null
+            && ($rule['default_length_seconds'] ?? null) === null;
     }
 
     /**
@@ -166,14 +176,17 @@ return new class extends Migration
 
         $blocking = [];
         foreach ($media as $medium) {
-            $mediumId = (int) $medium->id;
-            $mediumDefault = $medium->default_length_seconds === null
+            $mediumId = (int) $medium['id'];
+            $mediumDefault = ($medium['default_length_seconds'] ?? null) === null
                 ? null
-                : (int) $medium->default_length_seconds;
+                : (int) $medium['default_length_seconds'];
 
+            /** @var list<array{id: mixed, inventory_id: mixed, default_length_seconds: mixed, surcharge_percent: mixed}> $rules */
             $rules = DB::table('inventory_medium_rules')
                 ->where('advertising_medium_id', $mediumId)
-                ->get(['id', 'inventory_id', 'default_length_seconds', 'surcharge_percent']);
+                ->get(['id', 'inventory_id', 'default_length_seconds', 'surcharge_percent'])
+                ->map(fn ($row): array => (array) $row)
+                ->all();
 
             foreach ($rules as $rule) {
                 if ($this->isFullyUnconfigured($rule) || $this->isPristineAltDefault($rule, $mediumDefault)) {
@@ -181,10 +194,14 @@ return new class extends Migration
                 }
                 $blocking[] = sprintf(
                     'rule#%s inventar#%s length=%s surcharge=%s',
-                    $rule->id,
-                    $rule->inventory_id,
-                    $rule->default_length_seconds === null ? 'NULL' : (string) $rule->default_length_seconds,
-                    $rule->surcharge_percent === null ? 'NULL' : (string) $rule->surcharge_percent,
+                    $rule['id'],
+                    $rule['inventory_id'],
+                    ($rule['default_length_seconds'] ?? null) === null
+                        ? 'NULL'
+                        : (string) $rule['default_length_seconds'],
+                    ($rule['surcharge_percent'] ?? null) === null
+                        ? 'NULL'
+                        : (string) $rule['surcharge_percent'],
                 );
             }
         }
@@ -229,14 +246,17 @@ return new class extends Migration
         }
 
         foreach ($media as $medium) {
-            $mediumId = (int) $medium->id;
-            $mediumDefault = $medium->default_length_seconds === null
+            $mediumId = (int) $medium['id'];
+            $mediumDefault = ($medium['default_length_seconds'] ?? null) === null
                 ? null
-                : (int) $medium->default_length_seconds;
+                : (int) $medium['default_length_seconds'];
 
+            /** @var list<array{id: mixed, default_length_seconds: mixed, surcharge_percent: mixed}> $rules */
             $rules = DB::table('inventory_medium_rules')
                 ->where('advertising_medium_id', $mediumId)
-                ->get(['id', 'default_length_seconds', 'surcharge_percent']);
+                ->get(['id', 'default_length_seconds', 'surcharge_percent'])
+                ->map(fn ($row): array => (array) $row)
+                ->all();
 
             foreach ($rules as $rule) {
                 if (! $this->isPristineAltDefault($rule, $mediumDefault)) {
@@ -244,7 +264,7 @@ return new class extends Migration
                 }
 
                 DB::table('inventory_medium_rules')
-                    ->where('id', $rule->id)
+                    ->where('id', $rule['id'])
                     ->update([
                         'surcharge_percent' => null,
                         'default_length_seconds' => null,
