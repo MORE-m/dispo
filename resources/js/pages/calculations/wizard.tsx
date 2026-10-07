@@ -2029,10 +2029,11 @@ export default function CalculationWizard({
             currentItem !== undefined
                 ? resolveTargetMediumIdAfterPatch(currentItem, patch)
                 : null;
-        const clearTrailerSettlement = shouldClearTrailerSettlementForTargetMedium(
-            catalog,
-            targetMediumId,
-        );
+        const clearTrailerSettlement =
+            shouldClearTrailerSettlementForTargetMedium(
+                catalog,
+                targetMediumId,
+            );
 
         if (clearTrailerSettlement) {
             clearTrailerSettlementValidationForIndex(index);
