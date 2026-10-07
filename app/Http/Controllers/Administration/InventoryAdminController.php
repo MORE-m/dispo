@@ -163,7 +163,7 @@ class InventoryAdminController extends Controller
                         ? $rule->advertisingMedium->code
                         : null,
                     'is_active' => $rule->is_active,
-                    'surcharge_percent' => (string) $rule->surcharge_percent,
+                    'surcharge_percent' => $rule->surcharge_percent === null ? null : (string) $rule->surcharge_percent,
                     'default_length_seconds' => $rule->default_length_seconds,
                     'component_calculation_strategy' => $strategy->value,
                     'component_calculation_strategy_label' => $strategy->label(),

@@ -32,7 +32,9 @@ Slice: `BL-P9-02e`
 
 Dieser Slice schließt „für Admin sichtbar protokolliert“.  
 „Erneut versucht“ bleibt das bestehende automatische Retry.  
-Vollständig auf `main` erst nach Merge dieses Slices.
+Admin-Sicht auf `main`: PR #122 / Merge `68b7d8bf2dd604c44f703374b47d9815c73284ac`;
+Post-Merge-CI [37303343328](https://github.com/MORE-m/dispo/actions/runs/37303343328) SUCCESS.
+**Kein** Deploy. Submit-/Invalidierungsmails bleiben offen.
 
 ## Bewusst nicht
 

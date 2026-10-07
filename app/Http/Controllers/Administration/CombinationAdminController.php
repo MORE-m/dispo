@@ -116,7 +116,7 @@ class CombinationAdminController extends Controller
             'hint_text' => ['nullable', 'string', 'max:5000'],
             'sort' => ['sometimes', 'integer', 'min:0', 'max:999999'],
             'default_length_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
-            'surcharge_percent' => ['sometimes', 'numeric', 'min:0', 'max:999.9999'],
+            'surcharge_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999.9999'],
             'is_discountable' => ['sometimes', 'boolean'],
             'is_ae_eligible' => ['sometimes', 'boolean'],
             'component_calculation_strategy' => ['sometimes', 'string', Rule::enum(ComponentCalculationStrategy::class)],
@@ -162,7 +162,7 @@ class CombinationAdminController extends Controller
             'hint_text' => ['nullable', 'string', 'max:5000'],
             'sort' => ['sometimes', 'integer', 'min:0', 'max:999999'],
             'default_length_seconds' => ['nullable', 'integer', 'min:1', 'max:3600'],
-            'surcharge_percent' => ['sometimes', 'numeric', 'min:0', 'max:999.9999'],
+            'surcharge_percent' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999.9999'],
             'is_discountable' => ['sometimes', 'boolean'],
             'is_ae_eligible' => ['sometimes', 'boolean'],
             'component_calculation_strategy' => ['sometimes', 'string', Rule::enum(ComponentCalculationStrategy::class)],
@@ -269,7 +269,7 @@ class CombinationAdminController extends Controller
 
         return array_merge($row, [
             'default_length_seconds' => $rule->default_length_seconds,
-            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'surcharge_percent' => $rule->surcharge_percent === null ? null : (string) $rule->surcharge_percent,
             'is_discountable' => (bool) $rule->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible,
             'component_calculation_strategy' => $rule->component_calculation_strategy->value,

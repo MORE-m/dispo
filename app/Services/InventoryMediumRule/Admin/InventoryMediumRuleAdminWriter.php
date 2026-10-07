@@ -2,6 +2,7 @@
 
 namespace App\Services\InventoryMediumRule\Admin;
 
+use App\Enums\CalculationKind;
 use App\Enums\ComponentCalculationStrategy;
 use App\Exceptions\CatalogAdminConflictException;
 use App\Models\AdvertisingMedium;
@@ -35,7 +36,11 @@ final class InventoryMediumRuleAdminWriter
             $medium = $this->assertActiveMedium((int) $payload['advertising_medium_id']);
             $isActive = array_key_exists('is_active', $payload) ? (bool) $payload['is_active'] : true;
 
-            $fields = $this->normalizeWritableFields($payload, requireOperativeWhenActive: $isActive);
+            $fields = $this->normalizeWritableFields(
+                $payload,
+                requireOperativeWhenActive: $isActive,
+                medium: $medium,
+            );
 
             try {
                 $rule = new InventoryMediumRule;
@@ -101,6 +106,7 @@ final class InventoryMediumRuleAdminWriter
             $fields = $this->normalizeWritableFields(
                 $payload,
                 requireOperativeWhenActive: (bool) $locked->is_active,
+                medium: $locked->advertisingMedium()->first(),
             );
 
             $before = $this->auditPayload($locked);
@@ -199,14 +205,17 @@ final class InventoryMediumRuleAdminWriter
      *     hint_text: string|null,
      *     sort: int,
      *     default_length_seconds: int|null,
-     *     surcharge_percent: string,
+     *     surcharge_percent: string|null,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
      *     component_calculation_strategy: ComponentCalculationStrategy
      * }
      */
-    private function normalizeWritableFields(array $payload, bool $requireOperativeWhenActive): array
-    {
+    private function normalizeWritableFields(
+        array $payload,
+        bool $requireOperativeWhenActive,
+        ?AdvertisingMedium $medium = null,
+    ): array {
         $booking = InventoryMediumRuleOperativeContract::normalizeBookingCode($payload['booking_code'] ?? null);
         $planning = InventoryMediumRuleOperativeContract::normalizePlanningKey(
             $payload['planning_responsibility_key'] ?? null,
@@ -260,10 +269,20 @@ final class InventoryMediumRuleAdminWriter
             ]);
         }
 
-        $surcharge = array_key_exists('surcharge_percent', $payload)
-            ? (string) $payload['surcharge_percent']
-            : '0';
-        if (! is_numeric($surcharge) || (float) $surcharge < 0 || (float) $surcharge > 999.9999) {
+        // BL-P5-01a: NULL = nicht konfiguriert (Trailer fail-closed), 0 = ausdrücklich 0 %.
+        // Fehlendes Feld: Trailer → NULL (nie still 0), übrige Medien → 0 wie bisher.
+        $isTrailer = $medium?->kind === CalculationKind::SwfTrailer;
+        if (array_key_exists('surcharge_percent', $payload)) {
+            $surchargeRaw = $payload['surcharge_percent'];
+            $surcharge = $surchargeRaw === null || (is_string($surchargeRaw) && trim($surchargeRaw) === '')
+                ? null
+                : (string) $surchargeRaw;
+        } else {
+            $surcharge = $isTrailer ? null : '0';
+        }
+        if ($surcharge !== null
+            && (! is_numeric($surcharge) || (float) $surcharge < 0 || (float) $surcharge > 999.9999)
+        ) {
             throw ValidationException::withMessages([
                 'surcharge_percent' => 'Aufschlag ist ungültig.',
             ]);
@@ -284,7 +303,7 @@ final class InventoryMediumRuleAdminWriter
             'hint_text' => $hint,
             'sort' => $sort,
             'default_length_seconds' => $defaultLength,
-            'surcharge_percent' => number_format((float) $surcharge, 4, '.', ''),
+            'surcharge_percent' => $surcharge === null ? null : number_format((float) $surcharge, 4, '.', ''),
             'is_discountable' => array_key_exists('is_discountable', $payload)
                 ? (bool) $payload['is_discountable']
                 : true,
@@ -302,7 +321,7 @@ final class InventoryMediumRuleAdminWriter
      *     hint_text: string|null,
      *     sort: int,
      *     default_length_seconds: int|null,
-     *     surcharge_percent: string,
+     *     surcharge_percent: string|null,
      *     is_discountable: bool,
      *     is_ae_eligible: bool,
      *     component_calculation_strategy: ComponentCalculationStrategy
@@ -384,7 +403,7 @@ final class InventoryMediumRuleAdminWriter
             'hint_text' => $rule->hint_text,
             'sort' => (int) $rule->sort,
             'default_length_seconds' => $rule->default_length_seconds,
-            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'surcharge_percent' => $rule->surcharge_percent === null ? null : (string) $rule->surcharge_percent,
             'is_discountable' => (bool) $rule->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible,
             'component_calculation_strategy' => $rule->component_calculation_strategy->value,

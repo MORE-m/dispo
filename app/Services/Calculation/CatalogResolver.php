@@ -14,6 +14,7 @@ use App\Models\PriceListItem;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\CalculationPositionMethodKeyNormalizer;
+use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\InventoryMediumRule\InventoryMediumRuleOperativeContract;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
@@ -364,7 +365,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -580,7 +581,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -703,7 +704,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => (string) $rule->surcharge_percent,
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -711,6 +712,39 @@ final class CatalogResolver
             'medium_changed' => $mediumChanged,
             ...$this->liveCombinationFreeze($rule),
         ];
+    }
+
+    /**
+     * BL-P5-01a / SWF-004/005: Live-Aufschlag der Kombinationsregel.
+     *
+     * swf_trailer: Länge UND Aufschlag müssen je Inventar ausdrücklich konfiguriert sein
+     * (NULL = nicht konfiguriert, fail-closed; 0 = ausdrücklich 0 %). Kein Fallback auf
+     * Medium-Default oder ein anderes Inventar. Spot Classic: NULL wie bisher als 0.
+     */
+    private function liveSurchargePercent(
+        InventoryMediumRule $rule,
+        CalculationMethodFreezeDescriptor $freeze,
+        Inventory $inventory,
+    ): string {
+        if ($freeze->engineProfileKey !== EngineProfileRegistry::PROFILE_SWF_TRAILER) {
+            return (string) ($rule->surcharge_percent ?? '0');
+        }
+
+        if ($rule->default_length_seconds === null) {
+            throw ValidationException::withMessages([
+                'positions' => "Für {$inventory->name} ist keine Trailer-Länge konfiguriert. "
+                    .'Bitte die Länge in der Kombinationstabelle hinterlegen.',
+            ]);
+        }
+
+        if ($rule->surcharge_percent === null) {
+            throw ValidationException::withMessages([
+                'positions' => "Für {$inventory->name} ist kein Trailer-Aufschlag konfiguriert (0 % ist zulässig, "
+                    .'wenn ausdrücklich hinterlegt). Bitte den Aufschlag in der Kombinationstabelle hinterlegen.',
+            ]);
+        }
+
+        return (string) $rule->surcharge_percent;
     }
 
     public function activePriceList(int $inventoryId, ?int $year = null): ?PriceList

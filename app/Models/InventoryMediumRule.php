@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $hint_text
  * @property int $sort
  * @property int $lock_version
- * @property string $surcharge_percent
+ * @property string|null $surcharge_percent NULL = nicht konfiguriert (BL-P5-01a), 0 = ausdrücklich 0 %
  * @property int|null $default_length_seconds
  * @property bool $is_discountable
  * @property bool $is_ae_eligible

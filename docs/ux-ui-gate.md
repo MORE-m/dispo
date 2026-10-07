@@ -17,18 +17,18 @@
   + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1**
   + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1**
   + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1**
-  + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (Draft-PR)**
+  + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (PR #122 `main`)**
   + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und
   DSP-DCP-001 (abgeleiteter Kampagnenzeitraum) liegen auf `main` innerhalb der
   bereits freigegebenen Dispoentwurf-/Show-Fläche.
-- **Hinweis Stand 5.10.2026 (PO-NOT002-ADMIN-1):** zusätzlich freigegeben und auf
-  Draft-PR umgesetzt ist die **lesende Admin-Sicht** auf Outbox + Suppression:
+- **Hinweis Stand 5.10.2026 / Nachzug 7.10.2026 (PO-NOT002-ADMIN-1):** zusätzlich
+  freigegeben und auf `main` (PR #122 / Merge `68b7d8b…`; Post-Merge-CI `37303343328`
+  SUCCESS; **kein** Deploy) ist die **lesende Admin-Sicht** auf Outbox + Suppression:
   nur Rolle Admin; Default-Filter `failed`; Suppress-Tab getrennt von SMTP-Fehlern;
-  keine Versandaktionen. **Nicht** auf `main` abgeschlossen; Submit-/Invalidierungsmails
-  und In-App bleiben offen.
+  keine Versandaktionen. Submit-/Invalidierungsmails und In-App bleiben offen.
   Dok: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md`.
 - **Hinweis Stand 4.10.2026 (PO-APPROVAL-NOTIFY-1):** zusätzlich freigegeben und auf
   `main` (PR #121) ist ausschließlich **Freigabe erteilt/abgelehnt** über Outbox+SMTP:
@@ -101,7 +101,7 @@ dürfen.
 |---|---|---|
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
-| `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | blockiert |
+| `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | **teilweise freigegeben** (nur Trailer × Durchschnitt, PO-BLP501A-1 **A1**, `BL-P5-01a`); Rest blockiert |
 | `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
@@ -221,6 +221,11 @@ Nicht umsetzen, bis der Product Owner freigibt:
 - Trailer-/SWF-Fachoberflächen
 - Influencer-/Social-Media-Fachoberflächen
 - weitere Werbeelemente außerhalb Spot Classic
+
+**Hinweis Stand 7.10.2026:** Teilfreigabe **A1** nur Trailer × Durchschnitt
+(`PO-BLP501A-1` / `BL-P5-01a`) ist **akzeptiert** (Matrix-Inventare RH/ROCK/OLDIE/CARAVAN;
+ohne Calendar/Festpreis/weitere SWF). Alle übrigen Gate-C-Elemente (weitere SWF-Medien,
+Influencer, Social Media, weitere Werbeelemente) bleiben blockiert.
 
 ## UX-GATE-D – Abschlussprozesse (teilweise freigegeben)
 
@@ -378,7 +383,7 @@ Ausdrücklich **nicht** freigegeben bleiben u. a.:
 
 - Submit-Mails, Invalidierungsmails, weitere Status-Mails
 - In-App, Empfängerwahl; Submit-/Invalidierungsmails
-- Admin-Outbox-UI: freigegeben als **PO-NOT002-ADMIN-1 / BL-P9-02e** (Draft-PR; nicht auf `main`)
+- Admin-Outbox-UI: freigegeben als **PO-NOT002-ADMIN-1 / BL-P9-02e** (auf `main` PR #122; kein Deploy)
 - Permission-Änderung, allgemeine Notification-Engine
 
 **Product-Owner-Teilfreigabe (29. September 2026, UX-GATE-D / BL-P9-02c / PO-BLP902C-1):**
@@ -591,8 +596,8 @@ BL-P9-01c.
 | Gate-Status | Erlaubt |
 |---|---|
 | A und B freigegeben | App-Shell, gemeinsame Komponenten, Kalkulations-Wizard, Spot Classic, serverseitige Berechnung |
-| C blockiert | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente |
-| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + MORE-Spotkalkulation-Adapter (PRI-OPS-1 / PR #111) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Calendar×normal Vorlagen (BL-P4-03g / PO-BLP403G-1, PR #123) + Calendar×Hauptspot+Allonge (BL-P4-03h / PO-BLP403H-1, PR #124) + Calendar×Festpreis Einzelspot (BL-P4-03i / PO-BLP403I-1, PR #126) + Calendar×Festpreis×Allonge (BL-P4-03j / PO-BLP403J-1, PR #127) + Calendar×Tandem/Tridem (BL-P4-03k / PO-BLP403K-1 Draft-PR) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + Calc→Standardangebot-Vorschlag (BL-P4-03b / PO-BLP403B-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1) + Ask/Answer→Outbox (BL-P9-02b / PO-BLP902B-1) + Ask/Answer-SMTP (BL-P9-02c / PO-BLP902C-1) + CC-Archiv-Invalidierung (PO-AT13-CC-1 / PR #106); Kombinationstabellen-Admin (BL-P2-02a / PO-BLP202A-1) + Matrix-Seed (BL-P2-02b / PR #109) + Initialkatalog (BL-P2-02c / PR #110) auf `main`; Inventarauswahl einklappbar (PR #112); weitere Status-Mails/In-App/Admin-Outbox weiterhin gesperrt; Kombi-Mitgliedschaften entfallen; Nicht-Spot-Methoden / REP-007 / Abbinder weiter offen |
+| C teilweise (A1) | Trailer × Durchschnitt freigegeben; weitere SWF-Medien, Influencer, Social Media und weitere Werbeelemente blockiert |
+| D teilweise freigegeben | Dispoauftrag-Entwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin (BL-P2-01a) + Preislisten-Lifecycle (BL-P4-01a) + Excel-Import ohne Auto-Aktivierung (BL-P4-01b) + Wizard-Jahreswahl (BL-P4-01c / PO-PRI-YEAR-1) + MORE-Spotkalkulation-Adapter (PRI-OPS-1 / PR #111) + Standardangebote Average-Slice (BL-P4-03a / PO-BLP403A-1) + Calendar×normal Vorlagen (BL-P4-03g / PO-BLP403G-1, PR #123) + Calendar×Hauptspot+Allonge (BL-P4-03h / PO-BLP403H-1, PR #124) + Calendar×Festpreis Einzelspot (BL-P4-03i / PO-BLP403I-1, PR #126) + Calendar×Festpreis×Allonge (BL-P4-03j / PO-BLP403J-1, PR #127) + Calendar×Tandem/Tridem (BL-P4-03k / PO-BLP403K-1, PR #128) + Hauptspot+Allonge in Vorlagen (BL-P4-03c / PO-BLP403C-1) + Calc→Standardangebot-Vorschlag (BL-P4-03b / PO-BLP403B-1) + operativer Statuskern (BL-P8-02a / PO-BLP802A-1) + Rückfrage Vertrieb (BL-P8-02b / PO-BLP802B-1) + Kundenbestätigung Ausnahmeweg (BL-P8-02c / PO-BLP802C-1) + Rechnung per Ende + Completion (BL-P8-02d / PO-BLP802D-1) + Completed-Reopen + Storno (BL-P8-02e / PO-BLP802E-1) + Upload-Fundament Kundenbestätigung (BL-P9-01a / PO-BLP901A-1) + Materialuploads + Audio (BL-P9-01b / PO-BLP901B-1) + Dyn-Feld-Dateien (BL-P9-01c / PO-BLP901C-1) + allgemeine Kommentare (BL-P9-02a / PO-BLP902A-1) + Ask/Answer→Outbox (BL-P9-02b / PO-BLP902B-1) + Ask/Answer-SMTP (BL-P9-02c / PO-BLP902C-1) + CC-Archiv-Invalidierung (PO-AT13-CC-1 / PR #106); Kombinationstabellen-Admin (BL-P2-02a / PO-BLP202A-1) + Matrix-Seed (BL-P2-02b / PR #109) + Initialkatalog (BL-P2-02c / PR #110) auf `main`; Inventarauswahl einklappbar (PR #112); weitere Status-Mails/In-App/Admin-Outbox weiterhin gesperrt; Kombi-Mitgliedschaften entfallen; Nicht-Spot-Methoden / REP-007 / Abbinder weiter offen |
 
 Produktivdeployment und erfundene produktive Preis- oder Stammdaten bleiben
 unabhängig von den Gates unzulässig.

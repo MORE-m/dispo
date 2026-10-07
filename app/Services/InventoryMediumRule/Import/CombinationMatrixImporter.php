@@ -2,6 +2,7 @@
 
 namespace App\Services\InventoryMediumRule\Import;
 
+use App\Enums\CalculationKind;
 use App\Enums\ComponentCalculationStrategy;
 use App\Models\AdvertisingMedium;
 use App\Models\Inventory;
@@ -82,8 +83,10 @@ final class CombinationMatrixImporter
                     $rule->planning_responsibility_key = $row['planning_responsibility_key'];
                     $rule->hint_text = null;
                     $rule->sort = 0;
-                    $rule->default_length_seconds = $medium->default_length_seconds;
-                    $rule->surcharge_percent = '0';
+                    // BL-P5-01a: Trailer – Länge/Aufschlag nie erfinden (NULL = nicht konfiguriert, fail-closed).
+                    $isTrailer = $medium->kind === CalculationKind::SwfTrailer;
+                    $rule->default_length_seconds = $isTrailer ? null : $medium->default_length_seconds;
+                    $rule->surcharge_percent = $isTrailer ? null : '0';
                     $rule->is_discountable = (bool) $medium->is_discountable;
                     $rule->is_ae_eligible = (bool) $medium->is_ae_eligible;
                     $rule->component_calculation_strategy = ComponentCalculationStrategy::SharedTotalLength;

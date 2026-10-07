@@ -1,14 +1,16 @@
 # Readiness: BL-P9-02e – Admin-Sicht auf Benachrichtigungs-Outbox (lesend)
 
-Status: **FREIGEGEBEN / IMPLEMENTIERT AUF DRAFT-PR** (`feat/po-not002-admin-1`)  
-Stand: 5. Oktober 2026  
-Auditbasis: `origin/main` @ `a4ba38cc7193ac1cb3eec6307659bd27abf292be` (nach PR #121)  
-IDs: `NOT-002` (Admin-Sicht), Teil `NOT-001` (Lesekontext), Vorbilder `PO-BLP902B-1` / `PO-BLP902C-1` / `PO-APPROVAL-NOTIFY-1`  
-Gate-Kennung: `PO-NOT002-ADMIN-1`  
+Status: **FREIGEGEBEN / AUF `main`** (PR #122)
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Auditbasis (historisch): `origin/main` @ `a4ba38cc7193ac1cb3eec6307659bd27abf292be` (nach PR #121)
+Merge: `68b7d8bf2dd604c44f703374b47d9815c73284ac`; Post-Merge-CI
+[37303343328](https://github.com/MORE-m/dispo/actions/runs/37303343328) SUCCESS; **kein** Deploy
+IDs: `NOT-002` (Admin-Sicht), Teil `NOT-001` (Lesekontext), Vorbilder `PO-BLP902B-1` / `PO-BLP902C-1` / `PO-APPROVAL-NOTIFY-1`
+Gate-Kennung: `PO-NOT002-ADMIN-1`
 PO-Entscheidung: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md` (**Akzeptiert**)
 
-> Umsetzung liegt auf Feature-Branch/Draft-PR. **Nicht** vorzeitig als auf `main`
-> abgeschlossen markieren. Submit-/Invalidierungsmails bleiben offen.
+> Admin-Outbox-Sicht auf `main`. Submit-/Invalidierungsmails und In-App bleiben offen.
+> Deploy nicht erfolgt. Statuskorrektur ersetzt keine fehlende manuelle Fachabnahme.
 
 ## 0. Gate
 
@@ -24,7 +26,7 @@ PO-Entscheidung: `docs/entscheidungen/PO-NOT002-ADMIN-1-admin-outbox-sicht.md` (
 | Wer darf sehen (Admin vs. Management) | **nur Admin** (PO-Festlegung) |
 | Suppression in Scope von NOT-002? | **eigener Tab** (PO-Festlegung) |
 
-**Readiness-Urteil:** **FREIGEGEBEN**; Slice auf Draft-PR umgesetzt.
+**Readiness-Urteil:** **FREIGEGEBEN**; Slice auf `main` (PR #122).
 
 ---
 

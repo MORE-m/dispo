@@ -41,6 +41,7 @@ final readonly class CalculationMethodFreezeDescriptor
     {
         return match ($this->engineProfileKey) {
             EngineProfileRegistry::PROFILE_SPOT_CLASSIC => CalculationKind::SpotClassic,
+            EngineProfileRegistry::PROFILE_SWF_TRAILER => CalculationKind::SwfTrailer,
             default => throw new \InvalidArgumentException(
                 "Kein Legacy-kind für engine_profile_key „{$this->engineProfileKey}“.",
             ),

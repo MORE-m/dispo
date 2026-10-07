@@ -55,6 +55,43 @@ class AdvertisingMediumFactory extends Factory
         ]);
     }
 
+    /**
+     * BL-P5-01a: Trailer (kind=swf_trailer) in Kategorie special_advertising_formats.
+     */
+    public function swfTrailer(): static
+    {
+        return $this->state(fn (): array => [
+            'category_id' => fn (): int => $this->categoryId(CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS),
+            'kind' => CalculationKind::SwfTrailer,
+            'name' => 'Trailer/Vorpr. Element Station Voice',
+            'code' => 'trailer_station_voice',
+        ]);
+    }
+
+    /**
+     * BL-P5-01a: weiteres SWF-Medium ohne Berechnungsart (kind=null → nicht buchbar).
+     */
+    public function swfWithoutKind(string $name = 'Preseller', string $code = 'preseller'): static
+    {
+        return $this->state(fn (): array => [
+            'category_id' => fn (): int => $this->categoryId(CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS),
+            'kind' => null,
+            'name' => $name,
+            'code' => $code,
+        ]);
+    }
+
+    private function categoryId(string $key): int
+    {
+        $id = AdvertisingCategory::query()->where('key', $key)->value('id');
+
+        if ($id === null) {
+            throw new RuntimeException("AdvertisingMediumFactory: kanonische Kategorie „{$key}“ fehlt.");
+        }
+
+        return (int) $id;
+    }
+
     private function spotsCategoryId(): int
     {
         $id = AdvertisingCategory::query()

@@ -43,7 +43,7 @@ type MediumRuleRow = {
     advertising_medium_name: string;
     advertising_medium_code: string | null;
     is_active: boolean;
-    surcharge_percent: string;
+    surcharge_percent: string | null;
     default_length_seconds: number | null;
     component_calculation_strategy: string;
     component_calculation_strategy_label: string;
@@ -428,8 +428,10 @@ export default function InventoryShow({
                                             {rule.is_active
                                                 ? 'aktiv'
                                                 : 'inaktiv'}{' '}
-                                            · Aufschlag {rule.surcharge_percent}
-                                            %
+                                            ·{' '}
+                                            {rule.surcharge_percent === null
+                                                ? 'Aufschlag nicht konfiguriert'
+                                                : `Aufschlag ${rule.surcharge_percent} %`}
                                         </p>
                                     </div>
                                     <FormField

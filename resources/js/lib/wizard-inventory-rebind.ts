@@ -30,6 +30,10 @@ import {
     type ComponentCalculationStrategy,
     type SpotComponentDraft,
 } from '@/lib/spot-components';
+import {
+    SWF_TRAILER_KIND,
+    trailerLengthFromRule,
+} from '@/lib/wizard-trailer-medium-change';
 
 export type InventoryRebindCatalog = PriceYearCatalog & {
     inventories: Array<{
@@ -39,6 +43,7 @@ export type InventoryRebindCatalog = PriceYearCatalog & {
     }>;
     media: Array<{
         id: number;
+        kind?: string | null;
         default_length_seconds: number;
         calculation_method_options?: CalculationMethodOptions | null;
     }>;
@@ -129,16 +134,22 @@ export function rebindPositionOnInventoryChange(
     const methodUnchanged =
         methodState.calculation_method_key === position.calculation_method_key;
 
-    const retainedComponents = position.components;
+    // BL-P5-01a: Trailer übernimmt keine Spot-Komponenten; Länge nur aus Trailer-Regel.
+    const targetIsTrailer = medium.kind === SWF_TRAILER_KIND;
+    const retainedComponents = targetIsTrailer ? [] : position.components;
     const nextStrategy =
         retainedComponents.length > 0
             ? resolveStrategyFromRule(rule?.component_calculation_strategy)
             : null;
 
-    const nextLengthSeconds =
-        retainedComponents.length > 0
-            ? totalComponentLength(retainedComponents)
-            : (rule?.default_length_seconds ?? medium.default_length_seconds);
+    const nextLengthSeconds = targetIsTrailer
+        ? trailerLengthFromRule(
+              rule?.default_length_seconds,
+              position.length_seconds,
+          )
+        : retainedComponents.length > 0
+          ? totalComponentLength(retainedComponents)
+          : (rule?.default_length_seconds ?? medium.default_length_seconds);
 
     // Preisjahr bewusst behalten (kein stiller Jahreswechsel). Fehlt das Jahr
     // im Zielinventar, bleibt expected_price_list_id leer → Preview/Speichern fail-closed.

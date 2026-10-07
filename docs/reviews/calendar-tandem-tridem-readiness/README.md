@@ -1,20 +1,20 @@
-# Bericht: Calendar × Tandem/Tridem – BL-P4-03k Draft-PR
+# Bericht: Calendar × Tandem/Tridem – BL-P4-03k auf main
 
-Stand: 7. Oktober 2026
-Arbeitsbasis: `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a`
-Worktree: `dispo-wt-feat-bl-p4-03k` (Branch `feat/bl-p4-03k-calendar-tandem-tridem`)
-**Kein** Merge/Deploy.
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Arbeitsbasis: `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
+(PR #128; Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
+Historische Draft-Basis: `e44c1cf…` / Worktree `dispo-wt-feat-bl-p4-03k`
 
-PO-BLP403K-1 **A1 akzeptiert**. 03j auf Main (PR #127 / CI `37527679296` SUCCESS).
+PO-BLP403K-1 **A1 akzeptiert**. Feature auf **`main`**.
 
 ## Artefakte
 
 | Datei | Rolle |
 |---|---|
 | [`docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](../../entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md) | PO **Akzeptiert** A1 |
-| [`docs/readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md`](../../readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md) | Readiness READY / Draft-PR |
+| [`docs/readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md`](../../readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md) | Readiness READY / `main` |
 
-## Scope (umgesetzt, Draft-PR)
+## Scope (auf `main`)
 
 - Calendar × Spot Classic × Tandem und Tridem × normal und Festpreis
 - Verbindlich `shared_total_length`; Shared `media_gross` `''`
@@ -49,4 +49,4 @@ PO-BLP403K-1 **A1 akzeptiert**. 03j auf Main (PR #127 / CI `37527679296` SUCCESS
 
 ## Offen
 
-Budget, Abbinder. Kein Merge/Deploy.
+Budget, Abbinder. **Kein** Deploy. Statusnachzug ersetzt keine fehlende manuelle Fachabnahme.
