@@ -4,13 +4,18 @@ namespace Tests\Feature\Calculation;
 
 use App\Enums\CalculationKind;
 use App\Enums\DayGroup;
+use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\Calculation;
+use App\Models\Inventory;
+use App\Models\InventoryMediumRule;
+use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DispoOrder\DispoOrderWriter;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
+use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Tests\Concerns\CreatesTrailerAverageCatalog;
@@ -577,5 +582,213 @@ class SwfTrailerAverageAcceptanceTest extends TestCase
         $preview->assertOk();
         // 520,00 (Trailer) + 420,00 (Spot, Index 105)
         $this->assertSame('940.00', $preview->json('totals.media_gross'));
+    }
+
+    public function test_trailer_year_change_rebinds_to_target_year_price_list(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $user = $this->sales();
+        $currentYear = PriceListCalendar::currentYear();
+        $nextYear = $currentYear + 1;
+
+        $nextList = PriceList::factory()->create([
+            'inventory_id' => $catalog['a']->id,
+            'status' => PriceListStatus::Active,
+            'year' => $nextYear,
+            'version' => 'trailer-next-year',
+            'valid_from' => sprintf('%d-01-01', $nextYear),
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $nextList->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '4.0000',
+                ]);
+            }
+        }
+
+        $this->actingAs($user)->post(route('calculations.store'), $this->trailerPayload([
+            $this->trailerPosition($catalog['a'], $catalog['trailer'], 10),
+        ]))->assertRedirect();
+        $calculation = Calculation::query()->firstOrFail();
+
+        $writerPayload = app(CalculationWriter::class)->payloadFromCalculation(
+            $calculation->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $writerPayload['lock_version'] = $calculation->lock_version;
+        $writerPayload['positions'][0]['price_year'] = $nextYear;
+        $writerPayload['positions'][0]['expected_price_list_id'] = $nextList->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), $writerPayload)->assertRedirect();
+        $fresh = $calculation->fresh()->load(['positions.priceList']);
+
+        $this->assertSame($nextList->id, $fresh->positions[0]->price_list_id);
+        $this->assertSame($nextYear, (int) $fresh->positions[0]->priceList->year);
+        // 10 × 4,00 × 20 × 1,30 = 1040,00
+        $this->assertSame('1040.00', (string) $fresh->media_gross);
+    }
+
+    public function test_spot_to_trailer_medium_change_clears_components_and_uses_trailer_math(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $user = $this->sales();
+
+        $spotPayload = $this->trailerPayload([[
+            'inventory_id' => $catalog['a']->id,
+            'advertising_medium_id' => $catalog['spot']->id,
+            'spot_method' => 'average',
+            'length_seconds' => 30,
+            'position_discount_percent' => '0',
+            'ae_percent' => '0',
+            'components' => [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 0],
+                ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
+            ],
+            'component_calculation_strategy' => 'shared_total_length',
+            'time_ranges' => [[
+                'start_hour' => 8,
+                'end_hour_exclusive' => 9,
+                'day_group' => 'mo_fr',
+                'spot_count' => 10,
+                'sort' => 0,
+            ]],
+        ]]);
+        $this->actingAs($user)->post(route('calculations.store'), $spotPayload)->assertRedirect();
+        $calculation = Calculation::query()->firstOrFail()->load('positions.components');
+        $this->assertSame(CalculationKind::SpotClassic, $calculation->positions[0]->kind);
+        $this->assertGreaterThan(0, $calculation->positions[0]->components->count());
+
+        $writerPayload = app(CalculationWriter::class)->payloadFromCalculation(
+            $calculation->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.components', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $writerPayload['lock_version'] = $calculation->fresh()->lock_version;
+        $writerPayload['positions'][0]['advertising_medium_id'] = $catalog['trailer']->id;
+        $writerPayload['positions'][0]['length_seconds'] = 20;
+        $writerPayload['positions'][0]['components'] = [];
+        $writerPayload['positions'][0]['component_calculation_strategy'] = null;
+        $writerPayload['positions'][0]['pricing_settlement_mode'] = 'normal';
+        unset($writerPayload['positions'][0]['fixed_price_nn']);
+        // Mediumwechsel: erwartete Preisliste bleibt Inventar A (gleicher Pin).
+        $writerPayload['positions'][0]['expected_price_list_id'] = $catalog['listA']->id;
+        $writerPayload['positions'][0]['price_year'] = PriceListCalendar::currentYear();
+        $writerPayload['positions'] = $this->withPositionSchemaFingerprints(
+            $calculation,
+            $writerPayload['positions'],
+        );
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), $writerPayload)->assertRedirect();
+        $fresh = $calculation->fresh()->load(['positions.components']);
+
+        $this->assertSame(CalculationKind::SwfTrailer, $fresh->positions[0]->kind);
+        $this->assertSame(0, $fresh->positions[0]->components->count());
+        $this->assertSame('520.00', (string) $fresh->media_gross);
+
+        // Rückwechsel Trailer → Spot ohne Komponenten.
+        $back = app(CalculationWriter::class)->payloadFromCalculation(
+            $fresh->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.components', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $back['lock_version'] = $fresh->fresh()->lock_version;
+        $back['positions'][0]['advertising_medium_id'] = $catalog['spot']->id;
+        $back['positions'][0]['length_seconds'] = 20;
+        $back['positions'][0]['components'] = [];
+        $back['positions'][0]['component_calculation_strategy'] = null;
+        $back['positions'][0]['expected_price_list_id'] = $catalog['listA']->id;
+        $back['positions'][0]['price_year'] = PriceListCalendar::currentYear();
+        $back['positions'] = $this->withPositionSchemaFingerprints($fresh, $back['positions']);
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), $back)->assertRedirect();
+        $spotAgain = $calculation->fresh()->load('positions');
+        $this->assertSame(CalculationKind::SpotClassic, $spotAgain->positions[0]->kind);
+        $this->assertSame('spot_classic', $spotAgain->positions[0]->engine_profile_key);
+        // Rückwechsel darf nicht auf Trailer-Betrag 520,00 bleiben.
+        $this->assertNotSame('520.00', (string) $spotAgain->media_gross);
+        $this->assertGreaterThan(0, (float) $spotAgain->media_gross);
+    }
+
+    public function test_quantity_change_after_successor_list_keeps_trailer_pin(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $user = $this->sales();
+        $this->actingAs($user)->post(route('calculations.store'), $this->trailerPayload([
+            $this->trailerPosition($catalog['a'], $catalog['trailer'], 10),
+        ]))->assertRedirect();
+        $calculation = Calculation::query()->firstOrFail()->load('positions');
+        $pinnedId = (int) $calculation->positions[0]->price_list_id;
+        $pinnedVersion = (string) $calculation->positions[0]->price_list_version;
+
+        $previous = PriceList::query()->whereKey($pinnedId)->firstOrFail();
+        $previous->update(['status' => PriceListStatus::Archived]);
+        $successor = PriceList::factory()->create([
+            'inventory_id' => $catalog['a']->id,
+            'year' => PriceListCalendar::currentYear(),
+            'status' => PriceListStatus::Active,
+            'version' => 'trailer-successor',
+            'revision_number' => ((int) $previous->revision_number) + 1,
+            'valid_from' => $previous->valid_from,
+        ]);
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $successor->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => '9.0000',
+                ]);
+            }
+        }
+
+        $writerPayload = app(CalculationWriter::class)->payloadFromCalculation(
+            $calculation->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $writerPayload['lock_version'] = $calculation->lock_version;
+        $writerPayload['positions'][0]['time_ranges'][0]['spot_count'] = 20;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), $writerPayload)->assertRedirect();
+        $fresh = $calculation->fresh()->load('positions');
+
+        $this->assertSame($pinnedId, (int) $fresh->positions[0]->price_list_id);
+        $this->assertSame($pinnedVersion, (string) $fresh->positions[0]->price_list_version);
+        $this->assertNotSame($successor->id, (int) $fresh->positions[0]->price_list_id);
+        // 20 × 2,00 × 20 × 1,30 = 1040,00 (Pin-Preis, nicht Nachfolger 9,00)
+        $this->assertSame('1040.00', (string) $fresh->media_gross);
+    }
+
+    public function test_trailer_without_matrix_rule_is_rejected_without_mutation(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $user = $this->sales();
+        $this->actingAs($user)->post(route('calculations.store'), $this->trailerPayload([
+            $this->trailerPosition($catalog['a'], $catalog['trailer'], 10),
+        ]))->assertRedirect();
+        $calculation = Calculation::query()->firstOrFail();
+
+        $foreign = Inventory::factory()->create([
+            'organization_id' => $catalog['organization']->id,
+            'name' => 'Ohne Trailer-Matrix',
+            'code' => 'NOMAT',
+        ]);
+        // Spot-Regel vorhanden, bewusst keine Trailer-Regel (unzulässige Matrix-Kombi).
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $foreign->id,
+            'advertising_medium_id' => $catalog['spot']->id,
+            'default_length_seconds' => 30,
+            'surcharge_percent' => '0',
+        ]);
+        $this->createTrailerPriceList($foreign, '2.0000');
+
+        $writerPayload = app(CalculationWriter::class)->payloadFromCalculation(
+            $calculation->fresh(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts', 'configurationSnapshot', 'fieldValues']),
+        );
+        $writerPayload['lock_version'] = $calculation->lock_version;
+        $writerPayload['positions'][0]['inventory_id'] = $foreign->id;
+
+        $this->actingAs($user)->put(route('calculations.update', $calculation), $writerPayload)
+            ->assertSessionHasErrors();
+
+        $fresh = $calculation->fresh()->load('positions');
+        $this->assertSame($catalog['a']->id, $fresh->positions[0]->inventory_id);
+        $this->assertSame('520.00', (string) $fresh->media_gross);
     }
 }

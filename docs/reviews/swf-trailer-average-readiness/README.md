@@ -1,36 +1,49 @@
-# Bericht: SWF Trailer × Durchschnitt – BL-P5-01a Readiness
+# Bericht: SWF Trailer × Durchschnitt – BL-P5-01a
 
-Stand: 7. Oktober 2026
-Arbeitsbasis: `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
-(PR #128; Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
-Worktree: `dispo-wt-docs-swf-trailer-average-readiness`
-Branch: `docs/swf-trailer-average-readiness`
-Readiness-Stand ursprünglich Docs-only; nach A1/B1 ergänzt um Umsetzungsstand (Draft-PR `feat/bl-p5-01a-swf-trailer-average`). **Kein** Merge/Deploy.
+Stand: 7. Oktober 2026 (Review-Nachzug PR #129)
+Arbeitsbasis Feature: `feat/bl-p5-01a-swf-trailer-average` (Draft-PR #129)
+PO-BLP501A-1 **A1 + B1 unverändert freigegeben**. **Kein** Merge/Deploy.
 
 ## Artefakte
 
 | Datei | Rolle |
 |---|---|
 | [`docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](../../entscheidungen/PO-BLP501A-1-swf-trailer-average.md) | **A1 + B1 akzeptiert** |
-| [`docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](../../readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md) | Readiness **READY MIT DATEN-VORBEDINGUNGEN JE INVENTAR** + Umsetzungsstand |
+| [`docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](../../readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md) | Readiness + Umsetzungsstand |
 
-## Scope-Empfehlung
+## Scope
 
-- **Funktionsumfang:** Trailer × Average, inventarübergreifend für alle
-  matrix-zulässigen Inventare (4: RH, ROCK, OLDIE, CARAVAN), Preview→Save→Reload→Dispo
-- **Preisbasis (B1):** bestehende Spot-Sekunden-Grundpreise je Inventar/Jahr +
-  inventarspezifischer Trailer-Aufschlag; **keine** eigenen SWF-Listen
-- **Formel:** `Anzahl × Ø-Sekunden-Grundpreis × Länge × (1 + Aufschlag/100)`; kein Spotindex;
-  0 % Aufschlag nur wenn explizit; fehlende Konfiguration fail-closed
-- **Operativ zuerst:** Radio Hamburg (RHH-Länge/Aufschlag-Referenz)
-- **Außerhalb:** Calendar, Festpreis, CityLife, weitere SWF, Produktion, CRM, OA, Standardangebote/Budget
-- Elternpaket `BL-P5-01` danach nur **teilweise**, nicht erledigt
+- Trailer × Average, inventarübergreifend (Matrix: RH, ROCK, OLDIE, CARAVAN)
+- Preisbasis B1: Spot-Sekundenpreise + inventarspezifischer Trailer-Aufschlag
+- Formel `Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100)`; kein Spotindex
+- Fixture-Parität: 520,00 / 168,75 / 688,75
 
-## PO-Entscheidungen
+## Review-Nachzug (PR #129)
 
-**A1** (UX-GATE-C Teilfreigabe Trailer × Durchschnitt) und **B1** (Preisbasis) akzeptiert; keine offene PO-Frage.
+### Ursachen
 
-## Stopp
+1. **Komponenten:** `resolveComponentsAfterMediumChange` übernahm Spot-Komponenten auch für Trailer; UI-Ausblenden reichte nicht.
+2. **Festpreis:** `PricingSettlementSection` mit `hideFixedPrice={false}`; Spot-Festpreis blieb nach Mediumwechsel aktiv.
+3. **Migration:** `nullTrailerRuleConfiguration()` nullte alle Trailer-Regeln – inklusive individueller Werte; erneutes `up()` hätte gepflegte Länge/Aufschlag gelöscht. `down()` löschte ggf. vorbestehende Kategorie-Defaults.
 
-Draft-PR nach grüner CI; Merge/Deploy separat. Operative Freischaltung je Inventar erst nach
-Datenlieferung (Länge/Aufschlag, Spot-Preisliste).
+### Korrekturen
+
+1. Helper `wizard-trailer-medium-change.ts`: Trailer strippt Komponenten/Strategie, Länge aus Ziel-Regel, kein Stash-Restore in Trailer; Stash-Restore Spot/Tandem/Tridem erhalten. Inventar-Rebind strippt Trailer-Komponenten.
+2. `hideFixedPrice` für Trailer; Settlement-Reset auf `normal`, Festpreis-Input/Validierung bereinigt; Server-Ablehnung bleibt.
+3. Migration: nur Altdefaults (0 + Medium-Default/NULL-Länge) nullen; bei kind=NULL und individuellen Werten Preflight-Abbruch; bei bereits aktivem kind keine Regel-Mutation; `down()` entfernt nur `engine_profile_key=swf_trailer`, Default unberührt.
+
+### Nachweise
+
+- Browser-Smoke Port **8055**, `--retries=0`: 6/6
+  - Spot Komponenten → Trailer → Preview/Save/Reload
+  - Spot Festpreis → Trailer (Normal, keine Festpreiswahl)
+  - Trailer Inventar A → B (Ziel-Länge/Aufschlag/Preise)
+  - Unvollständig konfiguriertes Inventar: Sperre
+  - Rückwechsel Trailer → Spot ohne Regression
+  - Zwei-Inventar-Parität 520/168,75/688,75 + Dispo
+- Pest: Migration (Schutz individueller Werte, Re-up, Default-Erhalt), Acceptance (Jahreswechsel, Spot↔Trailer, Nachfolger-Pin Mengenänderung, Matrix ohne Regel ohne Mutation), Vitest Mediumwechsel/Rebind
+- Rechenbeispiele und Snapshot-/Dispo-Parität unverändert
+
+## Offen
+
+Operative Freischaltung je Inventar erst nach Datenlieferung. **Kein** Merge/Deploy – Stopp zur erneuten Review.

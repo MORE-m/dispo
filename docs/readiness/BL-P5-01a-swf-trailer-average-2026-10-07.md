@@ -313,7 +313,7 @@ Allonge-Trennung, Produktion außerhalb) sind **nicht** neu zur Abstimmung geste
 - `CalculationKind::SwfTrailer`, `EngineProfileRegistry::PROFILE_SWF_TRAILER` (average Released v1; **kein** Calendar/`fixed_price`).
 - Nur Medium `trailer_station_voice` → `kind=swf_trailer`; übrige SWF-Medien `kind=null` (unbuchbar).
 - Engine: kein Spotlängenindex (`length_index` = 100), Komponenten/Settlement `fixed_price` abgelehnt.
-- `inventory_medium_rules.surcharge_percent` nullable ohne Default; Datenmigration setzt Trailer-Regeln auf `NULL`/`NULL` (Länge/Aufschlag); Spot-Regeln unverändert.
+- `inventory_medium_rules.surcharge_percent` nullable ohne Default; Datenmigration nullt nur unbestätigte Trailer-Altdefaults (Aufschlag 0 + Länge Medium-Default/NULL). Individuelle Werte: bei `kind=NULL` Preflight-Abbruch (keine stille Löschung, keine automatische Freischaltung); bei bereits aktivem `kind=swf_trailer` lässt erneutes `up()` Länge/Aufschlag unberührt. Spot-Regeln unverändert.
 - Writer/Resolver fail-closed je Inventar (fehlende Regel-Länge oder fehlender Aufschlag; kein Medium-Default-Fallback); Vertrieb ändert nur die Länge, nie den Aufschlag.
 - Importer und Initialkatalog (Bootstrapper) setzen für Trailer kein 0 %/30 s.
 - Wizard blendet für Trailer die Spot-Komponenten-Aktivierung aus; Kalender/Festpreis erscheinen nicht (backend-gesteuert).

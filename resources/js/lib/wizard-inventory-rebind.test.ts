@@ -223,4 +223,74 @@ describe('rebindPositionOnInventoryChange', () => {
         expect(next?.total_spot_count).toBe(10);
         expect(next?.component_calculation_strategy).toBe('individual');
     });
+
+    it('BL-P5-01a: Trailer-Ziel strippt Komponenten und nimmt Länge aus Trailer-Regel', () => {
+        const trailerCatalog = {
+            ...catalog,
+            media: [
+                {
+                    id: 20,
+                    kind: 'swf_trailer',
+                    default_length_seconds: 30,
+                    calculation_method_options: {
+                        medium_id: 20,
+                        source: 'test',
+                        default_calculation_method_key: 'average',
+                        methods: [
+                            {
+                                key: 'average',
+                                name: 'Durchschnitt',
+                                help_text: null,
+                                is_default: true,
+                            },
+                        ],
+                    },
+                },
+            ],
+            rules: [
+                {
+                    inventory_id: 1,
+                    advertising_medium_id: 20,
+                    default_length_seconds: 20,
+                    component_calculation_strategy: null,
+                },
+                {
+                    inventory_id: 2,
+                    advertising_medium_id: 20,
+                    default_length_seconds: 15,
+                    component_calculation_strategy: null,
+                },
+            ],
+        };
+
+        const position = {
+            ...basePosition(1, 'shared_total_length'),
+            advertising_medium_id: 20,
+            calculation_method_key: 'average',
+            calculation_method_name: 'Durchschnitt',
+            planner_entries: [],
+            time_ranges: [
+                {
+                    start_hour: 8,
+                    end_hour_exclusive: 9,
+                    day_group: 'mo_fr',
+                    spot_count: 10,
+                },
+            ],
+            total_spot_count: 10,
+            length_seconds: 20,
+        };
+
+        const next = rebindPositionOnInventoryChange(
+            position,
+            2,
+            trailerCatalog,
+            trailerCatalog.media,
+        );
+
+        expect(next?.components).toEqual([]);
+        expect(next?.component_calculation_strategy).toBeNull();
+        expect(next?.length_seconds).toBe(15);
+        expect(next?.inventory_id).toBe(2);
+    });
 });

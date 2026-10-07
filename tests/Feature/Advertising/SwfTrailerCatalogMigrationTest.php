@@ -165,4 +165,77 @@ class SwfTrailerCatalogMigrationTest extends TestCase
             CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS,
         ));
     }
+
+    public function test_up_aborts_when_individual_trailer_values_exist_while_kind_null(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $migration = $this->migration();
+        $migration->down();
+
+        AdvertisingMedium::query()->whereKey($catalog['trailer']->id)->update(['kind' => null]);
+        InventoryMediumRule::query()
+            ->where('advertising_medium_id', $catalog['trailer']->id)
+            ->update(['default_length_seconds' => 20, 'surcharge_percent' => 30]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('individuellen Werten');
+        $migration->up();
+    }
+
+    public function test_up_preserves_configured_trailer_values_on_rerun_after_kind_active(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $migration = $this->migration();
+
+        // kind bereits swf_trailer (Factory); Admin-Pflege nach Erstlauf.
+        $catalog['ruleA']->update([
+            'default_length_seconds' => 20,
+            'surcharge_percent' => '30',
+        ]);
+        $catalog['ruleB']->update([
+            'default_length_seconds' => 15,
+            'surcharge_percent' => '0',
+        ]);
+
+        $migration->up();
+
+        $ruleA = $catalog['ruleA']->fresh();
+        $ruleB = $catalog['ruleB']->fresh();
+        $this->assertSame(20, $ruleA->default_length_seconds);
+        $this->assertSame('30.0000', $ruleA->surcharge_percent);
+        $this->assertSame(15, $ruleB->default_length_seconds);
+        $this->assertSame('0.0000', $ruleB->surcharge_percent);
+    }
+
+    public function test_down_keeps_category_default_and_only_removes_swf_trailer_assignment(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $this->assertNotNull($catalog['trailer']);
+        $migration = $this->migration();
+
+        $category = AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS)
+            ->firstOrFail();
+        $average = CalculationMethod::query()->where('key', 'average')->firstOrFail();
+        $this->assertSame($average->id, (int) $category->fresh()->default_calculation_method_id);
+        $this->assertSame(
+            1,
+            AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $category->id)
+                ->where('engine_profile_key', 'swf_trailer')
+                ->count(),
+        );
+
+        $migration->down();
+
+        // Default kann vor/durch Migration gesetzt sein – down() entfernt ihn nicht still.
+        $this->assertSame($average->id, (int) $category->fresh()->default_calculation_method_id);
+        $this->assertSame(
+            0,
+            AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $category->id)
+                ->where('engine_profile_key', 'swf_trailer')
+                ->count(),
+        );
+    }
 }

@@ -12,8 +12,11 @@ use Illuminate\Support\Facades\Schema;
  *    NULL = nicht konfiguriert (fail-closed für swf_trailer), 0 = ausdrücklich 0 %.
  * 2. Medium trailer_station_voice (nur dieses) erhält kind=swf_trailer, sofern bisher kind=NULL
  *    und Oberkategorie special_advertising_formats. Andere SWF-Medien bleiben kind=NULL.
- * 3. Bestehende Trailer-Regeln: surcharge_percent und default_length_seconds auf NULL
- *    (keine erfundenen Längen/Aufschläge; Spot-Regeln bleiben unverändert, 0 bleibt 0).
+ * 3. Trailer-Regeln: nur unbestätigte Altdefaults (Länge = Medium-Default oder NULL, Aufschlag 0)
+ *    werden auf NULL/NULL gesetzt. Individuelle Werte werden nicht still gelöscht und nicht
+ *    automatisch als fachlich bestätigt freigeschaltet: bei kind=NULL und Nicht-Pristine
+ *    bricht up() vor Datenänderungen an Regeln/kind ab. Ist kind bereits swf_trailer
+ *    (erneutes up nach Admin-Pflege), bleiben Länge/Aufschlag unberührt.
  * 4. Kategorie special_advertising_formats: Zuordnung average → Engine-Profil swf_trailer,
  *    Standardmethode average (nur falls noch keine Standardmethode gesetzt ist) –
  *    ausschließlich in Datenbanken, in denen das Trailer-Medium bereits existiert (Initialkatalog
@@ -21,9 +24,10 @@ use Illuminate\Support\Facades\Schema;
  *    Umgebungen erhalten die Zuordnung idempotent über den InitialCatalogBootstrapper.
  *
  * Rücksetzplan (down): nur wenn keine Positionen mit kind=swf_trailer existieren.
- * Setzt Trailer-Medium-kind zurück auf NULL, entfernt die Kategorie-Zuordnung (nur bei
- * unverändertem Engine-Profil) und macht surcharge_percent wieder NOT NULL (NULL → 0).
- * Gelöschte Längen/Aufschläge der Trailer-Regeln werden NICHT rekonstruiert.
+ * Setzt Trailer-Medium-kind zurück auf NULL, entfernt nur die migrationseigene Kategorie-
+ * Zuordnung (engine_profile_key=swf_trailer). default_calculation_method_id bleibt unberührt
+ * (kann vor der Migration bereits average gewesen sein). surcharge_percent wieder NOT NULL
+ * (NULL → 0). Gelöschte Längen/Aufschläge der Trailer-Regeln werden NICHT rekonstruiert.
  */
 return new class extends Migration
 {
@@ -40,8 +44,13 @@ return new class extends Migration
         $this->assertPrerequisites();
 
         $this->makeSurchargeNullable();
+
+        $kindWasAlreadyActive = $this->trailerKindAlreadyActive();
+        $this->assertTrailerRuleCleanupSafe($kindWasAlreadyActive);
         $this->activateTrailerMedium();
-        $this->nullTrailerRuleConfiguration();
+        // Nur bei Erstaktivierung: Altdefaults nullen. Erneutes up() nach kind=swf_trailer
+        // (inkl. ausdrücklicher 0 %-Aufschläge) lässt Regeln unverändert.
+        $this->nullTrailerRuleConfiguration($kindWasAlreadyActive);
         $this->assignCategoryAverage();
     }
 
@@ -100,6 +109,100 @@ return new class extends Migration
         return $id === null ? null : (int) $id;
     }
 
+    /**
+     * @return list<object{id: int|string, kind: mixed, default_length_seconds: mixed}>
+     */
+    private function trailerMediaRows(): array
+    {
+        return DB::table('advertising_media')
+            ->where('code', self::TRAILER_MEDIUM_CODE)
+            ->get(['id', 'kind', 'default_length_seconds'])
+            ->all();
+    }
+
+    private function trailerKindAlreadyActive(): bool
+    {
+        return collect($this->trailerMediaRows())->contains(
+            fn (object $row): bool => (string) ($row->kind ?? '') === self::KIND,
+        );
+    }
+
+    /**
+     * Unbestätigter Altdefault: Aufschlag ausdrücklich 0 und Länge NULL oder Medium-Default.
+     * Bereits NULL/NULL zählt hier nicht als „zu nullen“, sondern als unkonfiguriert.
+     */
+    private function isPristineAltDefault(object $rule, ?int $mediumDefaultLength): bool
+    {
+        $surcharge = $rule->surcharge_percent;
+        if ($surcharge === null || (float) $surcharge != 0.0) {
+            return false;
+        }
+
+        $length = $rule->default_length_seconds;
+
+        return $length === null
+            || ($mediumDefaultLength !== null && (int) $length === $mediumDefaultLength);
+    }
+
+    private function isFullyUnconfigured(object $rule): bool
+    {
+        return $rule->surcharge_percent === null && $rule->default_length_seconds === null;
+    }
+
+    /**
+     * Verhindert stilles Löschen individueller Trailer-Werte und automatische Freischaltung
+     * unbestätigter Altwerte: bei kind=NULL und Nicht-Pristine → Abbruch vor kind/Regel-Mutation.
+     */
+    private function assertTrailerRuleCleanupSafe(bool $kindWasAlreadyActive): void
+    {
+        if ($kindWasAlreadyActive) {
+            return;
+        }
+
+        $media = $this->trailerMediaRows();
+        if ($media === []) {
+            return;
+        }
+
+        $blocking = [];
+        foreach ($media as $medium) {
+            $mediumId = (int) $medium->id;
+            $mediumDefault = $medium->default_length_seconds === null
+                ? null
+                : (int) $medium->default_length_seconds;
+
+            $rules = DB::table('inventory_medium_rules')
+                ->where('advertising_medium_id', $mediumId)
+                ->get(['id', 'inventory_id', 'default_length_seconds', 'surcharge_percent']);
+
+            foreach ($rules as $rule) {
+                if ($this->isFullyUnconfigured($rule) || $this->isPristineAltDefault($rule, $mediumDefault)) {
+                    continue;
+                }
+                $blocking[] = sprintf(
+                    'rule#%s inventar#%s length=%s surcharge=%s',
+                    $rule->id,
+                    $rule->inventory_id,
+                    $rule->default_length_seconds === null ? 'NULL' : (string) $rule->default_length_seconds,
+                    $rule->surcharge_percent === null ? 'NULL' : (string) $rule->surcharge_percent,
+                );
+            }
+        }
+
+        if ($blocking === []) {
+            return;
+        }
+
+        throw new RuntimeException(
+            'BL-P5-01a: Trailer-Regeln mit individuellen Werten bei kind=NULL – '
+            .'Herkunft/Bestätigung nicht unterscheidbar. Keine automatische Löschung und '
+            .'keine automatische Freischaltung. Entweder Altdefaults auf Medium-Default/0 '
+            .'zurücksetzen (dann bereinigt up() auf NULL/NULL), oder nach fachlicher Prüfung '
+            .'kind=swf_trailer am Medium setzen und up() erneut ausführen (Werte bleiben). '
+            .'Betroffen: '.implode('; ', $blocking),
+        );
+    }
+
     private function activateTrailerMedium(): void
     {
         $categoryId = $this->swfCategoryId();
@@ -114,23 +217,40 @@ return new class extends Migration
             ->update(['kind' => self::KIND]);
     }
 
-    private function nullTrailerRuleConfiguration(): void
+    private function nullTrailerRuleConfiguration(bool $kindWasAlreadyActive): void
     {
-        $mediumIds = DB::table('advertising_media')
-            ->where('code', self::TRAILER_MEDIUM_CODE)
-            ->pluck('id')
-            ->all();
-
-        if ($mediumIds === []) {
+        if ($kindWasAlreadyActive) {
             return;
         }
 
-        DB::table('inventory_medium_rules')
-            ->whereIn('advertising_medium_id', $mediumIds)
-            ->update([
-                'surcharge_percent' => null,
-                'default_length_seconds' => null,
-            ]);
+        $media = $this->trailerMediaRows();
+        if ($media === []) {
+            return;
+        }
+
+        foreach ($media as $medium) {
+            $mediumId = (int) $medium->id;
+            $mediumDefault = $medium->default_length_seconds === null
+                ? null
+                : (int) $medium->default_length_seconds;
+
+            $rules = DB::table('inventory_medium_rules')
+                ->where('advertising_medium_id', $mediumId)
+                ->get(['id', 'default_length_seconds', 'surcharge_percent']);
+
+            foreach ($rules as $rule) {
+                if (! $this->isPristineAltDefault($rule, $mediumDefault)) {
+                    continue;
+                }
+
+                DB::table('inventory_medium_rules')
+                    ->where('id', $rule->id)
+                    ->update([
+                        'surcharge_percent' => null,
+                        'default_length_seconds' => null,
+                    ]);
+            }
+        }
     }
 
     private function assignCategoryAverage(): void
@@ -196,12 +316,10 @@ return new class extends Migration
             return;
         }
 
+        // Nur migrationseigene Zuordnung (engine_profile_key=swf_trailer) entfernen.
+        // Andere average-Zuordnungen und default_calculation_method_id bleiben erhalten
+        // (Default kann vor der Migration bereits gesetzt gewesen sein).
         $averageId = (int) DB::table('calculation_methods')->where('key', 'average')->value('id');
-
-        DB::table('advertising_categories')
-            ->where('id', $categoryId)
-            ->where('default_calculation_method_id', $averageId)
-            ->update(['default_calculation_method_id' => null]);
 
         DB::table('advertising_category_calculation_methods')
             ->where('advertising_category_id', $categoryId)

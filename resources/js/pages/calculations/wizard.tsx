@@ -86,6 +86,12 @@ import {
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
+import {
+    isSwfTrailerMedium,
+    resolveComponentsAfterMediumChange,
+    trailerSettlementReset,
+    type ComponentStashEntry,
+} from '@/lib/wizard-trailer-medium-change';
 import { spotLengthSpt010Hint } from '@/lib/spot-length-hint';
 import { SpotComponentsSection } from '@/components/spot-components-section';
 import {
@@ -272,11 +278,6 @@ type ComponentProfilesProp = Record<
         }>;
     }
 >;
-
-type ComponentStashEntry = {
-    components: SpotComponentDraft[];
-    strategy: ComponentCalculationStrategy | null;
-};
 
 type Catalog = {
     inventories: {
@@ -622,10 +623,7 @@ function mediumSupportsSpotComponents(
     catalog: Catalog,
     mediumId: number,
 ): boolean {
-    return (
-        catalog.media.find((item) => item.id === mediumId)?.kind !==
-        'swf_trailer'
-    );
+    return !isSwfTrailerMedium(catalog, mediumId);
 }
 
 function profileForMedium(
@@ -639,13 +637,6 @@ function profileForMedium(
     return profile === 'tandem' || profile === 'tridem' ? profile : null;
 }
 
-function componentStashKey(
-    clientKey: string,
-    profile: SpotComponentProfile | null,
-): string {
-    return `${clientKey}:${profile ?? 'optional'}`;
-}
-
 function positionUnitCount(position: PositionDraft): number {
     if (isCalendarCalculationMethod(position.calculation_method_key)) {
         return totalPlannerSpotCount(position.planner_entries);
@@ -656,73 +647,6 @@ function positionUnitCount(position: PositionDraft): number {
     }
 
     return position.total_spot_count;
-}
-
-function resolveComponentsAfterMediumChange(
-    item: PositionDraft,
-    newMediumId: number,
-    catalog: Catalog,
-    componentProfiles: ComponentProfilesProp,
-    stash: Map<string, ComponentStashEntry>,
-): {
-    components: SpotComponentDraft[];
-    strategy: ComponentCalculationStrategy | null;
-    length_seconds: number;
-} {
-    const medium = catalog.media.find(
-        (candidate) => candidate.id === newMediumId,
-    );
-    if (!medium) {
-        return {
-            components: item.components,
-            strategy: item.component_calculation_strategy,
-            length_seconds: item.length_seconds,
-        };
-    }
-
-    const oldProfile = profileForMedium(catalog, item.advertising_medium_id);
-    const newProfile = profileForMedium(catalog, newMediumId);
-    const rule = ruleFor(catalog, item.inventory_id, newMediumId);
-
-    if (item.components.length > 0 || item.component_calculation_strategy) {
-        stash.set(componentStashKey(item.client_key, oldProfile), {
-            components: item.components,
-            strategy: item.component_calculation_strategy,
-        });
-    }
-
-    let components: SpotComponentDraft[] = [];
-    let strategy: ComponentCalculationStrategy | null = null;
-
-    if (isForcedProfile(newProfile)) {
-        const meta = componentProfiles[newProfile];
-        const stashed = stash.get(
-            componentStashKey(item.client_key, newProfile),
-        );
-        const previous =
-            stashed && stashed.components.length > 0
-                ? stashed.components
-                : item.components;
-        components = buildProfileComponents(newProfile, meta.slots, previous);
-        strategy = 'shared_total_length';
-    } else if (isForcedProfile(oldProfile)) {
-        const stashed = stash.get(componentStashKey(item.client_key, null));
-        components = stashed?.components ?? [];
-        strategy = stashed?.strategy ?? null;
-    } else {
-        components = item.components.length > 0 ? item.components : [];
-        strategy = item.components.length
-            ? (item.component_calculation_strategy ??
-              resolveStrategyFromRule(rule?.component_calculation_strategy))
-            : null;
-    }
-
-    const length_seconds =
-        components.length > 0
-            ? totalComponentLength(components)
-            : (rule?.default_length_seconds ?? medium.default_length_seconds);
-
-    return { components, strategy, length_seconds };
 }
 
 function withForcedProfileComponentsIfNeeded(
@@ -2051,6 +1975,8 @@ export default function CalculationWizard({
             setBudgetProposalManual(true);
         }
 
+        let clearTrailerSettlementValidation = false;
+
         setPositions((current) =>
             current.map((item, itemIndex) => {
                 if (itemIndex !== index) {
@@ -2097,12 +2023,13 @@ export default function CalculationWizard({
                         field_schema: null,
                     };
 
-                    // BL-P4-03k: Inventarwechsel kann das Medium (Tandem↔Tridem) ändern.
-                    // Profile-Slots neu binden; Methode/Timing behalten, wenn auf dem
-                    // neuen Medium noch wählbar (sonst würde Calendar→Average resetten).
+                    // BL-P4-03k / BL-P5-01a: Inventarwechsel kann Medium ändern
+                    // (Tandem↔Tridem, Spot→Trailer). Komponenten/Länge neu binden;
+                    // Methode/Timing behalten, wenn auf dem neuen Medium noch wählbar.
                     if (
                         next.advertising_medium_id !==
-                        item.advertising_medium_id
+                            item.advertising_medium_id ||
+                        isSwfTrailerMedium(catalog, next.advertising_medium_id)
                     ) {
                         const componentState =
                             resolveComponentsAfterMediumChange(
@@ -2111,6 +2038,7 @@ export default function CalculationWizard({
                                 catalog,
                                 component_profiles,
                                 componentStashRef.current,
+                                next.inventory_id,
                             );
                         next = {
                             ...next,
@@ -2120,33 +2048,52 @@ export default function CalculationWizard({
                                 componentState.strategy,
                         };
 
-                        const nextMedium = catalog.media.find(
-                            (candidate) =>
-                                candidate.id === next.advertising_medium_id,
-                        );
-                        const previousMethodStillLive = findMethodOption(
-                            nextMedium?.calculation_method_options,
-                            item.calculation_method_key,
-                        );
-                        if (previousMethodStillLive) {
+                        if (
+                            isSwfTrailerMedium(
+                                catalog,
+                                next.advertising_medium_id,
+                            )
+                        ) {
                             next = {
                                 ...next,
-                                calculation_method_key:
-                                    previousMethodStillLive.key,
-                                calculation_method_name:
-                                    previousMethodStillLive.name,
-                                historical_calculation_method_key: null,
-                                historical_calculation_method_name: null,
-                                planner_entries: item.planner_entries,
-                                time_ranges: item.time_ranges,
-                                total_spot_count: isCalendarCalculationMethod(
-                                    previousMethodStillLive.key,
-                                )
-                                    ? totalPlannerSpotCount(
-                                          item.planner_entries,
-                                      )
-                                    : totalSpotCount(item.time_ranges),
+                                ...trailerSettlementReset(),
                             };
+                            clearTrailerSettlementValidation = true;
+                        }
+
+                        if (
+                            next.advertising_medium_id !==
+                            item.advertising_medium_id
+                        ) {
+                            const nextMedium = catalog.media.find(
+                                (candidate) =>
+                                    candidate.id === next.advertising_medium_id,
+                            );
+                            const previousMethodStillLive = findMethodOption(
+                                nextMedium?.calculation_method_options,
+                                item.calculation_method_key,
+                            );
+                            if (previousMethodStillLive) {
+                                next = {
+                                    ...next,
+                                    calculation_method_key:
+                                        previousMethodStillLive.key,
+                                    calculation_method_name:
+                                        previousMethodStillLive.name,
+                                    historical_calculation_method_key: null,
+                                    historical_calculation_method_name: null,
+                                    planner_entries: item.planner_entries,
+                                    time_ranges: item.time_ranges,
+                                    total_spot_count:
+                                        isCalendarCalculationMethod(
+                                            previousMethodStillLive.key,
+                                        )
+                                            ? totalPlannerSpotCount(
+                                                  item.planner_entries,
+                                              )
+                                            : totalSpotCount(item.time_ranges),
+                                };
+                            }
                         }
                     }
                 } else if (patch.advertising_medium_id !== undefined) {
@@ -2191,11 +2138,33 @@ export default function CalculationWizard({
                         schema_fingerprint: null,
                         field_schema: null,
                     };
+
+                    if (isSwfTrailerMedium(catalog, medium.id)) {
+                        next = {
+                            ...next,
+                            ...trailerSettlementReset(),
+                        };
+                        clearTrailerSettlementValidation = true;
+                    }
                 }
 
                 return next;
             }),
         );
+
+        if (clearTrailerSettlementValidation) {
+            setSettlementValidationTouched((current) => {
+                const copy = { ...current };
+                delete copy[index];
+                return copy;
+            });
+            setSaveFieldErrors((current) => {
+                const nextErrors = { ...current };
+                delete nextErrors[`positions.${index}.fixed_price_nn`];
+                delete nextErrors[`positions.${index}.pricing_settlement_mode`];
+                return nextErrors;
+            });
+        }
     }
 
     function removePosition(index: number) {
@@ -3901,9 +3870,10 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
-                                                            hideFixedPrice={
-                                                                false
-                                                            }
+                                                            hideFixedPrice={isSwfTrailerMedium(
+                                                                catalog,
+                                                                position.advertising_medium_id,
+                                                            )}
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index
