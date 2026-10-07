@@ -1025,5 +1025,4 @@ class StandardOfferBlP403kTest extends TestCase
             ->where('price_list_id', $list->id)
             ->update(['second_price' => $price]);
     }
-
 }

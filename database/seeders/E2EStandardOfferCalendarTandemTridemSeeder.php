@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CalculationKind;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DayGroup;
 use App\Enums\PriceListStatus;
