@@ -11,10 +11,11 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
- * BL-P4-03a/03c/03e/03f/03g/03h/03i/03j: Spot Classic Average (optional Hauptspot+Allonge,
+ * BL-P4-03a/03c/03e/03f/03g/03h/03i/03j/03k: Spot Classic Average (optional Hauptspot+Allonge,
  * N/N-Festpreis, Tandem/Tridem) und Spot Classic Calendar × `normal`/`fixed_price` mit
- * optionaler Hauptspot+Allonge (PO-BLP403H-1 / PO-BLP403I-1 / PO-BLP403J-1 / A1).
- * Ohne Tandem am Calendar. Budget bleibt abgewiesen.
+ * optionaler Hauptspot+Allonge und optional Tandem/Tridem
+ * (PO-BLP403H-1 / PO-BLP403I-1 / PO-BLP403J-1 / PO-BLP403K-1 / A1).
+ * Budget bleibt abgewiesen.
  */
 final class StandardOfferAverageContract
 {
@@ -183,7 +184,8 @@ final class StandardOfferAverageContract
      * PO-BLP403H-1 / A1: Calendar × normal, optional Hauptspot+Allonge.
      * PO-BLP403I-1 / A1: Calendar × Festpreis Einzelspot.
      * PO-BLP403J-1 / A1: Calendar × Festpreis × optional Hauptspot+Allonge.
-     * Ohne Tandem. Strategien laut Inventarregel (über assertResolvable/preview).
+     * PO-BLP403K-1 / A1: Calendar × Tandem/Tridem × normal/Festpreis.
+     * Ohne Profil: Strategien laut Inventarregel; mit Profil: shared_total_length.
      *
      * @param  array<string, mixed>  $position
      * @return array<string, mixed>
@@ -198,12 +200,7 @@ final class StandardOfferAverageContract
             ]);
         }
 
-        $profileRaw = $position['component_profile'] ?? null;
-        if ($profileRaw !== null && $profileRaw !== '') {
-            throw ValidationException::withMessages([
-                "positions.{$index}.component_profile" => 'Tandem/Tridem ist in Calendar-Vorlagen (BL-P4-03h) nicht erlaubt.',
-            ]);
-        }
+        $profile = $this->normalizeProfile($position, $index);
 
         if (array_key_exists('components', $position) && $position['components'] === null) {
             throw ValidationException::withMessages([
@@ -216,11 +213,20 @@ final class StandardOfferAverageContract
             $index,
             SpotCalculationMethod::Calendar,
             null,
-            null,
+            $profile,
         );
 
         $strategy = $position['component_calculation_strategy'] ?? null;
-        if ($normalizedComponents === []) {
+        if ($profile !== null) {
+            $required = SpotComponentProfileContract::requiredStrategy($profile);
+            if ($strategy !== null && $strategy !== ''
+                && (string) $strategy !== $required->value) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.component_calculation_strategy" => 'Tandem/Tridem erfordert shared_total_length.',
+                ]);
+            }
+            $strategy = $required->value;
+        } elseif ($normalizedComponents === []) {
             if ($strategy !== null && $strategy !== '') {
                 throw ValidationException::withMessages([
                     "positions.{$index}.component_calculation_strategy" => 'Strategie ohne Komponenten ist unzulässig.',
@@ -257,7 +263,7 @@ final class StandardOfferAverageContract
             'fixed_price_nn' => $settlement['fixed_price_nn'],
             'components' => $normalizedComponents,
             'planner_entries' => $plannerEntries,
-            'component_profile' => null,
+            'component_profile' => $profile?->value,
             'component_calculation_strategy' => $strategy,
         ];
     }

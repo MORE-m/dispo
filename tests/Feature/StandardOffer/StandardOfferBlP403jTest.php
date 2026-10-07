@@ -808,29 +808,14 @@ class StandardOfferBlP403jTest extends TestCase
         $this->assertSame('180.00', (string) $adoptedAvg->positions->first()->fixed_price_nn);
     }
 
-    public function test_rejects_calendar_tandem_budget_still(): void
+    public function test_rejects_budget_still(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
         $this->setSecondPrice($catalog, '2.0000');
 
-        try {
-            $this->writer()->create(
-                'Cal Tandem 03j',
-                $this->calendarFestpreisComponentsPayload(
-                    $catalog,
-                    [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
-                    ComponentCalculationStrategy::SharedTotalLength,
-                    '100.00',
-                    ['component_profile' => 'tandem'],
-                ),
-                $pm,
-            );
-            $this->fail('Calendar+Tandem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
-        }
+        // Calendar×Tandem: freigegeben in BL-P4-03k – Positivfälle dort.
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$this->calendarFestpreisComponentsPayload(

@@ -204,6 +204,9 @@ jobs:
       - name: Browser BL-P4-03j isolated tests
         run: npx playwright test -c playwright.blp403j.config.ts
 
+      - name: Browser BL-P4-03k isolated tests
+        run: npx playwright test -c playwright.blp403k.config.ts
+
   e2e-spt008:
     name: e2e-spt008
     runs-on: ubuntu-latest

@@ -1,8 +1,9 @@
 # BL-P4-03a/03c – Feld- und Funktionsmatrix (Vorlagen-Editor)
 
-Stand: 6. Oktober 2026 · **BL-P4-03j** Draft-PR (PO-BLP403J-1 A1); **BL-P4-03i** auf `main` (PR #126);
-**BL-P4-03h** auf `main` (PR #124); Dependency-Fix PR #125; **BL-P4-03g** (PR #123).
-**BL-P4-03f** auf `main` (PR #99). **BL-P4-03e** (PR #97). **BL-P4-03d** (PR #95).
+Stand: 7. Oktober 2026 · **BL-P4-03j** auf `main` (PR #127, PO-BLP403J-1 A1);
+**BL-P4-03i** auf `main` (PR #126); **BL-P4-03h** auf `main` (PR #124); Dependency-Fix
+PR #125; **BL-P4-03g** (PR #123). **BL-P4-03f** auf `main` (PR #99). **BL-P4-03e**
+(PR #97). **BL-P4-03d** (PR #95). **BL-P4-03k** Draft-PR (PO-BLP403K-1 A1).
 PO-BLP403A-1 / PO-BLP403C-1 / PO-BLP403B-1 / PO-BLP403F-1 / PO-BLP403G-1 / PO-BLP403H-1 /
 PO-BLP403I-1 / PO-BLP403J-1 / UX-GATE-D
 
@@ -11,8 +12,8 @@ unten). **03g:** Spot Classic **Calendar** × `normal` (Einzelspot). **03h:** Ca
 `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; konkrete Termine;
 Adopt Frozen-Parity; Materialisierung **v4-Vertragserweiterung**; Legacy v1–v3 und
 Calendar-Einzelspot lesbar. **03i:** Calendar × Festpreis Einzelspot.
-**03j (Draft-PR):** Calendar × Festpreis × optional Hauptspot+Allonge.
-Budget/Abbinder und Calendar×Tandem weiter Folgeslices.
+**03j (`main`, PR #127):** Calendar × Festpreis × optional Hauptspot+Allonge.
+Budget/Abbinder weiter Folgeslices. **03k (Draft-PR):** Calendar × Tandem/Tridem × normal/Festpreis.
 
 ## Gruppen
 

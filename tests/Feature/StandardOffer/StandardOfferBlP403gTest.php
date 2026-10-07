@@ -439,30 +439,8 @@ class StandardOfferBlP403gTest extends TestCase
         $this->setSecondPrice($catalog, '2.0000');
 
         // Calendar×Festpreis Einzelspot: freigegeben in BL-P4-03i.
-
         // Calendar+Komponenten: freigegeben in BL-P4-03h – Negativfälle dort.
-
-        try {
-            $this->writer()->create('Cal Tandem', $this->calendarDraftPayload($catalog, [
-                ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1],
-            ], [
-                'component_profile' => 'tandem',
-            ]), $pm);
-            $this->fail('Calendar+Tandem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
-        }
-
-        try {
-            $this->writer()->create('Cal Tridem', $this->calendarDraftPayload($catalog, [
-                ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1],
-            ], [
-                'component_profile' => 'tridem',
-            ]), $pm);
-            $this->fail('Calendar+Tridem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
-        }
+        // Calendar×Tandem/Tridem: freigegeben in BL-P4-03k – Positivfälle dort.
 
         $mixed = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',

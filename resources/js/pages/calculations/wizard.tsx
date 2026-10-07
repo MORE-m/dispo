@@ -2080,6 +2080,29 @@ export default function CalculationWizard({
                         position_discounts: [],
                         field_schema: null,
                     };
+
+                    // BL-P4-03k: Inventarwechsel kann das Medium (Tandem↔Tridem) ändern.
+                    // Rebind behält Timing, muss Profile-Slots aber neu binden.
+                    if (
+                        next.advertising_medium_id !==
+                        item.advertising_medium_id
+                    ) {
+                        const componentState =
+                            resolveComponentsAfterMediumChange(
+                                item,
+                                next.advertising_medium_id,
+                                catalog,
+                                component_profiles,
+                                componentStashRef.current,
+                            );
+                        next = {
+                            ...next,
+                            length_seconds: componentState.length_seconds,
+                            components: componentState.components,
+                            component_calculation_strategy:
+                                componentState.strategy,
+                        };
+                    }
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(
                         (candidate) =>
@@ -4102,8 +4125,8 @@ export default function CalculationWizard({
                                                         </div>
 
                                                         {(() => {
-                                                            // BL-P4-03c/03f/03h: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
-                                                            // Calendar-Vorlagen: optionale Allonge erlaubt; Tandem/Tridem weiter ausgeblendet.
+                                                            // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                            // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
                                                             const positionProfile =
                                                                 profileForMedium(
                                                                     catalog,
@@ -4120,14 +4143,8 @@ export default function CalculationWizard({
                                                                       ]
                                                                     : undefined;
 
-                                                            const calendarTemplate =
-                                                                isStandardOffer &&
-                                                                isCalendarCalculationMethod(
-                                                                    position.calculation_method_key,
-                                                                );
                                                             const showForcedProfileUi =
-                                                                forcedProfile &&
-                                                                !calendarTemplate;
+                                                                forcedProfile;
                                                             const showOptionalComponentsUi =
                                                                 !forcedProfile &&
                                                                 position

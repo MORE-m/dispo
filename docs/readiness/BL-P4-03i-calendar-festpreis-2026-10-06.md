@@ -52,5 +52,6 @@ Browser-Smoke isoliert: `playwright.blp403i.config.ts` / Port **8052**.
 
 ## 4. Bewusst offen
 
-Calendar×Festpreis×Komponenten (Folgeslice **PO-BLP403J-1** / **BL-P4-03j** vorgeschlagen),
-Calendar×Tandem, Budget-Vorlagen, Abbinder/SPT-013, Deploy.
+Calendar×Festpreis×Komponenten (Folgeslice **PO-BLP403J-1** / **BL-P4-03j** auf `main`
+PR #127), Calendar×Tandem (`PO-BLP403K-1` vorgeschlagen), Budget-Vorlagen,
+Abbinder/SPT-013, Deploy.

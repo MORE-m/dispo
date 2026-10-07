@@ -63,4 +63,5 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 Auf `main` gemergt: **PR #126** / `4a9dd4e…`; Post-Merge-CI
 [`37483249060`](https://github.com/MORE-m/dispo/actions/runs/37483249060) SUCCESS.
 **Kein** Deploy. Calendar×Festpreis×Komponenten/Tandem, Budget, Abbinder bleiben offen
-(Komponenten-Folgeslice: `PO-BLP403J-1` / `BL-P4-03j` vorgeschlagen).
+(Komponenten-Folgeslice: `PO-BLP403J-1` / `BL-P4-03j` auf `main` PR #127;
+Calendar×Tandem: `PO-BLP403K-1` vorgeschlagen).

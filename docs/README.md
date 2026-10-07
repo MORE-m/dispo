@@ -38,9 +38,12 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |
-| [`reviews/calendar-festpreis-hauptspot-allonge-readiness/`](reviews/calendar-festpreis-hauptspot-allonge-readiness/) | Bericht Calendar × Festpreis × Allonge (PO-BLP403J-1 A1, Draft-PR) |
-| [`readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md`](readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md) | Readiness Calendar × Festpreis × Allonge (READY / Draft-PR) |
-| [`entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`](entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md) | PO Calendar × Festpreis × Allonge (Akzeptiert A1, Draft-PR) |
+| [`reviews/calendar-festpreis-hauptspot-allonge-readiness/`](reviews/calendar-festpreis-hauptspot-allonge-readiness/) | Bericht Calendar × Festpreis × Allonge (PO-BLP403J-1 A1, auf `main` PR #127) |
+| [`readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md`](readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md) | Readiness Calendar × Festpreis × Allonge (READY / `main`) |
+| [`entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`](entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md) | PO Calendar × Festpreis × Allonge (Akzeptiert A1, PR #127) |
+| [`reviews/calendar-tandem-tridem-readiness/`](reviews/calendar-tandem-tridem-readiness/) | Bericht Calendar × Tandem/Tridem (PO-BLP403K-1 A1, Draft-PR) |
+| [`readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md`](readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md) | Readiness Calendar × Tandem/Tridem (READY / Draft-PR) |
+| [`entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md) | PO Calendar × Tandem/Tridem (Akzeptiert A1, Draft-PR) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 | [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |

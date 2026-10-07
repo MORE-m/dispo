@@ -1,20 +1,20 @@
-# Bericht: Calendar × Festpreis × Hauptspot+Allonge – BL-P4-03j Draft-PR
+# Bericht: Calendar × Festpreis × Hauptspot+Allonge – BL-P4-03j auf `main`
 
-Stand: 6. Oktober 2026
-Arbeitsbasis: `origin/main` @ `4a9dd4e518d123e01f61e932fc1b34b8e109a87f`
-Worktree: `dispo-wt-feat-bl-p4-03j` (Branch `feat/bl-p4-03j-calendar-festpreis-hauptspot-allonge`)
-**Kein** Merge/Deploy.
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Arbeitsbasis: `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a`
+(Merge PR #127; Post-Merge-CI [`37527679296`](https://github.com/MORE-m/dispo/actions/runs/37527679296) SUCCESS)
+**Kein** Deploy.
 
-PO-BLP403J-1 **A1 akzeptiert**. 03i auf Main (PR #126 / CI `37483249060` SUCCESS).
+PO-BLP403J-1 **A1 akzeptiert**. Slice auf Main (PR #127).
 
 ## Artefakte
 
 | Datei | Rolle |
 |---|---|
-| [`docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`](../../entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md) | PO **Akzeptiert** A1 |
-| [`docs/readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md`](../../readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md) | Readiness READY / Draft-PR |
+| [`docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`](../../entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md) | PO **Akzeptiert** A1; auf `main` |
+| [`docs/readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md`](../../readiness/BL-P4-03j-calendar-festpreis-hauptspot-allonge-2026-10-06.md) | Readiness READY / `main` |
 
-## Scope (umgesetzt, Draft-PR)
+## Scope (umgesetzt, auf `main`)
 
 - Calendar × Spot Classic × Festpreis × optional Hauptspot+Allonge
 - Strategien laut Inventarregel; Shared `media_gross` `''`
@@ -29,4 +29,5 @@ PO-BLP403J-1 **A1 akzeptiert**. 03i auf Main (PR #126 / CI `37483249060` SUCCESS
 
 ## Offen
 
-Calendar×Tandem, Budget, Abbinder. Kein Merge/Deploy.
+Calendar×Tandem (Folgeslice `PO-BLP403K-1` / `BL-P4-03k` vorgeschlagen), Budget, Abbinder.
+Kein Deploy.

@@ -64,7 +64,7 @@ Freeze-Struktur erfordern bewusst die passende Hydrate-Validierung/Persistenz
     aus Legacy-Gründen = leer; `null` ungültig; `[]` = gültige leere Liste
   (Draft-Semantik 03c: Komponenten absent/`[]` = aus, `null` abgelehnt)
 
-## v4 (BL-P4-03g / PO-BLP403G-1; erweitert BL-P4-03h / PO-BLP403H-1; erweitert BL-P4-03i / PO-BLP403I-1; erweitert BL-P4-03j / PO-BLP403J-1)
+## v4 (BL-P4-03g / PO-BLP403G-1; erweitert BL-P4-03h / PO-BLP403H-1; erweitert BL-P4-03i / PO-BLP403I-1; erweitert BL-P4-03j / PO-BLP403J-1; erweitert BL-P4-03k / PO-BLP403K-1)
 
 Calendar-Hydrate prüft vor Persistenz zusätzlich: nicht-leere `planner_entries` bei
 positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Zellen
@@ -72,7 +72,7 @@ positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Ze
 `line_gross`. Widersprüche → `ValidationException`, keine Teilanlage.
 
 - Optional `spot_method=calendar` mit Pflicht-Key `planner_entries` (konkrete ISO-Daten,
-  eingefrorene Sekundenpreise/Summen); kein `component_profile`.
+  eingefrorene Sekundenpreise/Summen).
 - **03h Vertragserweiterung:** Calendar × `normal` darf optional Hauptspot+Allonge
   (`components` + `component_calculation_strategy`) wie Average-Allonge.
   Reader-Stand PR #123 weist Calendar-Komponenten ab – erweiterte Snapshots brauchen
@@ -84,13 +84,17 @@ positivem `total_spot_count`, Spot-Summe = `total_spot_count`, keine Duplikat-Ze
   (Strategien laut Inventarregel; Shared-Total Komponenten-`media_gross` `''`).
   Reader-Stand PR #126 weist Calendar-Festpreis×Komponenten ab – neue Snapshots brauchen
   den erweiterten Reader. Kein v5, keine Schema-Migration.
-  Bestehende v4 Calendar×`normal`/Festpreis-Einzelspot sowie Average-v4 / Legacy v1–v3 bleiben gültig.
+- **03k Vertragserweiterung:** Calendar × optional `component_profile` `tandem`\|`tridem`
+  × `normal`\|`fixed_price` (02e/03f-Semantik; verbindlich `shared_total_length`;
+  Slot-Asserts wie Average-v3+). Reader-Stand PR #127 weist Calendar×`component_profile`
+  ab – neue Snapshots brauchen den erweiterten Reader. Kein v5, keine Schema-Migration.
+  Bestehende v4 Calendar 03g–03j sowie Average-v4 / Legacy v1–v3 bleiben gültig.
 - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed).
-- Hydrate persistiert Planner-Entries, Komponenten und Festpreis-N/N ohne Live-Preisauflösung (B1+C1).
+- Hydrate persistiert Planner-Entries, Komponenten, Profil und Festpreis-N/N ohne Live-Preisauflösung (B1+C1).
 
 ## Verbleibende Pflege bei weiteren Methoden
 
-Bei Calendar×Tandem, Budget-Vorlagen, Abbinder (oder anderer Methodik):
+Bei Budget-Vorlagen, Abbinder (oder anderer Methodik):
 
 1. neue `materialization_version` **oder** explizite Contract-Erweiterung,
 2. Freeze-Seite (`StandardOfferMaterializer` bzw. Nachfolger) erweitern,
@@ -99,6 +103,9 @@ Bei Calendar×Tandem, Budget-Vorlagen, Abbinder (oder anderer Methodik):
 4. Parity- und Fail-closed-Tests ergänzen.
 
 Neue Methoden werden **nicht** automatisch übernommen.
+**Hinweis Statusnachzug:** BL-P4-03j ist auf `main` (PR #127 / `e44c1cf…`,
+CI `37527679296` SUCCESS); kein Deploy. BL-P4-03k auf Feature-Branch / Draft-PR
+(PO-BLP403K-1 A1); bis Merge nicht als auf `main` erledigt führen.
 
 ## Entfernter Doppelcode
 

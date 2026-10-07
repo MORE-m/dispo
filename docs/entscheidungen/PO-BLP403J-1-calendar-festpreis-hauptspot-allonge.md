@@ -1,8 +1,10 @@
 # PO-BLP403J-1 – Calendar × Festpreis × Hauptspot+Allonge in Standardangeboten
 
-Status: **Akzeptiert** (A1; B1+C1 übernommen aus PO-BLP403G-1)
-Stand: 6. Oktober 2026
-Basis: `origin/main` @ `4a9dd4e518d123e01f61e932fc1b34b8e109a87f` (nach PR #126)
+Status: **Akzeptiert** (A1; B1+C1 übernommen aus PO-BLP403G-1); auf `main` (PR #127)
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Basis Implementierung: Feature auf `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a`
+(Merge PR #127; Post-Merge-CI [`37527679296`](https://github.com/MORE-m/dispo/actions/runs/37527679296) SUCCESS).
+Entscheidungsbasis damals: `4a9dd4e…` (nach PR #126).
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-014`, `COM-009`,
 `PRI-002` / `PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`,
 Vorgänger `PO-BLP403A-1` … `PO-BLP403I-1`
@@ -61,7 +63,8 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 
 ## Nicht-Ziele
 
-- Calendar × Tandem/Tridem
+- Calendar × Tandem/Tridem *(damalige Scope-Grenze dieses Gates; Folgeslice
+  `PO-BLP403K-1` / `BL-P4-03k` vorgeschlagen, nicht freigegeben)*
 - Budget-Vorlagen, Abbinder / SPT-013
 - Auto-Shift, Adopt-Preisjahr-Rebind
 - Lifecycle-/Rechteänderungen
@@ -70,5 +73,6 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 
 ## Implementierungsstand
 
-Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03j`). **Kein** Merge/Deploy in diesem Auftrag.
-Calendar×Tandem, Budget, Abbinder bleiben offen.
+Auf `main`: **PR #127** (`e44c1cf…`), Post-Merge-CI `37527679296` SUCCESS.
+**Kein** Deploy. Calendar×Tandem, Budget, Abbinder bleiben offen
+(Tandem: Readiness `PO-BLP403K-1` vorgeschlagen).
