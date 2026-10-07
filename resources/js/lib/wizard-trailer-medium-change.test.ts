@@ -60,16 +60,16 @@ const profiles = {
     tandem: {
         label: 'Tandem',
         slots: [
-            { role: 'main_spot' as const, label: 'Hauptspot', default_length_seconds: 20 },
-            { role: 'allonge' as const, label: 'Allonge', default_length_seconds: 10 },
+            { role: 'main_spot', label: 'Hauptspot', sort: 0 },
+            { role: 'allonge', label: 'Allonge', sort: 1 },
         ],
     },
     tridem: {
         label: 'Tridem',
         slots: [
-            { role: 'main_spot' as const, label: 'Hauptspot', default_length_seconds: 15 },
-            { role: 'allonge' as const, label: 'Allonge', default_length_seconds: 10 },
-            { role: 'reminder' as const, label: 'Reminder', default_length_seconds: 5 },
+            { role: 'main_spot', label: 'Hauptspot', sort: 0 },
+            { role: 'allonge', label: 'Allonge', sort: 1 },
+            { role: 'reminder', label: 'Reminder', sort: 2 },
         ],
     },
 };
