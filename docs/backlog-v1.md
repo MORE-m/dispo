@@ -80,7 +80,7 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (Draft-PR)** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App; weitere Invalidierungsauslöser)
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (PR #122 `main`)** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App; weitere Invalidierungsauslöser)
 - **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
@@ -316,7 +316,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`–`03j` auf `main`; **03k** Draft-PR; Budget/Abbinder offen)
+- **Status:** teilweise (`BL-P4-03a`–`03k` auf `main`; Budget/Abbinder offen)
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c/03h); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**; 03g `SPT-005`–`007` + **PO-BLP403G-1**; 03h **PO-BLP403H-1**
 - **Abhängigkeiten:** BL-P4-02 (Average + Calendar 02b + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**, **PO-BLP403G-1**, **PO-BLP403H-1**, **PO-BLP403I-1**, **PO-BLP403J-1**, **PO-BLP403K-1**; 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
@@ -329,7 +329,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 03h (`main`, PR #124, `5f13499…`; historischer Post-Merge-Run `37421402438` FAILURE `npm audit --omit=dev`; Dependency-Fix PR #125 `1a4e72c…`, Post-Merge-CI `37446149806` SUCCESS; kein Deploy; PO-BLP403H-1 A1 + B1+C1):** Calendar × `normal` × optional Hauptspot+Allonge; Strategien laut Inventarregel; explizite **v4-Vertragserweiterung** (kein v5); From-Calc Calendar+Komponenten; Mix weiter abgewiesen; isolierter Smoke Port **8051**; ADR `docs/entscheidungen/PO-BLP403H-1-calendar-hauptspot-allonge.md`
 - **Ergebnis 03i (`main`, PR #126, `4a9dd4e…`; Post-Merge-CI `37483249060` SUCCESS; kein Deploy; PO-BLP403I-1 A1 + B1+C1):** Calendar × Festpreis Einzelspot; explizite **v4-Vertragserweiterung**; 03h Allonge×`normal` bleibt; Calendar×Festpreis×Komponenten weiter abgewiesen; isolierter Smoke Port **8052**; ADR `docs/entscheidungen/PO-BLP403I-1-calendar-festpreis.md`
 - **Ergebnis 03j (`main`, PR #127, `e44c1cf…`; Post-Merge-CI `37527679296` SUCCESS; kein Deploy; PO-BLP403J-1 A1 + B1+C1):** Calendar × Festpreis × optional Hauptspot+Allonge; Strategien laut Inventarregel; explizite **v4-Vertragserweiterung**; Shared 600/500 / Individual 640/520; Smoke Port **8053**; Dok `docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`
-- **Ergebnis 03k (Draft-PR, nicht auf main, nicht erledigt):** `PO-BLP403K-1` A1 Calendar × Tandem/Tridem × normal/Festpreis; explizite **v4-Vertragserweiterung**; Fixture 600/888.50 und 760/1200; Smoke Port **8054**; Dok `docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`
+- **Ergebnis 03k (`main`, PR #128, `0ff11aa…`; Post-Merge-CI `37611870573` SUCCESS; kein Deploy; PO-BLP403K-1 A1 + B1+C1):** Calendar × Tandem/Tridem × normal/Festpreis; explizite **v4-Vertragserweiterung**; Fixture 600/888.50 und 760/1200; Smoke Port **8054**; Dok `docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`
 - **Grenzen:** kein Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
 - **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f/03g/03h/03i/03j/03k Feature-Tests; 03f/03g/03h/03i/03j/03k Smoke
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
@@ -349,19 +349,25 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P5-01 – SWF ohne Spotlängenindex
 
 - **Phase:** 5
-- **Status:** offen
+- **Status:** offen (Teilscope **`BL-P5-01a`** Docs-Readiness / PO **vorgeschlagen**; Paket nicht erledigt)
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
-- **Ergebnis:** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
+- **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
+- **BL-P5-01a (Implementierung im Draft-PR):** Trailer × Average, inventarübergreifend (Matrix: RH/ROCK/OLDIE/CARAVAN);
+  Preview→Save→Reload→Dispo; **A1** (UX-GATE-C Teilfreigabe) + **B1** (Spot-Grundpreise + inventarspezifischer Aufschlag)
+  akzeptiert; eigene Berechnungsart `swf_trailer`; fail-closed je Inventar bis Länge/Aufschlag gepflegt;
+  ohne Calendar/Festpreis/CityLife/weitere SWF; kein Merge/Deploy; Dok
+  `docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`,
+  `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
-- **Tests:** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
+- **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
 ### BL-P5-02 – Produktion/Sonstiges
 
 - **Phase:** 5
 - **Status:** offen
 - **Anforderungen:** `PRO-001` bis `PRO-007`
-- **Abhängigkeiten:** BL-P5-01
+- **Abhängigkeiten:** BL-P5-01 (hinreichender SWF-Fortschritt; **nicht** allein durch 01a-Readiness freigegeben)
 - **Ergebnis:** Zusatzzeilen, Produktionspreisliste, Überschreibungsfreigabe
 - **Akzeptanz:** `AT-11`
 - **Tests:** Pest Standardmenge 0, Buchungskennzeichen S, Sonderfreigabe bei Überschreibung
@@ -768,7 +774,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02e – Admin-Sicht Outbox + Suppression (PO-NOT002-ADMIN-1)
 
 - **Phase:** 9
-- **Status:** implementiert auf Draft-PR (`feat/po-not002-admin-1`); **nicht** auf `main`
+- **Status:** erledigt (`main`, PR **#122**, Merge `68b7d8bf2dd604c44f703374b47d9815c73284ac`;
+  Post-Merge-CI `37303343328` SUCCESS; **kein** Deploy)
 - **Kennung:** PO-NOT002-ADMIN-1 / UX-GATE-D Teilfreigabe lesende Admin-Outbox
 - **Anforderungen:** `NOT-002` (Admin-Protokollsicht); Lesekontext `NOT-001`
 - **Abhängigkeiten:** BL-P9-02b/02c/02d, Admin-Hub, Outbox-Fundament
@@ -779,12 +786,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   In-App, Empfängerwahl, allgemeine Audit-Explorer-UI, Migration ohne Bedarf
 - **Tests:** `NotificationOutboxAdminTest`, `NotificationErrorDisplayTest`;
   isolierter Browser-Smoke `playwright.po-not002-admin.config.ts`
-- **Hinweis:** NOT-002 erst nach Merge dieses Slices als auf `main` abgeschlossen führen
 
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a–02d auf `main`; **02e** Draft-PR); Submit-/Invalidierungsmails/In-App **offen**
+- **Status:** teilweise (02a–**02e** auf `main`); Submit-/Invalidierungsmails/In-App **offen**
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
@@ -792,9 +798,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
 - **Erledigt in 02c (`main`, PR #103):** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
 - **Erledigt in 02d (`main`, PR #121):** Freigabe erteilt/abgelehnt → Outbox+SMTP
-- **In Arbeit in 02e (Draft-PR):** Admin-Outbox-/Suppress-Sicht (PO-NOT002-ADMIN-1)
+- **Erledigt in 02e (`main`, PR #122):** Admin-Outbox-/Suppress-Sicht (PO-NOT002-ADMIN-1)
 - **Offen:** Submit-Mail, Invalidierungsmails, weitere Status-Ereignis-Mails, In-App
-- **Akzeptanz (Rest):** NOT-002 auf `main` nach Merge von 02e; Submit/Invalidierung weiter offen
+- **Akzeptanz (Rest):** Submit/Invalidierung/In-App weiter offen (Admin-Sicht NOT-002 auf `main`)
 - **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c); Freigabe-Outbox (02d);
   Admin-Outbox (02e)
 

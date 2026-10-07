@@ -1,8 +1,10 @@
 # PO-BLP403K-1 – Calendar × Tandem/Tridem in Standardangeboten
 
-Status: **Akzeptiert** (A1; B1+C1 übernommen aus PO-BLP403G-1)
-Stand: 7. Oktober 2026
-Basis: `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a` (nach PR #127)
+Status: **Akzeptiert** (A1; B1+C1 übernommen aus PO-BLP403G-1; auf `main` PR #128)
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Basis (Merge): `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
+(Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
+Historische Entscheidungsbasis: `e44c1cf436c6e1a63781910c7c1cd46ae019903a` (nach PR #127)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-012`, `COM-009`,
 `PRI-002` / `PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`,
 Vorgänger `PO-BLP403A-1` … `PO-BLP403J-1`
@@ -68,7 +70,9 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 
 ## Implementierungsstand
 
-Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03k`, PR #128). Review-Nachzug:
-Publish-Sync im Browser-Smoke, From-Calc-Viererkombination, Negativ-/Pin-/Rebind-Belege,
-UI-Inventarwechsel Tandem→Tridem (Slot-Rebuild + Timing).
-**Kein** Merge/Deploy in diesem Auftrag. Budget und Abbinder bleiben offen.
+Auf `main` gemergt (`BL-P4-03k`, PR #128 / Merge `0ff11aa…`; Post-Merge-CI
+`37611870573` SUCCESS). Review-Nachzug vor Merge: Publish-Sync im Browser-Smoke,
+From-Calc-Viererkombination, Negativ-/Pin-/Rebind-Belege, UI-Inventarwechsel
+Tandem→Tridem (Slot-Rebuild + Timing).
+**Kein** Deploy. Budget und Abbinder bleiben offen.
+Merge ersetzt keine separate manuelle Fachabnahme.

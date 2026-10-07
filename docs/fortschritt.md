@@ -1,53 +1,56 @@
 # Fortschritt V1
 
-Stand: 7. Oktober 2026 – **BL-P4-03k / PO-BLP403K-1** Calendar × Tandem/Tridem
-(A1 akzeptiert, Feature-Branch / Draft-PR). Basis `origin/main` @
-`e44c1cf436c6e1a63781910c7c1cd46ae019903a` (Merge PR #127). Lokale Arbeitsbasis
-unverändert: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
-Alt-`dispo` stillgelegt. **Kein** Merge/Deploy.
+Stand: 7. Oktober 2026 – **BL-P5-01a / PO-BLP501A-1** (Trailer × Average, inventarübergreifend;
+**A1 + B1 akzeptiert**; Implementierung im Draft-PR, **kein** Merge/Deploy).
+Basis `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
+(Merge PR #128; Post-Merge-CI `37611870573` **SUCCESS**; **kein** Deploy).
+Lokale Arbeitsbasis unverändert: Checkout `dispo-main`, Port **8000**,
+Dev-DB **`dispo_mat_core`**; Alt-`dispo` stillgelegt.
 
-03j auf `main`: PR #127 / Merge `e44c1cf…`; Post-Merge-CI `37527679296` **SUCCESS**.
-**Kein** Deploy. **03k** Draft-PR; bis Merge **nicht** als auf `main` erledigt.
+03k auf `main`: PR #128 / Merge `0ff11aa…`; Post-Merge-CI `37611870573` SUCCESS;
+**kein** Deploy. Manuelle Fachabnahme bleibt von Merge getrennt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03j** auf `main`;
-**03k** Draft-PR);
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03k** auf `main`;
+Budget/Abbinder offen);
+Phase 5 SWF: **BL-P5-01a** Readiness/PO **vorgeschlagen** (nicht freigegeben);
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP403K-1 / BL-P4-03k** Calendar × Tandem/Tridem × normal/Festpreis – Draft-PR.
-Kein Merge/Deploy in diesem Auftrag.
+**PO-BLP501A-1 / BL-P5-01a** Trailer × Durchschnitt – Implementierung im Draft-PR
+(Branch `feat/bl-p5-01a-swf-trailer-average`); **A1** und **B1** akzeptiert.
+Kein Merge/Deploy. Operative Freischaltung je Inventar erst nach Datenlieferung
+(Länge/Aufschlag). Standardangebote/Budget pausiert.
 
-Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
-Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen (BL-P4-03 Rest),
-SPT-013 Abbinder, weitere Status-Mails / In-App, weitere
-Freigabeinvalidierungs-Auslöser nur mit neuem Edit-Pfad, Nicht-Spot / CRM / REP
-(V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002 Systemfeld-Overrides,
-Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
+Offen / zurückgestellt u. a.:
+Datenlieferung Trailer-Länge/Aufschlag (ROCK/OLDIE/CARAVAN; RH nur Admin-Pflege), SWF-Rest (`BL-P5-01`),
+Produktion (`BL-P5-02`), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
+SPT-013 Abbinder, weitere Status-Mails / In-App, CRM / REP, ADV-001 Defaults,
+ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP403J-1 / BL-P4-03j** Calendar × Festpreis × optional Hauptspot+Allonge –
-**PR #127**, Merge `e44c1cf436c6e1a63781910c7c1cd46ae019903a`; Post-Merge-CI
-`37527679296` **SUCCESS**; **kein** Deploy.
+**PO-BLP403K-1 / BL-P4-03k** Calendar × Tandem/Tridem × normal/Festpreis –
+**PR #128**, Merge `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`; Post-Merge-CI
+`37611870573` **SUCCESS**; **kein** Deploy.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
 | Thema | Status |
 |---|---|
 | UX-GATE-D / PO-NOT002-ADMIN-1 | **freigegeben** (nur Admin, lesend) |
-| Outbox Liste+Detail, Default-Filter `failed` | **umgesetzt** (Draft-PR) |
-| Suppress-Tab getrennt von SMTP-`failed` | **umgesetzt** (Draft-PR) |
-| Fehler maskieren/kürzen vor Inertia | **umgesetzt** (Draft-PR) |
-| Quellen Comment/ApprovalRequest → Auftrag | **umgesetzt** (Draft-PR) |
+| Outbox Liste+Detail, Default-Filter `failed` | **umgesetzt** (`main`) |
+| Suppress-Tab getrennt von SMTP-`failed` | **umgesetzt** (`main`) |
+| Fehler maskieren/kürzen vor Inertia | **umgesetzt** (`main`) |
+| Quellen Comment/ApprovalRequest → Auftrag | **umgesetzt** (`main`) |
 | Retry/Resend/Dispatch/Mutation | **bewusst nicht** |
 | Submit-/Invalidierungsmails | **offen** |
-| NOT-002 auf `main` abgeschlossen | **nein** (erst nach Merge) |
-| Merge / Deploy | **offen** (Draft-PR) |
+| NOT-002 Admin-Sicht auf `main` | **ja** (PR #122 / Merge `68b7d8b…`; Post-Merge-CI `37303343328` SUCCESS) |
+| Deploy | **nicht erfolgt** / nicht beauftragt |
 
 ## PO-APPROVAL-NOTIFY-1 / BL-P9-02d (Oktober 2026)
 
@@ -60,9 +63,9 @@ Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 | Begründung nicht in Mail/Payload | **umgesetzt** |
 | Outbox-Write in Fach-TX; SMTP ohne Fach-Rollback | **umgesetzt** |
 | Submit / Invalidierung | **bewusst nicht** |
-| Admin-Outbox-UI | **in BL-P9-02e** (Draft-PR #122) |
-| NOT-002 vollständig auf `main` | **nein** |
-| Merge | **erledigt** (PR #121 auf `main`) |
+| Admin-Outbox-UI | **BL-P9-02e** auf `main` (PR #122) |
+| NOT-002 Admin-Sicht auf `main` | **ja** (Merge `68b7d8b…`; CI `37303343328`) |
+| Merge 02d | **erledigt** (PR #121 auf `main`) |
 | Deploy | **nicht erfolgt** / nicht beauftragt |
 
 ## PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 (Oktober 2026)
@@ -246,18 +249,32 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Post-Merge CI | **`37527679296` SUCCESS** |
 | Deploy | **kein** Deploy |
 
+## BL-P5-01a – Trailer × Average / PO-BLP501A-1 (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| Readiness inventarübergreifend Trailer × Average | **READY MIT DATEN-VORBEDINGUNGEN JE INVENTAR** |
+| Preisbasis **B1** (Spot-Grundpreise + inventarspezifischer Aufschlag) | **akzeptiert** |
+| PO/UX-GATE-C Teilfreigabe **A1** (nur Trailer × Durchschnitt) | **akzeptiert** |
+| Berechnungsart/Profil | eigenes `swf_trailer` (kein Spotlängenindex; kein Calendar/Festpreis) |
+| Aufschlag-Semantik | `NULL` = nicht konfiguriert (fail-closed); `0` = ausdrücklich 0 % |
+| Implementierung | Draft-PR; **kein** Merge, **kein** Deploy |
+| `BL-P5-01` vollständig | **nein** (Teilscope) |
+| Produktion `BL-P5-02` | **keine** Freigabe abgeleitet |
+
 ## BL-P4-03k – Calendar × Tandem/Tridem / PO-BLP403K-1 (Oktober 2026)
 
 | Prüfpunkt | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
-| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Profil | **umgesetzt** (Draft-PR) |
+| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Profil | **umgesetzt** (`main`) |
 | Viererkombination Tandem/Tridem × normal/Festpreis (600/888.50, 760/1200) | **Feature-Tests** |
 | Calc Persistenz/Reload vier Kombinationen | **Feature-Tests** |
 | Isolierter Browser-Smoke Port 8054 (Tandem normal + Tridem Festpreis) | **BESTANDEN** (`playwright.blp403k.config.ts`) |
 | Adopt-Freeze / Nachfolgerlisten-Pin getrennt | **Feature-Tests** |
 | Budget / Abbinder | **bewusst nicht** |
-| Merge / Deploy | **kein** |
+| Merge | **erledigt** (PR #128 / `0ff11aa…`; Post-Merge-CI `37611870573` SUCCESS) |
+| Deploy | **kein** |
 
 ## BL-P4-03g – Calendar in Standardangeboten / PO-BLP403G-1 (Oktober 2026)
 

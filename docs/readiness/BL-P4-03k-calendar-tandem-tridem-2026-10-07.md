@@ -1,8 +1,10 @@
 # Readiness: BL-P4-03k – Calendar × Tandem/Tridem in Standardangeboten
 
-Status: **READY** (PO-BLP403K-1 akzeptiert A1; Feature-Branch / Draft-PR)
-Stand: 7. Oktober 2026
-Audit-/Implementierungsbasis: `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a` (PR #127)
+Status: **READY** (PO-BLP403K-1 akzeptiert A1; auf `main` PR #128)
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Audit-/Implementierungsbasis: `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
+(Merge PR #128; Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
+Historische Readiness-Basis vor Merge: `e44c1cf436c6e1a63781910c7c1cd46ae019903a` (PR #127)
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-012`, `COM-009`,
 `PRI-002`/`PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`, **PO-BLP403K-1**, Slice **BL-P4-03k**
 Entscheidung: [`docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](../entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md)
@@ -13,14 +15,17 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](../
 |---|---|
 | UX-GATE-D Teilfreigabe Calendar×Tandem/Tridem | **akzeptiert** (A1; B1+C1 übernommen) |
 | Calendar 03g–03j / Average×Tandem 03f | auf Main |
-| Calc Calendar × Tandem/Tridem × Settlement | Feature-Tests ergänzt |
+| Calc Calendar × Tandem/Tridem × Settlement | Feature-Tests |
 | Materialisierung v4 Vertragserweiterung | umgesetzt (kein v5, keine Schema-Migration) |
 | Budget / Abbinder | bewusst außerhalb |
-| Merge / Deploy | **kein** Merge, **kein** Deploy |
+| Merge | **erledigt** (PR #128 / `0ff11aa…`) |
+| Post-Merge-CI | **SUCCESS** (`37611870573`) |
+| Deploy | **kein** Deploy |
+| Manuelle Fachabnahme | von Merge **getrennt**; Statuskorrektur ersetzt keine fehlende Abnahme |
 
-**Readiness-Urteil: READY** – Slice auf Feature-Branch / Draft-PR. Reader vor dieser
-Erweiterung (PR #127) weist Calendar×`component_profile` ab; neue Snapshots brauchen den
-erweiterten Reader. **Keine** Deployment-Freigabe.
+**Readiness-Urteil: READY** – Slice auf `main`. Reader vor dieser Erweiterung (PR #127)
+weist Calendar×`component_profile` ab; neue Snapshots brauchen den erweiterten Reader.
+**Keine** Deployment-Freigabe.
 
 ## 1. Akzeptierter Adoption-Vertrag
 
@@ -66,4 +71,5 @@ Getrennt: Adopt-Freeze nach Live-Preisänderung (+ DB-Reload); Nachfolgerlisten-
 
 ## 4. Bewusst offen
 
-Budget-Vorlagen, Abbinder/SPT-013, Merge/Deploy.
+Budget-Vorlagen, Abbinder/SPT-013, Deploy.
+Historische Scope-Entscheidungen unverändert.
