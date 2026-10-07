@@ -203,3 +203,19 @@ export function trailerSettlementReset(): {
         fixed_price_nn_input: '',
     };
 }
+
+/**
+ * Entscheidet außerhalb des React-State-Updaters, ob Festpreis-Validierung
+ * nach Inventar-/Mediumwechsel bereinigt werden muss (Ziel = Trailer).
+ * Keine Abhängigkeit von synchroner Ausführung von setState-Updatern.
+ */
+export function shouldClearTrailerSettlementForTargetMedium(
+    catalog: TrailerMediumChangeCatalog,
+    targetMediumId: number | null | undefined,
+): boolean {
+    if (targetMediumId === null || targetMediumId === undefined) {
+        return false;
+    }
+
+    return isSwfTrailerMedium(catalog, targetMediumId);
+}

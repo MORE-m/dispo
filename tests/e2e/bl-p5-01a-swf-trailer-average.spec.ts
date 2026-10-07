@@ -277,6 +277,76 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
         );
     });
 
+    test('Spot Festpreis-Validierungsfehler → Trailer: Fehler weg, Preview/Save/Reload', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+        await login(page);
+        await openNewCalculationStepTwo(
+            page,
+            'Trailer Festpreis Validierung Cleanup GmbH',
+        );
+
+        const expand = page.locator('[data-test="position-inventory-expand-0"]');
+        if (await expand.isVisible()) {
+            await expand.click();
+        }
+        await page.locator('[data-test="position-inventory-tile-0-TTA"]').click();
+        await page
+            .locator('[data-test="position-medium-0"]')
+            .selectOption({ label: 'Spot Classic' });
+
+        await fillRange(page, 0, '8', '9', '10');
+        await waitForPreview(page);
+
+        await page
+            .locator('[data-test="pricing-settlement-radio-0-fixed_price"]')
+            .check();
+        await page.locator('[data-test="fixed-price-nn-0"]').fill('');
+
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page.locator('[data-test="preview-error"]')).toContainText(
+            'Festpreis erfordert',
+            { timeout: 10_000 },
+        );
+
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await page
+            .locator('[data-test="position-medium-0"]')
+            .selectOption({ label: trailerMedium });
+
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
+        ).toHaveCount(0);
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-normal"]'),
+        ).toBeChecked();
+        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveCount(0);
+        await expect(page.locator('[data-test="preview-error"]')).toHaveCount(0);
+        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
+
+        await expectTrailerUi(page, 0, '20');
+        await waitForPreview(page);
+        await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText(
+            grossA,
+            { timeout: 20_000 },
+        );
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await waitForPreview(page);
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 30_000 });
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expectTrailerUi(page, 0, '20');
+        await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText(
+            grossA,
+            { timeout: 20_000 },
+        );
+        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
+    });
+
     test('Trailer Inventar A → B: Ziel-Länge, Ziel-Aufschlag, Zielpreise', async ({
         page,
     }) => {

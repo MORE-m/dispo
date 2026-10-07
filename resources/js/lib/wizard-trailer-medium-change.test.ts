@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     resolveComponentsAfterMediumChange,
+    shouldClearTrailerSettlementForTargetMedium,
     trailerLengthFromRule,
     trailerSettlementReset,
     type ComponentStashEntry,
@@ -215,5 +216,22 @@ describe('trailerLengthFromRule / trailerSettlementReset', () => {
             pricing_settlement_mode: 'normal',
             fixed_price_nn_input: '',
         });
+    });
+});
+
+describe('shouldClearTrailerSettlementForTargetMedium', () => {
+    it('ist true nur für Trailer-Zielmedium (direkt oder nach Inventar-Rebind)', () => {
+        expect(shouldClearTrailerSettlementForTargetMedium(catalog, 2)).toBe(
+            true,
+        );
+        expect(shouldClearTrailerSettlementForTargetMedium(catalog, 1)).toBe(
+            false,
+        );
+        expect(
+            shouldClearTrailerSettlementForTargetMedium(catalog, null),
+        ).toBe(false);
+        expect(
+            shouldClearTrailerSettlementForTargetMedium(catalog, undefined),
+        ).toBe(false);
     });
 });

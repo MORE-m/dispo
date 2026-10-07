@@ -89,6 +89,7 @@ import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import {
     isSwfTrailerMedium,
     resolveComponentsAfterMediumChange,
+    shouldClearTrailerSettlementForTargetMedium,
     trailerSettlementReset,
     type ComponentStashEntry,
 } from '@/lib/wizard-trailer-medium-change';
@@ -1970,12 +1971,72 @@ export default function CalculationWizard({
         return true;
     }
 
+    function resolveTargetMediumIdAfterPatch(
+        item: PositionDraft,
+        patch: Partial<PositionDraft>,
+    ): number | null {
+        if (patch.advertising_medium_id !== undefined) {
+            const medium = catalog.media.find(
+                (candidate) => candidate.id === patch.advertising_medium_id,
+            );
+            return medium?.id ?? null;
+        }
+
+        if (patch.inventory_id !== undefined) {
+            const rebound = rebindPositionOnInventoryChange(
+                item,
+                patch.inventory_id,
+                catalog,
+                allowedMediaFor(patch.inventory_id),
+            );
+            return rebound?.advertising_medium_id ?? null;
+        }
+
+        return null;
+    }
+
+    function clearTrailerSettlementValidationForIndex(positionIndex: number) {
+        setSettlementValidationTouched((current) => {
+            const copy = { ...current };
+            delete copy[positionIndex];
+            return copy;
+        });
+        setSaveFieldErrors((current) => {
+            const nextErrors = { ...current };
+            delete nextErrors[`positions.${positionIndex}.fixed_price_nn`];
+            delete nextErrors[
+                `positions.${positionIndex}.pricing_settlement_mode`
+            ];
+            return nextErrors;
+        });
+        // Save-Banner (preview-error) von Festpreis-Validierung mitentfernen.
+        setSaveError((current) =>
+            current !== null && current.includes('Festpreis erfordert')
+                ? null
+                : current,
+        );
+    }
+
     function updatePosition(index: number, patch: Partial<PositionDraft>) {
         if (usesRegularPlanningEditorView && planningMode === 'budget') {
             setBudgetProposalManual(true);
         }
 
-        let clearTrailerSettlementValidation = false;
+        // Zielmedium vor dem Positions-Updater bestimmen – Fehlerbereinigung darf
+        // nicht davon abhängen, ob React den Updater synchron ausführt (Batching).
+        const currentItem = positions[index];
+        const targetMediumId =
+            currentItem !== undefined
+                ? resolveTargetMediumIdAfterPatch(currentItem, patch)
+                : null;
+        const clearTrailerSettlement = shouldClearTrailerSettlementForTargetMedium(
+            catalog,
+            targetMediumId,
+        );
+
+        if (clearTrailerSettlement) {
+            clearTrailerSettlementValidationForIndex(index);
+        }
 
         setPositions((current) =>
             current.map((item, itemIndex) => {
@@ -2058,7 +2119,6 @@ export default function CalculationWizard({
                                 ...next,
                                 ...trailerSettlementReset(),
                             };
-                            clearTrailerSettlementValidation = true;
                         }
 
                         if (
@@ -2144,27 +2204,12 @@ export default function CalculationWizard({
                             ...next,
                             ...trailerSettlementReset(),
                         };
-                        clearTrailerSettlementValidation = true;
                     }
                 }
 
                 return next;
             }),
         );
-
-        if (clearTrailerSettlementValidation) {
-            setSettlementValidationTouched((current) => {
-                const copy = { ...current };
-                delete copy[index];
-                return copy;
-            });
-            setSaveFieldErrors((current) => {
-                const nextErrors = { ...current };
-                delete nextErrors[`positions.${index}.fixed_price_nn`];
-                delete nextErrors[`positions.${index}.pricing_settlement_mode`];
-                return nextErrors;
-            });
-        }
     }
 
     function removePosition(index: number) {
