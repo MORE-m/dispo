@@ -3,7 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 const monday = '2026-03-02';
 const hour8 = 8;
 const tandemGross = '600,00';
-const tandemNn = '888,50';
 const tridemGross = '760,00';
 const tridemNn = '1.200,00';
 
