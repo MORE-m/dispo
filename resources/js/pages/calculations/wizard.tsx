@@ -297,6 +297,7 @@ type Catalog = {
         is_active: boolean;
         is_bookable_for_new_positions: boolean;
         unbookable_reason: string | null;
+        kind?: string | null;
         calculation_method_options?: CalculationMethodOptions | null;
         component_profile?: SpotComponentProfile | null;
     }[];
@@ -610,6 +611,20 @@ function ruleFor(catalog: Catalog, inventoryId: number, mediumId: number) {
         (item) =>
             item.inventory_id === inventoryId &&
             item.advertising_medium_id === mediumId,
+    );
+}
+
+/**
+ * BL-P5-01a: Trailer (kind swf_trailer) kennt keine Spot-Komponenten
+ * (Hauptspot/Allonge/Tandem/Tridem); Backend lehnt sie ab.
+ */
+function mediumSupportsSpotComponents(
+    catalog: Catalog,
+    mediumId: number,
+): boolean {
+    return (
+        catalog.media.find((item) => item.id === mediumId)?.kind !==
+        'swf_trailer'
     );
 }
 
@@ -4185,6 +4200,10 @@ export default function CalculationWizard({
                                                             return (
                                                                 <div className="space-y-2">
                                                                     {!forcedProfile &&
+                                                                    mediumSupportsSpotComponents(
+                                                                        catalog,
+                                                                        position.advertising_medium_id,
+                                                                    ) &&
                                                                     position
                                                                         .components
                                                                         .length ===
