@@ -128,8 +128,16 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - A1 akzeptiert: Calendar × Festpreis × optional Hauptspot+Allonge; Strategien laut Inventarregel.
 - B1+C1 übernommen; explizite v4-Vertragserweiterung (kein v5).
 - From-Calc reine Calendar-Festpreis-Quellen inkl. Komponenten; Mix abgewiesen.
-- Draft-PR; **kein** Merge/Deploy.
+- Auf `main`: **PR #127** (`e44c1cf…`), Post-Merge-CI `37527679296` SUCCESS; **kein** Deploy.
 - Dok: `docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`.
+
+### Slice BL-P4-03k – Calendar × Tandem/Tridem (PO-BLP403K-1)
+
+- A1 akzeptiert: Calendar × Tandem und Tridem × normal und Festpreis; verbindlich `shared_total_length`.
+- B1+C1 übernommen; explizite v4-Vertragserweiterung (kein v5).
+- From-Calc reine Calendar-Profil-Quellen; Mix abgewiesen.
+- Draft-PR; **kein** Merge/Deploy.
+- Dok: `docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`.
 
 ### Slice BL-P4-03e – Festpreis in Average-Vorlagen
 

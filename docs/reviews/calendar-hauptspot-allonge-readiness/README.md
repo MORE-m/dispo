@@ -28,6 +28,7 @@ Der historische 03h-Post-Merge-Run `37421402438` bleibt fehlgeschlagen. Der Advi
 
 ## Offen
 
-Calendar×Festpreis×Komponenten/Tandem, Budget-Vorlagen, Abbinder/SPT-013.
+Calendar×Tandem, Budget-Vorlagen, Abbinder/SPT-013.
 Folgeslice Festpreis-Einzelspot: [`calendar-festpreis-readiness`](../calendar-festpreis-readiness/README.md) (`PO-BLP403I-1` A1, PR #126 auf `main`).
-Folgeslice Festpreis×Allonge: [`calendar-festpreis-hauptspot-allonge-readiness`](../calendar-festpreis-hauptspot-allonge-readiness/README.md) (`PO-BLP403J-1` Vorgeschlagen).
+Folgeslice Festpreis×Allonge: [`calendar-festpreis-hauptspot-allonge-readiness`](../calendar-festpreis-hauptspot-allonge-readiness/README.md) (`PO-BLP403J-1` A1, PR #127 auf `main`).
+Folgeslice Tandem/Tridem: [`calendar-tandem-tridem-readiness`](../calendar-tandem-tridem-readiness/README.md) (`PO-BLP403K-1` vorgeschlagen).

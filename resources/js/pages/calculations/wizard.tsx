@@ -74,6 +74,7 @@ import {
 } from '@/lib/pricing-settlement';
 import {
     calculationMethodPayloadFields,
+    findMethodOption,
     hasSubmittableCalculationMethodKey,
     initMethodStateForExistingPosition,
     initMethodStateForNewPosition,
@@ -2080,6 +2081,59 @@ export default function CalculationWizard({
                         position_discounts: [],
                         field_schema: null,
                     };
+
+                    // BL-P4-03k: Inventarwechsel kann das Medium (Tandem↔Tridem) ändern.
+                    // Profile-Slots neu binden; Methode/Timing behalten, wenn auf dem
+                    // neuen Medium noch wählbar (sonst würde Calendar→Average resetten).
+                    if (
+                        next.advertising_medium_id !==
+                        item.advertising_medium_id
+                    ) {
+                        const componentState =
+                            resolveComponentsAfterMediumChange(
+                                item,
+                                next.advertising_medium_id,
+                                catalog,
+                                component_profiles,
+                                componentStashRef.current,
+                            );
+                        next = {
+                            ...next,
+                            length_seconds: componentState.length_seconds,
+                            components: componentState.components,
+                            component_calculation_strategy:
+                                componentState.strategy,
+                        };
+
+                        const nextMedium = catalog.media.find(
+                            (candidate) =>
+                                candidate.id === next.advertising_medium_id,
+                        );
+                        const previousMethodStillLive = findMethodOption(
+                            nextMedium?.calculation_method_options,
+                            item.calculation_method_key,
+                        );
+                        if (previousMethodStillLive) {
+                            next = {
+                                ...next,
+                                calculation_method_key:
+                                    previousMethodStillLive.key,
+                                calculation_method_name:
+                                    previousMethodStillLive.name,
+                                historical_calculation_method_key: null,
+                                historical_calculation_method_name: null,
+                                planner_entries: item.planner_entries,
+                                time_ranges: item.time_ranges,
+                                total_spot_count: isCalendarCalculationMethod(
+                                    previousMethodStillLive.key,
+                                )
+                                    ? totalPlannerSpotCount(
+                                          item.planner_entries,
+                                      )
+                                    : totalSpotCount(item.time_ranges),
+                            };
+                        }
+                    }
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(
                         (candidate) =>
@@ -4102,8 +4156,8 @@ export default function CalculationWizard({
                                                         </div>
 
                                                         {(() => {
-                                                            // BL-P4-03c/03f/03h: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
-                                                            // Calendar-Vorlagen: optionale Allonge erlaubt; Tandem/Tridem weiter ausgeblendet.
+                                                            // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                            // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
                                                             const positionProfile =
                                                                 profileForMedium(
                                                                     catalog,
@@ -4120,14 +4174,8 @@ export default function CalculationWizard({
                                                                       ]
                                                                     : undefined;
 
-                                                            const calendarTemplate =
-                                                                isStandardOffer &&
-                                                                isCalendarCalculationMethod(
-                                                                    position.calculation_method_key,
-                                                                );
                                                             const showForcedProfileUi =
-                                                                forcedProfile &&
-                                                                !calendarTemplate;
+                                                                forcedProfile;
                                                             const showOptionalComponentsUi =
                                                                 !forcedProfile &&
                                                                 position

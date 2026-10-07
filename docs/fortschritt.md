@@ -1,39 +1,39 @@
 # Fortschritt V1
 
-Stand: 6. Oktober 2026 – **BL-P4-03j / PO-BLP403J-1** Calendar × Festpreis ×
-Hauptspot+Allonge (A1 akzeptiert, Feature-Branch / Draft-PR). Basis `origin/main` @
-`4a9dd4e518d123e01f61e932fc1b34b8e109a87f` (Merge PR #126).
-Lokale Arbeitsbasis unverändert: Checkout `dispo-main`, Port **8000**, Dev-DB
-**`dispo_mat_core`**; Alt-`dispo` stillgelegt. **Kein** Merge/Deploy.
+Stand: 7. Oktober 2026 – **BL-P4-03k / PO-BLP403K-1** Calendar × Tandem/Tridem
+(A1 akzeptiert, Feature-Branch / Draft-PR). Basis `origin/main` @
+`e44c1cf436c6e1a63781910c7c1cd46ae019903a` (Merge PR #127). Lokale Arbeitsbasis
+unverändert: Checkout `dispo-main`, Port **8000**, Dev-DB **`dispo_mat_core`**;
+Alt-`dispo` stillgelegt. **Kein** Merge/Deploy.
 
-03i auf `main`: PR #126 / Merge `4a9dd4e…`; Post-Merge-CI `37483249060` **SUCCESS**.
-**Kein** Deploy.
+03j auf `main`: PR #127 / Merge `e44c1cf…`; Post-Merge-CI `37527679296` **SUCCESS**.
+**Kein** Deploy. **03k** Draft-PR; bis Merge **nicht** als auf `main` erledigt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03i** auf `main`;
-**03j** Draft-PR);
+(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03j** auf `main`;
+**03k** Draft-PR);
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP403J-1 / BL-P4-03j** Calendar × Festpreis × optional Hauptspot+Allonge – Draft-PR.
+**PO-BLP403K-1 / BL-P4-03k** Calendar × Tandem/Tridem × normal/Festpreis – Draft-PR.
 Kein Merge/Deploy in diesem Auftrag.
 
 Kein weiterer Slice ohne Folgeauftrag. Offen / zurückgestellt u. a.:
-Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen / Calendar×Tandem
-(BL-P4-03 Rest), SPT-013 Abbinder, weitere Status-Mails / In-App, weitere
+Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen (BL-P4-03 Rest),
+SPT-013 Abbinder, weitere Status-Mails / In-App, weitere
 Freigabeinvalidierungs-Auslöser nur mit neuem Edit-Pfad, Nicht-Spot / CRM / REP
 (V1-verbindlich, phasenverschoben), ADV-001 Defaults, ADV-002 Systemfeld-Overrides,
 Hinweistexte aus Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP403I-1 / BL-P4-03i** Calendar × Festpreis Einzelspot – **PR #126**, Merge
-`4a9dd4e518d123e01f61e932fc1b34b8e109a87f`; Post-Merge-CI `37483249060`
-**SUCCESS**; **kein** Deploy.
+**PO-BLP403J-1 / BL-P4-03j** Calendar × Festpreis × optional Hauptspot+Allonge –
+**PR #127**, Merge `e44c1cf436c6e1a63781910c7c1cd46ae019903a`; Post-Merge-CI
+`37527679296` **SUCCESS**; **kein** Deploy.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
@@ -201,7 +201,7 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Adopt Frozen-Parity inkl. Komponenten | **umgesetzt** |
 | Legacy Average v1–v3 + Calendar-v4-Einzelspot + Average-v4 | **Regressionstests** |
 | Isolierter Browser-Smoke Port 8051 | **BESTANDEN** (`playwright.blp403h.config.ts`) |
-| Calendar×Festpreis/Tandem, Budget, Abbinder | **bewusst nicht** (Festpreis-Einzelspot: PO-BLP403I-1 A1 auf `main` PR #126; Komponenten-Folgeslice: PO-BLP403J-1 vorgeschlagen) |
+| Calendar×Festpreis/Tandem, Budget, Abbinder | **bewusst nicht** (Festpreis-Einzelspot: PO-BLP403I-1 A1 auf `main` PR #126; Komponenten: PO-BLP403J-1 auf `main` PR #127; Tandem: PO-BLP403K-1 vorgeschlagen) |
 | Merge | **PR #124** `5f13499…` |
 | Historischer Post-Merge-Run `37421402438` | **FAILURE** (`npm audit --omit=dev`, GHSA-68fv-2mgg-jv7q); mysql/e2e-spt008 und Pint/PHPStan/Pest grün; Browser-Steps übersprungen |
 | Deploy | **kein** |
@@ -226,7 +226,7 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Adopt Frozen-Parity 600.00 / 500.00 | **umgesetzt** (Feature-Tests) |
 | Calendar×`normal`×Allonge (03h) Regression | **Feature-Tests** |
 | Isolierter Browser-Smoke Port 8052 | **BESTANDEN** (`playwright.blp403i.config.ts`) |
-| Calendar×Festpreis×Komponenten / Tandem / Budget | **bewusst nicht** (Komponenten: PO-BLP403J-1 vorgeschlagen) |
+| Calendar×Festpreis×Komponenten / Tandem / Budget | **bewusst nicht** (Komponenten: PO-BLP403J-1 auf `main` PR #127; Tandem: PO-BLP403K-1 vorgeschlagen) |
 | Merge `main` | **PR #126** (`4a9dd4e518d123e01f61e932fc1b34b8e109a87f`) |
 | Post-Merge CI | **`37483249060` SUCCESS** |
 | Deploy | **kein** Deploy |
@@ -236,12 +236,27 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Prüfpunkt | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
-| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Festpreis×Komponenten | **umgesetzt** (Draft-PR) |
+| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Festpreis×Komponenten | **umgesetzt** (`main`) |
 | Shared 600/500 (`''`) / Individual 640/520 (420/220) | **Feature-Tests** (+ Komponentenbrutto 420/220) |
 | Calc-Triple Persistenz/Reload | **Feature-Tests** |
 | Isolierter Browser-Smoke Port 8053 (Shared + Individual Full-Flow) | **BESTANDEN** (`playwright.blp403j.config.ts`) |
 | Publish nach Inventarstrategie-Wechsel / Datum außerhalb Preisjahr | **Feature-Tests** (Jahresübertritt getrennt) |
-| Calendar×Tandem / Budget / Abbinder | **bewusst nicht** |
+| Calendar×Tandem / Budget / Abbinder | **bewusst nicht** (Tandem: PO-BLP403K-1 vorgeschlagen) |
+| Merge `main` | **PR #127** (`e44c1cf436c6e1a63781910c7c1cd46ae019903a`) |
+| Post-Merge CI | **`37527679296` SUCCESS** |
+| Deploy | **kein** Deploy |
+
+## BL-P4-03k – Calendar × Tandem/Tridem / PO-BLP403K-1 (Oktober 2026)
+
+| Prüfpunkt | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe A1 (+ B1+C1) | **akzeptiert** |
+| Draft/Sanitize/Freeze v4-Erweiterung/Hydrate Calendar×Profil | **umgesetzt** (Draft-PR) |
+| Viererkombination Tandem/Tridem × normal/Festpreis (600/888.50, 760/1200) | **Feature-Tests** |
+| Calc Persistenz/Reload vier Kombinationen | **Feature-Tests** |
+| Isolierter Browser-Smoke Port 8054 (Tandem normal + Tridem Festpreis) | **BESTANDEN** (`playwright.blp403k.config.ts`) |
+| Adopt-Freeze / Nachfolgerlisten-Pin getrennt | **Feature-Tests** |
+| Budget / Abbinder | **bewusst nicht** |
 | Merge / Deploy | **kein** |
 
 ## BL-P4-03g – Calendar in Standardangeboten / PO-BLP403G-1 (Oktober 2026)

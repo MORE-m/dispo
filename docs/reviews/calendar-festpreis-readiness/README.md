@@ -25,5 +25,7 @@ CI `37446149806` SUCCESS; historischer Run `37421402438` bleibt FAILURE.
 ## Offen
 
 Calendar×Festpreis×Komponenten (Folgeslice [`calendar-festpreis-hauptspot-allonge-readiness`](../calendar-festpreis-hauptspot-allonge-readiness/README.md),
-`PO-BLP403J-1` vorgeschlagen), Tandem am Calendar, Budget, Abbinder.
+`PO-BLP403J-1` auf `main` PR #127), Tandem am Calendar
+([`calendar-tandem-tridem-readiness`](../calendar-tandem-tridem-readiness/README.md),
+`PO-BLP403K-1` vorgeschlagen), Budget, Abbinder.
 Kein Deploy.

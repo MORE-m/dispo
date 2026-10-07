@@ -1,8 +1,10 @@
 # Readiness: BL-P4-03j – Calendar × Festpreis × Hauptspot+Allonge in Standardangeboten
 
-Status: **READY** (PO-BLP403J-1 akzeptiert A1; Feature-Branch / Draft-PR)
-Stand: 6. Oktober 2026
-Audit-/Implementierungsbasis: `origin/main` @ `4a9dd4e518d123e01f61e932fc1b34b8e109a87f` (PR #126)
+Status: **READY** (PO-BLP403J-1 akzeptiert A1; auf `main` PR #127)
+Stand: 7. Oktober 2026 (Statusnachzug Merge)
+Audit-/Implementierungsbasis: `origin/main` @ `e44c1cf436c6e1a63781910c7c1cd46ae019903a`
+(Merge PR #127; Post-Merge-CI [`37527679296`](https://github.com/MORE-m/dispo/actions/runs/37527679296) SUCCESS).
+Entscheidungsbasis damals: `4a9dd4e…` (PR #126).
 IDs: `STD-001`–`STD-009`, `VER-004`, `SPT-005`–`SPT-008`, `SPT-014`, `COM-009`,
 `PRI-002`/`PO-PRI-YEAR-1`, `AUTH-006`/`AUTH-007`, **PO-BLP403J-1**, Slice **BL-P4-03j**
 Entscheidung: [`docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`](../entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md)
@@ -15,10 +17,12 @@ Entscheidung: [`docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-al
 | Calendar × `normal` × Allonge (03h) / Festpreis Einzelspot (03i) | auf Main |
 | Calc Calendar × N/N-Festpreis × Komponenten | Engine orthogonal; Triple-Tests ergänzt |
 | Materialisierung v4 Vertragserweiterung | umgesetzt (kein v5, keine Schema-Migration) |
-| Calendar×Tandem / Budget / Abbinder | bewusst außerhalb |
-| Merge / Deploy | **kein** Merge, **kein** Deploy |
+| Calendar×Tandem / Budget / Abbinder | bewusst außerhalb (Tandem: PO-BLP403K-1 vorgeschlagen) |
+| Merge `main` | **PR #127** (`e44c1cf…`) |
+| Post-Merge CI | **`37527679296` SUCCESS** |
+| Deploy | **kein** Deploy |
 
-**Readiness-Urteil: READY** – Slice auf Feature-Branch / Draft-PR. Reader vor dieser
+**Readiness-Urteil: READY** – Slice auf `main` (PR #127). Reader vor dieser
 Erweiterung (PR #126) weist Calendar-Festpreis×Komponenten ab; neue Snapshots brauchen den
 erweiterten Reader. **Keine** Deployment-Freigabe.
 
@@ -59,4 +63,5 @@ Review-Nachzug (Feature-Tests, getrennt von Adopt-Freeze und Nachfolgerlisten-Pi
 
 ## 4. Bewusst offen
 
-Calendar×Tandem, Budget-Vorlagen, Abbinder/SPT-013, Merge/Deploy.
+Calendar×Tandem (Folgeslice `PO-BLP403K-1` / `BL-P4-03k` vorgeschlagen),
+Budget-Vorlagen, Abbinder/SPT-013, Deploy.

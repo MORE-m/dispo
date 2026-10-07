@@ -614,17 +614,7 @@ class StandardOfferBlP403iTest extends TestCase
             $this->assertArrayHasKey('positions.0.fixed_price_nn', $exception->errors());
         }
 
-        try {
-            $this->writer()->create('Cal Tandem', $this->calendarFestpreisPayload(
-                $catalog,
-                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
-                '100.00',
-                ['component_profile' => 'tandem'],
-            ), $pm);
-            $this->fail('Calendar+Tandem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
-        }
+        // Calendar×Tandem: freigegeben in BL-P4-03k – Positivfälle dort.
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$this->calendarFestpreisPayload($catalog, [

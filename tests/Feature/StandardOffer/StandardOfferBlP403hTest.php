@@ -215,24 +215,14 @@ class StandardOfferBlP403hTest extends TestCase
         $this->assertSame(0, StandardOffer::query()->count());
     }
 
-    public function test_rejects_calendar_tandem_budget_still(): void
+    public function test_rejects_budget_still(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $this->setRuleStrategy($catalog, ComponentCalculationStrategy::SharedTotalLength);
         $this->setSecondPrice($catalog, '2.0000');
 
-        try {
-            $this->writer()->create('Cal Tandem', $this->calendarComponentsDraftPayload(
-                $catalog,
-                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
-                ComponentCalculationStrategy::SharedTotalLength,
-                ['component_profile' => 'tandem'],
-            ), $pm);
-            $this->fail('Calendar+Tandem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0.component_profile', $exception->errors());
-        }
+        // Calendar×Tandem: freigegeben in BL-P4-03k – Positivfälle dort.
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$this->calendarComponentsDraftPayload(
@@ -486,10 +476,12 @@ class StandardOfferBlP403hTest extends TestCase
                     return $mat;
                 },
             ],
-            'calendar profile forbidden' => [
-                'needle' => 'component_profile ist für Calendar nicht erlaubt',
+            'calendar profile slots mismatch' => [
+                // Allonge-Sorts (0/1) passen nicht zu Tandem-Slots (1/2).
+                'needle' => 'components.0.sort',
                 'mutate' => static function (array $mat): array {
                     $mat['positions'][0]['component_profile'] = 'tandem';
+                    $mat['positions'][0]['component_calculation_strategy'] = 'shared_total_length';
 
                     return $mat;
                 },

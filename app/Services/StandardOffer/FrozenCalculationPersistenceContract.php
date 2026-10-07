@@ -82,24 +82,31 @@ use Illuminate\Validation\ValidationException;
  *   `[]` als „kein Profil“); Profil in v1/v2 fail-closed
  *
  * v4 Ergänzung (BL-P4-03g / PO-BLP403G-1 / A1+B1+C1; erweitert BL-P4-03h / PO-BLP403H-1;
- * erweitert BL-P4-03i / PO-BLP403I-1 / A1; erweitert BL-P4-03j / PO-BLP403J-1 / A1):
+ * erweitert BL-P4-03i / PO-BLP403I-1 / A1; erweitert BL-P4-03j / PO-BLP403J-1 / A1;
+ * erweitert BL-P4-03k / PO-BLP403K-1 / A1):
  * - optional `spot_method=calendar` mit Pflicht-`planner_entries` (konkrete ISO-Daten)
  * - **03h:** Calendar × `normal` darf optional Hauptspot+Allonge
- *   (`components` + `component_calculation_strategy`) wie Average-Allonge; kein `component_profile`
+ *   (`components` + `component_calculation_strategy`) wie Average-Allonge
  * - **03i Vertragserweiterung:** Calendar-Einzelspot (`components` leer/absent) darf
  *   `pricing_settlement_mode` `normal`|`fixed_price` inkl. `fixed_price_nn` (02d/03e-Semantik).
  * - **03j Vertragserweiterung:** Calendar × Festpreis × optional Hauptspot+Allonge
  *   (Strategien laut Inventarregel). Reader vor dieser Erweiterung (PR #126) weist
  *   Calendar-Festpreis×Komponenten ab – neue Snapshots brauchen den erweiterten Reader
  *   (Keys allein ≠ Kompatibilität mit #126-Code). Kein v5, keine Schema-Migration.
+ * - **03k Vertragserweiterung:** Calendar × optional `component_profile` `tandem`|`tridem`
+ *   × `normal`|`fixed_price` (02e/03f-Semantik; verbindlich `shared_total_length`;
+ *   Slot-Asserts wie Average-v3+). Reader vor dieser Erweiterung (PR #127) weist
+ *   Calendar×`component_profile` ab – neue Snapshots brauchen den erweiterten Reader
+ *   (Keys allein ≠ Kompatibilität mit #127-Code). Kein v5, keine Schema-Migration.
  * - Calendar-Hydrate: Spot-Summe = `total_spot_count`; keine Duplikat-Zellen;
  *   `day_group` muss zum Datum passen; `second_price`/`line_gross` dezimal gültig
  * - Average-Positionen in v4 wie v3; `planner_entries` absent/`[]` (nicht-leer fail-closed)
- * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten/`fixed_price_nn` ohne Live-Preisauflösung
- * - Legacy v1–v3 Average, v4 Calendar×`normal` (inkl. 03h-Allonge), Calendar×Festpreis-Einzelspot
- *   (03i) und Average-v4 weiter lesbar
+ * - Adopt hydratisiert Frozen-Zellen/Preise/Pins/Summen/Komponenten/Profil/`fixed_price_nn`
+ *   ohne Live-Preisauflösung
+ * - Legacy v1–v3 Average, v4 Calendar×`normal` (inkl. 03h-Allonge), Calendar×Festpreis
+ *   (03i/03j) und Average-v4 weiter lesbar
  *
- * Verbleibende Pflege bei weiteren Methoden (Calendar×Tandem, Abbinder, Budget):
+ * Verbleibende Pflege bei weiteren Methoden (Abbinder, Budget):
  * 1) neue `materialization_version` oder explizite Contract-Erweiterung,
  * 2) Freeze-Seite im Materializer erweitern,
  * 3) Hydrate-Asserts + Persistenzspiegel hier erweitern,
@@ -117,7 +124,7 @@ final class FrozenCalculationPersistenceContract
 
     public const LEGACY_IMPLICIT_VERSION = 1;
 
-    /** Aktuelle Freeze-Schreibversion (Calendar×normal inkl. Allonge, Calendar×Festpreis Einzelspot, Average-Varianten). */
+    /** Aktuelle Freeze-Schreibversion (Calendar×normal/Festpreis inkl. Allonge/Tandem/Tridem, Average-Varianten). */
     public const CURRENT_WRITE_VERSION = 4;
 
     /**
@@ -395,31 +402,25 @@ final class FrozenCalculationPersistenceContract
     }
 
     /**
-     * BL-P4-03g/03h/03i/03j: Calendar×normal/Festpreis optional Hauptspot+Allonge;
-     * Settlement in assertAverageMethodAndSettlement.
+     * BL-P4-03g/03h/03i/03j/03k: Calendar×normal/Festpreis optional Hauptspot+Allonge
+     * oder Tandem/Tridem-Profil; Settlement in assertAverageMethodAndSettlement.
      *
      * @param  array<string, mixed>  $position
      */
     private function assertCalendarPositionChildren(array $position, int $index, int $version): void
     {
-        $profileRaw = $position['component_profile'] ?? null;
-        if ($profileRaw !== null && $profileRaw !== '' && $profileRaw !== []) {
-            throw ValidationException::withMessages([
-                'frozen_materialization' => "Eingefrorene Vorlagendaten sind ungültig (Position {$index}: component_profile ist für Calendar nicht erlaubt).",
-            ]);
-        }
-
         $components = $this->assertChildList(
             $position,
             $index,
             'components',
             self::CHILD_LIST_OPTIONAL_ABSENT,
         );
-        $this->assertOptionalAllongeStrategy($position, $index, $components);
+        $this->assertComponentStrategyAndProfile($position, $index, $components, $version);
         foreach ($components as $childIndex => $component) {
             $this->assertComponentRow($component, $index, $childIndex, $position);
         }
-        if ($components !== []) {
+        $profileRaw = $position['component_profile'] ?? null;
+        if ($components !== [] && ($profileRaw === null || $profileRaw === '' || $profileRaw === [])) {
             $this->assertOptionalAllongeComponentStructure($components, $index);
         }
 

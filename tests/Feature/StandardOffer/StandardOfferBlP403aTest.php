@@ -217,7 +217,7 @@ class StandardOfferBlP403aTest extends TestCase
         ]);
     }
 
-    public function test_rejects_calendar_with_tandem_in_draft(): void
+    public function test_rejects_calendar_with_incomplete_tandem_slots_in_draft(): void
     {
         $catalog = $this->createSpotClassicCatalog();
         $pm = User::factory()->role(Role::ProductManagement)->create();
@@ -229,10 +229,11 @@ class StandardOfferBlP403aTest extends TestCase
             'hour' => 8,
             'spot_count' => 1,
         ]];
+        // Profil ohne kanonische Reminder-Slots bleibt fail-closed (gültige 03k-Fälle separat).
         $payload['positions'][0]['component_profile'] = 'tandem';
 
         $this->expectException(ValidationException::class);
-        $this->writer()->create('Ungültig Calendar Tandem', $payload, $pm);
+        $this->writer()->create('Ungültig Calendar Tandem Slots', $payload, $pm);
     }
 
     public function test_http_rejects_unsupported_options_without_coercion(): void
@@ -242,7 +243,7 @@ class StandardOfferBlP403aTest extends TestCase
         $base = $this->draftPayload($catalog);
         $base['title'] = 'Abgelehnte Vorlage';
 
-        // Calendar×Festpreis×Komponenten ist seit BL-P4-03j / A1 erlaubt; Tandem bleibt abgewiesen.
+        // Calendar×Tandem mit Allonge-Rollen/Sorts bleibt fail-closed (gültige 03k-Fälle separat).
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,
             'positions' => [[
@@ -263,7 +264,7 @@ class StandardOfferBlP403aTest extends TestCase
                     ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 1],
                 ],
             ]],
-        ])->assertSessionHasErrors('positions.0.component_profile');
+        ])->assertSessionHasErrors();
 
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$base,

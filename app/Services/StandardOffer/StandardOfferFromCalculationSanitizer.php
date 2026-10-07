@@ -7,17 +7,19 @@ use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Enums\SpotComponentProfile;
 use App\Models\Calculation;
+use App\Support\Advertising\SpotComponentProfileContract;
 use Illuminate\Validation\ValidationException;
 
 /**
  * BL-P4-03b / PO-BLP403B-1 / BL-P4-03g / PO-BLP403G-1 / BL-P4-03h / PO-BLP403H-1 /
- * BL-P4-03i / PO-BLP403I-1 / BL-P4-03j / PO-BLP403J-1 / STD-001:
+ * BL-P4-03i / PO-BLP403I-1 / BL-P4-03j / PO-BLP403J-1 / BL-P4-03k / PO-BLP403K-1 / STD-001:
  * Calc-Payload → kundenloser Vorlagen-Draft plus Prüfstufe
  * (nur Feldnamen, keine Quell-Freitextwerte).
  *
  * From-Calc: reine Average-Quellen (inkl. freigegebene Varianten) oder reine
- * Calendar-Quellen (×normal/×Festpreis, optional Hauptspot+Allonge; PO-BLP403H-1 /
- * PO-BLP403I-1 / PO-BLP403J-1 / A1). Mix Average+Calendar → komplette Ablehnung.
+ * Calendar-Quellen (×normal/×Festpreis, optional Hauptspot+Allonge oder Tandem/Tridem;
+ * PO-BLP403H-1 / PO-BLP403I-1 / PO-BLP403J-1 / PO-BLP403K-1 / A1).
+ * Mix Average+Calendar → komplette Ablehnung.
  */
 final class StandardOfferFromCalculationSanitizer
 {
@@ -211,7 +213,9 @@ final class StandardOfferFromCalculationSanitizer
 
         $profileRaw = $position['component_profile'] ?? null;
         if ($profileRaw !== null && $profileRaw !== '') {
-            $errors["positions.{$index}.component_profile"] = "{$label}: Tandem/Tridem kann nicht als Calendar-Standardangebot gespeichert werden (BL-P4-03h).";
+            if (! is_string($profileRaw) || SpotComponentProfile::tryFrom($profileRaw) === null) {
+                $errors["positions.{$index}.component_profile"] = "{$label}: Komponentenprofil ist ungültig.";
+            }
         }
 
         if (array_key_exists('components', $position) && $position['components'] === null) {
@@ -221,19 +225,29 @@ final class StandardOfferFromCalculationSanitizer
         } else {
             $components = is_array($position['components'] ?? null) ? $position['components'] : [];
             $strategy = $position['component_calculation_strategy'] ?? null;
-            if ($components !== [] && ($strategy === null || $strategy === '')) {
-                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ist für Komponenten erforderlich.";
-            }
-            if ($components === [] && $strategy !== null && $strategy !== '') {
-                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ohne Komponenten ist unzulässig.";
-            }
-            if ($strategy !== null && $strategy !== ''
-                && ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
-                $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Ungültige Komponentenstrategie.";
+            $hasProfile = is_string($profileRaw) && $profileRaw !== ''
+                && SpotComponentProfile::tryFrom($profileRaw) !== null;
+            if ($hasProfile) {
+                $profile = SpotComponentProfile::tryFrom((string) $profileRaw);
+                $required = SpotComponentProfileContract::requiredStrategy($profile)->value;
+                if ($strategy !== null && $strategy !== '' && (string) $strategy !== $required) {
+                    $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Tandem/Tridem erfordert shared_total_length.";
+                }
+            } else {
+                if ($components !== [] && ($strategy === null || $strategy === '')) {
+                    $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ist für Komponenten erforderlich.";
+                }
+                if ($components === [] && $strategy !== null && $strategy !== '') {
+                    $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Strategie ohne Komponenten ist unzulässig.";
+                }
+                if ($strategy !== null && $strategy !== ''
+                    && ComponentCalculationStrategy::tryFrom((string) $strategy) === null) {
+                    $errors["positions.{$index}.component_calculation_strategy"] = "{$label}: Ungültige Komponentenstrategie.";
+                }
             }
         }
 
-        // PO-BLP403J-1 / A1: Calendar × Festpreis auch mit optionaler Hauptspot+Allonge.
+        // PO-BLP403J-1 / PO-BLP403K-1: Calendar × Festpreis inkl. optionaler Komponenten/Profile.
         $this->assertSettlementCompatible($position, $index, $label, $errors, allowFixedPrice: true);
     }
 
@@ -329,11 +343,14 @@ final class StandardOfferFromCalculationSanitizer
             if (! array_key_exists('components', $safe) || $safe['components'] === null) {
                 $safe['components'] = [];
             }
-            $safe['component_profile'] = null;
-            if ($safe['components'] === []) {
+            $profileRaw = $safe['component_profile'] ?? null;
+            $safe['component_profile'] = is_string($profileRaw) && $profileRaw !== ''
+                ? $profileRaw
+                : null;
+            if ($safe['component_profile'] === null && $safe['components'] === []) {
                 $safe['component_calculation_strategy'] = null;
             }
-            // PO-BLP403J-1 / A1: Calendar × Festpreis auch mit optionaler Hauptspot+Allonge.
+            // PO-BLP403J-1 / PO-BLP403K-1: Calendar × Festpreis inkl. optionaler Komponenten/Profile.
             $modeRaw = $safe['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
             if ($modeRaw === '') {
                 $modeRaw = PricingSettlementMode::Normal->value;
