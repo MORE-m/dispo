@@ -1700,7 +1700,7 @@ final class CalculationWriter
 
         if ($payloadLength !== null && $payloadLength !== '') {
             $length = (int) $payloadLength;
-        } elseif ($existing !== null && ! $rebound && $existing->length_seconds !== null) {
+        } elseif ($existing !== null && ! $rebound) {
             $length = (int) $existing->length_seconds;
         } elseif ($rule !== null && $rule->default_length_seconds !== null) {
             $length = (int) $rule->default_length_seconds;
