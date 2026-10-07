@@ -19,12 +19,15 @@ use App\Models\StandardOffer;
 use App\Models\StandardOfferVersion;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\PriceList\Admin\PriceListAdminWriter;
 use App\Services\PriceList\Admin\PriceListImpactPreviewService;
 use App\Services\StandardOffer\FrozenCalculationPersistenceContract;
 use App\Services\StandardOffer\StandardOfferMaterializer;
 use App\Services\StandardOffer\StandardOfferWriter;
+use App\Support\InventoryMediumRule\InventoryMediumRuleOperativeContract;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -225,11 +228,27 @@ class StandardOfferBlP403kTest extends TestCase
         $this->assertSame($frozenPin, (int) $published->fresh()->frozen_materialization['positions'][0]['price_list_id']);
 
         $adopted = $this->writer()->adopt($published->fresh(), 'Adopt Freeze 03k', null, null, $sales);
-        $position = $adopted->fresh(['positions.plannerEntries'])->positions->firstOrFail();
+        $position = $adopted->fresh(['positions.plannerEntries', 'positions.components'])->positions->firstOrFail();
         $this->assertSame('600.00', (string) $adopted->media_gross);
         $this->assertSame('888.50', (string) $adopted->nn_invest);
         $this->assertSame('2.0000', (string) $position->plannerEntries->first()->second_price);
         $this->assertSame($frozenPin, (int) $position->price_list_id);
+        $this->assertSame('tandem', $position->component_profile?->value);
+        $this->assertCount(2, $position->components);
+
+        // Erneuter DB-Reload: Frozen-Nachweis ohne Live-Neuberechnung.
+        $reloadedCalc = Calculation::query()->with(['positions.plannerEntries', 'positions.components'])->findOrFail($adopted->id);
+        $reloadedPos = $reloadedCalc->positions->firstOrFail();
+        $this->assertSame('600.00', (string) $reloadedCalc->media_gross);
+        $this->assertSame('888.50', (string) $reloadedCalc->nn_invest);
+        $this->assertSame('2.0000', (string) $reloadedPos->plannerEntries->first()->second_price);
+        $this->assertSame($frozenPin, (int) $reloadedPos->price_list_id);
+        $this->assertSame('tandem', $reloadedPos->component_profile?->value);
+        $this->assertSame(
+            ['', ''],
+            $reloadedPos->components->sortBy('sort')->values()->map(fn ($c) => (string) ($c->media_gross ?? ''))->all(),
+        );
+        $this->assertSame('2.0000', (string) ($published->fresh()->frozen_materialization['positions'][0]['planner_entries'][0]['second_price'] ?? ''));
     }
 
     public function test_cell_edit_after_successor_list_keeps_pinned_list_a_prices(): void
@@ -288,6 +307,63 @@ class StandardOfferBlP403kTest extends TestCase
         $this->assertSame('888.50', (string) $edited->fixed_price_nn);
     }
 
+    public function test_normal_quantity_edit_after_successor_list_keeps_pin_and_follows_quantity(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $admin = User::factory()->role(Role::Admin)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $listA = PriceList::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+
+        $published = $this->publishCalendarProfile(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'normal',
+            null,
+            $pm,
+        );
+        $frozenVersion = (string) $published->frozen_materialization['positions'][0]['price_list_version'];
+        $adopted = $this->writer()->adopt($published->fresh(), 'Pin Normal 03k', null, null, $sales);
+        $this->assertSame($listA->id, (int) $adopted->positions->first()->price_list_id);
+        $this->assertSame('600.00', (string) $adopted->media_gross);
+        $this->assertSame('600.00', (string) $adopted->nn_invest);
+
+        $listB = $this->activateSuccessorList($catalog['hamburg']->id, 2026, '9.0000', $admin);
+        $this->assertNotSame($listA->id, $listB->id);
+
+        $reloaded = app(CalculationWriter::class)->payloadFromCalculation($adopted->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $reloaded['lock_version'] = $adopted->fresh()->lock_version;
+        $reloaded['positions'][0]['planner_entries'] = [
+            ['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 20],
+        ];
+        $updated = app(CalculationWriter::class)->update($adopted->fresh(), $reloaded, $sales);
+        $edited = $updated->fresh(['positions.plannerEntries'])->positions->firstOrFail();
+        $this->assertSame($listA->id, (int) $edited->price_list_id);
+        $this->assertSame($frozenVersion, (string) $edited->price_list_version);
+        $this->assertSame('2.0000', (string) $edited->plannerEntries->first()->second_price);
+        $this->assertSame(20, (int) $edited->plannerEntries->first()->spot_count);
+        // 20 × 2 × 30 × 1.00 = 1200.00; N/N folgt der Menge (normal).
+        $this->assertSame('1200.00', (string) $updated->media_gross);
+        $this->assertSame('1200.00', (string) $updated->nn_invest);
+    }
+
     public function test_from_calc_each_allowed_calendar_profile_source_and_mix_fails(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -296,61 +372,97 @@ class StandardOfferBlP403kTest extends TestCase
         $sales = User::factory()->role(Role::Sales)->create();
         $this->setSecondPrice($catalog, '2.0000');
 
-        $tandemCalcPayload = $this->withLiveSchemaFingerprint([
-            'planning_mode' => 'manual',
-            'customer_name' => 'Geheimkunde Tandem',
-            'order_discount_percent' => '0',
-            'ae_enabled' => false,
-            'order_discounts' => [],
-            'dynamic_field_values' => [],
-            'positions' => [[
-                ...$this->calendarProfilePosition(
-                    $catalog,
-                    $tandem,
-                    'tandem',
-                    $this->tandemComponents(),
-                    30,
-                    'normal',
-                    null,
-                    [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
-                ),
-            ]],
-        ]);
-        $tandemCalc = app(CalculationWriter::class)->create($tandemCalcPayload, $sales);
-        $tandemOffer = $this->writer()->createFromCalculation(
-            $tandemCalc->fresh(['positions', 'positions.components', 'positions.plannerEntries']),
-            $sales,
-        );
-        $this->assertSame('tandem', $tandemOffer->draftVersion?->draft_payload['positions'][0]['component_profile'] ?? null);
-        $this->assertArrayNotHasKey('customer_name', $tandemOffer->draftVersion?->draft_payload ?? []);
+        $sources = [
+            [
+                'label' => 'tandem normal',
+                'medium' => $tandem,
+                'profile' => 'tandem',
+                'components' => $this->tandemComponents(),
+                'length' => 30,
+                'mode' => 'normal',
+                'nn' => null,
+                'customer' => 'Geheimkunde Tandem Normal',
+            ],
+            [
+                'label' => 'tandem fixed_price',
+                'medium' => $tandem,
+                'profile' => 'tandem',
+                'components' => $this->tandemComponents(),
+                'length' => 30,
+                'mode' => 'fixed_price',
+                'nn' => '888.50',
+                'customer' => 'Geheimkunde Tandem Festpreis',
+            ],
+            [
+                'label' => 'tridem normal',
+                'medium' => $tridem,
+                'profile' => 'tridem',
+                'components' => $this->tridemComponents(),
+                'length' => 40,
+                'mode' => 'normal',
+                'nn' => null,
+                'customer' => 'Geheimkunde Tridem Normal',
+            ],
+            [
+                'label' => 'tridem fixed_price',
+                'medium' => $tridem,
+                'profile' => 'tridem',
+                'components' => $this->tridemComponents(),
+                'length' => 40,
+                'mode' => 'fixed_price',
+                'nn' => '1200.00',
+                'customer' => 'Geheimkunde Tridem Festpreis',
+            ],
+        ];
 
-        $tridemCalcPayload = $this->withLiveSchemaFingerprint([
-            'planning_mode' => 'manual',
-            'customer_name' => 'Geheimkunde Tridem',
-            'order_discount_percent' => '0',
-            'ae_enabled' => false,
-            'order_discounts' => [],
-            'dynamic_field_values' => [],
-            'positions' => [[
-                ...$this->calendarProfilePosition(
-                    $catalog,
-                    $tridem,
-                    'tridem',
-                    $this->tridemComponents(),
-                    40,
-                    'fixed_price',
-                    '1200.00',
-                    [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
-                ),
-            ]],
-        ]);
-        $tridemCalc = app(CalculationWriter::class)->create($tridemCalcPayload, $sales);
-        $tridemOffer = $this->writer()->createFromCalculation(
-            $tridemCalc->fresh(['positions', 'positions.components', 'positions.plannerEntries']),
-            $sales,
-        );
-        $this->assertSame('tridem', $tridemOffer->draftVersion?->draft_payload['positions'][0]['component_profile'] ?? null);
-        $this->assertSame('1200.00', $tridemOffer->draftVersion?->draft_payload['positions'][0]['fixed_price_nn'] ?? null);
+        foreach ($sources as $source) {
+            $calcPayload = $this->withLiveSchemaFingerprint([
+                'planning_mode' => 'manual',
+                'customer_name' => $source['customer'],
+                'order_discount_percent' => '0',
+                'ae_enabled' => false,
+                'order_discounts' => [],
+                'dynamic_field_values' => [],
+                'positions' => [[
+                    ...$this->calendarProfilePosition(
+                        $catalog,
+                        $source['medium'],
+                        $source['profile'],
+                        $source['components'],
+                        $source['length'],
+                        $source['mode'],
+                        $source['nn'],
+                        [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+                    ),
+                ]],
+            ]);
+            $calc = app(CalculationWriter::class)->create($calcPayload, $sales);
+            $offer = $this->writer()->createFromCalculation(
+                $calc->fresh(['positions', 'positions.components', 'positions.plannerEntries']),
+                $sales,
+            );
+            $draft = $offer->draftVersion;
+            $this->assertNotNull($draft, $source['label']);
+            $pos = $draft->draft_payload['positions'][0];
+            $this->assertSame($source['profile'], $pos['component_profile'] ?? null, $source['label']);
+            $this->assertSame($source['mode'], $pos['pricing_settlement_mode'] ?? null, $source['label']);
+            $this->assertSame('calendar', $pos['spot_method'] ?? null, $source['label']);
+            $this->assertSame('shared_total_length', $pos['component_calculation_strategy'] ?? null, $source['label']);
+            $this->assertCount(count($source['components']), $pos['components'] ?? [], $source['label']);
+            $this->assertSame('2026-03-02', $pos['planner_entries'][0]['date'] ?? null, $source['label']);
+            $this->assertSame(8, (int) ($pos['planner_entries'][0]['hour'] ?? 0), $source['label']);
+            $this->assertSame(10, (int) ($pos['planner_entries'][0]['spot_count'] ?? 0), $source['label']);
+            if ($source['nn'] !== null) {
+                $this->assertSame($source['nn'], $pos['fixed_price_nn'] ?? null, $source['label']);
+            } else {
+                $this->assertTrue(
+                    ! array_key_exists('fixed_price_nn', $pos) || $pos['fixed_price_nn'] === null || $pos['fixed_price_nn'] === '',
+                    $source['label'],
+                );
+            }
+            $this->assertArrayNotHasKey('customer_name', $draft->draft_payload, $source['label']);
+            $this->assertStringNotContainsString('Geheimkunde', json_encode($draft->draft_payload, JSON_THROW_ON_ERROR), $source['label']);
+        }
 
         $mixed = $this->withLiveSchemaFingerprint([
             'planning_mode' => 'manual',
@@ -410,6 +522,7 @@ class StandardOfferBlP403kTest extends TestCase
         $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
         $pm = User::factory()->role(Role::ProductManagement)->create();
         $this->setSecondPrice($catalog, '2.0000');
+        $entries = [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]];
 
         $individual = $this->calendarProfilePayload(
             $catalog,
@@ -419,19 +532,45 @@ class StandardOfferBlP403kTest extends TestCase
             30,
             'normal',
             null,
-            [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+            $entries,
         );
         $individual['positions'][0]['component_calculation_strategy'] = 'individual';
-        try {
-            $this->writer()->create('Individual 03k', $individual, $pm);
-            $this->fail('individual hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertTrue(
-                collect($exception->errors())->keys()->contains(
-                    fn ($key) => str_contains((string) $key, 'component_calculation_strategy'),
-                ),
-            );
-        }
+        $this->assertRejectedCreatePreviewPublishForCalendarProfile(
+            $catalog,
+            $tandem,
+            $pm,
+            $individual,
+            static function (array $draftPayload): array {
+                $draftPayload['positions'][0]['component_calculation_strategy'] = 'individual';
+
+                return $draftPayload;
+            },
+            'component_calculation_strategy',
+        );
+
+        $invalidProfile = $this->calendarProfilePayload(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'normal',
+            null,
+            $entries,
+        );
+        $invalidProfile['positions'][0]['component_profile'] = 'not-a-profile';
+        $this->assertRejectedCreatePreviewPublishForCalendarProfile(
+            $catalog,
+            $tandem,
+            $pm,
+            $invalidProfile,
+            static function (array $draftPayload): array {
+                $draftPayload['positions'][0]['component_profile'] = 'not-a-profile';
+
+                return $draftPayload;
+            },
+            'component_profile',
+        );
 
         $wrongRoles = $this->calendarProfilePayload(
             $catalog,
@@ -444,15 +583,78 @@ class StandardOfferBlP403kTest extends TestCase
             30,
             'normal',
             null,
-            [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 1]],
+            $entries,
         );
-        try {
-            $this->writer()->create('Wrong roles 03k', $wrongRoles, $pm);
-            $this->fail('Allonge auf Tandem hätte scheitern müssen.');
-        } catch (ValidationException $exception) {
-            $this->assertNotEmpty($exception->errors());
-        }
+        $this->assertRejectedCreatePreviewPublishForCalendarProfile(
+            $catalog,
+            $tandem,
+            $pm,
+            $wrongRoles,
+            static function (array $draftPayload): array {
+                $draftPayload['positions'][0]['components'] = [
+                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 1],
+                    ['role' => 'allonge', 'label' => 'Allonge', 'length_seconds' => 10, 'sort' => 2],
+                ];
 
+                return $draftPayload;
+            },
+            'components',
+        );
+
+        $wrongSort = $this->calendarProfilePayload(
+            $catalog,
+            $tandem,
+            'tandem',
+            [
+                ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 2],
+                ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 1],
+            ],
+            30,
+            'normal',
+            null,
+            $entries,
+        );
+        $this->assertRejectedCreatePreviewPublishForCalendarProfile(
+            $catalog,
+            $tandem,
+            $pm,
+            $wrongSort,
+            static function (array $draftPayload): array {
+                $draftPayload['positions'][0]['components'] = [
+                    ['role' => 'main_spot', 'label' => 'Hauptspot', 'length_seconds' => 20, 'sort' => 2],
+                    ['role' => 'reminder', 'label' => 'Reminder', 'length_seconds' => 10, 'sort' => 1],
+                ];
+
+                return $draftPayload;
+            },
+            'components',
+        );
+
+        $badLength = $this->calendarProfilePayload(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'normal',
+            null,
+            $entries,
+        );
+        $badLength['positions'][0]['length_seconds'] = 99;
+        $this->assertRejectedCreatePreviewPublishForCalendarProfile(
+            $catalog,
+            $tandem,
+            $pm,
+            $badLength,
+            static function (array $draftPayload): array {
+                $draftPayload['positions'][0]['length_seconds'] = 99;
+
+                return $draftPayload;
+            },
+            'length',
+        );
+
+        $offersBefore = StandardOffer::query()->count();
         $this->actingAs($pm)->post(route('standard-offers.store'), [
             ...$this->calendarProfilePayload(
                 $catalog,
@@ -467,6 +669,7 @@ class StandardOfferBlP403kTest extends TestCase
             'title' => 'Budget Reject 03k',
             'planning_mode' => 'budget',
         ])->assertSessionHasErrors();
+        $this->assertSame($offersBefore, StandardOffer::query()->count());
     }
 
     public function test_publish_after_inventory_rule_change_fails_closed(): void
@@ -519,6 +722,61 @@ class StandardOfferBlP403kTest extends TestCase
             ->count());
     }
 
+    public function test_publish_after_planning_rule_change_fails_closed(): void
+    {
+        // Forced-Profile ignorieren Inventar-Strategie Individual (shared_total_length bleibt Pflicht).
+        // Relevante Regeländerung: Einplanung auf must_not_plan – Publish fail-closed ohne Freeze.
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $offer = $this->writer()->create(
+            'Draft vor Planungsregelwechsel 03k',
+            $this->calendarProfilePayload(
+                $catalog,
+                $tandem,
+                'tandem',
+                $this->tandemComponents(),
+                30,
+                'normal',
+                null,
+                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+            ),
+            $pm,
+        );
+        $draft = $offer->draftVersion;
+        $this->assertNotNull($draft);
+        $draftId = $draft->id;
+        $lock = (int) $draft->lock_version;
+
+        InventoryMediumRule::query()
+            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('advertising_medium_id', $tandem->id)
+            ->update([
+                'planning_responsibility_key' => InventoryMediumRuleOperativeContract::PLANNING_MUST_NOT_PLAN,
+            ]);
+
+        try {
+            $this->writer()->publish($draft->fresh(), $lock, $pm);
+            $this->fail('Publish nach Planungsregelwechsel hätte scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $joined = collect($exception->errors())->flatten()->implode(' ');
+            $this->assertStringContainsString('darf nicht geplant werden', $joined);
+        }
+
+        $stillDraft = StandardOfferVersion::query()->findOrFail($draftId);
+        $this->assertSame(StandardOfferVersionStatus::Draft, $stillDraft->status);
+        $this->assertTrue(
+            $stillDraft->frozen_materialization === null
+            || $stillDraft->frozen_materialization === [],
+        );
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $offer->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
+    }
+
     public function test_missing_price_cell_and_dates_outside_price_year_and_year_crossing(): void
     {
         $catalog = $this->createSpotClassicCatalog();
@@ -555,6 +813,51 @@ class StandardOfferBlP403kTest extends TestCase
         $this->actingAs($pm)
             ->postJson(route('standard-offers.preview'), [...$missing, 'title' => 'Missing preview 03k'])
             ->assertStatus(422);
+
+        $validForPublish = $this->writer()->create(
+            'Missing price publish baseline 03k',
+            $this->calendarProfilePayload(
+                $catalog,
+                $tandem,
+                'tandem',
+                $this->tandemComponents(),
+                30,
+                'normal',
+                null,
+                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+            ),
+            $pm,
+        );
+        $publishDraft = $validForPublish->draftVersion;
+        $this->assertNotNull($publishDraft);
+        PriceListItem::query()
+            ->where('price_list_id', $active->id)
+            ->where('hour', 8)
+            ->delete();
+        try {
+            $this->writer()->publish($publishDraft->fresh(), (int) $publishDraft->lock_version, $pm);
+            $this->fail('Publish mit fehlender Preiszelle hätte scheitern müssen.');
+        } catch (ValidationException $exception) {
+            $this->assertNotEmpty($exception->errors());
+        }
+        $this->assertSame(StandardOfferVersionStatus::Draft, $publishDraft->fresh()->status);
+        $this->assertTrue(
+            $publishDraft->fresh()->frozen_materialization === null
+            || $publishDraft->fresh()->frozen_materialization === [],
+        );
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $validForPublish->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
+        // Stunde 8 wiederherstellen für Folgeasserts im gleichen Test.
+        foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+            PriceListItem::factory()->create([
+                'price_list_id' => $active->id,
+                'hour' => 8,
+                'day_group' => $group,
+                'second_price' => '2.0000',
+            ]);
+        }
 
         $outsideYear = $this->calendarProfilePayload(
             $catalog,
@@ -675,6 +978,23 @@ class StandardOfferBlP403kTest extends TestCase
                     return $mat;
                 },
             ],
+            'planner spot sum mismatch' => [
+                'needle' => 'Spot-Summe',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['total_spot_count'] = 99;
+
+                    return $mat;
+                },
+            ],
+            'duplicate planner cell' => [
+                'needle' => 'doppelte planner_entries-Zelle',
+                'mutate' => static function (array $mat): array {
+                    $mat['positions'][0]['planner_entries'][] = $mat['positions'][0]['planner_entries'][0];
+                    $mat['positions'][0]['total_spot_count'] = 20;
+
+                    return $mat;
+                },
+            ],
         ];
 
         $beforeCalcs = Calculation::query()->count();
@@ -703,6 +1023,208 @@ class StandardOfferBlP403kTest extends TestCase
         $ok = $this->writer()->adopt($published->fresh(), 'Baseline OK 03k', null, null, $sales);
         $this->assertSame('600.00', (string) $ok->media_gross);
         $this->assertCount(2, $ok->positions->first()->components);
+    }
+
+    public function test_post_adopt_year_inventory_and_medium_rebind_calendar_profile(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
+        $tridem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tridem()->create());
+        $this->attachProfileMediumToInventory($catalog['rock']->id, $tandem);
+        $pm = User::factory()->role(Role::ProductManagement)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+        $this->setSecondPriceForInventory($catalog['rock']->id, '4.0000');
+        $list2027 = $this->createActiveYearList($catalog, 2027, '3.0000');
+
+        $publishedYear = $this->publishCalendarProfile(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'fixed_price',
+            '888.50',
+            $pm,
+        );
+        $frozenPin = (int) $publishedYear->frozen_materialization['positions'][0]['price_list_id'];
+        $adoptedYear = $this->writer()->adopt($publishedYear->fresh(), 'Rebind Year 03k', null, null, $sales);
+        $yearPayload = app(CalculationWriter::class)->payloadFromCalculation($adoptedYear->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $yearPayload['lock_version'] = $adoptedYear->fresh()->lock_version;
+        $yearPayload['positions'][0]['price_year'] = 2027;
+        $yearPayload['positions'][0]['expected_price_list_id'] = $list2027->id;
+        $yearPayload['positions'][0]['planner_entries'] = [
+            ['date' => '2027-03-01', 'hour' => 8, 'spot_count' => 10],
+        ];
+        $afterYear = app(CalculationWriter::class)->update($adoptedYear->fresh(), $yearPayload, $sales);
+        $yearPos = $afterYear->fresh(['positions.plannerEntries', 'positions.components'])->positions->firstOrFail();
+        $this->assertNotSame($frozenPin, (int) $yearPos->price_list_id);
+        $this->assertSame($list2027->id, (int) $yearPos->price_list_id);
+        $this->assertSame('3.0000', (string) $yearPos->plannerEntries->first()->second_price);
+        $this->assertSame('888.50', (string) $afterYear->nn_invest);
+        $this->assertSame('tandem', $yearPos->component_profile?->value);
+        $this->assertCount(2, $yearPos->components);
+
+        $publishedInv = $this->publishCalendarProfile(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'fixed_price',
+            '888.50',
+            $pm,
+        );
+        $adoptedInv = $this->writer()->adopt($publishedInv->fresh(), 'Rebind Inv 03k', null, null, $sales);
+        $rockList = PriceList::query()
+            ->where('inventory_id', $catalog['rock']->id)
+            ->where('status', PriceListStatus::Active)
+            ->where('year', 2026)
+            ->firstOrFail();
+        $invPayload = app(CalculationWriter::class)->payloadFromCalculation($adoptedInv->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $invPayload['lock_version'] = $adoptedInv->fresh()->lock_version;
+        $invPayload['positions'][0]['inventory_id'] = $catalog['rock']->id;
+        $invPayload['positions'][0]['expected_price_list_id'] = $rockList->id;
+        $afterInv = app(CalculationWriter::class)->update($adoptedInv->fresh(), $invPayload, $sales);
+        $invPos = $afterInv->fresh(['positions.plannerEntries', 'positions.components'])->positions->firstOrFail();
+        $this->assertSame($rockList->id, (int) $invPos->price_list_id);
+        $this->assertSame('4.0000', (string) $invPos->plannerEntries->first()->second_price);
+        $this->assertSame('888.50', (string) $afterInv->nn_invest);
+        $this->assertSame('tandem', $invPos->component_profile?->value);
+
+        $publishedMedium = $this->publishCalendarProfile(
+            $catalog,
+            $tandem,
+            'tandem',
+            $this->tandemComponents(),
+            30,
+            'fixed_price',
+            '888.50',
+            $pm,
+        );
+        $adoptedMedium = $this->writer()->adopt($publishedMedium->fresh(), 'Rebind Medium 03k', null, null, $sales);
+        $adoptedMedium->load('configurationSnapshot');
+        $base = $adoptedMedium->configurationSnapshot;
+        $mediumPayload = app(CalculationWriter::class)->payloadFromCalculation($adoptedMedium->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $mediumPayload['lock_version'] = $adoptedMedium->fresh()->lock_version;
+        $mediumPayload['positions'][0]['advertising_medium_id'] = $tridem->id;
+        $mediumPayload['positions'][0]['component_profile'] = 'tridem';
+        $mediumPayload['positions'][0]['components'] = $this->tridemComponents();
+        $mediumPayload['positions'][0]['length_seconds'] = 40;
+        $mediumPayload['positions'][0]['schema_fingerprint'] = app(ConfigurationSnapshotFreezeService::class)
+            ->resolvePositionSchemaFromBase($base, (int) $tridem->id)['schema_fingerprint'];
+        $afterMedium = app(CalculationWriter::class)->update($adoptedMedium->fresh(), $mediumPayload, $sales);
+        $medPos = $afterMedium->fresh(['positions.components', 'positions.plannerEntries'])->positions->firstOrFail();
+        $this->assertSame('tridem', $medPos->component_profile?->value);
+        $this->assertCount(3, $medPos->components);
+        $this->assertSame(40, (int) $medPos->length_seconds);
+        $entryDate = $medPos->plannerEntries->first()->date;
+        $this->assertSame(
+            '2026-03-02',
+            $entryDate instanceof CarbonInterface ? $entryDate->toDateString() : (string) $entryDate,
+        );
+        $this->assertSame(10, (int) $medPos->plannerEntries->first()->spot_count);
+        $this->assertSame('888.50', (string) $afterMedium->nn_invest);
+    }
+
+    public function test_calendar_medium_switch_tandem_to_tridem_rebuilds_slots_keeps_timing(): void
+    {
+        $catalog = $this->createSpotClassicCatalog();
+        $tandem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tandem()->create());
+        $tridem = $this->attachProfileMedium($catalog, AdvertisingMedium::factory()->tridem()->create());
+        $sales = User::factory()->role(Role::Sales)->create();
+        $this->setSecondPrice($catalog, '2.0000');
+
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Switch 03k',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'order_discounts' => [],
+            'dynamic_field_values' => [],
+            'positions' => [[
+                ...$this->calendarProfilePosition(
+                    $catalog,
+                    $tandem,
+                    'tandem',
+                    $this->tandemComponents(),
+                    30,
+                    'normal',
+                    null,
+                    [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+                ),
+            ]],
+        ]);
+        $calc = app(CalculationWriter::class)->create($payload, $sales);
+        $this->assertSame('600.00', (string) $calc->media_gross);
+        $calc->load('configurationSnapshot');
+        $base = $calc->configurationSnapshot;
+
+        $update = app(CalculationWriter::class)->payloadFromCalculation($calc->fresh([
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'positions.components',
+            'orderDiscounts',
+        ]));
+        $update['lock_version'] = $calc->fresh()->lock_version;
+        $update['positions'][0]['advertising_medium_id'] = $tridem->id;
+        $update['positions'][0]['component_profile'] = 'tridem';
+        $update['positions'][0]['components'] = $this->tridemComponents();
+        $update['positions'][0]['length_seconds'] = 40;
+        $update['positions'][0]['schema_fingerprint'] = app(ConfigurationSnapshotFreezeService::class)
+            ->resolvePositionSchemaFromBase($base, (int) $tridem->id)['schema_fingerprint'];
+
+        $preview = app(CalculationWriter::class)->preview($update, $sales)->toArray();
+        $this->assertSame('760.00', $preview['media_gross']);
+        $this->assertSame('760.00', $preview['nn_invest']);
+
+        $updated = app(CalculationWriter::class)->update($calc->fresh(), $update, $sales);
+        $position = $updated->fresh(['positions.components', 'positions.plannerEntries'])->positions->firstOrFail();
+        $this->assertSame('tridem', $position->component_profile?->value);
+        $this->assertCount(3, $position->components);
+        $this->assertSame(
+            [20, 10, 10],
+            $position->components->sortBy('sort')->values()->map(fn ($c) => (int) $c->length_seconds)->all(),
+        );
+        $this->assertSame(40, (int) $position->length_seconds);
+        $this->assertSame(10, (int) $position->plannerEntries->first()->spot_count);
+        $this->assertSame(8, (int) $position->plannerEntries->first()->hour);
+        $this->assertSame('760.00', (string) $updated->media_gross);
+
+        $reloaded = app(CalculationWriter::class)->payloadFromCalculation($updated->fresh([
+            'positions.components',
+            'positions.plannerEntries',
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.discounts',
+            'orderDiscounts',
+        ]));
+        $this->assertSame('tridem', $reloaded['positions'][0]['component_profile'] ?? null);
+        $this->assertCount(3, $reloaded['positions'][0]['components']);
+        $this->assertSame(10, (int) $reloaded['positions'][0]['planner_entries'][0]['spot_count']);
     }
 
     public function test_normal_and_fixed_price_calendar_profiles_side_by_side(): void
@@ -773,13 +1295,83 @@ class StandardOfferBlP403kTest extends TestCase
      */
     private function attachProfileMedium(array $catalog, AdvertisingMedium $medium): AdvertisingMedium
     {
+        return $this->attachProfileMediumToInventory($catalog['hamburg']->id, $medium);
+    }
+
+    private function attachProfileMediumToInventory(int $inventoryId, AdvertisingMedium $medium): AdvertisingMedium
+    {
         InventoryMediumRule::factory()->create([
-            'inventory_id' => $catalog['hamburg']->id,
+            'inventory_id' => $inventoryId,
             'advertising_medium_id' => $medium->id,
             'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength,
         ]);
 
         return $medium;
+    }
+
+    /**
+     * @param  array{hamburg: Inventory}  $catalog
+     * @param  array<string, mixed>  $invalidPayload
+     * @param  callable(array<string, mixed>): array<string, mixed>  $corruptDraft
+     */
+    private function assertRejectedCreatePreviewPublishForCalendarProfile(
+        array $catalog,
+        AdvertisingMedium $medium,
+        User $pm,
+        array $invalidPayload,
+        callable $corruptDraft,
+        string $errorNeedle,
+    ): void {
+        $offersBefore = StandardOffer::query()->count();
+        try {
+            $this->writer()->create('Invalid profile create 03k', $invalidPayload, $pm);
+            $this->fail('Create hätte scheitern müssen ('.$errorNeedle.').');
+        } catch (ValidationException $exception) {
+            $joined = collect($exception->errors())->keys()->implode(' ').' '.collect($exception->errors())->flatten()->implode(' ');
+            $this->assertStringContainsString($errorNeedle, $joined, $joined);
+        }
+        $this->assertSame($offersBefore, StandardOffer::query()->count());
+
+        $this->actingAs($pm)
+            ->postJson(route('standard-offers.preview'), [...$invalidPayload, 'title' => 'Invalid profile preview 03k'])
+            ->assertStatus(422);
+
+        $valid = $this->writer()->create(
+            'Profile publish baseline 03k',
+            $this->calendarProfilePayload(
+                $catalog,
+                $medium,
+                'tandem',
+                $this->tandemComponents(),
+                30,
+                'normal',
+                null,
+                [['date' => '2026-03-02', 'hour' => 8, 'spot_count' => 10]],
+            ),
+            $pm,
+        );
+        $draft = $valid->draftVersion;
+        $this->assertNotNull($draft);
+        $draft->draft_payload = $corruptDraft($draft->draft_payload);
+        $draft->save();
+
+        try {
+            $this->writer()->publish($draft->fresh(), (int) $draft->lock_version, $pm);
+            $this->fail('Publish hätte scheitern müssen ('.$errorNeedle.').');
+        } catch (ValidationException $exception) {
+            $joined = collect($exception->errors())->keys()->implode(' ').' '.collect($exception->errors())->flatten()->implode(' ');
+            $this->assertStringContainsString($errorNeedle, $joined, $joined);
+        }
+
+        $this->assertSame(StandardOfferVersionStatus::Draft, $draft->fresh()->status);
+        $this->assertTrue(
+            $draft->fresh()->frozen_materialization === null
+            || $draft->fresh()->frozen_materialization === [],
+        );
+        $this->assertSame(0, StandardOfferVersion::query()
+            ->where('standard_offer_id', $valid->id)
+            ->where('status', StandardOfferVersionStatus::Published)
+            ->count());
     }
 
     /**
@@ -1015,8 +1607,13 @@ class StandardOfferBlP403kTest extends TestCase
      */
     private function setSecondPrice(array $catalog, string $price): void
     {
+        $this->setSecondPriceForInventory($catalog['hamburg']->id, $price);
+    }
+
+    private function setSecondPriceForInventory(int $inventoryId, string $price): void
+    {
         $list = PriceList::query()
-            ->where('inventory_id', $catalog['hamburg']->id)
+            ->where('inventory_id', $inventoryId)
             ->where('status', PriceListStatus::Active)
             ->where('year', 2026)
             ->firstOrFail();
@@ -1024,5 +1621,32 @@ class StandardOfferBlP403kTest extends TestCase
         PriceListItem::query()
             ->where('price_list_id', $list->id)
             ->update(['second_price' => $price]);
+    }
+
+    /**
+     * @param  array{hamburg: Inventory}  $catalog
+     */
+    private function createActiveYearList(array $catalog, int $year, string $secondPrice): PriceList
+    {
+        $list = PriceList::factory()->create([
+            'inventory_id' => $catalog['hamburg']->id,
+            'status' => PriceListStatus::Active,
+            'year' => $year,
+            'version' => 'e2e-03k-'.$year,
+            'valid_from' => sprintf('%d-01-01', $year),
+        ]);
+
+        foreach (range(0, 23) as $hour) {
+            foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                PriceListItem::factory()->create([
+                    'price_list_id' => $list->id,
+                    'hour' => $hour,
+                    'day_group' => $group,
+                    'second_price' => $secondPrice,
+                ]);
+            }
+        }
+
+        return $list;
     }
 }

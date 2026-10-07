@@ -23,10 +23,25 @@ PO-BLP403K-1 **A1 akzeptiert**. 03j auf Main (PR #127 / CI `37527679296` SUCCESS
 
 ## Abnahmebelege
 
-- Feature: `StandardOfferBlP403kTest` (Viererkombination, Freeze, Pin, From-Calc, Negativ)
+- Feature: `StandardOfferBlP403kTest`
+  - Viererkombination Draft→Publish→Adopt→Reload
+  - From-Calc alle vier Quellen (Profil/Slots/Planner/Settlement/Festpreis/kein Kundenleak) + Mix-Ablehnung
+  - Freeze nach Live-Preis + DB-Reload; Frozen-Planner-Parität (Spot-Summe, doppelte Zelle)
+  - Festpreis-Pin und Normal-Mengenänderung nach Nachfolgerliste B
+  - Rebind Jahr/Inventar/Medium; Medium-Switch Tandem→Tridem (Slots/Timing/Preview)
+  - Negativ Create/Preview/Publish: individual, Profil/Rollen/Sort/Länge, fehlende Preiszelle inkl. Publish,
+    Inventar-Deaktivierung, Planungsregel `must_not_plan`
 - Calc: `SpotClassicCalendarTandemTridemTest` (vier Kombinationen Persistenz/Reload)
 - Browser-Smoke Port **8054**: Tandem×normal und Tridem×Festpreis Full-Flow
+  - Publish wartet auf Response `/veroeffentlichen` und Show-Zustand (`new-draft` / Veröffentlicht)
+  - Sales: Adopt-Form sichtbar vor Kundenfeld; Slot-Längen und Planner nach Reload
 - Adopt-Freeze und Nachfolgerlisten-Pin getrennt
+
+## Review-Nachzug (PR #128)
+
+- Flake-Ursache: URL `/standardangebote/<id>` gilt schon für Draft; Publish-Abschluss wurde nicht
+  synchronisiert → Sales ohne Adopt-UI (`standard-offer-customer` Timeout).
+- Korrektur: Response + Published-Show-Zustand; lokal `--retries=0 --repeat-each=3`.
 
 ## Offen
 

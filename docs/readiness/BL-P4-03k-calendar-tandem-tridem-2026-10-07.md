@@ -46,13 +46,21 @@ Zellpreise aus gepinnter Liste; Listen-Rebind nur bei Jahr-/Inventar-/Mediumwech
 ## 3. Abnahme (Kurz)
 
 Synthetisch: `StandardOfferBlP403kTest`, `SpotClassicCalendarTandemTridemTest`
-(+ Regression 03e–03j / 03a Negativanpassungen).
+(+ Regression 03e–03j / 03a Negativanpassungen). From-Calc-Viererkombination,
+fehlende Preiszelle inkl. Publish, Profil-Negativ Create/Preview/Publish,
+Planungsregel- und Inventar-Deaktivierung, Frozen-Planner-Parität,
+Normal-Mengen-Pin und Rebind Jahr/Inventar/Medium sowie Medium-Switch
+Tandem→Tridem sind in `StandardOfferBlP403kTest` belegt.
+
 Browser-Smoke isoliert: `playwright.blp403k.config.ts` / Port **8054** —
 Tandem×normal und Tridem×Festpreis jeweils Save → Reload → Publish → Adopt → Calc-Reload.
+Publish synchronisiert über Response `/veroeffentlichen` und Published-Show-Zustand
+(nicht nur URL). Lokal mit `--retries=0 --repeat-each=3` geprüft.
 
 Fixture: Tandem 600,00 / N/N 888,50; Tridem 760,00 / N/N 1200,00 (`''` Komponentenbruttos).
 
-Getrennt: Adopt-Freeze nach Live-Preisänderung; Nachfolgerlisten-Pin bei Cell-Edit.
+Getrennt: Adopt-Freeze nach Live-Preisänderung (+ DB-Reload); Nachfolgerlisten-Pin
+(Festpreis und Normal-Mengenänderung).
 
 ## 4. Bewusst offen
 

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 const monday = '2026-03-02';
 const hour8 = 8;
@@ -103,6 +103,58 @@ async function expectFixedPricePreview(
     ).toContainText(nn);
 }
 
+function isPublishResponse(response: Response): boolean {
+    return (
+        response.request().method() === 'POST' &&
+        response.url().includes('/veroeffentlichen') &&
+        response.status() >= 200 &&
+        response.status() < 400
+    );
+}
+
+/**
+ * URL /standardangebote/<id> gilt schon für Draft – deshalb Publish-Response
+ * und sichtbaren Published-Zustand (Show-Seite) abwarten.
+ */
+async function publishAndAwaitPublishedShow(page: Page): Promise<string> {
+    const publishResponse = page.waitForResponse(isPublishResponse, {
+        timeout: 30_000,
+    });
+    await page.locator('[data-test="standard-offer-publish"]').click();
+    await publishResponse;
+
+    await expect(page.locator('[data-test="standard-offer-new-draft"]')).toBeVisible({
+        timeout: 30_000,
+    });
+    await expect(
+        page.getByText(/Version v\d+ · Veröffentlicht/).first(),
+    ).toBeVisible();
+    await expect(page.locator('[data-test="standard-offer-publish"]')).toHaveCount(0);
+    // PM sieht keine Adopt-UI; Kundenfeld erst nach Sales-Login.
+    await expect(page.locator('[data-test="standard-offer-customer"]')).toHaveCount(0);
+
+    return page.url();
+}
+
+async function openPublishedOfferAsSales(page: Page, offerUrl: string) {
+    await page.context().clearCookies();
+    await login(page, 'sales@example.com');
+    await page.goto(offerUrl);
+
+    await expect(
+        page.locator('[data-test="standard-offer-adopt-form"]'),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(
+        page.locator('[data-test="standard-offer-adopt-hint"]'),
+    ).toContainText('gespeicherten Termine und Preise');
+    await expect(
+        page.locator('[data-test="standard-offer-customer"]'),
+    ).toBeVisible();
+    await expect(
+        page.locator('[data-test="standard-offer-adopt"]'),
+    ).toBeVisible();
+}
+
 test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
     test('Calendar × Tandem × normal: speichern, publish, adopt, frozen parity', async ({
         page,
@@ -162,15 +214,8 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
         ).toHaveValue('10');
         await expectNormalPreviewGross(page, tandemGross);
 
-        await page.locator('[data-test="standard-offer-publish"]').click();
-        await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
-            timeout: 30_000,
-        });
-
-        const offerUrl = page.url();
-        await page.context().clearCookies();
-        await login(page, 'sales@example.com');
-        await page.goto(offerUrl);
+        const offerUrl = await publishAndAwaitPublishedShow(page);
+        await openPublishedOfferAsSales(page, offerUrl);
 
         await page
             .locator('[data-test="standard-offer-customer"]')
@@ -188,6 +233,9 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
         await expect(
             page.locator('[data-test="spot-component-length-main_spot-1-0"]'),
         ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-2-0"]'),
+        ).toHaveValue('10');
         await ensureWeekContainsDate(page, monday);
         await expect(
             page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
@@ -242,14 +290,24 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
         await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
             /1\.?200/,
         );
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-1-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-2-0"]'),
+        ).toHaveValue('10');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-3-0"]'),
+        ).toHaveValue('10');
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
         await expectFixedPricePreview(page, tridemGross, tridemNn);
 
-        await page.locator('[data-test="standard-offer-publish"]').click();
-        const offerUrl = page.url();
+        const offerUrl = await publishAndAwaitPublishedShow(page);
+        await openPublishedOfferAsSales(page, offerUrl);
 
-        await page.context().clearCookies();
-        await login(page, 'sales@example.com');
-        await page.goto(offerUrl);
         await page
             .locator('[data-test="standard-offer-customer"]')
             .fill('E2E Adopt Kunde 03k Tridem GmbH');
@@ -266,6 +324,19 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
         await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
             /1\.?200/,
         );
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-1-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-2-0"]'),
+        ).toHaveValue('10');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-3-0"]'),
+        ).toHaveValue('10');
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
         await expectFixedPricePreview(page, tridemGross, tridemNn);
         await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(
