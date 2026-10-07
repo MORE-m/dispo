@@ -21,8 +21,12 @@ use Illuminate\Database\Seeder;
 /**
  * E2E-Katalog für BL-P4-03k Calendar × Tandem/Tridem (isolierter Port).
  *
- * Zwei Inventare mit Profil-Medium (Tandem/Tridem), Strategie shared_total_length.
- * Preisjahr 2026 fest; Stunde 8 = 2,00 €/s.
+ * Zwei getrennte Inventare, jeweils genau ein Forced-Profile-Medium:
+ * - „Radio Hamburg Tandem“ → Medium tandem
+ * - „Radio Hamburg Tridem“ → Medium tridem
+ * UI-Inventarwechsel Tandem↔Tridem erzwingt damit Mediumwechsel und Slot-Rebuild
+ * ohne manuelle Mediumwahl. Strategie shared_total_length; Preisjahr 2026;
+ * Stunde 8 = 2,00 €/s.
  */
 class E2EStandardOfferCalendarTandemTridemSeeder extends Seeder
 {

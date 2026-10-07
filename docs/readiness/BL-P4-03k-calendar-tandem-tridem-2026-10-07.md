@@ -56,6 +56,8 @@ Browser-Smoke isoliert: `playwright.blp403k.config.ts` / Port **8054** —
 Tandem×normal und Tridem×Festpreis jeweils Save → Reload → Publish → Adopt → Calc-Reload.
 Publish synchronisiert über Response `/veroeffentlichen` und Published-Show-Zustand
 (nicht nur URL). Lokal mit `--retries=0 --repeat-each=3` geprüft.
+Zusätzlich UI-Inventarwechsel Tandem→Tridem: automatischer Slot-Rebuild ohne
+API-Payload, Calendar-Timing erhalten, Preview/Save/Reload.
 
 Fixture: Tandem 600,00 / N/N 888,50; Tridem 760,00 / N/N 1200,00 (`''` Komponentenbruttos).
 

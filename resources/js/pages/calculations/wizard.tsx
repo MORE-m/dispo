@@ -74,6 +74,7 @@ import {
 } from '@/lib/pricing-settlement';
 import {
     calculationMethodPayloadFields,
+    findMethodOption,
     hasSubmittableCalculationMethodKey,
     initMethodStateForExistingPosition,
     initMethodStateForNewPosition,
@@ -2082,7 +2083,8 @@ export default function CalculationWizard({
                     };
 
                     // BL-P4-03k: Inventarwechsel kann das Medium (Tandem↔Tridem) ändern.
-                    // Rebind behält Timing, muss Profile-Slots aber neu binden.
+                    // Profile-Slots neu binden; Methode/Timing behalten, wenn auf dem
+                    // neuen Medium noch wählbar (sonst würde Calendar→Average resetten).
                     if (
                         next.advertising_medium_id !==
                         item.advertising_medium_id
@@ -2102,6 +2104,35 @@ export default function CalculationWizard({
                             component_calculation_strategy:
                                 componentState.strategy,
                         };
+
+                        const nextMedium = catalog.media.find(
+                            (candidate) =>
+                                candidate.id === next.advertising_medium_id,
+                        );
+                        const previousMethodStillLive = findMethodOption(
+                            nextMedium?.calculation_method_options,
+                            item.calculation_method_key,
+                        );
+                        if (previousMethodStillLive) {
+                            next = {
+                                ...next,
+                                calculation_method_key:
+                                    previousMethodStillLive.key,
+                                calculation_method_name:
+                                    previousMethodStillLive.name,
+                                historical_calculation_method_key: null,
+                                historical_calculation_method_name: null,
+                                planner_entries: item.planner_entries,
+                                time_ranges: item.time_ranges,
+                                total_spot_count: isCalendarCalculationMethod(
+                                    previousMethodStillLive.key,
+                                )
+                                    ? totalPlannerSpotCount(
+                                          item.planner_entries,
+                                      )
+                                    : totalSpotCount(item.time_ranges),
+                            };
+                        }
                     }
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(

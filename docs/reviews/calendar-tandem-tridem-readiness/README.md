@@ -35,6 +35,8 @@ PO-BLP403K-1 **A1 akzeptiert**. 03j auf Main (PR #127 / CI `37527679296` SUCCESS
 - Browser-Smoke Port **8054**: Tandem×normal und Tridem×Festpreis Full-Flow
   - Publish wartet auf Response `/veroeffentlichen` und Show-Zustand (`new-draft` / Veröffentlicht)
   - Sales: Adopt-Form sichtbar vor Kundenfeld; Slot-Längen und Planner nach Reload
+- Browser-UI Inventarwechsel Tandem→Tridem: automatischer Slot-Rebuild (3 kanonische Slots),
+  Calendar/Planner-Timing erhalten, Preview 760,00, Save/Reload
 - Adopt-Freeze und Nachfolgerlisten-Pin getrennt
 
 ## Review-Nachzug (PR #128)
@@ -42,6 +44,8 @@ PO-BLP403K-1 **A1 akzeptiert**. 03j auf Main (PR #127 / CI `37527679296` SUCCESS
 - Flake-Ursache: URL `/standardangebote/<id>` gilt schon für Draft; Publish-Abschluss wurde nicht
   synchronisiert → Sales ohne Adopt-UI (`standard-offer-customer` Timeout).
 - Korrektur: Response + Published-Show-Zustand; lokal `--retries=0 --repeat-each=3`.
+- UI-Inventarwechsel: Mediumwechsel setzte Methode auf Average und verwarf Timing;
+  Wizard behält wählbare Methode + Planner und baut Profile-Slots neu.
 
 ## Offen
 

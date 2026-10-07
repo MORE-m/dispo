@@ -69,5 +69,6 @@ Keine neue Version, **keine** Schema-Migration. Explizite **v4-Vertragserweiteru
 ## Implementierungsstand
 
 Auf Feature-Branch / Draft-PR umgesetzt (`BL-P4-03k`, PR #128). Review-Nachzug:
-Publish-Sync im Browser-Smoke, From-Calc-Viererkombination und Negativ-/Pin-/Rebind-Belege.
+Publish-Sync im Browser-Smoke, From-Calc-Viererkombination, Negativ-/Pin-/Rebind-Belege,
+UI-Inventarwechsel Tandem→Tridem (Slot-Rebuild + Timing).
 **Kein** Merge/Deploy in diesem Auftrag. Budget und Abbinder bleiben offen.

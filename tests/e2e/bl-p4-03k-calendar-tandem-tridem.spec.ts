@@ -343,4 +343,117 @@ test.describe.serial('BL-P4-03k Calendar × Tandem/Tridem', () => {
             page.locator('[data-test="preview-net-total"]').first(),
         ).toContainText(tridemNn, { timeout: 20_000 });
     });
+
+    test('UI Inventarwechsel Tandem→Tridem: automatischer Slot-Rebuild, Timing, Save/Reload', async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        // 10 × 2,00 €/s × 40 s × Index 0,95 = 760,00 (Tridem nach Rebuild).
+        const expectedTridemGross = tridemGross;
+
+        await login(page, 'pm@example.com');
+        await page.goto('/standardangebote/neu');
+        await page.locator('[data-test="standard-offer-title"]').fill(
+            'E2E UI Inventarwechsel Tandem zu Tridem',
+        );
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+
+        await selectInventory(page, 'Radio Hamburg Tandem');
+        await page
+            .locator('[data-test="calculation-method-radio-0-calendar"]')
+            .check();
+        await page.locator('[data-test="position-price-year-0"]').selectOption('2026');
+        await fillTandemLengths(page);
+        await ensureWeekContainsDate(page, monday);
+        await page
+            .locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`)
+            .fill('10');
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="spot-components-section-0"]'),
+        ).toContainText('Tandem');
+        await expect(
+            page.locator('[data-test="spot-component-main_spot-1-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-reminder-2-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-reminder-3-0"]'),
+        ).toHaveCount(0);
+        await expectNormalPreviewGross(page, tandemGross);
+
+        // Inventarwechsel über UI – kein API-/Payload-Setzen von Komponenten.
+        await selectInventory(page, 'Radio Hamburg Tridem');
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeChecked({ timeout: 10_000 });
+        await expect(page.locator('[data-test="planner-grid-0"]')).toBeVisible({
+            timeout: 10_000,
+        });
+        await waitForPreview(page);
+
+        await expect(
+            page.locator('[data-test="spot-components-section-0"]'),
+        ).toContainText('Tridem');
+        await expect(
+            page.locator('[data-test="spot-components-strategy-hint-0"]'),
+        ).toContainText('Gemeinsame Gesamtlänge');
+        await expect(
+            page.locator('[data-test="spot-component-main_spot-1-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-reminder-2-0"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="spot-component-reminder-3-0"]'),
+        ).toBeVisible();
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
+
+        await fillTridemLengths(page);
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="spot-components-total-length-0"]'),
+        ).toContainText('40s');
+        await expect(
+            page.locator('[data-test="spot-components-derived-airings-0"]'),
+        ).toContainText('30');
+        await expectNormalPreviewGross(page, expectedTridemGross);
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(expectedTridemGross, { timeout: 20_000 });
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/standardangebote\/\d+/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(
+            page.locator('[data-test="calculation-method-radio-0-calendar"]'),
+        ).toBeChecked();
+        await expect(
+            page.locator('[data-test="spot-components-section-0"]'),
+        ).toContainText('Tridem');
+        await expect(
+            page.locator('[data-test="spot-component-length-main_spot-1-0"]'),
+        ).toHaveValue('20');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-2-0"]'),
+        ).toHaveValue('10');
+        await expect(
+            page.locator('[data-test="spot-component-length-reminder-3-0"]'),
+        ).toHaveValue('10');
+        await ensureWeekContainsDate(page, monday);
+        await expect(
+            page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
+        ).toHaveValue('10');
+        await expectNormalPreviewGross(page, expectedTridemGross);
+    });
 });
