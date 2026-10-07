@@ -89,7 +89,7 @@ class CatalogAdminAdv001c3b1Test extends TestCase
     public function test_registry_pairs_are_sorted_deterministically_for_multi_profile(): void
     {
         $pairs = EngineProfileRegistry::pairsForMethodKey('average');
-        $this->assertSame(['spot_classic'], array_column($pairs, 'engine_profile_key'));
+        $this->assertSame(['spot_classic', 'swf_trailer'], array_column($pairs, 'engine_profile_key'));
         $this->assertSame('released', $pairs[0]['pair_status']);
         $this->assertSame('v1', $pairs[0]['current_released_version']);
 

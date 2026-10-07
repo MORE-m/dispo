@@ -24,6 +24,11 @@ final class EngineProfileRegistry
     public const PROFILE_SPOT_CLASSIC = 'spot_classic';
 
     /**
+     * BL-P5-01a: SWF Trailer (nur Methode average; Spot-Sekundenpreise × Länge × Aufschlag, ohne Spotlängenindex).
+     */
+    public const PROFILE_SWF_TRAILER = 'swf_trailer';
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -52,6 +57,15 @@ final class EngineProfileRegistry
                 'pair_status' => EngineCapabilityStatus::Planned,
                 'current_released_version' => null,
                 'versions' => [],
+            ],
+        ],
+        self::PROFILE_SWF_TRAILER => [
+            'average' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
             ],
         ],
     ];

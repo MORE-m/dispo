@@ -81,10 +81,18 @@ class EngineProfileRegistryTest extends TestCase
         $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('free_position'));
 
         $average = EngineProfileRegistry::pairsForMethodKey('average');
-        $this->assertCount(1, $average);
+        // BL-P5-01a: average kennt zwei Profile (alphabetisch: spot_classic, swf_trailer).
+        $this->assertCount(2, $average);
         $this->assertSame('spot_classic', $average[0]['engine_profile_key']);
         $this->assertSame('released', $average[0]['pair_status']);
         $this->assertSame('v1', $average[0]['current_released_version']);
+        $this->assertSame('swf_trailer', $average[1]['engine_profile_key']);
+        $this->assertSame('released', $average[1]['pair_status']);
+        $this->assertSame('v1', $average[1]['current_released_version']);
+
+        // swf_trailer kennt weder calendar noch fixed_price.
+        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_trailer', 'calendar'));
+        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_trailer', 'fixed_price'));
 
         $keys = array_column(EngineProfileRegistry::pairsForMethodKey('calendar'), 'engine_profile_key');
         $sorted = $keys;

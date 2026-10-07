@@ -16,6 +16,9 @@ use App\Enums\SpotCalculationMethod;
  */
 final class CalculationEngine
 {
+    /** BL-P5-01a: Längenindex-Faktor 100 = kein Indexeinfluss (Trailer / SWF-001). */
+    private const NO_LENGTH_INDEX = 100;
+
     public function __construct(
         private readonly SpecialApprovalAssessor $assessor = new SpecialApprovalAssessor,
     ) {}
@@ -125,6 +128,15 @@ final class CalculationEngine
         string $orderDiscountPercent,
         array $orderDiscounts = [],
     ): PositionResult {
+        if ($position->isSwfTrailer()
+            && ($position->spotMethod !== SpotCalculationMethod::Average
+                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
+        ) {
+            throw new \InvalidArgumentException(
+                'Trailer unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (BL-P5-01a).',
+            );
+        }
+
         return match ($position->spotMethod) {
             SpotCalculationMethod::Average => $this->calculateAveragePosition(
                 $position,
@@ -391,6 +403,18 @@ final class CalculationEngine
         );
     }
 
+    /**
+     * SPT-009 Spotlängenindex nur für Spot Classic. swf_trailer: nie Index, immer 100.
+     */
+    private function lengthIndexFor(PositionInput $position, int $lengthSeconds): int
+    {
+        if ($position->isSwfTrailer()) {
+            return self::NO_LENGTH_INDEX;
+        }
+
+        return $position->lengthIndex ?? SpotLengthIndex::forSeconds($lengthSeconds);
+    }
+
     private function lengthSpotPrice(
         string $secondPrice,
         int $lengthSeconds,
@@ -451,7 +475,7 @@ final class CalculationEngine
     private function resolveComponentPlan(PositionInput $position): array
     {
         if (! $position->hasComponents()) {
-            $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+            $index = $this->lengthIndexFor($position, $position->lengthSeconds);
 
             return [
                 'strategy' => null,
@@ -474,7 +498,7 @@ final class CalculationEngine
                 fn (ComponentInput $component): int => $component->lengthSeconds,
                 $position->components,
             ));
-            $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($totalLength);
+            $index = $this->lengthIndexFor($position, $totalLength);
             $components = [];
             foreach ($position->components as $component) {
                 $components[] = [
@@ -502,7 +526,7 @@ final class CalculationEngine
 
         $components = [];
         foreach ($position->components as $component) {
-            $componentIndex = $component->lengthIndex ?? SpotLengthIndex::forSeconds($component->lengthSeconds);
+            $componentIndex = $position->isSwfTrailer() ? self::NO_LENGTH_INDEX : ($component->lengthIndex ?? SpotLengthIndex::forSeconds($component->lengthSeconds));
             $components[] = [
                 'role' => $component->role->value,
                 'label' => $component->label,
@@ -513,7 +537,7 @@ final class CalculationEngine
         }
 
         $totalLength = array_sum(array_column($components, 'length_seconds'));
-        $positionIndex = $position->lengthIndex ?? SpotLengthIndex::forSeconds(max(1, $totalLength));
+        $positionIndex = $this->lengthIndexFor($position, max(1, $totalLength));
 
         return [
             'strategy' => $strategy,
@@ -653,6 +677,7 @@ final class CalculationEngine
             positionDiscounts: $position->positionDiscounts,
             components: $position->components,
             componentCalculationStrategy: $position->componentCalculationStrategy,
+            engineProfileKey: $position->engineProfileKey,
         );
 
         return $this->calculateAveragePosition(
@@ -682,6 +707,7 @@ final class CalculationEngine
             positionDiscounts: $position->positionDiscounts,
             components: $position->components,
             componentCalculationStrategy: $position->componentCalculationStrategy,
+            engineProfileKey: $position->engineProfileKey,
         );
 
         return $this->calculateAveragePosition(
@@ -835,7 +861,7 @@ final class CalculationEngine
      */
     private function emptyPositionResult(PositionInput $position, string $orderDiscountPercent, array $orderDiscounts): PositionResult
     {
-        $index = $position->lengthIndex ?? SpotLengthIndex::forSeconds($position->lengthSeconds);
+        $index = $this->lengthIndexFor($position, $position->lengthSeconds);
 
         if ($position->pricingSettlementMode === PricingSettlementMode::FixedPrice
             && $position->fixedPriceNn !== null

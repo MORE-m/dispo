@@ -20,7 +20,7 @@ type RuleDetail = {
     hint_text: string | null;
     sort: number;
     default_length_seconds: number | null;
-    surcharge_percent: string;
+    surcharge_percent: string | null;
     is_discountable: boolean;
     is_ae_eligible: boolean;
     component_calculation_strategy: string;
@@ -62,7 +62,7 @@ export default function CombinationShow({
         sort: rule.sort,
         default_length_seconds:
             rule.default_length_seconds ?? ('' as number | ''),
-        surcharge_percent: rule.surcharge_percent,
+        surcharge_percent: rule.surcharge_percent ?? '',
         is_discountable: rule.is_discountable,
         is_ae_eligible: rule.is_ae_eligible,
         component_calculation_strategy: rule.component_calculation_strategy,
@@ -212,7 +212,7 @@ export default function CombinationShow({
                         />
                     </FormField>
                     <FormField
-                        label="Aufschlag %"
+                        label="Aufschlag % (leer = nicht konfiguriert; 0 = ausdrücklich 0 %)"
                         htmlFor="surcharge_percent"
                         error={form.errors.surcharge_percent}
                     >

@@ -5,6 +5,7 @@ namespace App\Services\Calculation;
 use App\Enums\ComponentCalculationStrategy;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
+use App\Support\Calculation\EngineProfileRegistry;
 
 final readonly class PositionInput
 {
@@ -37,7 +38,14 @@ final readonly class PositionInput
         public ?ComponentCalculationStrategy $componentCalculationStrategy = null,
         public PricingSettlementMode $pricingSettlementMode = PricingSettlementMode::Normal,
         public ?string $fixedPriceNn = null,
+        /** BL-P5-01a: swf_trailer rechnet ohne Spotlängenindex (Index fest 100). */
+        public ?string $engineProfileKey = null,
     ) {}
+
+    public function isSwfTrailer(): bool
+    {
+        return $this->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER;
+    }
 
     public function hasComponents(): bool
     {

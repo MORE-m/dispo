@@ -8,8 +8,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * ADV-001b / PO-ADV001b-8: fachlich-technische Kompatibilität kind ↔ Oberkategorie.
  *
- * Aktuell existiert nur CalculationKind::SpotClassic. Spot Classic ist laut
- * CatalogResolver und ADV-001a-Bestandsmap an die Kategorie „spots“ gebunden.
+ * Spot Classic ist laut CatalogResolver und ADV-001a-Bestandsmap an die Kategorie „spots“ gebunden.
+ * BL-P5-01a: SwfTrailer ist an „special_advertising_formats“ gebunden.
  * Weitere Kinds sind eigene spätere Fachslices.
  */
 final class AdvertisingKindCategoryCompatibility
@@ -21,6 +21,7 @@ final class AdvertisingKindCategoryCompatibility
     {
         return match ($kind) {
             CalculationKind::SpotClassic => [CanonicalAdvertisingCategories::SPOTS],
+            CalculationKind::SwfTrailer => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
         };
     }
 

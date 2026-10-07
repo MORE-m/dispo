@@ -7,9 +7,13 @@ use App\Enums\CalculationMethodMode;
 use App\Enums\InventoryType;
 use App\Enums\SpotComponentProfile;
 use App\Models\AdvertisingCategory;
+use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
+use App\Models\CalculationMethod;
 use App\Models\Inventory;
+use App\Support\Advertising\CanonicalAdvertisingCategories;
+use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\Inventory\InventoryCodeValidator;
 use App\Support\InventoryMediumRule\Catalog\InitialCatalogDefinitions;
 use App\Support\Organization\SingletonOrganizationResolver;
@@ -72,6 +76,8 @@ final class InitialCatalogBootstrapper
                     $mediaUnchanged++;
                 }
             }
+
+            $this->ensureSwfTrailerCategoryMethod($categoryIds);
         });
 
         return [
@@ -80,6 +86,45 @@ final class InitialCatalogBootstrapper
             'media_created' => $mediaCreated,
             'media_unchanged' => $mediaUnchanged,
         ];
+    }
+
+    /**
+     * BL-P5-01a: Kategorie special_advertising_formats → average (Profil swf_trailer),
+     * Standardmethode average. Idempotent; vorhandene Zuordnungen/Defaults werden nicht überschrieben.
+     *
+     * @param  array<string, int>  $categoryIds
+     */
+    private function ensureSwfTrailerCategoryMethod(array $categoryIds): void
+    {
+        $categoryId = $categoryIds[CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS] ?? null;
+        if ($categoryId === null) {
+            return;
+        }
+
+        $average = CalculationMethod::query()->where('key', 'average')->first();
+        if ($average === null) {
+            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Initialkatalog-Bootstrap.');
+        }
+
+        $exists = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $categoryId)
+            ->where('calculation_method_id', $average->id)
+            ->exists();
+        if (! $exists) {
+            $assignment = new AdvertisingCategoryCalculationMethod;
+            $assignment->advertising_category_id = $categoryId;
+            $assignment->calculation_method_id = $average->id;
+            $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_TRAILER;
+            $assignment->is_active = true;
+            $assignment->sort = 10;
+            $assignment->lock_version = 1;
+            $assignment->save();
+        }
+
+        AdvertisingCategory::query()
+            ->whereKey($categoryId)
+            ->whereNull('default_calculation_method_id')
+            ->update(['default_calculation_method_id' => $average->id]);
     }
 
     /**

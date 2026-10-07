@@ -53,8 +53,14 @@ final class AdvertisingMediumLiveBookability
             return $this->blocked('Keine freigegebene Berechnungsmethode vorhanden.');
         }
 
-        if ((string) $kindRaw !== CalculationKind::SpotClassic->value) {
-            return $this->blocked('Nur Spot Classic ist derzeit für neue Kalkulationen freigegeben.');
+        $kind = CalculationKind::tryFrom(trim((string) $kindRaw));
+        $expectedProfile = match ($kind) {
+            CalculationKind::SpotClassic => EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
+            CalculationKind::SwfTrailer => EngineProfileRegistry::PROFILE_SWF_TRAILER,
+            default => null,
+        };
+        if ($expectedProfile === null) {
+            return $this->blocked('Nur Spot Classic und Trailer sind derzeit für neue Kalkulationen freigegeben.');
         }
 
         $medium->loadMissing([
@@ -108,6 +114,11 @@ final class AdvertisingMediumLiveBookability
             EngineProfileRegistry::assertKnownMethodForProfile($assignmentProfile, $methodKey);
         } catch (InvalidArgumentException) {
             return $this->blocked('Die gewählte Berechnungsmethode ist technisch unbekannt.');
+        }
+
+        // BL-P5-01a: Kind und Engine-Profil müssen zusammenpassen (kein spot_classic-Missbrauch für Trailer).
+        if ($assignmentProfile !== $expectedProfile) {
+            return $this->blocked('Die Berechnungsmethode passt nicht zur Berechnungsart des Werbemittels.');
         }
 
         $pairStatus = EngineProfileRegistry::pairStatus($assignmentProfile, $methodKey);
