@@ -88,12 +88,14 @@ final class CalculationEngine
             );
 
             // BL-P5-02a Review: Produktionsrabatte eigenständig prüfen (eigene Zeilenflags).
+            // Effektiver Rabatt nur über rabattfähige Zeilen – nicht rabattfähige verdünnen nicht.
             if ($this->hasDiscountableProduction($position)) {
                 $productionStackedPercent = $this->stackedProductionPositionPercent($position);
+                $discountableAmounts = $this->discountableProductionAmounts($result->productionLines);
                 $productionEffective = $this->assessor->effectivePercentFromAmounts(
-                    $result->productionGross,
-                    $result->productionPositionDiscountAmount,
-                    $result->productionOrderDiscountAmount,
+                    $discountableAmounts['gross'],
+                    $discountableAmounts['position_discount'],
+                    $discountableAmounts['order_discount'],
                 );
                 $specialApprovalReasons = array_merge(
                     $specialApprovalReasons,
@@ -931,6 +933,18 @@ final class CalculationEngine
         }
 
         $positionDiscounts = $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent);
+        $appliedPositionPercent = $this->assessor->stackedPercent(
+            array_map(fn (DiscountInput $discount): string => $discount->percent, $positionDiscounts),
+        );
+        /** @var list<array{type: string, custom_label: string|null, percent: string}> $appliedDiscountsSnapshot */
+        $appliedDiscountsSnapshot = array_map(
+            fn (DiscountInput $discount): array => [
+                'type' => $discount->type->value,
+                'custom_label' => $discount->customLabel,
+                'percent' => Decimal::roundPrice($discount->percent),
+            ],
+            $positionDiscounts,
+        );
 
         foreach ($position->productionLines as $line) {
             $gross = Decimal::mul($line->quantity, $line->unitPrice);
@@ -972,6 +986,10 @@ final class CalculationEngine
                 afterPositionDiscount: Decimal::roundMoney($afterPosition),
                 orderDiscountAmount: Decimal::roundMoney(Decimal::sub($afterPosition, $afterOrder)),
                 afterOrderDiscount: Decimal::roundMoney($afterOrder),
+                positionDiscountPercent: $line->isDiscountable
+                    ? $appliedPositionPercent
+                    : Decimal::roundPrice('0'),
+                positionDiscountsSnapshot: $line->isDiscountable ? $appliedDiscountsSnapshot : [],
                 aePercent: $appliedAePercent,
                 aeAmount: Decimal::roundMoney($ae),
                 nnInvest: Decimal::roundMoney($nn),
@@ -1161,5 +1179,34 @@ final class CalculationEngine
         return $this->assessor->stackedPercent(
             array_map(fn (DiscountInput $discount): string => $discount->percent, $discounts),
         );
+    }
+
+    /**
+     * Nur rabattfähige Produktionszeilen für die effektive Sonderfreigabe-Prüfung (COM-002).
+     *
+     * @param  list<ProductionLineResult>  $lines
+     * @return array{gross: string, position_discount: string, order_discount: string}
+     */
+    private function discountableProductionAmounts(array $lines): array
+    {
+        $gross = '0.00';
+        $positionDiscount = '0.00';
+        $orderDiscount = '0.00';
+
+        foreach ($lines as $line) {
+            if (! $line->isDiscountable) {
+                continue;
+            }
+
+            $gross = Decimal::roundMoney(Decimal::add($gross, $line->lineGross));
+            $positionDiscount = Decimal::roundMoney(Decimal::add($positionDiscount, $line->positionDiscountAmount));
+            $orderDiscount = Decimal::roundMoney(Decimal::add($orderDiscount, $line->orderDiscountAmount));
+        }
+
+        return [
+            'gross' => $gross,
+            'position_discount' => $positionDiscount,
+            'order_discount' => $orderDiscount,
+        ];
     }
 }

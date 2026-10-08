@@ -7,6 +7,7 @@ Keine stillschweigenden ADR-Änderungen.
 
 | Datum | Thema | Entscheidung | Grundlage |
 |---|---|---|---|
+| 08.10.2026 | **PO-BLP502-1** / BL-P5-02a Restbefunde P1/P2 PR #131 | P1: effektive Sonderfreigabe nur über rabattfähige Produktionsbeträge (keine Verdünnung). P2: `position_discount_percent` + Staffel-Snapshot an Calc-Produktionszeile → Dispo. Draft bleibt; **kein** Merge/Deploy. | ADV-003, PRO-*, COM-002, VER-*, PO-BLP502-1, BL-P5-02a, PR #131 |
 | 08.10.2026 | **PO-BLP502-1** / BL-P5-02a Review-Nachzug PR #131 | Vier Befunde behoben: Produktions-Sonderfreigabe eigenständig; Positionsrabatte unabhängig vom Trägerflag; `ae_percent` an Produktionszeile + Dispo; From-Calc lehnt Produktion ab (auch Menge 0). Scope unverändert; Draft bleibt; **kein** Merge/Deploy. | ADV-003, PRO-*, COM-002, STD-001, PO-BLP502-1, BL-P5-02a, PR #131 |
 | 08.10.2026 | **PO-BLP502-1** / BL-P5-02a Spotproduktion Umsetzung | **Akzeptiert** A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag (Jahr=Träger-`price_year`). Feature-Branch: Admin-Modul, Calc-Zusatzzeilen, Dispo-S, Pin/Rebind, Überschreibung ausgeschlossen. Browser Port **8057** bestanden. `BL-P5-02`/`AT-11` teilweise; operative Preise nicht behauptet; **kein** Deploy. | ADV-003, PRO-*, AT-11, PO-BLP502-1, BL-P5-02a |
 | 08.10.2026 | **PO-BLP502-1** / BL-P5-02 Produktion Readiness | Docs-only historisch: READY MIT VORBEDINGUNGEN; A–H vorgeschlagen. **Nachzug:** akzeptiert + umgesetzt als BL-P5-02a (siehe Zeile darüber). | ADV-003, PRO-001–007, AT-11, PO-BLP502-1, BL-P5-02 |

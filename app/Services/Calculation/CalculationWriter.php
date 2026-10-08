@@ -1144,6 +1144,8 @@ final class CalculationWriter
                 'is_discountable' => $line->isDiscountable,
                 'is_ae_eligible' => $line->isAeEligible,
                 'ae_percent' => $line->aePercent,
+                'position_discount_percent' => $line->positionDiscountPercent,
+                'position_discounts_snapshot' => $line->positionDiscountsSnapshot,
                 'position_discount_amount' => $line->positionDiscountAmount,
                 'order_discount_amount' => $line->orderDiscountAmount,
                 'ae_amount' => $line->aeAmount,
@@ -1600,6 +1602,10 @@ final class CalculationWriter
                             'is_discountable' => (bool) $line->is_discountable,
                             'is_ae_eligible' => (bool) $line->is_ae_eligible,
                             'ae_percent' => (string) $line->ae_percent,
+                            'position_discount_percent' => (string) $line->position_discount_percent,
+                            'position_discounts' => is_array($line->position_discounts_snapshot)
+                                ? $line->position_discounts_snapshot
+                                : [],
                             'production_price_list_id' => $line->production_price_list_id,
                             'production_price_list_version' => $line->production_price_list_version,
                             'nn_invest' => (string) $line->nn_invest,

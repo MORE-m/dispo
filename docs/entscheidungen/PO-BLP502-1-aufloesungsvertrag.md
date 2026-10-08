@@ -33,8 +33,14 @@ Beim Speichern je Zusatzzeile eingefroren:
 - `production_price_list_id`, `production_price_list_version`
 - `unit_price`, `is_discountable`, `is_ae_eligible`
 - `ae_percent` (tatsächlich angewendeter Produktions-AE-Satz; unabhängig vom Trägerflag)
+- `position_discount_percent` und `position_discounts_snapshot` (angewendete Positionsrabatt-Staffel;
+  leer/`0`, wenn die Zeile nicht rabattfähig ist)
 - `label`, `quantity`, `remark`, `line_gross`, Rabatt-/AE-/N/N-Beiträge
-- Dispo zusätzlich Kennzeichen **S**; Dispo übernimmt `ae_percent` von der Calc-Zeile (nicht vom Träger)
+- Dispo zusätzlich Kennzeichen **S**; Dispo übernimmt `ae_percent`,
+  `position_discount_percent` und `position_discounts_snapshot` von der Calc-Zeile
+  (nicht vom Träger)
+- Sonderfreigabe (COM-002): effektiver Produktionsrabatt nur über **rabattfähige**
+  Produktionszeilen; nicht rabattfähige Zeilen verdünnen den Prozentsatz nicht
 
 ### Wann bleibt der Pin?
 

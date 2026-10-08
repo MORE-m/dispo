@@ -22,6 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $is_discountable
  * @property bool $is_ae_eligible
  * @property string $ae_percent
+ * @property string $position_discount_percent
+ * @property list<array{type: string, custom_label: string|null, percent: string}>|null $position_discounts_snapshot
  * @property string $position_discount_amount
  * @property string $order_discount_amount
  * @property string $ae_amount
@@ -44,6 +46,8 @@ class CalculationPositionProductionLine extends Model
         'is_discountable',
         'is_ae_eligible',
         'ae_percent',
+        'position_discount_percent',
+        'position_discounts_snapshot',
         'position_discount_amount',
         'order_discount_amount',
         'ae_amount',
@@ -63,6 +67,8 @@ class CalculationPositionProductionLine extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'ae_percent' => 'decimal:4',
+            'position_discount_percent' => 'decimal:4',
+            'position_discounts_snapshot' => 'array',
             'position_discount_amount' => 'decimal:2',
             'order_discount_amount' => 'decimal:2',
             'ae_amount' => 'decimal:2',

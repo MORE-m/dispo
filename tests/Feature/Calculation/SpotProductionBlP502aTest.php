@@ -1186,4 +1186,309 @@ class SpotProductionBlP502aTest extends TestCase
         $this->assertSame('15.0000', (string) $order->productionLines->first()->ae_percent);
         $this->assertSame('344.25', (string) $order->productionLines->first()->nn_invest);
     }
+
+    public function test_review_p1_mixed_production_flags_special_approval_via_admin_successor_pin(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $this->setCarrierFlags($catalog['a'], $catalog['spot'], false, false);
+        $this->setCarrierFlags($catalog['b'], $catalog['spot'], false, false);
+        $listOld = $this->createActiveProductionPriceList($catalog['a'], '150.00', true, false);
+        $this->createActiveProductionPriceList($catalog['b'], '80.00', false, false);
+        $user = User::factory()->role(Role::Sales)->create(['discount_limit_percent' => '10']);
+
+        $payload = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('a1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '2', 'Alt pinnt'),
+            ], ['position_discount_percent' => '8']),
+            $this->spotPosition($catalog['b'], $catalog['spot'], 5),
+        ], [
+            'order_discounts' => [['type' => 'quantity', 'percent' => '8']],
+            'ae_enabled' => false,
+        ]);
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload)->assertRedirect();
+        $calculation = $this->saved();
+
+        // Admin-Nachfolger: nicht rabattfähig; alte Zeile behält Pin true.
+        $listOld->update(['status' => PriceListStatus::Archived, 'archived_at' => now()]);
+        $this->createActiveProductionPriceList($catalog['a'], '150.00', false, false);
+
+        $this->updateFromStored($user, $calculation, function (array $p): array {
+            $p['positions'][0]['production_lines'][] = $this->line(
+                'a2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                '2',
+                'Neu aus Nachfolger',
+            );
+
+            return $p;
+        })->assertRedirect();
+
+        $calculation = $calculation->fresh(['positions.productionLines', 'positions.discounts', 'positions.inventory']);
+        $positionA = $calculation->positions()->orderBy('sort')->firstOrFail();
+        $lines = $positionA->productionLines()->orderBy('sort')->get();
+        $this->assertCount(2, $lines);
+        $old = $lines->firstWhere('client_key', 'a1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+        $neu = $lines->firstWhere('client_key', 'a2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+        $this->assertNotNull($old);
+        $this->assertNotNull($neu);
+        $this->assertTrue((bool) $old->is_discountable);
+        $this->assertFalse((bool) $neu->is_discountable);
+        $this->assertSame('150.00', (string) $old->unit_price);
+        $this->assertSame('150.00', (string) $neu->unit_price);
+        // Alte Zeile: 300 → 276 → 253,92 (Rabatt 46,08 = 15,36 %); neue bleibt 300.
+        $this->assertSame('24.00', (string) $old->position_discount_amount);
+        $this->assertSame('22.08', (string) $old->order_discount_amount);
+        $this->assertSame('46.08', bcadd((string) $old->position_discount_amount, (string) $old->order_discount_amount, 2));
+        $this->assertSame('253.92', (string) $old->nn_invest);
+        $this->assertSame('0.00', (string) $neu->position_discount_amount);
+        $this->assertSame('0.00', (string) $neu->order_discount_amount);
+        $this->assertSame('300.00', (string) $neu->nn_invest);
+
+        $preview = $this->preview($user, array_merge(
+            app(CalculationWriter::class)->payloadFromCalculation($calculation),
+            ['calculation_id' => $calculation->id],
+        ))->assertOk();
+        $this->assertTrue($preview->json('totals.requires_special_approval'));
+        $effective = collect($preview->json('totals.special_approval_reasons'))
+            ->firstWhere('code', SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value);
+        $this->assertNotNull($effective);
+        $this->assertSame('15.3600', $effective['actual_percent']);
+        $this->assertNotSame('7.6800', $effective['actual_percent']);
+
+        $this->assertTrue((bool) $calculation->requires_special_approval);
+        $full = app(SpecialApprovalAssessor::class)->assessFromCalculation(
+            $calculation,
+            $calculation->positions,
+        );
+        $this->assertTrue($full->requiresSpecialApproval);
+        $storedEffective = collect($full->reasons)
+            ->firstWhere('code', SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value);
+        $this->assertNotNull($storedEffective);
+        $this->assertSame('15.3600', $storedEffective['actual_percent']);
+
+        $positions = $calculation->positions()->orderBy('sort')->get();
+        $onlyB = app(SpecialApprovalAssessor::class)->assessFromCalculation(
+            $calculation,
+            $positions->slice(1)->values(),
+        );
+        $this->assertFalse($onlyB->requiresSpecialApproval);
+        $onlyA = app(SpecialApprovalAssessor::class)->assessFromCalculation(
+            $calculation,
+            $positions->slice(0, 1)->values(),
+        );
+        $this->assertTrue($onlyA->requiresSpecialApproval);
+
+        // Weitere nicht rabattfähige Zeile verändert die Freigabe nicht.
+        $this->updateFromStored($user, $calculation, function (array $p): array {
+            $p['positions'][0]['production_lines'][] = $this->line(
+                'a3333333-cccc-4ccc-8ccc-cccccccccccc',
+                '1',
+                'Noch eine nicht rabattfähig',
+            );
+
+            return $p;
+        })->assertRedirect();
+        $calculation = $calculation->fresh(['positions.productionLines', 'positions.discounts', 'positions.inventory']);
+        $this->assertTrue((bool) $calculation->requires_special_approval);
+        $afterExtra = app(SpecialApprovalAssessor::class)->assessFromCalculation(
+            $calculation,
+            $calculation->positions()->orderBy('sort')->get()->slice(0, 1)->values(),
+        );
+        $extraEffective = collect($afterExtra->reasons)
+            ->firstWhere('code', SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value);
+        $this->assertNotNull($extraEffective);
+        $this->assertSame('15.3600', $extraEffective['actual_percent']);
+
+        $positionAId = (int) $calculation->positions()->orderBy('sort')->value('id');
+        $order = app(DispoOrderWriter::class)->createFromCalculation(
+            $calculation,
+            [$positionAId],
+            $user,
+        )->order;
+        $this->assertTrue((bool) $order->requires_special_approval);
+
+        // Ausschließlich nicht rabattfähige Produktion → keine produktionsbedingte Freigabe.
+        $onlyNonDisc = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('a4444444-dddd-4ddd-8ddd-dddddddddddd', '2'),
+            ], ['position_discount_percent' => '8']),
+        ], [
+            'order_discounts' => [['type' => 'quantity', 'percent' => '8']],
+            'ae_enabled' => false,
+        ]);
+        // Nachfolgerliste ist Active und nicht rabattfähig.
+        $previewNon = $this->preview($user, $onlyNonDisc)->assertOk();
+        $this->assertFalse($previewNon->json('totals.requires_special_approval'));
+        $this->assertSame('0.00', $previewNon->json('totals.positions.0.production_lines.0.position_discount_amount'));
+        $this->assertSame('300.00', $previewNon->json('totals.positions.0.production_lines.0.nn_invest'));
+    }
+
+    public function test_review_p2_production_position_discounts_frozen_in_dispo_snapshot(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $this->setCarrierFlags($catalog['a'], $catalog['spot'], false, false);
+        $list = $this->createActiveProductionPriceList($catalog['a'], '150.00', true, false);
+        $user = $this->sales();
+        $payload = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('b1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '2'),
+            ], ['position_discount_percent' => '10']),
+        ], ['ae_enabled' => false]);
+
+        $preview = $this->preview($user, $payload)->assertOk();
+        $this->assertSame('30.00', $preview->json('totals.positions.0.production_lines.0.position_discount_amount'));
+        $this->assertSame('10.0000', $preview->json('totals.positions.0.production_lines.0.position_discount_percent'));
+        $this->assertSame('270.00', $preview->json('totals.positions.0.production_lines.0.nn_invest'));
+        $this->assertSame('0.00', $preview->json('totals.positions.0.position_discount_amount'));
+        $this->assertSame('600.00', $preview->json('totals.media_gross'));
+
+        $this->actingAs($user)->post(route('calculations.store'), $payload)->assertRedirect();
+        $calculation = $this->saved()->load('positions.productionLines');
+        $line = $calculation->positions[0]->productionLines->firstOrFail();
+        $this->assertSame('10.0000', (string) $line->position_discount_percent);
+        $this->assertSame('30.00', (string) $line->position_discount_amount);
+        $this->assertSame(
+            [['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000']],
+            $line->position_discounts_snapshot,
+        );
+        $this->assertSame('0.0000', (string) $calculation->positions[0]->position_discount_percent);
+
+        $order = app(DispoOrderWriter::class)->createFromCalculation(
+            $calculation,
+            $calculation->positions->pluck('id')->all(),
+            $user,
+        )->order->fresh(['positions', 'productionLines']);
+        $dispoLine = $order->productionLines->firstOrFail();
+        $this->assertSame('10.0000', (string) $dispoLine->position_discount_percent);
+        $this->assertSame('30.00', (string) $dispoLine->position_discount_amount);
+        $this->assertSame('270.00', (string) $dispoLine->nn_invest);
+        $this->assertSame(
+            [['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000']],
+            $dispoLine->position_discounts_snapshot,
+        );
+        $this->assertSame('0.0000', (string) $order->positions->first()->position_discount_percent);
+        $this->assertSame('600.00', (string) $order->positions->first()->media_gross);
+
+        // Snapshot stabil bei späteren Calc-/Admin-Änderungen.
+        $frozenPercent = (string) $dispoLine->position_discount_percent;
+        $frozenAmount = (string) $dispoLine->position_discount_amount;
+        $frozenSnap = $dispoLine->position_discounts_snapshot;
+        $this->updateFromStored($user, $calculation, function (array $p): array {
+            $p['positions'][0]['position_discount_percent'] = '20';
+            $p['positions'][0]['production_lines'][0]['quantity'] = '4';
+
+            return $p;
+        })->assertRedirect();
+        $list->update(['status' => PriceListStatus::Archived, 'archived_at' => now()]);
+        $this->createActiveProductionPriceList($catalog['a'], '999.00', false, false);
+        $this->assertSame($frozenPercent, (string) $dispoLine->fresh()->position_discount_percent);
+        $this->assertSame($frozenAmount, (string) $dispoLine->fresh()->position_discount_amount);
+        $this->assertSame($frozenSnap, $dispoLine->fresh()->position_discounts_snapshot);
+
+        // Gestapelte Positionsrabatte 10 % + 5 % → effektiv 14,5 %, Betrag 43,50.
+        ProductionPriceList::query()
+            ->where('inventory_id', $catalog['a']->id)
+            ->where('status', PriceListStatus::Active)
+            ->update(['status' => PriceListStatus::Archived, 'archived_at' => now()]);
+        $this->setCarrierFlags($catalog['a'], $catalog['spot'], false, false);
+        $this->createActiveProductionPriceList($catalog['a'], '150.00', true, false);
+        $stackedPayload = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('b2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '2'),
+            ], [
+                'position_discounts' => [
+                    ['type' => 'quantity', 'percent' => '10'],
+                    ['type' => 'special', 'percent' => '5'],
+                ],
+            ]),
+        ], ['ae_enabled' => false]);
+        $stackedPreview = $this->preview($user, $stackedPayload)->assertOk();
+        $this->assertSame('43.50', $stackedPreview->json('totals.positions.0.production_lines.0.position_discount_amount'));
+        $this->assertSame('14.5000', $stackedPreview->json('totals.positions.0.production_lines.0.position_discount_percent'));
+        $this->assertSame('256.50', $stackedPreview->json('totals.positions.0.production_lines.0.nn_invest'));
+
+        $this->actingAs($user)->post(route('calculations.store'), $stackedPayload)->assertRedirect();
+        $stackedCalc = Calculation::query()->orderByDesc('id')->firstOrFail()->load('positions.productionLines');
+        $stackedOrder = app(DispoOrderWriter::class)->createFromCalculation(
+            $stackedCalc,
+            $stackedCalc->positions->pluck('id')->all(),
+            $user,
+        )->order->fresh('productionLines');
+        $stackedDispo = $stackedOrder->productionLines->firstOrFail();
+        $this->assertSame('14.5000', (string) $stackedDispo->position_discount_percent);
+        $this->assertSame('43.50', (string) $stackedDispo->position_discount_amount);
+        $this->assertSame(
+            [
+                ['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000'],
+                ['type' => 'special', 'custom_label' => null, 'percent' => '5.0000'],
+            ],
+            $stackedDispo->position_discounts_snapshot,
+        );
+
+        // Träger rabattfähig, Produktion nicht → Produktionsrabatt 0.
+        ProductionPriceList::query()
+            ->where('inventory_id', $catalog['a']->id)
+            ->where('status', PriceListStatus::Active)
+            ->update(['status' => PriceListStatus::Archived, 'archived_at' => now()]);
+        $this->setCarrierFlags($catalog['a'], $catalog['spot'], true, false);
+        $this->createActiveProductionPriceList($catalog['a'], '150.00', false, false);
+        $reverse = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('b3333333-cccc-4ccc-8ccc-cccccccccccc', '2'),
+            ], ['position_discount_percent' => '10']),
+        ]);
+        $revPreview = $this->preview($user, $reverse)->assertOk();
+        $this->assertSame('0.00', $revPreview->json('totals.positions.0.production_lines.0.position_discount_amount'));
+        $this->assertSame('0.0000', $revPreview->json('totals.positions.0.production_lines.0.position_discount_percent'));
+        $this->assertSame([], $revPreview->json('totals.positions.0.production_lines.0.position_discounts'));
+        $this->assertSame('300.00', $revPreview->json('totals.positions.0.production_lines.0.nn_invest'));
+        $this->assertSame('60.00', $revPreview->json('totals.positions.0.position_discount_amount'));
+    }
+
+    public function test_review_p2_mixed_pinned_flags_dispo_discount_snapshots(): void
+    {
+        $catalog = $this->createTrailerAverageCatalog();
+        $this->setCarrierFlags($catalog['a'], $catalog['spot'], false, false);
+        $listOld = $this->createActiveProductionPriceList($catalog['a'], '150.00', true, false);
+        $user = $this->sales();
+        $payload = $this->trailerPayload([
+            $this->spotPosition($catalog['a'], $catalog['spot'], 10, [
+                $this->line('c1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '2'),
+            ], ['position_discount_percent' => '10']),
+        ]);
+        $this->actingAs($user)->post(route('calculations.store'), $payload)->assertRedirect();
+        $calculation = $this->saved();
+
+        $listOld->update(['status' => PriceListStatus::Archived, 'archived_at' => now()]);
+        $this->createActiveProductionPriceList($catalog['a'], '150.00', false, false);
+        $this->updateFromStored($user, $calculation, function (array $p): array {
+            $p['positions'][0]['production_lines'][] = $this->line(
+                'c2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                '2',
+            );
+
+            return $p;
+        })->assertRedirect();
+
+        $calculation = $calculation->fresh('positions.productionLines');
+        $calcLines = $calculation->positions[0]->productionLines->keyBy('client_key');
+        $order = app(DispoOrderWriter::class)->createFromCalculation(
+            $calculation,
+            $calculation->positions->pluck('id')->all(),
+            $user,
+        )->order->fresh('productionLines');
+
+        $oldDispo = $order->productionLines->first(fn ($row) => (bool) $row->is_discountable);
+        $newDispo = $order->productionLines->first(fn ($row) => ! (bool) $row->is_discountable);
+        $this->assertNotNull($oldDispo);
+        $this->assertNotNull($newDispo);
+        $this->assertSame('10.0000', (string) $oldDispo->position_discount_percent);
+        $this->assertSame('30.00', (string) $oldDispo->position_discount_amount);
+        $this->assertNotEmpty($oldDispo->position_discounts_snapshot);
+        $this->assertSame('0.0000', (string) $newDispo->position_discount_percent);
+        $this->assertSame('0.00', (string) $newDispo->position_discount_amount);
+        $this->assertSame([], $newDispo->position_discounts_snapshot ?? []);
+        $this->assertTrue((bool) $calcLines['c1111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa']->is_discountable);
+        $this->assertFalse((bool) $calcLines['c2222222-bbbb-4bbb-8bbb-bbbbbbbbbbbb']->is_discountable);
+    }
 }

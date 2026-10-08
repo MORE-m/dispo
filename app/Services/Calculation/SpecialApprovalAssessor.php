@@ -210,13 +210,18 @@ final class SpecialApprovalAssessor
             ? $position->productionLines
             : $position->productionLines()->get();
 
-        $hasDiscountable = false;
+        // Nur rabattfähige Zeilen: nicht rabattfähige verdünnen den effektiven Prozentsatz nicht.
+        $discountableGross = '0';
         $positionDiscountAmount = '0';
         $orderDiscountAmount = '0';
+        $hasDiscountable = false;
         foreach ($lines as $line) {
-            if ((bool) $line->is_discountable) {
-                $hasDiscountable = true;
+            if (! (bool) $line->is_discountable) {
+                continue;
             }
+
+            $hasDiscountable = true;
+            $discountableGross = Decimal::add($discountableGross, (string) $line->line_gross, 2);
             $positionDiscountAmount = Decimal::add(
                 $positionDiscountAmount,
                 (string) $line->position_discount_amount,
@@ -245,7 +250,7 @@ final class SpecialApprovalAssessor
             : $this->stackedPercent($discountPercents);
 
         $effective = $this->effectivePercentFromAmounts(
-            (string) ($position->production_gross ?? '0'),
+            Decimal::roundMoney($discountableGross),
             Decimal::roundMoney($positionDiscountAmount),
             Decimal::roundMoney($orderDiscountAmount),
         );

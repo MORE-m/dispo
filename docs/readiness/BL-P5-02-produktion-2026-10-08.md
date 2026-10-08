@@ -54,8 +54,9 @@ ohne Zeile blockiert fehlende Produktionskonfiguration Spot nicht.
   – Admin aktivieren, Wizard SPA+SPB, Preview/Save/Reload/Dispo S-Zeile,
   Inventarwechsel SPC fail-closed, Calendar-Sperre + Entfernung,
   divergente Träger-/Produktionsflags inkl. Order-Rabatt+AE; lokal `--retries=0`
-- Review-Nachzug: Sonderfreigabe Produktion, Positionsrabatte unabhängig vom Trägerflag,
-  eingefrorener Produktions-AE-Satz, From-Calc-Ablehnung bei Produktionszeilen
+- Review-Nachzug + Restbefunde P1/P2: Sonderfreigabe Produktion (inkl. nur
+  rabattfähige Zeilen für effektiv), Positionsrabatte unabhängig vom Trägerflag,
+  eingefrorener Produktions-AE-Satz und Positionsrabatt-Staffel, From-Calc-Ablehnung
   (siehe [`docs/reviews/production-readiness/README.md`](../reviews/production-readiness/README.md))
 
 ## 4. Bewusst offen

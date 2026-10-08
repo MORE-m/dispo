@@ -7,6 +7,9 @@ namespace App\Services\Calculation;
  */
 final readonly class ProductionLineResult
 {
+    /**
+     * @param  list<array{type: string, custom_label: string|null, percent: string}>  $positionDiscountsSnapshot
+     */
     public function __construct(
         public ?string $clientKey,
         public string $productionType,
@@ -23,6 +26,8 @@ final readonly class ProductionLineResult
         public string $afterPositionDiscount,
         public string $orderDiscountAmount,
         public string $afterOrderDiscount,
+        public string $positionDiscountPercent,
+        public array $positionDiscountsSnapshot,
         public string $aePercent,
         public string $aeAmount,
         public string $nnInvest,
@@ -48,6 +53,8 @@ final readonly class ProductionLineResult
             'production_price_list_version' => $this->productionPriceListVersion,
             'position_discount_amount' => $this->positionDiscountAmount,
             'order_discount_amount' => $this->orderDiscountAmount,
+            'position_discount_percent' => $this->positionDiscountPercent,
+            'position_discounts' => $this->positionDiscountsSnapshot,
             'ae_percent' => $this->aePercent,
             'ae_amount' => $this->aeAmount,
             'nn_invest' => $this->nnInvest,

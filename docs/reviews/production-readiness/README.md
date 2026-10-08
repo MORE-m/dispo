@@ -11,7 +11,7 @@ PO-BLP502-1 **akzeptiert** (A1/B1/C1/D1/E1/F/G1/H1a). Teilscope auf Feature-Bran
 | Datei | Rolle |
 |---|---|
 | [`docs/entscheidungen/PO-BLP502-1-produktion-sonstiges.md`](../../entscheidungen/PO-BLP502-1-produktion-sonstiges.md) | PO **Akzeptiert** |
-| [`docs/entscheidungen/PO-BLP502-1-aufloesungsvertrag.md`](../../entscheidungen/PO-BLP502-1-aufloesungsvertrag.md) | Pin-/Jahresauflösung inkl. `ae_percent` |
+| [`docs/entscheidungen/PO-BLP502-1-aufloesungsvertrag.md`](../../entscheidungen/PO-BLP502-1-aufloesungsvertrag.md) | Pin-/Jahresauflösung inkl. AE-/Rabatt-Freeze |
 | [`docs/readiness/BL-P5-02-produktion-2026-10-08.md`](../../readiness/BL-P5-02-produktion-2026-10-08.md) | Readiness READY / Teilscope |
 
 ## Scope
@@ -59,11 +59,27 @@ Vier Befunde nachvollzogen, mit Regressionstests belegt und behoben:
 
 **Nachweise:** Quelle mit Produktion / Menge 0 / gemischt → kein neuer Draft; ohne Produktion → Flow unverändert erfolgreich.
 
+### Restbefund P1: gemischte Produktionsflags (erneute Review)
+
+**Ursache:** Effektiver Produktionsrabatt nutzte `production_gross` aller Zeilen. Nicht rabattfähige Zeilen verdünnten den Prozentsatz (z. B. 46,08 / 600 = 7,68 % statt 15,36 % auf rabattfähigen 300).
+
+**Korrektur:** Preview (`CalculationEngine`) und gespeicherter Assessor rechnen den effektiven Rabatt nur über rabattfähige Produktionszeilen (Brutto + Rabattbeträge). Positions-/Auftragsprüfung unverändert.
+
+**Nachweise:** Admin-Nachfolger-Pfad (alte Zeile pinnt `is_discountable=true`, neue aus Nachfolger `false`); 300→276→253,92 (46,08 = 15,36 %); Sonderfreigabe zwingend; verdünntes 7,68 % bestimmt nicht; Teilübernahme nur betroffenem Träger; zusätzliche nicht rabattfähige Zeilen ändern Freigabe nicht; nur nicht rabattfähige Produktion → keine produktionsbedingte Freigabe.
+
+### Restbefund P2: Produktions-Positionsrabatte im Dispo-Snapshot
+
+**Ursache:** `productionFromLine` übernahm `carrier->position_discount_percent` und setzte `position_discounts_snapshot` leer.
+
+**Korrektur:** Additive Migration `position_discount_percent` + `position_discounts_snapshot` an Calc-Produktionszeilen; Engine friert angewendete Staffel ein (leer/`0` wenn nicht rabattfähig); Dispo kopiert gespeicherte Werte. Sales-Payload manipuliert diese Felder nicht.
+
+**Nachweise:** 300 −10 % → 270 mit Dispo 10 % + Staffel; gestapelt 10 %+5 % → 14,5 % / 43,50; Träger rabattfähig / Produktion nicht → 0; gemischte Pins; Snapshot stabil bei späteren Calc-/Admin-Änderungen.
+
 ## Abnahme
 
 - Feature-Tests Admin + Calc/Dispo + Review-Regressionen (`SpotProductionBlP502aTest`)
 - Browser Port **8057**, `--retries=0`: Vertical Slice; Inventarwechsel; Calendar-Sperre; **divergente Flags Preview→Save→Reload→Dispo**
-- Fixtures: 2×150=300, 3×80=240, Summe Produktion 540 (+ Medien); Review-Belege 270 / 255 / 229,50
+- Fixtures: 2×150=300, 3×80=240, Summe Produktion 540 (+ Medien); Review-Belege 270 / 255 / 229,50 / 15,36 %
 
 ## Offen
 

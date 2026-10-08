@@ -228,7 +228,8 @@ final class DispoOrderSnapshotMapper
             'average_second_price' => null,
             'length_index' => null,
             'surcharge_percent' => '0',
-            'position_discount_percent' => (string) $carrier->position_discount_percent,
+            // BL-P5-02a Review P2: angewendete Produktions-Positionsrabatte, nicht Trägerkonditionen.
+            'position_discount_percent' => (string) $line->position_discount_percent,
             // BL-P5-02a Review: eingefrorener Produktions-AE-Satz, nicht Träger-ae_percent.
             'ae_percent' => (string) $line->ae_percent,
             'is_discountable' => (bool) $line->is_discountable,
@@ -246,7 +247,9 @@ final class DispoOrderSnapshotMapper
             'time_ranges_snapshot' => [],
             'planner_entries_snapshot' => [],
             'components_snapshot' => [],
-            'position_discounts_snapshot' => [],
+            'position_discounts_snapshot' => is_array($line->position_discounts_snapshot)
+                ? $line->position_discounts_snapshot
+                : [],
             'production_type' => $line->production_type,
             'production_label' => $line->label,
             'production_quantity' => (string) $line->quantity,
