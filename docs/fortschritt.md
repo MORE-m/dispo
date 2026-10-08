@@ -19,8 +19,8 @@ Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In
 
 ## Aktuelle Aufgabe
 
-**BL-P5-02a** Draft-PR Review. **Kein** Merge/Deploy; keine operative DB-Pflege.
-Standardangebote/Budget pausiert.
+**BL-P5-02a** Draft-PR Review-Nachzug (vier Befunde) abschließen / erneute Review.
+**Kein** Merge/Deploy; keine operative DB-Pflege. Standardangebote/Budget pausiert.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,
@@ -30,9 +30,10 @@ ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP502-1 / BL-P5-02a** Spotproduktion an Spot Classic × Average –
-Feature-Branch Draft-PR (Admin-Preise, Calc-Zusatzzeilen, Dispo-S, Pin/H1a,
-Browser Port **8057**); **kein** Deploy; operative Preise nicht behauptet.
+**PO-BLP502-1 / BL-P5-02a Review-Nachzug** auf Draft-PR #131: Sonderfreigabe
+Produktionsrabatte, Positionsrabatte unabhängig vom Trägerflag, eingefrorener
+Produktions-AE-Satz, From-Calc-Ablehnung bei Produktion; Regressionen + Browser
+Port **8057**; **kein** Deploy; operative Preise nicht behauptet.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 

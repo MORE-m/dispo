@@ -86,6 +86,28 @@ final class CalculationEngine
                     $position->inventoryName,
                 ),
             );
+
+            // BL-P5-02a Review: Produktionsrabatte eigenständig prüfen (eigene Zeilenflags).
+            if ($this->hasDiscountableProduction($position)) {
+                $productionStackedPercent = $this->stackedProductionPositionPercent($position);
+                $productionEffective = $this->assessor->effectivePercentFromAmounts(
+                    $result->productionGross,
+                    $result->productionPositionDiscountAmount,
+                    $result->productionOrderDiscountAmount,
+                );
+                $specialApprovalReasons = array_merge(
+                    $specialApprovalReasons,
+                    $this->assessor->reasonsForRates(
+                        $productionStackedPercent,
+                        $orderStackedPercent,
+                        $productionEffective,
+                        $personalDiscountLimitPercent,
+                        null,
+                        $position->positionKey,
+                        $position->inventoryName,
+                    ),
+                );
+            }
         }
 
         foreach ($positions as $index => $position) {
@@ -926,6 +948,9 @@ final class CalculationEngine
                 ? $afterPosition
                 : $orderSequence[array_key_last($orderSequence)]['remaining'];
 
+            $appliedAePercent = $line->isAeEligible
+                ? Decimal::roundPrice($position->productionAePercent)
+                : '0';
             $ae = $line->isAeEligible
                 ? Decimal::mul($afterOrder, Decimal::percentFactor($position->productionAePercent))
                 : '0';
@@ -947,6 +972,7 @@ final class CalculationEngine
                 afterPositionDiscount: Decimal::roundMoney($afterPosition),
                 orderDiscountAmount: Decimal::roundMoney(Decimal::sub($afterPosition, $afterOrder)),
                 afterOrderDiscount: Decimal::roundMoney($afterOrder),
+                aePercent: $appliedAePercent,
                 aeAmount: Decimal::roundMoney($ae),
                 nnInvest: Decimal::roundMoney($nn),
                 sort: $line->sort,
@@ -1100,6 +1126,33 @@ final class CalculationEngine
     private function stackedPositionPercent(PositionInput $position): string
     {
         if (! $position->isDiscountable) {
+            return '0';
+        }
+
+        $discounts = $this->resolveDiscountList($position->positionDiscounts, $position->positionDiscountPercent);
+
+        return $this->assessor->stackedPercent(
+            array_map(fn (DiscountInput $discount): string => $discount->percent, $discounts),
+        );
+    }
+
+    private function hasDiscountableProduction(PositionInput $position): bool
+    {
+        foreach ($position->productionLines as $line) {
+            if ($line->isDiscountable) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Gestapelter Positionsrabatt für rabattfähige Produktionsleistung (unabhängig vom Trägerflag).
+     */
+    private function stackedProductionPositionPercent(PositionInput $position): string
+    {
+        if (! $this->hasDiscountableProduction($position)) {
             return '0';
         }
 

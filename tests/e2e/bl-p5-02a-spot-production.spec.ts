@@ -52,11 +52,7 @@ async function selectSpotInventory(page: Page, index: number, code: string) {
         .selectOption({ label: spotMedium });
 }
 
-async function fillRange(
-    page: Page,
-    index: number,
-    spots: string,
-) {
+async function fillRange(page: Page, index: number, spots: string) {
     if (
         (await page.locator(`[data-test="range-spots-${index}-0"]`).count()) ===
         0
@@ -71,7 +67,9 @@ async function fillRange(
         .locator(`[data-test="range-day-${index}-0"]`)
         .selectOption('mo_fr');
     await page.locator(`[data-test="range-spots-${index}-0"]`).fill(spots);
-    await page.locator(`[data-test="position-length-seconds-${index}"]`).fill('30');
+    await page
+        .locator(`[data-test="position-length-seconds-${index}"]`)
+        .fill('30');
 }
 
 async function addProductionLine(
@@ -105,27 +103,38 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
         const inventorySelect = page.locator(
             '[data-test="production-price-inventory-input"]',
         );
-        const spaValue = await inventorySelect.locator('option').evaluateAll(
-            (options) =>
-                options.find((option) =>
-                    (option.textContent ?? '').includes('Produktion Testsender A'),
-                )?.getAttribute('value') ?? '',
-        );
+        const spaValue = await inventorySelect
+            .locator('option')
+            .evaluateAll(
+                (options) =>
+                    options
+                        .find((option) =>
+                            (option.textContent ?? '').includes(
+                                'Produktion Testsender A',
+                            ),
+                        )
+                        ?.getAttribute('value') ?? '',
+            );
         expect(spaValue).not.toBe('');
         await inventorySelect.selectOption(spaValue);
-        await page.locator('[data-test="production-price-year-input"]').fill(
-            String(new Date().getFullYear()),
-        );
+        await page
+            .locator('[data-test="production-price-year-input"]')
+            .fill(String(new Date().getFullYear()));
         await page
             .locator('[data-test="production-price-name-input"]')
             .fill('E2E Admin SPA 150');
         await page
             .locator('[data-test="production-price-unit-price-input"]')
             .fill('150,00');
-        await page.locator('[data-test="production-price-create-submit"]').click();
-        await expect(page).toHaveURL(/\/administration\/produktionspreise\/\d+/, {
-            timeout: 30_000,
-        });
+        await page
+            .locator('[data-test="production-price-create-submit"]')
+            .click();
+        await expect(page).toHaveURL(
+            /\/administration\/produktionspreise\/\d+/,
+            {
+                timeout: 30_000,
+            },
+        );
         await page.locator('[data-test="production-price-activate"]').click();
         await expect(
             page.locator('[data-test="production-price-activate"]'),
@@ -150,7 +159,9 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
         ).toHaveValue(/300/);
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
-        await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
+        await page
+            .getByRole('button', { name: 'Werbeelement hinzufügen' })
+            .click();
         await selectSpotInventory(page, 1, 'SPB');
         await fillRange(page, 1, '5');
         await waitForPreview(page);
@@ -241,6 +252,120 @@ test.describe.serial('BL-P5-02a Spotproduktion', () => {
             'Produktion Testsender A',
             { timeout: 20_000 },
         );
+    });
+
+    test('Divergente Flags: Träger ohne Rabatt/AE, Produktion mit Order-Rabatt und AE', async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+
+        // Admin: SPA-Produktionspreis mit Rabatt+AE aktivieren (ersetzt Seed-Active).
+        await login(page, 'admin@example.com');
+        await page.goto('/administration/produktionspreise/neu');
+        const inventorySelect = page.locator(
+            '[data-test="production-price-inventory-input"]',
+        );
+        const spaValue = await inventorySelect
+            .locator('option')
+            .evaluateAll(
+                (options) =>
+                    options
+                        .find((option) =>
+                            (option.textContent ?? '').includes(
+                                'Produktion Testsender A',
+                            ),
+                        )
+                        ?.getAttribute('value') ?? '',
+            );
+        expect(spaValue).not.toBe('');
+        await inventorySelect.selectOption(spaValue);
+        await page
+            .locator('[data-test="production-price-year-input"]')
+            .fill(String(new Date().getFullYear()));
+        await page
+            .locator('[data-test="production-price-name-input"]')
+            .fill('E2E SPA Flags 150');
+        await page
+            .locator('[data-test="production-price-unit-price-input"]')
+            .fill('150,00');
+        await page
+            .locator('[data-test="production-price-discountable-input"]')
+            .check();
+        await page.locator('[data-test="production-price-ae-input"]').check();
+        await page
+            .locator('[data-test="production-price-create-submit"]')
+            .click();
+        await expect(page).toHaveURL(
+            /\/administration\/produktionspreise\/\d+/,
+            {
+                timeout: 30_000,
+            },
+        );
+        await page.locator('[data-test="production-price-activate"]').click();
+        await expect(
+            page.locator('[data-test="production-price-activate"]'),
+        ).toHaveCount(0, { timeout: 20_000 });
+
+        await page.context().clearCookies();
+        await login(page, 'sales@example.com');
+        await openNewCalculationStepTwo(page, 'Produktion E2E Flags GmbH');
+        await selectSpotInventory(page, 0, 'SPA');
+        await fillRange(page, 0, '10');
+        await addProductionLine(page, 0, 0, 'Spotproduktion Flags', '2');
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="production-total-0-0"]'),
+        ).toHaveValue(/300/);
+
+        await page.locator('[data-test="order_discounts-add"]').click();
+        await page
+            .locator('[data-test="order_discounts-type-0"]')
+            .selectOption('quantity');
+        await page
+            .locator('[data-test="order_discounts-percent-0"]')
+            .fill('10');
+        await page.locator('[data-test="ae-enabled"]').check();
+        await waitForPreview(page);
+
+        // Produktion 300 −10 % = 270 → AE 15 % = 40,50 → 229,50; Medien 600 unverändert.
+        // Gesamt N/N = 600 + 229,50 = 829,50
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(/829/, { timeout: 20_000 });
+        // AE nur auf Produktion (40,50); Medien ohne AE → Gesamt-AE im Summary.
+        await expect(
+            page.locator('[data-test="summary-ae-deduction"]').first(),
+        ).toContainText(/40/);
+
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
+            timeout: 30_000,
+        });
+
+        await page.reload();
+        await page.getByRole('button', { name: '3. Konditionen' }).click();
+        await expect(page.locator('[data-test="ae-enabled"]')).toBeChecked();
+        await expect(
+            page.locator('[data-test="order_discounts-percent-0"]'),
+        ).toHaveValue(/10/);
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await waitForPreview(page);
+        await expect(
+            page.locator('[data-test="preview-net-total"]').first(),
+        ).toContainText(/829/, { timeout: 20_000 });
+
+        await page.locator('[data-test="dispo-order-create-open"]').click();
+        await page.locator('[data-test="dispo-order-submit"]').click();
+        await expect(page).toHaveURL(/\/dispoauftraege\/\d+$/, {
+            timeout: 30_000,
+        });
+        await expect(
+            page.locator('[data-test="dispo-production-lines"]'),
+        ).toBeVisible();
+        await expect(page.locator('body')).toContainText('229');
+        await expect(page.locator('body')).toContainText('15');
     });
 
     test('Calendar-Methode mit Produktionszeile: Sperre, Entfernung möglich', async ({

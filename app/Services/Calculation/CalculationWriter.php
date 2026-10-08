@@ -762,15 +762,15 @@ final class CalculationWriter
             $lengthIndex = $this->resolveLengthIndex($lengthSeconds, $existingPosition);
             $componentInputs = $this->componentInputsFromResolved($item['components']);
 
+            // BL-P5-02a Review: validierte Positionsrabatte ungefiltert an die Engine übergeben.
+            // Medien wendet sie nur bei Träger-is_discountable an; Produktion je Zeilenflag.
             $inputs[] = new PositionInput(
                 inventoryId: $item['inventory']->id,
                 inventoryName: $item['inventory']->name,
                 positionKey: (string) $positionKey,
                 lengthSeconds: $lengthSeconds,
                 surchargePercent: (string) $item['surcharge_percent'],
-                positionDiscountPercent: $item['is_discountable']
-                    ? $this->effectivePercentFromDiscounts($item['position_discounts'])
-                    : '0',
+                positionDiscountPercent: $this->effectivePercentFromDiscounts($item['position_discounts']),
                 aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
                 isDiscountable: $item['is_discountable'],
                 isAeEligible: $item['is_ae_eligible'],
@@ -780,7 +780,7 @@ final class CalculationWriter
                 lengthIndex: $item['freeze']->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER ? 100 : $lengthIndex,
                 timeRanges: $item['time_ranges'],
                 plannerEntries: $item['planner_entries'],
-                positionDiscounts: $item['is_discountable'] ? $item['position_discounts'] : [],
+                positionDiscounts: $item['position_discounts'],
                 needsSpotRedistribution: $item['needs_spot_redistribution'],
                 components: $componentInputs,
                 componentCalculationStrategy: $item['component_calculation_strategy'],
@@ -1143,6 +1143,7 @@ final class CalculationWriter
                 'production_price_list_version' => $line->productionPriceListVersion,
                 'is_discountable' => $line->isDiscountable,
                 'is_ae_eligible' => $line->isAeEligible,
+                'ae_percent' => $line->aePercent,
                 'position_discount_amount' => $line->positionDiscountAmount,
                 'order_discount_amount' => $line->orderDiscountAmount,
                 'ae_amount' => $line->aeAmount,
@@ -1598,6 +1599,7 @@ final class CalculationWriter
                             'line_gross' => (string) $line->line_gross,
                             'is_discountable' => (bool) $line->is_discountable,
                             'is_ae_eligible' => (bool) $line->is_ae_eligible,
+                            'ae_percent' => (string) $line->ae_percent,
                             'production_price_list_id' => $line->production_price_list_id,
                             'production_price_list_version' => $line->production_price_list_version,
                             'nn_invest' => (string) $line->nn_invest,

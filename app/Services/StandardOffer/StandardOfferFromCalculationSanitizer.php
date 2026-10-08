@@ -145,6 +145,11 @@ final class StandardOfferFromCalculationSanitizer
                 ? (string) $position['spot_method']
                 : SpotCalculationMethod::Average->value;
 
+            // BL-P5-02a Review: Produktionszeilen (auch Menge 0) blockieren From-Calc vollständig.
+            if ($this->hasProductionLines($position)) {
+                $errors["positions.{$index}.production_lines"] = "{$label}: Kalkulationen mit Produktionszeilen können nicht als Standardangebot übernommen werden (keine stille Teilübernahme).";
+            }
+
             if ($method === SpotCalculationMethod::Average->value) {
                 $hasAverage = true;
                 $this->assertCompatibleAveragePosition($position, (int) $index, $label, $errors);
@@ -405,6 +410,25 @@ final class StandardOfferFromCalculationSanitizer
                 ]);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     */
+    private function hasProductionLines(array $position): bool
+    {
+        $lines = $position['production_lines'] ?? null;
+        if (! is_array($lines) || $lines === []) {
+            return false;
+        }
+
+        foreach ($lines as $line) {
+            if (is_array($line)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasNonEmptyValue(mixed $value): bool

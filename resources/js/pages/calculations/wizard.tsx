@@ -4765,8 +4765,20 @@ export default function CalculationWizard({
                                                         types={discountTypes}
                                                         canEdit={canEdit}
                                                         disabled={
-                                                            rule?.is_discountable ===
-                                                                false ||
+                                                            (rule?.is_discountable ===
+                                                                false &&
+                                                                !(
+                                                                    displayTotals
+                                                                        ?.positions[
+                                                                        index
+                                                                    ]
+                                                                        ?.production_lines ??
+                                                                    []
+                                                                ).some(
+                                                                    (line) =>
+                                                                        line.is_discountable ===
+                                                                        true,
+                                                                )) ||
                                                             fixedSettlement
                                                         }
                                                         fieldPrefix={`positions.${index}.position_discounts`}
@@ -5275,10 +5287,12 @@ export default function CalculationWizard({
                                                                                 {formatHour(
                                                                                     range.start_hour,
                                                                                 )}
+
                                                                                 –
                                                                                 {formatInclusiveEnd(
                                                                                     range.end_hour_exclusive,
                                                                                 )}
+
                                                                                 ,{' '}
                                                                                 {
                                                                                     range.spot_count

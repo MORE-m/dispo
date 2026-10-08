@@ -32,8 +32,9 @@ Beim Speichern je Zusatzzeile eingefroren:
 
 - `production_price_list_id`, `production_price_list_version`
 - `unit_price`, `is_discountable`, `is_ae_eligible`
+- `ae_percent` (tatsächlich angewendeter Produktions-AE-Satz; unabhängig vom Trägerflag)
 - `label`, `quantity`, `remark`, `line_gross`, Rabatt-/AE-/N/N-Beiträge
-- Dispo zusätzlich Kennzeichen **S**
+- Dispo zusätzlich Kennzeichen **S**; Dispo übernimmt `ae_percent` von der Calc-Zeile (nicht vom Träger)
 
 ### Wann bleibt der Pin?
 

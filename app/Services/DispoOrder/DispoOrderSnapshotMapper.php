@@ -229,7 +229,8 @@ final class DispoOrderSnapshotMapper
             'length_index' => null,
             'surcharge_percent' => '0',
             'position_discount_percent' => (string) $carrier->position_discount_percent,
-            'ae_percent' => $line->is_ae_eligible ? (string) $carrier->ae_percent : '0',
+            // BL-P5-02a Review: eingefrorener Produktions-AE-Satz, nicht Träger-ae_percent.
+            'ae_percent' => (string) $line->ae_percent,
             'is_discountable' => (bool) $line->is_discountable,
             'is_ae_eligible' => (bool) $line->is_ae_eligible,
             'media_gross' => '0.00',

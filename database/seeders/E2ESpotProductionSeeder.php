@@ -56,11 +56,14 @@ class E2ESpotProductionSeeder extends Seeder
             ->where('key', CanonicalAdvertisingCategories::SPOTS)
             ->value('id');
 
+        // Medium bleibt rabatt-/AE-fähig; SPA-Regel setzt die Trägerflags auf false (rule ∧ medium).
         $medium = AdvertisingMedium::factory()->create([
             'code' => 'spot_classic',
             'name' => 'Spot Classic',
             'category_id' => $spotsCategoryId,
             'kind' => CalculationKind::SpotClassic,
+            'is_discountable' => true,
+            'is_ae_eligible' => true,
         ]);
 
         $year = (int) now('Europe/Berlin')->year;
@@ -76,9 +79,12 @@ class E2ESpotProductionSeeder extends Seeder
                 'code' => $code,
             ]);
 
+            // SPA: Träger bewusst nicht rabatt-/AE-fähig für Review-Smoke divergenter Flags.
             InventoryMediumRule::factory()->create([
                 'inventory_id' => $inventory->id,
                 'advertising_medium_id' => $medium->id,
+                'is_discountable' => $code !== 'SPA',
+                'is_ae_eligible' => $code !== 'SPA',
             ]);
 
             $list = PriceList::factory()->create([

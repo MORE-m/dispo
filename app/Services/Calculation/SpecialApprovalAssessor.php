@@ -100,7 +100,8 @@ final class SpecialApprovalAssessor
      */
     public function assessFromCalculation(Calculation $calculation, Collection $selectedPositions): SpecialApprovalAssessment
     {
-        $calculation->loadMissing(['positions.inventory']);
+        $calculation->loadMissing(['positions.inventory', 'positions.productionLines', 'positions.discounts']);
+        $selectedPositions->loadMissing(['inventory', 'productionLines', 'discounts']);
 
         $limit = $calculation->personal_discount_limit_percent;
         $limitString = $limit === null || $limit === '' ? null : (string) $limit;
@@ -177,9 +178,77 @@ final class SpecialApprovalAssessor
             (string) $position->order_discount_amount,
         );
 
-        return $this->reasonsForRates(
+        $reasons = $this->reasonsForRates(
             $positionPercent,
             $orderPercent,
+            $effective,
+            $limit,
+            (int) $position->id,
+            'id:'.$position->id,
+            $position->inventory?->name,
+        );
+
+        return array_merge(
+            $reasons,
+            $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
+        );
+    }
+
+    /**
+     * BL-P5-02a Review: Produktionsrabatte aus gespeicherten Zeilen eigenständig prüfen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function productionReasonsFromStoredPosition(
+        CalculationPosition $position,
+        string $orderDiscountPercent,
+        ?string $limit,
+    ): array {
+        $lines = $position->relationLoaded('productionLines')
+            ? $position->productionLines
+            : $position->productionLines()->get();
+
+        $hasDiscountable = false;
+        $positionDiscountAmount = '0';
+        $orderDiscountAmount = '0';
+        foreach ($lines as $line) {
+            if ((bool) $line->is_discountable) {
+                $hasDiscountable = true;
+            }
+            $positionDiscountAmount = Decimal::add(
+                $positionDiscountAmount,
+                (string) $line->position_discount_amount,
+                2,
+            );
+            $orderDiscountAmount = Decimal::add(
+                $orderDiscountAmount,
+                (string) $line->order_discount_amount,
+                2,
+            );
+        }
+
+        if (! $hasDiscountable) {
+            return [];
+        }
+
+        $discounts = $position->relationLoaded('discounts')
+            ? $position->discounts
+            : $position->discounts()->get();
+        $positionPercent = $discounts->isEmpty()
+            ? (string) $position->position_discount_percent
+            : $this->stackedPercent(
+                $discounts->map(fn ($discount): string => (string) $discount->percent)->all(),
+            );
+
+        $effective = $this->effectivePercentFromAmounts(
+            (string) ($position->production_gross ?? '0'),
+            Decimal::roundMoney($positionDiscountAmount),
+            Decimal::roundMoney($orderDiscountAmount),
+        );
+
+        return $this->reasonsForRates(
+            $positionPercent,
+            $orderDiscountPercent,
             $effective,
             $limit,
             (int) $position->id,

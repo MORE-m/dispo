@@ -1,6 +1,6 @@
 # Readiness: BL-P5-02 – Produktionsleistungen in Kalkulation und Dispo
 
-Status: **READY** (Teilscope `BL-P5-02a` umgesetzt; Draft-PR)
+Status: **READY** (Teilscope `BL-P5-02a` umgesetzt; Draft-PR inkl. Review-Nachzug)
 Stand: 8. Oktober 2026
 Audit-/Implementierungsbasis: Feature-Branch auf `origin/main` @ `7583a3edfbb422b7b9580b4713747201d876b8d1`
 IDs: `ADV-003`, `PRO-001`–`PRO-007`, `AT-11` (teilweise), `COM-*`, `ADM-*`,
@@ -52,9 +52,13 @@ ohne Zeile blockiert fehlende Produktionskonfiguration Spot nicht.
   Flags; Dispo-S; Regression)
 - Browser isoliert Port **8057**: `playwright.blp502a.config.ts` / `E2ESpotProductionSeeder`
   – Admin aktivieren, Wizard SPA+SPB, Preview/Save/Reload/Dispo S-Zeile,
-  Inventarwechsel SPC fail-closed, Calendar-Sperre + Entfernung; lokal `--retries=0`
+  Inventarwechsel SPC fail-closed, Calendar-Sperre + Entfernung,
+  divergente Träger-/Produktionsflags inkl. Order-Rabatt+AE; lokal `--retries=0`
+- Review-Nachzug: Sonderfreigabe Produktion, Positionsrabatte unabhängig vom Trägerflag,
+  eingefrorener Produktions-AE-Satz, From-Calc-Ablehnung bei Produktionszeilen
+  (siehe [`docs/reviews/production-readiness/README.md`](../reviews/production-readiness/README.md))
 
 ## 4. Bewusst offen
 
 Operative Preispflege, Sonstiges-FreiPreis, Überschreibungs-Sonderfreigabe,
-weitere Träger/Methoden, vollständiges `AT-11`, Deploy.
+weitere Träger/Methoden, Produktion in Standardangeboten, vollständiges `AT-11`, Deploy.
