@@ -726,6 +726,23 @@ class SpotProductionBlP502aTest extends TestCase
         ]);
     }
 
+    /**
+     * JSON-Snapshots können je DB-Treiber unterschiedliche Key-Reihenfolge haben.
+     *
+     * @param  list<array{type: string, custom_label: string|null, percent: string}>  $expected
+     */
+    private function assertDiscountSnapshotSame(array $expected, mixed $actual): void
+    {
+        $this->assertIsArray($actual);
+        $this->assertCount(count($expected), $actual);
+        foreach ($expected as $index => $row) {
+            $this->assertIsArray($actual[$index] ?? null);
+            $this->assertSame($row['type'], $actual[$index]['type'] ?? null);
+            $this->assertSame($row['custom_label'], $actual[$index]['custom_label'] ?? null);
+            $this->assertSame($row['percent'], $actual[$index]['percent'] ?? null);
+        }
+    }
+
     public function test_review_production_position_discount_independent_of_carrier_flag(): void
     {
         $catalog = $this->createTrailerAverageCatalog();
@@ -1347,7 +1364,7 @@ class SpotProductionBlP502aTest extends TestCase
         $line = $calculation->positions[0]->productionLines->firstOrFail();
         $this->assertSame('10.0000', (string) $line->position_discount_percent);
         $this->assertSame('30.00', (string) $line->position_discount_amount);
-        $this->assertSame(
+        $this->assertDiscountSnapshotSame(
             [['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000']],
             $line->position_discounts_snapshot,
         );
@@ -1362,7 +1379,7 @@ class SpotProductionBlP502aTest extends TestCase
         $this->assertSame('10.0000', (string) $dispoLine->position_discount_percent);
         $this->assertSame('30.00', (string) $dispoLine->position_discount_amount);
         $this->assertSame('270.00', (string) $dispoLine->nn_invest);
-        $this->assertSame(
+        $this->assertDiscountSnapshotSame(
             [['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000']],
             $dispoLine->position_discounts_snapshot,
         );
@@ -1417,7 +1434,7 @@ class SpotProductionBlP502aTest extends TestCase
         $stackedDispo = $stackedOrder->productionLines->firstOrFail();
         $this->assertSame('14.5000', (string) $stackedDispo->position_discount_percent);
         $this->assertSame('43.50', (string) $stackedDispo->position_discount_amount);
-        $this->assertSame(
+        $this->assertDiscountSnapshotSame(
             [
                 ['type' => 'quantity', 'custom_label' => null, 'percent' => '10.0000'],
                 ['type' => 'special', 'custom_label' => null, 'percent' => '5.0000'],
