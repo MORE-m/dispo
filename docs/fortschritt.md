@@ -1,42 +1,46 @@
 # Fortschritt V1
 
-Stand: 7. Oktober 2026 – **BL-P5-01a / PO-BLP501A-1** (Trailer × Average, inventarübergreifend;
-**A1 + B1 akzeptiert**; Implementierung im Draft-PR, **kein** Merge/Deploy).
-Basis `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
-(Merge PR #128; Post-Merge-CI `37611870573` **SUCCESS**; **kein** Deploy).
+Stand: 8. Oktober 2026 – **BL-P5-01a / PO-BLP501A-1** auf `main`
+(PR [#129](https://github.com/MORE-m/dispo/pull/129) /
+`d97a5aefc3948e297fb510f7146e23bb38f71c14`;
+Post-Merge-CI [37668554937](https://github.com/MORE-m/dispo/actions/runs/37668554937) SUCCESS;
+**kein** Deploy). Lokale Daten-Readiness auf `dispo_mat_core` **abgeschlossen**
+(Migration + Admin 20 s/30 % + Writer-/Browser-Abnahme); Deploy/andere Umgebungen offen.
 Lokale Arbeitsbasis unverändert: Checkout `dispo-main`, Port **8000**,
 Dev-DB **`dispo_mat_core`**; Alt-`dispo` stillgelegt.
 
-03k auf `main`: PR #128 / Merge `0ff11aa…`; Post-Merge-CI `37611870573` SUCCESS;
-**kein** Deploy. Manuelle Fachabnahme bleibt von Merge getrennt.
+BL-P5-01a auf `main`: technisch umgesetzt; lokal operativ eingerichtet;
+Merge ≠ Deploy. `BL-P5-01` bleibt teilweise.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
 (**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03k** auf `main`;
 Budget/Abbinder offen);
-Phase 5 SWF: **BL-P5-01a** Readiness/PO **vorgeschlagen** (nicht freigegeben);
+Phase 5 SWF: **BL-P5-01a** auf `main` + lokal `dispo_mat_core` eingerichtet
+(Deploy/andere Umgebungen offen); `BL-P5-01` teilweise;
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP501A-1 / BL-P5-01a** Trailer × Durchschnitt – Implementierung im Draft-PR
-(Branch `feat/bl-p5-01a-swf-trailer-average`); **A1** und **B1** akzeptiert.
-Kein Merge/Deploy. Operative Freischaltung je Inventar erst nach Datenlieferung
-(Länge/Aufschlag). Standardangebote/Budget pausiert.
+**PO-BLP501A-1 lokal eingerichtet** auf `dispo_mat_core` (Migration + Admin 20 s/30 %
++ Writer-Abnahme + **Browser-Abnahme Port 8056** bestanden: Calc **8**/Dispo **7**,
+Inventarwechsel Calc **9**). Docs-only-Draft-PR zur Sicherung. **Kein** Deploy;
+andere Umgebungen unberührt. Standardangebote/Budget pausiert.
 
 Offen / zurückgestellt u. a.:
-Datenlieferung Trailer-Länge/Aufschlag (ROCK/OLDIE/CARAVAN; RH nur Admin-Pflege), SWF-Rest (`BL-P5-01`),
+Deploy/Staging/Prod für BL-P5-01a, SWF-Rest (`BL-P5-01`),
 Produktion (`BL-P5-02`), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
 SPT-013 Abbinder, weitere Status-Mails / In-App, CRM / REP, ADV-001 Defaults,
 ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP403K-1 / BL-P4-03k** Calendar × Tandem/Tridem × normal/Festpreis –
-**PR #128**, Merge `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`; Post-Merge-CI
-`37611870573` **SUCCESS**; **kein** Deploy.
+**PO-BLP501A-1 / BL-P5-01a** Trailer × Durchschnitt –
+**PR #129**, Merge `d97a5aefc3948e297fb510f7146e23bb38f71c14`; Post-Merge-CI
+`37668554937` **SUCCESS**; **kein** Deploy. Lokal `dispo_mat_core` eingerichtet
+(Migration + Admin 20/30 + Writer-/Browser-Abnahme); Deploy/andere Umgebungen offen.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
@@ -254,11 +258,15 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Thema | Status |
 |---|---|
 | Readiness inventarübergreifend Trailer × Average | **READY MIT DATEN-VORBEDINGUNGEN JE INVENTAR** |
-| Preisbasis **B1** (Spot-Grundpreise + inventarspezifischer Aufschlag) | **akzeptiert** |
-| PO/UX-GATE-C Teilfreigabe **A1** (nur Trailer × Durchschnitt) | **akzeptiert** |
-| Berechnungsart/Profil | eigenes `swf_trailer` (kein Spotlängenindex; kein Calendar/Festpreis) |
-| Aufschlag-Semantik | `NULL` = nicht konfiguriert (fail-closed); `0` = ausdrücklich 0 % |
-| Implementierung | Draft-PR; **kein** Merge, **kein** Deploy |
+| Operative Daten-Readiness | **LOKAL EINGERICHTET** (`dispo_mat_core` only) |
+| Initiale Admin-Werte Länge/Aufschlag | **20 s / 30 %** alle vier (PO; AdminWriter; kein Auto-Seed) |
+| Lokale Migration BL-P5-01a | **ausgeführt** (`kind=swf_trailer`, Average-Profil, nullable surcharge) |
+| Spotlisten 2026 (vier Inventare) | aktiv, je **72/72** Zellen workbook-paritätisch; unverändert |
+| Lokale Writer-Abnahme | Calc 3–6 + Dispo 3–6; Inventarwechsel Calc 7 – bestanden |
+| Lokale Browser-Abnahme (Port 8056) | Calc **8**/Dispo **7** (Summe 21.320,00); Inventarwechsel Calc **9** – bestanden |
+| Preisbasis **B1** / UX-GATE-C **A1** | **akzeptiert** |
+| Implementierung | **auf `main`** (PR #129 / `d97a5ae…`) |
+| Deploy / andere Umgebungen | **kein** Deploy; unberührt |
 | `BL-P5-01` vollständig | **nein** (Teilscope) |
 | Produktion `BL-P5-02` | **keine** Freigabe abgeleitet |
 

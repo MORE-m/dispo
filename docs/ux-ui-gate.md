@@ -222,10 +222,11 @@ Nicht umsetzen, bis der Product Owner freigibt:
 - Influencer-/Social-Media-Fachoberflächen
 - weitere Werbeelemente außerhalb Spot Classic
 
-**Hinweis Stand 7.10.2026:** Teilfreigabe **A1** nur Trailer × Durchschnitt
+**Hinweis Stand 8.10.2026:** Teilfreigabe **A1** nur Trailer × Durchschnitt
 (`PO-BLP501A-1` / `BL-P5-01a`) ist **akzeptiert** (Matrix-Inventare RH/ROCK/OLDIE/CARAVAN;
-ohne Calendar/Festpreis/weitere SWF). Alle übrigen Gate-C-Elemente (weitere SWF-Medien,
-Influencer, Social Media, weitere Werbeelemente) bleiben blockiert.
+ohne Calendar/Festpreis/weitere SWF). Code auf `main` (PR #129); lokal `dispo_mat_core`
+eingerichtet; Deploy/andere Umgebungen **offen**. Alle übrigen Gate-C-Elemente
+(weitere SWF-Medien, Influencer, Social Media, weitere Werbeelemente) bleiben blockiert.
 
 ## UX-GATE-D – Abschlussprozesse (teilweise freigegeben)
 

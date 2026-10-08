@@ -1,19 +1,20 @@
 # Readiness: BL-P5-01a – SWF Trailer × Durchschnitt (inventarübergreifend)
 
-Status: **READY MIT DATEN-VORBEDINGUNGEN JE INVENTAR** (A1 + B1 akzeptiert; Implementierung im Draft-PR)
-Stand: 7. Oktober 2026
-Auditbasis: `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
-(Merge PR #128; Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
+Status: **READY MIT DATEN-VORBEDINGUNGEN JE INVENTAR** (A1 + B1 akzeptiert; auf `main` PR #129)
+Stand: 8. Oktober 2026
+Auditbasis: `origin/main` @ `d97a5aefc3948e297fb510f7146e23bb38f71c14`
+(Merge PR [#129](https://github.com/MORE-m/dispo/pull/129); Post-Merge-CI [37668554937](https://github.com/MORE-m/dispo/actions/runs/37668554937) SUCCESS; **kein** Deploy)
 IDs: `SWF-001`–`SWF-005`, `SWF-008` (Abgrenzung), `SPT-016` (Abgrenzung),
 `PRI-002`/`PRI-004`/`PRI-005`/`PO-PRI-YEAR-1`/`PO-PRI-HOURS-1`, `COM-001`–`COM-008`,
 `MAT-001`–`MAT-003`, `ADV-001` (Methoden-Zuordnung), `CAL-001`/`CAL-005`, `AT-05`, `ADM-003`
 Entscheidung: [`docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](../entscheidungen/PO-BLP501A-1-swf-trailer-average.md)
 (**A1 ACCEPTED + B1 ACCEPTED**)
-Implementierung: Worktree `dispo-wt-feat-bl-p5-01a` / Branch `feat/bl-p5-01a-swf-trailer-average` (Draft-PR; **kein** Merge/Deploy)
+Operative Datenlage: [`BL-P5-01a-swf-trailer-average-data-2026-10-07.md`](BL-P5-01a-swf-trailer-average-data-2026-10-07.md)
 
-> Ursprünglich Docs-only-Readiness (Stand `0ff11aa`); nach A1/B1-Akzeptanz um den
-> **Umsetzungsstand** (Abschnitt 10) ergänzt. Dev-DB `dispo_mat_core` **nicht** geöffnet;
-> lokale Ist-Daten **ungeprüft**. Kein Merge/Deploy.
+> Ursprünglich Docs-only-Readiness (Stand `0ff11aa`); nach A1/B1 und Merge #129 um
+> Umsetzungsstand ergänzt. Lokale DB `dispo_mat_core`: Migration + Admin-Pflege 20 s/30 %
+> + serverseitige und Browser-Abnahme **bestanden** (siehe Daten-Readiness).
+> Merge ≠ Deploy; andere Umgebungen unberührt.
 
 ## 0. Urteil
 
@@ -21,11 +22,11 @@ Implementierung: Worktree `dispo-wt-feat-bl-p5-01a` / Branch `feat/bl-p5-01a-swf
 |---|---|
 | Formelvertrag Trailer Average (ohne Spotlängenindex) | **verbindlich (B1)** – Spot-Grundpreise × Länge × (1 + Aufschlag/100) |
 | Matrix-zulässige Inventare | **4** (Workbook/Parser-Vertrag); nicht 14 |
-| Eigenes Engine-Profil / kein `spot_classic`-Missbrauch | **umgesetzt** (`swf_trailer`, Draft-PR) |
+| Eigenes Engine-Profil / kein `spot_classic`-Missbrauch | **umgesetzt** (`swf_trailer`, `main` PR #129) |
 | Kategorie-Methoden `average` für SWF | **umgesetzt** (Migration/Bootstrapper; nur `average`) |
 | UX-GATE-C Teilfreigabe | **A1 akzeptiert** (Trailer × Durchschnitt; BLK-005 Teilfreigabe) |
 | Preisbasis | **entschieden B1** – bestehende Spot-Sekunden-Grundpreise je Inventar/Jahr; keine eigenen SWF-Listen |
-| Länge/Aufschlag je Inventar | inventarspezifisch; RHH-Referenz dokumentiert; übrige **Lieferung offen**; 0 % ok, fehlend fail-closed |
+| Länge/Aufschlag je Inventar | PO-Ziel **20 s / 30 %** alle vier (ausdrückliche Vorgabe; kein Auto-Seed); lokal auf `dispo_mat_core` gepflegt; fehlend fail-closed; keine zeitgesteuerte Gültigkeit |
 | Admin-Pflege Länge/Aufschlag (Rule-Felder) | Aufschlag nullable (`NULL` = nicht konfiguriert, `0` = ausdrücklich); Admin-Kombitabelle pflegt beides |
 | Calendar/Festpreis/CityLife/Produktion | bewusst **außerhalb**; V1-Rest |
 
@@ -87,10 +88,10 @@ Keine automatische Freischaltung aller 14 Katalog-Inventare.
 
 | Inventar | Kombi aktiv (Desired) | Booking / Planung | Preisquelle 2026 (B1) | Stunden/Day-Group | Std-Länge | Aufschlag | Disc/AE (Katalog-Default) | Methoden | Beleg | Fehlend für operative Nutzung |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Radio Hamburg | ja | SWF (K) / Disposition | Spot-Sekunden-Grundpreise PRI-OPS-1 (B1) | Spot-Import-Muster 72/72 (Audit #114; Dev-DB hier ungeprüft) | RHH-Ref. **20 s** | RHH-Ref. **+30 %** (0 % ok wenn explizit) | rabatt-/AE-fähig (Medium-Katalog) | keine SWF-Zuordnung live | Workbook + Doku + Spot-Audit | Gate-C (**A**); kind/Engine; Methoden; Rule-Seed Länge/Aufschlag |
-| ROCK ANTENNE Hamburg | ja | SWF (K) / Disposition | Spot-Grundpreise (B1) | Spot-Muster 72/72 (ungeprüft lokal) | **keine** verbindliche Lieferung | **keine** (fehlend ≠ 0 %) | wie Katalog | wie oben | Matrix | Länge/Aufschlag-Konfiguration; sonst fail-closed |
-| 80er 90er OLDIE … | ja | SWF (K) / Disposition | Spot-Grundpreise (B1) | Spot-Muster 72/72 | **keine** | **keine** | wie Katalog | wie oben | Matrix | Länge/Aufschlag-Konfiguration |
-| CARAVAN.fm | ja | UC / Disposition | Spot-Grundpreise (B1) | Spot-Muster 72/72 | **keine** | **keine** | wie Katalog | wie oben | Matrix | Länge/Aufschlag-Konfiguration |
+| Radio Hamburg | ja | SWF (K) / Disposition | Spot-Sekunden-Grundpreise PRI-OPS-1 (B1) | Spotliste 2026 lokal **72/72** workbook-paritätisch | **20 s** (Admin) | **30 %** (Admin) | rabatt-/AE-fähig (Medium-Katalog) | `swf_trailer` × `average` auf `main` | lokale Einrichtung + Browser-Abnahme | lokal OK; Deploy/andere Umgebungen offen |
+| ROCK ANTENNE Hamburg | ja | SWF (K) / Disposition | Spot-Grundpreise (B1) | Spotliste 2026 lokal **72/72** | **20 s** | **30 %** | wie Katalog | wie oben | wie RH | wie RH |
+| 80er 90er OLDIE … | ja | SWF (K) / Disposition | Spot-Grundpreise (B1) | Spotliste 2026 lokal **72/72** | **20 s** | **30 %** | wie Katalog | wie oben | wie RH | wie RH |
+| CARAVAN.fm | ja | UC / Disposition | Spot-Grundpreise (B1) | Spotliste 2026 lokal **72/72** | **20 s** | **30 %** | wie Katalog | wie oben | wie RH | wie RH |
 
 **Unterscheidung Belege:**
 
@@ -215,8 +216,10 @@ Spotlängenindex (`SPT-009`) und Spot-Komponentenpfade riskieren → **unzuläss
 1. PO akzeptiert Scope/UX-GATE-C **A1** (oder A2). **B1 ist erledigt.**
 2. UX-GATE-C Teilfreigabe dokumentiert.
 3. Daten: für jedes operativ freizuschaltende Inventar – aktive Spot-Preisliste (B1),
-   Rule-Länge gesetzt, Aufschlag **ausdrücklich** konfiguriert (inkl. erlaubter 0 %;
-   RHH-Seed nur Radio Hamburg).
+   Rule-Länge/Aufschlag laut PO-Ziel **20 s / 30 %** manuell gepflegt (kein Auto-Seed;
+   Quelle: PO-Datenlieferung, nicht RHH-Referenz-Übernahme). Gilt für neue Trailer-Positionen
+   ab Admin-Pflegezeitpunkt; bestehende Snapshots unverändert; keine zeitgesteuerte
+   Konfiguration. Lokale Einrichtung abgeschlossen, andere Umgebungen/Deploy offen.
 4. Keine Produktion-/CRM-/OA-Abhängigkeit für diesen Teilscope.
 5. `BL-P5-02` bleibt abhängig von hinreichendem SWF-Fortschritt; **dieser** Slice
    allein begründet **keine** Produktions-Implementierungsfreigabe.
@@ -283,14 +286,15 @@ Rabatt/AE-Beispiele an bestehenden COM-Verträgen ableiten (nicht neu erfinden).
 
 ---
 
-## 8. Offene Datenlieferungen
+## 8. Datenlieferungen
 
-| Lieferung | Verbindlich für |
+| Lieferung | Status / Verbindlich für |
 |---|---|
-| Rule-Länge/Aufschlag Radio Hamburg (Seed aus RHH-Ref. zulässig nach Gate **A**) | Erstfreischaltung RHH |
-| Rule-Länge/Aufschlag ROCK, OLDIE, CARAVAN (explizit, auch 0 %) | operative Freischaltung dieser Inventare |
-| Aktive Spot-Sekundenlisten je Inventar/Jahr (B1; historisch PRI-OPS-1) | jede operative Trailer-Rechnung |
+| Initiale Rule-Länge/Aufschlag RH/ROCK/OLDIE/CARAVAN (**20 s / 30 %**, PO) | **Lokal umgesetzt** auf `dispo_mat_core` (Admin-Pflege; kein Auto-Seed); Deploy/andere Umgebungen offen |
+| Gültigkeit der Admin-Werte | Keine zeitgesteuerte Konfiguration; gilt für **neue** Trailer-Positionen ab Pflegezeitpunkt; Snapshots unverändert |
+| Aktive Spot-Sekundenlisten 2026 (vier Inventare) | **Lokal geprüft**: je 72/72 Zellen workbook-paritätisch; Listen unverändert |
 | Hinweistexte Matrix | nicht blockierend für Erst-Slice |
+| Deploy / Staging / Prod | **offen** |
 
 ~~Eigene SWF-Preislisten~~ – entfallen durch **B1**.
 
@@ -306,7 +310,7 @@ Allonge-Trennung, Produktion außerhalb) sind **nicht** neu zur Abstimmung geste
 
 ---
 
-## 10. Umsetzungsstand `BL-P5-01a` (Draft-PR)
+## 10. Umsetzungsstand `BL-P5-01a` (auf `main`, PR #129)
 
 ### 10.1 Umgesetzt
 
@@ -319,14 +323,19 @@ Allonge-Trennung, Produktion außerhalb) sind **nicht** neu zur Abstimmung geste
 - Wizard blendet für Trailer die Spot-Komponenten-Aktivierung aus; Kalender/Festpreis erscheinen nicht (backend-gesteuert).
 - Tests: Pest (Formel 520,00 / 168,75 / 688,75, Mehrstunden-Durchschnitt, mehrere Zeiträume, kein Index, 0 %, fehlende Konfiguration/Preiszelle, andere SWF unbuchbar, Snapshot-Isolation, Rebind, Rechte, Rabatt/AE, Spot-Regression) und Playwright `playwright.blp501a.config.ts` (Port 8055).
 
-### 10.2 Datenlücken je Inventar (operativ)
+### 10.2 Operative Daten je Inventar
 
-| Inventar | Trailer-Regel nach Import/Migration | Fehlt für operative Nutzung |
+Nach Migration sind Trailer-Regeln fail-closed (`NULL`/`NULL`), bis Admin Länge/Aufschlag pflegt.
+Auf **`dispo_mat_core`** (7./8.10.2026): alle vier Inventare **20 s / 30 %** gepflegt;
+Spotlisten 2026 aktiv (72/72); lokale Writer- und Browser-Abnahme bestanden.
+Andere Umgebungen: weiterhin Migration + Pflege erforderlich (Deploy-Freigabe C offen).
+
+| Inventar | Lokal `dispo_mat_core` | Andere Umgebungen |
 |---|---|---|
-| Radio Hamburg | Länge/Aufschlag `NULL` | Admin pflegt Referenz **20 s / +30 %** (nur für dieses Inventar; **kein** automatischer Seed) + aktive Spot-Preisliste des Jahres |
-| ROCK ANTENNE Hamburg | `NULL`/`NULL` | Lieferung Länge und Aufschlag (0 % nur ausdrücklich) + Spot-Preisliste |
-| 80er 90er OLDIE ANTENNE Hamburg | `NULL`/`NULL` | wie ROCK |
-| CARAVAN.fm | `NULL`/`NULL` | wie ROCK |
+| Radio Hamburg | **20 / 30** + Spotliste 2026 | Migration + Admin-Pflege offen |
+| ROCK ANTENNE Hamburg | **20 / 30** + Spotliste 2026 | wie RH |
+| 80er 90er OLDIE ANTENNE Hamburg | **20 / 30** + Spotliste 2026 | wie RH |
+| CARAVAN.fm | **20 / 30** + Spotliste 2026 | wie RH |
 
 ### 10.3 Bewusste Entscheidungen
 

@@ -349,16 +349,20 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P5-01 – SWF ohne Spotlängenindex
 
 - **Phase:** 5
-- **Status:** offen (Teilscope **`BL-P5-01a`** Docs-Readiness / PO **vorgeschlagen**; Paket nicht erledigt)
+- **Status:** teilweise (Teilscope **`BL-P5-01a`** auf `main` PR #129 + lokal `dispo_mat_core`
+  eingerichtet; Paket nicht erledigt; Deploy/andere Umgebungen offen)
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
 - **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
-- **BL-P5-01a (Implementierung im Draft-PR):** Trailer × Average, inventarübergreifend (Matrix: RH/ROCK/OLDIE/CARAVAN);
-  Preview→Save→Reload→Dispo; **A1** (UX-GATE-C Teilfreigabe) + **B1** (Spot-Grundpreise + inventarspezifischer Aufschlag)
-  akzeptiert; eigene Berechnungsart `swf_trailer`; fail-closed je Inventar bis Länge/Aufschlag gepflegt;
-  ohne Calendar/Festpreis/CityLife/weitere SWF; kein Merge/Deploy; Dok
+- **BL-P5-01a (auf `main`, PR #129):** Trailer × Average, inventarübergreifend (Matrix: RH/ROCK/OLDIE/CARAVAN);
+  Preview→Save→Reload→Dispo; **A1** + **B1** akzeptiert; eigene Berechnungsart `swf_trailer`;
+  fail-closed je Inventar bis Länge/Aufschlag gepflegt; initiale Admin-Werte **20 s / 30 %** alle vier
+  (kein Auto-Seed; lokal gepflegt); Spotlisten 2026 lokal 72/72 geprüft; ohne Calendar/Festpreis/CityLife/weitere SWF;
+  Merge ≠ Deploy; Dok
   `docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`,
-  `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`
+  `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`,
+  `docs/readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`,
+  `docs/entscheidungen/PO-BLP501A-1-datenlieferung.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
 - **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
