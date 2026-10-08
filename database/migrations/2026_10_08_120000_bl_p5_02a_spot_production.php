@@ -47,7 +47,7 @@ return new class extends Migration
 
         Schema::create('calculation_position_production_lines', function (Blueprint $table): void {
             $table->id();
-            $table->foreignId('calculation_position_id')->constrained()->cascadeOnDelete();
+            $table->unsignedBigInteger('calculation_position_id');
             $table->string('client_key')->nullable();
             $table->string('production_type', 64);
             $table->string('label');
@@ -66,8 +66,12 @@ return new class extends Migration
             $table->unsignedInteger('sort')->default(0);
             $table->timestamps();
 
-            $table->index('calculation_position_id', 'calc_pos_production_lines_position_idx');
-            $table->foreign('production_price_list_id', 'calc_pos_production_lines_list_fk')
+            $table->index('calculation_position_id', 'calc_pos_prod_lines_pos_idx');
+            $table->foreign('calculation_position_id', 'calc_pos_prod_lines_pos_fk')
+                ->references('id')
+                ->on('calculation_positions')
+                ->cascadeOnDelete();
+            $table->foreign('production_price_list_id', 'calc_pos_prod_lines_list_fk')
                 ->references('id')
                 ->on('production_price_lists')
                 ->restrictOnDelete();
