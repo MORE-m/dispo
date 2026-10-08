@@ -44,9 +44,12 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`reviews/calendar-tandem-tridem-readiness/`](reviews/calendar-tandem-tridem-readiness/) | Bericht Calendar × Tandem/Tridem (PO-BLP403K-1 A1, auf `main` PR #128) |
 | [`readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md`](readiness/BL-P4-03k-calendar-tandem-tridem-2026-10-07.md) | Readiness Calendar × Tandem/Tridem (READY / `main`) |
 | [`entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md) | PO Calendar × Tandem/Tridem (Akzeptiert A1, PR #128) |
-| [`reviews/swf-trailer-average-readiness/`](reviews/swf-trailer-average-readiness/) | Bericht Trailer × Average (PO-BLP501A-1 A1 + B1 akzeptiert; Draft-PR) |
-| [`readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md) | Readiness Trailer × Average (READY mit Daten-Vorbedingungen je Inventar) |
-| [`entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](entscheidungen/PO-BLP501A-1-swf-trailer-average.md) | PO Trailer × Average (**A1 + B1** akzeptiert) |
+| [`reviews/swf-trailer-average-readiness/`](reviews/swf-trailer-average-readiness/) | Bericht Trailer × Average (PO-BLP501A-1 A1 + B1; auf `main` PR #129) |
+| [`readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md) | Feature-Readiness Trailer × Average (READY mit Daten-Vorbedingungen) |
+| [`reviews/swf-trailer-average-data-readiness/`](reviews/swf-trailer-average-data-readiness/) | Bericht operative Daten-Readiness nach PR #129 |
+| [`readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md) | Operative Daten-Readiness / lokale Einrichtung `dispo_mat_core` |
+| [`entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](entscheidungen/PO-BLP501A-1-swf-trailer-average.md) | PO Trailer × Average (**A1 + B1** akzeptiert; `main` PR #129) |
+| [`entscheidungen/PO-BLP501A-1-datenlieferung.md`](entscheidungen/PO-BLP501A-1-datenlieferung.md) | PO-Datenlieferung Länge/Aufschlag (20 s / 30 % lokal; Deploy/andere Umgebungen offen) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 | [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |

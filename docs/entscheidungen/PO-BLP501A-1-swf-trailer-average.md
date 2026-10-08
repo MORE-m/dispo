@@ -1,16 +1,18 @@
 # PO-BLP501A-1 – SWF Trailer × Durchschnitt (inventarübergreifend)
 
-Status: **Entschieden** (**A1 ACCEPTED** + **B1 ACCEPTED**) · Implementierung `BL-P5-01a` im Draft-PR; **kein** Merge/Deploy
-Stand: 7. Oktober 2026
-Basis: `origin/main` @ `0ff11aaeb8df4ccddd0688cdeb86a551e24b9614`
-(Merge PR #128; Post-Merge-CI [37611870573](https://github.com/MORE-m/dispo/actions/runs/37611870573) SUCCESS; **kein** Deploy)
+Status: **Entschieden** (**A1 ACCEPTED** + **B1 ACCEPTED**) · Implementierung `BL-P5-01a` auf `main` (PR #129); lokal `dispo_mat_core` eingerichtet; **kein** Deploy
+Stand: 8. Oktober 2026
+Basis: `origin/main` @ `d97a5aefc3948e297fb510f7146e23bb38f71c14`
+(Merge PR [#129](https://github.com/MORE-m/dispo/pull/129); Post-Merge-CI [37668554937](https://github.com/MORE-m/dispo/actions/runs/37668554937) SUCCESS; **kein** Deploy)
 IDs: `SWF-001`–`SWF-005`, `SWF-008` (nur Abgrenzung), `SPT-016` (Abgrenzung),
 `PRI-002`/`PRI-004`/`PRI-005`/`PO-PRI-YEAR-1`/`PO-PRI-HOURS-1`, `COM-001`–`COM-008`,
 `MAT-001`–`MAT-003`, `ADV-001` (nur Methoden-Zuordnung Kategorie), `ADV-003` (Abgrenzung),
 `CAL-001`/`CAL-005`, `AT-05`, `ADM-003`
-Vorgeschlagene Slice-Kennung: **`BL-P5-01a`** (Teilscope von `BL-P5-01`, nicht vollständig)
+Slice-Kennung: **`BL-P5-01a`** (Teilscope von `BL-P5-01`, nicht vollständig)
 Readiness: [`docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](../readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md)
-Arbeitsmodus: Implementierung im Draft-PR (Branch `feat/bl-p5-01a-swf-trailer-average`); **kein** Merge/Deploy; Daten-Vorbedingungen je Inventar bleiben bestehen
+Daten-Readiness: [`docs/readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`](../readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md)
+Datenlieferung: [`PO-BLP501A-1-datenlieferung.md`](PO-BLP501A-1-datenlieferung.md)
+Arbeitsmodus: Code auf `main`; lokal `dispo_mat_core` eingerichtet; Merge ≠ Deploy; andere Umgebungen unberührt
 
 > **A1** und **B1** sind fachlich bestätigt (7. Oktober 2026). UX-GATE-C-**Teilfreigabe A1**
 > gilt nur für Trailer × Durchschnitt. Keine Deployment-Freigabe. Historische
@@ -31,9 +33,10 @@ Arbeitsmodus: Implementierung im Draft-PR (Branch `feat/bl-p5-01a-swf-trailer-av
 
 ## Verbindlicher Ist-Rahmen (nicht zur Wahl)
 
-1. **Main:** PR #128 gemergt (`0ff11aa…`); Post-Merge-CI `37611870573` SUCCESS (`ci`/`mysql`/`e2e-spt008`). **Kein** Deploy.
+1. **Main:** PR #129 gemergt (`d97a5ae…`); Post-Merge-CI `37668554937` SUCCESS. **Kein** Deploy.
+   Historische Basis vor Feature: PR #128 (`0ff11aa…`).
 2. Spot Classic Average/Calendar inkl. Komponenten, Settlement-Festpreis, Tandem/Tridem auf `main`.
-3. Katalog: Medium `trailer_station_voice` / Name `Trailer/Vorpr. Element Station Voice`, Kategorie `special_advertising_formats`, `kind=null` → derzeit **nicht** live buchbar.
+3. Katalog: Medium `trailer_station_voice` / Name `Trailer/Vorpr. Element Station Voice`, Kategorie `special_advertising_formats`, `kind=swf_trailer` nach Migration/Bootstrap – operativ erst mit Länge/Aufschlag + aktiver Spotliste buchbar.
 4. Matrix (PO-MAT-CORE-MATRIX-1 / Workbook): Trailer **zulässig nur** auf
    Radio Hamburg, ROCK ANTENNE Hamburg, 80er 90er OLDIE ANTENNE Hamburg, CARAVAN.fm.
    Übrige Inventare: leere Buchungszelle bzw. `darf nicht geplant werden` → **keine** Regel.
@@ -94,15 +97,20 @@ Positions-Mediabrutto = Σ Zeitraumssummen
 
 B2 (eigene SWF-Listen) ist **nicht** gewählt.
 
-## C. Längen / Aufschläge (Daten, unverändert)
+## C. Längen / Aufschläge (Daten)
 
-- Radio Hamburg: dokumentierte Referenz 20 s / +30 % darf als **Admin-Seed nur für dieses Inventar**
-  (Rule-Felder) vorgeschlagen werden – nicht als Medium-Hardcode für alle Inventare.
-- ROCK / OLDIE / CARAVAN: Werte **fehlen** als verbindliche Lieferung → fail-closed bis Admin-Daten.
+**Nachzug lokale Einrichtung (7.–8.10.2026):** Initiale Admin-Werte **20 s / 30 %** für alle vier
+Inventare (PO-Vorgabe). Auf **`dispo_mat_core`** umgesetzt: Migration BL-P5-01a + Admin-Pflege +
+serverseitige und Browser-Abnahme (Port 8056). Werte gelten für **neue** Trailer-Positionen ab
+Pflegezeitpunkt; bestehende Snapshots unverändert; keine zeitgesteuerte Konfiguration.
+**Kein** Deploy; andere Umgebungen unberührt. Details:
+[`PO-BLP501A-1-datenlieferung.md`](PO-BLP501A-1-datenlieferung.md), Daten-Readiness.
+
 - Vertrieb darf Länge je Position ändern (`SWF-004`); Aufschlag aus Rule/Snapshot, Admin-pflegbar (`SWF-005`, `ADM-003`).
 - Explizit konfigurierte **0 %** erlaubt; fehlende Konfiguration ≠ 0 %.
+- Historische RHH-Referenz in `SWF-004`/`SWF-005` / `initialdaten.md` bleibt Dokumentationshistorie.
 
-## Umsetzung `BL-P5-01a` (Draft-PR)
+## Umsetzung `BL-P5-01a` (auf `main`, PR #129)
 
 | Baustein | Umsetzung |
 |---|---|
@@ -127,12 +135,12 @@ Medium-Default unbemerkt als „konfiguriert“ durchgehen.
 - Freischaltung als `kind=spot_classic` (würde Spotlängenindex riskieren)
 - ADV-002 / pauschale ADV-001-Rest-Defaults
 - Standardangebote, Budget-Vorlagen, CRM, OA
-- Merge / Deploy (nur Draft-PR; Freigabe separat)
+- Deploy / Einrichtung anderer Umgebungen (getrennt; siehe Datenlieferung Freigabe C)
 
 ## Kennungen
 
 | Rolle | Kennung | Status |
 |---|---|---|
-| Slice | `BL-P5-01a` | Implementierung im Draft-PR; Merge/Deploy offen |
+| Slice | `BL-P5-01a` | auf `main` (PR #129); lokal eingerichtet; Deploy/andere Umgebungen offen |
 | PO/Gate | `PO-BLP501A-1` | **A1 ACCEPTED + B1 ACCEPTED** |
-| Elternpaket | `BL-P5-01` | bleibt `offen` / teilweise nach Umsetzung von 01a |
+| Elternpaket | `BL-P5-01` | bleibt teilweise |

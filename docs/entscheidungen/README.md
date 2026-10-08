@@ -35,4 +35,5 @@ ohne die Entscheidung zu ersetzen.
 | [PO-APPROVAL-NOTIFY-1](PO-APPROVAL-NOTIFY-1-freigabe-entscheidungsmail.md) | Freigabe erteilt/abgelehnt per Outbox/SMTP | **Akzeptiert** |
 | [PO-NOT002-ADMIN-1](PO-NOT002-ADMIN-1-admin-outbox-sicht.md) | Admin-Outbox-Sicht lesend | **Akzeptiert** (`main` PR #122) |
 | [PO-BLP403K-1](PO-BLP403K-1-calendar-tandem-tridem.md) | Calendar × Tandem/Tridem Standardangebote | **Akzeptiert** (`main` PR #128) |
-| [PO-BLP501A-1](PO-BLP501A-1-swf-trailer-average.md) | Trailer × Average (A1 Gate-Teilfreigabe + B1 Preisbasis) | **Akzeptiert** (Implementierung Draft-PR `BL-P5-01a`) |
+| [PO-BLP501A-1](PO-BLP501A-1-swf-trailer-average.md) | Trailer × Average (A1 Gate-Teilfreigabe + B1 Preisbasis) | **Akzeptiert** (`main` PR #129; lokal eingerichtet; Deploy offen) |
+| [PO-BLP501A-1-datenlieferung](PO-BLP501A-1-datenlieferung.md) | Operative Trailer-Länge/Aufschlag + lokale Einrichtung | **Lokal umgesetzt** (`dispo_mat_core`; Deploy offen) |
