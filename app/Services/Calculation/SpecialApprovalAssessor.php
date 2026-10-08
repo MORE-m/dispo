@@ -101,7 +101,9 @@ final class SpecialApprovalAssessor
     public function assessFromCalculation(Calculation $calculation, Collection $selectedPositions): SpecialApprovalAssessment
     {
         $calculation->loadMissing(['positions.inventory', 'positions.productionLines', 'positions.discounts']);
-        $selectedPositions->loadMissing(['inventory', 'productionLines', 'discounts']);
+        foreach ($selectedPositions as $selectedPosition) {
+            $selectedPosition->loadMissing(['inventory', 'productionLines', 'discounts']);
+        }
 
         $limit = $calculation->personal_discount_limit_percent;
         $limitString = $limit === null || $limit === '' ? null : (string) $limit;
@@ -234,11 +236,13 @@ final class SpecialApprovalAssessor
         $discounts = $position->relationLoaded('discounts')
             ? $position->discounts
             : $position->discounts()->get();
-        $positionPercent = $discounts->isEmpty()
+        /** @var list<string> $discountPercents */
+        $discountPercents = array_values(
+            $discounts->map(fn ($discount): string => (string) $discount->percent)->all(),
+        );
+        $positionPercent = $discountPercents === []
             ? (string) $position->position_discount_percent
-            : $this->stackedPercent(
-                $discounts->map(fn ($discount): string => (string) $discount->percent)->all(),
-            );
+            : $this->stackedPercent($discountPercents);
 
         $effective = $this->effectivePercentFromAmounts(
             (string) ($position->production_gross ?? '0'),
