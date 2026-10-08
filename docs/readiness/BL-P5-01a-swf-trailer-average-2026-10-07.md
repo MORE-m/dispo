@@ -217,7 +217,9 @@ Spotlängenindex (`SPT-009`) und Spot-Komponentenpfade riskieren → **unzuläss
 2. UX-GATE-C Teilfreigabe dokumentiert.
 3. Daten: für jedes operativ freizuschaltende Inventar – aktive Spot-Preisliste (B1),
    Rule-Länge/Aufschlag laut PO-Ziel **20 s / 30 %** manuell gepflegt (kein Auto-Seed;
-   Quelle: PO-Datenlieferung, nicht RHH-Referenz-Übernahme); Gültigkeit weiter offen.
+   Quelle: PO-Datenlieferung, nicht RHH-Referenz-Übernahme). Gilt für neue Trailer-Positionen
+   ab Admin-Pflegezeitpunkt; bestehende Snapshots unverändert; keine zeitgesteuerte
+   Konfiguration. Lokale Einrichtung abgeschlossen, andere Umgebungen/Deploy offen.
 4. Keine Produktion-/CRM-/OA-Abhängigkeit für diesen Teilscope.
 5. `BL-P5-02` bleibt abhängig von hinreichendem SWF-Fortschritt; **dieser** Slice
    allein begründet **keine** Produktions-Implementierungsfreigabe.
