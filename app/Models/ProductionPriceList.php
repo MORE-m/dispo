@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\PriceListStatus;
 use App\Enums\ProductionType;
+use Carbon\CarbonImmutable;
 use Database\Factories\ProductionPriceListFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,8 +26,8 @@ use Illuminate\Support\Carbon;
  * @property string $unit_price
  * @property bool $is_discountable
  * @property bool $is_ae_eligible
- * @property Carbon|null $published_at
- * @property Carbon|null $archived_at
+ * @property Carbon|CarbonImmutable|null $published_at
+ * @property Carbon|CarbonImmutable|null $archived_at
  */
 class ProductionPriceList extends Model
 {

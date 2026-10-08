@@ -93,7 +93,7 @@ final class ProductionPriceResolver
         $liveCache = [];
         $inputs = [];
 
-        foreach (array_values($payloadLines) as $offset => $raw) {
+        foreach ($payloadLines as $offset => $raw) {
             $linePrefix = "{$field}.{$offset}";
 
             $type = $this->parseType($raw['production_type'] ?? null, $linePrefix);
@@ -164,8 +164,10 @@ final class ProductionPriceResolver
     {
         $position->loadMissing('productionLines');
 
-        return $position->productionLines
-            ->map(fn (CalculationPositionProductionLine $line): array => [
+        /** @var list<array<string, mixed>> $lines */
+        $lines = [];
+        foreach ($position->productionLines as $line) {
+            $lines[] = [
                 'client_key' => $line->client_key,
                 'production_type' => $line->production_type,
                 'label' => $line->label,
@@ -173,9 +175,10 @@ final class ProductionPriceResolver
                 'remark' => $line->remark,
                 'sort' => (int) $line->sort,
                 'production_price_list_id' => $line->production_price_list_id,
-            ])
-            ->values()
-            ->all();
+            ];
+        }
+
+        return $lines;
     }
 
     /**
@@ -218,9 +221,14 @@ final class ProductionPriceResolver
         if ($list === null
             || (int) $list->inventory_id !== (int) $inventory->id
             || (int) $list->year !== $priceYear
-            || $list->production_type !== $type
-            || $stored->production_type !== $type->value
         ) {
+            return null;
+        }
+
+        // Roh-Attribute: vermeidet Enum-Ein-Fall-Narrowing; bei Folgetypen bleibt Rebind korrekt.
+        $listType = (string) ($list->getAttributes()['production_type'] ?? '');
+        $storedType = (string) ($stored->getAttributes()['production_type'] ?? '');
+        if ($listType !== $type->value || $storedType !== $type->value) {
             return null;
         }
 

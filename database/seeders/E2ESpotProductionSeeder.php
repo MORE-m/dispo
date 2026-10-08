@@ -66,10 +66,10 @@ class E2ESpotProductionSeeder extends Seeder
         $year = (int) now('Europe/Berlin')->year;
 
         foreach ([
-            ['SPA', 'Produktion Testsender A', '150.00', true],
-            ['SPB', 'Produktion Testsender B', '80.00', true],
-            ['SPC', 'Produktion Testsender C', null, false],
-        ] as [$code, $name, $unitPrice, $withProduction]) {
+            ['SPA', 'Produktion Testsender A', '150.00'],
+            ['SPB', 'Produktion Testsender B', '80.00'],
+            ['SPC', 'Produktion Testsender C', null],
+        ] as [$code, $name, $unitPrice]) {
             $inventory = Inventory::factory()->create([
                 'organization_id' => $organization->id,
                 'name' => $name,
@@ -100,7 +100,7 @@ class E2ESpotProductionSeeder extends Seeder
                 }
             }
 
-            if ($withProduction && is_string($unitPrice)) {
+            if ($unitPrice !== null) {
                 ProductionPriceList::factory()->create([
                     'inventory_id' => $inventory->id,
                     'production_type' => ProductionType::SpotProduction,
