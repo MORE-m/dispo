@@ -18,6 +18,7 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionPlannerEntry;
+use App\Models\CalculationPositionProductionLine;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\DispoOrder;
@@ -108,6 +109,7 @@ class CalculationController extends Controller
             'positions.planRows',
             'positions.timeRanges',
             'positions.discounts',
+            'positions.productionLines',
             'positions.inventory',
             'positions.advertisingMedium',
             'positions.priceList',
@@ -154,7 +156,7 @@ class CalculationController extends Controller
 
         if ($request->integer('calculation_id') > 0) {
             $existing = Calculation::query()
-                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts'])
+                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.productionLines.productionPriceList', 'orderDiscounts'])
                 ->findOrFail($request->integer('calculation_id'));
             $this->authorize('view', $existing);
         } else {
@@ -261,7 +263,7 @@ class CalculationController extends Controller
 
         if ($request->integer('calculation_id') > 0) {
             $existing = Calculation::query()
-                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts'])
+                ->with(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'positions.productionLines.productionPriceList', 'orderDiscounts'])
                 ->findOrFail($request->integer('calculation_id'));
             $this->authorize('update', $existing);
         } else {
@@ -326,7 +328,7 @@ class CalculationController extends Controller
      */
     private function wizardProps(Request $request, ?Calculation $calculation): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.components', 'positions.discounts', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.components', 'positions.discounts', 'positions.productionLines', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
 
         $latestBudgetProposal = null;
         $appliedBudgetProposal = null;
@@ -526,6 +528,7 @@ class CalculationController extends Controller
                     'length_seconds' => $position->length_seconds,
                     'total_spot_count' => $position->total_spot_count,
                     'media_gross' => (string) $position->media_gross,
+                    'production_gross' => (string) $position->production_gross,
                     'nn_invest' => (string) $position->nn_invest,
                     'position_discount_percent' => (string) $position->position_discount_percent,
                     'ae_percent' => (string) $position->ae_percent,
@@ -675,6 +678,21 @@ class CalculationController extends Controller
                         ])->all(),
                         'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
                         'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
+                        'production_lines' => $position->productionLines->map(fn (CalculationPositionProductionLine $line): array => [
+                            'client_key' => $line->client_key,
+                            'production_type' => $line->production_type,
+                            'label' => $line->label,
+                            'quantity' => (string) $line->quantity,
+                            'remark' => $line->remark,
+                            'sort' => (int) $line->sort,
+                            'production_price_list_id' => $line->production_price_list_id,
+                            // Nur Anzeige (read-only): Preis/Flags kommen nie aus dem Client.
+                            'unit_price' => (string) $line->unit_price,
+                            'line_gross' => (string) $line->line_gross,
+                            'nn_invest' => (string) $line->nn_invest,
+                            'is_discountable' => (bool) $line->is_discountable,
+                            'is_ae_eligible' => (bool) $line->is_ae_eligible,
+                        ])->values()->all(),
                         'dynamic_field_values' => $snapshot === null
                             ? ['period_open' => true]
                             : $this->dynamicFields->positionValuesForPayload($position, $snapshot),

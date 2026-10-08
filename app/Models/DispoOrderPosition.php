@@ -42,9 +42,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<int, array<string, mixed>>|null $components_snapshot
  * @property array<int, array<string, mixed>>|null $position_discounts_snapshot
  * @property list<int>|null $invoice_end_months
+ * @property string|null $line_role
+ * @property string|null $production_type
+ * @property string|null $production_label
+ * @property string|null $production_quantity
+ * @property string|null $production_unit_price
+ * @property string|null $production_remark
+ * @property int|null $production_price_list_id
+ * @property string|null $production_price_list_version
+ * @property string|null $production_line_gross
  */
 class DispoOrderPosition extends Model
 {
+    public const LINE_ROLE_MEDIA = 'media';
+
+    /** BL-P5-02a: Spotproduktion/Sonstiges, Kennzeichen S. */
+    public const LINE_ROLE_PRODUCTION = 'production';
+
     protected $fillable = [
         'dispo_order_id',
         'calculation_position_id',
@@ -99,6 +113,15 @@ class DispoOrderPosition extends Model
         'planner_entries_snapshot',
         'components_snapshot',
         'position_discounts_snapshot',
+        'line_role',
+        'production_type',
+        'production_label',
+        'production_quantity',
+        'production_unit_price',
+        'production_remark',
+        'production_price_list_id',
+        'production_price_list_version',
+        'production_line_gross',
     ];
 
     /**
@@ -132,7 +155,15 @@ class DispoOrderPosition extends Model
             'components_snapshot' => 'array',
             'position_discounts_snapshot' => 'array',
             'invoice_end_months' => 'array',
+            'production_quantity' => 'decimal:4',
+            'production_unit_price' => 'decimal:2',
+            'production_line_gross' => 'decimal:2',
         ];
+    }
+
+    public function isProductionLine(): bool
+    {
+        return $this->line_role === self::LINE_ROLE_PRODUCTION;
     }
 
     /**

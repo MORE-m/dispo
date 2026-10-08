@@ -122,6 +122,7 @@ class DispoOrderController extends Controller
 
         $dispoOrder->load([
             'positions.fieldValues.snapshotFieldDefinition',
+            'productionLines',
             'fieldValues.snapshotFieldDefinition',
             'configurationSnapshot.fieldDefinitions',
             'configurationSnapshot.rules',
@@ -866,6 +867,23 @@ class DispoOrderController extends Controller
                 : ($order->approvalRequests->last() instanceof DispoOrderApprovalRequest
                     ? $this->serializeApprovalRequest($order->approvalRequests->last())
                     : null),
+            'production_lines' => $order->productionLines->map(fn (DispoOrderPosition $line): array => [
+                'id' => $line->id,
+                'calculation_position_id' => $line->calculation_position_id,
+                'booking_code' => $line->booking_code,
+                'inventory_name' => $line->inventory_name,
+                'label' => $line->production_label ?? $line->advertising_medium_name,
+                'production_type' => $line->production_type,
+                'quantity' => $line->production_quantity === null ? null : (string) $line->production_quantity,
+                'unit_price' => $line->production_unit_price === null ? null : (string) $line->production_unit_price,
+                'line_gross' => $line->production_line_gross === null ? null : (string) $line->production_line_gross,
+                'remark' => $line->production_remark,
+                'production_price_list_version' => $line->production_price_list_version,
+                'position_discount_amount' => (string) $line->position_discount_amount,
+                'order_discount_amount' => (string) $line->order_discount_amount,
+                'ae_amount' => (string) $line->ae_amount,
+                'nn_invest' => (string) $line->nn_invest,
+            ])->values()->all(),
             'positions' => $order->positions->map(function (DispoOrderPosition $position) use ($order, $dynamicValues): array {
                 $months = InvoiceEndMonthsContract::canonicalize(
                     is_array($position->invoice_end_months) ? $position->invoice_end_months : [],

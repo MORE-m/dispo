@@ -22,6 +22,10 @@ final class DispoOrderPositionAdoptionService
 
         $rows = DispoOrderPosition::query()
             ->whereIn('calculation_position_id', $positionIds)
+            // BL-P5-02a: Produktionszeilen hängen am Träger und sind keine eigene Übernahme.
+            ->where(function ($query): void {
+                $query->whereNull('line_role')->orWhere('line_role', DispoOrderPosition::LINE_ROLE_MEDIA);
+            })
             ->with('dispoOrder:id,number')
             ->get(['id', 'calculation_position_id', 'dispo_order_id']);
 
@@ -52,6 +56,7 @@ final class DispoOrderPositionAdoptionService
             'positions.advertisingMedium',
             'positions.timeRanges',
             'positions.plannerEntries',
+            'positions.productionLines',
         ]);
         $adoptions = $this->adoptionsForCalculation($calculation);
 
@@ -65,6 +70,14 @@ final class DispoOrderPositionAdoptionService
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,
                 'nn_invest' => (string) $position->nn_invest,
+                // BL-P5-02a: Produktion wird mit dem Träger übernommen (nicht separat wählbar).
+                'production_nn_invest' => (string) $position->production_nn_invest,
+                'production_lines' => $position->productionLines->map(fn ($line): array => [
+                    'label' => $line->label,
+                    'quantity' => (string) $line->quantity,
+                    'line_gross' => (string) $line->line_gross,
+                    'nn_invest' => (string) $line->nn_invest,
+                ])->values()->all(),
                 'time_ranges' => $position->timeRanges->map(fn ($range): array => [
                     'start_hour' => $range->start_hour,
                     'end_hour_exclusive' => $range->end_hour_exclusive,

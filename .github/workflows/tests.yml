@@ -210,6 +210,9 @@ jobs:
       - name: Browser BL-P5-01a isolated tests
         run: npx playwright test -c playwright.blp501a.config.ts
 
+      - name: Browser BL-P5-02a isolated tests
+        run: npx playwright test -c playwright.blp502a.config.ts
+
   e2e-spt008:
     name: e2e-spt008
     runs-on: ubuntu-latest

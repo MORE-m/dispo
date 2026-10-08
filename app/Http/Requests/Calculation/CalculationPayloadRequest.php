@@ -11,6 +11,7 @@ use App\Enums\FieldScope;
 use App\Enums\FieldType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
+use App\Enums\ProductionType;
 use App\Enums\SpotCalculationMethod;
 use App\Exceptions\FieldSetAssignmentConflictException;
 use App\Models\AdvertisingMedium;
@@ -273,6 +274,26 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.position_discounts.*.percent' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'positions.*.pricing_settlement_mode' => ['sometimes', 'nullable', Rule::enum(PricingSettlementMode::class)],
             'positions.*.fixed_price_nn' => ['sometimes', 'nullable'],
+            // BL-P5-02a: Sales liefert nur Art/Bezeichnung/Menge/Bemerkung/Sortierung; Preis, Flags und
+            // Beträge entstehen ausschließlich serverseitig (Pin/Live-Bindung).
+            'positions.*.production_lines' => ['sometimes', 'nullable', 'array', 'max:20'],
+            'positions.*.production_lines.*' => ['array'],
+            'positions.*.production_lines.*.client_key' => ['nullable', 'string', 'max:64'],
+            'positions.*.production_lines.*.production_type' => ['nullable', Rule::enum(ProductionType::class)],
+            'positions.*.production_lines.*.label' => ['nullable', 'string', 'max:120'],
+            'positions.*.production_lines.*.quantity' => ['nullable'],
+            'positions.*.production_lines.*.remark' => ['nullable', 'string', 'max:1000'],
+            'positions.*.production_lines.*.sort' => ['nullable', 'integer', 'min:0'],
+            'positions.*.production_lines.*.production_price_list_id' => ['nullable', 'integer', 'min:1'],
+            'positions.*.production_lines.*.unit_price' => ['prohibited'],
+            'positions.*.production_lines.*.line_gross' => ['prohibited'],
+            'positions.*.production_lines.*.is_discountable' => ['prohibited'],
+            'positions.*.production_lines.*.is_ae_eligible' => ['prohibited'],
+            'positions.*.production_lines.*.production_price_list_version' => ['prohibited'],
+            'positions.*.production_lines.*.position_discount_amount' => ['prohibited'],
+            'positions.*.production_lines.*.order_discount_amount' => ['prohibited'],
+            'positions.*.production_lines.*.ae_amount' => ['prohibited'],
+            'positions.*.production_lines.*.nn_invest' => ['prohibited'],
             'positions.*.dynamic_field_values' => ['sometimes', 'array'],
             'positions.*.dynamic_field_values.period_open' => ['sometimes', 'boolean'],
             'positions.*.dynamic_field_values.position_flight_period' => ['nullable', 'array'],

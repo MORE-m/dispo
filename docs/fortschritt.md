@@ -1,46 +1,38 @@
 # Fortschritt V1
 
-Stand: 8. Oktober 2026 – **BL-P5-01a / PO-BLP501A-1** auf `main`
-(PR [#129](https://github.com/MORE-m/dispo/pull/129) /
-`d97a5aefc3948e297fb510f7146e23bb38f71c14`;
-Post-Merge-CI [37668554937](https://github.com/MORE-m/dispo/actions/runs/37668554937) SUCCESS;
-**kein** Deploy). Lokale Daten-Readiness auf `dispo_mat_core` **abgeschlossen**
-(Migration + Admin 20 s/30 % + Writer-/Browser-Abnahme); Deploy/andere Umgebungen offen.
+Stand: 8. Oktober 2026 – **BL-P5-02a / PO-BLP502-1** Feature-Branch
+(Draft-PR; Basis `main` @ `7583a3e…` nach PR #130; **kein** Deploy).
+Technischer Slice Spotproduktion@Spot Classic Average; synthetische Fixtures;
+operative Produktionspreise **nicht** gepflegt/behauptet. `BL-P5-02`/`AT-11` teilweise.
 Lokale Arbeitsbasis unverändert: Checkout `dispo-main`, Port **8000**,
-Dev-DB **`dispo_mat_core`**; Alt-`dispo` stillgelegt.
-
-BL-P5-01a auf `main`: technisch umgesetzt; lokal operativ eingerichtet;
-Merge ≠ Deploy. `BL-P5-01` bleibt teilweise.
+Dev-DB **`dispo_mat_core`** unberührt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
 (**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03k** auf `main`;
 Budget/Abbinder offen);
-Phase 5 SWF: **BL-P5-01a** auf `main` + lokal `dispo_mat_core` eingerichtet
-(Deploy/andere Umgebungen offen); `BL-P5-01` teilweise;
+Phase 5: **BL-P5-01a** auf `main` (Deploy offen); **BL-P5-02a** Draft-PR;
+`BL-P5-01`/`BL-P5-02` teilweise;
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**PO-BLP501A-1 lokal eingerichtet** auf `dispo_mat_core` (Migration + Admin 20 s/30 %
-+ Writer-Abnahme + **Browser-Abnahme Port 8056** bestanden: Calc **8**/Dispo **7**,
-Inventarwechsel Calc **9**). Docs-only-Draft-PR zur Sicherung. **Kein** Deploy;
-andere Umgebungen unberührt. Standardangebote/Budget pausiert.
+**BL-P5-02a** Draft-PR Review. **Kein** Merge/Deploy; keine operative DB-Pflege.
+Standardangebote/Budget pausiert.
 
 Offen / zurückgestellt u. a.:
-Deploy/Staging/Prod für BL-P5-01a, SWF-Rest (`BL-P5-01`),
-Produktion (`BL-P5-02`), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
+Deploy BL-P5-01a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,
+Überschreibung, andere Träger), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
 SPT-013 Abbinder, weitere Status-Mails / In-App, CRM / REP, ADV-001 Defaults,
 ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP501A-1 / BL-P5-01a** Trailer × Durchschnitt –
-**PR #129**, Merge `d97a5aefc3948e297fb510f7146e23bb38f71c14`; Post-Merge-CI
-`37668554937` **SUCCESS**; **kein** Deploy. Lokal `dispo_mat_core` eingerichtet
-(Migration + Admin 20/30 + Writer-/Browser-Abnahme); Deploy/andere Umgebungen offen.
+**PO-BLP502-1 / BL-P5-02a** Spotproduktion an Spot Classic × Average –
+Feature-Branch Draft-PR (Admin-Preise, Calc-Zusatzzeilen, Dispo-S, Pin/H1a,
+Browser Port **8057**); **kein** Deploy; operative Preise nicht behauptet.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
@@ -251,6 +243,21 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Calendar×Tandem / Budget / Abbinder | **bewusst nicht** (Tandem: PO-BLP403K-1 vorgeschlagen) |
 | Merge `main` | **PR #127** (`e44c1cf436c6e1a63781910c7c1cd46ae019903a`) |
 | Post-Merge CI | **`37527679296` SUCCESS** |
+| Deploy | **kein** Deploy |
+
+## BL-P5-02a – Spotproduktion / PO-BLP502-1 (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| PO A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag | **akzeptiert** |
+| Admin Produktionspreise | **umgesetzt** (Feature-Branch) |
+| Calc Zusatzzeilen Spot Classic Average | **umgesetzt** |
+| Dispo eigene S-Zeilen | **umgesetzt** |
+| Preisüberschreibung | **ausgeschlossen** |
+| Feature-Tests | `ProductionPriceListAdminLifecycleTest`, `SpotProductionBlP502aTest` |
+| Browser-Smoke Port **8057** | **bestanden** (`playwright.blp502a.config.ts`, `--retries=0`) |
+| Operative Produktionspreise | **nicht** gepflegt/behauptet (synthetische Fixtures) |
+| `BL-P5-02` / `AT-11` vollständig | **nein** (teilweise) |
 | Deploy | **kein** Deploy |
 
 ## BL-P5-01a – Trailer × Average / PO-BLP501A-1 (Oktober 2026)

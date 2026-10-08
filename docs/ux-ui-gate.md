@@ -102,7 +102,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | **teilweise freigegeben** (nur Trailer × Durchschnitt, PO-BLP501A-1 **A1**, `BL-P5-01a`); Rest blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1**) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1 + **Produktionspreise Admin + Spotproduktion-Zusatzzeilen Calc/Dispo BL-P5-02a / PO-BLP502-1 A1**) · übrige Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -581,6 +581,21 @@ technischer Folgeslice **BL-P4-03d** (keine neue Fachoberfläche).
 
 Diese Entscheidungen geben **nicht** das gesamte UX-GATE-D und **nicht** den
 Rest von `BL-P4-03` frei.
+
+**Product-Owner-Teilfreigabe (8. Oktober 2026, UX-GATE-D / BL-P5-02a / PO-BLP502-1):**
+Für `BL-P5-02a` sind innerhalb von UX-GATE-D **ausschließlich** folgende
+Bestandteile freigegeben:
+
+- Administration → Produktionspreise (Draft/Active/Archive, Optimistic Lock, Audit)
+- Kalkulations-Wizard: optionale Spotproduktions-Zusatzzeilen an Spot Classic × Average
+- Dispoauftrag: eigene Produktionszeilen mit Kennzeichen S (read-only Snapshot)
+- serverseitige Preisauflösung, Pin/Freeze, Inventarwechsel H1a, fail-closed
+
+Diese Entscheidung gibt **nicht** das gesamte UX-GATE-D frei und **nicht**:
+Sonstiges-FreiPreis, Preisüberschreibung, andere Produktionsarten oder Träger
+(Calendar/Tandem/Trailer als Produktionsträger).
+
+
 
 Der Status `Entwurf` sowie die Freigabe-Kette bis Disposition/Ablehnung sind
 technisch und fachlich umgesetzt. Der abgelehnte Dispoauftrag bleibt als

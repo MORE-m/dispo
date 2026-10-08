@@ -20,6 +20,7 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionPlannerEntry;
+use App\Models\CalculationPositionProductionLine;
 use App\Models\CalculationPositionTimeRange;
 use App\Models\ConfigurationSnapshot;
 use App\Models\Inventory;
@@ -29,6 +30,7 @@ use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
+use App\Services\ProductionPrice\ProductionPriceResolver;
 use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
@@ -51,6 +53,7 @@ final class CalculationWriter
         private readonly ConfigurationSnapshotIntegrity $integrity,
         private readonly BudgetProposalFingerprint $budgetFingerprints,
         private readonly ComponentValidator $componentValidator,
+        private readonly ProductionPriceResolver $productionPrices,
     ) {}
 
     /**
@@ -323,6 +326,8 @@ final class CalculationWriter
                 'is_ae_eligible' => $item['is_ae_eligible'],
                 'price_list_version' => $item['priceList']->version,
                 'media_gross' => $result->mediaGross,
+                'production_gross' => $result->productionGross,
+                'production_nn_invest' => $result->productionNnInvest,
                 'position_discount_amount' => $result->positionDiscountAmount,
                 'order_discount_amount' => $result->orderDiscountAmount,
                 'ae_amount' => $result->aeAmount,
@@ -388,6 +393,7 @@ final class CalculationWriter
                 $item['component_profile'],
             );
             $this->syncPositionDiscounts($position, $item['position_discounts']);
+            $this->syncProductionLines($position, $result);
         }
 
         $this->syncOrderDiscounts($calculation, $this->orderDiscountInputs($payload));
@@ -401,6 +407,7 @@ final class CalculationWriter
                     $orphan->timeRanges()->delete();
                     $this->deletePlannerEntries($orphan);
                     $orphan->components()->delete();
+                    $orphan->productionLines()->delete();
                     $orphan->discounts()->delete();
                     $orphan->fieldValues()->delete();
                     $orphan->delete();
@@ -780,6 +787,8 @@ final class CalculationWriter
                 pricingSettlementMode: $item['pricing_settlement_mode'],
                 fixedPriceNn: $item['fixed_price_nn'],
                 engineProfileKey: $item['freeze']->engineProfileKey,
+                productionLines: $item['production_lines'],
+                productionAePercent: $item['production_ae_percent'],
             );
         }
 
@@ -869,8 +878,23 @@ final class CalculationWriter
                 ]);
             }
 
+            $productionLines = $this->productionPrices->resolveLinesForPosition(
+                $this->payloadProductionLines($position, $existingPosition),
+                $existingPosition,
+                $catalog['inventory'],
+                (int) $catalog['priceList']->year,
+                $catalog['spot_method'],
+                $catalog['freeze']->legacyKind(),
+                $settlement['mode'],
+                (int) $index,
+            );
+
             $resolved[] = [
                 ...$catalog,
+                'production_lines' => $productionLines,
+                'production_ae_percent' => $productionLines === []
+                    ? '0'
+                    : $this->resolveAePercent($payload, $position, true, $existingPosition),
                 'length_seconds' => $length,
                 'components' => $normalizedComponents,
                 'component_calculation_strategy' => $componentStrategy,
@@ -1076,6 +1100,69 @@ final class CalculationWriter
     }
 
     /**
+     * BL-P5-02a: Produktionszeilen aus dem Payload; ohne `production_lines`-Schlüssel bleiben gespeicherte Zeilen erhalten.
+     *
+     * @param  array<string, mixed>  $position
+     * @return list<array<string, mixed>>
+     */
+    private function payloadProductionLines(array $position, ?CalculationPosition $existing): array
+    {
+        if (! array_key_exists('production_lines', $position)) {
+            return $existing === null ? [] : $this->productionPrices->payloadLinesFromExisting($existing);
+        }
+
+        $lines = $position['production_lines'];
+        if (! is_array($lines)) {
+            return [];
+        }
+
+        return array_values(array_filter($lines, 'is_array'));
+    }
+
+    /**
+     * BL-P5-02a: eingefrorene Produktionszeilen synchronisieren (Pin: Preis/Flags/Version aus dem Engine-Input).
+     */
+    private function syncProductionLines(CalculationPosition $position, PositionResult $result): void
+    {
+        $existing = $position->productionLines()->get()->keyBy('client_key');
+        $seen = [];
+
+        foreach ($result->productionLines as $line) {
+            /** @var CalculationPositionProductionLine $model */
+            $model = ($line->clientKey !== null ? $existing->get($line->clientKey) : null)
+                ?? new CalculationPositionProductionLine;
+            $model->fill([
+                'client_key' => $line->clientKey,
+                'production_type' => $line->productionType,
+                'label' => $line->label,
+                'quantity' => $line->quantity,
+                'unit_price' => $line->unitPrice,
+                'line_gross' => $line->lineGross,
+                'remark' => $line->remark,
+                'production_price_list_id' => $line->productionPriceListId,
+                'production_price_list_version' => $line->productionPriceListVersion,
+                'is_discountable' => $line->isDiscountable,
+                'is_ae_eligible' => $line->isAeEligible,
+                'position_discount_amount' => $line->positionDiscountAmount,
+                'order_discount_amount' => $line->orderDiscountAmount,
+                'ae_amount' => $line->aeAmount,
+                'nn_invest' => $line->nnInvest,
+                'sort' => $line->sort,
+            ]);
+            $model->calculationPosition()->associate($position);
+            $model->save();
+            $seen[] = $model->id;
+        }
+
+        CalculationPositionProductionLine::query()
+            ->where('calculation_position_id', $position->id)
+            ->when($seen !== [], fn ($query) => $query->whereNotIn('id', $seen))
+            ->delete();
+
+        $position->unsetRelation('productionLines');
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      */
     private function applyHeaderFields(Calculation $calculation, array $payload): void
@@ -1147,6 +1234,19 @@ final class CalculationWriter
 
         return $this->normalizePositionsForCompare($payload['positions'])
             === $this->normalizePositionsForCompare($this->payloadFromCalculation($calculation)['positions']);
+    }
+
+    private function normalizeQuantityForCompare(mixed $quantity): string
+    {
+        if ($quantity === null || $quantity === '') {
+            return '0.0000';
+        }
+
+        try {
+            return Decimal::roundPrice(is_scalar($quantity) ? (string) $quantity : '0');
+        } catch (\InvalidArgumentException) {
+            return '__invalid__'.(is_scalar($quantity) ? (string) $quantity : '');
+        }
     }
 
     /**
@@ -1228,8 +1328,27 @@ final class CalculationWriter
                 }
             }
 
+            // BL-P5-02a: fehlender Schlüssel = Zeilen unverändert; für den Vergleich wie "keine Zeilen" behandeln.
+            $productionLines = [];
+            foreach (is_array($position['production_lines'] ?? null) ? $position['production_lines'] : [] as $line) {
+                if (! is_array($line)) {
+                    $productionLines[] = ['__invalid__' => true];
+
+                    continue;
+                }
+                $productionLines[] = [
+                    'client_key' => (string) ($line['client_key'] ?? ''),
+                    'production_type' => (string) ($line['production_type'] ?? 'spot_production'),
+                    'label' => trim((string) ($line['label'] ?? '')),
+                    'quantity' => $this->normalizeQuantityForCompare($line['quantity'] ?? null),
+                    'remark' => trim((string) ($line['remark'] ?? '')),
+                    'sort' => (int) ($line['sort'] ?? 0),
+                ];
+            }
+
             $normalized[] = [
                 'id' => isset($position['id']) ? (int) $position['id'] : null,
+                'production_lines' => $productionLines,
                 'client_key' => $position['client_key'] ?? null,
                 'inventory_id' => (int) ($position['inventory_id'] ?? 0),
                 'advertising_medium_id' => (int) ($position['advertising_medium_id'] ?? 0),
@@ -1334,6 +1453,7 @@ final class CalculationWriter
                     'custom_label' => $discount->custom_label,
                     'percent' => (string) $discount->percent,
                 ])->all(),
+                'production_lines' => $this->productionPrices->payloadLinesFromExisting($position),
                 'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
                 'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
                 'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
@@ -1466,6 +1586,23 @@ final class CalculationWriter
                             'percent' => (string) $discount->percent,
                         ]
                     )->all(),
+                    'production_gross' => (string) $position->production_gross,
+                    'production_nn_invest' => (string) $position->production_nn_invest,
+                    'production_lines' => $position->productionLines->map(
+                        fn (CalculationPositionProductionLine $line): array => [
+                            'client_key' => $line->client_key,
+                            'production_type' => $line->production_type,
+                            'label' => $line->label,
+                            'quantity' => (string) $line->quantity,
+                            'unit_price' => (string) $line->unit_price,
+                            'line_gross' => (string) $line->line_gross,
+                            'is_discountable' => (bool) $line->is_discountable,
+                            'is_ae_eligible' => (bool) $line->is_ae_eligible,
+                            'production_price_list_id' => $line->production_price_list_id,
+                            'production_price_list_version' => $line->production_price_list_version,
+                            'nn_invest' => (string) $line->nn_invest,
+                        ]
+                    )->values()->all(),
                     'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
                     'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
                     'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
@@ -1920,6 +2057,7 @@ final class CalculationWriter
             'positions.discounts',
             'positions.plannerEntries',
             'positions.components',
+            'positions.productionLines',
         ];
     }
 

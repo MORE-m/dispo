@@ -163,6 +163,7 @@ final class DispoOrderWriter
             'positions.planRows',
             'positions.timeRanges',
             'positions.discounts',
+            'positions.productionLines',
         ]);
 
         if ($calculation->positions->isEmpty()) {
@@ -231,6 +232,15 @@ final class DispoOrderWriter
             $orderPosition->fill($snapshot);
             $orderPosition->save();
             $sort++;
+
+            // BL-P5-02a: Produktionszeilen des gewählten Trägers folgen automatisch (nicht separat wählbar).
+            foreach ($position->productionLines as $line) {
+                $productionPosition = new DispoOrderPosition;
+                $productionPosition->dispo_order_id = $order->id;
+                $productionPosition->fill($this->mapper->productionFromLine($position, $line, $sort));
+                $productionPosition->save();
+                $sort++;
+            }
         }
 
         // DF-3.3a2β: Effektiv-Snapshots binden, bevor Positionswerte entstehen.
