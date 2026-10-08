@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $customer_confirmation_exception_set_by_name
  * @property Carbon|null $customer_confirmation_exception_set_at
  * @property-read Collection<int, DispoOrderPosition> $positions
+ * @property-read Collection<int, DispoOrderPosition> $productionLines
  * @property-read Collection<int, DispoOrderApprovalRequest> $approvalRequests
  * @property-read Collection<int, DispoOrderStatusEvent> $statusEvents
  * @property-read Collection<int, DispoOrderComment> $comments
@@ -160,7 +161,26 @@ class DispoOrder extends Model
      */
     public function positions(): HasMany
     {
-        return $this->hasMany(DispoOrderPosition::class)->orderBy('sort')->orderBy('id');
+        // BL-P5-02a: Medienzeilen. Produktionszeilen (line_role = production) liegen in productionLines().
+        return $this->hasMany(DispoOrderPosition::class)
+            ->where(function ($query): void {
+                $query->whereNull('line_role')->orWhere('line_role', DispoOrderPosition::LINE_ROLE_MEDIA);
+            })
+            ->orderBy('sort')
+            ->orderBy('id');
+    }
+
+    /**
+     * BL-P5-02a: eingefrorene Produktionszeilen (Kennzeichen S), getrennt von Medienpositionen.
+     *
+     * @return HasMany<DispoOrderPosition, $this>
+     */
+    public function productionLines(): HasMany
+    {
+        return $this->hasMany(DispoOrderPosition::class)
+            ->where('line_role', DispoOrderPosition::LINE_ROLE_PRODUCTION)
+            ->orderBy('sort')
+            ->orderBy('id');
     }
 
     /**

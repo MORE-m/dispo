@@ -369,12 +369,20 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P5-02 – Produktion/Sonstiges
 
 - **Phase:** 5
-- **Status:** offen
-- **Anforderungen:** `PRO-001` bis `PRO-007`
-- **Abhängigkeiten:** BL-P5-01 (hinreichender SWF-Fortschritt; **nicht** allein durch 01a-Readiness freigegeben)
-- **Ergebnis:** Zusatzzeilen, Produktionspreisliste, Überschreibungsfreigabe
-- **Akzeptanz:** `AT-11`
-- **Tests:** Pest Standardmenge 0, Buchungskennzeichen S, Sonderfreigabe bei Überschreibung
+- **Status:** teilweise (`BL-P5-02a` Spotproduktion@Spot Classic Average; PO-BLP502-1)
+- **Anforderungen:** `PRO-001` bis `PRO-007` (02a: Spotproduktion gebunden; Sonstiges/Überschreibung offen)
+- **Abhängigkeiten:** `BL-P5-02a` formal unabhängig von `BL-P5-01` (B1); Rest offen
+- **Ergebnis 02a:** Admin-Produktionspreise, Zusatzzeilen, Freeze, Dispo-S; **keine** Preisüberschreibung
+- **Akzeptanz:** `AT-11` teilweise
+- **Tests:** Pest Menge 0, S-Zeile, Pin/Rebind, Sales-Manipulation abgelehnt; Browser Port 8057
+
+### BL-P5-02a – Spotproduktion an Spot Classic × Average
+
+- **Phase:** 5
+- **Status:** erledigt (Feature-Branch / Draft-PR; **kein** Deploy; operative Preise nicht behauptet)
+- **Anforderungen:** `ADV-003`, `PRO-001`–`PRO-004`/`PRO-006`/`PRO-007` (Teil), `AT-11` (Teil)
+- **PO:** PO-BLP502-1 A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag
+- **Außerhalb:** Sonstiges-FreiPreis, Überschreibungs-Sonderfreigabe, andere Träger/Methoden
 
 ## Phase 6 – Online Audio, Social Media und Events
 

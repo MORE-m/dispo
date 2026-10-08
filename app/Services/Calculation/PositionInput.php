@@ -15,6 +15,7 @@ final readonly class PositionInput
      * @param  list<PlannerEntryInput>  $plannerEntries
      * @param  list<DiscountInput>  $positionDiscounts
      * @param  list<ComponentInput>  $components
+     * @param  list<ProductionLineInput>  $productionLines
      */
     public function __construct(
         public int $inventoryId,
@@ -40,7 +41,16 @@ final readonly class PositionInput
         public ?string $fixedPriceNn = null,
         /** BL-P5-01a: swf_trailer rechnet ohne Spotlängenindex (Index fest 100). */
         public ?string $engineProfileKey = null,
+        /** BL-P5-02a: gepinnte Produktionszeilen (nur Spot Classic × Durchschnitt). */
+        public array $productionLines = [],
+        /** BL-P5-02a: AE-Satz für AE-fähige Produktionszeilen (0 ohne Auftrags-AE). */
+        public string $productionAePercent = '0',
     ) {}
+
+    public function hasProductionLines(): bool
+    {
+        return $this->productionLines !== [];
+    }
 
     public function isSwfTrailer(): bool
     {

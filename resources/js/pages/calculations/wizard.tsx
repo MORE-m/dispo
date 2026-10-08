@@ -5,6 +5,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CalculationMethodSelector } from '@/components/calculation-method-selector';
 import { WizardInventorySelection } from '@/components/wizard-inventory-selection';
 import { PricingSettlementSection } from '@/components/pricing-settlement-section';
+import { ProductionLinesEditor } from '@/components/production-lines-editor';
+import {
+    productionLinesFromSaved,
+    productionLinesPayload,
+    productionSupported,
+    type ProductionLineDraft,
+    type ProductionLineResult,
+    type SavedProductionLine,
+} from '@/lib/production-lines';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
 import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
@@ -236,6 +245,8 @@ type PositionDraft = {
     time_ranges: TimeRangeDraft[];
     planner_entries: PlannerEntryDraft[];
     position_discounts: DiscountDraft[];
+    /** BL-P5-02a: Spotproduktion (nur Bezeichnung/Menge/Bemerkung; Preis liefert der Server). */
+    production_lines?: ProductionLineDraft[];
     period_open: boolean;
     flight_period_start: string;
     flight_period_end: string;
@@ -358,6 +369,9 @@ type Totals = {
     positions: {
         media_gross: string;
         nn_invest: string;
+        /** BL-P5-02a: nur Anzeige; media_gross bleibt medienrein. */
+        production_gross?: string;
+        production_lines?: ProductionLineResult[];
         spot_count: number;
         average_second_price?: string | null;
         after_position_discount?: string;
@@ -511,6 +525,7 @@ type SavedCalculation = {
         }>;
         pricing_settlement_mode?: string | null;
         fixed_price_nn?: string | null;
+        production_lines?: SavedProductionLine[];
         dynamic_field_values?: Record<string, unknown> & {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
@@ -1341,6 +1356,9 @@ export default function CalculationWizard({
                         return meta;
                     })(),
                     ...pricingSettlementDraftFromSaved(position),
+                    production_lines: productionLinesFromSaved(
+                        position.production_lines,
+                    ),
                 };
             });
         }
@@ -1735,6 +1753,9 @@ export default function CalculationWizard({
                               position.position_discounts,
                           ),
                           ...settlementPayloadFields(position),
+                          production_lines: productionLinesPayload(
+                              position.production_lines,
+                          ),
                           dynamic_field_values: {
                               period_open: position.period_open,
                               position_flight_period:
@@ -4744,8 +4765,20 @@ export default function CalculationWizard({
                                                         types={discountTypes}
                                                         canEdit={canEdit}
                                                         disabled={
-                                                            rule?.is_discountable ===
-                                                                false ||
+                                                            (rule?.is_discountable ===
+                                                                false &&
+                                                                !(
+                                                                    displayTotals
+                                                                        ?.positions[
+                                                                        index
+                                                                    ]
+                                                                        ?.production_lines ??
+                                                                    []
+                                                                ).some(
+                                                                    (line) =>
+                                                                        line.is_discountable ===
+                                                                        true,
+                                                                )) ||
                                                             fixedSettlement
                                                         }
                                                         fieldPrefix={`positions.${index}.position_discounts`}
@@ -4788,6 +4821,57 @@ export default function CalculationWizard({
                                                             </span>
                                                         </p>
                                                     ) : null}
+                                                    <ProductionLinesEditor
+                                                        positionIndex={index}
+                                                        lines={
+                                                            position.production_lines ??
+                                                            []
+                                                        }
+                                                        results={
+                                                            displayTotals
+                                                                ?.positions[
+                                                                index
+                                                            ]?.production_lines
+                                                        }
+                                                        canEdit={canEdit}
+                                                        supported={productionSupported(
+                                                            {
+                                                                mediumKind:
+                                                                    catalog.media.find(
+                                                                        (
+                                                                            item,
+                                                                        ) =>
+                                                                            item.id ===
+                                                                            position.advertising_medium_id,
+                                                                    )?.kind,
+                                                                methodKey:
+                                                                    position.calculation_method_key,
+                                                                settlementMode:
+                                                                    position.pricing_settlement_mode,
+                                                            },
+                                                        )}
+                                                        previewLoading={
+                                                            previewLoading
+                                                        }
+                                                        error={
+                                                            fieldErrors[
+                                                                `positions.${index}.production_lines`
+                                                            ]?.[0]
+                                                        }
+                                                        fieldErrors={
+                                                            fieldErrors
+                                                        }
+                                                        onChange={(
+                                                            production_lines,
+                                                        ) =>
+                                                            updatePosition(
+                                                                index,
+                                                                {
+                                                                    production_lines,
+                                                                },
+                                                            )
+                                                        }
+                                                    />
                                                 </CardContent>
                                             </Card>
                                         );

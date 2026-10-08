@@ -189,7 +189,8 @@ Mindestens folgende Fälle lösen eine kaufmännische Sonderfreigabe aus:
 - effektiver (kombinierter) Rabatt überschreitet persönliche Rabattgrenze,
 - Basis-TKP liegt unter Mindest-TKP (noch nicht implementiert),
 - Online-Audio-Festpreis (noch nicht implementiert),
-- überschreibender regulärer Produktionspreis (noch nicht implementiert),
+- überschreibender regulärer Produktionspreis (**BL-P5-02a:** Überschreibung
+  serverseitig ausgeschlossen; Sonderfreigabe-Auslöser bleibt Folgeslice),
 - weitere administrativ definierte Freigaberegel.
 
 ## Freigabereihenfolge (Slice)

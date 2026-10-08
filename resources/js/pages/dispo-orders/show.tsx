@@ -319,6 +319,25 @@ type OrderDetail = {
     historically_uncaptured?: boolean;
     derived_campaign_period?: DerivedCampaignPeriodProp;
     positions: OrderPosition[];
+    /** BL-P5-02a: Spotproduktion/Sonstiges (Kennzeichen S), eingefroren, ohne Planung. */
+    production_lines?: ProductionLine[];
+};
+
+type ProductionLine = {
+    id: number;
+    calculation_position_id: number | null;
+    booking_code: string | null;
+    inventory_name: string;
+    label: string;
+    quantity: string | null;
+    unit_price: string | null;
+    line_gross: string | null;
+    remark: string | null;
+    production_price_list_version: string | null;
+    position_discount_amount: string;
+    order_discount_amount: string;
+    ae_amount: string;
+    nn_invest: string;
 };
 
 type ChoiceMeta = Pick<ChoiceFieldEntry, 'initPayloadSafe' | 'issue'>;
@@ -2628,6 +2647,54 @@ export default function DispoOrderShow({
                                 </section>
                             );
                         })}
+                        {(order.production_lines ?? []).length > 0 ? (
+                            <section
+                                className="border-border/70 space-y-2 rounded-lg border border-dashed p-4"
+                                data-test="dispo-production-lines"
+                            >
+                                <h3 className="text-sm font-semibold">
+                                    Produktion / Sonstiges (
+                                    {(order.production_lines ?? []).length})
+                                </h3>
+                                <p className="text-muted-foreground text-xs">
+                                    Zusatzleistungen ohne Sendeplanung
+                                    (Kennzeichen S); Werte sind aus der
+                                    Kalkulation eingefroren.
+                                </p>
+                                {(order.production_lines ?? []).map((line) => (
+                                    <div
+                                        key={line.id}
+                                        className="flex flex-wrap items-baseline justify-between gap-2 border-t pt-2 text-sm"
+                                        data-test={`dispo-production-line-${line.id}`}
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium">
+                                                <span
+                                                    className="bg-muted mr-2 rounded px-1.5 py-0.5 text-xs font-semibold"
+                                                    data-test="dispo-production-booking-code"
+                                                >
+                                                    {line.booking_code ?? 'S'}
+                                                </span>
+                                                {line.label}
+                                            </p>
+                                            <p className="text-muted-foreground text-xs">
+                                                {line.inventory_name} · Menge{' '}
+                                                {line.quantity ?? '–'} ×{' '}
+                                                {line.unit_price
+                                                    ? money(line.unit_price)
+                                                    : '–'}
+                                                {line.remark
+                                                    ? ` · ${line.remark}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <p className="text-primary font-semibold tabular-nums">
+                                            {money(line.nn_invest)} N/N
+                                        </p>
+                                    </div>
+                                ))}
+                            </section>
+                        ) : null}
                         {canUpdate && anyPositionHasEditableCustoms ? (
                             <>
                                 {fieldErrors.lock_version ? (

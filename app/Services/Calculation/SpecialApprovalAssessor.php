@@ -100,7 +100,10 @@ final class SpecialApprovalAssessor
      */
     public function assessFromCalculation(Calculation $calculation, Collection $selectedPositions): SpecialApprovalAssessment
     {
-        $calculation->loadMissing(['positions.inventory']);
+        $calculation->loadMissing(['positions.inventory', 'positions.productionLines', 'positions.discounts']);
+        foreach ($selectedPositions as $selectedPosition) {
+            $selectedPosition->loadMissing(['inventory', 'productionLines', 'discounts']);
+        }
 
         $limit = $calculation->personal_discount_limit_percent;
         $limitString = $limit === null || $limit === '' ? null : (string) $limit;
@@ -177,9 +180,84 @@ final class SpecialApprovalAssessor
             (string) $position->order_discount_amount,
         );
 
-        return $this->reasonsForRates(
+        $reasons = $this->reasonsForRates(
             $positionPercent,
             $orderPercent,
+            $effective,
+            $limit,
+            (int) $position->id,
+            'id:'.$position->id,
+            $position->inventory?->name,
+        );
+
+        return array_merge(
+            $reasons,
+            $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
+        );
+    }
+
+    /**
+     * BL-P5-02a Review: Produktionsrabatte aus gespeicherten Zeilen eigenständig prüfen.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function productionReasonsFromStoredPosition(
+        CalculationPosition $position,
+        string $orderDiscountPercent,
+        ?string $limit,
+    ): array {
+        $lines = $position->relationLoaded('productionLines')
+            ? $position->productionLines
+            : $position->productionLines()->get();
+
+        // Nur rabattfähige Zeilen: nicht rabattfähige verdünnen den effektiven Prozentsatz nicht.
+        $discountableGross = '0';
+        $positionDiscountAmount = '0';
+        $orderDiscountAmount = '0';
+        $hasDiscountable = false;
+        foreach ($lines as $line) {
+            if (! (bool) $line->is_discountable) {
+                continue;
+            }
+
+            $hasDiscountable = true;
+            $discountableGross = Decimal::add($discountableGross, (string) $line->line_gross, 2);
+            $positionDiscountAmount = Decimal::add(
+                $positionDiscountAmount,
+                (string) $line->position_discount_amount,
+                2,
+            );
+            $orderDiscountAmount = Decimal::add(
+                $orderDiscountAmount,
+                (string) $line->order_discount_amount,
+                2,
+            );
+        }
+
+        if (! $hasDiscountable) {
+            return [];
+        }
+
+        $discounts = $position->relationLoaded('discounts')
+            ? $position->discounts
+            : $position->discounts()->get();
+        /** @var list<string> $discountPercents */
+        $discountPercents = array_values(
+            $discounts->map(fn ($discount): string => (string) $discount->percent)->all(),
+        );
+        $positionPercent = $discountPercents === []
+            ? (string) $position->position_discount_percent
+            : $this->stackedPercent($discountPercents);
+
+        $effective = $this->effectivePercentFromAmounts(
+            Decimal::roundMoney($discountableGross),
+            Decimal::roundMoney($positionDiscountAmount),
+            Decimal::roundMoney($orderDiscountAmount),
+        );
+
+        return $this->reasonsForRates(
+            $positionPercent,
+            $orderDiscountPercent,
             $effective,
             $limit,
             (int) $position->id,

@@ -14,6 +14,7 @@ use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
 use App\Http\Controllers\Administration\NotificationOutboxAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\Administration\PriceListImportController;
+use App\Http\Controllers\Administration\ProductionPriceListAdminController;
 use App\Http\Controllers\Administration\SpecialApproveRightAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
@@ -266,6 +267,24 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.price-lists.archive');
         Route::delete('administration/preislisten/{priceList}', [PriceListAdminController::class, 'destroy'])
             ->name('administration.price-lists.destroy');
+
+        // BL-P5-02a: Produktionspreise (Spotproduktion)
+        Route::get('administration/produktionspreise', [ProductionPriceListAdminController::class, 'index'])
+            ->name('administration.production-prices.index');
+        Route::get('administration/produktionspreise/neu', [ProductionPriceListAdminController::class, 'create'])
+            ->name('administration.production-prices.create');
+        Route::post('administration/produktionspreise', [ProductionPriceListAdminController::class, 'store'])
+            ->name('administration.production-prices.store');
+        Route::get('administration/produktionspreise/{productionPriceList}', [ProductionPriceListAdminController::class, 'show'])
+            ->name('administration.production-prices.show');
+        Route::put('administration/produktionspreise/{productionPriceList}', [ProductionPriceListAdminController::class, 'update'])
+            ->name('administration.production-prices.update');
+        Route::post('administration/produktionspreise/{productionPriceList}/aktivieren', [ProductionPriceListAdminController::class, 'activate'])
+            ->name('administration.production-prices.activate');
+        Route::post('administration/produktionspreise/{productionPriceList}/archivieren', [ProductionPriceListAdminController::class, 'archive'])
+            ->name('administration.production-prices.archive');
+        Route::post('administration/produktionspreise/{productionPriceList}/kopieren', [ProductionPriceListAdminController::class, 'copy'])
+            ->name('administration.production-prices.copy');
 
         // PO-AUTH-SPECIAL-APPROVE-1: Sonderfreigaberecht (nur Admin, Gate im Controller)
         Route::get('administration/sonderfreigaben', [SpecialApproveRightAdminController::class, 'index'])

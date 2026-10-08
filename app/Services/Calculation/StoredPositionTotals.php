@@ -30,6 +30,14 @@ final class StoredPositionTotals
         $nnInvest = '0.00';
 
         foreach ($positions as $position) {
+            // BL-P5-02a: Produktionszeilen tragen eigene Rabatt-/AE-Beträge; nn_invest enthält sie bereits.
+            $position->loadMissing('productionLines');
+            foreach ($position->productionLines as $line) {
+                $positionDiscountTotal = Decimal::roundMoney(Decimal::add($positionDiscountTotal, (string) $line->position_discount_amount));
+                $orderDiscountTotal = Decimal::roundMoney(Decimal::add($orderDiscountTotal, (string) $line->order_discount_amount));
+                $aeTotal = Decimal::roundMoney(Decimal::add($aeTotal, (string) $line->ae_amount));
+            }
+
             $mediaGross = Decimal::roundMoney(Decimal::add($mediaGross, (string) $position->media_gross));
             $positionDiscountTotal = Decimal::roundMoney(Decimal::add(
                 $positionDiscountTotal,

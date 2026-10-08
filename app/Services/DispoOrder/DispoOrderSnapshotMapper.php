@@ -9,8 +9,11 @@ use App\Models\CalculationPosition;
 use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionPlannerEntry;
+use App\Models\CalculationPositionProductionLine;
 use App\Models\CalculationPositionTimeRange;
+use App\Models\DispoOrderPosition;
 use App\Models\SpotClassicPlanRow;
+use App\Services\Calculation\Decimal;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
 use App\Support\Advertising\SpotComponentProfileContract;
@@ -86,6 +89,7 @@ final class DispoOrderSnapshotMapper
         $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
 
         return [
+            'line_role' => DispoOrderPosition::LINE_ROLE_MEDIA,
             'calculation_position_id' => $position->id,
             'sort' => $sort,
             'inventory_id' => $position->inventory_id,
@@ -130,7 +134,8 @@ final class DispoOrderSnapshotMapper
             'position_discount_amount' => (string) $position->position_discount_amount,
             'order_discount_amount' => (string) $position->order_discount_amount,
             'ae_amount' => (string) $position->ae_amount,
-            'nn_invest' => (string) $position->nn_invest,
+            // BL-P5-02a: Trägerzeile medienrein; Produktions-N/N steht in den eigenen S-Zeilen.
+            'nn_invest' => Decimal::roundMoney(Decimal::sub((string) $position->nn_invest, (string) $position->production_nn_invest)),
             'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
             'fixed_price_nn' => $position->fixed_price_nn === null ? null : (string) $position->fixed_price_nn,
             'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
@@ -189,12 +194,80 @@ final class DispoOrderSnapshotMapper
     }
 
     /**
+     * BL-P5-02a: eingefrorene Produktionszeile als eigene Dispozeile (Kennzeichen S, ohne Planung/Airings).
+     *
+     * Freeze-Spalten (kind/spot_method/engine_*) kommen vom Träger, damit die DB-Freeze-Guards konsistent bleiben.
+     *
+     * @return array<string, mixed>
+     */
+    public function productionFromLine(CalculationPosition $carrier, CalculationPositionProductionLine $line, int $sort): array
+    {
+        $base = $this->positionFromCalculationPosition($carrier, $sort);
+        $label = trim($line->label) !== '' ? $line->label : 'Spotproduktion';
+
+        return array_merge($base, [
+            'line_role' => DispoOrderPosition::LINE_ROLE_PRODUCTION,
+            'calculation_position_id' => $carrier->id,
+            'sort' => $sort,
+            'advertising_medium_id' => null,
+            'advertising_medium_name' => $label,
+            'advertising_medium_code' => null,
+            'booking_code' => 'S',
+            'planning_responsibility_key' => null,
+            'planning_responsibility_label' => null,
+            'combination_hint_text' => null,
+            'component_calculation_strategy' => null,
+            'component_profile' => null,
+            'derived_component_airings' => null,
+            'length_seconds' => 0,
+            'total_spot_count' => 0,
+            'needs_spot_redistribution' => false,
+            'price_list_id' => null,
+            'price_list_version' => null,
+            'price_list_name' => null,
+            'average_second_price' => null,
+            'length_index' => null,
+            'surcharge_percent' => '0',
+            // BL-P5-02a Review P2: angewendete Produktions-Positionsrabatte, nicht Trägerkonditionen.
+            'position_discount_percent' => (string) $line->position_discount_percent,
+            // BL-P5-02a Review: eingefrorener Produktions-AE-Satz, nicht Träger-ae_percent.
+            'ae_percent' => (string) $line->ae_percent,
+            'is_discountable' => (bool) $line->is_discountable,
+            'is_ae_eligible' => (bool) $line->is_ae_eligible,
+            'media_gross' => '0.00',
+            'position_discount_amount' => (string) $line->position_discount_amount,
+            'order_discount_amount' => (string) $line->order_discount_amount,
+            'ae_amount' => (string) $line->ae_amount,
+            'nn_invest' => (string) $line->nn_invest,
+            'pricing_settlement_mode' => 'normal',
+            'fixed_price_nn' => null,
+            'effective_pay_factor_percent' => null,
+            'effective_total_discount_percent' => null,
+            'plan_rows_snapshot' => [],
+            'time_ranges_snapshot' => [],
+            'planner_entries_snapshot' => [],
+            'components_snapshot' => [],
+            'position_discounts_snapshot' => is_array($line->position_discounts_snapshot)
+                ? $line->position_discounts_snapshot
+                : [],
+            'production_type' => $line->production_type,
+            'production_label' => $line->label,
+            'production_quantity' => (string) $line->quantity,
+            'production_unit_price' => (string) $line->unit_price,
+            'production_remark' => $line->remark,
+            'production_price_list_id' => $line->production_price_list_id,
+            'production_price_list_version' => $line->production_price_list_version,
+            'production_line_gross' => (string) $line->line_gross,
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function orderSnapshot(DispoOrderWriterResult $result): array
     {
         $order = $result->order;
-        $order->loadMissing(['positions', 'creator']);
+        $order->loadMissing(['positions', 'productionLines', 'creator']);
 
         return [
             'number' => $order->number,
@@ -210,6 +283,12 @@ final class DispoOrderSnapshotMapper
             'positions' => $order->positions->map(fn ($position): array => [
                 'calculation_position_id' => $position->calculation_position_id,
                 'inventory_name' => $position->inventory_name,
+                'nn_invest' => (string) $position->nn_invest,
+            ])->all(),
+            'production_lines' => $order->productionLines->map(fn ($position): array => [
+                'calculation_position_id' => $position->calculation_position_id,
+                'label' => $position->production_label,
+                'production_line_gross' => $position->production_line_gross === null ? null : (string) $position->production_line_gross,
                 'nn_invest' => (string) $position->nn_invest,
             ])->all(),
         ];

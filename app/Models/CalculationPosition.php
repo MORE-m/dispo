@@ -87,6 +87,8 @@ class CalculationPosition extends Model
         'is_ae_eligible',
         'price_list_version',
         'media_gross',
+        'production_gross',
+        'production_nn_invest',
         'position_discount_amount',
         'order_discount_amount',
         'ae_amount',
@@ -116,6 +118,8 @@ class CalculationPosition extends Model
             'is_ae_eligible' => 'boolean',
             'needs_spot_redistribution' => 'boolean',
             'media_gross' => 'decimal:2',
+            'production_gross' => 'decimal:2',
+            'production_nn_invest' => 'decimal:2',
             'position_discount_amount' => 'decimal:2',
             'order_discount_amount' => 'decimal:2',
             'ae_amount' => 'decimal:2',
@@ -212,6 +216,18 @@ class CalculationPosition extends Model
     public function components(): HasMany
     {
         return $this->hasMany(CalculationPositionComponent::class)
+            ->orderBy('sort')
+            ->orderBy('id');
+    }
+
+    /**
+     * BL-P5-02a: eingefrorene Produktionszeilen (Spotproduktion).
+     *
+     * @return HasMany<CalculationPositionProductionLine, $this>
+     */
+    public function productionLines(): HasMany
+    {
+        return $this->hasMany(CalculationPositionProductionLine::class)
             ->orderBy('sort')
             ->orderBy('id');
     }

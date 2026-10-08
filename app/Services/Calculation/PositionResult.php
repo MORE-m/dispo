@@ -14,6 +14,7 @@ final readonly class PositionResult
      * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $positionDiscounts
      * @param  list<array{type: string, label: string, percent: string, amount: string, remaining: string}>  $orderDiscounts
      * @param  list<array{role: string, label: string, length_seconds: int, sort: int, length_index: int, media_gross: string}>  $components
+     * @param  list<ProductionLineResult>  $productionLines  BL-P5-02a: Produktionszeilen; `nnInvest` enthält deren N/N, `mediaGross` und die Medien-Rabattfelder bleiben medienrein.
      */
     public function __construct(
         public string $mediaGross,
@@ -40,7 +41,22 @@ final readonly class PositionResult
         public ?string $fixedPriceNn = null,
         public ?string $effectivePayFactorPercent = null,
         public ?string $effectiveDiscountBeforeAePercent = null,
+        public string $productionGross = '0.00',
+        public string $productionNnInvest = '0.00',
+        public array $productionLines = [],
+        public string $productionPositionDiscountAmount = '0.00',
+        public string $productionOrderDiscountAmount = '0.00',
+        public string $productionAeAmount = '0.00',
+        public string $productionAeEligibleBase = '0.00',
     ) {}
+
+    /**
+     * N/N der Medienleistung ohne Produktion (Dispo-Trägerzeile).
+     */
+    public function mediaNnInvest(): string
+    {
+        return Decimal::roundMoney(Decimal::sub($this->nnInvest, $this->productionNnInvest));
+    }
 
     /**
      * @return array<string, mixed>
@@ -72,6 +88,13 @@ final readonly class PositionResult
             'fixed_price_nn' => $this->fixedPriceNn,
             'effective_pay_factor_percent' => $this->effectivePayFactorPercent,
             'effective_discount_before_ae_percent' => $this->effectiveDiscountBeforeAePercent,
+            'production_gross' => $this->productionGross,
+            'production_nn_invest' => $this->productionNnInvest,
+            'media_nn_invest' => $this->mediaNnInvest(),
+            'production_lines' => array_map(
+                static fn (ProductionLineResult $line): array => $line->toArray(),
+                $this->productionLines,
+            ),
         ];
     }
 }

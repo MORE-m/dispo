@@ -37,3 +37,5 @@ ohne die Entscheidung zu ersetzen.
 | [PO-BLP403K-1](PO-BLP403K-1-calendar-tandem-tridem.md) | Calendar × Tandem/Tridem Standardangebote | **Akzeptiert** (`main` PR #128) |
 | [PO-BLP501A-1](PO-BLP501A-1-swf-trailer-average.md) | Trailer × Average (A1 Gate-Teilfreigabe + B1 Preisbasis) | **Akzeptiert** (`main` PR #129; lokal eingerichtet; Deploy offen) |
 | [PO-BLP501A-1-datenlieferung](PO-BLP501A-1-datenlieferung.md) | Operative Trailer-Länge/Aufschlag + lokale Einrichtung | **Lokal umgesetzt** (`dispo_mat_core`; Deploy offen) |
+| [PO-BLP502-1](PO-BLP502-1-produktion-sonstiges.md) | Produktion/Sonstiges Erst-Slice (`BL-P5-02a`) | **Akzeptiert** (A1…H1a; Feature-Branch) |
+| [PO-BLP502-1-auflösung](PO-BLP502-1-aufloesungsvertrag.md) | Produktionspreis Jahr/Pin/Rebind | **Akzeptiert** (Ableitung PO-PRI-YEAR-1 + E1/H1a) |
