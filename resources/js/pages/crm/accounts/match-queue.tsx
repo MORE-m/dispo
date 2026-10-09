@@ -77,9 +77,7 @@ export default function CrmMatchQueuePage({
                     }
                 />
 
-                {error ? (
-                    <p className="text-sm text-red-700">{error}</p>
-                ) : null}
+                {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
                 {conflicts.length > 0 ? (
                     <div className="space-y-2">

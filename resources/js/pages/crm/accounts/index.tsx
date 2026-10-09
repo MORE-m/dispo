@@ -50,9 +50,7 @@ export default function CrmAccountsIndex({
 }) {
     const [showProvisionalForm, setShowProvisionalForm] = useState(false);
     const [provName, setProvName] = useState('');
-    const [provType, setProvType] = useState<'customer' | 'agency'>(
-        'customer',
-    );
+    const [provType, setProvType] = useState<'customer' | 'agency'>('customer');
     const [provEmail, setProvEmail] = useState('');
     const [provDomain, setProvDomain] = useState('');
     const [provBusy, setProvBusy] = useState(false);

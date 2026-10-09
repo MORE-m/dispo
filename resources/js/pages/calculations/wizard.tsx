@@ -3169,27 +3169,24 @@ export default function CalculationWizard({
                                                                             response.json(),
                                                                     )
                                                                     .then(
-                                                                        (
-                                                                            data: {
-                                                                                accounts: Array<{
-                                                                                    id: number;
-                                                                                    name:
-                                                                                        | string
-                                                                                        | null;
-                                                                                    meridian_pending: boolean;
-                                                                                }>;
-                                                                            },
-                                                                        ) =>
+                                                                        (data: {
+                                                                            accounts: Array<{
+                                                                                id: number;
+                                                                                name:
+                                                                                    | string
+                                                                                    | null;
+                                                                                meridian_pending: boolean;
+                                                                            }>;
+                                                                        }) =>
                                                                             setCustomerSearchHits(
                                                                                 data.accounts ??
                                                                                     [],
                                                                             ),
                                                                     )
-                                                                    .catch(
-                                                                        () =>
-                                                                            setCustomerSearchHits(
-                                                                                [],
-                                                                            ),
+                                                                    .catch(() =>
+                                                                        setCustomerSearchHits(
+                                                                            [],
+                                                                        ),
                                                                     );
                                                             }}
                                                         >
@@ -3250,7 +3247,8 @@ export default function CalculationWizard({
                                                       customerName.trim() !==
                                                           '' ? (
                                                         <p className="text-muted-foreground mt-1 text-xs">
-                                                            Meridian-Nummer folgt
+                                                            Meridian-Nummer
+                                                            folgt
                                                         </p>
                                                     ) : null}
                                                 </FormField>
@@ -3320,27 +3318,24 @@ export default function CalculationWizard({
                                                                             response.json(),
                                                                     )
                                                                     .then(
-                                                                        (
-                                                                            data: {
-                                                                                accounts: Array<{
-                                                                                    id: number;
-                                                                                    name:
-                                                                                        | string
-                                                                                        | null;
-                                                                                    meridian_pending: boolean;
-                                                                                }>;
-                                                                            },
-                                                                        ) =>
+                                                                        (data: {
+                                                                            accounts: Array<{
+                                                                                id: number;
+                                                                                name:
+                                                                                    | string
+                                                                                    | null;
+                                                                                meridian_pending: boolean;
+                                                                            }>;
+                                                                        }) =>
                                                                             setAgencySearchHits(
                                                                                 data.accounts ??
                                                                                     [],
                                                                             ),
                                                                     )
-                                                                    .catch(
-                                                                        () =>
-                                                                            setAgencySearchHits(
-                                                                                [],
-                                                                            ),
+                                                                    .catch(() =>
+                                                                        setAgencySearchHits(
+                                                                            [],
+                                                                        ),
                                                                     );
                                                             }}
                                                         >
@@ -3401,7 +3396,8 @@ export default function CalculationWizard({
                                                       agencyName.trim() !==
                                                           '' ? (
                                                         <p className="text-muted-foreground mt-1 text-xs">
-                                                            Meridian-Nummer folgt
+                                                            Meridian-Nummer
+                                                            folgt
                                                         </p>
                                                     ) : null}
                                                 </FormField>
@@ -3414,9 +3410,7 @@ export default function CalculationWizard({
                                                         className={
                                                             formSelectClass
                                                         }
-                                                        value={
-                                                            invoiceRecipient
-                                                        }
+                                                        value={invoiceRecipient}
                                                         onChange={(event) =>
                                                             setInvoiceRecipient(
                                                                 event.target
@@ -3460,7 +3454,8 @@ export default function CalculationWizard({
                                                         className="text-sm"
                                                     >
                                                         Vorläufigen Kunden aus
-                                                        Freitext anlegen (optional)
+                                                        Freitext anlegen
+                                                        (optional)
                                                     </label>
                                                 </div>
                                             </>
