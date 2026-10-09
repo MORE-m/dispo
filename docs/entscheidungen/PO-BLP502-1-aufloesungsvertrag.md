@@ -2,8 +2,9 @@
 
 Status: **Akzeptiert** (technische Ableitung aus PO-BLP502-1 E1/H1a + PO-PRI-YEAR-1;
 keine neue fachliche Preisjahres-Entscheidung)
-Stand: 8. Oktober 2026
-Basis: `feat/bl-p5-02a-spot-production` auf `origin/main` @ `7583a3e…`
+Stand: 9. Oktober 2026 (Nachzug Merge)
+Basis: auf `main` @ `157d8a290982077cff709c163818ac1a0f02cdd1` (PR #131);
+historisch Feature auf `7583a3e…`
 IDs: `PRO-004`, `VER-*`, `PO-PRI-YEAR-1`, `PO-BLP502-1` E1/H1a
 Slice: **BL-P5-02a**
 

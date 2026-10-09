@@ -1,39 +1,37 @@
 # Fortschritt V1
 
-Stand: 8. Oktober 2026 – **BL-P5-02a / PO-BLP502-1** Feature-Branch
-(Draft-PR; Basis `main` @ `7583a3e…` nach PR #130; **kein** Deploy).
-Technischer Slice Spotproduktion@Spot Classic Average; synthetische Fixtures;
-operative Produktionspreise **nicht** gepflegt/behauptet. `BL-P5-02`/`AT-11` teilweise.
-Lokale Arbeitsbasis unverändert: Checkout `dispo-main`, Port **8000**,
-Dev-DB **`dispo_mat_core`** unberührt.
+Stand: 9. Oktober 2026 – **BL-P5-02a** auf `main` (PR #131 / `157d8a2…`;
+Post-Merge-CI `37846313463` SUCCESS; **kein** Deploy).
+Technischer Slice + **lokale operative Einrichtung** `dispo_mat_core`:
+8 Active-Listen (600/400 €, 2026, Flags nein/nein); Browser-Abnahme Port **8059**.
+`BL-P5-02`/`AT-11` teilweise. Checkout `dispo-main`, Port **8000**, `.env` unberührt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
 (**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03k** auf `main`;
 Budget/Abbinder offen);
-Phase 5: **BL-P5-01a** auf `main` (Deploy offen); **BL-P5-02a** Draft-PR;
-`BL-P5-01`/`BL-P5-02` teilweise;
+Phase 5: **BL-P5-01a** auf `main` (Deploy offen); **BL-P5-02a** auf `main`
+(lokal eingerichtet; Deploy offen); `BL-P5-01`/`BL-P5-02` teilweise;
 Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
 Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
 
 ## Aktuelle Aufgabe
 
-**BL-P5-02a** Draft-PR Restbefunde P1/P2 (erneute Review) / Stopp zur Review.
-**Kein** Merge/Deploy; keine operative DB-Pflege. Standardangebote/Budget pausiert.
+**BL-P5-02a** lokal eingerichtet/abgenommen; Docs-only Draft-PR **#132** offen,
+Stopp zur Review. **Kein** Deploy, kein Folgeslice. Standardangebote/Budget pausiert.
 
 Offen / zurückgestellt u. a.:
-Deploy BL-P5-01a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,
+Deploy BL-P5-01a/02a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,
 Überschreibung, andere Träger), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
 SPT-013 Abbinder, weitere Status-Mails / In-App, CRM / REP, ADV-001 Defaults,
 ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**PO-BLP502-1 / BL-P5-02a Restbefunde P1/P2** auf Draft-PR #131: effektive
-Sonderfreigabe nur über rabattfähige Produktionszeilen; Dispo friert
-Produktions-Positionsrabatt-Staffel ein; Regressionen + Browser Port **8057**;
-**kein** Deploy; operative Preise nicht behauptet.
+**BL-P5-02a lokale Einrichtung + Abnahme** auf `dispo_mat_core`: Sicherung →
+3 Migrationen → 8× Admin Active → Browser Port **8059** (Calc 10–12, Dispo 8).
+**Kein** Deploy.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
 
@@ -251,13 +249,15 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Thema | Status |
 |---|---|
 | PO A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag | **akzeptiert** |
-| Admin Produktionspreise | **umgesetzt** (Feature-Branch) |
+| Admin Produktionspreise | **umgesetzt** (`main` PR #131) |
 | Calc Zusatzzeilen Spot Classic Average | **umgesetzt** |
 | Dispo eigene S-Zeilen | **umgesetzt** |
 | Preisüberschreibung | **ausgeschlossen** |
 | Feature-Tests | `ProductionPriceListAdminLifecycleTest`, `SpotProductionBlP502aTest` |
 | Browser-Smoke Port **8057** | **bestanden** (`playwright.blp502a.config.ts`, `--retries=0`) |
-| Operative Produktionspreise | **nicht** gepflegt/behauptet (synthetische Fixtures) |
+| Merge `main` | **PR #131** (`157d8a290982077cff709c163818ac1a0f02cdd1`) |
+| Post-Merge CI | **`37846313463` SUCCESS** |
+| Operative Produktionspreise | **lokal eingerichtet** (8× Active 600/400; Abnahme Port 8059; Deploy offen) |
 | `BL-P5-02` / `AT-11` vollständig | **nein** (teilweise) |
 | Deploy | **kein** Deploy |
 
