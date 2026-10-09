@@ -108,36 +108,71 @@ final class CrmAccountService
 
     /**
      * Manuelle Zuordnung vorläufiger Account → Salesforce-Account.
+     * Prüfungen werden nach lockForUpdate auf frisch geladenen Zeilen wiederholt.
      */
     public function linkProvisionalToSalesforce(
         CrmAccount $provisional,
         CrmAccount $salesforceAccount,
         User $actor,
     ): CrmAccount {
-        if ($provisional->type !== $salesforceAccount->type) {
-            throw ValidationException::withMessages([
-                'account' => 'Kunde darf nur mit Kunde, Agentur nur mit Agentur verknüpft werden.',
-            ]);
-        }
-        if (! $salesforceAccount->isLinkedToSalesforce()) {
-            throw ValidationException::withMessages([
-                'account' => 'Zielaccount ist nicht mit Salesforce verknüpft.',
-            ]);
-        }
-        if ($provisional->merged_into_account_id !== null) {
-            throw ValidationException::withMessages([
-                'account' => 'Account ist bereits zusammengeführt.',
-            ]);
-        }
-
         return DB::transaction(function () use ($provisional, $salesforceAccount, $actor): CrmAccount {
-            $provisional = CrmAccount::query()->lockForUpdate()->findOrFail($provisional->id);
-            $target = CrmAccount::query()->lockForUpdate()->findOrFail($salesforceAccount->id);
+            // Deterministische Sperrreihenfolge gegen Deadlocks.
+            $ids = [$provisional->id, $salesforceAccount->id];
+            sort($ids);
+            $locked = CrmAccount::query()
+                ->whereIn('id', $ids)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $provisional = $locked->get($provisional->id)
+                ?? CrmAccount::query()->lockForUpdate()->findOrFail($provisional->id);
+            $target = $locked->get($salesforceAccount->id)
+                ?? CrmAccount::query()->lockForUpdate()->findOrFail($salesforceAccount->id);
+
+            $target = $this->resolveCanonicalAccountLocked($target);
 
             if ($provisional->id === $target->id) {
-                return $target;
+                $this->afterSuccessfulLink($target, $actor, null);
+
+                return $target->fresh(['currentVersion']) ?? $target;
             }
 
+            // Idempotent: bereits auf dasselbe Ziel gemerged.
+            if ($provisional->merged_into_account_id === $target->id) {
+                $this->afterSuccessfulLink($target, $actor, null);
+
+                return $target->fresh(['currentVersion']) ?? $target;
+            }
+
+            if ($provisional->merged_into_account_id !== null
+                && $provisional->merged_into_account_id !== $target->id) {
+                $this->openConflict(CrmConflictType::LinkConflict, $provisional, null, [
+                    'message' => 'Vorläufiger Account ist bereits mit einem anderen Salesforce-Account verknüpft.',
+                    'existing_target_id' => $provisional->merged_into_account_id,
+                    'requested_target_id' => $target->id,
+                ]);
+                throw ValidationException::withMessages([
+                    'account' => 'Account ist bereits mit einem anderen Salesforce-Account verknüpft.',
+                ]);
+            }
+
+            if ($provisional->type !== $target->type) {
+                throw ValidationException::withMessages([
+                    'account' => 'Kunde darf nur mit Kunde, Agentur nur mit Agentur verknüpft werden.',
+                ]);
+            }
+            if (! $target->isLinkedToSalesforce() || $target->merged_into_account_id !== null) {
+                throw ValidationException::withMessages([
+                    'account' => 'Zielaccount ist nicht mit Salesforce verknüpft oder bereits zusammengeführt.',
+                ]);
+            }
+            if ($this->wouldCreateMergeCycle($provisional, $target)) {
+                throw ValidationException::withMessages([
+                    'account' => 'Zuordnung würde einen Merge-Zyklus erzeugen.',
+                ]);
+            }
             if ($provisional->salesforce_account_id_canonical !== null
                 && $provisional->salesforce_account_id_canonical !== $target->salesforce_account_id_canonical) {
                 throw ValidationException::withMessages([
@@ -157,7 +192,89 @@ final class CrmAccountService
                 'salesforce_account_id_canonical' => $target->salesforce_account_id_canonical,
             ]);
 
+            $this->afterSuccessfulLink($target, $actor, null);
+
             return $target->fresh(['currentVersion']) ?? $target;
+        });
+    }
+
+    private function resolveCanonicalAccountLocked(CrmAccount $account): CrmAccount
+    {
+        $current = $account;
+        $guard = 0;
+        while ($current->merged_into_account_id !== null && $guard < 10) {
+            $next = CrmAccount::query()
+                ->whereKey($current->merged_into_account_id)
+                ->lockForUpdate()
+                ->first();
+            if ($next === null) {
+                break;
+            }
+            $current = $next;
+            $guard++;
+        }
+
+        return $current;
+    }
+
+    private function wouldCreateMergeCycle(CrmAccount $provisional, CrmAccount $target): bool
+    {
+        $current = $target;
+        $guard = 0;
+        while ($current->merged_into_account_id !== null && $guard < 10) {
+            if ($current->merged_into_account_id === $provisional->id) {
+                return true;
+            }
+            $next = CrmAccount::query()->find($current->merged_into_account_id);
+            if ($next === null) {
+                break;
+            }
+            $current = $next;
+            $guard++;
+        }
+
+        return false;
+    }
+
+    private function afterSuccessfulLink(CrmAccount $target, User $actor, ?int $importId): void
+    {
+        $meridian = app(CrmMeridianSupplementService::class);
+        $meridian->supplementSalesforceIds($target, $actor, $importId);
+        $target->loadMissing('currentVersion');
+        $number = $target->currentVersion?->meridian_number;
+        if ($number !== null && $number !== '') {
+            $meridian->supplementMissing($target, $number, $actor, $importId);
+        }
+    }
+
+    /**
+     * Offenen Konflikt auditiert abschließen (keine Nummernüberschreibung).
+     */
+    public function resolveConflict(CrmConflict $conflict, User $actor, ?string $note = null): CrmConflict
+    {
+        return DB::transaction(function () use ($conflict, $actor, $note): CrmConflict {
+            $conflict = CrmConflict::query()->lockForUpdate()->findOrFail($conflict->id);
+            if ($conflict->status === 'resolved') {
+                return $conflict;
+            }
+
+            $conflict->status = 'resolved';
+            $conflict->resolved_by_id = $actor->id;
+            $conflict->resolved_at = now();
+            $details = $conflict->details ?? [];
+            if ($note !== null && $note !== '') {
+                $details['resolution_note'] = $note;
+            }
+            $details['resolution'] = 'acknowledged_without_overwrite';
+            $conflict->details = $details;
+            $conflict->save();
+
+            $this->audit->record($conflict, 'crm_conflict.resolved', $actor, null, [
+                'type' => $conflict->type->value,
+                'note' => $note,
+            ]);
+
+            return $conflict;
         });
     }
 

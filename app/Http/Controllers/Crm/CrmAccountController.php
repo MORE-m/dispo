@@ -105,6 +105,7 @@ class CrmAccountController extends Controller
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
             'type' => ['nullable', 'in:customer,agency'],
+            'salesforce_only' => ['nullable', 'boolean'],
         ]);
 
         $query = CrmAccount::query()
@@ -115,6 +116,10 @@ class CrmAccountController extends Controller
 
         if (! empty($validated['type'])) {
             $query->where('type', $validated['type']);
+        }
+        if ($request->boolean('salesforce_only')) {
+            $query->whereNotNull('salesforce_account_id_canonical')
+                ->where('is_provisional', false);
         }
         if (! empty($validated['q'])) {
             $q = '%'.$validated['q'].'%';
@@ -148,6 +153,30 @@ class CrmAccountController extends Controller
         ]);
     }
 
+    public function resolveConflict(Request $request, CrmConflict $crmConflict): JsonResponse
+    {
+        $this->authorize('manage-crm-matches');
+        $validated = $request->validate([
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $resolved = $this->accounts->resolveConflict(
+            $crmConflict,
+            $request->user(),
+            $validated['note'] ?? null,
+        );
+
+        return response()->json([
+            'conflict' => [
+                'id' => $resolved->id,
+                'type' => $resolved->type->value,
+                'status' => $resolved->status,
+                'details' => $resolved->details,
+                'resolved_at' => $resolved->resolved_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function matchQueue(Request $request): Response
     {
         $this->authorize('view-crm-accounts');
@@ -170,6 +199,7 @@ class CrmAccountController extends Controller
             ->map(fn (CrmConflict $c): array => [
                 'id' => $c->id,
                 'type' => $c->type->value,
+                'type_label' => $this->conflictTypeLabel($c->type->value),
                 'details' => $c->details,
                 'account' => $c->account ? $this->serializeAccount($c->account) : null,
             ]);
@@ -197,6 +227,19 @@ class CrmAccountController extends Controller
             'conflicts' => $openConflicts,
             'canManageMatches' => $request->user()?->can('manage-crm-matches') ?? false,
         ]);
+    }
+
+    private function conflictTypeLabel(string $type): string
+    {
+        return match ($type) {
+            'meridian_mismatch' => 'Abweichende Meridian-Nummer (Stammdaten)',
+            'order_meridian_mismatch' => 'Abweichende Meridian-Nummer (Auftrag)',
+            'type_change' => 'Typwechsel Kunde/Agentur',
+            'ambiguous_domain' => 'Mehrdeutige Domain',
+            'divergent_domains' => 'Unterschiedliche Domains in einer Zeile',
+            'link_conflict' => 'Widersprüchliche Zuordnung',
+            default => $type,
+        };
     }
 
     /**

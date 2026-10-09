@@ -119,20 +119,33 @@ final class CrmImportService
         return $import->fresh() ?? $import;
     }
 
-    public function apply(CrmImport $import, User $actor, string $expectedFingerprint, string $expectedCatalogFingerprint): CrmImport
-    {
+    public function apply(
+        CrmImport $import,
+        User $actor,
+        string $expectedFingerprint,
+        string $expectedCatalogFingerprint,
+    ): CrmImport {
         if ($import->status !== CrmImportStatus::Validated && $import->status !== CrmImportStatus::Applied) {
             throw ValidationException::withMessages([
                 'import' => 'Import ist nicht zur Anwendung bereit.',
             ]);
         }
 
-        return DB::transaction(function () use ($import, $actor, $expectedFingerprint, $expectedCatalogFingerprint): CrmImport {
+        /** @var array{kind: string, import: CrmImport} $outcome */
+        $outcome = DB::transaction(function () use (
+            $import,
+            $actor,
+            $expectedFingerprint,
+            $expectedCatalogFingerprint,
+        ): array {
             $import = CrmImport::query()->lockForUpdate()->findOrFail($import->id);
 
             if ($import->status === CrmImportStatus::Applied) {
-                return $import;
+                return ['kind' => 'applied', 'import' => $import];
             }
+
+            // Serialisiert Katalogänderungen gegen parallele Links/Imports.
+            CrmAccount::query()->orderBy('id')->lockForUpdate()->get(['id']);
 
             $binary = $this->files->get($import->stored_path);
             if ($binary === null) {
@@ -153,10 +166,13 @@ final class CrmImportService
                 $import->preview = $preview;
                 $import->fingerprint = $preview['fingerprint'];
                 $import->catalog_fingerprint = $catalogFp;
+                $import->valid_row_count = $preview['stats']['valid_rows'];
+                $import->error_count = $preview['stats']['error_rows'];
+                $import->warning_count = $preview['stats']['warning_rows'];
                 $import->save();
-                throw new CrmImportConflictException(
-                    'Bestand oder Vorschau hat sich geändert. Bitte Vorschau erneut prüfen.'
-                );
+
+                // Transaktion commitet die aktualisierte Vorschau; Exception danach.
+                return ['kind' => 'stale', 'import' => $import->fresh() ?? $import];
             }
 
             if ($preview['stats']['blocking_errors'] > 0) {
@@ -166,7 +182,7 @@ final class CrmImportService
             }
 
             $reportRows = [];
-            $supplements = ['calculations' => 0, 'dispo_orders' => 0];
+            $supplements = ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
 
             foreach ($preview['actions'] as $action) {
                 $result = $this->applyAction($action, $actor, $import->id);
@@ -174,10 +190,10 @@ final class CrmImportService
                 if (isset($result['supplement'])) {
                     $supplements['calculations'] += $result['supplement']['calculations'];
                     $supplements['dispo_orders'] += $result['supplement']['dispo_orders'];
+                    $supplements['conflicts'] += $result['supplement']['conflicts'] ?? 0;
                 }
             }
 
-            // Auto-Match vorläufiger Accounts gegen gesamten SF-Bestand (nach Upserts).
             $matchReport = $this->autoMatchProvisionals($actor, $import->id);
             foreach ($matchReport as $match) {
                 if (($match['mode'] ?? null) !== 'auto' || empty($match['linked_account_id'])) {
@@ -192,6 +208,30 @@ final class CrmImportService
                     $extra = $this->meridian->supplementMissing($linked, $meridian, $actor, $import->id);
                     $supplements['calculations'] += $extra['calculations'];
                     $supplements['dispo_orders'] += $extra['dispo_orders'];
+                    $supplements['conflicts'] += $extra['conflicts'];
+                } elseif ($linked !== null) {
+                    $sf = $this->meridian->supplementSalesforceIds($linked, $actor, $import->id);
+                    $supplements['calculations'] += $sf['calculations'];
+                    $supplements['dispo_orders'] += $sf['dispo_orders'];
+                }
+            }
+
+            // Folgeimport: fehlende Nachträge auch bei unveränderten Stammdaten nachholen.
+            foreach ($preview['actions'] as $action) {
+                $account = CrmAccount::query()
+                    ->with('currentVersion')
+                    ->where('salesforce_account_id_canonical', $action['salesforce']['canonical'])
+                    ->whereNull('merged_into_account_id')
+                    ->first();
+                if ($account === null) {
+                    continue;
+                }
+                $number = $account->currentVersion?->meridian_number;
+                if ($number !== null && $number !== '') {
+                    $extra = $this->meridian->supplementMissing($account, $number, $actor, $import->id);
+                    $supplements['calculations'] += $extra['calculations'];
+                    $supplements['dispo_orders'] += $extra['dispo_orders'];
+                    $supplements['conflicts'] += $extra['conflicts'];
                 }
             }
 
@@ -200,6 +240,7 @@ final class CrmImportService
             $import->report = [
                 'actions' => $reportRows,
                 'auto_matches' => $matchReport,
+                'planned_auto_matches' => $preview['planned_auto_matches'] ?? [],
                 'supplements' => $supplements,
                 'applied_at' => now()->toIso8601String(),
             ];
@@ -211,8 +252,17 @@ final class CrmImportService
                 'supplements' => $supplements,
             ]);
 
-            return $import->fresh() ?? $import;
+            return ['kind' => 'applied', 'import' => $import->fresh() ?? $import];
         });
+
+        if ($outcome['kind'] === 'stale') {
+            throw new CrmImportConflictException(
+                'Bestand oder Vorschau hat sich geändert. Bitte Vorschau erneut prüfen.',
+                $outcome['import'],
+            );
+        }
+
+        return $outcome['import'];
     }
 
     /**
@@ -268,16 +318,21 @@ final class CrmImportService
             if ($emailAnalysis['divergent']) {
                 $domain = null;
             }
-            $billingEmail = $emailAnalysis['emails'][0] ?? null;
-            if (count($emailAnalysis['emails']) === 1) {
+            $billingEmail = null;
+            if (count($emailAnalysis['emails']) >= 1 && ! $emailAnalysis['divergent']) {
                 $billingEmail = $emailAnalysis['emails'][0];
-            } elseif (count($emailAnalysis['emails']) > 1 && ! $emailAnalysis['divergent']) {
-                $billingEmail = $emailAnalysis['emails'][0];
-            } elseif ($emailAnalysis['divergent']) {
-                $billingEmail = null;
             }
 
             $meridian = $row['meridian_raw'] === '' ? null : $row['meridian_raw'];
+
+            $effect = $this->planUpsertEffect(
+                $canonical,
+                $type,
+                (string) $row['name'],
+                $billingEmail,
+                $domain,
+                $meridian,
+            );
 
             $actions[] = [
                 'line' => $row['line'],
@@ -290,6 +345,12 @@ final class CrmImportService
                 'meridian_number' => $meridian,
                 'divergent_domains' => $emailAnalysis['divergent'],
                 'domains' => $emailAnalysis['domains'],
+                'effect' => $effect['effect'],
+                'effect_label' => $effect['effect_label'],
+                'existing_account_id' => $effect['existing_account_id'],
+                'existing_version' => $effect['existing_version'],
+                'meridian_kept' => $effect['meridian_kept'],
+                'planned_supplement' => $effect['planned_supplement'],
             ];
         }
 
@@ -320,7 +381,6 @@ final class CrmImportService
                         fn (array $a): bool => ($a['salesforce']['canonical'] ?? null) !== $canonical,
                     ));
                 } else {
-                    // idempotent: nur erste Action behalten
                     $seen = false;
                     $actions = array_values(array_filter($actions, function (array $a) use ($canonical, &$seen): bool {
                         if (($a['salesforce']['canonical'] ?? null) !== $canonical) {
@@ -337,20 +397,39 @@ final class CrmImportService
             }
         }
 
+        $plannedMatches = $this->planAutoMatches($actions);
+
         $fingerprint = hash('sha256', json_encode([
             'actions' => $actions,
             'issues' => $issues,
+            'planned_auto_matches' => $plannedMatches,
         ], JSON_THROW_ON_ERROR));
 
         return [
             'actions' => $actions,
             'issues' => $issues,
+            'planned_auto_matches' => $plannedMatches,
             'stats' => [
                 'valid_rows' => $valid,
                 'error_rows' => $errorRows,
                 'warning_rows' => $warningRows,
                 'blocking_errors' => $blocking,
                 'action_count' => count($actions),
+                'create_count' => count(array_filter($actions, fn ($a) => $a['effect'] === 'create')),
+                'unchanged_count' => count(array_filter($actions, fn ($a) => $a['effect'] === 'unchanged')),
+                'new_version_count' => count(array_filter($actions, fn ($a) => $a['effect'] === 'new_version')),
+                'conflict_effect_count' => count(array_filter(
+                    $actions,
+                    fn ($a) => in_array($a['effect'], ['meridian_conflict', 'type_conflict'], true),
+                )),
+                'planned_auto_match_count' => count(array_filter(
+                    $plannedMatches,
+                    fn ($m) => ($m['mode'] ?? '') === 'auto',
+                )),
+                'planned_ambiguous_count' => count(array_filter(
+                    $plannedMatches,
+                    fn ($m) => ($m['mode'] ?? '') === 'ambiguous',
+                )),
             ],
             'fingerprint' => $fingerprint,
             'notes' => [
@@ -358,6 +437,164 @@ final class CrmImportService
                 'format' => 'UTF-8 CSV mit Semikolon; Typen Account KUNDE / Account AGENTUR.',
             ],
         ];
+    }
+
+    /**
+     * @return array{
+     *     effect: string,
+     *     effect_label: string,
+     *     existing_account_id: ?int,
+     *     existing_version: ?int,
+     *     meridian_kept: bool,
+     *     planned_supplement: bool
+     * }
+     */
+    private function planUpsertEffect(
+        string $canonical,
+        CrmAccountType $type,
+        string $name,
+        ?string $billingEmail,
+        ?string $domain,
+        ?string $meridian,
+    ): array {
+        $existing = CrmAccount::query()
+            ->with('currentVersion')
+            ->where('salesforce_account_id_canonical', $canonical)
+            ->whereNull('merged_into_account_id')
+            ->first();
+
+        if ($existing === null) {
+            return [
+                'effect' => 'create',
+                'effect_label' => 'Neuanlage',
+                'existing_account_id' => null,
+                'existing_version' => null,
+                'meridian_kept' => false,
+                'planned_supplement' => $meridian !== null && $meridian !== '',
+            ];
+        }
+
+        if ($existing->type !== $type) {
+            return [
+                'effect' => 'type_conflict',
+                'effect_label' => 'Typkonflikt',
+                'existing_account_id' => $existing->id,
+                'existing_version' => $existing->currentVersion?->version_number,
+                'meridian_kept' => true,
+                'planned_supplement' => false,
+            ];
+        }
+
+        $current = $existing->currentVersion;
+        $existingMeridian = $current?->meridian_number;
+        $meridianConflict = $meridian !== null && $meridian !== ''
+            && $existingMeridian !== null && $existingMeridian !== ''
+            && $meridian !== $existingMeridian;
+        $meridianKept = ($meridian === null || $meridian === '')
+            && $existingMeridian !== null && $existingMeridian !== '';
+        $effectiveMeridian = $meridianConflict || $meridianKept
+            ? $existingMeridian
+            : (($meridian === '') ? null : $meridian);
+
+        $unchanged = $current !== null
+            && $current->name === $name
+            && ($current->billing_email ?? null) === ($billingEmail ?? null)
+            && ($current->matching_domain ?? null) === ($domain ?? null)
+            && ($current->meridian_number ?? null) === ($effectiveMeridian ?? null);
+
+        $effect = $meridianConflict
+            ? 'meridian_conflict'
+            : ($unchanged ? 'unchanged' : 'new_version');
+        $label = match ($effect) {
+            'meridian_conflict' => 'Meridian-Konflikt (bestehende Nummer bleibt)',
+            'unchanged' => $meridianKept
+                ? 'Unverändert (Meridian-ID beibehalten)'
+                : 'Unverändert',
+            default => 'Neue Stammdatenversion',
+        };
+
+        $effectiveForSupplement = $effectiveMeridian ?? $existingMeridian;
+
+        return [
+            'effect' => $effect,
+            'effect_label' => $label,
+            'existing_account_id' => $existing->id,
+            'existing_version' => $current?->version_number,
+            'meridian_kept' => $meridianKept,
+            'planned_supplement' => $effectiveForSupplement !== null && $effectiveForSupplement !== '',
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $actions
+     * @return list<array<string, mixed>>
+     */
+    private function planAutoMatches(array $actions): array
+    {
+        $incomingDomainsByType = [];
+        foreach ($actions as $action) {
+            $domain = $action['matching_domain'] ?? null;
+            if ($domain === null || $domain === '') {
+                continue;
+            }
+            $incomingDomainsByType[$action['type']][$domain] = true;
+        }
+
+        $planned = [];
+        $provisionals = CrmAccount::query()
+            ->with('currentVersion')
+            ->where('is_provisional', true)
+            ->whereNull('salesforce_account_id_canonical')
+            ->whereNull('merged_into_account_id')
+            ->whereNotNull('matching_domain')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($provisionals as $provisional) {
+            $domain = $provisional->matching_domain;
+            if ($domain === null || $this->accounts->isSharedDomain($domain)) {
+                continue;
+            }
+
+            $candidates = $this->accounts->findSalesforceCandidatesByDomain($provisional->type, $domain);
+            $incomingCreateLines = [];
+            $typeValue = $provisional->type->value;
+            if (! empty($incomingDomainsByType[$typeValue][$domain])) {
+                foreach ($actions as $action) {
+                    if ($action['type'] !== $typeValue) {
+                        continue;
+                    }
+                    if (($action['matching_domain'] ?? null) !== $domain) {
+                        continue;
+                    }
+                    if ($action['effect'] === 'create') {
+                        $incomingCreateLines[] = (int) $action['line'];
+                    }
+                }
+            }
+
+            $candidateCount = count($candidates) + count($incomingCreateLines);
+            if ($candidateCount === 1) {
+                $planned[] = [
+                    'provisional_id' => $provisional->id,
+                    'provisional_name' => $provisional->currentVersion?->name,
+                    'domain' => $domain,
+                    'mode' => 'auto',
+                    'target_account_id' => $candidates !== [] ? $candidates[0]->id : null,
+                    'target_from_import_line' => $incomingCreateLines[0] ?? null,
+                ];
+            } elseif ($candidateCount > 1) {
+                $planned[] = [
+                    'provisional_id' => $provisional->id,
+                    'provisional_name' => $provisional->currentVersion?->name,
+                    'domain' => $domain,
+                    'mode' => 'ambiguous',
+                    'candidates' => $candidateCount,
+                ];
+            }
+        }
+
+        return $planned;
     }
 
     /**
@@ -380,7 +617,6 @@ final class CrmImportService
                 'domains' => $action['domains'],
                 'salesforce_canonical' => $action['salesforce']['canonical'],
             ]);
-            // Domain nicht für Auto-Match nutzen, Account trotzdem anlegen/aktualisieren.
             $payload['matching_domain'] = null;
         }
 
@@ -389,7 +625,6 @@ final class CrmImportService
             ->whereNull('merged_into_account_id')
             ->first();
 
-        $beforeMeridian = $before?->currentVersion?->meridian_number;
         $account = $this->accounts->upsertSalesforceAccount(
             $action['salesforce'],
             $type,
@@ -398,12 +633,15 @@ final class CrmImportService
             $importId,
         );
 
-        $supplement = ['calculations' => 0, 'dispo_orders' => 0];
+        $supplement = ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
         $account->loadMissing('currentVersion');
         $newMeridian = $account->currentVersion?->meridian_number;
-        if (($beforeMeridian === null || $beforeMeridian === '')
-            && $newMeridian !== null && $newMeridian !== '') {
+        if ($newMeridian !== null && $newMeridian !== '') {
             $supplement = $this->meridian->supplementMissing($account, $newMeridian, $actor, $importId);
+        } else {
+            $sf = $this->meridian->supplementSalesforceIds($account, $actor, $importId);
+            $supplement['calculations'] = $sf['calculations'];
+            $supplement['dispo_orders'] = $sf['dispo_orders'];
         }
 
         return [
@@ -411,6 +649,7 @@ final class CrmImportService
             'account_id' => $account->id,
             'salesforce_canonical' => $action['salesforce']['canonical'],
             'created' => $before === null,
+            'effect' => $action['effect'] ?? null,
             'version' => $account->currentVersion?->version_number,
             'supplement' => $supplement,
         ];

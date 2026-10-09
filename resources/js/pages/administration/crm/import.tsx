@@ -129,7 +129,9 @@ export default function CrmImportPage({
                         'Anwenden fehlgeschlagen.',
                 );
             }
-            setImportMeta(data.import as CrmImportMeta);
+            const meta = data.import as CrmImportMeta;
+            setImportMeta(meta);
+            setPreview(meta.preview);
             setApplied(true);
         } catch (err) {
             setError(
@@ -210,6 +212,18 @@ export default function CrmImportPage({
                                 {preview.stats.warning_rows} · Aktionen{' '}
                                 {preview.stats.action_count}
                             </p>
+                            <p className="text-muted-foreground">
+                                Geplant: Neu {preview.stats.create_count ?? 0} ·
+                                Unverändert {preview.stats.unchanged_count ?? 0}{' '}
+                                · Neue Version{' '}
+                                {preview.stats.new_version_count ?? 0} ·
+                                Konflikteffekte{' '}
+                                {preview.stats.conflict_effect_count ?? 0} ·
+                                Auto-Zuordnung{' '}
+                                {preview.stats.planned_auto_match_count ?? 0} ·
+                                Mehrdeutig{' '}
+                                {preview.stats.planned_ambiguous_count ?? 0}
+                            </p>
                             {preview.stats.blocking_errors > 0 ? (
                                 <p className="text-red-700">
                                     Blockierende Fehler:{' '}
@@ -255,6 +269,7 @@ export default function CrmImportPage({
                                 <thead className="bg-muted/40">
                                     <tr>
                                         <th className="px-2 py-2">Zeile</th>
+                                        <th className="px-2 py-2">Wirkung</th>
                                         <th className="px-2 py-2">Typ</th>
                                         <th className="px-2 py-2">Name</th>
                                         <th className="px-2 py-2">
@@ -269,9 +284,15 @@ export default function CrmImportPage({
                                         <tr
                                             key={`${action.line}-${action.salesforce.canonical}`}
                                             className="border-t"
+                                            data-test={`crm-preview-action-${action.line}`}
                                         >
                                             <td className="px-2 py-1">
                                                 {action.line}
+                                            </td>
+                                            <td className="px-2 py-1">
+                                                {action.effect_label ??
+                                                    action.effect ??
+                                                    '–'}
                                             </td>
                                             <td className="px-2 py-1">
                                                 {action.type}
@@ -284,7 +305,9 @@ export default function CrmImportPage({
                                             </td>
                                             <td className="px-2 py-1">
                                                 {action.meridian_number ??
-                                                    'Meridian-Nummer folgt'}
+                                                    (action.meridian_kept
+                                                        ? 'beibehalten'
+                                                        : 'Meridian-Nummer folgt')}
                                             </td>
                                             <td className="px-2 py-1">
                                                 {action.billing_email ?? '–'}
@@ -294,6 +317,31 @@ export default function CrmImportPage({
                                 </tbody>
                             </table>
                         </div>
+
+                        {(preview.planned_auto_matches?.length ?? 0) > 0 ? (
+                            <div
+                                className="rounded-xl border p-4 text-sm"
+                                data-test="crm-import-planned-matches"
+                            >
+                                <h2 className="mb-2 font-medium">
+                                    Geplante Zuordnungen (Bestand)
+                                </h2>
+                                <ul className="space-y-1">
+                                    {preview.planned_auto_matches?.map(
+                                        (match, index) => (
+                                            <li key={`m-${index}`}>
+                                                {String(
+                                                    match.provisional_name ??
+                                                        match.provisional_id,
+                                                )}{' '}
+                                                · {String(match.domain)} ·{' '}
+                                                {String(match.mode)}
+                                            </li>
+                                        ),
+                                    )}
+                                </ul>
+                            </div>
+                        ) : null}
 
                         <Button
                             type="button"
@@ -308,14 +356,22 @@ export default function CrmImportPage({
 
                 {applied ? (
                     <div
-                        className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm"
+                        className="space-y-2 rounded-xl border border-green-200 bg-green-50 p-4 text-sm"
                         data-test="crm-import-applied"
                     >
-                        Import wurde angewendet.
+                        <p>Import wurde angewendet.</p>
                         {importMeta?.applied_at ? (
-                            <p className="text-muted-foreground mt-1">
+                            <p className="text-muted-foreground">
                                 {importMeta.applied_at}
                             </p>
+                        ) : null}
+                        {importMeta?.report ? (
+                            <pre
+                                className="bg-background/70 overflow-x-auto rounded-md border p-2 text-xs"
+                                data-test="crm-import-report"
+                            >
+                                {JSON.stringify(importMeta.report, null, 2)}
+                            </pre>
                         ) : null}
                     </div>
                 ) : null}

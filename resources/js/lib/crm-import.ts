@@ -13,17 +13,28 @@ export type CrmImportAction = {
     salesforce: { raw: string; canonical: string };
     billing_email: string | null;
     matching_domain: string | null;
+    effect?: string;
+    effect_label?: string;
+    meridian_kept?: boolean;
+    planned_supplement?: boolean;
 };
 
 export type CrmImportPreview = {
     actions: CrmImportAction[];
     issues: CrmImportIssue[];
+    planned_auto_matches?: Array<Record<string, unknown>>;
     stats: {
         valid_rows: number;
         error_rows: number;
         warning_rows: number;
         blocking_errors: number;
         action_count: number;
+        create_count?: number;
+        unchanged_count?: number;
+        new_version_count?: number;
+        conflict_effect_count?: number;
+        planned_auto_match_count?: number;
+        planned_ambiguous_count?: number;
     };
     fingerprint: string;
     notes?: Record<string, string>;
@@ -39,6 +50,7 @@ export type CrmImportMeta = {
     error_count: number | null;
     warning_count: number | null;
     preview: CrmImportPreview | null;
+    report?: Record<string, unknown> | null;
     fingerprint: string | null;
     catalog_fingerprint: string | null;
     applied_at: string | null;

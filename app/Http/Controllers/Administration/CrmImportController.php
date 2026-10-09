@@ -63,9 +63,12 @@ class CrmImportController extends Controller
                 $validated['catalog_fingerprint'],
             );
         } catch (CrmImportConflictException $e) {
+            $refreshed = $e->import ?? ($crmImport->fresh() ?? $crmImport);
+
             return response()->json([
                 'message' => $e->getMessage(),
-                'import' => $this->serialize($crmImport->fresh() ?? $crmImport),
+                'import' => $this->serialize($refreshed),
+                'preview_refreshed' => true,
             ], 409);
         }
 
@@ -99,6 +102,7 @@ class CrmImportController extends Controller
             'warning_count' => $import->warning_count,
             'preview' => $import->preview,
             'report' => $import->report,
+            'status_label' => $import->status->value,
             'fingerprint' => $import->fingerprint,
             'catalog_fingerprint' => $import->catalog_fingerprint,
             'validated_at' => $import->validated_at?->toIso8601String(),

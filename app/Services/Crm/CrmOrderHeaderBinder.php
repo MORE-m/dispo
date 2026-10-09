@@ -6,11 +6,16 @@ use App\Enums\CrmAccountType;
 use App\Enums\InvoiceRecipient;
 use App\Models\Calculation;
 use App\Models\CrmAccount;
+use App\Models\CrmAccountVersion;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Bindet CRM-Accounts an Calc-/Dispo-Kopf-Snapshots (BL-P2-03a).
+ *
+ * Unveränderte Account-Identität: gespeicherte Version/Firmierung bleiben.
+ * Neue Bindung / expliziter Accountwechsel: aktuelle Stammdatenversion.
+ * Technische Meridian-/SF-Nachträge laufen separat (CrmMeridianSupplementService).
  */
 final class CrmOrderHeaderBinder
 {
@@ -34,8 +39,12 @@ final class CrmOrderHeaderBinder
      *     agency_salesforce_account_id: ?string
      * }
      */
-    public function resolveForCalculation(array $payload, User $actor, bool $allowFreitextProvisional): array
-    {
+    public function resolveForCalculation(
+        array $payload,
+        User $actor,
+        bool $allowFreitextProvisional,
+        ?Calculation $existing = null,
+    ): array {
         $customer = $this->resolveSide(
             accountId: isset($payload['customer_account_id']) ? (int) $payload['customer_account_id'] : null,
             freitextName: isset($payload['customer_name']) ? trim((string) $payload['customer_name']) : null,
@@ -44,6 +53,11 @@ final class CrmOrderHeaderBinder
             type: CrmAccountType::Customer,
             actor: $actor,
             allowFreitextProvisional: $allowFreitextProvisional && ! empty($payload['ensure_provisional_customer']),
+            existingAccountId: $existing?->customer_account_id,
+            existingVersionId: $existing?->customer_version_id,
+            existingName: $existing?->customer_name,
+            existingMeridian: $existing?->customer_meridian_number,
+            existingSalesforce: $existing?->customer_salesforce_account_id,
         );
 
         $agency = null;
@@ -58,6 +72,11 @@ final class CrmOrderHeaderBinder
                 type: CrmAccountType::Agency,
                 actor: $actor,
                 allowFreitextProvisional: $allowFreitextProvisional && ! empty($payload['ensure_provisional_agency']),
+                existingAccountId: $existing?->agency_account_id,
+                existingVersionId: $existing?->agency_version_id,
+                existingName: $existing?->agency_name,
+                existingMeridian: $existing?->agency_meridian_number,
+                existingSalesforce: $existing?->agency_salesforce_account_id,
             );
         }
 
@@ -93,10 +112,15 @@ final class CrmOrderHeaderBinder
         CrmAccountType $type,
         User $actor,
         bool $allowFreitextProvisional,
+        ?int $existingAccountId,
+        ?int $existingVersionId,
+        ?string $existingName,
+        ?string $existingMeridian,
+        ?string $existingSalesforce,
     ): ?array {
         if ($accountId) {
             $account = CrmAccount::query()->with('currentVersion')->find($accountId);
-            if ($account === null || $account->merged_into_account_id !== null) {
+            if ($account === null) {
                 throw ValidationException::withMessages([
                     $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account nicht gefunden.',
                 ]);
@@ -108,6 +132,20 @@ final class CrmOrderHeaderBinder
                     $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account-Typ passt nicht.',
                 ]);
             }
+
+            if ($this->sameAccountIdentity($existingAccountId, $account) && $existingVersionId !== null) {
+                $version = CrmAccountVersion::query()->whereKey($existingVersionId)->first();
+                if ($version !== null) {
+                    return [
+                        'account_id' => $account->id,
+                        'version_id' => $version->id,
+                        'name' => $existingName ?? $version->name,
+                        'meridian' => $existingMeridian,
+                        'salesforce_raw' => $account->salesforce_account_id_raw ?? $existingSalesforce,
+                    ];
+                }
+            }
+
             $version = $account->currentVersion;
             if ($version === null) {
                 throw ValidationException::withMessages([
@@ -161,6 +199,23 @@ final class CrmOrderHeaderBinder
         return null;
     }
 
+    private function sameAccountIdentity(?int $storedAccountId, CrmAccount $resolved): bool
+    {
+        if ($storedAccountId === null) {
+            return false;
+        }
+        if ($storedAccountId === $resolved->id) {
+            return true;
+        }
+
+        $stored = CrmAccount::query()->find($storedAccountId);
+        if ($stored === null) {
+            return false;
+        }
+
+        return $this->accounts->resolveCanonicalAccount($stored)->id === $resolved->id;
+    }
+
     /**
      * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $customer
      * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $agency
@@ -168,7 +223,6 @@ final class CrmOrderHeaderBinder
     private function resolveInvoiceRecipient(mixed $raw, ?array $customer, ?array $agency): ?InvoiceRecipient
     {
         if (($customer['account_id'] ?? null) === null && ($agency['account_id'] ?? null) === null) {
-            // Legacy-Freitext: keine historische Zuordnung erfinden (F1).
             return null;
         }
 

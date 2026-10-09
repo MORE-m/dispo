@@ -1180,7 +1180,12 @@ final class CalculationWriter
             || ! empty($payload['ensure_provisional_agency']);
 
         if ($touchesCrm) {
-            $crm = $this->crmHeaders->resolveForCalculation($payload, $user, allowFreitextProvisional: true);
+            $crm = $this->crmHeaders->resolveForCalculation(
+                $payload,
+                $user,
+                allowFreitextProvisional: true,
+                existing: $calculation->exists ? $calculation : null,
+            );
             $calculation->customer_name = $crm['customer_name'];
             $calculation->agency_name = $crm['agency_name'];
             $calculation->customer_account_id = $crm['customer_account_id'];
@@ -1499,6 +1504,9 @@ final class CalculationWriter
             'planning_mode' => $calculation->planning_mode->value,
             'customer_name' => $calculation->customer_name,
             'agency_name' => $calculation->agency_name,
+            'customer_account_id' => $calculation->customer_account_id,
+            'agency_account_id' => $calculation->agency_account_id,
+            'invoice_recipient' => $calculation->invoice_recipient?->value,
             'campaign' => $calculation->campaign,
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,

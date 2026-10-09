@@ -12,8 +12,10 @@ Phase 4 Preislisten/Spot Classic auf `main`; Phase 5 Trailer/Produktion auf `mai
 
 ## Aktuelle Aufgabe
 
-**BL-P2-03a / PO-BLP203-1** (A1/B1/C1/D-CSV/E1/F1/G1/H1 akzeptiert): Draft-PR,
-Stopp zur Review. **Kein** Merge/Deploy. `CRM-004` und Rest-`BL-P2-03` offen.
+**BL-P2-03a / PO-BLP203-1** (A1/B1/C1/D-CSV/E1/F1/G1/H1 akzeptiert): Draft-PR #133
+inkl. Review-Nachzug (Snapshots, Link-Locks, Meridian nach manuellem Link,
+Vorschau-409, Preview-Wirkungen, Prüfliste, E2E+CI). Stopp zur erneuten Review.
+**Kein** Merge/Deploy. `CRM-004` und Rest-`BL-P2-03` offen.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a, SWF-Rest, Produktion-Rest, Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest,
@@ -31,8 +33,9 @@ REP, ADV-001 Defaults, ADV-002, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10
 | Calc/Dispo + Rechnungsempfänger F1 | **umgesetzt** |
 | Meridian-Nachtrag E1 (keine Freigabeinvalidierung) | **umgesetzt** |
 | Kontakte `CRM-004` | **Folgeslice** |
-| Feature-Tests | `CrmSalesforceMeridianBlP203aTest` + `SalesforceAccountIdTest` |
-| E2E | Port **8060**, `npm run test:e2e:blp203a` |
+| Feature-Tests | `CrmSalesforceMeridianBlP203aTest` + `CrmSalesforceMeridianReviewNachzugTest` + Unit |
+| E2E | Port **8060**, `npm run test:e2e:blp203a` (auch in CI `tests.yml`) |
+| Review-Nachzug P1/P2 | **umgesetzt** (siehe Review-README) |
 | Deploy / operative Datenabnahme | **offen** |
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)

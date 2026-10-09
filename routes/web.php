@@ -126,6 +126,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('crm/accounts/vorlaeufig', [CrmAccountController::class, 'storeProvisional'])->name('crm.accounts.provisional');
     Route::get('crm/accounts/{crmAccount}', [CrmAccountController::class, 'show'])->name('crm.accounts.show');
     Route::post('crm/accounts/{crmAccount}/verknuepfen', [CrmAccountController::class, 'link'])->name('crm.accounts.link');
+    Route::post('crm/konflikte/{crmConflict}/abschliessen', [CrmAccountController::class, 'resolveConflict'])
+        ->name('crm.conflicts.resolve');
 
     Route::middleware(['can:access-administration'])->group(function () {
         Route::get('administration', AdministrationHubController::class)

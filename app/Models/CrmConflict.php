@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CrmConflictType;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,6 +14,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property CrmConflictType $type
  * @property string $status
  * @property array<string, mixed> $details
+ * @property int|null $resolved_by_id
+ * @property CarbonInterface|null $resolved_at
+ * @property CarbonInterface|null $created_at
  */
 class CrmConflict extends Model
 {

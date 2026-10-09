@@ -1049,6 +1049,12 @@ export default function CalculationWizard({
     );
     const [ensureProvisionalCustomer, setEnsureProvisionalCustomer] =
         useState(false);
+    const [ensureProvisionalAgency, setEnsureProvisionalAgency] =
+        useState(false);
+    const [customerMatchingDomain, setCustomerMatchingDomain] = useState('');
+    const [customerBillingEmail, setCustomerBillingEmail] = useState('');
+    const [agencyMatchingDomain, setAgencyMatchingDomain] = useState('');
+    const [agencyBillingEmail, setAgencyBillingEmail] = useState('');
     const [customerSearchQ, setCustomerSearchQ] = useState('');
     const [agencySearchQ, setAgencySearchQ] = useState('');
     const [customerSearchHits, setCustomerSearchHits] = useState<
@@ -1712,6 +1718,32 @@ export default function CalculationWizard({
                           : {}),
                       ...(ensureProvisionalCustomer
                           ? { ensure_provisional_customer: true }
+                          : {}),
+                      ...(ensureProvisionalAgency
+                          ? { ensure_provisional_agency: true }
+                          : {}),
+                      ...(customerMatchingDomain.trim() !== ''
+                          ? {
+                                customer_matching_domain:
+                                    customerMatchingDomain.trim(),
+                            }
+                          : {}),
+                      ...(customerBillingEmail.trim() !== ''
+                          ? {
+                                customer_billing_email:
+                                    customerBillingEmail.trim(),
+                            }
+                          : {}),
+                      ...(agencyMatchingDomain.trim() !== ''
+                          ? {
+                                agency_matching_domain:
+                                    agencyMatchingDomain.trim(),
+                            }
+                          : {}),
+                      ...(agencyBillingEmail.trim() !== ''
+                          ? {
+                                agency_billing_email: agencyBillingEmail.trim(),
+                            }
                           : {}),
                   }),
             campaign: campaign || null,
@@ -3243,10 +3275,11 @@ export default function CalculationWizard({
                                                             }
                                                         </p>
                                                     ) : customerAccountId.trim() !==
-                                                          '' ||
-                                                      customerName.trim() !==
-                                                          '' ? (
-                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                      '' ? (
+                                                        <p
+                                                            className="text-muted-foreground mt-1 text-xs"
+                                                            data-test="customer-meridian-pending"
+                                                        >
                                                             Meridian-Nummer
                                                             folgt
                                                         </p>
@@ -3392,10 +3425,11 @@ export default function CalculationWizard({
                                                             }
                                                         </p>
                                                     ) : agencyAccountId.trim() !==
-                                                          '' ||
-                                                      agencyName.trim() !==
-                                                          '' ? (
-                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                      '' ? (
+                                                        <p
+                                                            className="text-muted-foreground mt-1 text-xs"
+                                                            data-test="agency-meridian-pending"
+                                                        >
                                                             Meridian-Nummer
                                                             folgt
                                                         </p>
@@ -3433,30 +3467,137 @@ export default function CalculationWizard({
                                                         </option>
                                                     </select>
                                                 </FormField>
-                                                <div className="flex items-center gap-2 sm:col-span-2">
-                                                    <Checkbox
-                                                        id="ensure-provisional-customer"
-                                                        checked={
-                                                            ensureProvisionalCustomer
+                                                <FormField
+                                                    label="Kunde Matching-Domain"
+                                                    htmlFor="customer-matching-domain"
+                                                >
+                                                    <Input
+                                                        id="customer-matching-domain"
+                                                        data-test="customer-matching-domain"
+                                                        value={
+                                                            customerMatchingDomain
                                                         }
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            setEnsureProvisionalCustomer(
-                                                                checked ===
-                                                                    true,
+                                                        onChange={(event) =>
+                                                            setCustomerMatchingDomain(
+                                                                event.target
+                                                                    .value,
                                                             )
                                                         }
                                                         disabled={!canEdit}
+                                                        placeholder="z. B. kunde.test"
                                                     />
-                                                    <label
-                                                        htmlFor="ensure-provisional-customer"
-                                                        className="text-sm"
-                                                    >
-                                                        Vorläufigen Kunden aus
-                                                        Freitext anlegen
-                                                        (optional)
-                                                    </label>
+                                                </FormField>
+                                                <FormField
+                                                    label="Kunde Rechnungs-E-Mail"
+                                                    htmlFor="customer-billing-email"
+                                                >
+                                                    <Input
+                                                        id="customer-billing-email"
+                                                        data-test="customer-billing-email"
+                                                        value={
+                                                            customerBillingEmail
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCustomerBillingEmail(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                        placeholder="billing@kunde.test"
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur Matching-Domain"
+                                                    htmlFor="agency-matching-domain"
+                                                >
+                                                    <Input
+                                                        id="agency-matching-domain"
+                                                        data-test="agency-matching-domain"
+                                                        value={
+                                                            agencyMatchingDomain
+                                                        }
+                                                        onChange={(event) =>
+                                                            setAgencyMatchingDomain(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                        placeholder="z. B. agentur.test"
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur Rechnungs-E-Mail"
+                                                    htmlFor="agency-billing-email"
+                                                >
+                                                    <Input
+                                                        id="agency-billing-email"
+                                                        data-test="agency-billing-email"
+                                                        value={
+                                                            agencyBillingEmail
+                                                        }
+                                                        onChange={(event) =>
+                                                            setAgencyBillingEmail(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                        placeholder="desk@agentur.test"
+                                                    />
+                                                </FormField>
+                                                <div className="flex flex-col gap-2 sm:col-span-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id="ensure-provisional-customer"
+                                                            data-test="ensure-provisional-customer"
+                                                            checked={
+                                                                ensureProvisionalCustomer
+                                                            }
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                setEnsureProvisionalCustomer(
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                            disabled={!canEdit}
+                                                        />
+                                                        <label
+                                                            htmlFor="ensure-provisional-customer"
+                                                            className="text-sm"
+                                                        >
+                                                            Vorläufigen Kunden
+                                                            aus Freitext anlegen
+                                                        </label>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Checkbox
+                                                            id="ensure-provisional-agency"
+                                                            data-test="ensure-provisional-agency"
+                                                            checked={
+                                                                ensureProvisionalAgency
+                                                            }
+                                                            onCheckedChange={(
+                                                                checked,
+                                                            ) =>
+                                                                setEnsureProvisionalAgency(
+                                                                    checked ===
+                                                                        true,
+                                                                )
+                                                            }
+                                                            disabled={!canEdit}
+                                                        />
+                                                        <label
+                                                            htmlFor="ensure-provisional-agency"
+                                                            className="text-sm"
+                                                        >
+                                                            Vorläufige Agentur
+                                                            aus Freitext anlegen
+                                                        </label>
+                                                    </div>
                                                 </div>
                                             </>
                                         )}
