@@ -113,7 +113,7 @@ export default function CrmMatchQueuePage({
                 ) : null}
 
                 {rows.length === 0 ? (
-                    <EmptyState message="Keine vorläufigen Accounts in der Warteschlange." />
+                    <EmptyState title="Keine vorläufigen Accounts in der Warteschlange." />
                 ) : (
                     <div className="space-y-4">
                         {rows.map((row) => (

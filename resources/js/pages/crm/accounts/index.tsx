@@ -222,7 +222,7 @@ export default function CrmAccountsIndex({
                 ) : null}
 
                 {accounts.length === 0 ? (
-                    <EmptyState message="Keine Accounts gefunden." />
+                    <EmptyState title="Keine Accounts gefunden." />
                 ) : (
                     <div className="overflow-x-auto rounded-xl border">
                         <table className="w-full text-left text-sm">
