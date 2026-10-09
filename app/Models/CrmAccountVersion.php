@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * @property int $id
- * @property int $crm_account_id
+ * @property int<1, max> $id
+ * @property int<1, max> $crm_account_id
  * @property int $version_number
  * @property string $name
  * @property string|null $billing_email

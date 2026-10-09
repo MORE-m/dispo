@@ -24,6 +24,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $advisor_id
  * @property string|null $customer_name
  * @property string|null $agency_name
+ * @property int<1, max>|null $customer_account_id
+ * @property int<1, max>|null $agency_account_id
+ * @property int<1, max>|null $customer_version_id
+ * @property int<1, max>|null $agency_version_id
+ * @property InvoiceRecipient|null $invoice_recipient
+ * @property string|null $customer_meridian_number
+ * @property string|null $agency_meridian_number
+ * @property string|null $customer_salesforce_account_id
+ * @property string|null $agency_salesforce_account_id
  * @property string|null $campaign
  * @property string|null $product_title
  * @property string|null $briefing

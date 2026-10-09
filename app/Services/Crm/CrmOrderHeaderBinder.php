@@ -23,11 +23,11 @@ final class CrmOrderHeaderBinder
      * @return array{
      *     customer_name: ?string,
      *     agency_name: ?string,
-     *     customer_account_id: ?int,
-     *     agency_account_id: ?int,
-     *     customer_version_id: ?int,
-     *     agency_version_id: ?int,
-     *     invoice_recipient: ?string,
+     *     customer_account_id: int<1, max>|null,
+     *     agency_account_id: int<1, max>|null,
+     *     customer_version_id: int<1, max>|null,
+     *     agency_version_id: int<1, max>|null,
+     *     invoice_recipient: ?InvoiceRecipient,
      *     customer_meridian_number: ?string,
      *     agency_meridian_number: ?string,
      *     customer_salesforce_account_id: ?string,
@@ -83,7 +83,7 @@ final class CrmOrderHeaderBinder
     }
 
     /**
-     * @return array{account_id: ?int, version_id: ?int, name: ?string, meridian: ?string, salesforce_raw: ?string}|null
+     * @return array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null
      */
     private function resolveSide(
         ?int $accountId,
@@ -133,12 +133,17 @@ final class CrmOrderHeaderBinder
             ], $actor);
             $account->loadMissing('currentVersion');
             $version = $account->currentVersion;
+            if ($version === null) {
+                throw ValidationException::withMessages([
+                    $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Vorläufiger Account ohne Stammdatenversion.',
+                ]);
+            }
 
             return [
                 'account_id' => $account->id,
-                'version_id' => $version?->id,
-                'name' => $version?->name ?? $freitextName,
-                'meridian' => $version?->meridian_number,
+                'version_id' => $version->id,
+                'name' => $version->name,
+                'meridian' => $version->meridian_number,
                 'salesforce_raw' => null,
             ];
         }
@@ -157,10 +162,10 @@ final class CrmOrderHeaderBinder
     }
 
     /**
-     * @param  array{account_id: ?int, version_id: ?int, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $customer
-     * @param  array{account_id: ?int, version_id: ?int, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $agency
+     * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $customer
+     * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $agency
      */
-    private function resolveInvoiceRecipient(mixed $raw, ?array $customer, ?array $agency): ?string
+    private function resolveInvoiceRecipient(mixed $raw, ?array $customer, ?array $agency): ?InvoiceRecipient
     {
         if (($customer['account_id'] ?? null) === null && ($agency['account_id'] ?? null) === null) {
             // Legacy-Freitext: keine historische Zuordnung erfinden (F1).
@@ -169,14 +174,16 @@ final class CrmOrderHeaderBinder
 
         if ($raw === null || $raw === '') {
             if (($agency['account_id'] ?? null) === null) {
-                return InvoiceRecipient::Customer->value;
+                return InvoiceRecipient::Customer;
             }
             throw ValidationException::withMessages([
                 'invoice_recipient' => 'Rechnungsempfänger muss explizit gewählt werden (Kunde oder Agentur).',
             ]);
         }
 
-        $recipient = InvoiceRecipient::from((string) $raw);
+        $recipient = $raw instanceof InvoiceRecipient
+            ? $raw
+            : InvoiceRecipient::from((string) $raw);
         if ($recipient === InvoiceRecipient::Agency && ($agency['account_id'] ?? null) === null) {
             throw ValidationException::withMessages([
                 'invoice_recipient' => 'Agentur als Rechnungsempfänger nur bei gesetzter Agentur.',
@@ -188,7 +195,7 @@ final class CrmOrderHeaderBinder
             ]);
         }
 
-        return $recipient->value;
+        return $recipient;
     }
 
     /**
@@ -201,9 +208,7 @@ final class CrmOrderHeaderBinder
         $header['agency_account_id'] = $calculation->agency_account_id;
         $header['customer_version_id'] = $calculation->customer_version_id;
         $header['agency_version_id'] = $calculation->agency_version_id;
-        $header['invoice_recipient'] = $calculation->invoice_recipient instanceof InvoiceRecipient
-            ? $calculation->invoice_recipient->value
-            : $calculation->invoice_recipient;
+        $header['invoice_recipient'] = $calculation->invoice_recipient?->value;
         $header['customer_meridian_number'] = $calculation->customer_meridian_number;
         $header['agency_meridian_number'] = $calculation->agency_meridian_number;
         $header['customer_salesforce_account_id'] = $calculation->customer_salesforce_account_id;

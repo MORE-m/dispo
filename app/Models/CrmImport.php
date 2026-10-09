@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CrmImportStatus;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,6 +19,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed>|null $report
  * @property string|null $fingerprint
  * @property string|null $catalog_fingerprint
+ * @property CarbonInterface|null $validated_at
+ * @property CarbonInterface|null $applied_at
+ * @property CarbonInterface|null $failed_at
  */
 class CrmImport extends Model
 {

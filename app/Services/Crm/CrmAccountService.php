@@ -27,11 +27,17 @@ final class CrmAccountService
      */
     public function sharedDomains(): array
     {
-        return CrmSharedEmailDomain::query()
-            ->where('is_active', true)
-            ->orderBy('domain')
-            ->pluck('domain')
-            ->all();
+        $domains = [];
+        foreach (
+            CrmSharedEmailDomain::query()
+                ->where('is_active', true)
+                ->orderBy('domain')
+                ->pluck('domain') as $domain
+        ) {
+            $domains[] = (string) $domain;
+        }
+
+        return $domains;
     }
 
     public function isSharedDomain(?string $domain): bool
@@ -298,15 +304,21 @@ final class CrmAccountService
             return [];
         }
 
-        return CrmAccount::query()
-            ->with('currentVersion')
-            ->where('type', $type)
-            ->whereNull('merged_into_account_id')
-            ->whereNotNull('salesforce_account_id_canonical')
-            ->where('matching_domain', $domain)
-            ->orderBy('id')
-            ->get()
-            ->all();
+        $accounts = [];
+        foreach (
+            CrmAccount::query()
+                ->with('currentVersion')
+                ->where('type', $type)
+                ->whereNull('merged_into_account_id')
+                ->whereNotNull('salesforce_account_id_canonical')
+                ->where('matching_domain', $domain)
+                ->orderBy('id')
+                ->get() as $account
+        ) {
+            $accounts[] = $account;
+        }
+
+        return $accounts;
     }
 
     /**
@@ -318,16 +330,22 @@ final class CrmAccountService
             return [];
         }
 
-        return CrmAccount::query()
-            ->with('currentVersion')
-            ->where('type', $type)
-            ->whereNull('merged_into_account_id')
-            ->where('is_provisional', true)
-            ->whereNull('salesforce_account_id_canonical')
-            ->where('matching_domain', $domain)
-            ->orderBy('id')
-            ->get()
-            ->all();
+        $accounts = [];
+        foreach (
+            CrmAccount::query()
+                ->with('currentVersion')
+                ->where('type', $type)
+                ->whereNull('merged_into_account_id')
+                ->where('is_provisional', true)
+                ->whereNull('salesforce_account_id_canonical')
+                ->where('matching_domain', $domain)
+                ->orderBy('id')
+                ->get() as $account
+        ) {
+            $accounts[] = $account;
+        }
+
+        return $accounts;
     }
 
     public function catalogFingerprint(): string
@@ -400,7 +418,7 @@ final class CrmAccountService
             return;
         }
 
-        $nextNumber = ((int) ($current?->version_number ?? 0)) + 1;
+        $nextNumber = ($current !== null ? (int) $current->version_number : 0) + 1;
         $version = $this->createVersion(
             $account,
             $nextNumber,

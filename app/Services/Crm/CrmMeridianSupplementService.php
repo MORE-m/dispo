@@ -56,7 +56,7 @@ final class CrmMeridianSupplementService
                     DB::table('calculations')->where('id', $row->id)->update($updates);
                     $calcUpdated++;
                     $this->audit->record(
-                        Calculation::query()->findOrFail($row->id),
+                        Calculation::query()->whereKey((int) $row->id)->firstOrFail(),
                         'crm.meridian_supplemented',
                         $actor,
                         null,
@@ -93,7 +93,7 @@ final class CrmMeridianSupplementService
                     DB::table('dispo_orders')->where('id', $row->id)->update($updates);
                     $dispoUpdated++;
                     $this->audit->record(
-                        DispoOrder::query()->findOrFail($row->id),
+                        DispoOrder::query()->whereKey((int) $row->id)->firstOrFail(),
                         'crm.meridian_supplemented',
                         $actor,
                         null,

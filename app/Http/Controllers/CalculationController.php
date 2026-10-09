@@ -606,8 +606,7 @@ class CalculationController extends Controller
                 'agency_name' => $calculation->agency_name,
                 'customer_account_id' => $calculation->customer_account_id,
                 'agency_account_id' => $calculation->agency_account_id,
-                'invoice_recipient' => $calculation->invoice_recipient?->value
-                    ?? $calculation->invoice_recipient,
+                'invoice_recipient' => $calculation->invoice_recipient?->value,
                 'customer_meridian_number' => $calculation->customer_meridian_number,
                 'agency_meridian_number' => $calculation->agency_meridian_number,
                 'customer_salesforce_account_id' => $calculation->customer_salesforce_account_id,

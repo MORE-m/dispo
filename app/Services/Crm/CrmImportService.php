@@ -183,7 +183,10 @@ final class CrmImportService
                 if (($match['mode'] ?? null) !== 'auto' || empty($match['linked_account_id'])) {
                     continue;
                 }
-                $linked = CrmAccount::query()->with('currentVersion')->find($match['linked_account_id']);
+                $linked = CrmAccount::query()
+                    ->with('currentVersion')
+                    ->whereKey((int) $match['linked_account_id'])
+                    ->first();
                 $meridian = $linked?->currentVersion?->meridian_number;
                 if ($linked !== null && $meridian !== null && $meridian !== '') {
                     $extra = $this->meridian->supplementMissing($linked, $meridian, $actor, $import->id);

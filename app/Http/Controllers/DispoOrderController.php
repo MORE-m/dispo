@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Enums\DispoOrderStatus;
-use App\Enums\InvoiceRecipient;
 use App\Http\Requests\DispoOrder\AddDispoOrderCommentRequest;
 use App\Http\Requests\DispoOrder\AnswerSalesInquiryRequest;
 use App\Http\Requests\DispoOrder\ApproveDispoOrderRequest;
@@ -821,9 +820,7 @@ class DispoOrderController extends Controller
             'agency_name' => $order->agency_name,
             'customer_account_id' => $order->customer_account_id,
             'agency_account_id' => $order->agency_account_id,
-            'invoice_recipient' => $order->invoice_recipient instanceof InvoiceRecipient
-                ? $order->invoice_recipient->value
-                : $order->invoice_recipient,
+            'invoice_recipient' => $order->invoice_recipient?->value,
             'customer_meridian_number' => $order->customer_meridian_number,
             'agency_meridian_number' => $order->agency_meridian_number,
             'customer_salesforce_account_id' => $order->customer_salesforce_account_id,

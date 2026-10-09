@@ -24,6 +24,17 @@ use Illuminate\Support\Carbon;
  * @property DispoOrderStatus $status
  * @property int $created_by_id
  * @property string $source_calculation_number
+ * @property string|null $customer_name
+ * @property string|null $agency_name
+ * @property int<1, max>|null $customer_account_id
+ * @property int<1, max>|null $agency_account_id
+ * @property int<1, max>|null $customer_version_id
+ * @property int<1, max>|null $agency_version_id
+ * @property InvoiceRecipient|null $invoice_recipient
+ * @property string|null $customer_meridian_number
+ * @property string|null $agency_meridian_number
+ * @property string|null $customer_salesforce_account_id
+ * @property string|null $agency_salesforce_account_id
  * @property DispoOrderApprovalKind $approval_kind
  * @property array<int, array<string, mixed>>|null $special_approval_reasons
  * @property int $configuration_snapshot_id

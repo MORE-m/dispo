@@ -227,17 +227,14 @@ final class FrozenCalculationPersistenceContract
         $calculation->planning_mode = PlanningMode::Manual;
         $calculation->advisor_id = $user->id;
         // BL-P2-03a: Freitext-Übernahme → nachvollziehbare vorläufige Accounts (ohne Domain).
+        // Standardangebot→Calc: Freitext → vorläufige Accounts; Rechnungsempfänger Kunde (F1, keine Historie erfinden).
         $crmPayload = [
             'customer_name' => $customerName,
             'agency_name' => $agencyName,
             'ensure_provisional_customer' => true,
             'ensure_provisional_agency' => $agencyName !== null && $agencyName !== '',
-            'invoice_recipient' => $adoptionContext['invoice_recipient']
-                ?? ($agencyName !== null && $agencyName !== '' ? null : 'customer'),
+            'invoice_recipient' => 'customer',
         ];
-        if (($crmPayload['invoice_recipient'] ?? null) === null && $agencyName !== null && $agencyName !== '') {
-            $crmPayload['invoice_recipient'] = 'customer';
-        }
         $crm = app(CrmOrderHeaderBinder::class)
             ->resolveForCalculation($crmPayload, $user, allowFreitextProvisional: true);
         $calculation->customer_name = $crm['customer_name'];

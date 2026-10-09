@@ -8,15 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * @property int $id
+ * @property int<1, max> $id
  * @property CrmAccountType $type
  * @property string|null $salesforce_account_id_raw
  * @property string|null $salesforce_account_id_canonical
  * @property bool $is_provisional
  * @property string|null $matching_domain
- * @property int|null $current_version_id
- * @property int|null $merged_into_account_id
+ * @property int<1, max>|null $current_version_id
+ * @property int<1, max>|null $merged_into_account_id
  * @property int $lock_version
+ * @property-read CrmAccountVersion|null $currentVersion
  */
 class CrmAccount extends Model
 {
