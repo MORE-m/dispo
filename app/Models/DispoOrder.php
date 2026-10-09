@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\DerivedCampaignPeriodStatus;
 use App\Enums\DispoOrderApprovalKind;
 use App\Enums\DispoOrderStatus;
+use App\Enums\InvoiceRecipient;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -60,6 +61,15 @@ class DispoOrder extends Model
         'source_calculation_number',
         'customer_name',
         'agency_name',
+        'customer_account_id',
+        'agency_account_id',
+        'customer_version_id',
+        'agency_version_id',
+        'invoice_recipient',
+        'customer_meridian_number',
+        'agency_meridian_number',
+        'customer_salesforce_account_id',
+        'agency_salesforce_account_id',
         'campaign',
         'product_title',
         'briefing',
@@ -90,6 +100,7 @@ class DispoOrder extends Model
     {
         return [
             'status' => DispoOrderStatus::class,
+            'invoice_recipient' => InvoiceRecipient::class,
             'revises_dispo_order_id' => 'integer',
             'order_discount_percent' => 'decimal:4',
             'ae_enabled' => 'boolean',

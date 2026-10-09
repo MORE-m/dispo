@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\BudgetProposalStatus;
 use App\Enums\BudgetStrategy;
 use App\Enums\CalculationStatus;
+use App\Enums\InvoiceRecipient;
 use App\Enums\PlanningMode;
 use Database\Factories\CalculationFactory;
 use Illuminate\Database\Eloquent\Collection;
@@ -61,6 +62,15 @@ class Calculation extends Model
         'advisor_id',
         'customer_name',
         'agency_name',
+        'customer_account_id',
+        'agency_account_id',
+        'customer_version_id',
+        'agency_version_id',
+        'invoice_recipient',
+        'customer_meridian_number',
+        'agency_meridian_number',
+        'customer_salesforce_account_id',
+        'agency_salesforce_account_id',
         'campaign',
         'product_title',
         'briefing',
@@ -90,6 +100,7 @@ class Calculation extends Model
         return [
             'status' => CalculationStatus::class,
             'planning_mode' => PlanningMode::class,
+            'invoice_recipient' => InvoiceRecipient::class,
             'budget_strategy' => BudgetStrategy::class,
             'budget_proposal_status' => BudgetProposalStatus::class,
             'order_discount_percent' => 'decimal:4',

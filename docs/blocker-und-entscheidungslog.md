@@ -7,6 +7,7 @@ Keine stillschweigenden ADR-Änderungen.
 
 | Datum | Thema | Entscheidung | Grundlage |
 |---|---|---|---|
+| 09.10.2026 | **PO-BLP203-1** / BL-P2-03a CRM Salesforce/Meridian | **Akzeptiert** A1/B1/C1/D-CSV/E1/F1/G1/H1. Feature-Branch: CSV-Import, Versionen, vorläufige Accounts, Domain+Typ-Match, Calc/Dispo+Rechnungsempfänger, Meridian-Nachtrag ohne Freigabeinvalidierung. 15-/18-stellige SF-IDs case-sensitiv kanonisiert. E2E Port **8060**. `CRM-004`/`BL-P2-03` Rest offen; **kein** Deploy. | CRM-001–003, PO-BLP203-1, BL-P2-03a, UX-GATE-D |
 | 09.10.2026 | **PO-BLP502-1** lokale Einrichtung + Abnahme `dispo_mat_core` | **Umgesetzt:** Sicherung → 3 Migrationen → 8× Admin Active (600/400, Flags false, 2026) → Browser Port **8059** (Calc **10**/Dispo **8**; Menge0 Calc **11**; Inventarwechsel Calc **12** 1200→800). Bestand 1–9/1–7 unverändert. **Kein** Deploy. | ADV-003, PRO-*, PO-BLP502-1, BL-P5-02a |
 | 09.10.2026 | **PO-BLP502-1 Datenlieferung** + Lesung `dispo_mat_core` | Historisch: Zielwerte bestätigt; Migrationen pending; Schreibplan. **Nachzug:** Einrichtung (Zeile darüber). | ADV-003, PRO-*, PO-BLP502-1, BL-P5-02a |
 | 09.10.2026 | **PO-BLP502-1** / BL-P5-02a operative Daten-Readiness (Vorstufe) | Docs-only historisch: keine Belege; Q1–Q6 offen; DB ungeprüft. **Nachzug:** Preise bestätigt + Lesung (Zeile darüber). | ADV-003, PRO-*, PO-BLP502-1, BL-P5-02a, initialdaten |

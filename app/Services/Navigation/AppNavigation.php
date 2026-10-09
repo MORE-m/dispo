@@ -50,9 +50,9 @@ final class AppNavigation
             [
                 'key' => 'master-data',
                 'title' => 'Stammdaten',
-                'href' => '/stammdaten',
-                'available' => false,
-                'visible' => $user->canViewMasterData(),
+                'href' => '/crm/accounts',
+                'available' => true,
+                'visible' => $user->canViewCrmAccounts(),
             ],
             [
                 'key' => 'administration',

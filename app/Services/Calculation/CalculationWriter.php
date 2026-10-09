@@ -27,6 +27,7 @@ use App\Models\Inventory;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Crm\CrmOrderHeaderBinder;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\DynamicField\ConfigurationSnapshotIntegrity;
@@ -54,6 +55,7 @@ final class CalculationWriter
         private readonly BudgetProposalFingerprint $budgetFingerprints,
         private readonly ComponentValidator $componentValidator,
         private readonly ProductionPriceResolver $productionPrices,
+        private readonly CrmOrderHeaderBinder $crmHeaders,
     ) {}
 
     /**
@@ -135,7 +137,7 @@ final class CalculationWriter
             $before = $this->calculationSnapshot($locked);
 
             if ($this->isHeaderOnlyChange($payload, $locked) && ! $this->hasPositionsWithMissingClientKey($locked)) {
-                $this->applyHeaderFields($locked, $payload);
+                $this->applyHeaderFields($locked, $payload, $user);
                 $totals = $this->totalsFromExisting($locked, $payload, $user);
                 $this->applyTotals($locked, $totals, $user);
                 $locked->lock_version = $locked->lock_version + 1;
@@ -270,7 +272,7 @@ final class CalculationWriter
             }
         }
 
-        $this->applyHeaderFields($calculation, $payload);
+        $this->applyHeaderFields($calculation, $payload, $user);
         $this->applyTotals($calculation, $totals, $user);
         $calculation->save();
 
@@ -1168,11 +1170,33 @@ final class CalculationWriter
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function applyHeaderFields(Calculation $calculation, array $payload): void
+    private function applyHeaderFields(Calculation $calculation, array $payload, User $user): void
     {
         $calculation->planning_mode = PlanningMode::from((string) ($payload['planning_mode'] ?? 'manual'));
-        $calculation->customer_name = $payload['customer_name'] ?? null;
-        $calculation->agency_name = $payload['agency_name'] ?? null;
+        $touchesCrm = array_key_exists('customer_account_id', $payload)
+            || array_key_exists('agency_account_id', $payload)
+            || array_key_exists('invoice_recipient', $payload)
+            || ! empty($payload['ensure_provisional_customer'])
+            || ! empty($payload['ensure_provisional_agency']);
+
+        if ($touchesCrm) {
+            $crm = $this->crmHeaders->resolveForCalculation($payload, $user, allowFreitextProvisional: true);
+            $calculation->customer_name = $crm['customer_name'];
+            $calculation->agency_name = $crm['agency_name'];
+            $calculation->customer_account_id = $crm['customer_account_id'];
+            $calculation->agency_account_id = $crm['agency_account_id'];
+            $calculation->customer_version_id = $crm['customer_version_id'];
+            $calculation->agency_version_id = $crm['agency_version_id'];
+            $calculation->invoice_recipient = $crm['invoice_recipient'];
+            $calculation->customer_meridian_number = $crm['customer_meridian_number'];
+            $calculation->agency_meridian_number = $crm['agency_meridian_number'];
+            $calculation->customer_salesforce_account_id = $crm['customer_salesforce_account_id'];
+            $calculation->agency_salesforce_account_id = $crm['agency_salesforce_account_id'];
+        } else {
+            // Legacy-Freitext / Tests ohne CRM-Payload: Snapshots und Verknüpfungen nicht anfassen.
+            $calculation->customer_name = $payload['customer_name'] ?? null;
+            $calculation->agency_name = $payload['agency_name'] ?? null;
+        }
         $calculation->campaign = $payload['campaign'] ?? null;
         $calculation->product_title = $payload['product_title'] ?? null;
         $calculation->briefing = $payload['briefing'] ?? null;

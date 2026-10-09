@@ -1,31 +1,39 @@
 # Fortschritt V1
 
-Stand: 9. Oktober 2026 – **BL-P5-02a** auf `main` (PR #131 / `157d8a2…`;
-Post-Merge-CI `37846313463` SUCCESS; **kein** Deploy).
-Technischer Slice + **lokale operative Einrichtung** `dispo_mat_core`:
-8 Active-Listen (600/400 €, 2026, Flags nein/nein); Browser-Abnahme Port **8059**.
-`BL-P5-02`/`AT-11` teilweise. Checkout `dispo-main`, Port **8000**, `.env` unberührt.
+Stand: 9. Oktober 2026 – **BL-P2-03a** Feature-Branch `feat/bl-p2-03a-salesforce-meridian`
+(Basis `fff472f…` / PR #132); **kein** Deploy. Operative DB / Port 8000 unberührt.
 
 ## Aktuelle Phase
 
-Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); Phase 4 Preislisten/Spot Classic
-(**01a–01c**, **PRI-OPS-1**, **02a–02e**, **SPT-008**, **03a–03k** auf `main`;
-Budget/Abbinder offen);
-Phase 5: **BL-P5-01a** auf `main` (Deploy offen); **BL-P5-02a** auf `main`
-(lokal eingerichtet; Deploy offen); `BL-P5-01`/`BL-P5-02` teilweise;
-Phase 7 AT-13-Teil (**PO-AT13-CC-1** auf `main`);
-Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In-App offen).
+Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** CRM Salesforce/Meridian
+(CSV-Import, vorläufige Accounts, Domain+Typ-Match, Meridian-Nachtrag) in Umsetzung/PR;
+Phase 4 Preislisten/Spot Classic auf `main`; Phase 5 Trailer/Produktion auf `main`
+(Deploy offen); Phase 7/9 Teilumfänge auf `main`.
 
 ## Aktuelle Aufgabe
 
-**BL-P5-02a** lokal eingerichtet/abgenommen; Docs-only Draft-PR **#132** offen,
-Stopp zur Review. **Kein** Deploy, kein Folgeslice. Standardangebote/Budget pausiert.
+**BL-P2-03a / PO-BLP203-1** (A1/B1/C1/D-CSV/E1/F1/G1/H1 akzeptiert): Draft-PR,
+Stopp zur Review. **Kein** Merge/Deploy. `CRM-004` und Rest-`BL-P2-03` offen.
 
 Offen / zurückgestellt u. a.:
-Deploy BL-P5-01a/02a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,
-Überschreibung, andere Träger), Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen,
-SPT-013 Abbinder, weitere Status-Mails / In-App, CRM / REP, ADV-001 Defaults,
-ADV-002, Hinweistexte Matrix, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
+Deploy BL-P5-01a/02a, SWF-Rest, Produktion-Rest, Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest,
+Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen, SPT-013 Abbinder, In-App,
+REP, ADV-001 Defaults, ADV-002, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
+
+## BL-P2-03a / PO-BLP203-1 (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| UX-GATE-D Teilfreigabe B1 | **freigegeben** (nur CRM-Slice-Oberflächen) |
+| CSV-Import UTF-8/Semikolon | **umgesetzt** |
+| Stammdatenversionen + vorläufige Accounts | **umgesetzt** |
+| Domain+Typ-Zuordnung / Prüfliste | **umgesetzt** |
+| Calc/Dispo + Rechnungsempfänger F1 | **umgesetzt** |
+| Meridian-Nachtrag E1 (keine Freigabeinvalidierung) | **umgesetzt** |
+| Kontakte `CRM-004` | **Folgeslice** |
+| Feature-Tests | `CrmSalesforceMeridianBlP203aTest` + `SalesforceAccountIdTest` |
+| E2E | Port **8060**, `npm run test:e2e:blp203a` |
+| Deploy / operative Datenabnahme | **offen** |
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 

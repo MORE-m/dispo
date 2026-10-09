@@ -67,6 +67,15 @@ class AdministrationHubController extends Controller
                     'available' => true,
                 ],
                 [
+                    'key' => 'crm-import',
+                    'title' => 'CRM / Salesforce-Import',
+                    'description' => 'Salesforce-CSV importieren, Vorschau prüfen und Stammdaten/Meridian-Nachtrag anwenden (BL-P2-03a).',
+                    'href' => ($request->user()?->can('import-crm-accounts') ?? false)
+                        ? '/administration/crm/import'
+                        : null,
+                    'available' => $request->user()?->can('import-crm-accounts') ?? false,
+                ],
+                [
                     'key' => 'special-approve-rights',
                     'title' => 'Sonderfreigaberechte',
                     'description' => 'Kaufmännisches Sonderfreigaberecht für Vertrieb vergeben oder entziehen (nur Admin).',

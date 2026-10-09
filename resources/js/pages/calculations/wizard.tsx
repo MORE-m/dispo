@@ -466,6 +466,11 @@ type SavedCalculation = {
     planning_mode: string;
     customer_name: string | null;
     agency_name: string | null;
+    customer_account_id: number | null;
+    agency_account_id: number | null;
+    invoice_recipient: string | null;
+    customer_meridian_number: string | null;
+    agency_meridian_number: string | null;
     campaign: string | null;
     product_title: string | null;
     briefing: string | null;
@@ -1017,6 +1022,41 @@ export default function CalculationWizard({
     const [agencyName, setAgencyName] = useState(
         isStandardOffer ? '' : (calculation?.agency_name ?? ''),
     );
+    const [customerAccountId, setCustomerAccountId] = useState(
+        isStandardOffer
+            ? ''
+            : calculation?.customer_account_id != null
+              ? String(calculation.customer_account_id)
+              : '',
+    );
+    const [agencyAccountId, setAgencyAccountId] = useState(
+        isStandardOffer
+            ? ''
+            : calculation?.agency_account_id != null
+              ? String(calculation.agency_account_id)
+              : '',
+    );
+    const [invoiceRecipient, setInvoiceRecipient] = useState<
+        '' | 'customer' | 'agency'
+    >(
+        isStandardOffer
+            ? ''
+            : calculation?.invoice_recipient === 'agency'
+              ? 'agency'
+              : calculation?.invoice_recipient === 'customer'
+                ? 'customer'
+                : '',
+    );
+    const [ensureProvisionalCustomer, setEnsureProvisionalCustomer] =
+        useState(false);
+    const [customerSearchQ, setCustomerSearchQ] = useState('');
+    const [agencySearchQ, setAgencySearchQ] = useState('');
+    const [customerSearchHits, setCustomerSearchHits] = useState<
+        Array<{ id: number; name: string | null; meridian_pending: boolean }>
+    >([]);
+    const [agencySearchHits, setAgencySearchHits] = useState<
+        Array<{ id: number; name: string | null; meridian_pending: boolean }>
+    >([]);
     const [campaign, setCampaign] = useState(calculation?.campaign ?? '');
     const [productTitle, setProductTitle] = useState(
         calculation?.product_title ?? '',
@@ -1651,6 +1691,28 @@ export default function CalculationWizard({
                 : {
                       customer_name: customerName || null,
                       agency_name: agencyName || null,
+                      ...(customerAccountId.trim() !== ''
+                          ? {
+                                customer_account_id: Number.parseInt(
+                                    customerAccountId,
+                                    10,
+                                ),
+                            }
+                          : {}),
+                      ...(agencyAccountId.trim() !== ''
+                          ? {
+                                agency_account_id: Number.parseInt(
+                                    agencyAccountId,
+                                    10,
+                                ),
+                            }
+                          : {}),
+                      ...(invoiceRecipient !== ''
+                          ? { invoice_recipient: invoiceRecipient }
+                          : {}),
+                      ...(ensureProvisionalCustomer
+                          ? { ensure_provisional_customer: true }
+                          : {}),
                   }),
             campaign: campaign || null,
             product_title: productTitle || null,
@@ -1821,6 +1883,10 @@ export default function CalculationWizard({
             planningMode,
             customerName,
             agencyName,
+            customerAccountId,
+            agencyAccountId,
+            invoiceRecipient,
+            ensureProvisionalCustomer,
             campaign,
             productTitle,
             briefing,
@@ -3035,6 +3101,368 @@ export default function CalculationWizard({
                                                         disabled={!canEdit}
                                                     />
                                                 </FormField>
+                                                <FormField
+                                                    label="Kunden-Account-ID"
+                                                    htmlFor="customer-account-id"
+                                                >
+                                                    <Input
+                                                        id="customer-account-id"
+                                                        type="number"
+                                                        min={1}
+                                                        value={
+                                                            customerAccountId
+                                                        }
+                                                        onChange={(event) =>
+                                                            setCustomerAccountId(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Kunde suchen"
+                                                    htmlFor="customer-search"
+                                                >
+                                                    <div className="flex gap-2">
+                                                        <Input
+                                                            id="customer-search"
+                                                            value={
+                                                                customerSearchQ
+                                                            }
+                                                            onChange={(event) =>
+                                                                setCustomerSearchQ(
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            disabled={!canEdit}
+                                                            placeholder="Name, Meridian, SF-ID…"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            disabled={
+                                                                !canEdit ||
+                                                                customerSearchQ.trim() ===
+                                                                    ''
+                                                            }
+                                                            onClick={() => {
+                                                                void fetch(
+                                                                    `/crm/accounts/suche?type=customer&q=${encodeURIComponent(customerSearchQ.trim())}`,
+                                                                    {
+                                                                        headers:
+                                                                            {
+                                                                                Accept: 'application/json',
+                                                                                'X-Requested-With':
+                                                                                    'XMLHttpRequest',
+                                                                            },
+                                                                        credentials:
+                                                                            'same-origin',
+                                                                    },
+                                                                )
+                                                                    .then(
+                                                                        (
+                                                                            response,
+                                                                        ) =>
+                                                                            response.json(),
+                                                                    )
+                                                                    .then(
+                                                                        (
+                                                                            data: {
+                                                                                accounts: Array<{
+                                                                                    id: number;
+                                                                                    name:
+                                                                                        | string
+                                                                                        | null;
+                                                                                    meridian_pending: boolean;
+                                                                                }>;
+                                                                            },
+                                                                        ) =>
+                                                                            setCustomerSearchHits(
+                                                                                data.accounts ??
+                                                                                    [],
+                                                                            ),
+                                                                    )
+                                                                    .catch(
+                                                                        () =>
+                                                                            setCustomerSearchHits(
+                                                                                [],
+                                                                            ),
+                                                                    );
+                                                            }}
+                                                        >
+                                                            Suchen
+                                                        </Button>
+                                                    </div>
+                                                    {customerSearchHits.length >
+                                                    0 ? (
+                                                        <ul className="mt-2 space-y-1 text-xs">
+                                                            {customerSearchHits.map(
+                                                                (hit) => (
+                                                                    <li
+                                                                        key={
+                                                                            hit.id
+                                                                        }
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            className="text-primary underline"
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            onClick={() => {
+                                                                                setCustomerAccountId(
+                                                                                    String(
+                                                                                        hit.id,
+                                                                                    ),
+                                                                                );
+                                                                                if (
+                                                                                    hit.name
+                                                                                ) {
+                                                                                    setCustomerName(
+                                                                                        hit.name,
+                                                                                    );
+                                                                                }
+                                                                                setCustomerSearchHits(
+                                                                                    [],
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            {hit.name ??
+                                                                                `#${hit.id}`}
+                                                                        </button>
+                                                                    </li>
+                                                                ),
+                                                            )}
+                                                        </ul>
+                                                    ) : null}
+                                                    {calculation?.customer_meridian_number ? (
+                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                            Meridian:{' '}
+                                                            {
+                                                                calculation.customer_meridian_number
+                                                            }
+                                                        </p>
+                                                    ) : customerAccountId.trim() !==
+                                                          '' ||
+                                                      customerName.trim() !==
+                                                          '' ? (
+                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                            Meridian-Nummer folgt
+                                                        </p>
+                                                    ) : null}
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur-Account-ID"
+                                                    htmlFor="agency-account-id"
+                                                >
+                                                    <Input
+                                                        id="agency-account-id"
+                                                        type="number"
+                                                        min={1}
+                                                        value={agencyAccountId}
+                                                        onChange={(event) =>
+                                                            setAgencyAccountId(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                </FormField>
+                                                <FormField
+                                                    label="Agentur suchen"
+                                                    htmlFor="agency-search"
+                                                >
+                                                    <div className="flex gap-2">
+                                                        <Input
+                                                            id="agency-search"
+                                                            value={
+                                                                agencySearchQ
+                                                            }
+                                                            onChange={(event) =>
+                                                                setAgencySearchQ(
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                            disabled={!canEdit}
+                                                            placeholder="Name, Meridian, SF-ID…"
+                                                        />
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            disabled={
+                                                                !canEdit ||
+                                                                agencySearchQ.trim() ===
+                                                                    ''
+                                                            }
+                                                            onClick={() => {
+                                                                void fetch(
+                                                                    `/crm/accounts/suche?type=agency&q=${encodeURIComponent(agencySearchQ.trim())}`,
+                                                                    {
+                                                                        headers:
+                                                                            {
+                                                                                Accept: 'application/json',
+                                                                                'X-Requested-With':
+                                                                                    'XMLHttpRequest',
+                                                                            },
+                                                                        credentials:
+                                                                            'same-origin',
+                                                                    },
+                                                                )
+                                                                    .then(
+                                                                        (
+                                                                            response,
+                                                                        ) =>
+                                                                            response.json(),
+                                                                    )
+                                                                    .then(
+                                                                        (
+                                                                            data: {
+                                                                                accounts: Array<{
+                                                                                    id: number;
+                                                                                    name:
+                                                                                        | string
+                                                                                        | null;
+                                                                                    meridian_pending: boolean;
+                                                                                }>;
+                                                                            },
+                                                                        ) =>
+                                                                            setAgencySearchHits(
+                                                                                data.accounts ??
+                                                                                    [],
+                                                                            ),
+                                                                    )
+                                                                    .catch(
+                                                                        () =>
+                                                                            setAgencySearchHits(
+                                                                                [],
+                                                                            ),
+                                                                    );
+                                                            }}
+                                                        >
+                                                            Suchen
+                                                        </Button>
+                                                    </div>
+                                                    {agencySearchHits.length >
+                                                    0 ? (
+                                                        <ul className="mt-2 space-y-1 text-xs">
+                                                            {agencySearchHits.map(
+                                                                (hit) => (
+                                                                    <li
+                                                                        key={
+                                                                            hit.id
+                                                                        }
+                                                                    >
+                                                                        <button
+                                                                            type="button"
+                                                                            className="text-primary underline"
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            onClick={() => {
+                                                                                setAgencyAccountId(
+                                                                                    String(
+                                                                                        hit.id,
+                                                                                    ),
+                                                                                );
+                                                                                if (
+                                                                                    hit.name
+                                                                                ) {
+                                                                                    setAgencyName(
+                                                                                        hit.name,
+                                                                                    );
+                                                                                }
+                                                                                setAgencySearchHits(
+                                                                                    [],
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            {hit.name ??
+                                                                                `#${hit.id}`}
+                                                                        </button>
+                                                                    </li>
+                                                                ),
+                                                            )}
+                                                        </ul>
+                                                    ) : null}
+                                                    {calculation?.agency_meridian_number ? (
+                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                            Meridian:{' '}
+                                                            {
+                                                                calculation.agency_meridian_number
+                                                            }
+                                                        </p>
+                                                    ) : agencyAccountId.trim() !==
+                                                          '' ||
+                                                      agencyName.trim() !==
+                                                          '' ? (
+                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                            Meridian-Nummer folgt
+                                                        </p>
+                                                    ) : null}
+                                                </FormField>
+                                                <FormField
+                                                    label="Rechnungsempfänger"
+                                                    htmlFor="invoice-recipient"
+                                                >
+                                                    <select
+                                                        id="invoice-recipient"
+                                                        className={
+                                                            formSelectClass
+                                                        }
+                                                        value={
+                                                            invoiceRecipient
+                                                        }
+                                                        onChange={(event) =>
+                                                            setInvoiceRecipient(
+                                                                event.target
+                                                                    .value as
+                                                                    | ''
+                                                                    | 'customer'
+                                                                    | 'agency',
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    >
+                                                        <option value="">
+                                                            – nicht gesetzt –
+                                                        </option>
+                                                        <option value="customer">
+                                                            Kunde
+                                                        </option>
+                                                        <option value="agency">
+                                                            Agentur
+                                                        </option>
+                                                    </select>
+                                                </FormField>
+                                                <div className="flex items-center gap-2 sm:col-span-2">
+                                                    <Checkbox
+                                                        id="ensure-provisional-customer"
+                                                        checked={
+                                                            ensureProvisionalCustomer
+                                                        }
+                                                        onCheckedChange={(
+                                                            checked,
+                                                        ) =>
+                                                            setEnsureProvisionalCustomer(
+                                                                checked ===
+                                                                    true,
+                                                            )
+                                                        }
+                                                        disabled={!canEdit}
+                                                    />
+                                                    <label
+                                                        htmlFor="ensure-provisional-customer"
+                                                        className="text-sm"
+                                                    >
+                                                        Vorläufigen Kunden aus
+                                                        Freitext anlegen (optional)
+                                                    </label>
+                                                </div>
                                             </>
                                         )}
                                         <FormField

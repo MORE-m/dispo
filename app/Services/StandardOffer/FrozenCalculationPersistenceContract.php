@@ -26,6 +26,7 @@ use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\Calculation\DayGroupFromDate;
 use App\Services\Calculation\Decimal;
+use App\Services\Crm\CrmOrderHeaderBinder;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotCloneService;
 use App\Support\Advertising\SpotComponentProfileContract;
@@ -225,8 +226,31 @@ final class FrozenCalculationPersistenceContract
         $calculation->status = CalculationStatus::Draft;
         $calculation->planning_mode = PlanningMode::Manual;
         $calculation->advisor_id = $user->id;
-        $calculation->customer_name = $customerName;
-        $calculation->agency_name = $agencyName;
+        // BL-P2-03a: Freitext-Übernahme → nachvollziehbare vorläufige Accounts (ohne Domain).
+        $crmPayload = [
+            'customer_name' => $customerName,
+            'agency_name' => $agencyName,
+            'ensure_provisional_customer' => true,
+            'ensure_provisional_agency' => $agencyName !== null && $agencyName !== '',
+            'invoice_recipient' => $adoptionContext['invoice_recipient']
+                ?? ($agencyName !== null && $agencyName !== '' ? null : 'customer'),
+        ];
+        if (($crmPayload['invoice_recipient'] ?? null) === null && $agencyName !== null && $agencyName !== '') {
+            $crmPayload['invoice_recipient'] = 'customer';
+        }
+        $crm = app(CrmOrderHeaderBinder::class)
+            ->resolveForCalculation($crmPayload, $user, allowFreitextProvisional: true);
+        $calculation->customer_name = $crm['customer_name'];
+        $calculation->agency_name = $crm['agency_name'];
+        $calculation->customer_account_id = $crm['customer_account_id'];
+        $calculation->agency_account_id = $crm['agency_account_id'];
+        $calculation->customer_version_id = $crm['customer_version_id'];
+        $calculation->agency_version_id = $crm['agency_version_id'];
+        $calculation->invoice_recipient = $crm['invoice_recipient'];
+        $calculation->customer_meridian_number = $crm['customer_meridian_number'];
+        $calculation->agency_meridian_number = $crm['agency_meridian_number'];
+        $calculation->customer_salesforce_account_id = $crm['customer_salesforce_account_id'];
+        $calculation->agency_salesforce_account_id = $crm['agency_salesforce_account_id'];
         $calculation->campaign = $campaignOverride !== null && $campaignOverride !== ''
             ? $campaignOverride
             : ($materialization['campaign'] ?? null);
