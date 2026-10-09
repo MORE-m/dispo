@@ -202,7 +202,10 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
   unverändert fail-closed. `.env` / DB `dispo` nicht umgestellt; Merge importiert
   nicht. Weitere Inventar-/Produktlisten und digitale Festpreise weiter zu liefern.
 - Festpreise für Online Audio, Podcast, Events und weitere digitale Produkte,
-- Produktionspreise je Inventar und Typ,
+- Produktionspreise je Inventar und Typ:
+  Spotproduktion 2026 für acht Spot-Inventare **lokal** auf `dispo_mat_core`
+  (600,00 / 400,00; Flags nein/nein; Admin Active) –
+  `docs/entscheidungen/PO-BLP502-1-datenlieferung.md`; Deploy/andere Umgebungen offen,
 - finale technische und DMP-Targetings einschließlich Aufschlägen,
 - erforderliche Kunden-, Agentur- und Kontaktstammdaten,
 - Nutzer, Rollen, Rabattgrenzen und Sonderfreigaberechte,

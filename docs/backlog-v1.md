@@ -372,17 +372,22 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Status:** teilweise (`BL-P5-02a` Spotproduktion@Spot Classic Average; PO-BLP502-1)
 - **Anforderungen:** `PRO-001` bis `PRO-007` (02a: Spotproduktion gebunden; Sonstiges/Überschreibung offen)
 - **Abhängigkeiten:** `BL-P5-02a` formal unabhängig von `BL-P5-01` (B1); Rest offen
-- **Ergebnis 02a:** Admin-Produktionspreise, Zusatzzeilen, Freeze, Dispo-S; **keine** Preisüberschreibung
+- **Ergebnis 02a:** Admin-Produktionspreise, Zusatzzeilen, Freeze, Dispo-S; **keine** Preisüberschreibung; auf `main` PR #131; operative Preise lokal `dispo_mat_core`
 - **Akzeptanz:** `AT-11` teilweise
 - **Tests:** Pest Menge 0, S-Zeile, Pin/Rebind, Sales-Manipulation abgelehnt; Browser Port 8057
 
 ### BL-P5-02a – Spotproduktion an Spot Classic × Average
 
 - **Phase:** 5
-- **Status:** erledigt (Feature-Branch / Draft-PR; **kein** Deploy; operative Preise nicht behauptet)
+- **Status:** erledigt technisch + lokal eingerichtet (`main` PR #131 / `157d8a2…`;
+  `dispo_mat_core`; **kein** Deploy)
 - **Anforderungen:** `ADV-003`, `PRO-001`–`PRO-004`/`PRO-006`/`PRO-007` (Teil), `AT-11` (Teil)
-- **PO:** PO-BLP502-1 A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag
-- **Außerhalb:** Sonstiges-FreiPreis, Überschreibungs-Sonderfreigabe, andere Träger/Methoden
+- **PO:** PO-BLP502-1 A1/B1/C1/D1/E1/F/G1/H1a + Auflösungsvertrag;
+  Datenlieferung lokal umgesetzt (8× 600/400 €)
+- **Dok:** `docs/readiness/BL-P5-02a-spot-production-data-2026-10-09.md`,
+  `docs/entscheidungen/PO-BLP502-1-datenlieferung.md`
+- **Außerhalb:** Sonstiges-FreiPreis, Überschreibungs-Sonderfreigabe, andere Träger/Methoden,
+  Deploy / andere Umgebungen
 
 ## Phase 6 – Online Audio, Social Media und Events
 

@@ -1,15 +1,20 @@
 # Readiness: BL-P5-02 – Produktionsleistungen in Kalkulation und Dispo
 
-Status: **READY** (Teilscope `BL-P5-02a` umgesetzt; Draft-PR inkl. Review-Nachzug)
-Stand: 8. Oktober 2026
-Audit-/Implementierungsbasis: Feature-Branch auf `origin/main` @ `7583a3edfbb422b7b9580b4713747201d876b8d1`
+Status: **READY** (Teilscope `BL-P5-02a` auf `main`; operative Daten offen)
+Stand: 9. Oktober 2026 (Nachzug Merge PR #131)
+Code auf `main`: `157d8a290982077cff709c163818ac1a0f02cdd1`
+(PR [#131](https://github.com/MORE-m/dispo/pull/131);
+Post-Merge-CI [37846313463](https://github.com/MORE-m/dispo/actions/runs/37846313463) SUCCESS)
+Historische Feature-Basis: `7583a3edfbb422b7b9580b4713747201d876b8d1`
 IDs: `ADV-003`, `PRO-001`–`PRO-007`, `AT-11` (teilweise), `COM-*`, `ADM-*`,
 `PO-BLP502-1`, Auflösungsvertrag
 Entscheidung: [`docs/entscheidungen/PO-BLP502-1-produktion-sonstiges.md`](../entscheidungen/PO-BLP502-1-produktion-sonstiges.md)
 (**A1/B1/C1/D1/E1/F/G1/H1a akzeptiert**)
 Auflösung: [`PO-BLP502-1-aufloesungsvertrag.md`](../entscheidungen/PO-BLP502-1-aufloesungsvertrag.md)
+Daten: [`BL-P5-02a-spot-production-data-2026-10-09`](BL-P5-02a-spot-production-data-2026-10-09.md)
+/ [`PO-BLP502-1-datenlieferung`](../entscheidungen/PO-BLP502-1-datenlieferung.md)
 
-> Technischer Slice fertig ≠ operative Preise gepflegt. **Kein** Deploy.
+> Technischer Slice auf `main` ≠ operative Preise gepflegt. **Kein** Deploy.
 > `BL-P5-02` / `AT-11` nur **teilweise**. Überschreibungs-Sonderfreigabe und
 > Sonstiges-FreiPreis offen. Andere Träger/Methoden offen.
 
@@ -24,12 +29,12 @@ Auflösung: [`PO-BLP502-1-aufloesungsvertrag.md`](../entscheidungen/PO-BLP502-1-
 | Preview/Save/Reload/Dispo | **Feature-Tests + Browser-Smoke** |
 | Freeze / Pin / Inventarwechsel H1a | **umgesetzt** |
 | Preisüberschreibung | **serverseitig ausgeschlossen** (F) |
-| Operative Produktionspreise | **nicht** behauptet; synthetische Fixtures |
+| Operative Produktionspreise | **lokal eingerichtet** (8× Active; Abnahme Port 8059; Deploy offen) |
 | Elternpaket `BL-P5-02` / `AT-11` vollständig | **nein** (teilweise) |
 | Deploy | **kein** Deploy |
 
-**Readiness-Urteil: READY** für Teilscope `BL-P5-02a` auf dem Feature-Branch.
-Keine Deployment-Freigabe. Keine operative Datenlieferung.
+**Readiness-Urteil: READY** für Teilscope `BL-P5-02a` auf `main` (PR #131).
+Keine Deployment-Freigabe. Operative lokale Einrichtung: siehe Daten-Readiness.
 
 ## 1. Scope `BL-P5-02a`
 

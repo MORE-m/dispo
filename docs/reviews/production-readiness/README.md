@@ -1,10 +1,14 @@
 # Bericht: Produktion/Sonstiges – BL-P5-02a Umsetzung + Review-Nachzug
 
-Stand: 8. Oktober 2026
-Arbeitsbasis: Feature `feat/bl-p5-02a-spot-production` auf `origin/main` @ `7583a3e…`
-(PR #131 Draft; **kein** Deploy)
+Stand: 9. Oktober 2026 (Nachzug Merge); Review-Inhalt 8. Oktober 2026
+Arbeitsbasis historisch: Feature `feat/bl-p5-02a-spot-production` auf `7583a3e…`.
+**Auf `main`:** `157d8a290982077cff709c163818ac1a0f02cdd1`
+(PR [#131](https://github.com/MORE-m/dispo/pull/131) MERGED;
+Post-Merge-CI [37846313463](https://github.com/MORE-m/dispo/actions/runs/37846313463) SUCCESS;
+**kein** Deploy). Operative Daten: siehe
+[`spot-production-data-readiness`](../spot-production-data-readiness/).
 
-PO-BLP502-1 **akzeptiert** (A1/B1/C1/D1/E1/F/G1/H1a). Teilscope auf Feature-Branch.
+PO-BLP502-1 **akzeptiert** (A1/B1/C1/D1/E1/F/G1/H1a). Teilscope auf `main`.
 
 ## Artefakte
 
@@ -83,4 +87,5 @@ Vier Befunde nachvollzogen, mit Regressionstests belegt und behoben:
 
 ## Offen
 
-`BL-P5-02`/`AT-11` teilweise; operative Preise; Sonstiges/Überschreibung; andere Träger; Produktion in Standardangeboten; **kein** Deploy.
+`BL-P5-02`/`AT-11` teilweise; operative Preise lokal eingerichtet (Deploy offen);
+Sonstiges/Überschreibung; andere Träger; Produktion in Standardangeboten; **kein** Deploy.

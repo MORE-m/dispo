@@ -50,10 +50,13 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md) | Operative Daten-Readiness / lokale Einrichtung `dispo_mat_core` |
 | [`entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](entscheidungen/PO-BLP501A-1-swf-trailer-average.md) | PO Trailer × Average (**A1 + B1** akzeptiert; `main` PR #129) |
 | [`entscheidungen/PO-BLP501A-1-datenlieferung.md`](entscheidungen/PO-BLP501A-1-datenlieferung.md) | PO-Datenlieferung Länge/Aufschlag (20 s / 30 % lokal; Deploy/andere Umgebungen offen) |
-| [`reviews/production-readiness/`](reviews/production-readiness/) | Bericht Produktion `BL-P5-02a` (PO-BLP502-1 akzeptiert; Feature-Branch) |
-| [`readiness/BL-P5-02-produktion-2026-10-08.md`](readiness/BL-P5-02-produktion-2026-10-08.md) | Readiness Produktion Teilscope READY (`BL-P5-02`/`AT-11` teilweise) |
-| [`entscheidungen/PO-BLP502-1-produktion-sonstiges.md`](entscheidungen/PO-BLP502-1-produktion-sonstiges.md) | PO Produktion Erst-Slice Spotproduktion@Spot Classic (**Akzeptiert**) |
+| [`reviews/production-readiness/`](reviews/production-readiness/) | Bericht Produktion `BL-P5-02a` (PO-BLP502-1 akzeptiert; auf `main` PR #131) |
+| [`readiness/BL-P5-02-produktion-2026-10-08.md`](readiness/BL-P5-02-produktion-2026-10-08.md) | Feature-Readiness Produktion Teilscope READY (`BL-P5-02`/`AT-11` teilweise) |
+| [`reviews/spot-production-data-readiness/`](reviews/spot-production-data-readiness/) | Bericht lokale Einrichtung + Browser-Abnahme Spotproduktion |
+| [`readiness/BL-P5-02a-spot-production-data-2026-10-09.md`](readiness/BL-P5-02a-spot-production-data-2026-10-09.md) | Operative Daten-Readiness Spotproduktion (lokal eingerichtet; Deploy offen) |
+| [`entscheidungen/PO-BLP502-1-produktion-sonstiges.md`](entscheidungen/PO-BLP502-1-produktion-sonstiges.md) | PO Produktion Erst-Slice Spotproduktion@Spot Classic (**Akzeptiert**; `main` PR #131) |
 | [`entscheidungen/PO-BLP502-1-aufloesungsvertrag.md`](entscheidungen/PO-BLP502-1-aufloesungsvertrag.md) | Produktionspreis Jahr/Pin/Rebind |
+| [`entscheidungen/PO-BLP502-1-datenlieferung.md`](entscheidungen/PO-BLP502-1-datenlieferung.md) | PO-Datenlieferung Spotproduktionspreise (lokal 600/400 €; Deploy offen) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 | [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |
