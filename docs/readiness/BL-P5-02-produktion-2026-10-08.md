@@ -1,7 +1,8 @@
 # Readiness: BL-P5-02 – Produktionsleistungen in Kalkulation und Dispo
 
-Status: **READY** (Teilscope `BL-P5-02a` auf `main`; operative Daten offen)
-Stand: 9. Oktober 2026 (Nachzug Merge PR #131)
+Status: **READY** (Teilscope `BL-P5-02a` auf `main`; lokal auf `dispo_mat_core`
+eingerichtet und abgenommen; Deploy und andere Umgebungen offen)
+Stand: 9. Oktober 2026 (Nachzug lokale Einrichtung + Docs-PR #132)
 Code auf `main`: `157d8a290982077cff709c163818ac1a0f02cdd1`
 (PR [#131](https://github.com/MORE-m/dispo/pull/131);
 Post-Merge-CI [37846313463](https://github.com/MORE-m/dispo/actions/runs/37846313463) SUCCESS)
@@ -14,9 +15,11 @@ Auflösung: [`PO-BLP502-1-aufloesungsvertrag.md`](../entscheidungen/PO-BLP502-1-
 Daten: [`BL-P5-02a-spot-production-data-2026-10-09`](BL-P5-02a-spot-production-data-2026-10-09.md)
 / [`PO-BLP502-1-datenlieferung`](../entscheidungen/PO-BLP502-1-datenlieferung.md)
 
-> Technischer Slice auf `main` ≠ operative Preise gepflegt. **Kein** Deploy.
-> `BL-P5-02` / `AT-11` nur **teilweise**. Überschreibungs-Sonderfreigabe und
-> Sonstiges-FreiPreis offen. Andere Träger/Methoden offen.
+> Technischer Slice auf `main` (PR #131). Operative Preise lokal auf
+> `dispo_mat_core` eingerichtet und abgenommen; Deploy und andere Umgebungen
+> offen. **Kein** Deploy. `BL-P5-02` / `AT-11` nur **teilweise**.
+> Überschreibungs-Sonderfreigabe und Sonstiges-FreiPreis offen.
+> Andere Träger/Methoden offen.
 
 ## 0. Urteil
 
@@ -34,7 +37,8 @@ Daten: [`BL-P5-02a-spot-production-data-2026-10-09`](BL-P5-02a-spot-production-d
 | Deploy | **kein** Deploy |
 
 **Readiness-Urteil: READY** für Teilscope `BL-P5-02a` auf `main` (PR #131).
-Keine Deployment-Freigabe. Operative lokale Einrichtung: siehe Daten-Readiness.
+Technische Umsetzung auf `main`; lokale Einrichtung/Abnahme auf `dispo_mat_core`
+(siehe Daten-Readiness). Keine Deployment-Freigabe.
 
 ## 1. Scope `BL-P5-02a`
 
@@ -66,5 +70,7 @@ ohne Zeile blockiert fehlende Produktionskonfiguration Spot nicht.
 
 ## 4. Bewusst offen
 
-Operative Preispflege, Sonstiges-FreiPreis, Überschreibungs-Sonderfreigabe,
-weitere Träger/Methoden, Produktion in Standardangeboten, vollständiges `AT-11`, Deploy.
+Deploy / operative Preise anderer Umgebungen, Sonstiges-FreiPreis,
+Überschreibungs-Sonderfreigabe, weitere Träger/Methoden, Produktion in
+Standardangeboten, vollständiges `AT-11`. Lokale Preispflege `dispo_mat_core`
+ist erledigt (siehe Daten-Readiness); sie ersetzt kein Deploy.

@@ -18,8 +18,8 @@ Phase 9 Notifications (**02a–02e** auf `main`; Submit-/Invalidierungsmails, In
 
 ## Aktuelle Aufgabe
 
-**BL-P5-02a** lokal eingerichtet/abgenommen; Docs-Branch ohne Commit/PR in diesem
-Schritt. **Stopp** – kein Deploy, kein Folgeslice. Standardangebote/Budget pausiert.
+**BL-P5-02a** lokal eingerichtet/abgenommen; Docs-only Draft-PR **#132** offen,
+Stopp zur Review. **Kein** Deploy, kein Folgeslice. Standardangebote/Budget pausiert.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a, SWF-Rest (`BL-P5-01`), Produktion-Rest (`BL-P5-02`: Sonstiges,

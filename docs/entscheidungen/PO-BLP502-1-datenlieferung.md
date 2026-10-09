@@ -10,8 +10,9 @@ Bezug: [`PO-BLP502-1`](PO-BLP502-1-produktion-sonstiges.md),
 [`Auflösungsvertrag`](PO-BLP502-1-aufloesungsvertrag.md);
 Daten-Readiness: [`BL-P5-02a-spot-production-data-2026-10-09`](../readiness/BL-P5-02a-spot-production-data-2026-10-09.md)
 
-> Lokale Schreibfreigabe + Browser-Abnahme ausgeführt. **Kein** Deploy.
-> Andere Umgebungen unberührt. Synthetische 150/80 bleiben Fixture-only.
+> Freigaben **A/B/C** lokal erledigt. **C** = lokale Fach-/Browser-Abnahme,
+> **nicht** Deployment-Freigabe. Deploy / andere Umgebungen separat offen.
+> Synthetische 150/80 bleiben Fixture-only.
 
 ## Entschiedene Admin-Zielwerte
 
@@ -31,10 +32,10 @@ Spätere Änderungen: Nachfolgerversion; Pins/Snapshots erhalten.
 
 ## Freigaben
 
-- [x] Lesende Prüfung Ziel-DB (**A**)
+- [x] **A** Lesende Prüfung Ziel-DB
 - [x] **B** Migration BL-P5-02a (drei Pfade) + Admin-Pflege alle acht
-- [x] Lokale Browser-Abnahme Port **8059**
-- [ ] **C** Deploy / andere Umgebungen
+- [x] **C** Lokale Fach-/Browser-Abnahme Port **8059**
+- [ ] Deploy / andere Umgebungen (separat; **nicht** Freigabe C)
 
 ## Lokales Ergebnis (Kurz)
 

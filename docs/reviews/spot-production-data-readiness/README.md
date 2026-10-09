@@ -43,6 +43,17 @@ Dispo: S-Zeilen mit Preis/Menge/Betrag; Medienzeilen separat.
 Hinweis: Für fehlende Vite-Manifest-Einträge der Produktionspreis-UI wurde lokal
 `npm run build` ausgeführt (`public/build` gitignored; kein Source-Commit).
 
+## Freigaben A/B/C
+
+| Schritt | Bedeutung | Status |
+|---|---|---|
+| **A** | Lesende Ziel-DB-Prüfung | erledigt |
+| **B** | Migration + Admin-Pflege | erledigt |
+| **C** | Lokale Fach-/Browser-Abnahme Port 8059 | erledigt |
+
+**C** ist keine Deployment-Freigabe.
+
 ## Offen
 
-Deploy und alle Nicht-Lokal-Umgebungen. `BL-P5-02`/`AT-11` teilweise.
+Deploy und alle Nicht-Lokal-Umgebungen (separat von A/B/C).
+`BL-P5-02`/`AT-11` teilweise.

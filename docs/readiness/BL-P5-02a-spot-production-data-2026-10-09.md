@@ -115,10 +115,10 @@ Calc **1–9** und Dispo **1–7**: `updated_at` unverändert gegenüber Pre-Acc
 
 | Schritt | Status |
 |---|---|
-| A Lesung | erledigt |
-| B Migration + Admin | **erledigt** |
-| C Lokale Abnahme | **erledigt** |
-| Deploy | **offen** / separat |
+| **A** Lesende Ziel-DB-Prüfung | **erledigt** |
+| **B** Migration + Admin-Pflege | **erledigt** |
+| **C** Lokale Fach-/Browser-Abnahme | **erledigt** |
+| Deploy / andere Umgebungen | **offen** / separat (**nicht** Freigabe C) |
 
 ## 6. Grenzen
 
