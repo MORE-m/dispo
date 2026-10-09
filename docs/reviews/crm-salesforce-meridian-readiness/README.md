@@ -6,6 +6,8 @@ Arbeitsbasis: `origin/main` @ `fff472f112882b65abad4633ea8e5177ebe58f42`
 Feature-Branch: `feat/bl-p2-03a-salesforce-meridian`
 Worktree: `dispo-wt-feat-bl-p2-03a`
 Draft-PR: [#133](https://github.com/MORE-m/dispo/pull/133)
+Final HEAD: `a8ecb302a8e16fdc5b7955e57522eb54cea5b6d1`
+CI: grün auf exakt diesem HEAD (Run [`37992762467`](https://github.com/MORE-m/dispo/actions/runs/37992762467); `ci` / `mysql` / `e2e-spt008`, inkl. Browser BL-P2-03a)
 
 **Kein** Deploy. Port 8000 / `dispo-main` / `dispo_mat_core` / `.env` unberührt.
 Migrationen nur in isolierten Test-/E2E-DBs.
@@ -49,7 +51,8 @@ pauschale Erledigung von `BL-P2-03`, Deploy.
 - Unit: `SalesforceAccountIdTest`
 - Feature: `CrmSalesforceMeridianBlP203aTest`, `CrmSalesforceMeridianReviewNachzugTest`
 - E2E: `npm run test:e2e:blp203a` (Port **8060**, CI-Job vorhanden)
+- CI: Run `37992762467` auf HEAD `a8ecb30` vollständig grün
 
 ## Offen
 
-`CRM-004`, operative Datenabnahme, Deploy; erneute Review des Draft-PR.
+`CRM-004`, operative Datenabnahme, Deploy; erneute Review des Draft-PR (kein Merge).
