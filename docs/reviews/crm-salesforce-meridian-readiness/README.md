@@ -1,15 +1,15 @@
 # Bericht: CRM Salesforce / Meridian – BL-P2-03a
 
-Stand: 10. Oktober 2026 (Review-Nachzug Restbefunde PR #133)
-Arbeitsbasis: `origin/main` @ `fff472f112882b65abad4633ea8e5177ebe58f42`
-(Merge PR [#132](https://github.com/MORE-m/dispo/pull/132))
-Feature-Branch: `feat/bl-p2-03a-salesforce-meridian`
-Worktree: `dispo-wt-feat-bl-p2-03a`
-Draft-PR: [#133](https://github.com/MORE-m/dispo/pull/133)
+Stand: 10. Oktober 2026 (Feature auf `main`; Daten-Readiness Docs-Draft)
+Arbeitsbasis: `origin/main` @ `65da41121206b0b66327831ff9586996f2c3c331`
+(Merge PR [#133](https://github.com/MORE-m/dispo/pull/133) + D1 PR [#134](https://github.com/MORE-m/dispo/pull/134);
+Post-Merge-CI [`38063164855`](https://github.com/MORE-m/dispo/actions/runs/38063164855) SUCCESS)
+Historischer Feature-Worktree: `dispo-wt-feat-bl-p2-03a` (optional belassen)
 
-**Kein** Deploy. Port 8000 / `dispo-main` / `dispo_mat_core` / `.env` unberührt.
-Migrationen nur in isolierten Test-/E2E-DBs.
-PO A1/B1/C1/D-CSV/E1/F1/G1/H1 unverändert akzeptiert.
+**Kein** Deploy. Port 8000 / `dispo-main` / `.env` unberührt.
+Lokale CRM-Daten A/B/C: siehe [`crm-salesforce-meridian-data-readiness`](../crm-salesforce-meridian-data-readiness/)
+(Docs-Draft-PR; noch nicht auf `main`).
+PO A1/B1/C1/D+D1/E1/F1/G1/H1 unverändert akzeptiert.
 
 ## Artefakte
 
@@ -35,7 +35,7 @@ PO A1/B1/C1/D-CSV/E1/F1/G1/H1 unverändert akzeptiert.
 ## Scope (A1)
 
 - Manueller Salesforce-**CSV**-Import (UTF-8, Semikolon)
-- Typmapping `Account KUNDE` / `Account AGENTUR`
+- Typmapping D1: KUNDE/GESELLSCHAFTER/SONSTIGE → Kunde; AGENTUR → Agentur
 - Stammdatenversionen, vorläufige Accounts, Domain+Typ-Zuordnung/Prüfliste
 - Calc/Dispo-Anbindung inkl. Rechnungsempfänger (F1)
 - Meridian-Nachtrag statusunabhängig ohne Freigabeinvalidierung (E1)
@@ -55,4 +55,5 @@ pauschale Erledigung von `BL-P2-03`, Deploy.
 
 ## Offen
 
-`CRM-004`, operative Datenabnahme, Deploy; erneute Review des Draft-PR (kein Merge).
+`CRM-004`, Rest-`BL-P2-03`, Deploy / andere Umgebungen.
+Lokale B/C erledigt (Daten-Docs separat; keine Deployment-Freigabe).

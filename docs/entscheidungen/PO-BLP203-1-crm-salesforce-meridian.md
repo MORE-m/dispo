@@ -2,15 +2,18 @@
 
 Status: **Akzeptiert** (A1, B1, C1, D + **D1**, E1, F1, G1, H1)
 Stand: 10. Oktober 2026
-Code-Basis Feature-Nachzug: Branch `feat/bl-p2-03a-crm-record-type-mapping` auf
-`origin/main` @ `aed4b070c1217b4ee883febca2751786c9b95aec` (Merge PR [#133](https://github.com/MORE-m/dispo/pull/133));
-**kein** Deploy / kein operativer Import
+Code auf `main`: `65da41121206b0b66327831ff9586996f2c3c331`
+(Merge PR [#133](https://github.com/MORE-m/dispo/pull/133) + D1 PR [#134](https://github.com/MORE-m/dispo/pull/134);
+Post-Merge-CI [`38063164855`](https://github.com/MORE-m/dispo/actions/runs/38063164855) SUCCESS).
+Lokale Daten A/B/C in `dispo_mat_core` erledigt (siehe Datenlieferung); **kein** Deploy.
 IDs: `CRM-001`–`CRM-003` (Slice), `CRM-004` (Folgeslice), `DSP-*`, `APR-004` (Abgrenzung E1),
 `VER-*`, `AUD-*`, `ADM-001`, `AUTH-001`–`AUTH-007`, UX-GATE-D
 Slice-Kennung: **`BL-P2-03a`** (Teilscope von `BL-P2-03`, nicht vollständig)
 Readiness: [`docs/readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md`](../readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md)
-Daten: [`PO-BLP203-1-datenlieferung`](PO-BLP203-1-datenlieferung.md) (Docs-Worktree Daten-Readiness)
-Review: [`docs/reviews/crm-salesforce-meridian-readiness/`](../reviews/crm-salesforce-meridian-readiness/)
+Daten: [`PO-BLP203-1-datenlieferung`](PO-BLP203-1-datenlieferung.md) ·
+[`BL-P2-03a-crm-salesforce-meridian-data-2026-10-10`](../readiness/BL-P2-03a-crm-salesforce-meridian-data-2026-10-10.md)
+Review Feature: [`docs/reviews/crm-salesforce-meridian-readiness/`](../reviews/crm-salesforce-meridian-readiness/)
+Review Daten: [`docs/reviews/crm-salesforce-meridian-data-readiness/`](../reviews/crm-salesforce-meridian-data-readiness/)
 
 > Bestätigte Fachregeln R1–R7 bleiben verbindlich und werden nicht erneut zur Wahl gestellt.
 > Mit dem Implementierungsauftrag sind A1/B1/C1/E1/F1/G1/H1 sowie das CSV-Format (D) akzeptiert.

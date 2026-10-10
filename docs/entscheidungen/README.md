@@ -40,5 +40,5 @@ ohne die Entscheidung zu ersetzen.
 | [PO-BLP502-1](PO-BLP502-1-produktion-sonstiges.md) | Produktion/Sonstiges Erst-Slice (`BL-P5-02a`) | **Akzeptiert** (A1…H1a; `main` PR #131) |
 | [PO-BLP502-1-auflösung](PO-BLP502-1-aufloesungsvertrag.md) | Produktionspreis Jahr/Pin/Rebind | **Akzeptiert** (Ableitung PO-PRI-YEAR-1 + E1/H1a) |
 | [PO-BLP502-1-datenlieferung](PO-BLP502-1-datenlieferung.md) | Operative Spotproduktionspreise je Inventar | **Lokal umgesetzt** (`dispo_mat_core`; Deploy offen) |
-| [PO-BLP203-1](PO-BLP203-1-crm-salesforce-meridian.md) | CRM Salesforce/Meridian Erst-Slice (`BL-P2-03a`) | **Akzeptiert** (A1…H1 + **D1**; `main` PR #133, D1-Nachzug) |
-| [PO-BLP203-1-datenlieferung](PO-BLP203-1-datenlieferung.md) | Lokale CRM-Einrichtung / Export | **A erledigt; D1 akzeptiert; B/C offen** |
+| [PO-BLP203-1](PO-BLP203-1-crm-salesforce-meridian.md) | CRM Salesforce/Meridian Erst-Slice (`BL-P2-03a`) | **Akzeptiert** (A1…H1 + **D1**; `main` PR #133/#134) |
+| [PO-BLP203-1-datenlieferung](PO-BLP203-1-datenlieferung.md) | Lokale CRM-Einrichtung (Export/Migration/Import) | **A/B/C lokal erledigt** (`dispo_mat_core`; Deploy offen) |
