@@ -526,19 +526,15 @@ final class CrmImportService
     }
 
     /**
+     * Geplante Auto-Matches anhand des Salesforce-Bestands nach allen zulässigen
+     * Importänderungen (gleiche Regeln wie {@see autoMatchProvisionals}).
+     *
      * @param  list<array<string, mixed>>  $actions
      * @return list<array<string, mixed>>
      */
     private function planAutoMatches(array $actions): array
     {
-        $incomingDomainsByType = [];
-        foreach ($actions as $action) {
-            $domain = $action['matching_domain'] ?? null;
-            if ($domain === null || $domain === '') {
-                continue;
-            }
-            $incomingDomainsByType[$action['type']][$domain] = true;
-        }
+        $projected = $this->projectSalesforceCatalogAfterActions($actions);
 
         $planned = [];
         $provisionals = CrmAccount::query()
@@ -556,45 +552,102 @@ final class CrmImportService
                 continue;
             }
 
-            $candidates = $this->accounts->findSalesforceCandidatesByDomain($provisional->type, $domain);
-            $incomingCreateLines = [];
             $typeValue = $provisional->type->value;
-            if (! empty($incomingDomainsByType[$typeValue][$domain])) {
-                foreach ($actions as $action) {
-                    if ($action['type'] !== $typeValue) {
-                        continue;
-                    }
-                    if (($action['matching_domain'] ?? null) !== $domain) {
-                        continue;
-                    }
-                    if ($action['effect'] === 'create') {
-                        $incomingCreateLines[] = (int) $action['line'];
-                    }
-                }
-            }
+            $candidates = array_values(array_filter(
+                $projected,
+                static fn (array $row): bool => $row['type'] === $typeValue
+                    && ($row['matching_domain'] ?? null) === $domain,
+            ));
 
-            $candidateCount = count($candidates) + count($incomingCreateLines);
-            if ($candidateCount === 1) {
+            if (count($candidates) === 1) {
+                $target = $candidates[0];
                 $planned[] = [
                     'provisional_id' => $provisional->id,
                     'provisional_name' => $provisional->currentVersion?->name,
                     'domain' => $domain,
                     'mode' => 'auto',
-                    'target_account_id' => $candidates !== [] ? $candidates[0]->id : null,
-                    'target_from_import_line' => $incomingCreateLines[0] ?? null,
+                    'target_account_id' => $target['id'],
+                    'target_from_import_line' => $target['from_import_line'],
+                    'target_salesforce_canonical' => $target['canonical'],
                 ];
-            } elseif ($candidateCount > 1) {
+            } elseif (count($candidates) > 1) {
                 $planned[] = [
                     'provisional_id' => $provisional->id,
                     'provisional_name' => $provisional->currentVersion?->name,
                     'domain' => $domain,
                     'mode' => 'ambiguous',
-                    'candidates' => $candidateCount,
+                    'candidates' => count($candidates),
+                    'candidate_canonicals' => array_values(array_map(
+                        static fn (array $row): string => (string) $row['canonical'],
+                        $candidates,
+                    )),
                 ];
             }
         }
 
         return $planned;
+    }
+
+    /**
+     * Effektiver Salesforce-Katalog nach Apply der Importaktionen (ohne DB-Schreiben).
+     * Typkonflikte ändern den Bestand nicht; divergierende Domains setzen matching_domain auf null.
+     *
+     * @param  list<array<string, mixed>>  $actions
+     * @return list<array{id: ?int, canonical: string, type: string, matching_domain: ?string, from_import_line: ?int}>
+     */
+    private function projectSalesforceCatalogAfterActions(array $actions): array
+    {
+        /** @var array<string, array{id: ?int, canonical: string, type: string, matching_domain: ?string, from_import_line: ?int}> $byCanonical */
+        $byCanonical = [];
+
+        foreach (
+            CrmAccount::query()
+                ->whereNotNull('salesforce_account_id_canonical')
+                ->whereNull('merged_into_account_id')
+                ->orderBy('id')
+                ->get(['id', 'type', 'salesforce_account_id_canonical', 'matching_domain']) as $account
+        ) {
+            $canonical = (string) $account->salesforce_account_id_canonical;
+            $byCanonical[$canonical] = [
+                'id' => (int) $account->id,
+                'canonical' => $canonical,
+                'type' => $account->type->value,
+                'matching_domain' => $account->matching_domain,
+                'from_import_line' => null,
+            ];
+        }
+
+        foreach ($actions as $action) {
+            if (($action['effect'] ?? null) === 'type_conflict') {
+                // Apply lässt den bestehenden Account unverändert.
+                continue;
+            }
+
+            $canonical = (string) ($action['salesforce']['canonical'] ?? '');
+            if ($canonical === '') {
+                continue;
+            }
+
+            $domain = ! empty($action['divergent_domains'])
+                ? null
+                : (($action['matching_domain'] ?? null) === '' ? null : ($action['matching_domain'] ?? null));
+
+            if (isset($byCanonical[$canonical])) {
+                $byCanonical[$canonical]['matching_domain'] = $domain;
+
+                continue;
+            }
+
+            $byCanonical[$canonical] = [
+                'id' => isset($action['existing_account_id']) ? (int) $action['existing_account_id'] : null,
+                'canonical' => $canonical,
+                'type' => (string) $action['type'],
+                'matching_domain' => $domain,
+                'from_import_line' => isset($action['line']) ? (int) $action['line'] : null,
+            ];
+        }
+
+        return array_values($byCanonical);
     }
 
     /**

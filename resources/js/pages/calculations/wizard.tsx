@@ -1919,6 +1919,11 @@ export default function CalculationWizard({
             agencyAccountId,
             invoiceRecipient,
             ensureProvisionalCustomer,
+            ensureProvisionalAgency,
+            customerMatchingDomain,
+            customerBillingEmail,
+            agencyMatchingDomain,
+            agencyBillingEmail,
             campaign,
             productTitle,
             briefing,
@@ -3268,7 +3273,10 @@ export default function CalculationWizard({
                                                         </ul>
                                                     ) : null}
                                                     {calculation?.customer_meridian_number ? (
-                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                        <p
+                                                            className="text-muted-foreground mt-1 text-xs"
+                                                            data-test="customer-meridian-number"
+                                                        >
                                                             Meridian:{' '}
                                                             {
                                                                 calculation.customer_meridian_number
@@ -3418,7 +3426,10 @@ export default function CalculationWizard({
                                                         </ul>
                                                     ) : null}
                                                     {calculation?.agency_meridian_number ? (
-                                                        <p className="text-muted-foreground mt-1 text-xs">
+                                                        <p
+                                                            className="text-muted-foreground mt-1 text-xs"
+                                                            data-test="agency-meridian-number"
+                                                        >
                                                             Meridian:{' '}
                                                             {
                                                                 calculation.agency_meridian_number
@@ -5851,10 +5862,12 @@ export default function CalculationWizard({
                                                                                 {formatHour(
                                                                                     range.start_hour,
                                                                                 )}
+
                                                                                 –
                                                                                 {formatInclusiveEnd(
                                                                                     range.end_hour_exclusive,
                                                                                 )}
+
                                                                                 ,{' '}
                                                                                 {
                                                                                     range.spot_count

@@ -193,7 +193,14 @@ export default function CrmImportPage({
                     </Button>
                 </div>
 
-                {error ? <p className="text-sm text-red-700">{error}</p> : null}
+                {error ? (
+                    <p
+                        className="text-sm text-red-700"
+                        data-test="crm-import-error"
+                    >
+                        {error}
+                    </p>
+                ) : null}
 
                 {importMeta && preview ? (
                     <div className="space-y-4" data-test="crm-import-preview">

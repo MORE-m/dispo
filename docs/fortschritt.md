@@ -36,7 +36,7 @@ REP, ADV-001 Defaults, ADV-002, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10
 | Feature-Tests | `CrmSalesforceMeridianBlP203aTest` + `CrmSalesforceMeridianReviewNachzugTest` + Unit |
 | E2E | Port **8060**, `npm run test:e2e:blp203a` (auch in CI `tests.yml`) |
 | Review-Nachzug P1/P2 | **umgesetzt** (siehe Review-README) |
-| CI final HEAD | **grün** `a8ecb30` / Run 37992762467 (`ci`/`mysql`/`e2e-spt008`) |
+| Restbefunde 10.10. | Wizard-Payload-Deps, Preview-Domainwechsel, E2E vertikal/409/Concurrency |
 | Deploy / operative Datenabnahme | **offen** |
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)

@@ -21,8 +21,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
@@ -86,8 +88,12 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
         $this->assertSame($v1Id, $header['customer_version_id'] ?? null);
     }
 
+    /**
+     * Sequenzielle Absicherung: zweite Zuordnung auf anderes Ziel wird abgelehnt.
+     * Keine echte Parallelität — siehe {@see concurrent_manual_links_serialize_to_one_target}.
+     */
     #[Test]
-    public function competing_manual_links_cannot_split_orders_across_targets(): void
+    public function sequential_second_manual_link_to_other_target_is_rejected(): void
     {
         Storage::fake((string) config('dispo.files_disk'));
         $admin = User::factory()->role(Role::Admin)->create();
@@ -132,6 +138,91 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
         $this->assertSame($sf1->id, $calc->customer_account_id);
         $this->assertNotSame($sf2->id, $calc->customer_account_id);
         $this->assertSame($sf1->id, $provisional->fresh()->merged_into_account_id);
+    }
+
+    #[Test]
+    public function concurrent_manual_links_serialize_to_one_target(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('Parallele Link-Worker erfordern MySQL (GitHub-Job mysql).');
+        }
+
+        Storage::fake((string) config('dispo.files_disk'));
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $accounts = app(CrmAccountService::class);
+
+        $this->importAndApply($admin, [
+            ['SF Eins', 'M-1', '001xx000003DGbq', 'a@one.test', 'Account KUNDE'],
+            ['SF Zwei', 'M-2', '001xx000003DGBr', 'b@two.test', 'Account KUNDE'],
+        ]);
+        $sf1 = CrmAccount::query()->where('salesforce_account_id_canonical', SalesforceAccountId::normalize('001xx000003DGbq')['canonical'])->firstOrFail();
+        $sf2 = CrmAccount::query()->where('salesforce_account_id_canonical', SalesforceAccountId::normalize('001xx000003DGBr')['canonical'])->firstOrFail();
+
+        $provisional = $accounts->createProvisional([
+            'name' => 'Vorläufig Race',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'race-link.test',
+        ], $sales);
+
+        $calc = app(CalculationWriter::class)->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_account_id' => $provisional->id,
+            'invoice_recipient' => 'customer',
+            'campaign' => 'Concurrent Link',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+        ]), $sales);
+
+        $runDir = storage_path('framework/testing/concurrency-crm-link-'.Str::uuid());
+        if (! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
+            $this->fail('Run directory could not be created.');
+        }
+
+        $payloadA = json_encode([
+            'provisional_id' => $provisional->id,
+            'salesforce_id' => $sf1->id,
+            'actor_id' => $admin->id,
+        ], JSON_THROW_ON_ERROR);
+        $payloadB = json_encode([
+            'provisional_id' => $provisional->id,
+            'salesforce_id' => $sf2->id,
+            'actor_id' => $admin->id,
+        ], JSON_THROW_ON_ERROR);
+
+        $worker = base_path('tests/concurrency/crm_manual_link_worker.php');
+        $php = PHP_BINARY;
+        $baseEnv = $this->workerEnvironment();
+
+        $processA = new Process([$php, $worker, $runDir, '0', $payloadA], base_path(), $baseEnv);
+        $processB = new Process([$php, $worker, $runDir, '1', $payloadB], base_path(), $baseEnv);
+        $processA->start();
+        $processB->start();
+        $processA->wait();
+        $processB->wait();
+
+        $results = [];
+        foreach ([0, 1] as $id) {
+            $file = $runDir.'/worker-'.$id.'.result';
+            $this->assertFileExists($file);
+            $results[] = trim((string) file_get_contents($file));
+        }
+
+        $ok = array_values(array_filter($results, fn (string $line): bool => str_starts_with($line, 'OK:')));
+        $errors = array_values(array_filter($results, fn (string $line): bool => str_starts_with($line, 'ERROR:')));
+        $this->assertCount(1, $ok, 'Genau ein Link darf gewinnen. Got: '.implode(' | ', $results));
+        $this->assertCount(1, $errors, 'Der zweite Link muss scheitern. Got: '.implode(' | ', $results));
+
+        $winnerId = (int) explode(':', $ok[0], 2)[1];
+        $this->assertContains($winnerId, [$sf1->id, $sf2->id]);
+
+        $calc->refresh();
+        $this->assertSame($winnerId, $calc->customer_account_id);
+        $this->assertSame($winnerId, $provisional->fresh()->merged_into_account_id);
+        $other = $winnerId === $sf1->id ? $sf2->id : $sf1->id;
+        $this->assertNotSame($other, $calc->customer_account_id);
     }
 
     #[Test]
@@ -288,6 +379,151 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
     }
 
     #[Test]
+    public function domain_change_preview_creates_unique_match_aligned_with_apply(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $sf = '001xx000003DGbq';
+
+        $this->importAndApply($admin, [
+            ['SF Alt Domain', '', $sf, 'a@old-domain.test', 'Account KUNDE'],
+        ]);
+        $account = CrmAccount::query()->whereNull('merged_into_account_id')->firstOrFail();
+
+        $provisional = app(CrmAccountService::class)->createProvisional([
+            'name' => 'Vorläufig Neu',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'new-domain.test',
+        ], $sales);
+
+        $upload = $this->actingAs($admin)->post('/administration/crm/import', [
+            'file' => UploadedFile::fake()->createWithContent('sf.csv', $this->csv([
+                ['SF Alt Domain', '', $sf, 'a@new-domain.test', 'Account KUNDE'],
+            ])),
+        ])->assertOk();
+
+        $matches = $upload->json('import.preview.planned_auto_matches');
+        $this->assertCount(1, $matches);
+        $this->assertSame('auto', $matches[0]['mode']);
+        $this->assertSame($provisional->id, $matches[0]['provisional_id']);
+        $this->assertSame($account->id, $matches[0]['target_account_id']);
+        $canonical = SalesforceAccountId::normalize($sf)['canonical'];
+        $this->assertSame($canonical, $matches[0]['target_salesforce_canonical']);
+
+        $apply = $this->actingAs($admin)->postJson('/administration/crm/import/'.$upload->json('import.id').'/anwenden', [
+            'fingerprint' => $upload->json('import.fingerprint'),
+            'catalog_fingerprint' => $upload->json('import.catalog_fingerprint'),
+        ])->assertOk();
+
+        $reportMatches = collect($apply->json('import.report.auto_matches') ?? []);
+        $this->assertNotEmpty($reportMatches);
+        $this->assertSame('auto', $reportMatches->first()['mode']);
+        $this->assertSame($account->id, $reportMatches->first()['linked_account_id']);
+        $this->assertSame($account->id, $provisional->fresh()->merged_into_account_id);
+        $this->assertSame('new-domain.test', $account->fresh()->matching_domain);
+    }
+
+    #[Test]
+    public function domain_change_preview_removes_previous_match(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $sf = '001xx000003DGBr';
+
+        $this->importAndApply($admin, [
+            ['SF Lose Domain', '', $sf, 'a@keep-domain.test', 'Account KUNDE'],
+        ]);
+
+        app(CrmAccountService::class)->createProvisional([
+            'name' => 'Vorläufig Keep',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'keep-domain.test',
+        ], $sales);
+
+        $upload = $this->actingAs($admin)->post('/administration/crm/import', [
+            'file' => UploadedFile::fake()->createWithContent('sf.csv', $this->csv([
+                ['SF Lose Domain', '', $sf, 'a@other-domain.test', 'Account KUNDE'],
+            ])),
+        ])->assertOk();
+
+        $matches = $upload->json('import.preview.planned_auto_matches') ?? [];
+        $this->assertSame([], $matches);
+
+        $this->actingAs($admin)->postJson('/administration/crm/import/'.$upload->json('import.id').'/anwenden', [
+            'fingerprint' => $upload->json('import.fingerprint'),
+            'catalog_fingerprint' => $upload->json('import.catalog_fingerprint'),
+        ])->assertOk();
+
+        $this->assertTrue(
+            CrmAccount::query()
+                ->where('is_provisional', true)
+                ->where('matching_domain', 'keep-domain.test')
+                ->whereNull('merged_into_account_id')
+                ->exists(),
+        );
+    }
+
+    #[Test]
+    public function domain_change_preview_creates_and_clears_ambiguity(): void
+    {
+        Storage::fake((string) config('dispo.files_disk'));
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+
+        $this->importAndApply($admin, [
+            ['SF A', '', '001xx000003DGbq', 'a@ambig-a.test', 'Account KUNDE'],
+            ['SF B', '', '001xx000003DGBr', 'b@ambig-b.test', 'Account KUNDE'],
+        ]);
+
+        $provisional = app(CrmAccountService::class)->createProvisional([
+            'name' => 'Vorläufig Ambig',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'shared-now.test',
+        ], $sales);
+
+        $ambiguousUpload = $this->actingAs($admin)->post('/administration/crm/import', [
+            'file' => UploadedFile::fake()->createWithContent('sf.csv', $this->csv([
+                ['SF A', '', '001xx000003DGbq', 'a@shared-now.test', 'Account KUNDE'],
+                ['SF B', '', '001xx000003DGBr', 'b@shared-now.test', 'Account KUNDE'],
+            ])),
+        ])->assertOk();
+
+        $ambiguous = $ambiguousUpload->json('import.preview.planned_auto_matches');
+        $this->assertCount(1, $ambiguous);
+        $this->assertSame('ambiguous', $ambiguous[0]['mode']);
+        $this->assertSame(2, $ambiguous[0]['candidates']);
+
+        $this->actingAs($admin)->postJson('/administration/crm/import/'.$ambiguousUpload->json('import.id').'/anwenden', [
+            'fingerprint' => $ambiguousUpload->json('import.fingerprint'),
+            'catalog_fingerprint' => $ambiguousUpload->json('import.catalog_fingerprint'),
+        ])->assertOk();
+        $this->assertNull($provisional->fresh()->merged_into_account_id);
+
+        $clearUpload = $this->actingAs($admin)->post('/administration/crm/import', [
+            'file' => UploadedFile::fake()->createWithContent('sf.csv', $this->csv([
+                ['SF A', '', '001xx000003DGbq', 'a@shared-now.test', 'Account KUNDE'],
+                ['SF B', '', '001xx000003DGBr', 'b@ambig-b.test', 'Account KUNDE'],
+            ])),
+        ])->assertOk();
+
+        $clear = $clearUpload->json('import.preview.planned_auto_matches');
+        $this->assertCount(1, $clear);
+        $this->assertSame('auto', $clear[0]['mode']);
+        $sfA = CrmAccount::query()
+            ->where('salesforce_account_id_canonical', SalesforceAccountId::normalize('001xx000003DGbq')['canonical'])
+            ->firstOrFail();
+        $this->assertSame($sfA->id, $clear[0]['target_account_id']);
+
+        $this->actingAs($admin)->postJson('/administration/crm/import/'.$clearUpload->json('import.id').'/anwenden', [
+            'fingerprint' => $clearUpload->json('import.fingerprint'),
+            'catalog_fingerprint' => $clearUpload->json('import.catalog_fingerprint'),
+        ])->assertOk();
+        $this->assertSame($sfA->id, $provisional->fresh()->merged_into_account_id);
+    }
+
+    #[Test]
     public function manual_search_link_without_domain_and_conflict_resolve(): void
     {
         Storage::fake((string) config('dispo.files_disk'));
@@ -394,5 +630,26 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
         $apply->assertOk();
 
         return CrmImport::query()->findOrFail($id);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function workerEnvironment(): array
+    {
+        $vars = [
+            'APP_KEY', 'APP_ENV', 'DB_CONNECTION', 'DB_HOST', 'DB_PORT',
+            'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_URL',
+        ];
+
+        $env = [];
+        foreach ($vars as $var) {
+            $value = getenv($var);
+            if ($value !== false) {
+                $env[$var] = (string) $value;
+            }
+        }
+
+        return $env;
     }
 }

@@ -1430,27 +1430,31 @@ export default function DispoOrderShow({
                         ) : null}
                         {order.customer_meridian_number != null ||
                         order.customer_name ? (
-                            <Detail
-                                label="Meridian (Kunde)"
-                                value={
-                                    order.customer_meridian_number &&
-                                    order.customer_meridian_number !== ''
-                                        ? order.customer_meridian_number
-                                        : 'Meridian-Nummer folgt'
-                                }
-                            />
+                            <div data-test="dispo-customer-meridian">
+                                <Detail
+                                    label="Meridian (Kunde)"
+                                    value={
+                                        order.customer_meridian_number &&
+                                        order.customer_meridian_number !== ''
+                                            ? order.customer_meridian_number
+                                            : 'Meridian-Nummer folgt'
+                                    }
+                                />
+                            </div>
                         ) : null}
                         {order.agency_meridian_number != null ||
                         order.agency_name ? (
-                            <Detail
-                                label="Meridian (Agentur)"
-                                value={
-                                    order.agency_meridian_number &&
-                                    order.agency_meridian_number !== ''
-                                        ? order.agency_meridian_number
-                                        : 'Meridian-Nummer folgt'
-                                }
-                            />
+                            <div data-test="dispo-agency-meridian">
+                                <Detail
+                                    label="Meridian (Agentur)"
+                                    value={
+                                        order.agency_meridian_number &&
+                                        order.agency_meridian_number !== ''
+                                            ? order.agency_meridian_number
+                                            : 'Meridian-Nummer folgt'
+                                    }
+                                />
+                            </div>
                         ) : null}
                         <Detail label="Kampagne" value={order.campaign} />
                         <Detail
