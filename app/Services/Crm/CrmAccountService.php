@@ -282,7 +282,13 @@ final class CrmAccountService
      * Auto- oder Import-Verknüpfung: setzt SF-ID auf vorläufigem Account oder merged in bestehenden.
      *
      * @param  array{raw: string, canonical: string}  $salesforce
-     * @param  array{name: string, billing_email: ?string, matching_domain: ?string, meridian_number: ?string}  $payload
+     * @param  array{
+     *     name: string,
+     *     billing_email: ?string,
+     *     matching_domain: ?string,
+     *     meridian_number: ?string,
+     *     salesforce_record_type?: ?string
+     * }  $payload
      */
     public function attachSalesforceIdentity(
         CrmAccount $account,
@@ -356,7 +362,13 @@ final class CrmAccountService
 
     /**
      * @param  array{raw: string, canonical: string}  $salesforce
-     * @param  array{name: string, billing_email: ?string, matching_domain: ?string, meridian_number: ?string}  $payload
+     * @param  array{
+     *     name: string,
+     *     billing_email: ?string,
+     *     matching_domain: ?string,
+     *     meridian_number: ?string,
+     *     salesforce_record_type?: ?string
+     * }  $payload
      */
     public function upsertSalesforceAccount(
         array $salesforce,
@@ -485,7 +497,13 @@ final class CrmAccountService
     }
 
     /**
-     * @param  array{name: string, billing_email: ?string, matching_domain: ?string, meridian_number: ?string}  $payload
+     * @param  array{
+     *     name: string,
+     *     billing_email: ?string,
+     *     matching_domain: ?string,
+     *     meridian_number: ?string,
+     *     salesforce_record_type?: ?string
+     * }  $payload
      * @param  array{raw: string, canonical: string}  $salesforce
      */
     private function applyImportedMasterData(
@@ -523,11 +541,15 @@ final class CrmAccountService
         $account->is_provisional = false;
         $account->matching_domain = $payload['matching_domain'];
 
+        $incomingRecordType = $payload['salesforce_record_type'] ?? null;
+        $incomingRecordType = $incomingRecordType === '' ? null : $incomingRecordType;
+
         $unchanged = $current !== null
             && $current->name === $payload['name']
             && ($current->billing_email ?? null) === ($payload['billing_email'] ?? null)
             && ($current->matching_domain ?? null) === ($payload['matching_domain'] ?? null)
-            && ($current->meridian_number ?? null) === ($effectiveMeridian ?? null);
+            && ($current->meridian_number ?? null) === ($effectiveMeridian ?? null)
+            && ($current->salesforce_record_type ?? null) === ($incomingRecordType ?? null);
 
         if ($unchanged) {
             $account->save();
@@ -544,6 +566,7 @@ final class CrmAccountService
                 'billing_email' => $payload['billing_email'],
                 'matching_domain' => $payload['matching_domain'],
                 'meridian_number' => $effectiveMeridian,
+                'salesforce_record_type' => $incomingRecordType,
             ],
             $actor,
             $importId,
@@ -566,7 +589,13 @@ final class CrmAccountService
     }
 
     /**
-     * @param  array{name: string, billing_email: ?string, matching_domain: ?string, meridian_number: ?string}  $payload
+     * @param  array{
+     *     name: string,
+     *     billing_email: ?string,
+     *     matching_domain: ?string,
+     *     meridian_number: ?string,
+     *     salesforce_record_type?: ?string
+     * }  $payload
      */
     private function createVersion(
         CrmAccount $account,
@@ -576,6 +605,8 @@ final class CrmAccountService
         ?int $importId,
         CrmAccountVersionSource $source,
     ): CrmAccountVersion {
+        $recordType = $payload['salesforce_record_type'] ?? null;
+
         return CrmAccountVersion::query()->create([
             'crm_account_id' => $account->id,
             'version_number' => $number,
@@ -583,6 +614,7 @@ final class CrmAccountService
             'billing_email' => $payload['billing_email'],
             'matching_domain' => $payload['matching_domain'],
             'meridian_number' => $payload['meridian_number'],
+            'salesforce_record_type' => $recordType === '' ? null : $recordType,
             'source' => $source,
             'created_by_id' => $actor->id,
             'crm_import_id' => $importId,

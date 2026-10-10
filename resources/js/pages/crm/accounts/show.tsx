@@ -9,6 +9,7 @@ type AccountVersion = {
     billing_email: string | null;
     matching_domain: string | null;
     meridian_number: string | null;
+    salesforce_record_type: string | null;
     source: string;
     created_at: string | null;
     created_by: string | null;
@@ -26,6 +27,7 @@ type CrmAccountDetail = {
     name: string | null;
     billing_email: string | null;
     meridian_number: string | null;
+    salesforce_record_type: string | null;
     meridian_pending: boolean;
     version_number: number | null;
     versions?: AccountVersion[];
@@ -91,6 +93,18 @@ export default function CrmAccountShow({
                         <p>{account.matching_domain ?? '–'}</p>
                     </div>
                     <div>
+                        <p className="text-muted-foreground">
+                            Salesforce-Datensatztyp
+                        </p>
+                        <p className="font-mono">
+                            {account.salesforce_record_type ?? '–'}
+                        </p>
+                    </div>
+                    <div>
+                        <p className="text-muted-foreground">Interner Typ</p>
+                        <p>{account.type_label}</p>
+                    </div>
+                    <div>
                         <p className="text-muted-foreground">Version</p>
                         <p>{account.version_number ?? '–'}</p>
                     </div>
@@ -146,6 +160,7 @@ export default function CrmAccountShow({
                                     <tr>
                                         <th className="px-2 py-2">v</th>
                                         <th className="px-2 py-2">Name</th>
+                                        <th className="px-2 py-2">SF-Typ</th>
                                         <th className="px-2 py-2">Meridian</th>
                                         <th className="px-2 py-2">Quelle</th>
                                         <th className="px-2 py-2">Erstellt</th>
@@ -162,6 +177,10 @@ export default function CrmAccountShow({
                                             </td>
                                             <td className="px-2 py-1">
                                                 {version.name}
+                                            </td>
+                                            <td className="px-2 py-1 font-mono text-xs">
+                                                {version.salesforce_record_type ??
+                                                    '–'}
                                             </td>
                                             <td className="px-2 py-1">
                                                 {version.meridian_number ??

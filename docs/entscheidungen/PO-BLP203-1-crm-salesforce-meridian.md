@@ -1,18 +1,20 @@
 # PO-BLP203-1 – CRM Salesforce / Meridian (BL-P2-03a)
 
-Status: **Akzeptiert** (A1, B1, C1, D wie unten, E1, F1, G1, H1)
-Stand: 9. Oktober 2026
-Auditbasis: `origin/main` @ `fff472f112882b65abad4633ea8e5177ebe58f42`
-(Merge PR [#132](https://github.com/MORE-m/dispo/pull/132); Feature-Branch `feat/bl-p2-03a-salesforce-meridian`;
-**kein** Deploy)
+Status: **Akzeptiert** (A1, B1, C1, D + **D1**, E1, F1, G1, H1)
+Stand: 10. Oktober 2026
+Code-Basis Feature-Nachzug: Branch `feat/bl-p2-03a-crm-record-type-mapping` auf
+`origin/main` @ `aed4b070c1217b4ee883febca2751786c9b95aec` (Merge PR [#133](https://github.com/MORE-m/dispo/pull/133));
+**kein** Deploy / kein operativer Import
 IDs: `CRM-001`–`CRM-003` (Slice), `CRM-004` (Folgeslice), `DSP-*`, `APR-004` (Abgrenzung E1),
 `VER-*`, `AUD-*`, `ADM-001`, `AUTH-001`–`AUTH-007`, UX-GATE-D
 Slice-Kennung: **`BL-P2-03a`** (Teilscope von `BL-P2-03`, nicht vollständig)
 Readiness: [`docs/readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md`](../readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md)
+Daten: [`PO-BLP203-1-datenlieferung`](PO-BLP203-1-datenlieferung.md) (Docs-Worktree Daten-Readiness)
 Review: [`docs/reviews/crm-salesforce-meridian-readiness/`](../reviews/crm-salesforce-meridian-readiness/)
 
 > Bestätigte Fachregeln R1–R7 bleiben verbindlich und werden nicht erneut zur Wahl gestellt.
 > Mit dem Implementierungsauftrag sind A1/B1/C1/E1/F1/G1/H1 sowie das CSV-Format (D) akzeptiert.
+> **D1** ergänzt das Typmapping um die gelieferten Salesforce-Typen Gesellschafter/Sonstiges.
 
 ## Akzeptierte Entscheidungen
 
@@ -21,7 +23,8 @@ Review: [`docs/reviews/crm-salesforce-meridian-readiness/`](../reviews/crm-sales
 | **A1** | Vollständiger vertikaler Slice: Import → Stammdaten → vorläufige Accounts → Zuordnung → Calc/Dispo → Meridian-Nachtrag. Kontakte/`CRM-004` und CRM-Vollausbau außerhalb |
 | **B1** | UX-GATE-D **Teilfreigabe nur** für die erforderlichen CRM-Oberflächen dieses Slices |
 | **C1** | Import / manuelle Zuordnung / Konflikte: Admin + Management. Vorläufige Accounts: Sales + Admin + Management. Disposition: lesend. Bestehende Calc-/Dispo-Rechte bleiben zusätzlich maßgeblich. Produktmanagement: keine neuen CRM-Rechte |
-| **D** | Erster Slice: manueller **CSV**-Import (UTF-8, Semikolon). Spalten: Accountname, Meridian-ID, Account-ID, Rechnungs-E-Mail, Account-Datensatztyp. Typmapping: `Account KUNDE` → Kunde, `Account AGENTUR` → Agentur. Kein XLSX, keine API, kein E-Mail-Ingest. Mehrere unterschiedliche Domains in einer Zelle → Prüfliste (nicht erste Adresse wählen) |
+| **D** | Erster Slice: manueller **CSV**-Import (UTF-8, Semikolon). Spalten: Accountname, Meridian-ID, Account-ID, Rechnungs-E-Mail, Account-Datensatztyp. Kein XLSX, keine API, kein E-Mail-Ingest. Mehrere unterschiedliche Domains in einer Zelle → Prüfliste (nicht erste Adresse wählen) |
+| **D1** | Explizites Typmapping der gelieferten Strings: `Account KUNDE` / `Account GESELLSCHAFTER` / `Account SONSTIGE` → intern **Kunde** (`customer`); `Account AGENTUR` → **Agentur** (`agency`). Originaler Salesforce-Datensatztyp wird je Stammdatenversion gespeichert und in der Account-Detailansicht angezeigt (vorläufige/historische Versionen dürfen `NULL` haben). Wechsel Kunde↔Gesellschafter↔Sonstiges bei gleicher SF-ID = neue Version, interner Typ bleibt Kunde. Wechsel intern Kunde↔Agentur = Typkonflikt. Domain+Typ-Matching nutzt den internen Typ (Kundengruppe gemeinsam; Eindeutigkeit über die ganze Gruppe). Andere unbekannte Typen bleiben blockierende Fehler. **Keine** Filterung der Exportdatei; der frühere Filtervorschlag (Typen entfernen) ist **verworfen**. |
 | **E1** | Reine Salesforce-Verknüpfung bzw. Meridian-Ergänzung invalidiert **keine** Freigabe und ändert keinen Status |
 | **F1** | Rechnungsempfänger explizit `customer` \| `agency`; Agentur nur bei gesetzter Agentur. Bei bestehenden Freitext-Aufträgen keine historische Zuordnung erfinden |
 | **G1** | Kontakte / `CRM-004` bleiben Folgeslice |

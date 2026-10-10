@@ -260,6 +260,7 @@ class CrmAccountController extends Controller
             'name' => $version?->name,
             'billing_email' => $version?->billing_email,
             'meridian_number' => $version?->meridian_number,
+            'salesforce_record_type' => $version?->salesforce_record_type,
             'meridian_pending' => $version === null || $version->meridian_number === null || $version->meridian_number === '',
             'version_number' => $version?->version_number,
         ];
@@ -272,6 +273,7 @@ class CrmAccountController extends Controller
                 'billing_email' => $v->billing_email,
                 'matching_domain' => $v->matching_domain,
                 'meridian_number' => $v->meridian_number,
+                'salesforce_record_type' => $v->salesforce_record_type,
                 'source' => $v->source->value,
                 'created_at' => $v->created_at?->toIso8601String(),
                 'created_by' => $v->createdBy?->name,

@@ -15,12 +15,18 @@ enum CrmAccountType: string
         };
     }
 
+    /**
+     * Explizites Mapping der gelieferten Salesforce-Datensatztypen (PO-BLP203-1 D1).
+     * Gesellschafter/Sonstiges → intern Kunde; unbekannte Typen bleiben blockierend.
+     */
     public static function fromExportRecordType(string $raw): ?self
     {
         $normalized = trim($raw);
 
         return match ($normalized) {
-            'Account KUNDE' => self::Customer,
+            'Account KUNDE',
+            'Account GESELLSCHAFTER',
+            'Account SONSTIGE' => self::Customer,
             'Account AGENTUR' => self::Agency,
             default => null,
         };

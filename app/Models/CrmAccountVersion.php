@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $billing_email
  * @property string|null $matching_domain
  * @property string|null $meridian_number
+ * @property string|null $salesforce_record_type
  * @property CrmAccountVersionSource $source
  */
 class CrmAccountVersion extends Model
@@ -25,6 +26,7 @@ class CrmAccountVersion extends Model
         'billing_email',
         'matching_domain',
         'meridian_number',
+        'salesforce_record_type',
         'source',
         'created_by_id',
         'crm_import_id',
