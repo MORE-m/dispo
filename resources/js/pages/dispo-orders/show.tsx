@@ -267,6 +267,9 @@ type OrderDetail = {
     calculation_id: number;
     customer_name: string | null;
     agency_name: string | null;
+    invoice_recipient?: string | null;
+    customer_meridian_number?: string | null;
+    agency_meridian_number?: string | null;
     campaign: string | null;
     product_title: string | null;
     briefing: string | null;
@@ -1412,6 +1415,47 @@ export default function DispoOrderShow({
                     <CardContent className="grid gap-4 px-5 py-4 sm:grid-cols-2">
                         <Detail label="Kunde" value={order.customer_name} />
                         <Detail label="Agentur" value={order.agency_name} />
+                        {order.invoice_recipient != null &&
+                        order.invoice_recipient !== '' ? (
+                            <Detail
+                                label="Rechnungsempfänger"
+                                value={
+                                    order.invoice_recipient === 'agency'
+                                        ? 'Agentur'
+                                        : order.invoice_recipient === 'customer'
+                                          ? 'Kunde'
+                                          : order.invoice_recipient
+                                }
+                            />
+                        ) : null}
+                        {order.customer_meridian_number != null ||
+                        order.customer_name ? (
+                            <div data-test="dispo-customer-meridian">
+                                <Detail
+                                    label="Meridian (Kunde)"
+                                    value={
+                                        order.customer_meridian_number &&
+                                        order.customer_meridian_number !== ''
+                                            ? order.customer_meridian_number
+                                            : 'Meridian-Nummer folgt'
+                                    }
+                                />
+                            </div>
+                        ) : null}
+                        {order.agency_meridian_number != null ||
+                        order.agency_name ? (
+                            <div data-test="dispo-agency-meridian">
+                                <Detail
+                                    label="Meridian (Agentur)"
+                                    value={
+                                        order.agency_meridian_number &&
+                                        order.agency_meridian_number !== ''
+                                            ? order.agency_meridian_number
+                                            : 'Meridian-Nummer folgt'
+                                    }
+                                />
+                            </div>
+                        ) : null}
                         <Detail label="Kampagne" value={order.campaign} />
                         <Detail
                             label="Produkt / Titel"

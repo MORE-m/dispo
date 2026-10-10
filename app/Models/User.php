@@ -177,4 +177,36 @@ class User extends Authenticatable
     {
         return $this->hasRole(Role::Admin);
     }
+
+    /** PO-BLP203-1 C1: CSV-Import anwenden. */
+    public function canImportCrmAccounts(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Management);
+    }
+
+    /** PO-BLP203-1 C1: vorläufige Kunden/Agenturen anlegen. */
+    public function canCreateProvisionalCrmAccounts(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Sales, Role::Management);
+    }
+
+    /** PO-BLP203-1 C1: manuelle Zuordnung / Konflikte bearbeiten. */
+    public function canManageCrmMatches(): bool
+    {
+        return $this->hasAnyRole(Role::Admin, Role::Management);
+    }
+
+    /**
+     * Stammdaten lesen: Admin/GF inkl. Import-UI; Disposition lesend;
+     * Sales für Auswahl in Calc; PM ohne CRM-Rechte (H1).
+     */
+    public function canViewCrmAccounts(): bool
+    {
+        return $this->hasAnyRole(
+            Role::Admin,
+            Role::Management,
+            Role::Sales,
+            Role::Disposition,
+        );
+    }
 }

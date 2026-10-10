@@ -40,6 +40,7 @@ export default defineConfig({
         '**/bl-p2-02c-*.spec.ts',
         '**/bl-p4-01a-*.spec.ts',
         '**/bl-p4-01b-*.spec.ts',
+        '**/bl-p2-03a-*.spec.ts',
         '**/bl-p4-01c-*.spec.ts',
         '**/bl-p4-02b-*.spec.ts',
         '**/bl-p4-02c-*.spec.ts',

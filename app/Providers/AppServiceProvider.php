@@ -75,6 +75,22 @@ class AppServiceProvider extends ServiceProvider
             return $user->canViewNotificationOutbox();
         });
 
+        Gate::define('import-crm-accounts', function (User $user): bool {
+            return $user->canImportCrmAccounts();
+        });
+
+        Gate::define('create-provisional-crm-accounts', function (User $user): bool {
+            return $user->canCreateProvisionalCrmAccounts();
+        });
+
+        Gate::define('manage-crm-matches', function (User $user): bool {
+            return $user->canManageCrmMatches();
+        });
+
+        Gate::define('view-crm-accounts', function (User $user): bool {
+            return $user->canViewCrmAccounts();
+        });
+
         Gate::policy(Calculation::class, CalculationPolicy::class);
         Gate::policy(DispoOrder::class, DispoOrderPolicy::class);
         Gate::policy(StandardOffer::class, StandardOfferPolicy::class);

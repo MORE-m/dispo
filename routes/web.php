@@ -6,6 +6,7 @@ use App\Http\Controllers\Administration\AdvertisingMediumAdminController;
 use App\Http\Controllers\Administration\CalculationMethodAdminController;
 use App\Http\Controllers\Administration\CatalogHubController;
 use App\Http\Controllers\Administration\CombinationAdminController;
+use App\Http\Controllers\Administration\CrmImportController;
 use App\Http\Controllers\Administration\FieldDefinitionAdminController;
 use App\Http\Controllers\Administration\FieldSetAdminController;
 use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\Administration\ProductionPriceListAdminController;
 use App\Http\Controllers\Administration\SpecialApproveRightAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
+use App\Http\Controllers\Crm\CrmAccountController;
 use App\Http\Controllers\DispoOrderController;
 use App\Http\Controllers\E2E\E2EChoiceSnapshotController;
 use App\Http\Controllers\HealthController;
@@ -115,7 +117,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('kalkulationen/{calculation}/dispoauftraege', [DispoOrderController::class, 'store'])
         ->name('dispo-orders.store');
     Route::get('auswertungen', UnavailableModuleController::class)->defaults('module', 'reports')->name('reports.index');
-    Route::get('stammdaten', UnavailableModuleController::class)->defaults('module', 'master-data')->name('master-data.index');
+    Route::get('stammdaten', fn () => redirect()->route('crm.accounts.index'))->name('master-data.index');
+
+    // BL-P2-03a / PO-BLP203-1: CRM Salesforce/Meridian
+    Route::get('crm/accounts', [CrmAccountController::class, 'index'])->name('crm.accounts.index');
+    Route::get('crm/accounts/pruefliste', [CrmAccountController::class, 'matchQueue'])->name('crm.accounts.match-queue');
+    Route::get('crm/accounts/suche', [CrmAccountController::class, 'search'])->name('crm.accounts.search');
+    Route::post('crm/accounts/vorlaeufig', [CrmAccountController::class, 'storeProvisional'])->name('crm.accounts.provisional');
+    Route::get('crm/accounts/{crmAccount}', [CrmAccountController::class, 'show'])->name('crm.accounts.show');
+    Route::post('crm/accounts/{crmAccount}/verknuepfen', [CrmAccountController::class, 'link'])->name('crm.accounts.link');
+    Route::post('crm/konflikte/{crmConflict}/abschliessen', [CrmAccountController::class, 'resolveConflict'])
+        ->name('crm.conflicts.resolve');
 
     Route::middleware(['can:access-administration'])->group(function () {
         Route::get('administration', AdministrationHubController::class)
@@ -236,6 +248,15 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.inventories.reactivate-preview');
         Route::post('administration/inventare/{inventory}/reaktivieren', [InventoryAdminController::class, 'reactivate'])
             ->name('administration.inventories.reactivate');
+
+        Route::get('administration/crm/import', [CrmImportController::class, 'create'])
+            ->name('administration.crm.import');
+        Route::post('administration/crm/import', [CrmImportController::class, 'upload'])
+            ->name('administration.crm.import.upload');
+        Route::get('administration/crm/import/{crmImport}', [CrmImportController::class, 'show'])
+            ->name('administration.crm.import.show');
+        Route::post('administration/crm/import/{crmImport}/anwenden', [CrmImportController::class, 'apply'])
+            ->name('administration.crm.import.apply');
 
         Route::get('administration/preislisten', [PriceListAdminController::class, 'index'])
             ->name('administration.price-lists.index');

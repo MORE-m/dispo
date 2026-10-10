@@ -222,12 +222,15 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 
 - **Phase:** 2
-- **Status:** offen
-- **Anforderungen:** `CRM-001` bis `CRM-004`
+- **Status:** teilweise (`BL-P2-03a` Salesforce-CSV / Meridian-Nachtrag)
+- **Anforderungen:** `CRM-001` bis `CRM-003` (Slice); `CRM-004` Kontakte **offen**
 - **Abhängigkeiten:** BL-P1-02
 - **Ergebnis:** Stammdatenpflege inkl. Meridian-Nummer
 - **Akzeptanz:** Rechnungsempfänger nur Kunde oder Agentur modellierbar
-- **Tests:** Pest Validierung und Berechtigung
+- **Tests:** Feature/Unit + E2E Port 8060 (`playwright.blp203a.config.ts`)
+- **Slice `BL-P2-03a`:** manueller CSV-Import, Versionen, vorläufige Accounts,
+  Domain+Typ-Zuordnung, Calc/Dispo-Anbindung, Meridian-Nachtrag (PO-BLP203-1 A1…H1).
+  **Nicht** erledigt: Kontakte, API, E-Mail-Ingest, XLSX, Deploy/operative Datenabnahme.
 
 ## Phase 3 – Versionen, dynamische Felder und Snapshots
 

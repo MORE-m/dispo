@@ -57,6 +57,9 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entscheidungen/PO-BLP502-1-produktion-sonstiges.md`](entscheidungen/PO-BLP502-1-produktion-sonstiges.md) | PO Produktion Erst-Slice Spotproduktion@Spot Classic (**Akzeptiert**; `main` PR #131) |
 | [`entscheidungen/PO-BLP502-1-aufloesungsvertrag.md`](entscheidungen/PO-BLP502-1-aufloesungsvertrag.md) | Produktionspreis Jahr/Pin/Rebind |
 | [`entscheidungen/PO-BLP502-1-datenlieferung.md`](entscheidungen/PO-BLP502-1-datenlieferung.md) | PO-Datenlieferung Spotproduktionspreise (lokal 600/400 €; Deploy offen) |
+| [`reviews/crm-salesforce-meridian-readiness/`](reviews/crm-salesforce-meridian-readiness/) | Bericht CRM Salesforce/Meridian Readiness (`BL-P2-03a`; PO-BLP203-1 vorgeschlagen) |
+| [`readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md`](readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md) | Feature-Readiness CRM Import/Zuordnung/Meridian-Nachtrag (READY MIT VORBEDINGUNGEN) |
+| [`entscheidungen/PO-BLP203-1-crm-salesforce-meridian.md`](entscheidungen/PO-BLP203-1-crm-salesforce-meridian.md) | PO CRM Salesforce/Meridian Erst-Slice (**Vorgeschlagen**; R1–R7 bestätigt) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 | [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |

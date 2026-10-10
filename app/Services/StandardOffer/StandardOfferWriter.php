@@ -367,7 +367,7 @@ final class StandardOfferWriter
         $customerName = trim($customerName);
         if ($customerName === '') {
             throw ValidationException::withMessages([
-                'customer_name' => 'Kunde ist bei der Übernahme Pflicht (Freitext bis CRM-Slice).',
+                'customer_name' => 'Kunde ist bei der Übernahme Pflicht.',
             ]);
         }
 

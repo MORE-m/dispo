@@ -1,0 +1,63 @@
+# PO-BLP203-1 – CRM Salesforce / Meridian (BL-P2-03a)
+
+Status: **Akzeptiert** (A1, B1, C1, D wie unten, E1, F1, G1, H1)
+Stand: 9. Oktober 2026
+Auditbasis: `origin/main` @ `fff472f112882b65abad4633ea8e5177ebe58f42`
+(Merge PR [#132](https://github.com/MORE-m/dispo/pull/132); Feature-Branch `feat/bl-p2-03a-salesforce-meridian`;
+**kein** Deploy)
+IDs: `CRM-001`–`CRM-003` (Slice), `CRM-004` (Folgeslice), `DSP-*`, `APR-004` (Abgrenzung E1),
+`VER-*`, `AUD-*`, `ADM-001`, `AUTH-001`–`AUTH-007`, UX-GATE-D
+Slice-Kennung: **`BL-P2-03a`** (Teilscope von `BL-P2-03`, nicht vollständig)
+Readiness: [`docs/readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md`](../readiness/BL-P2-03-crm-salesforce-meridian-2026-10-09.md)
+Review: [`docs/reviews/crm-salesforce-meridian-readiness/`](../reviews/crm-salesforce-meridian-readiness/)
+
+> Bestätigte Fachregeln R1–R7 bleiben verbindlich und werden nicht erneut zur Wahl gestellt.
+> Mit dem Implementierungsauftrag sind A1/B1/C1/E1/F1/G1/H1 sowie das CSV-Format (D) akzeptiert.
+
+## Akzeptierte Entscheidungen
+
+| ID | Entscheidung |
+|---|---|
+| **A1** | Vollständiger vertikaler Slice: Import → Stammdaten → vorläufige Accounts → Zuordnung → Calc/Dispo → Meridian-Nachtrag. Kontakte/`CRM-004` und CRM-Vollausbau außerhalb |
+| **B1** | UX-GATE-D **Teilfreigabe nur** für die erforderlichen CRM-Oberflächen dieses Slices |
+| **C1** | Import / manuelle Zuordnung / Konflikte: Admin + Management. Vorläufige Accounts: Sales + Admin + Management. Disposition: lesend. Bestehende Calc-/Dispo-Rechte bleiben zusätzlich maßgeblich. Produktmanagement: keine neuen CRM-Rechte |
+| **D** | Erster Slice: manueller **CSV**-Import (UTF-8, Semikolon). Spalten: Accountname, Meridian-ID, Account-ID, Rechnungs-E-Mail, Account-Datensatztyp. Typmapping: `Account KUNDE` → Kunde, `Account AGENTUR` → Agentur. Kein XLSX, keine API, kein E-Mail-Ingest. Mehrere unterschiedliche Domains in einer Zelle → Prüfliste (nicht erste Adresse wählen) |
+| **E1** | Reine Salesforce-Verknüpfung bzw. Meridian-Ergänzung invalidiert **keine** Freigabe und ändert keinen Status |
+| **F1** | Rechnungsempfänger explizit `customer` \| `agency`; Agentur nur bei gesetzter Agentur. Bei bestehenden Freitext-Aufträgen keine historische Zuordnung erfinden |
+| **G1** | Kontakte / `CRM-004` bleiben Folgeslice |
+| **H1** | Salesforce-„Projektmanagement“ ist keine Tool-Rolle und gibt Produktmanagement keine Rechte |
+
+## Bestätigte Fachregeln (unverändert verbindlich)
+
+| ID | Regel |
+|---|---|
+| **R1** | Salesforce führende Quelle; Meridian-Abgleich außerhalb; danach Meridian-Nummer am SF-Account |
+| **R2** | Täglicher Export → Tool-Import inkl. Accounts ohne Meridian; manueller Dateiimport |
+| **R3** | Bekannte Spalten; Numbers nicht als Parser-Format |
+| **R4** | SF-Account-ID = Identität; Firmierungsänderung → Version; Re-Import unverändert → keine Version; Aufträge behalten Snapshots |
+| **R5** | „Meridian-Nummer folgt“ in jedem Status; Nachtrag ohne Mutation eingefrorener Auftragsdaten; Audit; Abweichung = Konflikt |
+| **R6** | Vorläufige Kunden/Agenturen nutzbar; Firmierung, Typ, Domain/E-Mail für Erstabgleich; Adresse nicht nötig |
+| **R7** | Erstzuordnung nur Domain + Typ; Auto nur bei genau einem Treffer; nach Link nur SF-ID |
+
+## Salesforce-ID (Implementierungsvertrag zu D/R4)
+
+- IDs und Meridian-Nummern als **Text**; führende Nullen erhalten.
+- 15-stellige IDs sind **case-sensitive**. Kein pauschales Lowercasing / case-insensitiver Vergleich.
+- Kanonischer Schlüssel führt gültige 15- und 18-stellige Formen derselben Identität zusammen (Checksum-Verfahren). Originalwert bleibt erhalten.
+- Ungültige oder widersprüchliche IDs erscheinen im Importbericht.
+
+## Datenabdeckung CSV
+
+Die gelieferte CSV enthält **keine Adressspalten**. Es werden keine Adressen erfunden.
+Nicht gelieferte Felder leeren bestehende Adressattribute nicht (falls später ergänzt).
+
+## Nicht-Ziele
+
+- `CRM-004` Kontakte, Salesforce-/Meridian-API, E-Mail-Ingest, XLSX/Numbers
+- Pauschale Erledigung von `BL-P2-03`
+- Deploy / operative DB-Pflege
+
+## Folge
+
+`BL-P2-03` und `CRM-001`–`CRM-003` nach Abnahme dieses Slices **teilweise**;
+`CRM-004` offen. Operative Datenabnahme und Deploy getrennt.
