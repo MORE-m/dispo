@@ -229,8 +229,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Akzeptanz:** Rechnungsempfänger nur Kunde oder Agentur modellierbar
 - **Tests:** Feature/Unit + E2E Port 8060 (`playwright.blp203a.config.ts`)
 - **Slice `BL-P2-03a`:** manueller CSV-Import, Versionen, vorläufige Accounts,
-  Domain+Typ-Zuordnung, Calc/Dispo-Anbindung, Meridian-Nachtrag (PO-BLP203-1 A1…H1).
-  **Nicht** erledigt: Kontakte, API, E-Mail-Ingest, XLSX, Deploy/operative Datenabnahme.
+  Domain+Typ-Zuordnung (D1), Calc/Dispo-Anbindung, Meridian-Nachtrag (PO-BLP203-1 A1…H1+D1);
+  lokal in `dispo_mat_core` eingerichtet/abgenommen (Import-ID 2; Docs-Draft).
+  **Nicht** erledigt: Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX, Deploy/andere Umgebungen;
+  `BL-P2-03` bleibt teilweise.
 
 ## Phase 3 – Versionen, dynamische Felder und Snapshots
 

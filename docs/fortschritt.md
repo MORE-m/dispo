@@ -1,33 +1,33 @@
 # Fortschritt V1
 
-Stand: 9. Oktober 2026 – **BL-P2-03a** Feature-Branch `feat/bl-p2-03a-salesforce-meridian`
-(Basis `fff472f…` / PR #132); **kein** Deploy. Operative DB / Port 8000 unberührt.
+Stand: 10. Oktober 2026 – **BL-P2-03a** auf `main` (PR #134 / `65da411…`);
+Daten-Readiness **A/B/C lokal erledigt**; Deploy offen. Port 8000 / `.env` unberührt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** CRM Salesforce/Meridian
-(CSV-Import, vorläufige Accounts, Domain+Typ-Match, Meridian-Nachtrag) in Umsetzung/PR;
+technisch auf `main` inkl. lokaler CRM-Einrichtung/Abnahme in `dispo_mat_core`;
 Phase 4 Preislisten/Spot Classic auf `main`; Phase 5 Trailer/Produktion auf `main`
 (Deploy offen); Phase 7/9 Teilumfänge auf `main`.
 
 ## Aktuelle Aufgabe
 
-**BL-P2-03a / PO-BLP203-1** (A1/B1/C1/D-CSV/E1/F1/G1/H1 akzeptiert): Draft-PR #133
-inkl. Review-Nachzug (Snapshots, Link-Locks, Meridian nach manuellem Link,
-Vorschau-409, Preview-Wirkungen, Prüfliste, E2E+CI). Stopp zur erneuten Review.
-**Kein** Merge/Deploy. `CRM-004` und Rest-`BL-P2-03` offen.
+**BL-P2-03a / PO-BLP203-1:** lokale B/C erledigt (Sicherung → Migrationen → Import-ID 2
+→ Browser Port 8061). Docs-Draft-PR zur Sicherung der Abnahme-Doku (noch nicht auf `main`).
+Deploy und andere Umgebungen offen. `CRM-004` und Rest-`BL-P2-03` offen.
 
 Offen / zurückgestellt u. a.:
-Deploy BL-P5-01a/02a, SWF-Rest, Produktion-Rest, Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest,
-Submit-Empfänger, Invalidierungsmails, Budget-Vorlagen, SPT-013 Abbinder, In-App,
-REP, ADV-001 Defaults, ADV-002, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
+Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
+Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest, Submit-Empfänger, Invalidierungsmails,
+Budget-Vorlagen, SPT-013 Abbinder, In-App, REP, ADV-001 Defaults, ADV-002,
+MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
 ## BL-P2-03a / PO-BLP203-1 (Oktober 2026)
 
 | Thema | Status |
 |---|---|
 | UX-GATE-D Teilfreigabe B1 | **freigegeben** (nur CRM-Slice-Oberflächen) |
-| CSV-Import UTF-8/Semikolon | **umgesetzt** |
+| CSV-Import UTF-8/Semikolon | **umgesetzt** (`main` PR #133) |
 | Stammdatenversionen + vorläufige Accounts | **umgesetzt** |
 | Domain+Typ-Zuordnung / Prüfliste | **umgesetzt** |
 | Calc/Dispo + Rechnungsempfänger F1 | **umgesetzt** |
@@ -35,14 +35,20 @@ REP, ADV-001 Defaults, ADV-002, MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10
 | Kontakte `CRM-004` | **Folgeslice** |
 | Feature-Tests | `CrmSalesforceMeridianBlP203aTest` + `CrmSalesforceMeridianReviewNachzugTest` + Unit |
 | E2E | Port **8060**, `npm run test:e2e:blp203a` (auch in CI `tests.yml`) |
-| Review-Nachzug P1/P2 | **umgesetzt** (siehe Review-README) |
-| Restbefunde 10.10. | Wizard-Payload-Deps, Preview-Domainwechsel, E2E vertikal/409/Concurrency |
-| Deploy / operative Datenabnahme | **offen** |
+| Review-Nachzug P1/P2 | **umgesetzt** (siehe Feature-Review-README) |
+| Merge PR #133 / Post-Merge-CI | **SUCCESS** (`38041556034`) |
+| D1 Typmapping PR #134 | **SUCCESS** (`38063164855`; Head `65da411…`) |
+| Daten-Readiness A (lesen) | **erledigt** |
+| Operativer Import B | **erledigt** (Import-ID **2**, SHA-256 `0c424903…e150`; 3453/3097/356) |
+| Migrationen CRM lokal | **erledigt** (`2026_10_09_180000_…`, `2026_10_10_160000_…`) |
+| Browser-Abnahme C | **erledigt** (Port **8061**, 3/3; Server beendet) |
+| Deploy | **offen** |
 
 ## Zuletzt abgeschlossene Aufgabe (Umsetzung)
 
-**BL-P5-02a lokale Einrichtung + Abnahme** auf `dispo_mat_core`: Sicherung →
-3 Migrationen → 8× Admin Active → Browser Port **8059** (Calc 10–12, Dispo 8).
+**BL-P2-03a lokale Einrichtung + Abnahme B/C** auf `dispo_mat_core`: Sicherung
+`local-backups/bl-p2-03a-20261010-175832/` → 2 CRM-Migrationen → Admin-Import ID 2
+→ Browser Port **8061** (Calc 22/23, Dispo 17/18 u. a.). Baseline 1–12/1–9 match.
 **Kein** Deploy.
 
 ## PO-NOT002-ADMIN-1 / BL-P9-02e (Oktober 2026)
