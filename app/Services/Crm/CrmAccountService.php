@@ -282,7 +282,13 @@ final class CrmAccountService
      * Auto- oder Import-Verknüpfung: setzt SF-ID auf vorläufigem Account oder merged in bestehenden.
      *
      * @param  array{raw: string, canonical: string}  $salesforce
-     * @param  array{name: string, billing_email: ?string, matching_domain: ?string, meridian_number: ?string}  $payload
+     * @param  array{
+     *     name: string,
+     *     billing_email: ?string,
+     *     matching_domain: ?string,
+     *     meridian_number: ?string,
+     *     salesforce_record_type?: ?string
+     * }  $payload
      */
     public function attachSalesforceIdentity(
         CrmAccount $account,
@@ -361,7 +367,7 @@ final class CrmAccountService
      *     billing_email: ?string,
      *     matching_domain: ?string,
      *     meridian_number: ?string,
-     *     salesforce_record_type: ?string
+     *     salesforce_record_type?: ?string
      * }  $payload
      */
     public function upsertSalesforceAccount(
@@ -496,7 +502,7 @@ final class CrmAccountService
      *     billing_email: ?string,
      *     matching_domain: ?string,
      *     meridian_number: ?string,
-     *     salesforce_record_type: ?string
+     *     salesforce_record_type?: ?string
      * }  $payload
      * @param  array{raw: string, canonical: string}  $salesforce
      */
