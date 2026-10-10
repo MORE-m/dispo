@@ -325,6 +325,8 @@ final class CrmImportService
 
             $meridian = $row['meridian_raw'] === '' ? null : $row['meridian_raw'];
 
+            $recordType = $row['record_type_raw'] === '' ? null : (string) $row['record_type_raw'];
+
             $effect = $this->planUpsertEffect(
                 $canonical,
                 $type,
@@ -332,6 +334,7 @@ final class CrmImportService
                 $billingEmail,
                 $domain,
                 $meridian,
+                $recordType,
             );
 
             $actions[] = [
@@ -343,6 +346,7 @@ final class CrmImportService
                 'billing_email' => $billingEmail,
                 'matching_domain' => $domain,
                 'meridian_number' => $meridian,
+                'salesforce_record_type' => $recordType,
                 'divergent_domains' => $emailAnalysis['divergent'],
                 'domains' => $emailAnalysis['domains'],
                 'effect' => $effect['effect'],
@@ -434,7 +438,7 @@ final class CrmImportService
             'fingerprint' => $fingerprint,
             'notes' => [
                 'addresses' => 'CSV enthält keine Adressspalten; Adressen werden weder erfunden noch geleert.',
-                'format' => 'UTF-8 CSV mit Semikolon; Typen Account KUNDE / Account AGENTUR.',
+                'format' => 'UTF-8 CSV mit Semikolon; Typen Account KUNDE / Account GESELLSCHAFTER / Account SONSTIGE → Kunde, Account AGENTUR → Agentur.',
             ],
         ];
     }
@@ -456,6 +460,7 @@ final class CrmImportService
         ?string $billingEmail,
         ?string $domain,
         ?string $meridian,
+        ?string $salesforceRecordType,
     ): array {
         $existing = CrmAccount::query()
             ->with('currentVersion')
@@ -500,7 +505,8 @@ final class CrmImportService
             && $current->name === $name
             && ($current->billing_email ?? null) === ($billingEmail ?? null)
             && ($current->matching_domain ?? null) === ($domain ?? null)
-            && ($current->meridian_number ?? null) === ($effectiveMeridian ?? null);
+            && ($current->meridian_number ?? null) === ($effectiveMeridian ?? null)
+            && ($current->salesforce_record_type ?? null) === ($salesforceRecordType ?? null);
 
         $effect = $meridianConflict
             ? 'meridian_conflict'
@@ -662,6 +668,7 @@ final class CrmImportService
             'billing_email' => $action['billing_email'],
             'matching_domain' => $action['matching_domain'],
             'meridian_number' => $action['meridian_number'],
+            'salesforce_record_type' => $action['salesforce_record_type'] ?? null,
         ];
 
         if (! empty($action['divergent_domains'])) {
