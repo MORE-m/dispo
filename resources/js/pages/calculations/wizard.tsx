@@ -5862,12 +5862,10 @@ export default function CalculationWizard({
                                                                                 {formatHour(
                                                                                     range.start_hour,
                                                                                 )}
-
                                                                                 –
                                                                                 {formatInclusiveEnd(
                                                                                     range.end_hour_exclusive,
                                                                                 )}
-
                                                                                 ,{' '}
                                                                                 {
                                                                                     range.spot_count

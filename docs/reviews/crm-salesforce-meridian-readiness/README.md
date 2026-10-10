@@ -24,7 +24,7 @@ PO A1/B1/C1/D-CSV/E1/F1/G1/H1 unverändert akzeptiert.
 |---|---|---|
 | P1 Stammdatensnapshots | Bei unveränderter Account-Identität bleiben Version/Firmierung; Canonical-ID nach Merge ok; Meridian technisch getrennt | `calc_save_keeps_historical_snapshot_after_master_data_version_change` |
 | P1 Link unter Sperre (sequenziell) | Zweite Zuordnung auf anderes Ziel abgelehnt | `sequential_second_manual_link_to_other_target_is_rejected` |
-| P1 Link unter Sperre (parallel, MySQL) | Zwei Worker, genau ein Gewinner; Calc/Dispo nicht gesplittet | `concurrent_manual_links_serialize_to_one_target` |
+| P1 Link unter Sperre (parallel, MySQL) | Zwei Worker mit getrennten DB-Verbindungen (`DatabaseMigrations`); genau ein Gewinner | `CrmManualLinkConcurrencyTest::concurrent_manual_links_serialize_to_one_target` |
 | P2 Meridian nach manuellem Link | SF-ID + Meridian nach Link; Folgeimport unverändert nachholend; Order-Mismatch = Konflikt | `manual_link_supplements_…`, `order_meridian_mismatch_…` |
 | P2 Veraltete Vorschau | Refresh commitet vor 409; erneut anwendbar | `stale_preview_is_persisted_on_409_and_can_be_reapplied` + E2E Zwei-Tab-409 |
 | P2 Vorschau-Wirkungen | Effects + geplante Auto-Matches; Domainwechsel am Bestand in Preview | `preview_exposes_effects_…`, `domain_change_preview_*` |
