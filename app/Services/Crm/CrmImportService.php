@@ -577,10 +577,10 @@ final class CrmImportService
                     'domain' => $domain,
                     'mode' => 'ambiguous',
                     'candidates' => count($candidates),
-                    'candidate_canonicals' => array_values(array_map(
+                    'candidate_canonicals' => array_map(
                         static fn (array $row): string => (string) $row['canonical'],
                         $candidates,
-                    )),
+                    ),
                 ];
             }
         }
