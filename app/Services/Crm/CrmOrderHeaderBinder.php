@@ -193,7 +193,8 @@ final class CrmOrderHeaderBinder
             );
         }
 
-        if ($hasAccountKey && $accountId === null) {
+        if ($hasAccountKey) {
+            // account_id explizit null (Freitext / leeren).
             if ($freitextName === null) {
                 return null;
             }
@@ -201,22 +202,38 @@ final class CrmOrderHeaderBinder
             $existingIsLegacyFreitext = $existingAccountId === null
                 && $existingName !== null
                 && $existingName !== '';
-            $existingHasAccount = $existingAccountId !== null;
 
-            $shouldCreateProvisional = $allowFreitextProvisional && (
-                $existingHasAccount
-                || ($existingIsLegacyFreitext && $forceProvisional)
-                || (! $existingHasAccount && ! $existingIsLegacyFreitext)
-            );
-
-            if ($shouldCreateProvisional) {
-                return $this->createProvisionalBinding(
-                    name: $freitextName,
-                    email: $freitextEmail,
-                    domain: $freitextDomain,
-                    type: $type,
-                    actor: $actor,
-                );
+            if ($allowFreitextProvisional) {
+                if ($existingAccountId !== null) {
+                    // Wechsel von gebundenem Account → neue Freitext-Firmierung.
+                    return $this->createProvisionalBinding(
+                        name: $freitextName,
+                        email: $freitextEmail,
+                        domain: $freitextDomain,
+                        type: $type,
+                        actor: $actor,
+                    );
+                }
+                if ($existingIsLegacyFreitext) {
+                    if ($forceProvisional) {
+                        return $this->createProvisionalBinding(
+                            name: $freitextName,
+                            email: $freitextEmail,
+                            domain: $freitextDomain,
+                            type: $type,
+                            actor: $actor,
+                        );
+                    }
+                } else {
+                    // Neue Calc / leerer Bestand.
+                    return $this->createProvisionalBinding(
+                        name: $freitextName,
+                        email: $freitextEmail,
+                        domain: $freitextDomain,
+                        type: $type,
+                        actor: $actor,
+                    );
+                }
             }
 
             return [
@@ -362,12 +379,14 @@ final class CrmOrderHeaderBinder
         ?array $customer,
         ?array $agency,
     ): ?InvoiceRecipient {
-        $customerBound = ($customer['account_id'] ?? null) !== null;
-        $agencyBound = ($agency['account_id'] ?? null) !== null;
+        $customerBound = $customer !== null && ($customer['account_id'] ?? null) !== null;
+        $agencyBound = $agency !== null && ($agency['account_id'] ?? null) !== null;
+        $customerName = $customer === null ? null : $customer['name'];
+        $agencyName = $agency === null ? null : $agency['name'];
         $customerPresent = $customerBound
-            || (($customer['name'] ?? null) !== null && ($customer['name'] ?? '') !== '');
+            || ($customerName !== null && $customerName !== '');
         $agencyPresent = $agencyBound
-            || (($agency['name'] ?? null) !== null && ($agency['name'] ?? '') !== '');
+            || ($agencyName !== null && $agencyName !== '');
 
         if (! $customerBound && ! $agencyBound) {
             // Historischer Freitext ohne Account: keine RE-Zuordnung erfinden.
@@ -380,11 +399,9 @@ final class CrmOrderHeaderBinder
                     'invoice_recipient' => 'Rechnungsempfänger muss explizit gewählt werden (Kunde oder Agentur).',
                 ]);
             }
-            if ($customerBound) {
-                return InvoiceRecipient::Customer;
-            }
 
-            return null;
+            // Mindestens ein Account ist gebunden; ohne Agentur → Default Kunde.
+            return InvoiceRecipient::Customer;
         }
 
         $recipient = $raw instanceof InvoiceRecipient
