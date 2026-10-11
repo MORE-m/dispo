@@ -13,15 +13,19 @@ use Illuminate\Validation\ValidationException;
 /**
  * Bindet CRM-Accounts an Calc-/Dispo-Kopf-Snapshots (BL-P2-03a + Wizard-Picker).
  *
- * Payload-Vertrag (CRM-001 / PO-BLP203-1 Ergänzung):
- * - fehlender `*_account_id`-Schlüssel: Legacy-/Teilpfad (nur Name, kein Auto-Provisional)
+ * Payload-Vertrag (CRM-001 / PO-BLP203-1 I1):
+ * - Seite nicht mitgesendet (weder Account- noch Name-/Create-Schlüssel):
+ *   bestehende Bindung bzw. historischer Freitext vollständig erhalten
  * - `*_account_id` = int: explizite Account-Auswahl
  * - `*_account_id` = null + Name: Freitext
- *   - neue Calc / leerer Bestand / Wechsel von gebundenem Account → vorläufiger Account
- *   - historischer Freitext-Bestand (Name ohne Account) → ohne Migration behalten,
- *     außer `*_create_provisional` / `ensure_provisional_*` (explizite Überführung)
- * - `*_account_id` = null + leerer Name: Seite leeren (Agentur)
+ *   - Neuanlage / leerer Bestand / Wechsel von gebundenem Account → vorläufiger Account
+ *   - historischer Freitext-Bestand → ohne Migration behalten,
+ *     außer `*_create_provisional` / `ensure_provisional_*`
+ * - `*_account_id` = null + leerer Name: Seite leeren
+ * - fehlender `*_account_id` + Name: Neuanlage → Provisional; historischer Bestand → unlinked;
+ *   gebundene Calc → bestehende Account-Identität erhalten
  *
+ * Bestandsschutz am gespeicherten Zustand, nicht an der Payload-Form.
  * Preview ruft diesen Binder nicht auf. Unveränderte Account-Identität behält Version/Firmierung.
  */
 final class CrmOrderHeaderBinder
@@ -52,36 +56,57 @@ final class CrmOrderHeaderBinder
         bool $allowFreitextProvisional,
         ?Calculation $existing = null,
     ): array {
-        $customer = $this->resolveSide(
-            payload: $payload,
-            accountKey: 'customer_account_id',
-            nameKey: 'customer_name',
-            emailKey: 'customer_billing_email',
-            domainKey: 'customer_matching_domain',
-            createProvisionalKey: 'customer_create_provisional',
-            legacyEnsureKey: 'ensure_provisional_customer',
-            type: CrmAccountType::Customer,
-            actor: $actor,
-            allowFreitextProvisional: $allowFreitextProvisional,
-            existingAccountId: $existing?->customer_account_id !== null
-                ? (int) $existing->customer_account_id
-                : null,
-            existingVersionId: $existing?->customer_version_id !== null
-                ? (int) $existing->customer_version_id
-                : null,
-            existingName: $existing?->customer_name,
-            existingMeridian: $existing?->customer_meridian_number,
-            existingSalesforce: $existing?->customer_salesforce_account_id,
+        $customerTouched = $this->sideTouched(
+            $payload,
+            'customer_account_id',
+            'customer_name',
+            'customer_create_provisional',
+            'ensure_provisional_customer',
+        );
+        $agencyTouched = $this->sideTouched(
+            $payload,
+            'agency_account_id',
+            'agency_name',
+            'agency_create_provisional',
+            'ensure_provisional_agency',
         );
 
-        $agencyTouched = array_key_exists('agency_account_id', $payload)
-            || array_key_exists('agency_name', $payload)
-            || ! empty($payload['ensure_provisional_agency'])
-            || ! empty($payload['agency_create_provisional']);
+        $customer = $customerTouched
+            ? $this->resolveSide(
+                payload: $payload,
+                accountKey: 'customer_account_id',
+                nameKey: 'customer_name',
+                emailKey: 'customer_billing_email',
+                domainKey: 'customer_matching_domain',
+                createProvisionalKey: 'customer_create_provisional',
+                legacyEnsureKey: 'ensure_provisional_customer',
+                type: CrmAccountType::Customer,
+                actor: $actor,
+                allowFreitextProvisional: $allowFreitextProvisional,
+                existingAccountId: $existing?->customer_account_id !== null
+                    ? (int) $existing->customer_account_id
+                    : null,
+                existingVersionId: $existing?->customer_version_id !== null
+                    ? (int) $existing->customer_version_id
+                    : null,
+                existingName: $existing?->customer_name,
+                existingMeridian: $existing?->customer_meridian_number,
+                existingSalesforce: $existing?->customer_salesforce_account_id,
+            )
+            : $this->preserveSide(
+                existingAccountId: $existing?->customer_account_id !== null
+                    ? (int) $existing->customer_account_id
+                    : null,
+                existingVersionId: $existing?->customer_version_id !== null
+                    ? (int) $existing->customer_version_id
+                    : null,
+                existingName: $existing?->customer_name,
+                existingMeridian: $existing?->customer_meridian_number,
+                existingSalesforce: $existing?->customer_salesforce_account_id,
+            );
 
-        $agency = null;
-        if ($agencyTouched) {
-            $agency = $this->resolveSide(
+        $agency = $agencyTouched
+            ? $this->resolveSide(
                 payload: $payload,
                 accountKey: 'agency_account_id',
                 nameKey: 'agency_name',
@@ -101,26 +126,18 @@ final class CrmOrderHeaderBinder
                 existingName: $existing?->agency_name,
                 existingMeridian: $existing?->agency_meridian_number,
                 existingSalesforce: $existing?->agency_salesforce_account_id,
-            );
-        } elseif ($existing !== null && $existing->agency_account_id !== null) {
-            $agency = [
-                'account_id' => (int) $existing->agency_account_id,
-                'version_id' => $existing->agency_version_id !== null
+            )
+            : $this->preserveSide(
+                existingAccountId: $existing?->agency_account_id !== null
+                    ? (int) $existing->agency_account_id
+                    : null,
+                existingVersionId: $existing?->agency_version_id !== null
                     ? (int) $existing->agency_version_id
                     : null,
-                'name' => $existing->agency_name,
-                'meridian' => $existing->agency_meridian_number,
-                'salesforce_raw' => $existing->agency_salesforce_account_id,
-            ];
-        } elseif ($existing !== null && $existing->agency_name !== null && $existing->agency_name !== '') {
-            $agency = [
-                'account_id' => null,
-                'version_id' => null,
-                'name' => $existing->agency_name,
-                'meridian' => null,
-                'salesforce_raw' => null,
-            ];
-        }
+                existingName: $existing?->agency_name,
+                existingMeridian: $existing?->agency_meridian_number,
+                existingSalesforce: $existing?->agency_salesforce_account_id,
+            );
 
         $invoice = $this->resolveInvoiceRecipient(
             array_key_exists('invoice_recipient', $payload)
@@ -143,6 +160,60 @@ final class CrmOrderHeaderBinder
             'customer_salesforce_account_id' => $customer['salesforce_raw'] ?? null,
             'agency_salesforce_account_id' => $agency['salesforce_raw'] ?? null,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function sideTouched(
+        array $payload,
+        string $accountKey,
+        string $nameKey,
+        string $createProvisionalKey,
+        string $legacyEnsureKey,
+    ): bool {
+        return array_key_exists($accountKey, $payload)
+            || array_key_exists($nameKey, $payload)
+            || ! empty($payload[$createProvisionalKey])
+            || ! empty($payload[$legacyEnsureKey]);
+    }
+
+    /**
+     * @return array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null
+     */
+    /**
+     * @param  int<1, max>|null  $existingAccountId
+     * @param  int<1, max>|null  $existingVersionId
+     * @return array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null
+     */
+    private function preserveSide(
+        ?int $existingAccountId,
+        ?int $existingVersionId,
+        ?string $existingName,
+        ?string $existingMeridian,
+        ?string $existingSalesforce,
+    ): ?array {
+        if ($existingAccountId !== null) {
+            return [
+                'account_id' => $existingAccountId,
+                'version_id' => $existingVersionId,
+                'name' => $existingName,
+                'meridian' => $existingMeridian,
+                'salesforce_raw' => $existingSalesforce,
+            ];
+        }
+
+        if ($existingName !== null && $existingName !== '') {
+            return [
+                'account_id' => null,
+                'version_id' => null,
+                'name' => $existingName,
+                'meridian' => null,
+                'salesforce_raw' => null,
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -199,64 +270,100 @@ final class CrmOrderHeaderBinder
                 return null;
             }
 
-            $existingIsLegacyFreitext = $existingAccountId === null
-                && $existingName !== null
-                && $existingName !== '';
-
-            if ($allowFreitextProvisional) {
-                if ($existingAccountId !== null) {
-                    // Wechsel von gebundenem Account → neue Freitext-Firmierung.
-                    return $this->createProvisionalBinding(
-                        name: $freitextName,
-                        email: $freitextEmail,
-                        domain: $freitextDomain,
-                        type: $type,
-                        actor: $actor,
-                    );
-                }
-                if ($existingIsLegacyFreitext) {
-                    if ($forceProvisional) {
-                        return $this->createProvisionalBinding(
-                            name: $freitextName,
-                            email: $freitextEmail,
-                            domain: $freitextDomain,
-                            type: $type,
-                            actor: $actor,
-                        );
-                    }
-                } else {
-                    // Neue Calc / leerer Bestand.
-                    return $this->createProvisionalBinding(
-                        name: $freitextName,
-                        email: $freitextEmail,
-                        domain: $freitextDomain,
-                        type: $type,
-                        actor: $actor,
-                    );
-                }
-            }
-
-            return [
-                'account_id' => null,
-                'version_id' => null,
-                'name' => $freitextName,
-                'meridian' => null,
-                'salesforce_raw' => null,
-            ];
+            return $this->resolveFreitextName(
+                freitextName: $freitextName,
+                freitextEmail: $freitextEmail,
+                freitextDomain: $freitextDomain,
+                type: $type,
+                actor: $actor,
+                allowFreitextProvisional: $allowFreitextProvisional,
+                forceProvisional: $forceProvisional,
+                existingAccountId: $existingAccountId,
+                existingName: $existingName,
+                switchFromBoundAccount: $existingAccountId !== null,
+            );
         }
 
-        // Fehlender Account-Schlüssel: Legacy-/Testpfad ohne Auto-Provisional.
+        // Fehlender Account-Schlüssel, aber Name/Create-Flags (Seite ist „touched“).
         if ($freitextName !== null) {
-            return [
-                'account_id' => null,
-                'version_id' => null,
-                'name' => $freitextName,
-                'meridian' => null,
-                'salesforce_raw' => null,
-            ];
+            if ($existingAccountId !== null) {
+                // Name ohne Account-Schlüssel bei gebundener Calc: Identität erhalten.
+                return $this->bindExistingAccount(
+                    accountId: $existingAccountId,
+                    type: $type,
+                    existingAccountId: $existingAccountId,
+                    existingVersionId: $existingVersionId,
+                    existingName: $existingName,
+                    existingMeridian: $existingMeridian,
+                    existingSalesforce: $existingSalesforce,
+                );
+            }
+
+            return $this->resolveFreitextName(
+                freitextName: $freitextName,
+                freitextEmail: $freitextEmail,
+                freitextDomain: $freitextDomain,
+                type: $type,
+                actor: $actor,
+                allowFreitextProvisional: $allowFreitextProvisional,
+                forceProvisional: $forceProvisional,
+                existingAccountId: null,
+                existingName: $existingName,
+                switchFromBoundAccount: false,
+            );
+        }
+
+        if ($forceProvisional) {
+            throw ValidationException::withMessages([
+                $nameKey => 'Firmierung für vorläufigen Account fehlt.',
+            ]);
         }
 
         return null;
+    }
+
+    /**
+     * @return array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}
+     */
+    private function resolveFreitextName(
+        string $freitextName,
+        ?string $freitextEmail,
+        ?string $freitextDomain,
+        CrmAccountType $type,
+        User $actor,
+        bool $allowFreitextProvisional,
+        bool $forceProvisional,
+        ?int $existingAccountId,
+        ?string $existingName,
+        bool $switchFromBoundAccount,
+    ): array {
+        $existingIsLegacyFreitext = $existingAccountId === null
+            && $existingName !== null
+            && $existingName !== '';
+
+        $shouldCreateProvisional = $allowFreitextProvisional && (
+            $switchFromBoundAccount
+            || ($existingIsLegacyFreitext && $forceProvisional)
+            || (! $existingIsLegacyFreitext && $existingAccountId === null)
+        );
+
+        if ($shouldCreateProvisional) {
+            return $this->createProvisionalBinding(
+                name: $freitextName,
+                email: $freitextEmail,
+                domain: $freitextDomain,
+                type: $type,
+                actor: $actor,
+            );
+        }
+
+        return [
+            'account_id' => null,
+            'version_id' => null,
+            'name' => $freitextName,
+            'meridian' => null,
+            'salesforce_raw' => null,
+        ];
     }
 
     /**
@@ -332,15 +439,15 @@ final class CrmOrderHeaderBinder
 
         $account = $this->accounts->createProvisional([
             'name' => $name,
-            'type' => $type,
+            'type' => $type->value,
             'billing_email' => $email,
             'matching_domain' => $domain,
         ], $actor);
-        $account->loadMissing('currentVersion');
+
         $version = $account->currentVersion;
         if ($version === null) {
             throw ValidationException::withMessages([
-                $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Vorläufiger Account ohne Stammdatenversion.',
+                $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Vorläufiger Account ohne Version.',
             ]);
         }
 
@@ -349,7 +456,7 @@ final class CrmOrderHeaderBinder
             'version_id' => $version->id,
             'name' => $version->name,
             'meridian' => $version->meridian_number,
-            'salesforce_raw' => null,
+            'salesforce_raw' => $account->salesforce_account_id_raw,
         ];
     }
 
@@ -400,7 +507,6 @@ final class CrmOrderHeaderBinder
                 ]);
             }
 
-            // Mindestens ein Account ist gebunden; ohne Agentur → Default Kunde.
             return InvoiceRecipient::Customer;
         }
 

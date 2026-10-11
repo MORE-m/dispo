@@ -4,11 +4,13 @@ namespace Tests\Feature\Crm;
 
 use App\Enums\InvoiceRecipient;
 use App\Enums\Role;
+use App\Models\Calculation;
 use App\Models\CrmAccount;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\Crm\CrmAccountService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -41,12 +43,33 @@ final class CrmWizardPickerBindingTest extends TestCase
     }
 
     #[Test]
+    public function new_freitext_without_account_key_creates_provisional(): void
+    {
+        $sales = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $payload = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Ohne Account Key GmbH',
+            'campaign' => 'Create',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+        ]);
+        $calc = $writer->create($payload, $sales);
+        $this->assertNotNull($calc->customer_account_id);
+        $this->assertTrue(CrmAccount::query()->findOrFail($calc->customer_account_id)->is_provisional);
+        $this->assertSame('Ohne Account Key GmbH', $calc->customer_name);
+    }
+
+    #[Test]
     public function repeated_save_does_not_create_extra_provisional(): void
     {
         $sales = User::factory()->role(Role::Sales)->create();
         $writer = app(CalculationWriter::class);
         $calc = $writer->create($this->headerPayload('Wieder Firma'), $sales);
         $accountId = $calc->customer_account_id;
+        $versionId = $calc->customer_version_id;
         $this->assertNotNull($accountId);
         $count = CrmAccount::query()->count();
 
@@ -57,26 +80,41 @@ final class CrmWizardPickerBindingTest extends TestCase
         $writer->update($calc->fresh(), $this->withLiveSchemaFingerprint($payload), $sales);
 
         $this->assertSame($count, CrmAccount::query()->count());
-        $this->assertSame($accountId, $calc->fresh()->customer_account_id);
+        $fresh = $calc->fresh();
+        $this->assertSame($accountId, $fresh->customer_account_id);
+        $this->assertSame($versionId, $fresh->customer_version_id);
     }
 
     #[Test]
-    public function legacy_freitext_without_account_key_stays_unlinked(): void
+    public function freitext_save_then_bound_resave_is_idempotent(): void
     {
         $sales = User::factory()->role(Role::Sales)->create();
         $writer = app(CalculationWriter::class);
-        $payload = $this->withLiveSchemaFingerprint([
-            'planning_mode' => 'manual',
-            'customer_name' => 'Alt Freitext AG',
-            'campaign' => 'Legacy',
-            'product_title' => 'Titel',
-            'order_discount_percent' => '0',
-            'ae_enabled' => false,
-            'positions' => [],
-        ]);
-        $calc = $writer->create($payload, $sales);
+        $calc = $writer->create($this->headerPayload('Idempotent AG'), $sales);
+        $accountId = $calc->customer_account_id;
+        $versionId = $calc->customer_version_id;
+        $count = CrmAccount::query()->count();
+
+        // Zweiter Save wie nach Picker-Sync: Account-ID, nicht erneut null+create.
+        $again = $this->headerPayload('Idempotent AG');
+        $again['customer_account_id'] = $accountId;
+        $again['invoice_recipient'] = 'customer';
+        $again['lock_version'] = $calc->fresh()->lock_version;
+        $writer->update($calc->fresh(), $again, $sales);
+
+        $this->assertSame($count, CrmAccount::query()->count());
+        $fresh = $calc->fresh();
+        $this->assertSame($accountId, $fresh->customer_account_id);
+        $this->assertSame($versionId, $fresh->customer_version_id);
+    }
+
+    #[Test]
+    public function legacy_freitext_without_account_stays_unlinked_on_update(): void
+    {
+        $sales = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $calc = $this->makeHistoricalFreitextCalc($sales, 'Alt Freitext AG');
         $this->assertNull($calc->customer_account_id);
-        $this->assertSame('Alt Freitext AG', $calc->customer_name);
 
         $again = $this->headerPayload('Alt Freitext AG');
         $again['lock_version'] = $calc->fresh()->lock_version;
@@ -93,16 +131,7 @@ final class CrmWizardPickerBindingTest extends TestCase
     {
         $sales = User::factory()->role(Role::Sales)->create();
         $writer = app(CalculationWriter::class);
-        $payload = $this->withLiveSchemaFingerprint([
-            'planning_mode' => 'manual',
-            'customer_name' => 'Konvertier Mich',
-            'campaign' => 'Convert',
-            'product_title' => 'Titel',
-            'order_discount_percent' => '0',
-            'ae_enabled' => false,
-            'positions' => [],
-        ]);
-        $calc = $writer->create($payload, $sales);
+        $calc = $this->makeHistoricalFreitextCalc($sales, 'Konvertier Mich');
         $this->assertNull($calc->customer_account_id);
 
         $convert = $this->headerPayload('Konvertier Mich');
@@ -188,6 +217,189 @@ final class CrmWizardPickerBindingTest extends TestCase
         $this->assertNotNull($fresh->customer_account_id);
         $this->assertNotSame($existing->id, $fresh->customer_account_id);
         $this->assertSame('Komplett Neu', $fresh->customer_name);
+    }
+
+    #[Test]
+    public function untouch_customer_preserves_binding_when_only_agency_or_invoice_changes(): void
+    {
+        $sales = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $payload = $this->headerPayload('Gebundener Kunde');
+        $payload['agency_name'] = 'Gebundene Agentur';
+        $payload['agency_account_id'] = null;
+        $payload['invoice_recipient'] = 'agency';
+        $calc = $writer->create($payload, $sales);
+
+        $customerId = $calc->customer_account_id;
+        $customerVersion = $calc->customer_version_id;
+        $customerName = $calc->customer_name;
+        $customerSf = $calc->customer_salesforce_account_id;
+        $customerMeridian = $calc->customer_meridian_number;
+        $agencyId = $calc->agency_account_id;
+        $agencyVersion = $calc->agency_version_id;
+        $agencyName = $calc->agency_name;
+
+        // a) nur Agentur wechseln (Kunde nicht senden)
+        $agencyOnly = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'agency_name' => 'Agentur Neu',
+            'agency_account_id' => null,
+            'invoice_recipient' => 'agency',
+            'campaign' => 'CRM Picker',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+            'lock_version' => $calc->fresh()->lock_version,
+        ]);
+        $writer->update($calc->fresh(), $agencyOnly, $sales);
+        $fresh = $calc->fresh();
+        $this->assertSame($customerId, $fresh->customer_account_id);
+        $this->assertSame($customerVersion, $fresh->customer_version_id);
+        $this->assertSame($customerName, $fresh->customer_name);
+        $this->assertSame($customerSf, $fresh->customer_salesforce_account_id);
+        $this->assertSame($customerMeridian, $fresh->customer_meridian_number);
+        $this->assertNotSame($agencyId, $fresh->agency_account_id);
+        $this->assertSame('Agentur Neu', $fresh->agency_name);
+
+        // b) nur Rechnungsempfänger (beide Seiten nicht senden)
+        $invoiceOnly = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'invoice_recipient' => 'customer',
+            'campaign' => 'CRM Picker',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+            'lock_version' => $fresh->lock_version,
+        ]);
+        $writer->update($fresh, $invoiceOnly, $sales);
+        $fresh = $calc->fresh();
+        $this->assertSame($customerId, $fresh->customer_account_id);
+        $this->assertSame($customerVersion, $fresh->customer_version_id);
+        $this->assertSame('Agentur Neu', $fresh->agency_name);
+        $this->assertNotNull($fresh->agency_account_id);
+        $this->assertSame(InvoiceRecipient::Customer, $fresh->invoice_recipient);
+
+        // c) nur Kunde wechseln (Agentur nicht senden)
+        $customerOnly = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_name' => 'Kunde Neu',
+            'customer_account_id' => null,
+            'invoice_recipient' => 'customer',
+            'campaign' => 'CRM Picker',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+            'lock_version' => $fresh->lock_version,
+        ]);
+        $agencyIdBefore = $fresh->agency_account_id;
+        $agencyVersionBefore = $fresh->agency_version_id;
+        $writer->update($fresh, $customerOnly, $sales);
+        $fresh = $calc->fresh();
+        $this->assertNotSame($customerId, $fresh->customer_account_id);
+        $this->assertSame('Kunde Neu', $fresh->customer_name);
+        $this->assertSame($agencyIdBefore, $fresh->agency_account_id);
+        $this->assertSame($agencyVersionBefore, $fresh->agency_version_id);
+        $this->assertSame('Agentur Neu', $fresh->agency_name);
+        unset($agencyName, $agencyVersion);
+    }
+
+    #[Test]
+    public function untouch_preserves_historical_freitext_customer(): void
+    {
+        $sales = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $calc = $this->makeHistoricalFreitextCalc($sales, 'Hist Freitext');
+
+        $invoiceOnly = $this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'invoice_recipient' => null,
+            'campaign' => 'Legacy',
+            'product_title' => 'Titel',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+            'lock_version' => $calc->lock_version,
+        ]);
+        $before = CrmAccount::query()->count();
+        $writer->update($calc, $invoiceOnly, $sales);
+        $this->assertSame($before, CrmAccount::query()->count());
+        $fresh = $calc->fresh();
+        $this->assertNull($fresh->customer_account_id);
+        $this->assertSame('Hist Freitext', $fresh->customer_name);
+    }
+
+    #[Test]
+    public function failed_save_rolls_back_provisional_account(): void
+    {
+        $sales = User::factory()->role(Role::Sales)->create();
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->headerPayload('Basis Kunde'), $sales);
+        $before = CrmAccount::query()->count();
+
+        // Freitext-Wechsel würde Provisional anlegen, scheitert aber an RE ohne Agentur.
+        $switch = $this->headerPayload('Rollback Firma');
+        $switch['invoice_recipient'] = 'agency';
+        $switch['lock_version'] = $calc->fresh()->lock_version;
+
+        try {
+            $writer->update($calc->fresh(), $switch, $sales);
+            $this->fail('Expected validation exception');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('invoice_recipient', $e->errors());
+        }
+
+        $this->assertSame($before, CrmAccount::query()->count());
+        $fresh = $calc->fresh();
+        $this->assertSame('Basis Kunde', $fresh->customer_name);
+        $this->assertNotNull($fresh->customer_account_id);
+    }
+
+    #[Test]
+    public function disposition_cannot_create_provisional_via_freitext(): void
+    {
+        $disposition = User::factory()->role(Role::Disposition)->create();
+        $writer = app(CalculationWriter::class);
+
+        try {
+            $writer->create($this->headerPayload('Keine Rechte GmbH'), $disposition);
+            $this->fail('Expected validation exception');
+        } catch (ValidationException $e) {
+            $this->assertArrayHasKey('customer_name', $e->errors());
+        }
+
+        $this->assertSame(0, CrmAccount::query()->count());
+    }
+
+    /**
+     * Historischen Freitext-Bestand vorbereiten (nicht über Neuanlage-Bypass).
+     */
+    private function makeHistoricalFreitextCalc(User $advisor, string $name): Calculation
+    {
+        $writer = app(CalculationWriter::class);
+        $calc = $writer->create($this->headerPayload($name), $advisor);
+        $accountId = $calc->customer_account_id;
+        $this->assertNotNull($accountId);
+
+        DB::table('calculations')->where('id', $calc->id)->update([
+            'customer_account_id' => null,
+            'customer_version_id' => null,
+            'customer_salesforce_account_id' => null,
+            'customer_meridian_number' => null,
+            'invoice_recipient' => null,
+        ]);
+
+        // Vorläufigen Account entfernen, der nur für die Fixture entstand.
+        DB::table('crm_account_versions')->where('crm_account_id', $accountId)->delete();
+        DB::table('crm_accounts')->where('id', $accountId)->delete();
+
+        $fresh = $calc->fresh();
+        $this->assertNull($fresh->customer_account_id);
+        $this->assertSame($name, $fresh->customer_name);
+
+        return $fresh;
     }
 
     /**

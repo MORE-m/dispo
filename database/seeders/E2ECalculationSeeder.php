@@ -155,9 +155,10 @@ class E2ECalculationSeeder extends Seeder
             $limited,
         );
 
-        // Historischer Freitext ohne Account-Schlüssel (Bestandsschutz CRM-Wizard-Picker).
+        // Historischer Freitext-Bestand: nach Create Verknüpfung entfernen
+        // (Neuanlage erzeugt Provisional; Bestandsschutz gilt nur für Altbestand).
         $sales = User::query()->where('email', 'sales@example.com')->firstOrFail();
-        app(CalculationWriter::class)->create([
+        $legacy = app(CalculationWriter::class)->create([
             'planning_mode' => 'manual',
             'schema_fingerprint' => $baseFingerprint,
             'customer_name' => 'E2E Legacy Freitext GmbH',
@@ -177,5 +178,16 @@ class E2ECalculationSeeder extends Seeder
                 'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
             ]],
         ], $sales);
+        $legacyAccountId = $legacy->customer_account_id;
+        $legacy->customer_account_id = null;
+        $legacy->customer_version_id = null;
+        $legacy->customer_salesforce_account_id = null;
+        $legacy->customer_meridian_number = null;
+        $legacy->invoice_recipient = null;
+        $legacy->save();
+        if ($legacyAccountId !== null) {
+            \App\Models\CrmAccountVersion::query()->where('crm_account_id', $legacyAccountId)->delete();
+            \App\Models\CrmAccount::query()->whereKey($legacyAccountId)->delete();
+        }
     }
 }

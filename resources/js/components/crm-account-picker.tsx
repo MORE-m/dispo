@@ -117,16 +117,23 @@ export function CrmAccountPicker({
         }
     }, [value.mode, value.mode === 'account' ? value.accountId : null]);
 
+    function invalidateSearchUi() {
+        requestSeq.current += 1;
+        setHits([]);
+        setLoading(false);
+        setError(null);
+    }
+
     async function runSearch(raw: string) {
         const q = raw.trim();
         if (q === '') {
-            setHits([]);
-            setError(null);
+            invalidateSearchUi();
             return;
         }
         const seq = ++requestSeq.current;
         setLoading(true);
         setError(null);
+        setHits([]);
         try {
             const response = await fetch(
                 `/crm/accounts/suche?type=${encodeURIComponent(type)}&q=${encodeURIComponent(q)}`,
@@ -162,18 +169,14 @@ export function CrmAccountPicker({
     }
 
     function clearSelection() {
-        requestSeq.current += 1;
-        setHits([]);
+        invalidateSearchUi();
         setQuery('');
-        setError(null);
         onChange({ mode: 'empty' });
     }
 
     function useFreitext(name: string) {
-        requestSeq.current += 1;
-        setHits([]);
+        invalidateSearchUi();
         setQuery('');
-        setError(null);
         onChange({
             mode: 'freitext',
             name,
@@ -390,13 +393,17 @@ export function CrmAccountPicker({
                                 value={query}
                                 disabled={disabled}
                                 placeholder="Name, Meridian, SF-ID…"
-                                onChange={(event) =>
-                                    setQuery(event.target.value)
-                                }
+                                onChange={(event) => {
+                                    setQuery(event.target.value);
+                                    // Tippen invalidiert laufende Antworten und alte Treffer.
+                                    invalidateSearchUi();
+                                }}
                                 onKeyDown={(event) => {
                                     if (event.key === 'Enter') {
                                         event.preventDefault();
-                                        void runSearch(query);
+                                        void runSearch(
+                                            event.currentTarget.value,
+                                        );
                                     }
                                 }}
                             />
@@ -454,8 +461,7 @@ export function CrmAccountPicker({
                                             )}
                                             data-test={`${testIdPrefix}-hit-${hit.id}`}
                                             onClick={() => {
-                                                requestSeq.current += 1;
-                                                setHits([]);
+                                                invalidateSearchUi();
                                                 setQuery('');
                                                 onChange(
                                                     hitToAccountValue(hit),

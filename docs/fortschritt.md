@@ -30,6 +30,7 @@ MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 | Binder-Payload-Vertrag + Preview ohne Accounts | **umgesetzt** |
 | Feature-Tests `CrmWizardPickerBindingTest` | **umgesetzt** |
 | E2E Port **8064** `playwright.crm-wizard-picker.config.ts` | **in CI** |
+| Review-Nachzug P1/P2 (State-Sync, Untouch, Neuanlage-Key, stale search) | **umgesetzt** (PR #136) |
 | BL-P2-03a E2E an Picker angepasst | **umgesetzt** |
 | Calc-Banner / Stammdaten-Textsuche / CRM-004 | **nicht** in diesem Slice |
 | Deploy | **offen** |

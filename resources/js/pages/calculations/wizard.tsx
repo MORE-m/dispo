@@ -1,4 +1,4 @@
-import type { HttpExceptionResponse } from '@inertiajs/core';
+import type { HttpExceptionResponse, Page } from '@inertiajs/core';
 import { Head, router, usePage } from '@inertiajs/react';
 import { SlidersHorizontal, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -2442,6 +2442,79 @@ export default function CalculationWizard({
             preserveState: true,
             preserveScroll: true,
             onFinish: () => setBusy(false),
+            onSuccess: (page: Page) => {
+                if (isStandardOffer) {
+                    return;
+                }
+                const saved = (
+                    page.props as {
+                        calculation?: {
+                            customer_account_id?: number | null;
+                            agency_account_id?: number | null;
+                            customer_name?: string | null;
+                            agency_name?: string | null;
+                            customer_meridian_number?: string | null;
+                            agency_meridian_number?: string | null;
+                            invoice_recipient?: string | null;
+                            positions?: Array<{
+                                id?: number | null;
+                                client_key?: string | null;
+                                schema_fingerprint?: string | null;
+                            }>;
+                        } | null;
+                    }
+                ).calculation;
+                if (!saved) {
+                    return;
+                }
+                // Freitext→Provisional: Picker auf gespeicherte Account-Bindung umstellen,
+                // damit ein weiterer Save mit preserveState keine Duplikate erzeugt.
+                setCustomerPicker(
+                    crmPickerFromCalculation({
+                        accountId: saved.customer_account_id,
+                        name: saved.customer_name,
+                        meridianNumber: saved.customer_meridian_number,
+                    }),
+                );
+                setAgencyPicker(
+                    crmPickerFromCalculation({
+                        accountId: saved.agency_account_id,
+                        name: saved.agency_name,
+                        meridianNumber: saved.agency_meridian_number,
+                    }),
+                );
+                setInvoiceRecipient(
+                    saved.invoice_recipient === 'agency'
+                        ? 'agency'
+                        : saved.invoice_recipient === 'customer'
+                          ? 'customer'
+                          : '',
+                );
+                // IDs/Fingerprints vom Server übernehmen, ohne übrige Draft-Eingaben zu verwerfen.
+                const savedPositions = saved.positions ?? [];
+                if (savedPositions.length > 0) {
+                    setPositions((current) =>
+                        current.map((position, index) => {
+                            const match =
+                                savedPositions.find(
+                                    (row) =>
+                                        row.client_key != null &&
+                                        row.client_key === position.client_key,
+                                ) ?? savedPositions[index];
+                            if (!match) {
+                                return position;
+                            }
+                            return {
+                                ...position,
+                                id: match.id ?? position.id,
+                                schema_fingerprint:
+                                    match.schema_fingerprint ??
+                                    position.schema_fingerprint,
+                            };
+                        }),
+                    );
+                }
+            },
             // Freeze-Konflikt: keine Validierung, sondern veraltetes Feldschema.
             onHttpException: (response: HttpExceptionResponse) => {
                 if (response.status !== 409) {

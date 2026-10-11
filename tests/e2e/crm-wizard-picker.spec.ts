@@ -54,8 +54,31 @@ async function fillMinimalSpotsAndSave(page: Page) {
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
     await page.locator('[data-test="range-spots-0-0"]').fill('10');
     await page.getByRole('button', { name: '3. Konditionen' }).click();
+    await saveAndWaitForPickerSync(page);
+}
+
+/** Wartet auf abgeschlossenen Save inkl. Picker-Sync (nicht nur URL). */
+async function saveAndWaitForPickerSync(page: Page) {
+    const responsePromise = page.waitForResponse(
+        (response) =>
+            (response.request().method() === 'POST' ||
+                response.request().method() === 'PUT') &&
+            /\/kalkulationen(\/\d+)?$/.test(
+                new URL(response.url()).pathname,
+            ) &&
+            response.status() >= 200 &&
+            response.status() < 400,
+        { timeout: 30_000 },
+    );
     await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+    await responsePromise;
     await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
+    await expect(
+        page.locator('[data-test="crm-customer-freitext-hint"]'),
+    ).toHaveCount(0, { timeout: 15_000 });
+    await expect(
+        page.getByText('Kalkulation gespeichert').first(),
+    ).toBeVisible({ timeout: 15_000 });
 }
 
 async function createDispoFromCurrentCalc(page: Page) {
@@ -192,14 +215,15 @@ test.describe('CRM Wizard Picker', () => {
         await expect(page.locator('#invoice-recipient')).toHaveValue('customer');
     });
 
-    test('Wiederholter Save erzeugt keinen zweiten Provisional; Preview legt keinen an', async ({
+    test('Wiederholter Save ohne Reload erzeugt keinen zweiten Provisional', async ({
         page,
     }) => {
         test.setTimeout(120_000);
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
         await adoptFreitext(page, 'crm-customer', 'Picker Idempotent GmbH');
-        await page.locator('#invoice-recipient').selectOption('customer');
+        await adoptFreitext(page, 'crm-agency', 'Picker Idempotent Agentur');
+        await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await page.locator('[data-test="range-spots-0-0"]').fill('5');
@@ -212,26 +236,108 @@ test.describe('CRM Wizard Picker', () => {
         expect((await beforePreview.json()).accounts?.length ?? 0).toBe(0);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
-        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
+        await saveAndWaitForPickerSync(page);
 
-        const afterFirst = await page.request.get(
+        const afterFirstCustomer = await page.request.get(
             '/crm/accounts/suche?type=customer&q=Picker%20Idempotent%20GmbH',
         );
-        const firstList = (await afterFirst.json()).accounts ?? [];
-        expect(firstList.length).toBe(1);
-        const firstId = firstList[0].id;
+        const afterFirstAgency = await page.request.get(
+            '/crm/accounts/suche?type=agency&q=Picker%20Idempotent%20Agentur',
+        );
+        const customerList = (await afterFirstCustomer.json()).accounts ?? [];
+        const agencyList = (await afterFirstAgency.json()).accounts ?? [];
+        expect(customerList.length).toBe(1);
+        expect(agencyList.length).toBe(1);
+        const customerId = customerList[0].id;
+        const agencyId = agencyList[0].id;
+
+        // Ohne Reload: Picker muss Account-Mode sein (Sync nach Save).
+        await expect(
+            page.locator('[data-test="crm-customer-freitext-hint"]'),
+        ).toHaveCount(0);
+        await expect(
+            page.locator('[data-test="crm-agency-freitext-hint"]'),
+        ).toHaveCount(0);
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
-        await page.getByRole('button', { name: 'Speichern', exact: true }).click();
-        await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
+        await saveAndWaitForPickerSync(page);
 
-        const afterSecond = await page.request.get(
-            '/crm/accounts/suche?type=customer&q=Picker%20Idempotent%20GmbH',
+        const afterSecondCustomer = await (
+            await page.request.get(
+                '/crm/accounts/suche?type=customer&q=Picker%20Idempotent%20GmbH',
+            )
+        ).json();
+        const afterSecondAgency = await (
+            await page.request.get(
+                '/crm/accounts/suche?type=agency&q=Picker%20Idempotent%20Agentur',
+            )
+        ).json();
+        expect(afterSecondCustomer.accounts?.length ?? 0).toBe(1);
+        expect(afterSecondAgency.accounts?.length ?? 0).toBe(1);
+        expect(afterSecondCustomer.accounts[0].id).toBe(customerId);
+        expect(afterSecondAgency.accounts[0].id).toBe(agencyId);
+    });
+
+    test('Veraltete Suchantworten überschreiben neuere Eingaben nicht', async ({
+        page,
+    }) => {
+        test.setTimeout(120_000);
+        await login(page, 'admin@example.com');
+        const tmp = writeCsv([
+            'Accountname;Meridian-ID;Account-ID;Rechnungs-E-Mail;Account-Datensatztyp',
+            'Firma Alpha Suche;M-A;001xx00000ALPH1;a@alpha-suche.test;Account KUNDE',
+            'Firma Beta Suche;M-B;001xx00000BETA1;b@beta-suche.test;Account KUNDE',
+            '',
+        ]);
+        await uploadAndApply(page, tmp);
+        fs.unlinkSync(tmp);
+
+        await login(page, 'sales@example.com');
+        await page.goto('/kalkulationen/neu');
+
+        let releaseAlpha: (() => void) | undefined;
+        const alphaGate = new Promise<void>((resolve) => {
+            releaseAlpha = resolve;
+        });
+
+        await page.route('**/crm/accounts/suche**', async (route) => {
+            const url = new URL(route.request().url());
+            const q = url.searchParams.get('q') ?? '';
+            if (q.includes('Alpha')) {
+                await alphaGate;
+            }
+            await route.continue();
+        });
+
+        await page.locator('[data-test="crm-customer-search"]').fill('Firma Alpha Suche');
+        await page.locator('[data-test="crm-customer-search-btn"]').click();
+        await expect(page.locator('[data-test="crm-customer-loading"]')).toBeVisible();
+
+        await page.locator('[data-test="crm-customer-search"]').fill('Firma Beta Suche');
+        await expect(page.locator('[data-test="crm-customer-hits"]')).toHaveCount(0);
+        await page.locator('[data-test="crm-customer-search-btn"]').click();
+        await expect(
+            page.locator('[data-test="crm-customer-hits"]'),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(page.locator('[data-test="crm-customer-hits"]')).toContainText(
+            'Firma Beta Suche',
         );
-        const secondList = (await afterSecond.json()).accounts ?? [];
-        expect(secondList.length).toBe(1);
-        expect(secondList[0].id).toBe(firstId);
+        await expect(page.locator('[data-test="crm-customer-hits"]')).not.toContainText(
+            'Firma Alpha Suche',
+        );
+
+        releaseAlpha?.();
+        await page.waitForTimeout(500);
+        await expect(page.locator('[data-test="crm-customer-hits"]')).toContainText(
+            'Firma Beta Suche',
+        );
+        await expect(page.locator('[data-test="crm-customer-hits"]')).not.toContainText(
+            'Firma Alpha Suche',
+        );
+
+        await page.locator('[data-test="crm-customer-search"]').fill('Firma Alpha Suche');
+        await expect(page.locator('[data-test="crm-customer-hits"]')).toHaveCount(0);
+        await expect(page.locator('[data-test="crm-customer-loading"]')).toHaveCount(0);
     });
 
     test('Historischer Freitext bleibt ohne Auto-Migration speicherbar', async ({
