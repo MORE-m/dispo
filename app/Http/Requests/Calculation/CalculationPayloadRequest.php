@@ -193,6 +193,8 @@ class CalculationPayloadRequest extends FormRequest
             'agency_matching_domain' => ['nullable', 'string', 'max:255'],
             'ensure_provisional_customer' => ['sometimes', 'boolean'],
             'ensure_provisional_agency' => ['sometimes', 'boolean'],
+            'customer_create_provisional' => ['sometimes', 'boolean'],
+            'agency_create_provisional' => ['sometimes', 'boolean'],
             'campaign' => ['nullable', 'string', 'max:255'],
             'product_title' => ['nullable', 'string', 'max:255'],
             'briefing' => ['nullable', 'string', 'max:20000'],

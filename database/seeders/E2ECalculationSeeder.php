@@ -154,5 +154,28 @@ class E2ECalculationSeeder extends Seeder
             $positionIds,
             $limited,
         );
+
+        // Historischer Freitext ohne Account-Schlüssel (Bestandsschutz CRM-Wizard-Picker).
+        $sales = User::query()->where('email', 'sales@example.com')->firstOrFail();
+        app(CalculationWriter::class)->create([
+            'planning_mode' => 'manual',
+            'schema_fingerprint' => $baseFingerprint,
+            'customer_name' => 'E2E Legacy Freitext GmbH',
+            'campaign' => 'Legacy-Freitext',
+            'product_title' => 'Legacy Produkt',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [[
+                'inventory_id' => $hamburg->id,
+                'advertising_medium_id' => $medium->id,
+                'schema_fingerprint' => $positionFingerprint,
+                'spot_method' => 'average',
+                'length_seconds' => 30,
+                'total_spot_count' => 5,
+                'position_discount_percent' => '0',
+                'ae_percent' => '0',
+                'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
+            ]],
+        ], $sales);
     }
 }

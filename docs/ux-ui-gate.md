@@ -19,9 +19,10 @@
   + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1**
   + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (PR #122 `main`)**
   + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**
-  + **CRM Salesforce/Meridian BL-P2-03a / PO-BLP203-1 B1** – nur CSV-Import, Stammdaten,
-    vorläufige Accounts, Prüfliste/Zuordnung, Konfliktanzeige, Calc/Dispo-Accountwahl
-    und Rechnungsempfänger; **nicht** Kontakte/`CRM-004`, API, E-Mail-Ingest, XLSX)
+  + **CRM Salesforce/Meridian BL-P2-03a / PO-BLP203-1 B1 + I1** – CSV-Import, Stammdaten,
+    vorläufige Accounts, Prüfliste/Zuordnung, Konfliktanzeige, Wizard-Picker
+    (Suche/Freitext→Provisional/Clear/RE) und Rechnungsempfänger; **nicht** Kontakte/`CRM-004`,
+    API, E-Mail-Ingest, XLSX, Calc-Isolationsbanner, Stammdaten-Textsuche außerhalb Picker)
 - **Technische Abnahme:** UX-GATE-A/B abgenommen (HEAD `976aae5`,
   Actions [33252415668](https://github.com/MORE-m/dispo/actions/runs/33252415668))
 - **Hinweis Stand 22.09.2026:** Dispo-Slices SPT-008 (Spotplanungs-XLSX) und

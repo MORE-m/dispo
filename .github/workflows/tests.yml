@@ -216,6 +216,9 @@ jobs:
       - name: Browser BL-P2-03a isolated tests
         run: npx playwright test -c playwright.blp203a.config.ts
 
+      - name: Browser CRM Wizard Picker isolated tests
+        run: npx playwright test -c playwright.crm-wizard-picker.config.ts
+
   e2e-spt008:
     name: e2e-spt008
     runs-on: ubuntu-latest

@@ -1,7 +1,7 @@
 # PO-BLP203-1 – CRM Salesforce / Meridian (BL-P2-03a)
 
-Status: **Akzeptiert** (A1, B1, C1, D + **D1**, E1, F1, G1, H1)
-Stand: 10. Oktober 2026
+Status: **Akzeptiert** (A1, B1, C1, D + **D1**, E1, F1, G1, H1, **I1**)
+Stand: 11. Oktober 2026
 Code auf `main`: `65da41121206b0b66327831ff9586996f2c3c331`
 (Merge PR [#133](https://github.com/MORE-m/dispo/pull/133) + D1 PR [#134](https://github.com/MORE-m/dispo/pull/134);
 Post-Merge-CI [`38063164855`](https://github.com/MORE-m/dispo/actions/runs/38063164855) SUCCESS).
@@ -32,6 +32,7 @@ Review Daten: [`docs/reviews/crm-salesforce-meridian-data-readiness/`](../review
 | **F1** | Rechnungsempfänger explizit `customer` \| `agency`; Agentur nur bei gesetzter Agentur. Bei bestehenden Freitext-Aufträgen keine historische Zuordnung erfinden |
 | **G1** | Kontakte / `CRM-004` bleiben Folgeslice |
 | **H1** | Salesforce-„Projektmanagement“ ist keine Tool-Rolle und gibt Produktmanagement keine Rechte |
+| **I1** | **CRM-Wizard-Picker / Freitext:** Auch neue Kalkulationen dürfen mit frei eingegebener Kundenfirmierung erstellt werden. Benutzer wählt vorhandenen Account **oder** erfasst Freitext. Agentur analog, optional. Freitext ist kein unverbundener Name: beim erfolgreichen Speichern wird automatisch ein vorläufiger CRM-Account erzeugt und verknüpft (keine Vorläufig-Checkbox, kein Pflichtdialog). E-Mail/Domain optional; Salesforce-ID und Meridian nicht Pflicht. Ohne Domain bleibt der Auftrag nutzbar. Erstabgleich später nur über eindeutige Domain+Typ; ohne Domain/Mehrdeutigkeit manuell; nach Verknüpfung nur Salesforce-ID; Meridian-Nachtrag nach R5/E1. Keine automatische Namens-/Adresszuordnung. Historische Freitext-Kalkulationen bleiben ohne Auto-Migration bearbeitbar; Bestandsschutz serverseitig am gespeicherten Zustand (fehlender bzw. null-Account ohne Create-Flag). UX-Freigabe: Picker-Oberflächen innerhalb der bestehenden CRM-Teilfreigabe B1. Preview legt keine Accounts an. |
 
 ## Bestätigte Fachregeln (unverändert verbindlich)
 

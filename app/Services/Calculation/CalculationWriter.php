@@ -1177,7 +1177,9 @@ final class CalculationWriter
             || array_key_exists('agency_account_id', $payload)
             || array_key_exists('invoice_recipient', $payload)
             || ! empty($payload['ensure_provisional_customer'])
-            || ! empty($payload['ensure_provisional_agency']);
+            || ! empty($payload['ensure_provisional_agency'])
+            || ! empty($payload['customer_create_provisional'])
+            || ! empty($payload['agency_create_provisional']);
 
         if ($touchesCrm) {
             $crm = $this->crmHeaders->resolveForCalculation(

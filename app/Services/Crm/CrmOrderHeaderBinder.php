@@ -11,11 +11,18 @@ use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Bindet CRM-Accounts an Calc-/Dispo-Kopf-Snapshots (BL-P2-03a).
+ * Bindet CRM-Accounts an Calc-/Dispo-Kopf-Snapshots (BL-P2-03a + Wizard-Picker).
  *
- * Unveränderte Account-Identität: gespeicherte Version/Firmierung bleiben.
- * Neue Bindung / expliziter Accountwechsel: aktuelle Stammdatenversion.
- * Technische Meridian-/SF-Nachträge laufen separat (CrmMeridianSupplementService).
+ * Payload-Vertrag (CRM-001 / PO-BLP203-1 Ergänzung):
+ * - fehlender `*_account_id`-Schlüssel: Legacy-/Teilpfad (nur Name, kein Auto-Provisional)
+ * - `*_account_id` = int: explizite Account-Auswahl
+ * - `*_account_id` = null + Name: Freitext
+ *   - neue Calc / leerer Bestand / Wechsel von gebundenem Account → vorläufiger Account
+ *   - historischer Freitext-Bestand (Name ohne Account) → ohne Migration behalten,
+ *     außer `*_create_provisional` / `ensure_provisional_*` (explizite Überführung)
+ * - `*_account_id` = null + leerer Name: Seite leeren (Agentur)
+ *
+ * Preview ruft diesen Binder nicht auf. Unveränderte Account-Identität behält Version/Firmierung.
  */
 final class CrmOrderHeaderBinder
 {
@@ -46,49 +53,86 @@ final class CrmOrderHeaderBinder
         ?Calculation $existing = null,
     ): array {
         $customer = $this->resolveSide(
-            accountId: isset($payload['customer_account_id']) ? (int) $payload['customer_account_id'] : null,
-            freitextName: isset($payload['customer_name']) ? trim((string) $payload['customer_name']) : null,
-            freitextEmail: isset($payload['customer_billing_email']) ? (string) $payload['customer_billing_email'] : null,
-            freitextDomain: isset($payload['customer_matching_domain']) ? (string) $payload['customer_matching_domain'] : null,
+            payload: $payload,
+            accountKey: 'customer_account_id',
+            nameKey: 'customer_name',
+            emailKey: 'customer_billing_email',
+            domainKey: 'customer_matching_domain',
+            createProvisionalKey: 'customer_create_provisional',
+            legacyEnsureKey: 'ensure_provisional_customer',
             type: CrmAccountType::Customer,
             actor: $actor,
-            allowFreitextProvisional: $allowFreitextProvisional && ! empty($payload['ensure_provisional_customer']),
-            existingAccountId: $existing?->customer_account_id,
-            existingVersionId: $existing?->customer_version_id,
+            allowFreitextProvisional: $allowFreitextProvisional,
+            existingAccountId: $existing?->customer_account_id !== null
+                ? (int) $existing->customer_account_id
+                : null,
+            existingVersionId: $existing?->customer_version_id !== null
+                ? (int) $existing->customer_version_id
+                : null,
             existingName: $existing?->customer_name,
             existingMeridian: $existing?->customer_meridian_number,
             existingSalesforce: $existing?->customer_salesforce_account_id,
         );
 
+        $agencyTouched = array_key_exists('agency_account_id', $payload)
+            || array_key_exists('agency_name', $payload)
+            || ! empty($payload['ensure_provisional_agency'])
+            || ! empty($payload['agency_create_provisional']);
+
         $agency = null;
-        $agencyName = isset($payload['agency_name']) ? trim((string) $payload['agency_name']) : null;
-        $agencyAccountId = isset($payload['agency_account_id']) ? (int) $payload['agency_account_id'] : null;
-        if ($agencyAccountId || ($agencyName !== null && $agencyName !== '') || ! empty($payload['ensure_provisional_agency'])) {
+        if ($agencyTouched) {
             $agency = $this->resolveSide(
-                accountId: $agencyAccountId,
-                freitextName: $agencyName,
-                freitextEmail: isset($payload['agency_billing_email']) ? (string) $payload['agency_billing_email'] : null,
-                freitextDomain: isset($payload['agency_matching_domain']) ? (string) $payload['agency_matching_domain'] : null,
+                payload: $payload,
+                accountKey: 'agency_account_id',
+                nameKey: 'agency_name',
+                emailKey: 'agency_billing_email',
+                domainKey: 'agency_matching_domain',
+                createProvisionalKey: 'agency_create_provisional',
+                legacyEnsureKey: 'ensure_provisional_agency',
                 type: CrmAccountType::Agency,
                 actor: $actor,
-                allowFreitextProvisional: $allowFreitextProvisional && ! empty($payload['ensure_provisional_agency']),
-                existingAccountId: $existing?->agency_account_id,
-                existingVersionId: $existing?->agency_version_id,
+                allowFreitextProvisional: $allowFreitextProvisional,
+                existingAccountId: $existing?->agency_account_id !== null
+                    ? (int) $existing->agency_account_id
+                    : null,
+                existingVersionId: $existing?->agency_version_id !== null
+                    ? (int) $existing->agency_version_id
+                    : null,
                 existingName: $existing?->agency_name,
                 existingMeridian: $existing?->agency_meridian_number,
                 existingSalesforce: $existing?->agency_salesforce_account_id,
             );
+        } elseif ($existing !== null && $existing->agency_account_id !== null) {
+            $agency = [
+                'account_id' => (int) $existing->agency_account_id,
+                'version_id' => $existing->agency_version_id !== null
+                    ? (int) $existing->agency_version_id
+                    : null,
+                'name' => $existing->agency_name,
+                'meridian' => $existing->agency_meridian_number,
+                'salesforce_raw' => $existing->agency_salesforce_account_id,
+            ];
+        } elseif ($existing !== null && $existing->agency_name !== null && $existing->agency_name !== '') {
+            $agency = [
+                'account_id' => null,
+                'version_id' => null,
+                'name' => $existing->agency_name,
+                'meridian' => null,
+                'salesforce_raw' => null,
+            ];
         }
 
         $invoice = $this->resolveInvoiceRecipient(
-            $payload['invoice_recipient'] ?? null,
+            array_key_exists('invoice_recipient', $payload)
+                ? $payload['invoice_recipient']
+                : ($existing?->invoice_recipient?->value),
             $customer,
             $agency,
         );
 
         return [
-            'customer_name' => $customer['name'] ?? ($payload['customer_name'] ?? null),
-            'agency_name' => $agency['name'] ?? (($agencyName !== null && $agencyName !== '') ? $agencyName : null),
+            'customer_name' => $customer['name'] ?? null,
+            'agency_name' => $agency['name'] ?? null,
             'customer_account_id' => $customer['account_id'] ?? null,
             'agency_account_id' => $agency['account_id'] ?? null,
             'customer_version_id' => $customer['version_id'] ?? null,
@@ -102,13 +146,17 @@ final class CrmOrderHeaderBinder
     }
 
     /**
+     * @param  array<string, mixed>  $payload
      * @return array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null
      */
     private function resolveSide(
-        ?int $accountId,
-        ?string $freitextName,
-        ?string $freitextEmail,
-        ?string $freitextDomain,
+        array $payload,
+        string $accountKey,
+        string $nameKey,
+        string $emailKey,
+        string $domainKey,
+        string $createProvisionalKey,
+        string $legacyEnsureKey,
         CrmAccountType $type,
         User $actor,
         bool $allowFreitextProvisional,
@@ -118,75 +166,70 @@ final class CrmOrderHeaderBinder
         ?string $existingMeridian,
         ?string $existingSalesforce,
     ): ?array {
-        if ($accountId) {
-            $account = CrmAccount::query()->with('currentVersion')->find($accountId);
-            if ($account === null) {
-                throw ValidationException::withMessages([
-                    $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account nicht gefunden.',
-                ]);
-            }
-            $account = $this->accounts->resolveCanonicalAccount($account);
-            $account->loadMissing('currentVersion');
-            if ($account->type !== $type) {
-                throw ValidationException::withMessages([
-                    $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account-Typ passt nicht.',
-                ]);
-            }
+        $hasAccountKey = array_key_exists($accountKey, $payload);
+        $rawAccountId = $hasAccountKey ? $payload[$accountKey] : null;
+        $accountId = $rawAccountId !== null && $rawAccountId !== ''
+            ? (int) $rawAccountId
+            : null;
+        $freitextName = array_key_exists($nameKey, $payload)
+            ? trim((string) ($payload[$nameKey] ?? ''))
+            : null;
+        if ($freitextName === '') {
+            $freitextName = null;
+        }
+        $freitextEmail = isset($payload[$emailKey]) ? (string) $payload[$emailKey] : null;
+        $freitextDomain = isset($payload[$domainKey]) ? (string) $payload[$domainKey] : null;
+        $forceProvisional = ! empty($payload[$createProvisionalKey]) || ! empty($payload[$legacyEnsureKey]);
 
-            if ($this->sameAccountIdentity($existingAccountId, $account) && $existingVersionId !== null) {
-                $version = CrmAccountVersion::query()->whereKey($existingVersionId)->first();
-                if ($version !== null) {
-                    return [
-                        'account_id' => $account->id,
-                        'version_id' => $version->id,
-                        'name' => $existingName ?? $version->name,
-                        'meridian' => $existingMeridian,
-                        'salesforce_raw' => $account->salesforce_account_id_raw ?? $existingSalesforce,
-                    ];
-                }
-            }
-
-            $version = $account->currentVersion;
-            if ($version === null) {
-                throw ValidationException::withMessages([
-                    $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account hat keine Stammdatenversion.',
-                ]);
-            }
-
-            return [
-                'account_id' => $account->id,
-                'version_id' => $version->id,
-                'name' => $version->name,
-                'meridian' => $version->meridian_number,
-                'salesforce_raw' => $account->salesforce_account_id_raw,
-            ];
+        if ($hasAccountKey && $accountId !== null) {
+            return $this->bindExistingAccount(
+                accountId: $accountId,
+                type: $type,
+                existingAccountId: $existingAccountId,
+                existingVersionId: $existingVersionId,
+                existingName: $existingName,
+                existingMeridian: $existingMeridian,
+                existingSalesforce: $existingSalesforce,
+            );
         }
 
-        if ($allowFreitextProvisional && $freitextName !== null && $freitextName !== '') {
-            $account = $this->accounts->createProvisional([
-                'name' => $freitextName,
-                'type' => $type,
-                'billing_email' => $freitextEmail,
-                'matching_domain' => $freitextDomain,
-            ], $actor);
-            $account->loadMissing('currentVersion');
-            $version = $account->currentVersion;
-            if ($version === null) {
-                throw ValidationException::withMessages([
-                    $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Vorläufiger Account ohne Stammdatenversion.',
-                ]);
+        if ($hasAccountKey && $accountId === null) {
+            if ($freitextName === null) {
+                return null;
+            }
+
+            $existingIsLegacyFreitext = $existingAccountId === null
+                && $existingName !== null
+                && $existingName !== '';
+            $existingHasAccount = $existingAccountId !== null;
+
+            $shouldCreateProvisional = $allowFreitextProvisional && (
+                $existingHasAccount
+                || ($existingIsLegacyFreitext && $forceProvisional)
+                || (! $existingHasAccount && ! $existingIsLegacyFreitext)
+            );
+
+            if ($shouldCreateProvisional) {
+                return $this->createProvisionalBinding(
+                    name: $freitextName,
+                    email: $freitextEmail,
+                    domain: $freitextDomain,
+                    type: $type,
+                    actor: $actor,
+                );
             }
 
             return [
-                'account_id' => $account->id,
-                'version_id' => $version->id,
-                'name' => $version->name,
-                'meridian' => $version->meridian_number,
+                'account_id' => null,
+                'version_id' => null,
+                'name' => $freitextName,
+                'meridian' => null,
                 'salesforce_raw' => null,
             ];
         }
 
-        if ($freitextName !== null && $freitextName !== '') {
+        // Fehlender Account-Schlüssel: Legacy-/Testpfad ohne Auto-Provisional.
+        if ($freitextName !== null) {
             return [
                 'account_id' => null,
                 'version_id' => null,
@@ -197,6 +240,100 @@ final class CrmOrderHeaderBinder
         }
 
         return null;
+    }
+
+    /**
+     * @return array{account_id: int<1, max>, version_id: int<1, max>, name: ?string, meridian: ?string, salesforce_raw: ?string}
+     */
+    private function bindExistingAccount(
+        int $accountId,
+        CrmAccountType $type,
+        ?int $existingAccountId,
+        ?int $existingVersionId,
+        ?string $existingName,
+        ?string $existingMeridian,
+        ?string $existingSalesforce,
+    ): array {
+        $account = CrmAccount::query()->with('currentVersion')->find($accountId);
+        if ($account === null) {
+            throw ValidationException::withMessages([
+                $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account nicht gefunden.',
+            ]);
+        }
+        $account = $this->accounts->resolveCanonicalAccount($account);
+        $account->loadMissing('currentVersion');
+        if ($account->type !== $type) {
+            throw ValidationException::withMessages([
+                $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account-Typ passt nicht.',
+            ]);
+        }
+
+        if ($this->sameAccountIdentity($existingAccountId, $account) && $existingVersionId !== null) {
+            $version = CrmAccountVersion::query()->whereKey($existingVersionId)->first();
+            if ($version !== null) {
+                return [
+                    'account_id' => $account->id,
+                    'version_id' => $version->id,
+                    'name' => $existingName ?? $version->name,
+                    'meridian' => $existingMeridian,
+                    'salesforce_raw' => $account->salesforce_account_id_raw ?? $existingSalesforce,
+                ];
+            }
+        }
+
+        $version = $account->currentVersion;
+        if ($version === null) {
+            throw ValidationException::withMessages([
+                $type === CrmAccountType::Customer ? 'customer_account_id' : 'agency_account_id' => 'Account hat keine Stammdatenversion.',
+            ]);
+        }
+
+        return [
+            'account_id' => $account->id,
+            'version_id' => $version->id,
+            'name' => $version->name,
+            'meridian' => $version->meridian_number,
+            'salesforce_raw' => $account->salesforce_account_id_raw,
+        ];
+    }
+
+    /**
+     * @return array{account_id: int<1, max>, version_id: int<1, max>, name: ?string, meridian: ?string, salesforce_raw: ?string}
+     */
+    private function createProvisionalBinding(
+        string $name,
+        ?string $email,
+        ?string $domain,
+        CrmAccountType $type,
+        User $actor,
+    ): array {
+        if (! $actor->canCreateProvisionalCrmAccounts()) {
+            throw ValidationException::withMessages([
+                $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Keine Berechtigung, vorläufige Accounts anzulegen.',
+            ]);
+        }
+
+        $account = $this->accounts->createProvisional([
+            'name' => $name,
+            'type' => $type,
+            'billing_email' => $email,
+            'matching_domain' => $domain,
+        ], $actor);
+        $account->loadMissing('currentVersion');
+        $version = $account->currentVersion;
+        if ($version === null) {
+            throw ValidationException::withMessages([
+                $type === CrmAccountType::Customer ? 'customer_name' : 'agency_name' => 'Vorläufiger Account ohne Stammdatenversion.',
+            ]);
+        }
+
+        return [
+            'account_id' => $account->id,
+            'version_id' => $version->id,
+            'name' => $version->name,
+            'meridian' => $version->meridian_number,
+            'salesforce_raw' => null,
+        ];
     }
 
     private function sameAccountIdentity(?int $storedAccountId, CrmAccount $resolved): bool
@@ -220,32 +357,53 @@ final class CrmOrderHeaderBinder
      * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $customer
      * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $agency
      */
-    private function resolveInvoiceRecipient(mixed $raw, ?array $customer, ?array $agency): ?InvoiceRecipient
-    {
-        if (($customer['account_id'] ?? null) === null && ($agency['account_id'] ?? null) === null) {
+    private function resolveInvoiceRecipient(
+        mixed $raw,
+        ?array $customer,
+        ?array $agency,
+    ): ?InvoiceRecipient {
+        $customerBound = ($customer['account_id'] ?? null) !== null;
+        $agencyBound = ($agency['account_id'] ?? null) !== null;
+        $customerPresent = $customerBound
+            || (($customer['name'] ?? null) !== null && ($customer['name'] ?? '') !== '');
+        $agencyPresent = $agencyBound
+            || (($agency['name'] ?? null) !== null && ($agency['name'] ?? '') !== '');
+
+        if (! $customerBound && ! $agencyBound) {
+            // Historischer Freitext ohne Account: keine RE-Zuordnung erfinden.
             return null;
         }
 
         if ($raw === null || $raw === '') {
-            if (($agency['account_id'] ?? null) === null) {
+            if ($agencyBound) {
+                throw ValidationException::withMessages([
+                    'invoice_recipient' => 'Rechnungsempfänger muss explizit gewählt werden (Kunde oder Agentur).',
+                ]);
+            }
+            if ($customerBound) {
                 return InvoiceRecipient::Customer;
             }
-            throw ValidationException::withMessages([
-                'invoice_recipient' => 'Rechnungsempfänger muss explizit gewählt werden (Kunde oder Agentur).',
-            ]);
+
+            return null;
         }
 
         $recipient = $raw instanceof InvoiceRecipient
             ? $raw
             : InvoiceRecipient::from((string) $raw);
-        if ($recipient === InvoiceRecipient::Agency && ($agency['account_id'] ?? null) === null) {
+
+        if ($recipient === InvoiceRecipient::Agency && ! $agencyPresent) {
             throw ValidationException::withMessages([
                 'invoice_recipient' => 'Agentur als Rechnungsempfänger nur bei gesetzter Agentur.',
             ]);
         }
-        if ($recipient === InvoiceRecipient::Customer && ($customer['account_id'] ?? null) === null) {
+        if ($recipient === InvoiceRecipient::Customer && ! $customerBound) {
             throw ValidationException::withMessages([
                 'invoice_recipient' => 'Kunde als Rechnungsempfänger erfordert einen Kundenaccount.',
+            ]);
+        }
+        if ($recipient === InvoiceRecipient::Agency && ! $agencyBound) {
+            throw ValidationException::withMessages([
+                'invoice_recipient' => 'Agentur als Rechnungsempfänger erfordert einen Agenturaccount.',
             ]);
         }
 

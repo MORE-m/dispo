@@ -1,20 +1,19 @@
 # Fortschritt V1
 
-Stand: 10. Oktober 2026 – **BL-P2-03a** auf `main` (PR #134 / `65da411…`);
-Daten-Readiness **A/B/C lokal erledigt**; Deploy offen. Port 8000 / `.env` unberührt.
+Stand: 11. Oktober 2026 – CRM-Wizard-Picker (PO-BLP203-1 **I1**) in Umsetzung/Review;
+Basis `origin/main` @ `d4ff196…` (PR #135). Port 8000 / `.env` / `dispo_mat_core` unberührt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** CRM Salesforce/Meridian
-technisch auf `main` inkl. lokaler CRM-Einrichtung/Abnahme in `dispo_mat_core`;
-Phase 4 Preislisten/Spot Classic auf `main`; Phase 5 Trailer/Produktion auf `main`
-(Deploy offen); Phase 7/9 Teilumfänge auf `main`.
+auf `main` inkl. lokaler Datenabnahme; **CRM-Wizard-Picker** (Freitext→Provisional,
+Account-Suche/Clear/RE) als schmaler Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**BL-P2-03a / PO-BLP203-1:** lokale B/C erledigt (Sicherung → Migrationen → Import-ID 2
-→ Browser Port 8061). Docs-Draft-PR zur Sicherung der Abnahme-Doku (noch nicht auf `main`).
-Deploy und andere Umgebungen offen. `CRM-004` und Rest-`BL-P2-03` offen.
+**CRM-Wizard-Picker / PO-BLP203-1 I1:** Draft-PR Review; CI auf Feature-HEAD.
+Nicht in diesem Slice: Calc-Isolationsbanner, Stammdaten-Textsuche außerhalb Picker,
+`CRM-004`, weitere Methoden/SWF, Deploy, operative Datenpflege.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
@@ -22,11 +21,24 @@ Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest, Submit-Empfänger, Invalidierungsma
 Budget-Vorlagen, SPT-013 Abbinder, In-App, REP, ADV-001 Defaults, ADV-002,
 MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 
+## CRM-Wizard-Picker / PO-BLP203-1 I1 (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| PO-Ergänzung I1 (Freitext→Provisional, Bestandsschutz) | **dokumentiert** |
+| Wizard-Picker UI (Suche/Freitext/Clear/RE/Meridian) | **umgesetzt** (Draft-PR) |
+| Binder-Payload-Vertrag + Preview ohne Accounts | **umgesetzt** |
+| Feature-Tests `CrmWizardPickerBindingTest` | **umgesetzt** |
+| E2E Port **8064** `playwright.crm-wizard-picker.config.ts` | **in CI** |
+| BL-P2-03a E2E an Picker angepasst | **umgesetzt** |
+| Calc-Banner / Stammdaten-Textsuche / CRM-004 | **nicht** in diesem Slice |
+| Deploy | **offen** |
+
 ## BL-P2-03a / PO-BLP203-1 (Oktober 2026)
 
 | Thema | Status |
 |---|---|
-| UX-GATE-D Teilfreigabe B1 | **freigegeben** (nur CRM-Slice-Oberflächen) |
+| UX-GATE-D Teilfreigabe B1 | **freigegeben** (nur CRM-Slice-Oberflächen; Picker I1 eingeschlossen) |
 | CSV-Import UTF-8/Semikolon | **umgesetzt** (`main` PR #133) |
 | Stammdatenversionen + vorläufige Accounts | **umgesetzt** |
 | Domain+Typ-Zuordnung / Prüfliste | **umgesetzt** |

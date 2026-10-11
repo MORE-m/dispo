@@ -151,7 +151,8 @@ test.describe.serial('ADV-001c4b Wizard Berechnungsmethoden', () => {
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
 
-        await page.locator('#customer').fill('C4b Nav GmbH');
+        await page.locator('[data-test="crm-customer-search"]').fill('C4b Nav GmbH');
+        await page.locator('[data-test="crm-customer-use-freitext"]').click();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 
         await expectLiveMethodChooser(page);
