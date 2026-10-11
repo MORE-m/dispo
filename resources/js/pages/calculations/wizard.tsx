@@ -3056,7 +3056,7 @@ export default function CalculationWizard({
                                             </FormField>
                                         ) : (
                                             <>
-                                                <div className="sm:col-span-2 space-y-4">
+                                                <div className="space-y-4 sm:col-span-2">
                                                     <CrmAccountPicker
                                                         label="Kunde"
                                                         type="customer"
@@ -3064,7 +3064,9 @@ export default function CalculationWizard({
                                                         value={customerPicker}
                                                         disabled={!canEdit}
                                                         onChange={(next) => {
-                                                            setCustomerPicker(next);
+                                                            setCustomerPicker(
+                                                                next,
+                                                            );
                                                         }}
                                                     />
                                                     <CrmAccountPicker
@@ -3075,7 +3077,9 @@ export default function CalculationWizard({
                                                         disabled={!canEdit}
                                                         optional
                                                         onChange={(next) => {
-                                                            setAgencyPicker(next);
+                                                            setAgencyPicker(
+                                                                next,
+                                                            );
                                                             if (
                                                                 next.mode ===
                                                                     'empty' &&
@@ -3101,12 +3105,9 @@ export default function CalculationWizard({
                                                             value={
                                                                 invoiceRecipient
                                                             }
-                                                            onChange={(
-                                                                event,
-                                                            ) =>
+                                                            onChange={(event) =>
                                                                 setInvoiceRecipient(
-                                                                    event
-                                                                        .target
+                                                                    event.target
                                                                         .value as
                                                                         | ''
                                                                         | 'customer'
@@ -3116,7 +3117,8 @@ export default function CalculationWizard({
                                                             disabled={!canEdit}
                                                         >
                                                             <option value="">
-                                                                – nicht gesetzt –
+                                                                – nicht gesetzt
+                                                                –
                                                             </option>
                                                             <option value="customer">
                                                                 Kunde

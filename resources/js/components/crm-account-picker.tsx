@@ -457,7 +457,9 @@ export function CrmAccountPicker({
                                                 requestSeq.current += 1;
                                                 setHits([]);
                                                 setQuery('');
-                                                onChange(hitToAccountValue(hit));
+                                                onChange(
+                                                    hitToAccountValue(hit),
+                                                );
                                             }}
                                         >
                                             <span className="font-medium">
@@ -524,9 +526,7 @@ export function crmPickerToPayload(
     const accountKey =
         side === 'customer' ? 'customer_account_id' : 'agency_account_id';
     const emailKey =
-        side === 'customer'
-            ? 'customer_billing_email'
-            : 'agency_billing_email';
+        side === 'customer' ? 'customer_billing_email' : 'agency_billing_email';
     const domainKey =
         side === 'customer'
             ? 'customer_matching_domain'
