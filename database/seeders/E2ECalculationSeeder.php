@@ -8,6 +8,8 @@ use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingCategory;
 use App\Models\AdvertisingMedium;
+use App\Models\CrmAccount;
+use App\Models\CrmAccountVersion;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\Organization;
@@ -186,8 +188,8 @@ class E2ECalculationSeeder extends Seeder
         $legacy->invoice_recipient = null;
         $legacy->save();
         if ($legacyAccountId !== null) {
-            \App\Models\CrmAccountVersion::query()->where('crm_account_id', $legacyAccountId)->delete();
-            \App\Models\CrmAccount::query()->whereKey($legacyAccountId)->delete();
+            CrmAccountVersion::query()->where('crm_account_id', $legacyAccountId)->delete();
+            CrmAccount::query()->whereKey($legacyAccountId)->delete();
         }
     }
 }
