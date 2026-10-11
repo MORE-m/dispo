@@ -628,6 +628,8 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             'planning_mode' => 'manual',
             'customer_name' => 'FP Update OK',
+            'customer_account_id' => null,
+            'customer_create_provisional' => true,
             'campaign' => 'C',
             'product_title' => 'P',
             'order_discount_percent' => '0',
@@ -641,6 +643,8 @@ class ConfigurationSnapshotDf33a2bFeatureTest extends TestCase
         $this->actingAs($user)->put(route('calculations.update', $calculation), [
             'planning_mode' => 'manual',
             'customer_name' => 'Header Only',
+            'customer_account_id' => null,
+            'customer_create_provisional' => true,
             'campaign' => 'C',
             'product_title' => 'P',
             'order_discount_percent' => '0',

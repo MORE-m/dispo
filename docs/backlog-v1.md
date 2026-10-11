@@ -230,9 +230,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests:** Feature/Unit + E2E Port 8060 (`playwright.blp203a.config.ts`)
 - **Slice `BL-P2-03a`:** manueller CSV-Import, Versionen, vorläufige Accounts,
   Domain+Typ-Zuordnung (D1), Calc/Dispo-Anbindung, Meridian-Nachtrag (PO-BLP203-1 A1…H1+D1);
-  lokal in `dispo_mat_core` eingerichtet/abgenommen (Import-ID 2; Docs-Draft).
-  **Nicht** erledigt: Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX, Deploy/andere Umgebungen;
-  `BL-P2-03` bleibt teilweise.
+  lokal in `dispo_mat_core` eingerichtet/abgenommen (Import-ID 2).
+- **CRM-Wizard-Picker (I1):** verständliche Kunden-/Agenturauswahl, Freitext→automatisch
+  vorläufiger Account beim Speichern, Bestandsschutz historischer Freitext-Calcs,
+  klarer Rechnungsempfänger; E2E Port 8064 in CI. **Nicht** in I1: Calc-Isolationsbanner,
+  Stammdaten-Textsuche außerhalb Picker, Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX,
+  Deploy/andere Umgebungen; `BL-P2-03` bleibt teilweise.
 
 ## Phase 3 – Versionen, dynamische Felder und Snapshots
 

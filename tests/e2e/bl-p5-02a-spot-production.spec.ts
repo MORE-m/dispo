@@ -33,7 +33,8 @@ async function waitForPreview(page: Page) {
 
 async function openNewCalculationStepTwo(page: Page, customer: string) {
     await page.goto('/kalkulationen/neu');
-    await page.locator('#customer').fill(customer);
+    await page.locator('[data-test="crm-customer-search"]').fill(customer);
+    await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 }
 

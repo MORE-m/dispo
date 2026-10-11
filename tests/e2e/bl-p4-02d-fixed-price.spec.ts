@@ -17,7 +17,8 @@ async function login(page: Page) {
 
 async function openNewCalculationStepTwo(page: Page) {
     await page.goto('/kalkulationen/neu');
-    await page.locator('#customer').fill('Festpreis E2E GmbH');
+    await page.locator('[data-test="crm-customer-search"]').fill('Festpreis E2E GmbH');
+    await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 }
 

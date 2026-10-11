@@ -62,6 +62,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entscheidungen/PO-BLP203-1-crm-salesforce-meridian.md`](entscheidungen/PO-BLP203-1-crm-salesforce-meridian.md) | PO CRM Salesforce/Meridian Erst-Slice (**Akzeptiert**; `main` PR #133) |
 | [`reviews/crm-salesforce-meridian-data-readiness/`](reviews/crm-salesforce-meridian-data-readiness/) | Bericht lokale CRM-Daten-Readiness (A/B/C lokal erledigt; Deploy offen) |
 | [`readiness/BL-P2-03a-crm-salesforce-meridian-data-2026-10-10.md`](readiness/BL-P2-03a-crm-salesforce-meridian-data-2026-10-10.md) | Daten-Readiness Salesforce/Meridian (`dispo_mat_core`; Import-ID 2) |
+| [`reviews/usability-audit-calc-dispo/`](reviews/usability-audit-calc-dispo/) | Nutzbarkeits-Audit Calc/CRM/Methoden→Dispo (Top-1 Picker umgesetzt / I1) |
+| [`reviews/crm-wizard-picker/`](reviews/crm-wizard-picker/) | Review CRM-Wizard-Picker (PO-BLP203-1 I1) |
 | [`entscheidungen/PO-BLP203-1-datenlieferung.md`](entscheidungen/PO-BLP203-1-datenlieferung.md) | PO-Datenlieferung / lokale CRM-Einrichtung (A/B/C lokal erledigt) |
 | [`reviews/audit-nachzug-after-pr114/`](reviews/audit-nachzug-after-pr114/) | Audit-Nachzug nach PR #114 (Kalkulierbarkeit, Invalidierung, H–K) |
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |

@@ -17,7 +17,8 @@ async function login(page: Page, email = 'sales@example.com') {
 
 async function openNewCalculationStepTwo(page: Page) {
     await page.goto('/kalkulationen/neu');
-    await page.locator('#customer').fill('Tandem Tridem E2E GmbH');
+    await page.locator('[data-test="crm-customer-search"]').fill('Tandem Tridem E2E GmbH');
+    await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 }
 

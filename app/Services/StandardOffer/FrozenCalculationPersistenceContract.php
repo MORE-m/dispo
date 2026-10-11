@@ -226,13 +226,13 @@ final class FrozenCalculationPersistenceContract
         $calculation->status = CalculationStatus::Draft;
         $calculation->planning_mode = PlanningMode::Manual;
         $calculation->advisor_id = $user->id;
-        // BL-P2-03a: Freitext-Übernahme → nachvollziehbare vorläufige Accounts (ohne Domain).
-        // Standardangebot→Calc: Freitext → vorläufige Accounts; Rechnungsempfänger Kunde (F1, keine Historie erfinden).
+        // Freitext-Übernahme → vorläufige Accounts (null-Account-Keys = neue Freitext-Erfassung).
+        // Rechnungsempfänger Kunde (F1, keine Historie erfinden).
         $crmPayload = [
             'customer_name' => $customerName,
+            'customer_account_id' => null,
             'agency_name' => $agencyName,
-            'ensure_provisional_customer' => true,
-            'ensure_provisional_agency' => $agencyName !== null && $agencyName !== '',
+            'agency_account_id' => null,
             'invoice_recipient' => 'customer',
         ];
         $crm = app(CrmOrderHeaderBinder::class)

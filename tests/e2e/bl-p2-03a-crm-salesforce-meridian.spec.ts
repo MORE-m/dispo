@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { adoptFreitext } from './helpers/crm-wizard-picker';
 
 /**
  * BL-P2-03a Browser-Belege (isoliert Port 8060 / SQLite).
@@ -112,26 +113,25 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await login(page, 'sales@example.com');
 
         await page.goto('/kalkulationen/neu');
-        await expect(page.locator('#customer')).toBeVisible({ timeout: 30_000 });
+        await expect(page.locator('[data-test="crm-customer"]')).toBeVisible({
+            timeout: 30_000,
+        });
 
-        // Zuerst übrige Auftragskopf-/Positionsfelder, Domain/Agentur zuletzt (Payload-Regression).
-        await page.locator('#customer').fill('Vertikal Kunde Historisch');
-        await page.locator('#agency').fill('Vertikal Agentur Historisch');
-        await page.locator('#invoice-recipient').selectOption('agency');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await page.locator('[data-test="range-spots-0-0"]').fill('10');
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
 
+        await adoptFreitext(page, 'crm-customer', 'Vertikal Kunde Historisch');
         await page.locator('#customer-matching-domain').fill('vertikal-kunde.test');
         await page
             .locator('[data-test="customer-billing-email"]')
             .fill('billing@vertikal-kunde.test');
+        await adoptFreitext(page, 'crm-agency', 'Vertikal Agentur Historisch');
         await page.locator('#agency-matching-domain').fill('vertikal-agentur.test');
         await page
             .locator('[data-test="agency-billing-email"]')
             .fill('desk@vertikal-agentur.test');
-        await page.locator('[data-test="ensure-provisional-customer"]').click();
-        await page.locator('[data-test="ensure-provisional-agency"]').click();
+        await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
@@ -139,15 +139,19 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         const calcUrl = page.url();
 
         await page.reload();
-        await expect(page.locator('#customer')).toHaveValue(
-            'Vertikal Kunde Historisch',
-        );
-        await expect(page.locator('#agency')).toHaveValue(
-            'Vertikal Agentur Historisch',
-        );
+        await expect(
+            page.locator('[data-test="crm-customer-selected-name"]'),
+        ).toHaveText('Vertikal Kunde Historisch');
+        await expect(
+            page.locator('[data-test="crm-agency-selected-name"]'),
+        ).toHaveText('Vertikal Agentur Historisch');
         await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
-        await expect(page.locator('#customer-account-id')).not.toHaveValue('');
-        await expect(page.locator('#agency-account-id')).not.toHaveValue('');
+        await expect(
+            page.locator('[data-test="crm-customer-selection"]'),
+        ).toBeVisible();
+        await expect(
+            page.locator('[data-test="crm-agency-selection"]'),
+        ).toBeVisible();
 
         await createDispoFromCurrentCalc(page);
         const dispoUrl = page.url();
@@ -176,9 +180,9 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(page.locator('[data-test="customer-meridian-pending"]')).toBeVisible({
             timeout: 20_000,
         });
-        await expect(page.locator('#customer')).toHaveValue(
-            'Vertikal Kunde Historisch',
-        );
+        await expect(
+            page.locator('[data-test="crm-customer-selected-name"]'),
+        ).toHaveText('Vertikal Kunde Historisch');
 
         const importMeridian = writeCsv([
             'Accountname;Meridian-ID;Account-ID;Rechnungs-E-Mail;Account-Datensatztyp',
@@ -196,16 +200,20 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(page.locator('[data-test="agency-meridian-number"]')).toContainText(
             'M-VA',
         );
-        await expect(page.locator('#customer')).toHaveValue(
-            'Vertikal Kunde Historisch',
-        );
-        await expect(page.locator('#agency')).toHaveValue(
-            'Vertikal Agentur Historisch',
-        );
+        await expect(
+            page.locator('[data-test="crm-customer-selected-name"]'),
+        ).toHaveText('Vertikal Kunde Historisch');
+        await expect(
+            page.locator('[data-test="crm-agency-selected-name"]'),
+        ).toHaveText('Vertikal Agentur Historisch');
         await expect(page.locator('#invoice-recipient')).toHaveValue('agency');
-        const linkedCustomerId = await page
-            .locator('#customer-account-id')
-            .inputValue();
+        // Nach Domain-Match zeigt der kanonische Account den SF-Namen.
+        const search = await page.request.get(
+            '/crm/accounts/suche?type=customer&q=SF%20Vertikal%20Kunde',
+        );
+        const searchJson = await search.json();
+        const linkedCustomerId = String(searchJson.accounts?.[0]?.id ?? '');
+        expect(linkedCustomerId).not.toBe('');
 
         await page.goto(dispoUrl);
         await page.reload();
@@ -252,8 +260,7 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
 
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
-        await page.locator('#customer').fill('Auftrag Ohne Domain');
-        await page.locator('[data-test="ensure-provisional-customer"]').click();
+        await adoptFreitext(page, 'crm-customer', 'Auftrag Ohne Domain');
         await fillMinimalSpotsAndSave(page);
         const calcUrl = page.url();
         await createDispoFromCurrentCalc(page);
@@ -291,7 +298,9 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         await expect(page.locator('[data-test="customer-meridian-number"]')).toContainText(
             'M-MAN',
         );
-        await expect(page.locator('#customer')).toHaveValue('Auftrag Ohne Domain');
+        await expect(
+            page.locator('[data-test="crm-customer-selected-name"]'),
+        ).toHaveText('Auftrag Ohne Domain');
 
         await page.goto(dispoUrl);
         await page.reload();
@@ -370,41 +379,52 @@ test.describe('BL-P2-03a CRM Salesforce/Meridian', () => {
         test.setTimeout(120_000);
         await login(page, 'sales@example.com');
         await page.goto('/kalkulationen/neu');
-        await expect(page.locator('#customer-matching-domain')).toBeVisible({
+        await expect(page.locator('[data-test="crm-customer"]')).toBeVisible({
             timeout: 30_000,
         });
 
-        await page.locator('#customer').fill('Wizard Domain Kunde');
-        await page.locator('#agency').fill('Wizard Domain Agentur');
-        await page.locator('#invoice-recipient').selectOption('agency');
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await page.locator('[data-test="range-spots-0-0"]').fill('5');
         await page.getByRole('button', { name: '1. Grunddaten' }).click();
 
-        // Domain/E-Mail und Vorläufig-Agentur als letzte Aktion.
+        await adoptFreitext(page, 'crm-customer', 'Wizard Domain Kunde');
         await page.locator('#customer-matching-domain').fill('wizard-kunde.test');
         await page
             .locator('[data-test="customer-billing-email"]')
             .fill('c@wizard-kunde.test');
+        await adoptFreitext(page, 'crm-agency', 'Wizard Domain Agentur');
         await page.locator('#agency-matching-domain').fill('wizard-agentur.test');
         await page
             .locator('[data-test="agency-billing-email"]')
             .fill('a@wizard-agentur.test');
-        await page.locator('[data-test="ensure-provisional-customer"]').click();
-        await page.locator('[data-test="ensure-provisional-agency"]').click();
+        await page.locator('#invoice-recipient').selectOption('agency');
 
         await page.getByRole('button', { name: '3. Konditionen' }).click();
         await page.getByRole('button', { name: 'Speichern', exact: true }).click();
         await expect(page).toHaveURL(/kalkulationen\/\d+/, { timeout: 30_000 });
 
         await page.reload();
-        await expect(page.locator('#customer')).toHaveValue('Wizard Domain Kunde');
-        await expect(page.locator('#agency')).toHaveValue('Wizard Domain Agentur');
-        await expect(page.locator('#customer-account-id')).not.toHaveValue('');
-        await expect(page.locator('#agency-account-id')).not.toHaveValue('');
+        await expect(
+            page.locator('[data-test="crm-customer-selected-name"]'),
+        ).toHaveText('Wizard Domain Kunde');
+        await expect(
+            page.locator('[data-test="crm-agency-selected-name"]'),
+        ).toHaveText('Wizard Domain Agentur');
 
-        const customerAccountId = await page.locator('#customer-account-id').inputValue();
-        const agencyAccountId = await page.locator('#agency-account-id').inputValue();
+        const customerSearch = await page.request.get(
+            '/crm/accounts/suche?type=customer&q=Wizard%20Domain%20Kunde',
+        );
+        const agencySearch = await page.request.get(
+            '/crm/accounts/suche?type=agency&q=Wizard%20Domain%20Agentur',
+        );
+        const customerAccountId = String(
+            (await customerSearch.json()).accounts?.[0]?.id ?? '',
+        );
+        const agencyAccountId = String(
+            (await agencySearch.json()).accounts?.[0]?.id ?? '',
+        );
+        expect(customerAccountId).not.toBe('');
+        expect(agencyAccountId).not.toBe('');
 
         await login(page, 'admin@example.com');
         await page.goto(`/crm/accounts/${customerAccountId}`);

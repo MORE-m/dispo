@@ -1175,9 +1175,13 @@ final class CalculationWriter
         $calculation->planning_mode = PlanningMode::from((string) ($payload['planning_mode'] ?? 'manual'));
         $touchesCrm = array_key_exists('customer_account_id', $payload)
             || array_key_exists('agency_account_id', $payload)
+            || array_key_exists('customer_name', $payload)
+            || array_key_exists('agency_name', $payload)
             || array_key_exists('invoice_recipient', $payload)
             || ! empty($payload['ensure_provisional_customer'])
-            || ! empty($payload['ensure_provisional_agency']);
+            || ! empty($payload['ensure_provisional_agency'])
+            || ! empty($payload['customer_create_provisional'])
+            || ! empty($payload['agency_create_provisional']);
 
         if ($touchesCrm) {
             $crm = $this->crmHeaders->resolveForCalculation(
@@ -1197,11 +1201,8 @@ final class CalculationWriter
             $calculation->agency_meridian_number = $crm['agency_meridian_number'];
             $calculation->customer_salesforce_account_id = $crm['customer_salesforce_account_id'];
             $calculation->agency_salesforce_account_id = $crm['agency_salesforce_account_id'];
-        } else {
-            // Legacy-Freitext / Tests ohne CRM-Payload: Snapshots und Verknüpfungen nicht anfassen.
-            $calculation->customer_name = $payload['customer_name'] ?? null;
-            $calculation->agency_name = $payload['agency_name'] ?? null;
         }
+        // Ohne CRM-Schlüssel: bestehende Snapshots/Verknüpfungen unverändert lassen.
         $calculation->campaign = $payload['campaign'] ?? null;
         $calculation->product_title = $payload['product_title'] ?? null;
         $calculation->briefing = $payload['briefing'] ?? null;

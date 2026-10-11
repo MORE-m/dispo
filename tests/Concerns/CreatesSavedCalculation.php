@@ -26,7 +26,11 @@ trait CreatesSavedCalculation
         $payload = [
             'planning_mode' => 'manual',
             'customer_name' => 'Testkunde GmbH',
+            'customer_account_id' => null,
             'agency_name' => 'Testagentur',
+            'agency_account_id' => null,
+            // Bei Kunde+Agentur muss RE explizit sein (PO-BLP203-1 F1 / I1).
+            'invoice_recipient' => $options['invoice_recipient'] ?? 'customer',
             'campaign' => 'Frühjahr 2026',
             'product_title' => 'Produkt A',
             'order_discount_percent' => (string) ($options['order_discount_percent'] ?? '0'),

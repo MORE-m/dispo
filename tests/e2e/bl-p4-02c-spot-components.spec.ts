@@ -24,7 +24,8 @@ async function logout(page: Page) {
 
 async function openNewCalculationStepTwo(page: Page) {
     await page.goto('/kalkulationen/neu');
-    await page.locator('#customer').fill('Spot-Komponenten E2E GmbH');
+    await page.locator('[data-test="crm-customer-search"]').fill('Spot-Komponenten E2E GmbH');
+    await page.locator('[data-test="crm-customer-use-freitext"]').click();
     await page.getByRole('button', { name: '2. Werbeelemente' }).click();
 }
 
