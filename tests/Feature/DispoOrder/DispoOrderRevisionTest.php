@@ -437,12 +437,24 @@ class DispoOrderRevisionTest extends TestCase
         $baseFingerprint = (string) ($calculation->configurationSnapshot?->schema_fingerprint
             ?? $this->liveSchemaFingerprint());
 
+        $customerName = $overrides['customer_name'] ?? $calculation->customer_name;
+        $customerNameChanged = array_key_exists('customer_name', $overrides)
+            && $overrides['customer_name'] !== $calculation->customer_name;
+
         return [
             'lock_version' => $calculation->lock_version,
             'planning_mode' => $calculation->planning_mode->value,
             'schema_fingerprint' => $baseFingerprint,
-            'customer_name' => $overrides['customer_name'] ?? $calculation->customer_name,
+            'customer_name' => $customerName,
+            'customer_account_id' => $customerNameChanged ? null : $calculation->customer_account_id,
+            ...(
+                $customerNameChanged
+                    ? ['customer_create_provisional' => true]
+                    : []
+            ),
             'agency_name' => $calculation->agency_name,
+            'agency_account_id' => $calculation->agency_account_id,
+            'invoice_recipient' => $calculation->invoice_recipient?->value ?? 'customer',
             'campaign' => $calculation->campaign,
             'product_title' => $calculation->product_title,
             'briefing' => $calculation->briefing,

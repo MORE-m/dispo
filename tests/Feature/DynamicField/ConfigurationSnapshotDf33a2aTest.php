@@ -262,6 +262,8 @@ class ConfigurationSnapshotDf33a2aTest extends TestCase
         $position = $calculation->positions()->firstOrFail();
         $payload = $this->basePayload($catalog);
         $payload['customer_name'] = 'Generation 1';
+        $payload['customer_account_id'] = null;
+        $payload['customer_create_provisional'] = true;
         $payload['lock_version'] = $calculation->fresh()->lock_version;
         $payload['positions'][0]['id'] = $position->id;
         $payload['positions'][0]['client_key'] = $position->client_key;

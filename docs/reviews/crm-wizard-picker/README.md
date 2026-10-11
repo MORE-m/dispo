@@ -22,7 +22,7 @@ Draft-PR: [#136](https://github.com/MORE-m/dispo/pull/136)
 | Befund | Fix |
 |---|---|
 | P1 Picker-State nach Save | `onSuccess` synchronisiert Picker/RE/Meridian aus Server-Props trotz `preserveState` |
-| P1 Nicht mitgesendete Seite | Binder erhält unberührte Kunden-/Agenturseite vollständig |
+| P1 Nicht mitgesendete Seite | Binder erhält unberührte Kunden-/Agenturseite vollständig; `invoice_recipient` fehlt vs. explizit null unterschieden |
 | P2 Neuanlage ohne Account-Key | Name ohne `*_account_id` erzeugt Provisional; Historie nur am gespeicherten Zustand |
 | P2 Veraltete Suche | Tippen/Clear/Auswahl invalidiert Seq, Treffer und Loading |
 

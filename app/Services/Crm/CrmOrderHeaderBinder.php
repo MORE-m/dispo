@@ -139,13 +139,23 @@ final class CrmOrderHeaderBinder
                 existingSalesforce: $existing?->agency_salesforce_account_id,
             );
 
-        $invoice = $this->resolveInvoiceRecipient(
-            array_key_exists('invoice_recipient', $payload)
-                ? $payload['invoice_recipient']
-                : ($existing?->invoice_recipient?->value),
-            $customer,
-            $agency,
-        );
+        if (array_key_exists('invoice_recipient', $payload)) {
+            // Explizit gesendet (inkl. null): Wizard-/API-Wahl gegen resultierendes Paar prüfen.
+            $invoice = $this->resolveInvoiceRecipient(
+                $payload['invoice_recipient'],
+                $customer,
+                $agency,
+            );
+        } elseif ($existing?->invoice_recipient !== null) {
+            $invoice = $this->resolveInvoiceRecipient(
+                $existing->invoice_recipient->value,
+                $customer,
+                $agency,
+            );
+        } else {
+            // Schlüssel fehlt und kein Bestand: Default Kunde bei gebundenem Kundenaccount.
+            $invoice = $this->defaultInvoiceRecipientWhenOmitted($customer);
+        }
 
         return [
             'customer_name' => $customer['name'] ?? null,
@@ -475,6 +485,19 @@ final class CrmOrderHeaderBinder
         }
 
         return $this->accounts->resolveCanonicalAccount($stored)->id === $resolved->id;
+    }
+
+    /**
+     * @param  array{account_id: int<1, max>|null, version_id: int<1, max>|null, name: ?string, meridian: ?string, salesforce_raw: ?string}|null  $customer
+     */
+    private function defaultInvoiceRecipientWhenOmitted(?array $customer): ?InvoiceRecipient
+    {
+        $customerBound = $customer !== null && ($customer['account_id'] ?? null) !== null;
+        if ($customerBound) {
+            return InvoiceRecipient::Customer;
+        }
+
+        return null;
     }
 
     /**

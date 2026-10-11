@@ -310,7 +310,10 @@ class SpotClassicComponentsTest extends TestCase
 
         $payload = $writer->payloadFromCalculation($calc);
         $payload['lock_version'] = $calc->lock_version;
+        // Unveränderte Account-Identität behält Firmierungs-Snapshot; Wechsel nur per Freitext/Account.
         $payload['customer_name'] = 'Header geändert';
+        $payload['customer_account_id'] = null;
+        $payload['customer_create_provisional'] = true;
         unset($payload['positions'][0]['components']);
         unset($payload['positions'][0]['component_calculation_strategy']);
 
