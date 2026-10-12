@@ -222,6 +222,9 @@ jobs:
       - name: Browser Calc Dispo Isolation Banner isolated tests
         run: npx playwright test -c playwright.calc-dispo-isolation-banner.config.ts
 
+      - name: Browser CRM Masterdata Search isolated tests
+        run: npx playwright test -c playwright.crm-masterdata-search.config.ts
+
   e2e-spt008:
     name: e2e-spt008
     runs-on: ubuntu-latest

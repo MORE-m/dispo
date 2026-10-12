@@ -1,11 +1,17 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { EmptyState } from '@/components/feedback/states';
 import { FormField } from '@/components/form-field';
 import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { jsonPost } from '@/lib/json-post';
+
+type AccountLabel = {
+    title: string;
+    meta: string[];
+    identity: string[];
+};
 
 type CrmAccountRow = {
     id: number;
@@ -15,6 +21,10 @@ type CrmAccountRow = {
     matching_domain: string | null;
     salesforce_account_id_raw: string | null;
     meridian_number: string | null;
+    meridian_pending?: boolean;
+    is_provisional?: boolean;
+    salesforce_record_type?: string | null;
+    label: AccountLabel;
 };
 
 type QueueRow = {
@@ -28,8 +38,36 @@ type OpenConflict = {
     type: string;
     type_label: string;
     details: Record<string, unknown> | null;
+    summary_lines: string[];
+    account_expected: boolean;
+    entity_link: { label: string; url: string } | null;
+    technical_details: { key: string; value: string }[];
     account: CrmAccountRow | null;
 };
+
+function AccountLabelBlock({
+    account,
+    role,
+}: {
+    account: CrmAccountRow;
+    role?: string;
+}) {
+    return (
+        <div data-test={role ? `crm-account-label-${role}` : undefined}>
+            <p className="font-medium">{account.label.title}</p>
+            {account.label.meta.length > 0 ? (
+                <p className="text-muted-foreground text-sm">
+                    {account.label.meta.join(' · ')}
+                </p>
+            ) : null}
+            {account.label.identity.length > 0 ? (
+                <p className="text-muted-foreground font-mono text-xs">
+                    {account.label.identity.join(' · ')}
+                </p>
+            ) : null}
+        </div>
+    );
+}
 
 export default function CrmMatchQueuePage({
     rows,
@@ -46,6 +84,10 @@ export default function CrmMatchQueuePage({
     const [searchHits, setSearchHits] = useState<
         Record<number, CrmAccountRow[]>
     >({});
+    const [searchLoading, setSearchLoading] = useState<Record<number, boolean>>(
+        {},
+    );
+    const searchSeq = useRef<Record<number, number>>({});
     const [conflictNote, setConflictNote] = useState<Record<number, string>>(
         {},
     );
@@ -76,22 +118,50 @@ export default function CrmMatchQueuePage({
     }
 
     async function searchTargets(row: QueueRow) {
-        const q = (searchQ[row.account.id] ?? '').trim();
-        const response = await fetch(
-            `/crm/accounts/suche?salesforce_only=1&type=${encodeURIComponent(row.account.type)}&q=${encodeURIComponent(q)}`,
-            {
-                headers: {
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
+        const accountId = row.account.id;
+        const q = (searchQ[accountId] ?? '').trim();
+        const seq = (searchSeq.current[accountId] ?? 0) + 1;
+        searchSeq.current[accountId] = seq;
+        setSearchLoading((prev) => ({ ...prev, [accountId]: true }));
+        setError(null);
+
+        try {
+            const response = await fetch(
+                `/crm/accounts/suche?salesforce_only=1&type=${encodeURIComponent(row.account.type)}&q=${encodeURIComponent(q)}`,
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
                 },
-                credentials: 'same-origin',
-            },
-        );
-        const data = (await response.json()) as { accounts?: CrmAccountRow[] };
-        setSearchHits((prev) => ({
-            ...prev,
-            [row.account.id]: data.accounts ?? [],
-        }));
+            );
+            if (!response.ok) {
+                throw new Error('Suche fehlgeschlagen.');
+            }
+            const data = (await response.json()) as {
+                accounts?: CrmAccountRow[];
+            };
+            if (searchSeq.current[accountId] !== seq) {
+                return;
+            }
+            setSearchHits((prev) => ({
+                ...prev,
+                [accountId]: data.accounts ?? [],
+            }));
+        } catch (err) {
+            if (searchSeq.current[accountId] !== seq) {
+                return;
+            }
+            setSearchHits((prev) => ({ ...prev, [accountId]: [] }));
+            setError(
+                err instanceof Error ? err.message : 'Suche fehlgeschlagen.',
+            );
+        } finally {
+            if (searchSeq.current[accountId] === seq) {
+                setSearchLoading((prev) => ({ ...prev, [accountId]: false }));
+            }
+        }
     }
 
     async function resolveConflict(conflictId: number) {
@@ -149,28 +219,62 @@ export default function CrmMatchQueuePage({
                                 >
                                     <p>
                                         <strong>{conflict.type_label}</strong>
-                                        {conflict.account ? (
-                                            <>
-                                                {' '}
-                                                ·{' '}
-                                                <Link
-                                                    href={`/crm/accounts/${conflict.account.id}`}
-                                                    className="underline"
-                                                >
-                                                    {conflict.account.name ??
-                                                        conflict.account.id}
-                                                </Link>
-                                            </>
-                                        ) : null}
                                     </p>
-                                    {conflict.details ? (
-                                        <pre className="bg-muted/40 overflow-x-auto rounded-md p-2 text-xs">
-                                            {JSON.stringify(
-                                                conflict.details,
-                                                null,
-                                                2,
+                                    {conflict.account ? (
+                                        <AccountLabelBlock
+                                            account={conflict.account}
+                                            role={`conflict-${conflict.id}`}
+                                        />
+                                    ) : conflict.account_expected ? (
+                                        <p className="text-muted-foreground">
+                                            Account-Referenz nicht mehr
+                                            verfügbar
+                                        </p>
+                                    ) : null}
+                                    {conflict.entity_link ? (
+                                        <p>
+                                            <Link
+                                                href={conflict.entity_link.url}
+                                                className="text-primary underline-offset-4 hover:underline"
+                                                data-test={`crm-conflict-entity-link-${conflict.id}`}
+                                            >
+                                                {conflict.entity_link.label}
+                                            </Link>
+                                        </p>
+                                    ) : null}
+                                    {conflict.summary_lines.length > 0 ? (
+                                        <ul
+                                            className="text-muted-foreground list-disc space-y-1 pl-5"
+                                            data-test={`crm-conflict-summary-${conflict.id}`}
+                                        >
+                                            {conflict.summary_lines.map(
+                                                (line) => (
+                                                    <li key={line}>{line}</li>
+                                                ),
                                             )}
-                                        </pre>
+                                        </ul>
+                                    ) : null}
+                                    {conflict.technical_details.length > 0 ? (
+                                        <details
+                                            className="text-muted-foreground text-xs"
+                                            data-test={`crm-conflict-technical-${conflict.id}`}
+                                        >
+                                            <summary>
+                                                Technische Zusatzdetails
+                                            </summary>
+                                            <ul className="mt-1 list-disc space-y-1 pl-5">
+                                                {conflict.technical_details.map(
+                                                    (pair) => (
+                                                        <li
+                                                            key={`${pair.key}:${pair.value}`}
+                                                        >
+                                                            {pair.key}:{' '}
+                                                            {pair.value}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </details>
                                     ) : null}
                                     {canManageMatches ? (
                                         <div className="flex flex-wrap items-end gap-2">
@@ -230,19 +334,14 @@ export default function CrmMatchQueuePage({
                                 className="rounded-xl border p-4"
                                 data-test={`crm-queue-row-${row.account.id}`}
                             >
-                                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                    <div>
-                                        <p className="font-medium">
-                                            {row.account.name ?? '–'} (
-                                            {row.account.type_label})
-                                        </p>
-                                        <p className="text-muted-foreground text-sm">
-                                            ID {row.account.id}
-                                            {row.account.matching_domain
-                                                ? ` · ${row.account.matching_domain}`
-                                                : ' · keine Domain'}
-                                        </p>
-                                    </div>
+                                <div className="space-y-1">
+                                    <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                                        Quelle (vorläufig)
+                                    </p>
+                                    <AccountLabelBlock
+                                        account={row.account}
+                                        role={`source-${row.account.id}`}
+                                    />
                                 </div>
 
                                 {row.shared_domain ? (
@@ -260,13 +359,15 @@ export default function CrmMatchQueuePage({
                                                 key={candidate.id}
                                                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
                                             >
-                                                <span>
-                                                    Domain-Treffer:{' '}
-                                                    {candidate.name ?? '–'} · SF{' '}
-                                                    {candidate.salesforce_account_id_raw ??
-                                                        '–'}{' '}
-                                                    (ID {candidate.id})
-                                                </span>
+                                                <div>
+                                                    <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                                                        Ziel (Domain-Treffer)
+                                                    </p>
+                                                    <AccountLabelBlock
+                                                        account={candidate}
+                                                        role={`candidate-${candidate.id}`}
+                                                    />
+                                                </div>
                                                 {canManageMatches ? (
                                                     <Button
                                                         type="button"
@@ -306,13 +407,31 @@ export default function CrmMatchQueuePage({
                                                     searchQ[row.account.id] ??
                                                     ''
                                                 }
-                                                onChange={(event) =>
+                                                onChange={(event) => {
+                                                    const value =
+                                                        event.target.value;
                                                     setSearchQ((prev) => ({
                                                         ...prev,
-                                                        [row.account.id]:
-                                                            event.target.value,
-                                                    }))
-                                                }
+                                                        [row.account.id]: value,
+                                                    }));
+                                                    searchSeq.current[
+                                                        row.account.id
+                                                    ] =
+                                                        (searchSeq.current[
+                                                            row.account.id
+                                                        ] ?? 0) + 1;
+                                                    setSearchHits((prev) => ({
+                                                        ...prev,
+                                                        [row.account.id]: [],
+                                                    }));
+                                                    setSearchLoading(
+                                                        (prev) => ({
+                                                            ...prev,
+                                                            [row.account.id]:
+                                                                false,
+                                                        }),
+                                                    );
+                                                }}
                                                 placeholder="Name, SF-ID, Meridian…"
                                             />
                                             <Button
@@ -326,6 +445,11 @@ export default function CrmMatchQueuePage({
                                                 Suchen
                                             </Button>
                                         </div>
+                                        {searchLoading[row.account.id] ? (
+                                            <p className="text-muted-foreground text-sm">
+                                                Suche läuft…
+                                            </p>
+                                        ) : null}
                                         <ul className="space-y-2 text-sm">
                                             {(
                                                 searchHits[row.account.id] ?? []
@@ -334,14 +458,15 @@ export default function CrmMatchQueuePage({
                                                     key={hit.id}
                                                     className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2"
                                                 >
-                                                    <span>
-                                                        {hit.name ?? '–'} · SF{' '}
-                                                        {hit.salesforce_account_id_raw ??
-                                                            '–'}
-                                                        {hit.meridian_number
-                                                            ? ` · ${hit.meridian_number}`
-                                                            : ''}
-                                                    </span>
+                                                    <div>
+                                                        <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                                                            Ziel (Suche)
+                                                        </p>
+                                                        <AccountLabelBlock
+                                                            account={hit}
+                                                            role={`hit-${hit.id}`}
+                                                        />
+                                                    </div>
                                                     <Button
                                                         type="button"
                                                         size="sm"
