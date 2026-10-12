@@ -106,7 +106,7 @@ final class CrmConflictSummaryPresentationTest extends TestCase
 
                 $joined = static fn (array $row): string => implode(' | ', $row['summary_lines']);
 
-                return $calcC['details'] === $detailsCalcCustomer
+                return $this->detailsMatch($detailsCalcCustomer, $calcC['details'])
                     && str_contains($joined($calcC), 'Kalkulation K-2026-77001')
                     && str_contains($joined($calcC), 'Betroffene Seite: Kunde')
                     && str_contains($joined($calcC), 'Bestehende Meridian-Nummer: M-OTHER-C')
@@ -115,7 +115,7 @@ final class CrmConflictSummaryPresentationTest extends TestCase
                     && str_contains((string) $calcC['entity_link']['url'], '/kalkulationen/')
                     && str_contains($joined($calcA), 'Kalkulation K-2026-77002')
                     && str_contains($joined($calcA), 'Betroffene Seite: Agentur')
-                    && $dispoC['details'] === $detailsDispoCustomer
+                    && $this->detailsMatch($detailsDispoCustomer, $dispoC['details'])
                     && str_contains($joined($dispoC), 'Dispoauftrag DA-2026-77001-01')
                     && str_contains($joined($dispoC), 'Betroffene Seite: Kunde')
                     && str_contains($joined($dispoC), 'Gespeicherter Auftragsstatus (Konfliktstand): Entwurf')
@@ -191,7 +191,7 @@ final class CrmConflictSummaryPresentationTest extends TestCase
         $this->assertStringContainsString('keine Berechtigung', $deniedJoined);
         $this->assertStringNotContainsString('K-2026-88001', $deniedJoined);
         $this->assertNull($denied['entity_link']);
-        $this->assertSame($okDetails, $ok->fresh()->details);
+        $this->assertTrue($this->detailsMatch($okDetails, $ok->fresh()->details));
     }
 
     #[Test]
@@ -342,18 +342,29 @@ final class CrmConflictSummaryPresentationTest extends TestCase
                     $linkJoined = implode(' | ', $linkRow['summary_lines']);
                     $meridianJoined = implode(' | ', $meridianRow['summary_lines']);
 
-                    return $linkRow['details'] === $linkDetails
+                    return $this->detailsMatch($linkDetails, $linkRow['details'])
                         && str_contains($linkJoined, 'Vorläufiger Account ist bereits')
                         && str_contains($linkJoined, 'Link Ziel AG')
                         && str_contains($linkJoined, 'Angefragtes Ziel: Account-Referenz nicht mehr verfügbar')
-                        && $meridianRow['details'] === $meridianDetails
+                        && $this->detailsMatch($meridianDetails, $meridianRow['details'])
                         && str_contains($meridianJoined, 'Bestehende Meridian-Nummer: M-ALT')
                         && str_contains($meridianJoined, 'Eingehende Meridian-Nummer: M-NEU')
                         && str_contains($meridianJoined, 'Salesforce-Identität: 001XX000003LINK');
                 }));
 
-        $this->assertSame($linkDetails, $link->fresh()->details);
-        $this->assertSame($meridianDetails, $meridian->fresh()->details);
+        $this->assertTrue($this->detailsMatch($linkDetails, $link->fresh()->details));
+        $this->assertTrue($this->detailsMatch($meridianDetails, $meridian->fresh()->details));
+    }
+
+    /**
+     * MySQL kann JSON-Schlüsselreihenfolge ändern; Inhalt muss gleich bleiben.
+     * Lose Array-Gleichheit (`==`) ignoriert Schlüsselreihenfolge und int/string-IDs.
+     *
+     * @param  array<string, mixed>  $expected
+     */
+    private function detailsMatch(array $expected, mixed $actual): bool
+    {
+        return is_array($actual) && $expected == $actual;
     }
 
     /**
