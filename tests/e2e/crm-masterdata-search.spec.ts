@@ -82,26 +82,32 @@ async function uploadAndApply(page: Page, csvPath: string) {
 }
 
 function setCalcCustomerMeridian(calcId: number, meridian: string) {
-    execFileSync(
+    const dbPath = process.env.CRM_MD_E2E_DB || e2eDb;
+    const updated = execFileSync(
         'php',
         [
             '-r',
             [
-                '$pdo = new PDO("sqlite:" . getenv("CRM_MD_E2E_DB"));',
+                '$db = getenv("CRM_MD_E2E_DB");',
+                'if ($db === false || $db === "") { fwrite(STDERR, "CRM_MD_E2E_DB missing\\n"); exit(2); }',
+                '$pdo = new PDO("sqlite:" . $db);',
                 '$st = $pdo->prepare("update calculations set customer_meridian_number=? where id=?");',
                 '$st->execute([getenv("CRM_MD_E2E_MERIDIAN"), (int) getenv("CRM_MD_E2E_CALC_ID")]);',
-                'echo $st->rowCount();',
+                'echo (string) $st->rowCount();',
             ].join(''),
         ],
         {
             encoding: 'utf8',
             env: {
                 ...process.env,
-                CRM_MD_E2E_DB: e2eDb,
+                CRM_MD_E2E_DB: dbPath,
                 CRM_MD_E2E_CALC_ID: String(calcId),
                 CRM_MD_E2E_MERIDIAN: meridian,
             },
         },
+    ).trim();
+    expect(Number(updated), `Meridian-Update in ${dbPath} für Calc ${calcId}`).toBeGreaterThan(
+        0,
     );
 }
 

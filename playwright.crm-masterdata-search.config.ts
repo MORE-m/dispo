@@ -14,6 +14,9 @@ const e2eDb = path.resolve(
 const e2ePort = process.env.E2E_CRM_MASTERDATA_SEARCH_PORT ?? '8066';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
+// Für PDO-Hilfen in der Spec (nicht nur webServer.env).
+process.env.CRM_MD_E2E_DB = e2eDb;
+
 const e2eEnv = {
     APP_ENV: 'testing',
     E2E_SERVER: '1',
@@ -24,6 +27,7 @@ const e2eEnv = {
     DB_CONNECTION: 'sqlite',
     DB_DATABASE: e2eDb,
     DB_URL: '',
+    CRM_MD_E2E_DB: e2eDb,
 };
 
 export default defineConfig({
