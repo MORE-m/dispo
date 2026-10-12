@@ -1,8 +1,8 @@
 # Fortschritt V1
 
 Stand: 12. Oktober 2026 – CRM Stammdaten-Textsuche + Prüflisten-Labels (Audit P3)
-in Umsetzung/Review; Basis `origin/main` @ `50b9d46…` (nach PR #137).
-Port 8000 / `.env` / `dispo_mat_core` unberührt.
+inkl. P2-Konfliktzusammenfassung in Review; Basis `origin/main` @ `50b9d46…`
+(nach PR #137). Port 8000 / `.env` / `dispo_mat_core` unberührt.
 
 ## Aktuelle Phase
 
@@ -44,6 +44,7 @@ MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 | Index-Suche Firmierung/Meridian/SF-ID/Domain + Filter | **umgesetzt** (Draft-PR) |
 | Pagination 50 / URL-Parameter / Reset | **umgesetzt** |
 | Prüfliste verständliche Labels (ohne Roh-ID-Fokus) | **umgesetzt** |
+| Konfliktzusammenfassung je Typ (Audit P2) | **umgesetzt** (Draft-PR #138) |
 | Matching-/Importvertrag unverändert | **ja** |
 | E2E Port **8066** | **in CI** |
 | `CRM-004` / `BL-P2-03` voll | **nicht** |

@@ -39,6 +39,9 @@ type OpenConflict = {
     type_label: string;
     details: Record<string, unknown> | null;
     summary_lines: string[];
+    account_expected: boolean;
+    entity_link: { label: string; url: string } | null;
+    technical_details: { key: string; value: string }[];
     account: CrmAccountRow | null;
 };
 
@@ -222,12 +225,23 @@ export default function CrmMatchQueuePage({
                                             account={conflict.account}
                                             role={`conflict-${conflict.id}`}
                                         />
-                                    ) : (
+                                    ) : conflict.account_expected ? (
                                         <p className="text-muted-foreground">
                                             Account-Referenz nicht mehr
                                             verfügbar
                                         </p>
-                                    )}
+                                    ) : null}
+                                    {conflict.entity_link ? (
+                                        <p>
+                                            <Link
+                                                href={conflict.entity_link.url}
+                                                className="text-primary underline-offset-4 hover:underline"
+                                                data-test={`crm-conflict-entity-link-${conflict.id}`}
+                                            >
+                                                {conflict.entity_link.label}
+                                            </Link>
+                                        </p>
+                                    ) : null}
                                     {conflict.summary_lines.length > 0 ? (
                                         <ul
                                             className="text-muted-foreground list-disc space-y-1 pl-5"
@@ -239,6 +253,28 @@ export default function CrmMatchQueuePage({
                                                 ),
                                             )}
                                         </ul>
+                                    ) : null}
+                                    {conflict.technical_details.length > 0 ? (
+                                        <details
+                                            className="text-muted-foreground text-xs"
+                                            data-test={`crm-conflict-technical-${conflict.id}`}
+                                        >
+                                            <summary>
+                                                Technische Zusatzdetails
+                                            </summary>
+                                            <ul className="mt-1 list-disc space-y-1 pl-5">
+                                                {conflict.technical_details.map(
+                                                    (pair) => (
+                                                        <li
+                                                            key={`${pair.key}:${pair.value}`}
+                                                        >
+                                                            {pair.key}:{' '}
+                                                            {pair.value}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </details>
                                     ) : null}
                                     {canManageMatches ? (
                                         <div className="flex flex-wrap items-end gap-2">

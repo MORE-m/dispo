@@ -8,11 +8,13 @@ use App\Models\CrmAccount;
 use App\Models\CrmConflict;
 use App\Services\Crm\CrmAccountService;
 use App\Support\Crm\CrmAccountPresentation;
+use App\Support\Crm\CrmConflictPresentation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -201,21 +203,54 @@ class CrmAccountController extends Controller
             ->get();
 
         $relatedIds = $this->collectConflictAccountIds($openConflicts);
-        $relatedById = $relatedIds === []
+        $relatedModels = $relatedIds === []
             ? collect()
             : CrmAccount::query()
                 ->with('currentVersion')
                 ->whereIn('id', $relatedIds)
                 ->get()
                 ->keyBy('id');
+        $relatedById = $relatedModels->map(
+            fn (CrmAccount $account): array => $this->serializeAccount($account),
+        );
 
-        $conflicts = $openConflicts->map(function (CrmConflict $c) use ($relatedById): array {
+        [$calcIds, $dispoIds] = $this->collectConflictEntityIds($openConflicts);
+        $calculationsById = $calcIds === []
+            ? collect()
+            : DB::table('calculations')->whereIn('id', $calcIds)->get(['id', 'number'])->keyBy('id');
+        $dispoOrdersById = $dispoIds === []
+            ? collect()
+            : DB::table('dispo_orders')->whereIn('id', $dispoIds)->get(['id', 'number', 'status'])->keyBy('id');
+
+        $viewer = $request->user();
+        $canViewCalculations = $viewer?->canAccessCalculations() ?? false;
+        $canViewDispoOrders = $viewer?->canViewDispoOrders() ?? false;
+
+        $conflicts = $openConflicts->map(function (CrmConflict $c) use (
+            $relatedById,
+            $calculationsById,
+            $dispoOrdersById,
+            $canViewCalculations,
+            $canViewDispoOrders,
+        ): array {
+            $presentation = CrmConflictPresentation::summarize(
+                $c,
+                $relatedById,
+                $calculationsById,
+                $dispoOrdersById,
+                $canViewCalculations,
+                $canViewDispoOrders,
+            );
+
             return [
                 'id' => $c->id,
                 'type' => $c->type->value,
                 'type_label' => $this->conflictTypeLabel($c->type->value),
                 'details' => $c->details,
-                'summary_lines' => $this->conflictSummaryLines($c, $relatedById),
+                'summary_lines' => $presentation['summary_lines'],
+                'account_expected' => $presentation['account_expected'],
+                'entity_link' => $presentation['entity_link'],
+                'technical_details' => $presentation['technical_details'],
                 'account' => $c->account ? $this->serializeAccount($c->account) : null,
             ];
         });
@@ -326,6 +361,8 @@ class CrmAccountController extends Controller
             'ambiguous_domain' => 'Mehrdeutige Domain',
             'divergent_domains' => 'Unterschiedliche Domains in einer Zeile',
             'link_conflict' => 'Widersprüchliche Zuordnung',
+            'invalid_salesforce_id' => 'Ungültige Salesforce-ID',
+            'duplicate_contradictory_row' => 'Widersprüchliche Dublette',
             default => $type,
         };
     }
@@ -344,52 +381,46 @@ class CrmAccountController extends Controller
                     $ids[] = (int) $details[$key];
                 }
             }
+            $candidates = $details['candidate_ids'] ?? null;
+            if (is_array($candidates)) {
+                foreach ($candidates as $candidateId) {
+                    if (is_numeric($candidateId)) {
+                        $ids[] = (int) $candidateId;
+                    }
+                }
+            }
         }
 
         return array_values(array_unique(array_filter($ids, fn (int $id): bool => $id > 0)));
     }
 
     /**
-     * Menschliche Konfliktzeilen ohne Mutation der gespeicherten details.
-     *
-     * @param  Collection<int, CrmAccount>  $relatedById
-     * @return list<string>
+     * @param  Collection<int, CrmConflict>  $conflicts
+     * @return array{0: list<int>, 1: list<int>}
      */
-    private function conflictSummaryLines(CrmConflict $conflict, $relatedById): array
+    private function collectConflictEntityIds($conflicts): array
     {
-        $details = $conflict->details ?? [];
-        $lines = [];
-
-        if (isset($details['message']) && is_string($details['message']) && trim($details['message']) !== '') {
-            $lines[] = trim($details['message']);
-        }
-
-        if (array_key_exists('existing_meridian', $details) || array_key_exists('incoming_meridian', $details)) {
-            $existing = is_string($details['existing_meridian'] ?? null) ? $details['existing_meridian'] : '–';
-            $incoming = is_string($details['incoming_meridian'] ?? null) ? $details['incoming_meridian'] : '–';
-            $lines[] = 'Bestehende Meridian-Nummer: '.$existing;
-            $lines[] = 'Eingehende Meridian-Nummer: '.$incoming;
-        }
-
-        foreach (
-            [
-                'existing_target_id' => 'Bestehendes Ziel',
-                'requested_target_id' => 'Angefragtes Ziel',
-            ] as $key => $prefix
-        ) {
-            if (! isset($details[$key]) || ! is_numeric($details[$key])) {
+        $calcIds = [];
+        $dispoIds = [];
+        foreach ($conflicts as $conflict) {
+            $details = $conflict->details ?? [];
+            $entity = $details['entity'] ?? null;
+            $entityId = $details['entity_id'] ?? null;
+            if (! is_numeric($entityId) || (int) $entityId <= 0) {
                 continue;
             }
-            $id = (int) $details[$key];
-            $related = $relatedById->get($id);
-            if ($related instanceof CrmAccount) {
-                $lines[] = $prefix.': '.CrmAccountPresentation::oneLine($this->serializeAccount($related));
-            } else {
-                $lines[] = $prefix.': '.CrmAccountPresentation::unresolvedReferenceFallback();
+            $id = (int) $entityId;
+            if ($entity === 'calculation') {
+                $calcIds[] = $id;
+            } elseif ($entity === 'dispo_order') {
+                $dispoIds[] = $id;
             }
         }
 
-        return $lines;
+        return [
+            array_values(array_unique($calcIds)),
+            array_values(array_unique($dispoIds)),
+        ];
     }
 
     /**

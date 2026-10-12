@@ -138,11 +138,12 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 - **Slice:** Prop `linkedDispoOrders` → Banner nur Wizard; freigegebene Singular-/Plural-Texte; Links bei Dispo-Ansichtsrecht; keine Lifecycle-/Policy-Änderung.
 - **Abnahme:** Nach Create erscheint Banner; Mehrfachaufträge Plural; Dispo-Snapshot unverändert nach Calc-Edit.
 
-### 3) Stammdaten-Textsuche (+ Prüfliste-Labels) — **umgesetzt** (Draft-PR)
+### 3) Stammdaten-Textsuche (+ Prüfliste-Labels) — **umgesetzt** (Draft-PR #138)
 
 - **Nutzen:** Auffinden/Zuordnung außerhalb Wizard; seltener als (1), aber häufig bei Konflikten.
 - **Slice:** Index-`q` + Pagination; Prüfliste ohne Roh-ID als Primärlabel; Matching unverändert.
-- **Abnahme:** Suche Name/Meridian/SF-ID/Domain; Filterkombi; Labels Quelle/Ziel unterscheidbar.
+- **P2 Nachzug:** Konfliktzusammenfassung je Typ (Auftrags-Meridian mit Vorgangsnummer/Seite/Nummern; Domain-/Typ-Konflikte); `details` unverändert.
+- **Abnahme:** Suche Name/Meridian/SF-ID/Domain; Filterkombi; Labels Quelle/Ziel unterscheidbar; Prüfliste Auftrags-Konflikt nachvollziehbar.
 
 **Nicht** als nächster Hebel aus diesem Audit: pauschal „CRM fertigbauen“, `CRM-004`, weitere SWF-Träger, weitere Methoden, Standardangebote, Deploy.
 
