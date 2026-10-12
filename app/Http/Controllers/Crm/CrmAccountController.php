@@ -7,16 +7,23 @@ use App\Http\Controllers\Controller;
 use App\Models\CrmAccount;
 use App\Models\CrmConflict;
 use App\Services\Crm\CrmAccountService;
+use App\Support\Crm\CrmAccountPresentation;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * BL-P2-03a: Stammdaten, vorläufige Accounts, manuelle Zuordnung.
+ * Textsuche/Pagination Stammdatenliste + verständliche Labels (Audit P3).
  */
 class CrmAccountController extends Controller
 {
+    private const INDEX_PER_PAGE = 50;
+
     public function __construct(
         private readonly CrmAccountService $accounts,
     ) {}
@@ -26,26 +33,37 @@ class CrmAccountController extends Controller
         $this->authorize('view-crm-accounts');
 
         $type = $request->query('type');
-        $query = CrmAccount::query()
-            ->with('currentVersion')
-            ->whereNull('merged_into_account_id')
-            ->orderByDesc('id');
+        $typeFilter = in_array($type, ['customer', 'agency'], true) ? $type : null;
+        $provisionalOnly = $request->query('provisional') === '1';
+        $q = $this->optionalSearchQuery($request);
+        $page = max(1, (int) $request->query('page', 1));
 
-        if (in_array($type, ['customer', 'agency'], true)) {
-            $query->where('type', $type);
-        }
-        if ($request->query('provisional') === '1') {
+        $query = $this->baseAccountQuery();
+        $this->applyTypeFilter($query, $typeFilter);
+        if ($provisionalOnly) {
             $query->where('is_provisional', true);
         }
+        $this->applyTextSearch($query, $q);
 
-        $accounts = $query->limit(200)->get()->map(fn (CrmAccount $a): array => $this->serializeAccount($a));
+        /** @var LengthAwarePaginator<int, CrmAccount> $paginator */
+        $paginator = $query
+            ->orderByDesc('id')
+            ->paginate(self::INDEX_PER_PAGE, ['*'], 'page', $page)
+            ->withQueryString();
+
+        $accounts = collect($paginator->items())
+            ->map(fn (CrmAccount $a): array => $this->serializeAccount($a))
+            ->values()
+            ->all();
 
         return Inertia::render('crm/accounts/index', [
             'accounts' => $accounts,
             'filters' => [
-                'type' => $type,
-                'provisional' => $request->query('provisional') === '1',
+                'type' => $typeFilter,
+                'provisional' => $provisionalOnly,
+                'q' => $q,
             ],
+            'pagination' => $this->paginationMeta($paginator),
             'canImport' => $request->user()?->can('import-crm-accounts') ?? false,
             'canCreateProvisional' => $request->user()?->can('create-provisional-crm-accounts') ?? false,
             'canManageMatches' => $request->user()?->can('manage-crm-matches') ?? false,
@@ -108,28 +126,13 @@ class CrmAccountController extends Controller
             'salesforce_only' => ['nullable', 'boolean'],
         ]);
 
-        $query = CrmAccount::query()
-            ->with('currentVersion')
-            ->whereNull('merged_into_account_id')
-            ->orderByDesc('id')
-            ->limit(30);
-
-        if (! empty($validated['type'])) {
-            $query->where('type', $validated['type']);
-        }
+        $query = $this->baseAccountQuery()->orderByDesc('id')->limit(30);
+        $this->applyTypeFilter($query, $validated['type'] ?? null);
         if ($request->boolean('salesforce_only')) {
             $query->whereNotNull('salesforce_account_id_canonical')
                 ->where('is_provisional', false);
         }
-        if (! empty($validated['q'])) {
-            $q = '%'.$validated['q'].'%';
-            $query->where(function ($builder) use ($q): void {
-                $builder->where('salesforce_account_id_raw', 'like', $q)
-                    ->orWhere('matching_domain', 'like', $q)
-                    ->orWhereHas('currentVersion', fn ($v) => $v->where('name', 'like', $q)
-                        ->orWhere('meridian_number', 'like', $q));
-            });
-        }
+        $this->applyTextSearch($query, isset($validated['q']) ? trim((string) $validated['q']) : null);
 
         return response()->json([
             'accounts' => $query->get()->map(fn (CrmAccount $a): array => $this->serializeAccount($a)),
@@ -195,14 +198,27 @@ class CrmAccountController extends Controller
             ->where('status', 'open')
             ->orderByDesc('id')
             ->limit(100)
-            ->get()
-            ->map(fn (CrmConflict $c): array => [
+            ->get();
+
+        $relatedIds = $this->collectConflictAccountIds($openConflicts);
+        $relatedById = $relatedIds === []
+            ? collect()
+            : CrmAccount::query()
+                ->with('currentVersion')
+                ->whereIn('id', $relatedIds)
+                ->get()
+                ->keyBy('id');
+
+        $conflicts = $openConflicts->map(function (CrmConflict $c) use ($relatedById): array {
+            return [
                 'id' => $c->id,
                 'type' => $c->type->value,
                 'type_label' => $this->conflictTypeLabel($c->type->value),
                 'details' => $c->details,
+                'summary_lines' => $this->conflictSummaryLines($c, $relatedById),
                 'account' => $c->account ? $this->serializeAccount($c->account) : null,
-            ]);
+            ];
+        });
 
         $rows = $provisionals->map(function (CrmAccount $account): array {
             $candidates = [];
@@ -224,9 +240,81 @@ class CrmAccountController extends Controller
 
         return Inertia::render('crm/accounts/match-queue', [
             'rows' => $rows,
-            'conflicts' => $openConflicts,
+            'conflicts' => $conflicts,
             'canManageMatches' => $request->user()?->can('manage-crm-matches') ?? false,
         ]);
+    }
+
+    /**
+     * @return Builder<CrmAccount>
+     */
+    private function baseAccountQuery(): Builder
+    {
+        return CrmAccount::query()
+            ->with('currentVersion')
+            ->whereNull('merged_into_account_id');
+    }
+
+    /**
+     * @param  Builder<CrmAccount>  $query
+     */
+    private function applyTypeFilter(Builder $query, ?string $type): void
+    {
+        if ($type === 'customer' || $type === 'agency') {
+            $query->where('type', $type);
+        }
+    }
+
+    /**
+     * @param  Builder<CrmAccount>  $query
+     */
+    private function applyTextSearch(Builder $query, ?string $q): void
+    {
+        if ($q === null || $q === '') {
+            return;
+        }
+
+        $like = '%'.$q.'%';
+        $query->where(function (Builder $builder) use ($like): void {
+            $builder->where('salesforce_account_id_raw', 'like', $like)
+                ->orWhere('salesforce_account_id_canonical', 'like', $like)
+                ->orWhere('matching_domain', 'like', $like)
+                ->orWhereHas('currentVersion', function (Builder $version) use ($like): void {
+                    $version->where('name', 'like', $like)
+                        ->orWhere('meridian_number', 'like', $like);
+                });
+        });
+    }
+
+    private function optionalSearchQuery(Request $request): ?string
+    {
+        $raw = $request->query('q');
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return null;
+        }
+
+        return mb_substr($trimmed, 0, 120);
+    }
+
+    /**
+     * @param  LengthAwarePaginator<int, mixed>  $paginator
+     * @return array{current_page: int, last_page: int, per_page: int, total: int, from: int|null, to: int|null}
+     */
+    private function paginationMeta(LengthAwarePaginator $paginator): array
+    {
+        return [
+            'current_page' => $paginator->currentPage(),
+            'last_page' => $paginator->lastPage(),
+            'per_page' => $paginator->perPage(),
+            'total' => $paginator->total(),
+            'from' => $paginator->firstItem(),
+            'to' => $paginator->lastItem(),
+        ];
     }
 
     private function conflictTypeLabel(string $type): string
@@ -240,6 +328,68 @@ class CrmAccountController extends Controller
             'link_conflict' => 'Widersprüchliche Zuordnung',
             default => $type,
         };
+    }
+
+    /**
+     * @param  Collection<int, CrmConflict>  $conflicts
+     * @return list<int>
+     */
+    private function collectConflictAccountIds($conflicts): array
+    {
+        $ids = [];
+        foreach ($conflicts as $conflict) {
+            $details = $conflict->details ?? [];
+            foreach (['existing_target_id', 'requested_target_id', 'crm_account_id'] as $key) {
+                if (isset($details[$key]) && is_numeric($details[$key])) {
+                    $ids[] = (int) $details[$key];
+                }
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids, fn (int $id): bool => $id > 0)));
+    }
+
+    /**
+     * Menschliche Konfliktzeilen ohne Mutation der gespeicherten details.
+     *
+     * @param  Collection<int, CrmAccount>  $relatedById
+     * @return list<string>
+     */
+    private function conflictSummaryLines(CrmConflict $conflict, $relatedById): array
+    {
+        $details = $conflict->details ?? [];
+        $lines = [];
+
+        if (isset($details['message']) && is_string($details['message']) && trim($details['message']) !== '') {
+            $lines[] = trim($details['message']);
+        }
+
+        if (array_key_exists('existing_meridian', $details) || array_key_exists('incoming_meridian', $details)) {
+            $existing = is_string($details['existing_meridian'] ?? null) ? $details['existing_meridian'] : '–';
+            $incoming = is_string($details['incoming_meridian'] ?? null) ? $details['incoming_meridian'] : '–';
+            $lines[] = 'Bestehende Meridian-Nummer: '.$existing;
+            $lines[] = 'Eingehende Meridian-Nummer: '.$incoming;
+        }
+
+        foreach (
+            [
+                'existing_target_id' => 'Bestehendes Ziel',
+                'requested_target_id' => 'Angefragtes Ziel',
+            ] as $key => $prefix
+        ) {
+            if (! isset($details[$key]) || ! is_numeric($details[$key])) {
+                continue;
+            }
+            $id = (int) $details[$key];
+            $related = $relatedById->get($id);
+            if ($related instanceof CrmAccount) {
+                $lines[] = $prefix.': '.CrmAccountPresentation::oneLine($this->serializeAccount($related));
+            } else {
+                $lines[] = $prefix.': '.CrmAccountPresentation::unresolvedReferenceFallback();
+            }
+        }
+
+        return $lines;
     }
 
     /**
@@ -264,6 +414,8 @@ class CrmAccountController extends Controller
             'meridian_pending' => $version === null || $version->meridian_number === null || $version->meridian_number === '',
             'version_number' => $version?->version_number,
         ];
+
+        $data['label'] = CrmAccountPresentation::fromSerialized($data);
 
         if ($withVersions) {
             $data['versions'] = $account->versions->map(fn ($v): array => [

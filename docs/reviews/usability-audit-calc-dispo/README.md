@@ -92,11 +92,11 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 |---|---|
 | Ablauf | Nav „Stammdaten“ → `/crm/accounts`; Filter nur Typ / „Nur vorläufig“; Prüfliste erreichbar |
 | Wirkung | Auffinden außerhalb des Wizards erschwert; Prüfliste zeigt z. B. „ID … · keine Domain“ |
-| Code | `crm/accounts/index.tsx` (kein Text-`q`); `match-queue.tsx`; Nav `AppNavigation.php` → Stammdaten |
-| Tests | Suche API in Feature-Tests; Listen-Textsuche nicht als Alltags-E2E |
-| Browser | **8062** Liste + Prüfliste erreichbar; ein Rest-Provisional ohne Domain sichtbar |
+| Code | `crm/accounts/index.tsx` (`q` + Pagination); `match-queue.tsx` Labels; Nav Stammdaten |
+| Tests | `CrmMasterdataSearchTest`; E2E Port **8066** |
+| Browser | Suche/Filter/Labels im Folgeslice (Draft-PR) |
 | Typ | Bedienungsproblem |
-| Kleinste Korrektur | Textsuche auf Index (existierende `/crm/accounts/suche`-Semantik); Prüfliste-Kurztexte statt Roh-ID-Fokus |
+| Status | **umgesetzt** im Stammdaten-Such-Folgeslice |
 
 ### Weitere belegte Punkte (niedriger als Top 3)
 
@@ -138,13 +138,11 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 - **Slice:** Prop `linkedDispoOrders` → Banner nur Wizard; freigegebene Singular-/Plural-Texte; Links bei Dispo-Ansichtsrecht; keine Lifecycle-/Policy-Änderung.
 - **Abnahme:** Nach Create erscheint Banner; Mehrfachaufträge Plural; Dispo-Snapshot unverändert nach Calc-Edit.
 
-### 3) Stammdaten-Textsuche (+ Prüfliste-Labels)
+### 3) Stammdaten-Textsuche (+ Prüfliste-Labels) — **umgesetzt** (Draft-PR)
 
 - **Nutzen:** Auffinden/Zuordnung außerhalb Wizard; seltener als (1), aber häufig bei Konflikten.
-- **Slice:** Index-`q` gegen bestehende Suche; Prüfliste ohne Roh-ID als Primärlabel.
-- **PO-Fragen:** Keine, wenn nur Anzeige/Filter.
-- **Gates/Daten:** vorhanden.
-- **Abnahme:** Suche nach Name/Meridian/SF-ID liefert Treffer; Prüfliste verständlich ohne JSON/ID-Fokus.
+- **Slice:** Index-`q` + Pagination; Prüfliste ohne Roh-ID als Primärlabel; Matching unverändert.
+- **Abnahme:** Suche Name/Meridian/SF-ID/Domain; Filterkombi; Labels Quelle/Ziel unterscheidbar.
 
 **Nicht** als nächster Hebel aus diesem Audit: pauschal „CRM fertigbauen“, `CRM-004`, weitere SWF-Träger, weitere Methoden, Standardangebote, Deploy.
 

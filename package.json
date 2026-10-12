@@ -25,6 +25,7 @@
         "test:e2e:blp203a": "playwright test -c playwright.blp203a.config.ts",
         "test:e2e:crm-wizard-picker": "playwright test -c playwright.crm-wizard-picker.config.ts --retries=0",
         "test:e2e:calc-dispo-isolation-banner": "playwright test -c playwright.calc-dispo-isolation-banner.config.ts --retries=0",
+        "test:e2e:crm-masterdata-search": "playwright test -c playwright.crm-masterdata-search.config.ts --retries=0",
         "test:e2e:spt008": "bash tests/e2e/helpers/run-spt008-isolated-cases.sh",
         "test:e2e:dspdcp001": "playwright test -c playwright.dspdcp001.config.ts",
         "test:e2e:blp802a": "playwright test -c playwright.blp802a.config.ts",

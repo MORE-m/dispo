@@ -233,9 +233,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   lokal in `dispo_mat_core` eingerichtet/abgenommen (Import-ID 2).
 - **CRM-Wizard-Picker (I1):** verständliche Kunden-/Agenturauswahl, Freitext→automatisch
   vorläufiger Account beim Speichern, Bestandsschutz historischer Freitext-Calcs,
-  klarer Rechnungsempfänger; E2E Port 8064 in CI. **Nicht** in I1: Calc-Isolationsbanner,
-  Stammdaten-Textsuche außerhalb Picker, Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX,
-  Deploy/andere Umgebungen; `BL-P2-03` bleibt teilweise.
+  klarer Rechnungsempfänger; E2E Port 8064 in CI (`main`, PR #136).
+- **Stammdaten-Textsuche + Prüflisten-Labels (Audit P3):** Index-Suche + Pagination;
+  verständliche Labels in Prüfliste/Konflikt; E2E Port **8066** (Draft-PR).
+  **Weiter offen:** Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX, Deploy;
+  `BL-P2-03` bleibt teilweise.
 
 ## Phase 3 – Versionen, dynamische Felder und Snapshots
 

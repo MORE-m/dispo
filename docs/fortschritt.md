@@ -1,20 +1,19 @@
 # Fortschritt V1
 
-Stand: 12. Oktober 2026 – Calc↔Dispo-Isolationsbanner (PO-CALC-DISPO-HINT-1 Folgeslice)
-in Umsetzung/Review; Basis `origin/main` @ `a76e24e…` (nach PR #136).
+Stand: 12. Oktober 2026 – CRM Stammdaten-Textsuche + Prüflisten-Labels (Audit P3)
+in Umsetzung/Review; Basis `origin/main` @ `50b9d46…` (nach PR #137).
 Port 8000 / `.env` / `dispo_mat_core` unberührt.
 
 ## Aktuelle Phase
 
 Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** + CRM-Wizard-Picker I1
-auf `main` (PR #136); **Calc-Isolationsbanner** als schmaler Folgeslice. Phase 4/5 auf
-`main` (Deploy offen).
++ Calc-Isolationsbanner auf `main` (PR #136/#137); **Stammdaten-Textsuche** als schmaler
+Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**Calc↔Dispo-Isolationsbanner / PO-CALC-DISPO-HINT-1 Folgeslice:** Draft-PR; CI auf Feature-HEAD.
-Nicht in diesem Slice: Stammdaten-Textsuche außerhalb Picker, `CRM-004`, weitere Methoden/SWF,
-Deploy, operative Datenpflege.
+**CRM Stammdaten-Textsuche + Prüflisten-Labels:** Draft-PR; CI auf Feature-HEAD.
+Nicht in diesem Slice: `CRM-004`, Auto-Matching, Deploy, operative Datenpflege.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
@@ -33,7 +32,21 @@ MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 | E2E Port **8064** `playwright.crm-wizard-picker.config.ts` | **in CI** |
 | Review-Nachzug P1/P2 (State-Sync, Untouch, Neuanlage-Key, stale search) | **umgesetzt** (PR #136) |
 | BL-P2-03a E2E an Picker angepasst | **umgesetzt** |
-| Calc-Banner / Stammdaten-Textsuche / CRM-004 | **nicht** in diesem Slice |
+| Calc-Banner | **umgesetzt** (`main`, PR #137) |
+| Stammdaten-Textsuche / Prüflisten-Labels | **Folgeslice** (dieser Branch) |
+| CRM-004 | **nicht** in I1 |
+| Deploy | **offen** |
+
+## CRM Stammdaten-Textsuche + Prüflisten-Labels (Oktober 2026)
+
+| Thema | Status |
+|---|---|
+| Index-Suche Firmierung/Meridian/SF-ID/Domain + Filter | **umgesetzt** (Draft-PR) |
+| Pagination 50 / URL-Parameter / Reset | **umgesetzt** |
+| Prüfliste verständliche Labels (ohne Roh-ID-Fokus) | **umgesetzt** |
+| Matching-/Importvertrag unverändert | **ja** |
+| E2E Port **8066** | **in CI** |
+| `CRM-004` / `BL-P2-03` voll | **nicht** |
 | Deploy | **offen** |
 
 ## BL-P2-03a / PO-BLP203-1 (Oktober 2026)
