@@ -53,7 +53,8 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
   Positionen (`DSP-002`) und ersetzt oder storniert bestehende Aufträge
   nicht automatisch.
 - Nach Ablehnung: bestehender Nachbesserungs-/Revisionspfad.
-- UI-Hinweise: Create-Dialog und Dispo-Detail (`PO-CALC-DISPO-HINT-1`).
+- UI-Hinweise: Create-Dialog, Dispo-Detail und Kalkulations-Wizard
+  (`PO-CALC-DISPO-HINT-1`, inkl. Folgeslice Banner).
 
 ### Implementierter Slice BL-P4-03a / PO-BLP403A-1 (+ 03c / PO-BLP403C-1)
 

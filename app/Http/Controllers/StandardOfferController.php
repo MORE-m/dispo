@@ -436,6 +436,7 @@ class StandardOfferController extends Controller
         $props['latestBudgetProposal'] = null;
         $props['appliedBudgetProposal'] = null;
         $props['dispoOrderRevision'] = null;
+        $props['linkedDispoOrders'] = null;
 
         if ($version !== null) {
             $props['calculation'] = $this->calculationShapeFromDraft($version);

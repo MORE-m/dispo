@@ -41,7 +41,7 @@ Entscheidung: `docs/entscheidungen/PO-CALC-DISPO-LIFECYCLE-1-calc-edit-nach-disp
 
 > Dieser Dispoauftrag enthält den Kalkulationsstand bei seiner Erstellung. Spätere Änderungen an der Kalkulation werden nicht übernommen.
 
-**Calc-Wizard:** entfällt in diesem Slice – bestehende Props erkennen verknüpfte Dispoaufträge nicht ohne neue Abfrage-/Diff-Infrastruktur.
+**Calc-Wizard (Folgeslice):** Singular/Plural-Banner bei ≥1 Dispo; Nummern mit Link nur bei Ansichtsrecht; kein Banner im Standardangebotsmodus.
 
 ## 2. Scope
 
