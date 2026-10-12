@@ -483,11 +483,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### PO-CALC-DISPO-LIFECYCLE-1 / PO-CALC-DISPO-HINT-1 – Isolation verständlich machen
 
 - **Phase:** 8 Nachzug
-- **Status:** Umsetzung auf Feature-Branch (Draft-PR)
+- **Status:** Create/Show auf `main` (PR #120); **Wizard-Banner** Draft-PR (Folgeslice)
 - **Anforderungen:** `DSP-001`–`DSP-003`; Entscheidung Option A akzeptiert
-- **Ergebnis:** verbindlicher Lifecycle (Calc editierbar, Dispo-Stand unabhängig, neuer Create ohne Auto-Ersatz); UI-Hinweise Create-Dialog + Dispo-Show; Docs
-- **Ausschluss:** Calc-Sperre, Diff, Sync, neue Korrekturfunktion, Wizard-Hinweis ohne Linked-Order-Props, Persistenz-/Policy-Änderung
-- **Tests:** Vitest Dialog-Hinweise; Playwright `dispo-order.spec.ts`; Isolation-Pest als Regression
+- **Ergebnis:** verbindlicher Lifecycle; UI-Hinweise Create-Dialog + Dispo-Show; Wizard-Banner bei ≥1 verknüpftem Dispo (Singular/Plural, Links bei Ansichtsrecht)
+- **Ausschluss:** Calc-Sperre, Diff, Sync, neue Korrekturfunktion, Persistenz-/Policy-Änderung
+- **Tests:** Vitest Dialog-/Banner-Hinweise; Playwright `dispo-order.spec.ts` + Port **8065** Isolationsbanner; Isolation-Pest
 
 ### BL-P8-01b – Vier-Augen-Freigabe (Vertical Slice)
 

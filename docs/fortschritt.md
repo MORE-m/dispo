@@ -1,19 +1,20 @@
 # Fortschritt V1
 
-Stand: 11. Oktober 2026 – CRM-Wizard-Picker (PO-BLP203-1 **I1**) in Umsetzung/Review;
-Basis `origin/main` @ `d4ff196…` (PR #135). Port 8000 / `.env` / `dispo_mat_core` unberührt.
+Stand: 12. Oktober 2026 – Calc↔Dispo-Isolationsbanner (PO-CALC-DISPO-HINT-1 Folgeslice)
+in Umsetzung/Review; Basis `origin/main` @ `a76e24e…` (nach PR #136).
+Port 8000 / `.env` / `dispo_mat_core` unberührt.
 
 ## Aktuelle Phase
 
-Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** CRM Salesforce/Meridian
-auf `main` inkl. lokaler Datenabnahme; **CRM-Wizard-Picker** (Freitext→Provisional,
-Account-Suche/Clear/RE) als schmaler Folgeslice. Phase 4/5 auf `main` (Deploy offen).
+Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** + CRM-Wizard-Picker I1
+auf `main` (PR #136); **Calc-Isolationsbanner** als schmaler Folgeslice. Phase 4/5 auf
+`main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**CRM-Wizard-Picker / PO-BLP203-1 I1:** Draft-PR Review; CI auf Feature-HEAD.
-Nicht in diesem Slice: Calc-Isolationsbanner, Stammdaten-Textsuche außerhalb Picker,
-`CRM-004`, weitere Methoden/SWF, Deploy, operative Datenpflege.
+**Calc↔Dispo-Isolationsbanner / PO-CALC-DISPO-HINT-1 Folgeslice:** Draft-PR; CI auf Feature-HEAD.
+Nicht in diesem Slice: Stammdaten-Textsuche außerhalb Picker, `CRM-004`, weitere Methoden/SWF,
+Deploy, operative Datenpflege.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
@@ -100,10 +101,10 @@ MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
 |---|---|
 | Option A: Calc editierbar, Dispo-Stand unabhängig | **akzeptiert** |
 | Neuer Create = Übernahmeweg, kein Auto-Ersatz/Storno | **akzeptiert** |
-| UI-Hinweis Create-Dialog + Dispo-Show | **umgesetzt** (dieser Branch) |
-| Wizard-Hinweis | **nicht** (keine Linked-Order-Props ohne neue Abfrage) |
+| UI-Hinweis Create-Dialog + Dispo-Show | **umgesetzt** (`main`, PR #120) |
+| Wizard-Isolationsbanner (≥1 Dispo; Singular/Plural; Links bei Recht) | **umgesetzt** (Draft-PR) |
 | Lifecycle-/Persistenz-/Policy-Änderung | **nein** |
-| Merge / Deploy | **offen** (Draft-PR) |
+| Merge / Deploy Banner-Folgeslice | **offen** (Draft-PR) |
 
 ## PRI-OPS-1 – MORE Spotkalkulation 2026 / Preislisten-Adapter (Oktober 2026)
 

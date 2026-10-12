@@ -80,11 +80,11 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 |---|---|
 | Ablauf | Nach Dispo-Create bleibt Calc editierbar (PO Option A); Hinweise nur im Create-Dialog und Dispo-Show |
 | Wirkung | Vertrieb ändert Konditionen im Wizard und nimmt an, der bestehende Dispo folge mit – muss außerhalb des Tools nachhalten oder „weiß es“ |
-| Code | Hinweise: `dispo-order-create-dialog.tsx`, `dispo-orders/show.tsx`; **kein** Banner in `wizard.tsx` |
-| Tests | Pest Isolation stark (`CreateDispoOrderFromCalculationTest`); Vitest/E2E prüfen Create-/Show-Texte; **kein** Wizard-Banner-Assert |
-| Browser | **8062** Dispo 17: Isolationstext unter Quellkalkulation. **8063**: Create-Dialog beide Hinweise; nach Create `DA-…-02` Show-Hinweis; Wizard ohne Hinweis |
-| Typ | Bedienungsproblem (Lifecycle fachlich entschieden, Oberfläche unvollständig) |
-| Kleinste Korrektur | Calc-Banner wenn ≥1 Dispo existiert / Position `already_adopted` (PO-CALC-DISPO-HINT-1 Folgeslice; ggf. schmale Prop) |
+| Code | Hinweise: `dispo-order-create-dialog.tsx`, `dispo-orders/show.tsx`; Wizard: `calc-dispo-isolation-banner.tsx` + Prop `linkedDispoOrders` |
+| Tests | Pest Isolation + `CalcDispoIsolationBannerTest`; Vitest/E2E Create/Show + Wizard-Banner Port **8065** |
+| Browser | Create/Show-Hinweise (PR #120); Wizard-Banner nach Dispo-Create (HINT-1 Folgeslice) |
+| Typ | Bedienungsproblem (Lifecycle fachlich entschieden; Wizard-Oberfläche nachgezogen) |
+| Status | **umgesetzt** im HINT-1-Folgeslice (Draft-PR) |
 
 ### P3 – Stammdaten-Liste ohne Namenssuche; Prüfliste zeigt Roh-IDs (Bedienungsproblem)
 
@@ -132,13 +132,11 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 - **PO-Entscheidung I1:** Freitext bleibt erlaubt; Auto-Provisional beim Speichern; keine Account-Auswahlpflicht.
 - **Nicht** erledigt hier: Calc-Banner, Stammdaten-Textsuche, CRM-004, Deploy.
 
-### 2) Calc-Banner Isolation nach Dispo
+### 2) Calc-Banner Isolation nach Dispo — **umgesetzt** (PO-CALC-DISPO-HINT-1 Folgeslice)
 
 - **Nutzen:** Verhindert falsche Annahme „Dispo aktualisiert sich“.
-- **Slice:** Prop `has_dispo_orders` / adopted-Flags → Banner nur Wizard; Texte wie HINT-1; keine Lifecycle-/Policy-Änderung.
-- **PO-Fragen:** Wortlaut; Sichtbarkeit immer vs. nur bei `already_adopted`.
-- **Gates:** Lifecycle Option A akzeptiert; HINT-1 auf `main`.
-- **Abnahme:** Nach Create erscheint Banner; zweiter Create weiter möglich; Dispo-Money unverändert nach Calc-Edit (bestehende Pest).
+- **Slice:** Prop `linkedDispoOrders` → Banner nur Wizard; freigegebene Singular-/Plural-Texte; Links bei Dispo-Ansichtsrecht; keine Lifecycle-/Policy-Änderung.
+- **Abnahme:** Nach Create erscheint Banner; Mehrfachaufträge Plural; Dispo-Snapshot unverändert nach Calc-Edit.
 
 ### 3) Stammdaten-Textsuche (+ Prüfliste-Labels)
 
@@ -154,7 +152,7 @@ Preiszeitraum/Spots/Tagesgruppe sichtbar.
 
 1. CRM-001-Durchsetzung: Pflicht-Kundenaccount jetzt vs. Übergangsphase (soft).
 2. CRM-003-Anzeige: RE-primärer Meridian-Block vs. Status quo beide Seiten.
-3. Calc-Banner-Wortlaut / Prop-Umfang (HINT-1 Rest).
+3. ~~Calc-Banner-Wortlaut / Prop-Umfang (HINT-1 Rest).~~ → Folgeslice umgesetzt.
 4. Deploy CRM/Trailer/Produktion – separat, nicht Teil dieses Audits.
 5. `CRM-004` Kontakte – weiter Folgeslice, hier nicht priorisiert.
 

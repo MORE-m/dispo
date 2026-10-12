@@ -718,6 +718,10 @@ class CalculationController extends Controller
             'dispoOrderRevision' => $calculation === null
                 ? null
                 : $this->dispoOrderRevisionProp($request, $calculation),
+            // PO-CALC-DISPO-HINT-1 Folgeslice: Wizard-Isolationsbanner (DSP-003).
+            'linkedDispoOrders' => $calculation === null
+                ? null
+                : $this->linkedDispoOrdersProp($request, $calculation),
         ];
     }
 
@@ -1075,6 +1079,48 @@ class CalculationController extends Controller
             'predecessor_number' => $context['predecessor_number'],
             'rejection_reason' => $context['rejection_reason'],
             'return_url' => $context['return_url'],
+        ];
+    }
+
+    /**
+     * Verknüpfte Dispoaufträge für das Calc-Isolationsbanner (PO-CALC-DISPO-HINT-1).
+     * Alle Status inkl. completed/cancelled; Nummern/Links nur bei Dispo-Ansichtsrecht.
+     *
+     * @return array{count: int, orders: list<array{number: string, show_url: string}>}|null
+     */
+    private function linkedDispoOrdersProp(Request $request, Calculation $calculation): ?array
+    {
+        $orders = $calculation->dispoOrders()
+            ->orderBy('number_calc_seq')
+            ->orderBy('id')
+            ->get(['id', 'number', 'number_calc_seq', 'calculation_id']);
+
+        $count = $orders->count();
+        if ($count < 1) {
+            return null;
+        }
+
+        $user = $request->user();
+        $canView = $user !== null && $user->can('viewAny', DispoOrder::class);
+
+        /** @var list<array{number: string, show_url: string}> $visible */
+        $visible = [];
+        if ($canView) {
+            foreach ($orders as $order) {
+                if (! $user->can('view', $order)) {
+                    continue;
+                }
+
+                $visible[] = [
+                    'number' => $order->number,
+                    'show_url' => route('dispo-orders.show', $order),
+                ];
+            }
+        }
+
+        return [
+            'count' => $count,
+            'orders' => $visible,
         ];
     }
 

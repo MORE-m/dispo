@@ -140,7 +140,7 @@ Nicht vorhanden (bewusst, Katalog):
 |---|---|
 | Create-Dialog | immer: Übernahme aktueller Stand + keine nachträgliche Sync; bei bestehenden Aufträgen zusätzlich: kein automatisches Ersetzen/Stornieren |
 | Dispo-Show (Quellkalkulation) | Stand bei Erstellung; spätere Calc-Änderungen werden nicht übernommen |
-| Calc-Wizard | **nicht** in diesem Slice (Props erkennen verknüpfte Aufträge nicht ohne neue Abfrage) |
+| Calc-Wizard | Folgeslice: Isolationsbanner bei ≥1 verknüpftem Dispo (`linkedDispoOrders`) |
 
 Hinweise behaupten **keine** konkrete Abweichung und führen keine Diff-Prüfung durch.
 

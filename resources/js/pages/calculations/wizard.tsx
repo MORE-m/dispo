@@ -22,6 +22,10 @@ import {
 } from '@/lib/production-lines';
 import { CalculationSummaryPanel } from '@/components/calculation-summary-panel';
 import { DispoOrderCreateAction } from '@/components/dispo-order-create-action';
+import {
+    CalcDispoIsolationBanner,
+    type LinkedDispoOrdersProp,
+} from '@/components/calc-dispo-isolation-banner';
 import { DispoOrderRevisionBanner } from '@/components/dispo-order-revision-banner';
 import type { DispoOrderRevisionContext } from '@/types/dispo-order';
 import { type BudgetSpotProposal } from '@/components/budget-proposal-panel';
@@ -955,6 +959,7 @@ export default function CalculationWizard({
     canProposeAsStandardOffer = false,
     canCreateDispoOrder = false,
     dispoOrderRevision = null,
+    linkedDispoOrders = null,
     standardOffer = null,
 }: {
     catalog: Catalog;
@@ -971,6 +976,7 @@ export default function CalculationWizard({
     canProposeAsStandardOffer?: boolean;
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
+    linkedDispoOrders?: LinkedDispoOrdersProp | null;
     standardOffer?: {
         mode: 'create' | 'edit';
         offer_id: number | null;
@@ -2963,6 +2969,11 @@ export default function CalculationWizard({
                 ) : null}
                 {dispoOrderRevision ? (
                     <DispoOrderRevisionBanner revision={dispoOrderRevision} />
+                ) : null}
+                {!isStandardOffer &&
+                linkedDispoOrders &&
+                linkedDispoOrders.count > 0 ? (
+                    <CalcDispoIsolationBanner linked={linkedDispoOrders} />
                 ) : null}
                 {planningMode === 'budget' && usesRegularPlanningEditorView ? (
                     <div
