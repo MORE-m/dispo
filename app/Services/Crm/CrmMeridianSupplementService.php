@@ -45,8 +45,6 @@ final class CrmMeridianSupplementService
             ];
         }
 
-        $accountIds = $this->identityAccountIds($account);
-        $sfRaw = $account->salesforce_account_id_raw;
         $calcUpdated = 0;
         $dispoUpdated = 0;
         $conflicts = 0;
@@ -54,9 +52,7 @@ final class CrmMeridianSupplementService
 
         DB::transaction(function () use (
             $account,
-            $accountIds,
             $meridianNumber,
-            $sfRaw,
             $actor,
             $importId,
             &$calcUpdated,
@@ -64,11 +60,16 @@ final class CrmMeridianSupplementService
             &$conflicts,
             &$conflictsCreated,
         ): void {
+            // Sperrreihenfolge (wie Import/Link): Accounts (id ASC) → Aufträge → Konflikte.
+            [$lockedAccount, $accountIds] = $this->lockIdentityAccounts($account);
+            $sfRaw = $lockedAccount->salesforce_account_id_raw;
+
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -91,7 +92,7 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        if ($this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
@@ -116,7 +117,7 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        if ($this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
@@ -158,6 +159,7 @@ final class CrmMeridianSupplementService
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -181,7 +183,7 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        if ($this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
@@ -207,7 +209,7 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        if ($this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
@@ -269,16 +271,18 @@ final class CrmMeridianSupplementService
             return ['calculations' => 0, 'dispo_orders' => 0];
         }
 
-        $accountIds = $this->identityAccountIds($account);
         $calcUpdated = 0;
         $dispoUpdated = 0;
 
-        DB::transaction(function () use ($accountIds, $sfRaw, $actor, $importId, &$calcUpdated, &$dispoUpdated): void {
+        DB::transaction(function () use ($account, $sfRaw, $actor, $importId, &$calcUpdated, &$dispoUpdated): void {
+            [, $accountIds] = $this->lockIdentityAccounts($account);
+
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -321,6 +325,7 @@ final class CrmMeridianSupplementService
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -393,16 +398,16 @@ final class CrmMeridianSupplementService
      */
     private function openOrderConflict(CrmAccount $account, ?int $importId, array $details): bool
     {
-        // Account-Zeile sperren: auch ohne bestehende Konflikte serialisiert das
-        // parallele openOrderConflict-Aufrufe für denselben Account (Gap ohne Rows).
+        // Account ist in supplementMissing bereits gesperrt; erneutes lockForUpdate
+        // ist in derselben Transaktion idempotent und absichert Direktaufrufe.
         CrmAccount::query()->whereKey($account->id)->lockForUpdate()->firstOrFail();
 
         $open = CrmConflict::query()
             ->where('crm_account_id', $account->id)
             ->where('type', CrmConflictType::OrderMeridianMismatch)
             ->where('status', 'open')
-            ->lockForUpdate()
             ->orderBy('id')
+            ->lockForUpdate()
             ->get();
 
         foreach ($open as $conflict) {
@@ -433,6 +438,85 @@ final class CrmMeridianSupplementService
             && (string) ($existing['field'] ?? '') === (string) ($incoming['field'] ?? '')
             && (string) ($existing['existing'] ?? '') === (string) ($incoming['existing'] ?? '')
             && (string) ($existing['incoming'] ?? '') === (string) ($incoming['incoming'] ?? '');
+    }
+
+    /**
+     * Sperrt die Account-Identität (Kanon + Aliasse) in aufsteigender id-Reihenfolge
+     * und liefert die unter Sperre erneut ermittelte Alias-Liste.
+     *
+     * @return array{0: CrmAccount, 1: list<int>}
+     */
+    private function lockIdentityAccounts(CrmAccount $account): array
+    {
+        $canonicalGuess = $this->resolveCanonicalRead($account);
+        $seedIds = array_values(array_unique(array_merge(
+            [$account->id],
+            $this->identityAccountIds($canonicalGuess),
+            $this->mergeChainIds($account),
+        )));
+        sort($seedIds);
+
+        CrmAccount::query()
+            ->whereIn('id', $seedIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get(['id']);
+
+        // Erneute Auflösung ohne zusätzliche Sperren (Zeilen sind bereits gelockt).
+        $lockedStart = CrmAccount::query()->whereKey($account->id)->firstOrFail();
+        $canonical = $this->resolveCanonicalRead($lockedStart);
+        $accountIds = $this->identityAccountIds($canonical);
+
+        $missing = array_values(array_diff($accountIds, $seedIds));
+        if ($missing !== []) {
+            sort($missing);
+            CrmAccount::query()
+                ->whereIn('id', $missing)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id']);
+            $canonical = $this->resolveCanonicalRead($lockedStart->fresh() ?? $lockedStart);
+            $accountIds = $this->identityAccountIds($canonical);
+        }
+
+        return [$canonical, $accountIds];
+    }
+
+    private function resolveCanonicalRead(CrmAccount $account): CrmAccount
+    {
+        $current = $account;
+        $guard = 0;
+        while ($current->merged_into_account_id !== null && $guard < 10) {
+            $next = CrmAccount::query()->find($current->merged_into_account_id);
+            if ($next === null) {
+                break;
+            }
+            $current = $next;
+            $guard++;
+        }
+
+        return $current;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function mergeChainIds(CrmAccount $account): array
+    {
+        $ids = [$account->id];
+        $current = $account;
+        $guard = 0;
+        while ($current->merged_into_account_id !== null && $guard < 10) {
+            $ids[] = (int) $current->merged_into_account_id;
+            $next = CrmAccount::query()->find($current->merged_into_account_id);
+            if ($next === null) {
+                break;
+            }
+            $current = $next;
+            $guard++;
+        }
+
+        return $ids;
     }
 
     /**

@@ -107,15 +107,35 @@ final class CrmAccountService
     }
 
     /**
-     * Manuelle Zuordnung vorläufiger Account → Salesforce-Account.
+     * Manuelle / automatische Zuordnung vorläufiger Account → Salesforce-Account.
      * Prüfungen werden nach lockForUpdate auf frisch geladenen Zeilen wiederholt.
+     *
+     * Sperrreihenfolge: Accounts (id ASC) → Aufträge (in repoint/Nachtrag) → Konflikte.
+     *
+     * @return array{
+     *     account: CrmAccount,
+     *     supplements: array{
+     *         calculations: int,
+     *         dispo_orders: int,
+     *         conflicts: int,
+     *         conflicts_created: int
+     *     }
+     * }
      */
     public function linkProvisionalToSalesforce(
         CrmAccount $provisional,
         CrmAccount $salesforceAccount,
         User $actor,
-    ): CrmAccount {
-        return DB::transaction(function () use ($provisional, $salesforceAccount, $actor): CrmAccount {
+        ?int $importId = null,
+        bool $supplementAfterLink = true,
+    ): array {
+        return DB::transaction(function () use (
+            $provisional,
+            $salesforceAccount,
+            $actor,
+            $importId,
+            $supplementAfterLink,
+        ): array {
             // Deterministische Sperrreihenfolge gegen Deadlocks.
             $ids = [$provisional->id, $salesforceAccount->id];
             sort($ids);
@@ -133,22 +153,39 @@ final class CrmAccountService
 
             $target = $this->resolveCanonicalAccountLocked($target);
 
-            if ($provisional->id === $target->id) {
-                $this->afterSuccessfulLink($target, $actor, null);
+            $emptySupplements = [
+                'calculations' => 0,
+                'dispo_orders' => 0,
+                'conflicts' => 0,
+                'conflicts_created' => 0,
+            ];
 
-                return $target->fresh(['currentVersion']) ?? $target;
+            if ($provisional->id === $target->id) {
+                $supplements = $supplementAfterLink
+                    ? $this->afterSuccessfulLink($target, $actor, $importId)
+                    : $emptySupplements;
+
+                return [
+                    'account' => $target->fresh(['currentVersion']) ?? $target,
+                    'supplements' => $supplements,
+                ];
             }
 
             // Idempotent: bereits auf dasselbe Ziel gemerged.
             if ($provisional->merged_into_account_id === $target->id) {
-                $this->afterSuccessfulLink($target, $actor, null);
+                $supplements = $supplementAfterLink
+                    ? $this->afterSuccessfulLink($target, $actor, $importId)
+                    : $emptySupplements;
 
-                return $target->fresh(['currentVersion']) ?? $target;
+                return [
+                    'account' => $target->fresh(['currentVersion']) ?? $target,
+                    'supplements' => $supplements,
+                ];
             }
 
             if ($provisional->merged_into_account_id !== null
                 && $provisional->merged_into_account_id !== $target->id) {
-                $this->openConflict(CrmConflictType::LinkConflict, $provisional, null, [
+                $this->openConflict(CrmConflictType::LinkConflict, $provisional, $importId, [
                     'message' => 'Vorläufiger Account ist bereits mit einem anderen Salesforce-Account verknüpft.',
                     'existing_target_id' => $provisional->merged_into_account_id,
                     'requested_target_id' => $target->id,
@@ -190,11 +227,17 @@ final class CrmAccountService
             $this->audit->record($provisional, 'crm_account.manual_linked', $actor, null, [
                 'merged_into_account_id' => $target->id,
                 'salesforce_account_id_canonical' => $target->salesforce_account_id_canonical,
+                'import_id' => $importId,
             ]);
 
-            $this->afterSuccessfulLink($target, $actor, null);
+            $supplements = $supplementAfterLink
+                ? $this->afterSuccessfulLink($target, $actor, $importId)
+                : $emptySupplements;
 
-            return $target->fresh(['currentVersion']) ?? $target;
+            return [
+                'account' => $target->fresh(['currentVersion']) ?? $target,
+                'supplements' => $supplements,
+            ];
         });
     }
 
@@ -236,15 +279,31 @@ final class CrmAccountService
         return false;
     }
 
-    private function afterSuccessfulLink(CrmAccount $target, User $actor, ?int $importId): void
+    /**
+     * @return array{
+     *     calculations: int,
+     *     dispo_orders: int,
+     *     conflicts: int,
+     *     conflicts_created: int
+     * }
+     */
+    private function afterSuccessfulLink(CrmAccount $target, User $actor, ?int $importId): array
     {
         $meridian = app(CrmMeridianSupplementService::class);
-        $meridian->supplementSalesforceIds($target, $actor, $importId);
         $target->loadMissing('currentVersion');
         $number = $target->currentVersion?->meridian_number;
         if ($number !== null && $number !== '') {
-            $meridian->supplementMissing($target, $number, $actor, $importId);
+            return $meridian->supplementMissing($target, $number, $actor, $importId);
         }
+
+        $sf = $meridian->supplementSalesforceIds($target, $actor, $importId);
+
+        return [
+            'calculations' => $sf['calculations'],
+            'dispo_orders' => $sf['dispo_orders'],
+            'conflicts' => 0,
+            'conflicts_created' => 0,
+        ];
     }
 
     /**
@@ -641,14 +700,36 @@ final class CrmAccountService
 
     private function repointOrders(int $fromAccountId, int $toAccountId): void
     {
-        DB::table('calculations')->where('customer_account_id', $fromAccountId)
-            ->update(['customer_account_id' => $toAccountId]);
-        DB::table('calculations')->where('agency_account_id', $fromAccountId)
-            ->update(['agency_account_id' => $toAccountId]);
-        DB::table('dispo_orders')->where('customer_account_id', $fromAccountId)
-            ->update(['customer_account_id' => $toAccountId]);
-        DB::table('dispo_orders')->where('agency_account_id', $fromAccountId)
-            ->update(['agency_account_id' => $toAccountId]);
+        // Aufträge nach Account-Sperre in id-Reihenfolge sperren (kein Deadlock mit Nachtrag).
+        $calcIds = DB::table('calculations')
+            ->where(function ($q) use ($fromAccountId): void {
+                $q->where('customer_account_id', $fromAccountId)
+                    ->orWhere('agency_account_id', $fromAccountId);
+            })
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
+        if ($calcIds->isNotEmpty()) {
+            DB::table('calculations')->whereIn('id', $calcIds)->where('customer_account_id', $fromAccountId)
+                ->update(['customer_account_id' => $toAccountId]);
+            DB::table('calculations')->whereIn('id', $calcIds)->where('agency_account_id', $fromAccountId)
+                ->update(['agency_account_id' => $toAccountId]);
+        }
+
+        $dispoIds = DB::table('dispo_orders')
+            ->where(function ($q) use ($fromAccountId): void {
+                $q->where('customer_account_id', $fromAccountId)
+                    ->orWhere('agency_account_id', $fromAccountId);
+            })
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
+        if ($dispoIds->isNotEmpty()) {
+            DB::table('dispo_orders')->whereIn('id', $dispoIds)->where('customer_account_id', $fromAccountId)
+                ->update(['customer_account_id' => $toAccountId]);
+            DB::table('dispo_orders')->whereIn('id', $dispoIds)->where('agency_account_id', $fromAccountId)
+                ->update(['agency_account_id' => $toAccountId]);
+        }
     }
 
     public function resolveCanonicalAccount(CrmAccount $account): CrmAccount

@@ -205,33 +205,50 @@ final class CrmImportService
                 }
             }
 
+            // Auto-Match verknüpft ohne unmittelbaren Nachtrag; Nachtrag einmal je Ziel
+            // nach allen Links (neu gebundene Aufträge inkl. Mehrfach-Provisionals).
             $matchReport = $this->autoMatchProvisionals($actor, $import->id);
+            /** @var array<int, CrmAccount> */
+            $autoMatchTargets = [];
             foreach ($matchReport as $match) {
                 if (($match['mode'] ?? null) !== 'auto' || empty($match['linked_account_id'])) {
                     continue;
                 }
                 $linkedId = (int) $match['linked_account_id'];
-                if (isset($meridianSupplementDone[$linkedId])) {
+                if (isset($autoMatchTargets[$linkedId])) {
                     continue;
                 }
                 $linked = CrmAccount::query()
                     ->with('currentVersion')
                     ->whereKey($linkedId)
                     ->first();
-                $meridian = $linked?->currentVersion?->meridian_number;
-                if ($linked !== null && $meridian !== null && $meridian !== '') {
-                    $extra = $this->meridian->supplementMissing($linked, $meridian, $actor, $import->id);
-                    $meridianSupplementDone[$linkedId] = true;
-                    $supplements['calculations'] += $extra['calculations'];
-                    $supplements['dispo_orders'] += $extra['dispo_orders'];
-                    $supplements['conflicts'] += $extra['conflicts'];
-                    $supplements['conflicts_created'] += $extra['conflicts_created'];
-                } elseif ($linked !== null) {
-                    $sf = $this->meridian->supplementSalesforceIds($linked, $actor, $import->id);
-                    $meridianSupplementDone[$linkedId] = true;
-                    $supplements['calculations'] += $sf['calculations'];
-                    $supplements['dispo_orders'] += $sf['dispo_orders'];
+                if ($linked !== null) {
+                    $autoMatchTargets[$linkedId] = $linked;
                 }
+            }
+            foreach ($autoMatchTargets as $linkedId => $linked) {
+                $alreadyCounted = isset($meridianSupplementDone[$linkedId]);
+                $meridian = $linked->currentVersion?->meridian_number;
+                if ($meridian !== null && $meridian !== '') {
+                    $extra = $this->meridian->supplementMissing($linked, $meridian, $actor, $import->id);
+                } else {
+                    $sf = $this->meridian->supplementSalesforceIds($linked, $actor, $import->id);
+                    $extra = [
+                        'calculations' => $sf['calculations'],
+                        'dispo_orders' => $sf['dispo_orders'],
+                        'conflicts' => 0,
+                        'conflicts_created' => 0,
+                    ];
+                }
+                $supplements['calculations'] += $extra['calculations'];
+                $supplements['dispo_orders'] += $extra['dispo_orders'];
+                $supplements['conflicts_created'] += $extra['conflicts_created'];
+                // Zweiter Nachtrag desselben Ziels: nur neu angelegte Konflikte zählen,
+                // keine Doppelzählung bereits in applyAction erkannter Widersprüche.
+                $supplements['conflicts'] += $alreadyCounted
+                    ? $extra['conflicts_created']
+                    : $extra['conflicts'];
+                $meridianSupplementDone[$linkedId] = true;
             }
 
             // Folgeimport: Nachtrag nur für Accounts, die in diesem Apply noch nicht
@@ -764,7 +781,15 @@ final class CrmImportService
             $candidates = $this->accounts->findSalesforceCandidatesByDomain($provisional->type, $domain);
             if (count($candidates) === 1) {
                 $target = $candidates[0];
-                $linked = $this->accounts->linkProvisionalToSalesforce($provisional, $target, $actor);
+                // Nachtrag zentral nach allen Auto-Matches (Import-Report, Mehrfach-Links).
+                $linkResult = $this->accounts->linkProvisionalToSalesforce(
+                    $provisional,
+                    $target,
+                    $actor,
+                    $importId,
+                    false,
+                );
+                $linked = $linkResult['account'];
                 $report[] = [
                     'provisional_id' => $provisional->id,
                     'linked_account_id' => $linked->id,

@@ -44,17 +44,20 @@ while (count(glob($runDir.'/worker-*.ready')) < 2) {
 }
 
 try {
-    /** @var array{account_id: int, meridian: string, actor_id: int, import_id: int} $data */
+    /** @var array{account_id: int, meridian: string, actor_id: int, import_id: ?int} $data */
     $data = json_decode($payloadJson, true, 512, JSON_THROW_ON_ERROR);
 
     $account = CrmAccount::query()->findOrFail((int) $data['account_id']);
     $actor = User::query()->findOrFail((int) $data['actor_id']);
+    $importId = array_key_exists('import_id', $data) && $data['import_id'] !== null
+        ? (int) $data['import_id']
+        : null;
 
     $result = $app->make(CrmMeridianSupplementService::class)->supplementMissing(
         $account,
         (string) $data['meridian'],
         $actor,
-        (int) $data['import_id'],
+        $importId,
     );
 
     file_put_contents(

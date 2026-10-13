@@ -1,9 +1,10 @@
 # Review: Idempotenz `order_meridian_mismatch`
 
-Stand: 13. Oktober 2026  
+Stand: 13. Oktober 2026 (Nachzug P2 Sperrreihenfolge + Auto-Match-Report)  
 Art: **Produktfix** (kein Deploy, keine Mutation in `dispo_mat_core`)  
 Basis: `origin/main` @ `64096081bcc4de4756f827bb75d6ff8da95f770e`  
-Branch / Worktree: `fix/crm-order-meridian-conflict-idempotency` / `dispo-wt-fix-crm-order-meridian-conflict-idempotency`
+Branch / Worktree: `fix/crm-order-meridian-conflict-idempotency` / `dispo-wt-fix-crm-order-meridian-conflict-idempotency`  
+Draft-PR: [#139](https://github.com/MORE-m/dispo/pull/139)
 
 ## Befund (vorher)
 
@@ -33,40 +34,69 @@ Report-Zähler:
 
 | Schlüssel | Bedeutung |
 |---|---|
-| `supplements.conflicts` | erkannte Widersprüche (fachlich, auch bei Wiederholung) |
+| `supplements.calculations` / `dispo_orders` | tatsächlich ergänzte Vorgänge |
+| `supplements.conflicts` | erkannte Widersprüche (fachlich) |
 | `supplements.conflicts_created` | neu angelegte offene Konfliktdatensätze |
+
+## Sperrreihenfolge (P2)
+
+Einheitlich für Supplement, Import und manuellen/automatischen Link:
+
+1. **Accounts** (Kanon + Aliasse / Merge-Kette) in aufsteigender `id`-Reihenfolge, Identität unter Sperre erneut aufgelöst  
+2. **Kalkulationen** (`orderBy id` + `lockForUpdate`)  
+3. **Dispoaufträge** (`orderBy id` + `lockForUpdate`)  
+4. **Konflikte** (offene `order_meridian_mismatch` des Accounts)
+
+`repointOrders` sperrt betroffene Aufträge vor dem Update. Keine pauschalen Retries.
+
+## Auto-Match-Report (P2)
+
+- `linkProvisionalToSalesforce(..., ?importId, supplementAfterLink=false)` beim Import-Auto-Match  
+- Nach allen Links: **ein** Nachtrag je Zielaccount; Ergebnisse in den Import-Report  
+- Bereits in `applyAction` gezählte Ziele: bei Re-Nachtrag nur `conflicts_created` zu `conflicts` addieren (keine Doppelzählung)  
+- Manueller Link: weiterhin Nachtrag mit `supplementAfterLink=true`, `importId=null` möglich  
+
+Beispiel Soll/Ist Auto-Match (Provisional + leere Meridian → SF mit `M-BAM-KEEP`):
+
+| Zähler | Soll | Ist (Browser/Setup) |
+|---|---|---|
+| calculations | 1 | 1 |
+| dispo_orders | 0 | 0 |
+| conflicts | 0 | 0 |
+| conflicts_created | 0 | 0 |
+
+Mismatch-Auto-Match: `conflicts=1`, `conflicts_created=1`, `crm_import_id` = verursachender Import.
 
 ## Umsetzung
 
-- `CrmMeridianSupplementService::openOrderConflict()`: Account-`lockForUpdate`, Abgleich offener Konflikte, Create nur bei fehlender Identität; Rückgabe `bool`.
-- `supplementMissing()` liefert `conflicts` und `conflicts_created`.
-- `CrmImportService`: Nachtragspfad entflochten (`$meridianSupplementDone`); Aggregation beider Zähler.
+- `CrmMeridianSupplementService`: Account-first-Sperren, idempotentes `openOrderConflict`, Zähler `conflicts` / `conflicts_created`
+- `CrmImportService`: Entflechtung Apply/Folgeimport; Auto-Match-Nachtrag zentral + Report
+- `CrmAccountService`: Link liefert `{account, supplements}`; optionales `importId`; `repointOrders` mit Auftragssperren
 
 ## Tests
 
 | Nachweis | Beleg |
 |---|---|
-| Calc-Mismatch → genau 1 offener Konflikt | `CrmOrderMeridianConflictIdempotencyTest::apply_with_calc_mismatch_…` |
-| Dispo-Mismatch → genau 1 | `…apply_with_dispo_mismatch_…` |
-| Service-Wiederholung + unveränderter Folgeimport → kein Duplikat | `…repeated_service_call_…` |
-| Kunde/Agentur × Calc/Dispo getrennt | `…customer_agency_calc_dispo_…` |
-| Nach Resolve erneut → neuer offener Satz (R5) | `…resolved_conflict_reopens_…` |
-| Fehlende Meridian wird nachgetragen | `…missing_meridian_is_still_supplemented_…` |
-| Bestehender Nachzug-Test zählt exakt 1 | `order_meridian_mismatch_opens_conflict_without_overwrite` |
-| MySQL parallel → genau 1 Create | `CrmOrderMeridianConflictConcurrencyTest` + Worker |
-| Manueller Link regressionsfrei (MySQL) | `CrmManualLinkConcurrencyTest` |
-
-Lokal: SQLite-CRM-Suite 73 passed / 2 skipped; MySQL-Filter (Idempotenz+Concurrency+Manual-Link) 9 passed.
+| Calc/Dispo-Mismatch → genau 1 offener Konflikt | `CrmOrderMeridianConflictIdempotencyTest` |
+| Service-Wiederholung + Folgeimport | idem |
+| Auto-Match Report Calc/Dispo | `CrmImportAutoMatchSupplementReportTest::auto_match_supplements_…` |
+| Auto-Match Mismatch + `crm_import_id` | `…auto_match_mismatch_…` |
+| Mehrere Provisionals → ein Ziel | `…multiple_provisionals_…` |
+| Unveränderter Folgeimport | `…unchanged_reimport_…` |
+| MySQL Supplement∥Supplement | `CrmOrderMeridianConflictConcurrencyTest` |
+| MySQL Supplement∥Import | `…concurrent_supplement_and_import_…` |
+| MySQL Supplement∥Manual-Link | `…concurrent_supplement_and_manual_link_…` |
+| Manueller Link Regression | `CrmManualLinkConcurrencyTest` |
 
 ## Browser (synthetisch)
 
-- DB-Kopie: `dispo_accept_crm_omm_idempotency_20261013` (Quelle `dispo_mat_core` leer; Katalog nur in Kopie aktiviert)
-- Port **8068** (beendet); Port 8000 / `.env` unberührt
-- Apply1: `conflicts=1`, `conflicts_created=1`; Apply2: `conflicts=1`, `conflicts_created=0`; open=1
-- Prüfliste: genau eine Karte (Vorgang K-2026-00001, Seite Kunde, M-OMM-OTHER → M-OMM-KEEP); Calc Meridian/Name unverändert
-- Belege außerhalb Git: `local-backups/crm-omm-idempotency-browser-20261013/`
+- DB: `dispo_accept_crm_omm_idempotency_20261013` (bestehende Kopie; keine Löschung alter Konflikte)
+- Port **8069** (beendet); Port 8000 / `.env` / `dispo_mat_core` unberührt
+- Import→Auto-Match: Report `calculations=1`; UI Calc K-2026-00002 zeigt `Meridian: M-BAM-KEEP`
+- Früherer Idempotenz-Check Port 8068 unverändert gültig
+- Belege: `local-backups/crm-omm-idempotency-browser-20261013/`
 
-**Keine Bestand-Abnahme** der gefüllten operativen Katalogdaten – Quelle war leer; Prüfung ist synthetisch.
+**Keine Bestand-Abnahme** – Quelle `dispo_mat_core` bleibt leer (separater Datenbefund).
 
 ## Nicht geändert
 

@@ -123,7 +123,7 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
         ]), $sales);
 
         $first = $accounts->linkProvisionalToSalesforce($provisional, $sf1, $admin);
-        $this->assertSame($sf1->id, $first->id);
+        $this->assertSame($sf1->id, $first['account']->id);
 
         try {
             $accounts->linkProvisionalToSalesforce($provisional->fresh(), $sf2, $admin);
