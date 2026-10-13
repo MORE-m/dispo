@@ -406,10 +406,7 @@ final class CrmMeridianSupplementService
             ->get();
 
         foreach ($open as $conflict) {
-            if ($this->sameOpenOrderMeridianIdentity(
-                is_array($conflict->details) ? $conflict->details : [],
-                $details,
-            )) {
+            if ($this->sameOpenOrderMeridianIdentity($conflict->details ?? [], $details)) {
                 return false;
             }
         }
