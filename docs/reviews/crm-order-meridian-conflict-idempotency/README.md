@@ -4,8 +4,10 @@ Stand: 13. Oktober 2026 (Nachzug P2 Alias-Sperren vor Link/Repoint)
 Art: **Produktfix** (kein Deploy, keine Mutation in `dispo_mat_core`)
 Basis: `origin/main` @ `64096081bcc4de4756f827bb75d6ff8da95f770e`
 Ausgangs-HEAD: `3352cd0ab932ca9a9ea9c9eb94cf0c218541635e`
+Final-HEAD: `adf25a427f8aa6bd4ec7eaad499ea8d75abe0359`
 Branch / Worktree: `fix/crm-order-meridian-conflict-idempotency` / `dispo-wt-fix-crm-order-meridian-conflict-idempotency`
 Draft-PR: [#139](https://github.com/MORE-m/dispo/pull/139)
+CI: [38416434899](https://github.com/MORE-m/dispo/actions/runs/38416434899) SUCCESS (`ci`/`mysql`/`e2e-spt008`)
 
 ## Befund (vorher)
 
