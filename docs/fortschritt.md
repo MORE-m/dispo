@@ -1,8 +1,21 @@
 # Fortschritt V1
 
-Stand: 12. Oktober 2026 – CRM Stammdaten-Textsuche + Prüflisten-Labels (Audit P3)
-inkl. P2-Konfliktzusammenfassung in Review; Basis `origin/main` @ `50b9d46…`
-(nach PR #137). Port 8000 / `.env` / `dispo_mat_core` unberührt.
+Stand: 13. Oktober 2026 – Katalog, Matrix, Spotlisten, Trailer-Regeln, Produktionspreise und Salesforce lokal in `dispo_mat_core` eingerichtet.
+Code auf `origin/main` @ `11dcc522…` (PR #139, Post-Merge-CI `38433789254` SUCCESS), kein Code-Diff.
+14 Inventare, 42 Werbemittel, 201 Kombinationen, 8 aktive Spotlisten 2026, 8 aktive Produktionspreise 2026.
+Vier Trailer 20 s / 30 %. Salesforce-Import **11** applied, idempotenter Re-Import **12**.
+Sicherung nur als Verweis: `local-backups/local-admin-setup-20261013-204510/`.
+Calc→Dispo-Smoke auf Port 8075 bestanden, Soll = Ist, Smoke-Daten belassen. Technische lokale Prüfung, keine Fachabnahme, kein Deploy.
+Frühere Feature-Abnahmen bleiben der damalige Stand. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` bleiben teilweise. `CRM-004` bleibt offen.
+Die Browser-Abnahme zu PR #136/#137/#138 auf der Kopie `dispo_accept_crm_calc_20261013` ist keine Bestandsabnahme dieser Einrichtung.
+Kein Dump-Restore. Die Ursache des vorherigen Leerstands bleibt unbekannt.
+Offen: `max_allowed_packet` derzeit 16 MiB, nach MySQL-Neustart wieder 1 MiB; CRM-Importhinweis ohne alle vier Salesforce-Typen; Fachabnahme und Deploy.
+Port 8000 und `.env` von `dispo-main` unberührt.
+Bericht: `docs/reviews/local-admin-setup-readiness/` und `docs/readiness/local-admin-setup-readiness-2026-10-13.md`.
+
+Stand davor: 12. Oktober 2026 – CRM Stammdaten-Textsuche + Prüflisten-Labels (Audit P3)
+inkl. P2-Konfliktzusammenfassung in Review; Basis damals `origin/main` @ `50b9d46…`
+(nach PR #137).
 
 ## Aktuelle Phase
 
@@ -12,8 +25,9 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**CRM Stammdaten-Textsuche + Prüflisten-Labels:** Draft-PR; CI auf Feature-HEAD.
-Nicht in diesem Slice: `CRM-004`, Auto-Matching, Deploy, operative Datenpflege.
+**Dokumentation der lokalen Neueinrichtung und des Calc→Dispo-Smokes** auf `dispo_mat_core`. Technische lokale Prüfung, keine Fachabnahme, kein Deploy.
+Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
+Die Abschnitte darunter bleiben der jeweilige damalige Slice-Stand.
 
 Offen / zurückgestellt u. a.:
 Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
