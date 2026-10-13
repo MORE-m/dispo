@@ -1,9 +1,10 @@
 # Review: Idempotenz `order_meridian_mismatch`
 
-Stand: 13. Oktober 2026 (Nachzug P2 Sperrreihenfolge + Auto-Match-Report)  
-Art: **Produktfix** (kein Deploy, keine Mutation in `dispo_mat_core`)  
-Basis: `origin/main` @ `64096081bcc4de4756f827bb75d6ff8da95f770e`  
-Branch / Worktree: `fix/crm-order-meridian-conflict-idempotency` / `dispo-wt-fix-crm-order-meridian-conflict-idempotency`  
+Stand: 13. Oktober 2026 (Nachzug P2 Alias-Sperren vor Link/Repoint)
+Art: **Produktfix** (kein Deploy, keine Mutation in `dispo_mat_core`)
+Basis: `origin/main` @ `64096081bcc4de4756f827bb75d6ff8da95f770e`
+Ausgangs-HEAD: `3352cd0ab932ca9a9ea9c9eb94cf0c218541635e`
+Branch / Worktree: `fix/crm-order-meridian-conflict-idempotency` / `dispo-wt-fix-crm-order-meridian-conflict-idempotency`
 Draft-PR: [#139](https://github.com/MORE-m/dispo/pull/139)
 
 ## Befund (vorher)
@@ -40,21 +41,23 @@ Report-Zähler:
 
 ## Sperrreihenfolge (P2)
 
-Einheitlich für Supplement, Import und manuellen/automatischen Link:
+Gemeinsam über `CrmAccountIdentityLocker` für Supplement, Import und manuellen/automatischen Link:
 
-1. **Accounts** (Kanon + Aliasse / Merge-Kette) in aufsteigender `id`-Reihenfolge, Identität unter Sperre erneut aufgelöst  
-2. **Kalkulationen** (`orderBy id` + `lockForUpdate`)  
-3. **Dispoaufträge** (`orderBy id` + `lockForUpdate`)  
-4. **Konflikte** (offene `order_meridian_mismatch` des Accounts)
+1. **Accounts** (Kanon + bestehende Aliasse + Merge-Kette + Link-Quelle) in aufsteigender `id`-Reihenfolge **vor** `repointOrders` / Auftragszugriff
+2. Unter Sperre: Identität erneut prüfen (`lockForUpdate` = InnoDB Current Read, kein reiner RR-Snapshot)
+3. Fehlende IDs → `CrmAccountLockSetExpandedException`, Transaktion kontrolliert mit vereinigter Menge neu (max. 1 Expansion); **kein** Nachsperren kleinerer IDs bei gehaltenen größeren Locks
+4. **Kalkulationen** (`orderBy id` + `lockForUpdate`)
+5. **Dispoaufträge** (`orderBy id` + `lockForUpdate`)
+6. **Konflikte** (offene `order_meridian_mismatch` des Accounts)
 
-`repointOrders` sperrt betroffene Aufträge vor dem Update. Keine pauschalen Retries.
+Keine pauschalen Retries als Ersatz für korrekte Reihenfolge.
 
 ## Auto-Match-Report (P2)
 
-- `linkProvisionalToSalesforce(..., ?importId, supplementAfterLink=false)` beim Import-Auto-Match  
-- Nach allen Links: **ein** Nachtrag je Zielaccount; Ergebnisse in den Import-Report  
-- Bereits in `applyAction` gezählte Ziele: bei Re-Nachtrag nur `conflicts_created` zu `conflicts` addieren (keine Doppelzählung)  
-- Manueller Link: weiterhin Nachtrag mit `supplementAfterLink=true`, `importId=null` möglich  
+- `linkProvisionalToSalesforce(..., ?importId, supplementAfterLink=false)` beim Import-Auto-Match
+- Nach allen Links: **ein** Nachtrag je Zielaccount; Ergebnisse in den Import-Report
+- Bereits in `applyAction` gezählte Ziele: bei Re-Nachtrag nur `conflicts_created` zu `conflicts` addieren (keine Doppelzählung)
+- Manueller Link: weiterhin Nachtrag mit `supplementAfterLink=true`, `importId=null` möglich
 
 Beispiel Soll/Ist Auto-Match (Provisional + leere Meridian → SF mit `M-BAM-KEEP`):
 
@@ -69,9 +72,10 @@ Mismatch-Auto-Match: `conflicts=1`, `conflicts_created=1`, `crm_import_id` = ver
 
 ## Umsetzung
 
-- `CrmMeridianSupplementService`: Account-first-Sperren, idempotentes `openOrderConflict`, Zähler `conflicts` / `conflicts_created`
+- `CrmAccountIdentityLocker` + `CrmAccountLockSetExpandedException`: gemeinsame Identitäts-Sperren
+- `CrmMeridianSupplementService`: Locker; nested Link-Transaktion ohne zweiten Expansion-Wrapper
 - `CrmImportService`: Entflechtung Apply/Folgeimport; Auto-Match-Nachtrag zentral + Report
-- `CrmAccountService`: Link liefert `{account, supplements}`; optionales `importId`; `repointOrders` mit Auftragssperren
+- `CrmAccountService`: `lockForLink` vor Repoint/Nachtrag; `{account, supplements}`; optionales `importId`
 
 ## Tests
 
@@ -86,6 +90,7 @@ Mismatch-Auto-Match: `conflicts=1`, `conflicts_created=1`, `crm_import_id` = ver
 | MySQL Supplement∥Supplement | `CrmOrderMeridianConflictConcurrencyTest` |
 | MySQL Supplement∥Import | `…concurrent_supplement_and_import_…` |
 | MySQL Supplement∥Manual-Link | `…concurrent_supplement_and_manual_link_…` |
+| MySQL älterer Alias ∩ Manual-Link (Barrieren an Sperrstellen) | `…concurrent_older_alias_supplement_and_manual_link_overlap_…` |
 | Manueller Link Regression | `CrmManualLinkConcurrencyTest` |
 
 ## Browser (synthetisch)

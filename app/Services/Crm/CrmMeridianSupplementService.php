@@ -19,6 +19,7 @@ final class CrmMeridianSupplementService
 {
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly CrmAccountIdentityLocker $identityLocker,
     ) {}
 
     /**
@@ -50,7 +51,7 @@ final class CrmMeridianSupplementService
         $conflicts = 0;
         $conflictsCreated = 0;
 
-        DB::transaction(function () use (
+        $run = function (array $extraIds) use (
             $account,
             $meridianNumber,
             $actor,
@@ -61,7 +62,9 @@ final class CrmMeridianSupplementService
             &$conflictsCreated,
         ): void {
             // Sperrreihenfolge (wie Import/Link): Accounts (id ASC) → Aufträge → Konflikte.
-            [$lockedAccount, $accountIds] = $this->lockIdentityAccounts($account);
+            $locked = $this->identityLocker->lockIdentity($account, $extraIds);
+            $lockedAccount = $locked['canonical'];
+            $accountIds = $locked['account_ids'];
             $sfRaw = $lockedAccount->salesforce_account_id_raw;
 
             $calcRows = DB::table('calculations')
@@ -247,7 +250,14 @@ final class CrmMeridianSupplementService
                     );
                 }
             }
-        });
+        };
+
+        // Bereits offene Transaktion (z. B. manueller Link): Expansion an äußeren Wrapper.
+        if (DB::transactionLevel() > 0) {
+            $run([]);
+        } else {
+            $this->identityLocker->withStableAccountLocks($run);
+        }
 
         return [
             'calculations' => $calcUpdated,
@@ -274,8 +284,16 @@ final class CrmMeridianSupplementService
         $calcUpdated = 0;
         $dispoUpdated = 0;
 
-        DB::transaction(function () use ($account, $sfRaw, $actor, $importId, &$calcUpdated, &$dispoUpdated): void {
-            [, $accountIds] = $this->lockIdentityAccounts($account);
+        $run = function (array $extraIds) use (
+            $account,
+            $sfRaw,
+            $actor,
+            $importId,
+            &$calcUpdated,
+            &$dispoUpdated,
+        ): void {
+            $locked = $this->identityLocker->lockIdentity($account, $extraIds);
+            $accountIds = $locked['account_ids'];
 
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
@@ -364,7 +382,13 @@ final class CrmMeridianSupplementService
                     );
                 }
             }
-        });
+        };
+
+        if (DB::transactionLevel() > 0) {
+            $run([]);
+        } else {
+            $this->identityLocker->withStableAccountLocks($run);
+        }
 
         return ['calculations' => $calcUpdated, 'dispo_orders' => $dispoUpdated];
     }
@@ -438,98 +462,5 @@ final class CrmMeridianSupplementService
             && (string) ($existing['field'] ?? '') === (string) ($incoming['field'] ?? '')
             && (string) ($existing['existing'] ?? '') === (string) ($incoming['existing'] ?? '')
             && (string) ($existing['incoming'] ?? '') === (string) ($incoming['incoming'] ?? '');
-    }
-
-    /**
-     * Sperrt die Account-Identität (Kanon + Aliasse) in aufsteigender id-Reihenfolge
-     * und liefert die unter Sperre erneut ermittelte Alias-Liste.
-     *
-     * @return array{0: CrmAccount, 1: list<int>}
-     */
-    private function lockIdentityAccounts(CrmAccount $account): array
-    {
-        $canonicalGuess = $this->resolveCanonicalRead($account);
-        $seedIds = array_values(array_unique(array_merge(
-            [$account->id],
-            $this->identityAccountIds($canonicalGuess),
-            $this->mergeChainIds($account),
-        )));
-        sort($seedIds);
-
-        CrmAccount::query()
-            ->whereIn('id', $seedIds)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get(['id']);
-
-        // Erneute Auflösung ohne zusätzliche Sperren (Zeilen sind bereits gelockt).
-        $lockedStart = CrmAccount::query()->whereKey($account->id)->firstOrFail();
-        $canonical = $this->resolveCanonicalRead($lockedStart);
-        $accountIds = $this->identityAccountIds($canonical);
-
-        $missing = array_values(array_diff($accountIds, $seedIds));
-        if ($missing !== []) {
-            sort($missing);
-            CrmAccount::query()
-                ->whereIn('id', $missing)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get(['id']);
-            $canonical = $this->resolveCanonicalRead($lockedStart->fresh() ?? $lockedStart);
-            $accountIds = $this->identityAccountIds($canonical);
-        }
-
-        return [$canonical, $accountIds];
-    }
-
-    private function resolveCanonicalRead(CrmAccount $account): CrmAccount
-    {
-        $current = $account;
-        $guard = 0;
-        while ($current->merged_into_account_id !== null && $guard < 10) {
-            $next = CrmAccount::query()->find($current->merged_into_account_id);
-            if ($next === null) {
-                break;
-            }
-            $current = $next;
-            $guard++;
-        }
-
-        return $current;
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function mergeChainIds(CrmAccount $account): array
-    {
-        $ids = [$account->id];
-        $current = $account;
-        $guard = 0;
-        while ($current->merged_into_account_id !== null && $guard < 10) {
-            $ids[] = (int) $current->merged_into_account_id;
-            $next = CrmAccount::query()->find($current->merged_into_account_id);
-            if ($next === null) {
-                break;
-            }
-            $current = $next;
-            $guard++;
-        }
-
-        return $ids;
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function identityAccountIds(CrmAccount $account): array
-    {
-        $ids = [$account->id];
-        $merged = CrmAccount::query()
-            ->where('merged_into_account_id', $account->id)
-            ->pluck('id')
-            ->all();
-
-        return array_values(array_unique(array_merge($ids, array_map('intval', $merged))));
     }
 }

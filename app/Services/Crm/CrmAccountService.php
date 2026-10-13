@@ -20,6 +20,7 @@ final class CrmAccountService
 {
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly CrmAccountIdentityLocker $identityLocker,
     ) {}
 
     /**
@@ -129,29 +130,17 @@ final class CrmAccountService
         ?int $importId = null,
         bool $supplementAfterLink = true,
     ): array {
-        return DB::transaction(function () use (
+        // Volle Identitätsmenge (Ziel + bestehende Aliasse + Quelle) vor Repoint/Nachtrag.
+        return $this->identityLocker->withStableAccountLocks(function (array $extraIds) use (
             $provisional,
             $salesforceAccount,
             $actor,
             $importId,
             $supplementAfterLink,
         ): array {
-            // Deterministische Sperrreihenfolge gegen Deadlocks.
-            $ids = [$provisional->id, $salesforceAccount->id];
-            sort($ids);
-            $locked = CrmAccount::query()
-                ->whereIn('id', $ids)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
-
-            $provisional = $locked->get($provisional->id)
-                ?? CrmAccount::query()->lockForUpdate()->findOrFail($provisional->id);
-            $target = $locked->get($salesforceAccount->id)
-                ?? CrmAccount::query()->lockForUpdate()->findOrFail($salesforceAccount->id);
-
-            $target = $this->resolveCanonicalAccountLocked($target);
+            $locked = $this->identityLocker->lockForLink($provisional, $salesforceAccount, $extraIds);
+            $provisional = $locked['provisional'];
+            $target = $locked['target'];
 
             $emptySupplements = [
                 'calculations' => 0,
@@ -239,25 +228,6 @@ final class CrmAccountService
                 'supplements' => $supplements,
             ];
         });
-    }
-
-    private function resolveCanonicalAccountLocked(CrmAccount $account): CrmAccount
-    {
-        $current = $account;
-        $guard = 0;
-        while ($current->merged_into_account_id !== null && $guard < 10) {
-            $next = CrmAccount::query()
-                ->whereKey($current->merged_into_account_id)
-                ->lockForUpdate()
-                ->first();
-            if ($next === null) {
-                break;
-            }
-            $current = $next;
-            $guard++;
-        }
-
-        return $current;
     }
 
     private function wouldCreateMergeCycle(CrmAccount $provisional, CrmAccount $target): bool

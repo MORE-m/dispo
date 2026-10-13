@@ -242,6 +242,145 @@ final class CrmOrderMeridianConflictConcurrencyTest extends TestCase
         );
     }
 
+    #[Test]
+    public function concurrent_older_alias_supplement_and_manual_link_overlap_without_deadlock(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('Parallele Alias/Link-Worker erfordern MySQL.');
+        }
+
+        Storage::fake((string) config('dispo.files_disk'));
+        $admin = User::factory()->role(Role::Admin)->create();
+        $sales = User::factory()->role(Role::Sales)->create();
+        $accounts = app(CrmAccountService::class);
+
+        // Älterer Alias (niedrige ID) vor dem Salesforce-Ziel anlegen.
+        $olderAlias = $accounts->createProvisional([
+            'name' => 'Älterer Alias',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'alias-old-overlap.test',
+        ], $sales);
+
+        $this->importAndApply($admin, [
+            ['SF Ziel', 'M-KEEP', '001xx000003DGbq', 'a@alias-overlap.test', 'Account KUNDE'],
+        ]);
+        $sf = CrmAccount::query()
+            ->where('salesforce_account_id_canonical', SalesforceAccountId::normalize('001xx000003DGbq')['canonical'])
+            ->firstOrFail();
+
+        $this->assertLessThan($sf->id, $olderAlias->id, 'Alias-ID muss kleiner als Ziel-ID sein.');
+
+        $accounts->linkProvisionalToSalesforce($olderAlias, $sf, $admin);
+        $this->assertSame($sf->id, $olderAlias->fresh()->merged_into_account_id);
+
+        $source = $accounts->createProvisional([
+            'name' => 'Neue Quelle',
+            'type' => CrmAccountType::Customer,
+            'matching_domain' => 'alias-source-overlap.test',
+        ], $sales);
+        $this->assertGreaterThan($sf->id, $source->id, 'Quelle muss nach dem Ziel liegen.');
+
+        $calcSf = app(CalculationWriter::class)->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_account_id' => $sf->id,
+            'invoice_recipient' => 'customer',
+            'campaign' => 'Alias SF',
+            'product_title' => 'T',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+        ]), $sales);
+        DB::table('calculations')->where('id', $calcSf->id)->update([
+            'customer_meridian_number' => 'M-OTHER',
+        ]);
+
+        $calcSource = app(CalculationWriter::class)->create($this->withLiveSchemaFingerprint([
+            'planning_mode' => 'manual',
+            'customer_account_id' => $source->id,
+            'invoice_recipient' => 'customer',
+            'campaign' => 'Alias Source',
+            'product_title' => 'T',
+            'order_discount_percent' => '0',
+            'ae_enabled' => false,
+            'positions' => [],
+        ]), $sales);
+
+        $runDir = storage_path('framework/testing/concurrency-crm-alias-link-'.Str::uuid());
+        if (! mkdir($runDir, 0700, true) && ! is_dir($runDir)) {
+            $this->fail('Run directory could not be created.');
+        }
+
+        $worker = base_path('tests/concurrency/crm_alias_link_overlap_worker.php');
+        $php = PHP_BINARY;
+        $baseEnv = $this->workerEnvironment();
+
+        $payloadHolder = json_encode([
+            'role' => 'supplement_holder',
+            'account_id' => $sf->id,
+            'meridian' => 'M-KEEP',
+            'actor_id' => $admin->id,
+            'prelock_account_ids' => [$olderAlias->id, $sf->id],
+            'orchestration' => [
+                'signal_after_prelock' => 'holder_accounts_locked',
+                'wait_after_prelock' => ['waiter_entered'],
+                'pause_ms_after_prelock_wait' => 300,
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $payloadWaiter = json_encode([
+            'role' => 'manual_link_waiter',
+            'provisional_id' => $source->id,
+            'salesforce_id' => $sf->id,
+            'actor_id' => $admin->id,
+            'orchestration' => [
+                'wait_before' => ['holder_accounts_locked'],
+                'signal_entering_link' => 'waiter_entered',
+                'signal_after_link' => 'waiter_finished',
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $processA = new Process([$php, $worker, $runDir, '0', $payloadHolder], base_path(), $baseEnv);
+        $processB = new Process([$php, $worker, $runDir, '1', $payloadWaiter], base_path(), $baseEnv);
+        $processA->setTimeout(120);
+        $processB->setTimeout(120);
+        $processA->start();
+        $processB->start();
+        $processA->wait();
+        $processB->wait();
+
+        $results = [];
+        foreach ([0, 1] as $id) {
+            $file = $runDir.'/worker-'.$id.'.result';
+            $this->assertFileExists(
+                $file,
+                'Worker '.$id.' result missing. A='.$processA->getErrorOutput().' B='.$processB->getErrorOutput(),
+            );
+            $results[] = trim((string) file_get_contents($file));
+        }
+
+        $this->assertFileExists($runDir.'/holder_accounts_locked');
+        $this->assertFileExists($runDir.'/waiter_entered');
+        $this->assertFileExists($runDir.'/waiter_finished');
+        $holderLockedAt = (float) file_get_contents($runDir.'/holder_accounts_locked');
+        $waiterEnteredAt = (float) file_get_contents($runDir.'/waiter_entered');
+        $waiterFinishedAt = (float) file_get_contents($runDir.'/waiter_finished');
+        $this->assertGreaterThan(0.0, $holderLockedAt);
+        $this->assertGreaterThan($holderLockedAt, $waiterEnteredAt, 'Link muss nach gehaltenen Account-Sperren eintreten.');
+        $this->assertGreaterThan($waiterEnteredAt, $waiterFinishedAt);
+
+        $ok = array_values(array_filter($results, fn (string $line): bool => str_starts_with($line, 'OK:')));
+        $this->assertCount(2, $ok, 'Supplement und Link müssen beide ok enden. Got: '.implode(' | ', $results));
+        $this->assertSame($sf->id, $source->fresh()->merged_into_account_id);
+        $this->assertSame($sf->id, $calcSource->fresh()->customer_account_id);
+        $this->assertSame(
+            1,
+            CrmConflict::query()
+                ->where('type', CrmConflictType::OrderMeridianMismatch)
+                ->where('status', 'open')
+                ->count(),
+        );
+    }
+
     /**
      * @return list<string>
      */
