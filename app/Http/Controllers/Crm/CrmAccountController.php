@@ -151,7 +151,8 @@ class CrmAccountController extends Controller
         $target = CrmAccount::query()
             ->whereKey((int) $validated['salesforce_account_id'])
             ->firstOrFail();
-        $linked = $this->accounts->linkProvisionalToSalesforce($crmAccount, $target, $request->user());
+        $linkResult = $this->accounts->linkProvisionalToSalesforce($crmAccount, $target, $request->user());
+        $linked = $linkResult['account'];
 
         return response()->json([
             'account' => $this->serializeAccount($linked->load('currentVersion')),

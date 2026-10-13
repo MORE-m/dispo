@@ -123,7 +123,7 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
         ]), $sales);
 
         $first = $accounts->linkProvisionalToSalesforce($provisional, $sf1, $admin);
-        $this->assertSame($sf1->id, $first->id);
+        $this->assertSame($sf1->id, $first['account']->id);
 
         try {
             $accounts->linkProvisionalToSalesforce($provisional->fresh(), $sf2, $admin);
@@ -508,8 +508,13 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
 
         $calc->refresh();
         $this->assertSame('M-OTHER', $calc->customer_meridian_number);
-        $this->assertTrue(
-            CrmConflict::query()->where('type', CrmConflictType::OrderMeridianMismatch)->exists(),
+        $this->assertSame(
+            1,
+            CrmConflict::query()
+                ->where('type', CrmConflictType::OrderMeridianMismatch)
+                ->where('status', 'open')
+                ->count(),
+            'Ein Apply darf genau einen offenen order_meridian_mismatch anlegen.',
         );
     }
 

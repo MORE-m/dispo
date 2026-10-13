@@ -19,10 +19,16 @@ final class CrmMeridianSupplementService
 {
     public function __construct(
         private readonly AuditLogger $audit,
+        private readonly CrmAccountIdentityLocker $identityLocker,
     ) {}
 
     /**
-     * @return array{calculations: int, dispo_orders: int, conflicts: int}
+     * @return array{
+     *     calculations: int,
+     *     dispo_orders: int,
+     *     conflicts: int,
+     *     conflicts_created: int
+     * }
      */
     public function supplementMissing(
         CrmAccount $account,
@@ -32,31 +38,41 @@ final class CrmMeridianSupplementService
     ): array {
         $meridianNumber = trim($meridianNumber);
         if ($meridianNumber === '') {
-            return ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
+            return [
+                'calculations' => 0,
+                'dispo_orders' => 0,
+                'conflicts' => 0,
+                'conflicts_created' => 0,
+            ];
         }
 
-        $accountIds = $this->identityAccountIds($account);
-        $sfRaw = $account->salesforce_account_id_raw;
         $calcUpdated = 0;
         $dispoUpdated = 0;
         $conflicts = 0;
+        $conflictsCreated = 0;
 
-        DB::transaction(function () use (
+        $run = function (array $extraIds) use (
             $account,
-            $accountIds,
             $meridianNumber,
-            $sfRaw,
             $actor,
             $importId,
             &$calcUpdated,
             &$dispoUpdated,
             &$conflicts,
+            &$conflictsCreated,
         ): void {
+            // Sperrreihenfolge (wie Import/Link): Accounts (id ASC) → Aufträge → Konflikte.
+            $locked = $this->identityLocker->lockIdentity($account, $extraIds);
+            $lockedAccount = $locked['canonical'];
+            $accountIds = $locked['account_ids'];
+            $sfRaw = $lockedAccount->salesforce_account_id_raw;
+
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -79,13 +95,15 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
                             'existing' => $row->customer_meridian_number,
                             'incoming' => $meridianNumber,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['customer_meridian_number'] = $meridianUpdate;
                     }
@@ -102,13 +120,15 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
                             'existing' => $row->agency_meridian_number,
                             'incoming' => $meridianNumber,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['agency_meridian_number'] = $meridianUpdate;
                     }
@@ -142,6 +162,7 @@ final class CrmMeridianSupplementService
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -165,14 +186,16 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
                             'existing' => $row->customer_meridian_number,
                             'incoming' => $meridianNumber,
                             'order_status' => $row->status,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['customer_meridian_number'] = $meridianUpdate;
                     }
@@ -189,14 +212,16 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($lockedAccount, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
                             'existing' => $row->agency_meridian_number,
                             'incoming' => $meridianNumber,
                             'order_status' => $row->status,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['agency_meridian_number'] = $meridianUpdate;
                     }
@@ -225,12 +250,22 @@ final class CrmMeridianSupplementService
                     );
                 }
             }
-        });
+        };
+
+        // Bereits offene Transaktion (z. B. manueller Link): Expansion an äußeren Wrapper.
+        if (DB::transactionLevel() > 0) {
+            $run([]);
+        } else {
+            $this->identityLocker->withStableAccountLocks($run);
+        }
 
         return [
             'calculations' => $calcUpdated,
             'dispo_orders' => $dispoUpdated,
+            // Erkannte Widersprüche (fachlich), unabhängig von Doppelaufrufen.
             'conflicts' => $conflicts,
+            // Neu angelegte offene Konfliktdatensätze (idempotent).
+            'conflicts_created' => $conflictsCreated,
         ];
     }
 
@@ -246,16 +281,26 @@ final class CrmMeridianSupplementService
             return ['calculations' => 0, 'dispo_orders' => 0];
         }
 
-        $accountIds = $this->identityAccountIds($account);
         $calcUpdated = 0;
         $dispoUpdated = 0;
 
-        DB::transaction(function () use ($accountIds, $sfRaw, $actor, $importId, &$calcUpdated, &$dispoUpdated): void {
+        $run = function (array $extraIds) use (
+            $account,
+            $sfRaw,
+            $actor,
+            $importId,
+            &$calcUpdated,
+            &$dispoUpdated,
+        ): void {
+            $locked = $this->identityLocker->lockIdentity($account, $extraIds);
+            $accountIds = $locked['account_ids'];
+
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -298,6 +343,7 @@ final class CrmMeridianSupplementService
                     $q->whereIn('customer_account_id', $accountIds)
                         ->orWhereIn('agency_account_id', $accountIds);
                 })
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get([
                     'id',
@@ -336,7 +382,13 @@ final class CrmMeridianSupplementService
                     );
                 }
             }
-        });
+        };
+
+        if (DB::transactionLevel() > 0) {
+            $run([]);
+        } else {
+            $this->identityLocker->withStableAccountLocks($run);
+        }
 
         return ['calculations' => $calcUpdated, 'dispo_orders' => $dispoUpdated];
     }
@@ -357,10 +409,37 @@ final class CrmMeridianSupplementService
     }
 
     /**
+     * Öffnet einen Auftrags-Meridian-Konflikt idempotent.
+     *
+     * Fachliche Identität (offen): Account, Vorgangstyp, Vorgang, Seite (Feld),
+     * bestehende und eingehende Meridian. Import-ID und Auftragsstatus allein
+     * vervielfachen denselben offenen Widerspruch nicht. Abgeschlossene Konflikte
+     * bleiben unberührt; ein erneuter Widerspruch nach Abschluss erzeugt einen
+     * neuen offenen Datensatz (R5: Abweichung = Konflikt, keine Unterdrückung).
+     *
      * @param  array<string, mixed>  $details
+     * @return bool true, wenn ein neuer offener Konflikt angelegt wurde
      */
-    private function openOrderConflict(CrmAccount $account, ?int $importId, array $details): void
+    private function openOrderConflict(CrmAccount $account, ?int $importId, array $details): bool
     {
+        // Account ist in supplementMissing bereits gesperrt; erneutes lockForUpdate
+        // ist in derselben Transaktion idempotent und absichert Direktaufrufe.
+        CrmAccount::query()->whereKey($account->id)->lockForUpdate()->firstOrFail();
+
+        $open = CrmConflict::query()
+            ->where('crm_account_id', $account->id)
+            ->where('type', CrmConflictType::OrderMeridianMismatch)
+            ->where('status', 'open')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($open as $conflict) {
+            if ($this->sameOpenOrderMeridianIdentity($conflict->details ?? [], $details)) {
+                return false;
+            }
+        }
+
         CrmConflict::query()->create([
             'crm_account_id' => $account->id,
             'crm_import_id' => $importId,
@@ -368,19 +447,20 @@ final class CrmMeridianSupplementService
             'status' => 'open',
             'details' => $details,
         ]);
+
+        return true;
     }
 
     /**
-     * @return list<int>
+     * @param  array<string, mixed>  $existing
+     * @param  array<string, mixed>  $incoming
      */
-    private function identityAccountIds(CrmAccount $account): array
+    private function sameOpenOrderMeridianIdentity(array $existing, array $incoming): bool
     {
-        $ids = [$account->id];
-        $merged = CrmAccount::query()
-            ->where('merged_into_account_id', $account->id)
-            ->pluck('id')
-            ->all();
-
-        return array_values(array_unique(array_merge($ids, array_map('intval', $merged))));
+        return (string) ($existing['entity'] ?? '') === (string) ($incoming['entity'] ?? '')
+            && (int) ($existing['entity_id'] ?? 0) === (int) ($incoming['entity_id'] ?? 0)
+            && (string) ($existing['field'] ?? '') === (string) ($incoming['field'] ?? '')
+            && (string) ($existing['existing'] ?? '') === (string) ($incoming['existing'] ?? '')
+            && (string) ($existing['incoming'] ?? '') === (string) ($incoming['incoming'] ?? '');
     }
 }

@@ -54,7 +54,7 @@ try {
     $actor = User::query()->findOrFail((int) $data['actor_id']);
 
     $linked = $app->make(CrmAccountService::class)
-        ->linkProvisionalToSalesforce($provisional, $salesforce, $actor);
+        ->linkProvisionalToSalesforce($provisional, $salesforce, $actor)['account'];
 
     file_put_contents($resultFile, 'OK:'.$linked->id);
 } catch (ValidationException $exception) {
