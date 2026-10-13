@@ -22,7 +22,12 @@ final class CrmMeridianSupplementService
     ) {}
 
     /**
-     * @return array{calculations: int, dispo_orders: int, conflicts: int}
+     * @return array{
+     *     calculations: int,
+     *     dispo_orders: int,
+     *     conflicts: int,
+     *     conflicts_created: int
+     * }
      */
     public function supplementMissing(
         CrmAccount $account,
@@ -32,7 +37,12 @@ final class CrmMeridianSupplementService
     ): array {
         $meridianNumber = trim($meridianNumber);
         if ($meridianNumber === '') {
-            return ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
+            return [
+                'calculations' => 0,
+                'dispo_orders' => 0,
+                'conflicts' => 0,
+                'conflicts_created' => 0,
+            ];
         }
 
         $accountIds = $this->identityAccountIds($account);
@@ -40,6 +50,7 @@ final class CrmMeridianSupplementService
         $calcUpdated = 0;
         $dispoUpdated = 0;
         $conflicts = 0;
+        $conflictsCreated = 0;
 
         DB::transaction(function () use (
             $account,
@@ -51,6 +62,7 @@ final class CrmMeridianSupplementService
             &$calcUpdated,
             &$dispoUpdated,
             &$conflicts,
+            &$conflictsCreated,
         ): void {
             $calcRows = DB::table('calculations')
                 ->where(function ($q) use ($accountIds): void {
@@ -79,13 +91,15 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($account, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
                             'existing' => $row->customer_meridian_number,
                             'incoming' => $meridianNumber,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['customer_meridian_number'] = $meridianUpdate;
                     }
@@ -102,13 +116,15 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($account, $importId, [
                             'entity' => 'calculation',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
                             'existing' => $row->agency_meridian_number,
                             'incoming' => $meridianNumber,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['agency_meridian_number'] = $meridianUpdate;
                     }
@@ -165,14 +181,16 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($account, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'customer_meridian_number',
                             'existing' => $row->customer_meridian_number,
                             'incoming' => $meridianNumber,
                             'order_status' => $row->status,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['customer_meridian_number'] = $meridianUpdate;
                     }
@@ -189,14 +207,16 @@ final class CrmMeridianSupplementService
                     );
                     if ($conflicted) {
                         $sideConflicts++;
-                        $this->openOrderConflict($account, $importId, [
+                        if ($this->openOrderConflict($account, $importId, [
                             'entity' => 'dispo_order',
                             'entity_id' => (int) $row->id,
                             'field' => 'agency_meridian_number',
                             'existing' => $row->agency_meridian_number,
                             'incoming' => $meridianNumber,
                             'order_status' => $row->status,
-                        ]);
+                        ])) {
+                            $conflictsCreated++;
+                        }
                     } elseif ($meridianUpdate !== null) {
                         $updates['agency_meridian_number'] = $meridianUpdate;
                     }
@@ -230,7 +250,10 @@ final class CrmMeridianSupplementService
         return [
             'calculations' => $calcUpdated,
             'dispo_orders' => $dispoUpdated,
+            // Erkannte Widersprüche (fachlich), unabhängig von Doppelaufrufen.
             'conflicts' => $conflicts,
+            // Neu angelegte offene Konfliktdatensätze (idempotent).
+            'conflicts_created' => $conflictsCreated,
         ];
     }
 
@@ -357,10 +380,40 @@ final class CrmMeridianSupplementService
     }
 
     /**
+     * Öffnet einen Auftrags-Meridian-Konflikt idempotent.
+     *
+     * Fachliche Identität (offen): Account, Vorgangstyp, Vorgang, Seite (Feld),
+     * bestehende und eingehende Meridian. Import-ID und Auftragsstatus allein
+     * vervielfachen denselben offenen Widerspruch nicht. Abgeschlossene Konflikte
+     * bleiben unberührt; ein erneuter Widerspruch nach Abschluss erzeugt einen
+     * neuen offenen Datensatz (R5: Abweichung = Konflikt, keine Unterdrückung).
+     *
      * @param  array<string, mixed>  $details
+     * @return bool true, wenn ein neuer offener Konflikt angelegt wurde
      */
-    private function openOrderConflict(CrmAccount $account, ?int $importId, array $details): void
+    private function openOrderConflict(CrmAccount $account, ?int $importId, array $details): bool
     {
+        // Account-Zeile sperren: auch ohne bestehende Konflikte serialisiert das
+        // parallele openOrderConflict-Aufrufe für denselben Account (Gap ohne Rows).
+        CrmAccount::query()->whereKey($account->id)->lockForUpdate()->firstOrFail();
+
+        $open = CrmConflict::query()
+            ->where('crm_account_id', $account->id)
+            ->where('type', CrmConflictType::OrderMeridianMismatch)
+            ->where('status', 'open')
+            ->lockForUpdate()
+            ->orderBy('id')
+            ->get();
+
+        foreach ($open as $conflict) {
+            if ($this->sameOpenOrderMeridianIdentity(
+                is_array($conflict->details) ? $conflict->details : [],
+                $details,
+            )) {
+                return false;
+            }
+        }
+
         CrmConflict::query()->create([
             'crm_account_id' => $account->id,
             'crm_import_id' => $importId,
@@ -368,6 +421,21 @@ final class CrmMeridianSupplementService
             'status' => 'open',
             'details' => $details,
         ]);
+
+        return true;
+    }
+
+    /**
+     * @param  array<string, mixed>  $existing
+     * @param  array<string, mixed>  $incoming
+     */
+    private function sameOpenOrderMeridianIdentity(array $existing, array $incoming): bool
+    {
+        return (string) ($existing['entity'] ?? '') === (string) ($incoming['entity'] ?? '')
+            && (int) ($existing['entity_id'] ?? 0) === (int) ($incoming['entity_id'] ?? 0)
+            && (string) ($existing['field'] ?? '') === (string) ($incoming['field'] ?? '')
+            && (string) ($existing['existing'] ?? '') === (string) ($incoming['existing'] ?? '')
+            && (string) ($existing['incoming'] ?? '') === (string) ($incoming['incoming'] ?? '');
     }
 
     /**

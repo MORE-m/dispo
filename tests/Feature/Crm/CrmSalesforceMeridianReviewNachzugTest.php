@@ -508,8 +508,13 @@ final class CrmSalesforceMeridianReviewNachzugTest extends TestCase
 
         $calc->refresh();
         $this->assertSame('M-OTHER', $calc->customer_meridian_number);
-        $this->assertTrue(
-            CrmConflict::query()->where('type', CrmConflictType::OrderMeridianMismatch)->exists(),
+        $this->assertSame(
+            1,
+            CrmConflict::query()
+                ->where('type', CrmConflictType::OrderMeridianMismatch)
+                ->where('status', 'open')
+                ->count(),
+            'Ein Apply darf genau einen offenen order_meridian_mismatch anlegen.',
         );
     }
 

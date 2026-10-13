@@ -182,15 +182,26 @@ final class CrmImportService
             }
 
             $reportRows = [];
-            $supplements = ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
+            $supplements = [
+                'calculations' => 0,
+                'dispo_orders' => 0,
+                'conflicts' => 0,
+                'conflicts_created' => 0,
+            ];
+            /** @var array<int, true> Account-IDs, für die in diesem Apply bereits nachgetragen wurde */
+            $meridianSupplementDone = [];
 
             foreach ($preview['actions'] as $action) {
                 $result = $this->applyAction($action, $actor, $import->id);
                 $reportRows[] = $result;
+                if (isset($result['account_id'])) {
+                    $meridianSupplementDone[(int) $result['account_id']] = true;
+                }
                 if (isset($result['supplement'])) {
                     $supplements['calculations'] += $result['supplement']['calculations'];
                     $supplements['dispo_orders'] += $result['supplement']['dispo_orders'];
                     $supplements['conflicts'] += $result['supplement']['conflicts'] ?? 0;
+                    $supplements['conflicts_created'] += $result['supplement']['conflicts_created'] ?? 0;
                 }
             }
 
@@ -199,39 +210,49 @@ final class CrmImportService
                 if (($match['mode'] ?? null) !== 'auto' || empty($match['linked_account_id'])) {
                     continue;
                 }
+                $linkedId = (int) $match['linked_account_id'];
+                if (isset($meridianSupplementDone[$linkedId])) {
+                    continue;
+                }
                 $linked = CrmAccount::query()
                     ->with('currentVersion')
-                    ->whereKey((int) $match['linked_account_id'])
+                    ->whereKey($linkedId)
                     ->first();
                 $meridian = $linked?->currentVersion?->meridian_number;
                 if ($linked !== null && $meridian !== null && $meridian !== '') {
                     $extra = $this->meridian->supplementMissing($linked, $meridian, $actor, $import->id);
+                    $meridianSupplementDone[$linkedId] = true;
                     $supplements['calculations'] += $extra['calculations'];
                     $supplements['dispo_orders'] += $extra['dispo_orders'];
                     $supplements['conflicts'] += $extra['conflicts'];
+                    $supplements['conflicts_created'] += $extra['conflicts_created'];
                 } elseif ($linked !== null) {
                     $sf = $this->meridian->supplementSalesforceIds($linked, $actor, $import->id);
+                    $meridianSupplementDone[$linkedId] = true;
                     $supplements['calculations'] += $sf['calculations'];
                     $supplements['dispo_orders'] += $sf['dispo_orders'];
                 }
             }
 
-            // Folgeimport: fehlende Nachträge auch bei unveränderten Stammdaten nachholen.
+            // Folgeimport: Nachtrag nur für Accounts, die in diesem Apply noch nicht
+            // über applyAction/Auto-Match nachgetragen wurden (kein Doppelaufruf).
             foreach ($preview['actions'] as $action) {
                 $account = CrmAccount::query()
                     ->with('currentVersion')
                     ->where('salesforce_account_id_canonical', $action['salesforce']['canonical'])
                     ->whereNull('merged_into_account_id')
                     ->first();
-                if ($account === null) {
+                if ($account === null || isset($meridianSupplementDone[$account->id])) {
                     continue;
                 }
                 $number = $account->currentVersion?->meridian_number;
                 if ($number !== null && $number !== '') {
                     $extra = $this->meridian->supplementMissing($account, $number, $actor, $import->id);
+                    $meridianSupplementDone[$account->id] = true;
                     $supplements['calculations'] += $extra['calculations'];
                     $supplements['dispo_orders'] += $extra['dispo_orders'];
                     $supplements['conflicts'] += $extra['conflicts'];
+                    $supplements['conflicts_created'] += $extra['conflicts_created'];
                 }
             }
 
@@ -693,7 +714,12 @@ final class CrmImportService
             $importId,
         );
 
-        $supplement = ['calculations' => 0, 'dispo_orders' => 0, 'conflicts' => 0];
+        $supplement = [
+            'calculations' => 0,
+            'dispo_orders' => 0,
+            'conflicts' => 0,
+            'conflicts_created' => 0,
+        ];
         $account->loadMissing('currentVersion');
         $newMeridian = $account->currentVersion?->meridian_number;
         if ($newMeridian !== null && $newMeridian !== '') {
