@@ -71,6 +71,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md`](readiness/audit-8-inventar-kalkulierbarkeit-smoke-2026-10-02.md) | Readiness empfohlener 8-Inventar-Smoke |
 | [`readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md`](readiness/BL-P9-02d-approval-mails-outbox-2026-10-04.md) | Readiness Freigabe-Mails Outbox/SMTP (PO-APPROVAL-NOTIFY-1) |
 | [`entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md`](entscheidungen/PO-AUTH-RIGHTS-1-rechtekonflikte-entscheidungsvorlage.md) | PO-Entscheidung Rechtekonflikte A–D |
+| [`reviews/local-admin-setup-readiness/`](reviews/local-admin-setup-readiness/) | Einrichtung und anschließender Calc→Dispo-Smoke in `dispo_mat_core` (keine Fachabnahme, kein Deploy) |
+| [`readiness/local-admin-setup-readiness-2026-10-13.md`](readiness/local-admin-setup-readiness-2026-10-13.md) | Lokale Datenbereitschaft plus Smoke-Soll/Ist (Katalog, Preise, Salesforce) |
 
 ## Pflegeprozess
 
