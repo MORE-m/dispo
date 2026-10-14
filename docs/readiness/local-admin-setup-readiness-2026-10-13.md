@@ -42,4 +42,14 @@ Preise vor dem Preview: Radio Hamburg Ø 40,0000 €/s (56+43+31+30), ROCK Ø 14
 
 Zweiter Save ohne Reload hat bei Kalkulation 2 und 3 keine zusätzlichen Accounts erzeugt. Dispo-Snapshots bleiben nach Mengenänderung, Agentur-Lösen und AE-Aktivierung auf dem jeweiligen früheren Stand.
 
-Offen und nicht Teil dieses Smokes: `max_allowed_packet` derzeit nur temporär 16 MiB, nach einem MySQL-Neustart wieder 1 MiB; der CRM-Importhinweis nennt weiter nicht alle vier erlaubten Salesforce-Typen. Fachabnahme, andere Umgebungen und Deploy bleiben offen. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` bleiben teilweise. `CRM-004` bleibt offen.
+Zum Smoke-Zeitpunkt offen und nicht Teil dieses Smokes: `max_allowed_packet` nur temporär 16 MiB; der CRM-Importhinweis nannte nicht alle vier erlaubten Salesforce-Typen. Beides ist der getrennte Nachzug unten. Fachabnahme, andere Umgebungen und Deploy bleiben offen. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` bleiben teilweise. `CRM-004` bleibt offen.
+
+## Nachzug 14. Oktober 2026
+
+Zwei getrennte Punkte auf Basis `a1bfadac0243ab487f27ac824c70efc193174f28`.
+
+Lokale Betriebskonfiguration, nicht im Git: In `[mysqld]` der wirksamen XAMPP-Datei steht `max_allowed_packet=16M`. Nach Neustart nur dieser MariaDB und über eine neue Verbindung sind Global- und Sessionwert 16777216. Bestand danach unverändert, Fingerprints wie oben. Port 8000 hat Login und Katalog geliefert, ohne Neustart von Apache oder dem Appserver. Sicherung nur als Verweis: `local-backups/mysql-max-allowed-packet-20261014/`. Keine weitere MySQL-Einstellung, kein Dump, kein Restore.
+
+Produktnachzug, Branch `fix/crm-import-record-type-help`, vor Merge Draft-PR und nicht auf `main`: der Seitenhinweis nennt Account KUNDE, Account GESELLSCHAFTER, Account SONSTIGE und Account AGENTUR. KUNDE, GESELLSCHAFTER und SONSTIGE intern Kunde, AGENTUR intern Agentur, unbekannte Typen blockieren den Import. CSV, UTF-8, Semikolon und Pflichtspalten bleiben. Parser, Typmapping, Matching, Versionierung und Importverhalten sind unverändert.
+
+Die Ursache des früheren Leerstands bleibt unbekannt. Fachabnahme, Deploy und die Elternpakete sind nicht erledigt.

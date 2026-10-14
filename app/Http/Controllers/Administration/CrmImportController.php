@@ -27,7 +27,7 @@ class CrmImportController extends Controller
         return Inertia::render('administration/crm/import', [
             'notes' => [
                 'format' => 'UTF-8 CSV, Semikolon; Spalten Accountname, Meridian-ID, Account-ID, Rechnungs-E-Mail, Account-Datensatztyp',
-                'types' => 'Account KUNDE / Account AGENTUR',
+                'types' => 'Erlaubte Exportwerte: Account KUNDE, Account GESELLSCHAFTER, Account SONSTIGE, Account AGENTUR. KUNDE, GESELLSCHAFTER und SONSTIGE werden intern als Kunde behandelt, AGENTUR intern als Agentur. Andere unbekannte Datensatztypen blockieren den Import.',
                 'addresses' => 'Keine Adressspalten in diesem Export – Adressen werden nicht erfunden oder geleert.',
             ],
         ]);

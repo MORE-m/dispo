@@ -251,6 +251,21 @@ final class CrmRecordTypeMappingBlP203aTest extends TestCase
     }
 
     #[Test]
+    public function import_page_names_all_four_accepted_record_types(): void
+    {
+        $admin = User::factory()->role(Role::Admin)->create();
+
+        $this->actingAs($admin)
+            ->get('/administration/crm/import')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('administration/crm/import')
+                ->where('notes.format', 'UTF-8 CSV, Semikolon; Spalten Accountname, Meridian-ID, Account-ID, Rechnungs-E-Mail, Account-Datensatztyp')
+                ->where('notes.types', 'Erlaubte Exportwerte: Account KUNDE, Account GESELLSCHAFTER, Account SONSTIGE, Account AGENTUR. KUNDE, GESELLSCHAFTER und SONSTIGE werden intern als Kunde behandelt, AGENTUR intern als Agentur. Andere unbekannte Datensatztypen blockieren den Import.')
+                ->where('notes.addresses', 'Keine Adressspalten in diesem Export – Adressen werden nicht erfunden oder geleert.'));
+    }
+
+    #[Test]
     public function provisional_versions_have_null_salesforce_record_type(): void
     {
         $sales = User::factory()->role(Role::Sales)->create();

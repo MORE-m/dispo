@@ -9,7 +9,7 @@ Worktree: `docs/local-admin-setup-readiness` / `dispo-wt-docs-local-admin-setup-
 Geprüfte DB: lokale MySQL **`dispo_mat_core`** @ `127.0.0.1:3306`
 Admin-UI: Separatserver `http://127.0.0.1:8073` (danach beendet). Port **8000**, `.env` von `dispo-main` und bestehende Worktrees unberührt.
 
-Code auf `main` bleibt umgesetzt. Abschnitte 1–7 halten den Stand **vor** der Neueinrichtung fest. Abschnitt 8 ist die Einrichtung, Abschnitt 9 der Smoke. Die Ursache des damaligen Leerstands ist weiterhin unbekannt und gilt nicht als behoben. Historische Dumps wurden nicht zurückgespielt.
+Code auf `main` bleibt umgesetzt. Abschnitte 1–7 halten den Stand **vor** der Neueinrichtung fest. Abschnitt 8 ist die Einrichtung, Abschnitt 9 der Smoke. Abschnitt 10 ist der getrennte Nachzug vom 14. Oktober 2026. Die Ursache des damaligen Leerstands ist weiterhin unbekannt und gilt nicht als behoben. Historische Dumps wurden nicht zurückgespielt.
 
 ### Abgrenzung
 
@@ -442,6 +442,20 @@ Danach „15 % AE berücksichtigen“. Soll: AE nur auf den Medienrest 3.285,00 
 
 Accounts 3456 = 3454 plus 3455 und 3456. Versionen 3456, davon zwei an den neuen Accounts. Kalkulationen 6, Dispos 6, sämtlich die oben genannten Smoke-Sätze. Fingerprint von Kalkulation 1 und von Account 1–3454 identisch zur Baseline. Keine Mutation der importierten Stammdaten, keine neue Importzeile.
 
-### Offen, unverändert
+### Offen nach dem Smoke
 
-`max_allowed_packet` ist derzeit nur temporär 16 MiB und fällt nach einem MySQL-Neustart auf 1 MiB zurück. Der CRM-Importhinweis nennt weiter nicht alle vier erlaubten Salesforce-Typen. Die Ursache des früheren Leerstands bleibt unbekannt. Fachabnahme, andere Umgebungen und Deploy bleiben offen. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` sind nicht vollständig. `CRM-004` bleibt offen. Die Smoke-Daten bleiben in `dispo_mat_core`.
+Zum Smoke-Zeitpunkt war `max_allowed_packet` nur temporär 16 MiB, und der CRM-Importhinweis nannte nicht alle vier Salesforce-Typen. Beides steht in Abschnitt 10. Die Ursache des früheren Leerstands bleibt unbekannt. Fachabnahme, andere Umgebungen und Deploy bleiben offen. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` sind nicht vollständig. `CRM-004` bleibt offen. Die Smoke-Daten bleiben in `dispo_mat_core`.
+
+## 10. Nachzug 14. Oktober 2026
+
+Basis `origin/main` @ `a1bfadac0243ab487f27ac824c70efc193174f28`, PR #140, Post-Merge-CI `38469887057` SUCCESS. Zwei getrennte Punkte. Kein Deploy, keine operative Datenpflege.
+
+### Lokale MySQL-Konfiguration
+
+Nicht im Git. Wirksame Datei der lokalen XAMPP-MariaDB 10.4.28, Datadir `/Applications/XAMPP/xamppfiles/var/mysql/`, Port 3306. In `[mysqld]` steht `max_allowed_packet=16M`. `[mysqldump]` bleibt unverändert. Sicherung nur als Verweis: `local-backups/mysql-max-allowed-packet-20261014/`.
+
+Nach Neustart nur dieser Instanz, nicht des XAMPP-Stacks und nicht des Servers auf Port 8000: gleiche Datenbank, Log-Sequence fortgesetzt, Fingerprints von Kalkulation 1 und Accounts 1–3454 identisch zur Baseline in Abschnitt 9. Zählung unverändert: 18 Datenbanken, 6 Kalkulationen, 6 Dispos, 3456 Accounts, 14 Inventare, 62 Migrationen, 8 Spotlisten, 8 Produktionslisten. Globales und Session-`max_allowed_packet` über eine neue Verbindung 16777216. Login und `/administration/katalog` auf Port 8000 danach 200, Appserver weiter PID 3130. `.env` unverändert.
+
+### CRM-Importhinweis
+
+Branch `fix/crm-import-record-type-help`, vor Merge Draft-PR, nicht auf `main`. Der Seitenhinweis nennt die Exportwerte Account KUNDE, Account GESELLSCHAFTER, Account SONSTIGE und Account AGENTUR. KUNDE, GESELLSCHAFTER und SONSTIGE werden intern als Kunde behandelt, AGENTUR intern als Agentur. Andere unbekannte Datensatztypen blockieren den Import. CSV, UTF-8, Semikolon und die Pflichtspalten bleiben. Die Vorschau-Notiz im Import-Service listete die vier Typen bereits und bleibt unverändert. Parser, Typmapping, Matching, Versionierung und Importverhalten sind unverändert.
