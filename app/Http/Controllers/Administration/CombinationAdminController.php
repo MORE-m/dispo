@@ -278,7 +278,26 @@ class CombinationAdminController extends Controller
             'must_not_plan' => InventoryMediumRuleOperativeContract::isMustNotPlan(
                 $rule->planning_responsibility_key,
             ),
+            'show_allonge_confirmation' => $rule->advertisingMedium?->code === 'allonge',
+            'allonge_confirmation_label' => $this->allongeConfirmationLabel(
+                $rule,
+                $rule->advertisingMedium?->code,
+            ),
         ]);
+    }
+
+    private function allongeConfirmationLabel(InventoryMediumRule $rule, ?string $mediumCode): ?string
+    {
+        if ($mediumCode !== 'allonge') {
+            return null;
+        }
+
+        $confirmedAt = $rule->swf_allonge_confirmed_at;
+        if ($confirmedAt === null) {
+            return 'Allonge-Konfiguration nicht bestätigt';
+        }
+
+        return 'Allonge-Konfiguration bestätigt am '.$confirmedAt->timezone(config('app.timezone'))->format('d.m.Y H:i');
     }
 
     /**

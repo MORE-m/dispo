@@ -719,13 +719,19 @@ final class CatalogResolver
      *
      * swf_trailer: Länge UND Aufschlag müssen je Inventar ausdrücklich konfiguriert sein
      * (NULL = nicht konfiguriert, fail-closed; 0 = ausdrücklich 0 %). Kein Fallback auf
-     * Medium-Default oder ein anderes Inventar. Spot Classic: NULL wie bisher als 0.
+     * Medium-Default oder ein anderes Inventar.
+     * swf_allonge: zusätzlich swf_allonge_confirmed_at. Zahlen allein, auch 30/0, genügen nicht.
+     * Spot Classic: NULL wie bisher als 0.
      */
     private function liveSurchargePercent(
         InventoryMediumRule $rule,
         CalculationMethodFreezeDescriptor $freeze,
         Inventory $inventory,
     ): string {
+        if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE) {
+            return $this->liveAllongeSurchargePercent($rule, $inventory);
+        }
+
         if ($freeze->engineProfileKey !== EngineProfileRegistry::PROFILE_SWF_TRAILER) {
             return (string) ($rule->surcharge_percent ?? '0');
         }
@@ -741,6 +747,22 @@ final class CatalogResolver
             throw ValidationException::withMessages([
                 'positions' => "Für {$inventory->name} ist kein Trailer-Aufschlag konfiguriert (0 % ist zulässig, "
                     .'wenn ausdrücklich hinterlegt). Bitte den Aufschlag in der Kombinationstabelle hinterlegen.',
+            ]);
+        }
+
+        return (string) $rule->surcharge_percent;
+    }
+
+    private function liveAllongeSurchargePercent(InventoryMediumRule $rule, Inventory $inventory): string
+    {
+        if ($rule->swf_allonge_confirmed_at === null
+            || $rule->default_length_seconds === null
+            || $rule->surcharge_percent === null
+        ) {
+            throw ValidationException::withMessages([
+                'positions' => "Für {$inventory->name} ist die Allonge-Konfiguration nicht bestätigt. "
+                    .'Bitte Default-Länge und Aufschlag in der Kombination speichern. '
+                    .'0 % ist zulässig, wenn der Aufschlag ausdrücklich hinterlegt und gespeichert ist.',
             ]);
         }
 
@@ -1406,6 +1428,12 @@ final class CatalogResolver
         if ($priceList === null) {
             throw ValidationException::withMessages([
                 'budget_wish_inventory_ids' => $this->missingYearPriceListMessage($inventory->name, $year),
+            ]);
+        }
+
+        if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE) {
+            throw ValidationException::withMessages([
+                'budget_wish_inventory_ids' => 'Allonge ist für die Budgetplanung nicht freigegeben.',
             ]);
         }
 

@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
  *
  * Spot Classic ist laut CatalogResolver und ADV-001a-Bestandsmap an die Kategorie „spots“ gebunden.
  * BL-P5-01a: SwfTrailer ist an „special_advertising_formats“ gebunden.
+ * PO-ALLONGE-1: SwfAllonge ebenso, nur das Medium allonge.
  * Weitere Kinds sind eigene spätere Fachslices.
  */
 final class AdvertisingKindCategoryCompatibility
@@ -22,6 +23,7 @@ final class AdvertisingKindCategoryCompatibility
         return match ($kind) {
             CalculationKind::SpotClassic => [CanonicalAdvertisingCategories::SPOTS],
             CalculationKind::SwfTrailer => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
+            CalculationKind::SwfAllonge => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
         };
     }
 

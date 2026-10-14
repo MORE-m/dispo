@@ -245,6 +245,12 @@ der Trailerkalkulation dürfen konfigurierte Standardlängen und gruppierte
 Zeitschienen verwenden. Premium-, Tages-, Abend- und Wochenend-Trailer werden aus
 Tagesgruppe und Uhrzeit abgeleitet und nicht als eigene Werbemittel gespeichert.
 
+**PO-ALLONGE-1:** Das SWF-Medium Allonge rechnet wie der Trailer ohne Spotlängenindex:
+Anzahl × Ø-Sekundenpreis × gewählte Positionslänge × (1 + Admin-Aufschlag / 100).
+Der Aufschlag kommt nur aus der bestätigten Inventar-Kombination. Eine Nutzerlänge
+allein schaltet eine unbestätigte Kombination nicht frei. Das ist nicht die
+Spot-Allonge-Komponente. Startwerte bleiben offen. `BL-P5-01` bleibt teilweise.
+
 ## Online Audio und Podcast
 
 ```text

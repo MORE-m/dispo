@@ -202,6 +202,51 @@ describe('resolveComponentsAfterMediumChange (Trailer)', () => {
         expect(result.length_seconds).toBe(15);
         expect(result.components).toEqual([]);
     });
+
+    it('räumt beim Wechsel auf Allonge Komponenten ab und nimmt die Regel-Länge', () => {
+        const allongeCatalog: TrailerMediumChangeCatalog = {
+            media: [
+                ...catalog.media,
+                {
+                    id: 4,
+                    kind: 'swf_allonge',
+                    default_length_seconds: 30,
+                    component_profile: null,
+                },
+            ],
+            rules: [
+                ...catalog.rules,
+                {
+                    inventory_id: 10,
+                    advertising_medium_id: 4,
+                    default_length_seconds: 10,
+                    component_calculation_strategy: null,
+                },
+            ],
+        };
+        const stash = new Map<string, ComponentStashEntry>();
+        const result = resolveComponentsAfterMediumChange(
+            {
+                client_key: 'p1',
+                inventory_id: 10,
+                advertising_medium_id: 1,
+                length_seconds: 30,
+                components: spotComponents,
+                component_calculation_strategy: 'shared_total_length',
+            },
+            4,
+            allongeCatalog,
+            profiles,
+            stash,
+        );
+
+        expect(result.components).toEqual([]);
+        expect(result.strategy).toBeNull();
+        expect(result.length_seconds).toBe(10);
+        expect(shouldClearTrailerSettlementForTargetMedium(allongeCatalog, 4)).toBe(
+            true,
+        );
+    });
 });
 
 describe('trailerLengthFromRule / trailerSettlementReset', () => {

@@ -71,6 +71,19 @@ class AdvertisingMediumFactory extends Factory
     /**
      * BL-P5-01a: weiteres SWF-Medium ohne Berechnungsart (kind=null → nicht buchbar).
      */
+    /**
+     * PO-ALLONGE-1: Allonge (kind=swf_allonge). Override-Zuordnung legt der Katalog-Helper an.
+     */
+    public function swfAllonge(): static
+    {
+        return $this->state(fn (): array => [
+            'category_id' => fn (): int => $this->categoryId(CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS),
+            'kind' => CalculationKind::SwfAllonge,
+            'name' => 'Allonge',
+            'code' => 'allonge',
+        ]);
+    }
+
     public function swfWithoutKind(string $name = 'Preseller', string $code = 'preseller'): static
     {
         return $this->state(fn (): array => [

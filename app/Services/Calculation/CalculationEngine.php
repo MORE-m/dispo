@@ -166,6 +166,15 @@ final class CalculationEngine
             );
         }
 
+        if ($position->isSwfAllonge()
+            && ($position->spotMethod !== SpotCalculationMethod::Average
+                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
+        ) {
+            throw new \InvalidArgumentException(
+                'Allonge unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-ALLONGE-1).',
+            );
+        }
+
         return match ($position->spotMethod) {
             SpotCalculationMethod::Average => $this->calculateAveragePosition(
                 $position,
@@ -433,11 +442,11 @@ final class CalculationEngine
     }
 
     /**
-     * SPT-009 Spotlängenindex nur für Spot Classic. swf_trailer: nie Index, immer 100.
+     * SPT-009 Spotlängenindex nur für Spot Classic. swf_trailer und swf_allonge: nie Index, immer 100.
      */
     private function lengthIndexFor(PositionInput $position, int $lengthSeconds): int
     {
-        if ($position->isSwfTrailer()) {
+        if ($position->usesAverageLengthWithoutIndex()) {
             return self::NO_LENGTH_INDEX;
         }
 
@@ -555,7 +564,7 @@ final class CalculationEngine
 
         $components = [];
         foreach ($position->components as $component) {
-            $componentIndex = $position->isSwfTrailer() ? self::NO_LENGTH_INDEX : ($component->lengthIndex ?? SpotLengthIndex::forSeconds($component->lengthSeconds));
+            $componentIndex = $position->usesAverageLengthWithoutIndex() ? self::NO_LENGTH_INDEX : ($component->lengthIndex ?? SpotLengthIndex::forSeconds($component->lengthSeconds));
             $components[] = [
                 'role' => $component->role->value,
                 'label' => $component->label,

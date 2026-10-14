@@ -59,15 +59,20 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $categoryKey = AdvertisingCategory::query()->whereKey($medium->category_id)->value('key');
             $this->assertSame($definition['category_key'], $categoryKey);
             $this->assertSame($definition['kind']?->value, $medium->kind?->value);
-            $this->assertSame(CalculationMethodMode::Inherit, $medium->calculation_method_mode);
-            $this->assertNull($medium->default_calculation_method_id);
+            if ($definition['code'] === 'allonge') {
+                $this->assertSame(CalculationMethodMode::Override, $medium->calculation_method_mode);
+                $this->assertNotNull($medium->default_calculation_method_id);
+            } else {
+                $this->assertSame(CalculationMethodMode::Inherit, $medium->calculation_method_mode);
+                $this->assertNull($medium->default_calculation_method_id);
+            }
             $this->assertSame(30, $medium->default_length_seconds);
             $this->assertSame($definition['is_discountable'], $medium->is_discountable);
             $this->assertSame($definition['is_ae_eligible'], $medium->is_ae_eligible);
             $this->assertSame($definition['component_profile']?->value, $medium->component_profile?->value);
             $this->assertTrue($medium->is_active);
             $this->assertSame(
-                0,
+                $definition['code'] === 'allonge' ? 1 : 0,
                 AdvertisingMediumCalculationMethod::query()
                     ->where('advertising_medium_id', $medium->id)
                     ->count(),

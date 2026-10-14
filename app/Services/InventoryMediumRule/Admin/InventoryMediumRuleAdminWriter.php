@@ -111,6 +111,7 @@ final class InventoryMediumRuleAdminWriter
 
             $before = $this->auditPayload($locked);
             $this->applyWritableFields($locked, $fields);
+            $this->applyAllongeConfirmation($locked, $locked->advertisingMedium()->first());
 
             if ($this->auditPayload($locked) === $before) {
                 return $locked->loadMissing(['inventory', 'advertisingMedium.category']);
@@ -269,9 +270,10 @@ final class InventoryMediumRuleAdminWriter
             ]);
         }
 
-        // BL-P5-01a: NULL = nicht konfiguriert (Trailer fail-closed), 0 = ausdrücklich 0 %.
-        // Fehlendes Feld: Trailer → NULL (nie still 0), übrige Medien → 0 wie bisher.
-        $isTrailer = $medium?->kind === CalculationKind::SwfTrailer;
+        // BL-P5-01a / PO-ALLONGE-1: NULL = nicht konfiguriert, 0 = ausdrücklich 0 %.
+        // Fehlendes Feld: Trailer und Allonge → NULL (nie still 0), übrige Medien → 0 wie bisher.
+        $isTrailer = $medium?->kind === CalculationKind::SwfTrailer
+            || $medium?->kind === CalculationKind::SwfAllonge;
         if (array_key_exists('surcharge_percent', $payload)) {
             $surchargeRaw = $payload['surcharge_percent'];
             $surcharge = $surchargeRaw === null || (is_string($surchargeRaw) && trim($surchargeRaw) === '')
@@ -338,6 +340,29 @@ final class InventoryMediumRuleAdminWriter
         $rule->is_discountable = $fields['is_discountable'];
         $rule->is_ae_eligible = $fields['is_ae_eligible'];
         $rule->component_calculation_strategy = $fields['component_calculation_strategy'];
+    }
+
+    /**
+     * PO-ALLONGE-1: nur das Detail-Update bestätigt Allonge. Der Zeitpunkt kommt
+     * nie aus dem Client. Andere Medien lassen die Spalte unberührt.
+     * Gültige Länge und gesetzter Aufschlag (einschließlich 0) bestätigen;
+     * fehlt eines von beiden, wird nur der Zeitpunkt geleert.
+     */
+    private function applyAllongeConfirmation(InventoryMediumRule $rule, ?AdvertisingMedium $medium): void
+    {
+        if ($medium?->kind !== CalculationKind::SwfAllonge) {
+            return;
+        }
+
+        $length = $rule->default_length_seconds;
+        $surcharge = $rule->surcharge_percent;
+        $complete = $length !== null
+            && $length >= 1
+            && $length <= 3600
+            && $surcharge !== null
+            && $surcharge !== '';
+
+        $rule->swf_allonge_confirmed_at = $complete ? now() : null;
     }
 
     private function assertActiveInventory(int $id): Inventory
@@ -408,6 +433,7 @@ final class InventoryMediumRuleAdminWriter
             'is_ae_eligible' => (bool) $rule->is_ae_eligible,
             'component_calculation_strategy' => $rule->component_calculation_strategy->value,
             'lock_version' => (int) $rule->lock_version,
+            'swf_allonge_confirmed_at' => $rule->swf_allonge_confirmed_at?->toIso8601String(),
         ];
     }
 

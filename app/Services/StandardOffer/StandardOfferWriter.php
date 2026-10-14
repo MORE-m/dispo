@@ -26,6 +26,7 @@ final class StandardOfferWriter
     public function __construct(
         private readonly StandardOfferNumberSequencer $offerNumbers,
         private readonly StandardOfferAverageContract $averageContract,
+        private readonly StandardOfferSpotClassicBoundary $spotClassicBoundary,
         private readonly StandardOfferFromCalculationSanitizer $fromCalculation,
         private readonly StandardOfferMaterializer $materializer,
         private readonly FrozenCalculationPersistenceContract $frozenPersistence,
@@ -42,6 +43,7 @@ final class StandardOfferWriter
         $title = $this->assertTitle($title);
         $payload = $this->averageContract->normalizeDraftPayload($draftPayload);
         $this->fromCalculation->assertNoCustomerLeak($payload);
+        $this->spotClassicBoundary->assertDraftPayload($payload);
         $this->assertResolvable($payload, $user);
 
         return DB::transaction(function () use ($title, $payload, $user): StandardOffer {
@@ -77,9 +79,11 @@ final class StandardOfferWriter
      */
     public function createFromCalculation(Calculation $calculation, User $user): StandardOffer
     {
+        $this->spotClassicBoundary->assertSourceCalculation($calculation);
         $payload = $this->calculations->payloadFromCalculation($calculation);
         $sanitized = $this->fromCalculation->sanitize($calculation, $payload);
         $sanitized['draft_payload'] = $this->rebindLiveSchemaFingerprints($sanitized['draft_payload']);
+        $this->spotClassicBoundary->assertDraftPayload($sanitized['draft_payload']);
         $this->assertResolvable($sanitized['draft_payload'], $user);
 
         return DB::transaction(function () use ($calculation, $sanitized, $user): StandardOffer {
@@ -129,6 +133,7 @@ final class StandardOfferWriter
         $title = $this->assertTitle($title);
         $payload = $this->averageContract->normalizeDraftPayload($draftPayload);
         $this->fromCalculation->assertNoCustomerLeak($payload);
+        $this->spotClassicBoundary->assertDraftPayload($payload);
         $this->assertResolvable($payload, $user);
 
         return DB::transaction(function () use ($version, $title, $payload, $expectedLockVersion, $user): StandardOfferVersion {
@@ -269,6 +274,7 @@ final class StandardOfferWriter
             $this->assertProposalReviewReadyForPublish($locked);
             $payload = $this->averageContract->normalizeDraftPayload($locked->draft_payload ?? []);
             $this->fromCalculation->assertNoCustomerLeak($payload);
+            $this->spotClassicBoundary->assertDraftPayload($payload);
             $frozen = $this->materializer->freeze($payload, $user);
 
             $previousPublished = StandardOfferVersion::query()

@@ -21,6 +21,12 @@ import {
 
 export const SWF_TRAILER_KIND = 'swf_trailer';
 
+export const SWF_ALLONGE_KIND = 'swf_allonge';
+
+export function isSwfLengthKind(kind: string | null | undefined): boolean {
+    return kind === SWF_TRAILER_KIND || kind === SWF_ALLONGE_KIND;
+}
+
 export type TrailerComponentProfiles = Record<
     SpotComponentProfile,
     { label: string; slots: ProfileSlot[] }
@@ -62,6 +68,25 @@ export function isSwfTrailerMedium(
     return (
         catalog.media.find((item) => item.id === mediumId)?.kind ===
         SWF_TRAILER_KIND
+    );
+}
+
+export function isSwfAllongeMedium(
+    catalog: TrailerMediumChangeCatalog,
+    mediumId: number,
+): boolean {
+    return (
+        catalog.media.find((item) => item.id === mediumId)?.kind ===
+        SWF_ALLONGE_KIND
+    );
+}
+
+export function isSwfLengthMedium(
+    catalog: TrailerMediumChangeCatalog,
+    mediumId: number,
+): boolean {
+    return isSwfLengthKind(
+        catalog.media.find((item) => item.id === mediumId)?.kind,
     );
 }
 
@@ -144,7 +169,7 @@ export function resolveComponentsAfterMediumChange(
     }
 
     // Trailer: nie Komponenten/Strategie, nie Stash-Restore optionaler Spot-Komponenten.
-    if (medium.kind === SWF_TRAILER_KIND) {
+    if (isSwfLengthKind(medium.kind)) {
         return {
             components: [],
             strategy: null,
@@ -171,7 +196,7 @@ export function resolveComponentsAfterMediumChange(
         strategy = 'shared_total_length';
     } else if (
         isForcedProfile(oldProfile) ||
-        isSwfTrailerMedium(catalog, item.advertising_medium_id)
+        isSwfLengthMedium(catalog, item.advertising_medium_id)
     ) {
         // Rückwechsel von Tandem/Tridem oder Trailer → optionaler Spot: Stash wiederherstellen.
         const stashed = stash.get(componentStashKey(item.client_key, null));
@@ -217,5 +242,5 @@ export function shouldClearTrailerSettlementForTargetMedium(
         return false;
     }
 
-    return isSwfTrailerMedium(catalog, targetMediumId);
+    return isSwfLengthMedium(catalog, targetMediumId);
 }

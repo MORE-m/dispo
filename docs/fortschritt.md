@@ -1,6 +1,14 @@
 # Fortschritt V1
 
-Stand: 14. Oktober 2026 – zwei getrennte Nachzüge auf Basis `origin/main` @ `a1bfadac0243ab487f27ac824c70efc193174f28` (PR #140, Post-Merge-CI `38469887057` SUCCESS).
+Stand: 14. Oktober 2026 – Branch `feat/swf-allonge-average`. SWF-Medium Allonge × Durchschnitt
+gemäß PO-ALLONGE-1 ist auf diesem Branch umgesetzt, nicht gemergt und nicht deployed.
+Review-Nachzug: Standardangebote lehnen Allonge serverseitig ab; der Wizard-Hinweis
+unterscheidet Live-Pfad und gespeicherten Snapshot. Die Vergleichsbasis wird nach
+erfolgreichem Save aus der Serverantwort übernommen und bleibt vom Preislisten-Pin
+getrennt. Operative Startwerte und die
+Buchbarkeit der vier Sender sind nicht hergestellt. `BL-P5-01` bleibt teilweise.
+
+Stand davor: 14. Oktober 2026 – zwei getrennte Nachzüge auf Basis `origin/main` @ `a1bfadac0243ab487f27ac824c70efc193174f28` (PR #140, Post-Merge-CI `38469887057` SUCCESS).
 Lokaler Betrieb, nicht im Git: `max_allowed_packet` der XAMPP-MariaDB dauerhaft 16 MiB, nach Neustart und neuer Verbindung geprüft. Sicherung nur als Verweis `local-backups/mysql-max-allowed-packet-20261014/`.
 Produkt, dieser Branch `fix/crm-import-record-type-help`, vor Merge Draft-PR: der CRM-Seitenhinweis nennt Account KUNDE, Account GESELLSCHAFTER, Account SONSTIGE und Account AGENTUR. Parser, Mapping und Importverhalten unverändert.
 Die Ursache des früheren Leerstands bleibt unbekannt. Fachabnahme und Deploy bleiben offen. `BL-P2-03`, `BL-P5-01` und `BL-P5-02` bleiben teilweise. `CRM-004` bleibt offen.
