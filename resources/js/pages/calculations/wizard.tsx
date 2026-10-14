@@ -1448,11 +1448,8 @@ export default function CalculationWizard({
 
     useEffect(() => {
         const reloadCatalog = () => {
-            router.reload({
-                only: ['catalog'],
-                preserveState: true,
-                preserveScroll: true,
-            });
+            // reload setzt preserveState bereits. Nur der Katalog wird ersetzt.
+            router.reload({ only: ['catalog'] });
         };
         window.addEventListener('dispo:reload-catalog', reloadCatalog);
 
