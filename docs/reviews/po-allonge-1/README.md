@@ -27,3 +27,12 @@ gespeicherte Position bleibt ohne Sperrmeldung, auch nach Entzug der
 Admin-Bestätigung. Neue Positionen sowie Inventar-, Medium- und
 Preisjahr-Wechsel zeigen die Sperre, solange die Kombination unbestätigt ist.
 Der Snapshot-Pfad prüft die aktuelle Bestätigung nicht erneut.
+
+Nach einem erfolgreichen Save mit `preserveState` übernimmt der Wizard die
+gespeicherte Identität und das gespeicherte Preisjahr aus der Serverantwort
+(`client_key`, sonst Index). Das ist die Vergleichsbasis des Hinweises.
+`original_price_year` und `original_price_list_*` bleiben der Preislisten-Pin
+und die Weg-/Zurück-Auswahl. Ein fehlgeschlagener Save ändert die
+Vergleichsbasis nicht. Ein Katalog-Reload ohne Neuinitialisierung des
+Formulars ist über das Event `dispo:reload-catalog` möglich, ohne sichtbares
+Bedienelement.

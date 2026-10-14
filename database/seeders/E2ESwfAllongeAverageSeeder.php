@@ -29,6 +29,7 @@ use Illuminate\Database\Seeder;
  * Synthetische Werte, keine operativen Startwerte:
  * - Allonge Testsender A: 2,00 €/s · Default 10 s · +30 % · bestätigt
  * - Allonge Testsender Unbestätigt: 2,00 €/s · 30 s / 0 % · nicht bestätigt
+ * - Folgejahr beide Sender: 4,00 €/s, nur für den Preisjahr-Wechsel im Browser
  */
 class E2ESwfAllongeAverageSeeder extends Seeder
 {
@@ -129,6 +130,25 @@ class E2ESwfAllongeAverageSeeder extends Seeder
                         'hour' => $hour,
                         'day_group' => $group,
                         'second_price' => '2.0000',
+                    ]);
+                }
+            }
+
+            $nextList = PriceList::factory()->create([
+                'inventory_id' => $inventory->id,
+                'status' => PriceListStatus::Active,
+                'year' => PriceListCalendar::nextYear(),
+                'version' => 'e2e-allonge-next-'.$row['code'],
+                'valid_from' => now()->toDateString(),
+            ]);
+
+            foreach (range(0, 23) as $hour) {
+                foreach ([DayGroup::MoFr, DayGroup::Sa, DayGroup::So] as $group) {
+                    PriceListItem::factory()->create([
+                        'price_list_id' => $nextList->id,
+                        'hour' => $hour,
+                        'day_group' => $group,
+                        'second_price' => '4.0000',
                     ]);
                 }
             }

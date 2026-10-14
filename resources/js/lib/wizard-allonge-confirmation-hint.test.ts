@@ -26,7 +26,7 @@ describe('allongeConfigurationHint', () => {
             inventory_id: 10,
             advertising_medium_id: 1,
             price_year: 2026,
-            original_price_year: 2026,
+            saved_price_year: null,
         });
 
         expect(hint?.tone).toBe('block');
@@ -38,10 +38,10 @@ describe('allongeConfigurationHint', () => {
             id: 5,
             inventory_id: 10,
             advertising_medium_id: 1,
-            original_inventory_id: 10,
-            original_advertising_medium_id: 1,
-            price_year: 2026,
-            original_price_year: 2026,
+            saved_inventory_id: 10,
+            saved_advertising_medium_id: 1,
+            price_year: 2027,
+            saved_price_year: 2027,
         });
 
         expect(hint?.tone).toBe('snapshot');
@@ -54,24 +54,22 @@ describe('allongeConfigurationHint', () => {
             id: 5,
             inventory_id: 10,
             advertising_medium_id: 1,
-            original_inventory_id: 10,
-            original_advertising_medium_id: 1,
+            saved_inventory_id: 10,
+            saved_advertising_medium_id: 1,
             price_year: 2026,
-            original_price_year: 2026,
+            saved_price_year: 2026,
         };
 
         expect(
             allongeConfigurationHint(catalog, {
                 ...saved,
-                inventory_id: 10,
-                original_inventory_id: 11,
+                saved_inventory_id: 11,
             })?.tone,
         ).toBe('block');
         expect(
             allongeConfigurationHint(catalog, {
                 ...saved,
-                advertising_medium_id: 1,
-                original_advertising_medium_id: 9,
+                saved_advertising_medium_id: 9,
             })?.tone,
         ).toBe('block');
         expect(
@@ -80,16 +78,30 @@ describe('allongeConfigurationHint', () => {
         ).toBe('block');
     });
 
+    it('behandelt einen abweichenden Preislisten-Pin nicht als Live-Rebind', () => {
+        const hint = allongeConfigurationHint(catalog, {
+            id: 5,
+            inventory_id: 10,
+            advertising_medium_id: 1,
+            saved_inventory_id: 10,
+            saved_advertising_medium_id: 1,
+            price_year: 2027,
+            saved_price_year: 2027,
+        });
+
+        expect(hint?.tone).toBe('snapshot');
+    });
+
     it('bleibt stumm, wenn die Kombination bestätigt ist oder das Medium kein Allonge ist', () => {
         expect(
             allongeConfigurationHint(catalog, {
                 id: 5,
                 inventory_id: 11,
                 advertising_medium_id: 1,
-                original_inventory_id: 11,
-                original_advertising_medium_id: 1,
+                saved_inventory_id: 11,
+                saved_advertising_medium_id: 1,
                 price_year: 2026,
-                original_price_year: 2026,
+                saved_price_year: 2026,
             }),
         ).toBeNull();
         expect(

@@ -56,6 +56,62 @@ async function selectAllonge(page: Page, index: number, inventoryCode: string) {
         .selectOption({ label: allongeMedium });
 }
 
+async function reloadCatalogWithoutRemount(page: Page) {
+    const done = page.waitForResponse(
+        (response) =>
+            response.request().method() === 'GET' &&
+            response.ok() &&
+            (response.request().headers()['x-inertia-partial-data'] ?? '').includes(
+                'catalog',
+            ),
+    );
+    await page.evaluate(() => {
+        window.dispatchEvent(new Event('dispo:reload-catalog'));
+    });
+    await done;
+}
+
+async function setAllongeConfirmation(
+    page: Page,
+    inventoryLabel: string,
+    length: string,
+    surcharge: string,
+) {
+    await page.goto('/administration/kombinationen');
+    await page
+        .locator('[data-test="combination-filter-inventory"]')
+        .selectOption({ label: inventoryLabel });
+    const row = page
+        .locator('[data-test^="combination-row-"]')
+        .filter({
+            has: page.getByRole('cell', { name: 'Allonge', exact: true }),
+        })
+        .first();
+    await row.locator('[data-test^="combination-open-"]').click();
+    await page.locator('#default_length_seconds').fill(length);
+    await page.locator('#surcharge_percent').fill(surcharge);
+    await page.locator('[data-test="combination-save-submit"]').click();
+    await expect(page.locator('[data-test="allonge-confirmation-status"]')).toContainText(
+        surcharge === '' ? 'nicht bestätigt' : 'bestätigt am',
+        { timeout: 20_000 },
+    );
+}
+
+async function enabledOtherPriceYear(page: Page): Promise<string> {
+    const priceYear = page.locator('[data-test="position-price-year-0"]');
+    const currentYear = await priceYear.inputValue();
+    const otherYear = await priceYear.locator('option:not([disabled])').evaluateAll(
+        (options, current) =>
+            options
+                .map((option) => (option as HTMLOptionElement).value)
+                .find((value) => value !== '' && value !== current) ?? null,
+        currentYear,
+    );
+    expect(otherYear).not.toBeNull();
+
+    return otherYear as string;
+}
+
 async function fillRange(page: Page, index: number, spots: string) {
     if ((await page.locator(`[data-test="range-spots-${index}-0"]`).count()) === 0) {
         await page.locator(`[data-test="range-add-${index}"]`).click();
@@ -303,5 +359,233 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         await expect(page.locator('[data-test="position-length-seconds-1"]')).toHaveCount(0);
         await page.goto(dispoUrl);
         await expect(page.locator('body')).toContainText('390,00');
+    });
+
+    test('gespeicherter Wechsel übernimmt die Vergleichsbasis ohne Reload', async ({
+        page,
+        browser,
+    }) => {
+        test.setTimeout(300_000);
+        const adminContext = await browser.newContext({
+            baseURL: `http://127.0.0.1:${process.env.E2E_PO_ALLONGE_1_PORT ?? '8067'}`,
+        });
+        const admin = await adminContext.newPage();
+
+        try {
+            await login(admin, 'admin@example.com');
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender A (ATA)',
+                '10',
+                '30',
+            );
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '0',
+            );
+
+            await login(page);
+            await openNewCalculationStepTwo(page, 'Allonge Basis GmbH');
+            await selectAllonge(page, 0, 'ATA');
+            await page.locator('[data-test="position-length-seconds-0"]').fill('15');
+            await fillRange(page, 0, '10');
+            await waitForPreview(page);
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText(
+                '390,00',
+                { timeout: 20_000 },
+            );
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="wizard-save"]').click();
+            await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 30_000 });
+            const calculationUrl = page.url();
+
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="dispo-order-create-open"]').click();
+            await page.locator('[data-test="dispo-order-submit"]').click();
+            await expect(page).toHaveURL(/\/dispoauftraege\/\d+$/, { timeout: 30_000 });
+            const dispoUrl = page.url();
+            await expect(page.locator('body')).toContainText('390,00');
+
+            await page.goto(calculationUrl);
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await selectAllonge(page, 0, 'ATU');
+            await page.locator('[data-test="position-length-seconds-0"]').fill('15');
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '',
+            );
+            await reloadCatalogWithoutRemount(page);
+            await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue(
+                '15',
+            );
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toHaveCount(0);
+
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="wizard-save"]').click();
+            await expect(page.locator('body')).toContainText('nicht bestätigt', {
+                timeout: 20_000,
+            });
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue(
+                '15',
+            );
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '0',
+            );
+            await reloadCatalogWithoutRemount(page);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+            await waitForPreview(page);
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('300,00', {
+                timeout: 20_000,
+            });
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="wizard-save"]').click();
+            await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 30_000 });
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue(
+                '15',
+            );
+            await expect(page.locator('body')).not.toContainText('neu bepreist');
+
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '',
+            );
+            await reloadCatalogWithoutRemount(page);
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+                'bleiben gültig',
+            );
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).not.toContainText(
+                'gesperrt',
+            );
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('300,00', {
+                timeout: 20_000,
+            });
+
+            const nextYear = await enabledOtherPriceYear(page);
+            await page.locator('[data-test="position-price-year-0"]').selectOption(nextYear);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+            await expect(page.locator('body')).toContainText('neu bepreist');
+            await page.locator('[data-test="position-price-year-0"]').selectOption(
+                await page.locator('[data-test="position-price-year-0"] option').evaluateAll(
+                    (options, selected) =>
+                        options
+                            .map((option) => (option as HTMLOptionElement).value)
+                            .find((value) => value !== selected) ?? selected,
+                    nextYear,
+                ),
+            );
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+                'bleiben gültig',
+            );
+
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '0',
+            );
+            await reloadCatalogWithoutRemount(page);
+            await page.locator('[data-test="position-price-year-0"]').selectOption(nextYear);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+            await waitForPreview(page);
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('600,00', {
+                timeout: 20_000,
+            });
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="wizard-save"]').click();
+            await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 30_000 });
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await expect(page.locator('[data-test="position-price-year-0"]')).toHaveValue(nextYear);
+            await expect(page.locator('body')).toContainText('neu bepreist');
+
+            await setAllongeConfirmation(
+                admin,
+                'Allonge Testsender Unbestätigt (ATU)',
+                '30',
+                '',
+            );
+            await reloadCatalogWithoutRemount(page);
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+                'bleiben gültig',
+            );
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('600,00', {
+                timeout: 20_000,
+            });
+
+            const pinnedYear = await page
+                .locator('[data-test="position-price-year-0"] option')
+                .evaluateAll(
+                    (options, selected) =>
+                        options
+                            .map((option) => (option as HTMLOptionElement).value)
+                            .find((value) => value !== '' && value !== selected) ?? null,
+                    nextYear,
+                );
+            expect(pinnedYear).not.toBeNull();
+            await page
+                .locator('[data-test="position-price-year-0"]')
+                .selectOption(pinnedYear as string);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+            await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+            await page.locator('[data-test="wizard-save"]').click();
+            await expect(page.locator('body')).toContainText('nicht bestätigt', {
+                timeout: 20_000,
+            });
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toHaveCount(0);
+            await page.locator('[data-test="position-price-year-0"]').selectOption(nextYear);
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+                'bleiben gültig',
+            );
+            await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('600,00', {
+                timeout: 20_000,
+            });
+
+            await page.locator('[data-test="position-medium-0"]').selectOption({
+                label: 'Spot Classic',
+            });
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toHaveCount(0);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+            await page.locator('[data-test="position-medium-0"]').selectOption({
+                label: allongeMedium,
+            });
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+                'bleiben gültig',
+            );
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+
+            await admin.goto(dispoUrl);
+            await expect(admin.locator('body')).toContainText('390,00');
+        } finally {
+            await adminContext.close();
+        }
     });
 });

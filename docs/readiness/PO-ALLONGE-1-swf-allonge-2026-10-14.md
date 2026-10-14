@@ -24,6 +24,9 @@ bestätigenden Admin-Speicherungen je Inventar. Dieser Slice ändert
 - Wizard: nur Durchschnitt, Länge editierbar, kein Aufschlagsfeld, keine Spot-Komponenten.
 - Standardangebote bleiben auf Spot Classic begrenzt (From-Calc, Draft, Publish).
 - Der Wizard-Hinweis sperrt nur den Live-Pfad, nicht einen gültigen Snapshot.
+- Nach erfolgreichem Save stammt die Vergleichsbasis aus der Serverantwort.
+  Der Preislisten-Pin bleibt unverändert. Ein fehlgeschlagener Save übernimmt
+  keine neue Basis.
 
 ## Belege
 

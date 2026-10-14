@@ -106,6 +106,7 @@ import {
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
+import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
 import {
     isSwfLengthMedium,
     resolveComponentsAfterMediumChange,
@@ -282,9 +283,13 @@ type PositionDraft = {
     price_list_status: string | null;
     pricing_settlement_mode: PricingSettlementMode;
     fixed_price_nn_input: string;
-    /** Gespeicherter Inventar-/Medium-Bezug für den Allonge-Snapshot-Hinweis. */
-    original_inventory_id: number | null;
-    original_advertising_medium_id: number | null;
+    /**
+     * Zuletzt erfolgreich gespeicherte Identität für den Allonge-Hinweis.
+     * Unabhängig vom Preislisten-Pin original_price_year.
+     */
+    saved_inventory_id: number | null;
+    saved_advertising_medium_id: number | null;
+    saved_price_year: number | null;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -819,8 +824,9 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             custom_choice_meta: {},
             price_year: year,
             original_price_year: year,
-            original_inventory_id: null,
-            original_advertising_medium_id: null,
+            saved_inventory_id: null,
+            saved_advertising_medium_id: null,
+            saved_price_year: null,
             original_price_list_id: expectedPriceListIdForYear(
                 catalog,
                 inventory.id,
@@ -1311,9 +1317,9 @@ export default function CalculationWizard({
                         position.needs_spot_redistribution,
                     price_year: pinnedYear,
                     original_price_year: position.price_year ?? pinnedYear,
-                    original_inventory_id: position.inventory_id,
-                    original_advertising_medium_id:
-                        position.advertising_medium_id,
+                    saved_inventory_id: position.inventory_id,
+                    saved_advertising_medium_id: position.advertising_medium_id,
+                    saved_price_year: position.price_year ?? pinnedYear,
                     original_price_list_id:
                         position.expected_price_list_id ?? null,
                     original_price_list_version:
@@ -1439,6 +1445,20 @@ export default function CalculationWizard({
               ]
             : [];
     });
+
+    useEffect(() => {
+        const reloadCatalog = () => {
+            router.reload({
+                only: ['catalog'],
+                preserveState: true,
+                preserveScroll: true,
+            });
+        };
+        window.addEventListener('dispo:reload-catalog', reloadCatalog);
+
+        return () =>
+            window.removeEventListener('dispo:reload-catalog', reloadCatalog);
+    }, []);
 
     useEffect(() => {
         setPositions((current) => {
@@ -2473,6 +2493,9 @@ export default function CalculationWizard({
                                 id?: number | null;
                                 client_key?: string | null;
                                 schema_fingerprint?: string | null;
+                                inventory_id?: number | null;
+                                advertising_medium_id?: number | null;
+                                price_year?: number | null;
                             }>;
                         } | null;
                     }
@@ -2503,28 +2526,18 @@ export default function CalculationWizard({
                           ? 'customer'
                           : '',
                 );
-                // IDs/Fingerprints vom Server übernehmen, ohne übrige Draft-Eingaben zu verwerfen.
+                // ID, Fingerprint und gespeicherte Allonge-Vergleichsbasis
+                // übernehmen. Preislisten-Pin und übrige Eingaben bleiben.
                 const savedPositions = saved.positions ?? [];
                 if (savedPositions.length > 0) {
                     setPositions((current) =>
-                        current.map((position, index) => {
-                            const match =
-                                savedPositions.find(
-                                    (row) =>
-                                        row.client_key != null &&
-                                        row.client_key === position.client_key,
-                                ) ?? savedPositions[index];
-                            if (!match) {
-                                return position;
-                            }
-                            return {
-                                ...position,
-                                id: match.id ?? position.id,
-                                schema_fingerprint:
-                                    match.schema_fingerprint ??
-                                    position.schema_fingerprint,
-                            };
-                        }),
+                        current.map((position, index) =>
+                            applySuccessfulPositionSave(
+                                position,
+                                savedPositions,
+                                index,
+                            ),
+                        ),
                     );
                 }
             },
@@ -2543,6 +2556,7 @@ export default function CalculationWizard({
                 return false;
             },
             onError: (errors: Record<string, string | string[]>) => {
+                // Fehlgeschlagener Save lässt die gespeicherte Vergleichsbasis unverändert.
                 const mapped = mapValidationErrors(errors);
                 setSaveFieldErrors(mapped);
                 const detail = firstValidationMessage(mapped);
@@ -2742,13 +2756,17 @@ export default function CalculationWizard({
                         budgetPriceYear ??
                         defaultPriceYear(catalog, item.inventory_id),
                     original_price_year: existing?.original_price_year ?? null,
-                    original_inventory_id:
-                        existing?.original_inventory_id ??
+                    saved_inventory_id:
+                        existing?.saved_inventory_id ??
                         existing?.inventory_id ??
                         null,
-                    original_advertising_medium_id:
-                        existing?.original_advertising_medium_id ??
+                    saved_advertising_medium_id:
+                        existing?.saved_advertising_medium_id ??
                         existing?.advertising_medium_id ??
+                        null,
+                    saved_price_year:
+                        existing?.saved_price_year ??
+                        existing?.price_year ??
                         null,
                     original_price_list_id:
                         existing?.original_price_list_id ?? null,

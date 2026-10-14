@@ -2,8 +2,10 @@
  * PO-ALLONGE-1: Hinweis folgt dem Live- oder Snapshot-Pfad.
  *
  * Eine neue Position und ein Inventar-, Medium- oder Preisjahr-Wechsel
- * brauchen die bestätigte Kombination. Eine unveränderte gespeicherte
- * Position behält ihren Pin, auch wenn die Admin-Bestätigung später fehlt.
+ * brauchen die bestätigte Kombination. Vergleich ist die zuletzt erfolgreich
+ * gespeicherte Identität, nicht der Preislisten-Pin. Eine unveränderte
+ * gespeicherte Position behält ihren Snapshot, auch wenn die
+ * Admin-Bestätigung später fehlt.
  */
 
 import { SWF_ALLONGE_KIND } from '@/lib/wizard-trailer-medium-change';
@@ -21,10 +23,11 @@ export type AllongeHintPosition = {
     id?: number | null;
     inventory_id: number;
     advertising_medium_id: number;
-    original_inventory_id?: number | null;
-    original_advertising_medium_id?: number | null;
     price_year?: number | null;
-    original_price_year?: number | null;
+    /** Zuletzt erfolgreich gespeicherte Identität. Nicht der Preislisten-Pin. */
+    saved_inventory_id?: number | null;
+    saved_advertising_medium_id?: number | null;
+    saved_price_year?: number | null;
 };
 
 export type AllongeConfigurationHint = {
@@ -71,22 +74,21 @@ function needsLiveAllongeResolution(position: AllongeHintPosition): boolean {
     }
 
     if (
-        position.original_inventory_id != null &&
-        position.inventory_id !== position.original_inventory_id
+        position.saved_inventory_id != null &&
+        position.inventory_id !== position.saved_inventory_id
     ) {
         return true;
     }
 
     if (
-        position.original_advertising_medium_id != null &&
-        position.advertising_medium_id !==
-            position.original_advertising_medium_id
+        position.saved_advertising_medium_id != null &&
+        position.advertising_medium_id !== position.saved_advertising_medium_id
     ) {
         return true;
     }
 
     return (
-        position.original_price_year != null &&
-        position.price_year !== position.original_price_year
+        position.saved_price_year != null &&
+        position.price_year !== position.saved_price_year
     );
 }
