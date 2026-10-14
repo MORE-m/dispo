@@ -79,7 +79,8 @@ function needsLiveAllongeResolution(position: AllongeHintPosition): boolean {
 
     if (
         position.original_advertising_medium_id != null &&
-        position.advertising_medium_id !== position.original_advertising_medium_id
+        position.advertising_medium_id !==
+            position.original_advertising_medium_id
     ) {
         return true;
     }

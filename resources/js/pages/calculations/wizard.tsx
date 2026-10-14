@@ -1312,7 +1312,8 @@ export default function CalculationWizard({
                     price_year: pinnedYear,
                     original_price_year: position.price_year ?? pinnedYear,
                     original_inventory_id: position.inventory_id,
-                    original_advertising_medium_id: position.advertising_medium_id,
+                    original_advertising_medium_id:
+                        position.advertising_medium_id,
                     original_price_list_id:
                         position.expected_price_list_id ?? null,
                     original_price_list_version:
