@@ -31,7 +31,7 @@ import {
     type SpotComponentDraft,
 } from '@/lib/spot-components';
 import {
-    SWF_TRAILER_KIND,
+    isSwfLengthKind,
     trailerLengthFromRule,
 } from '@/lib/wizard-trailer-medium-change';
 
@@ -135,14 +135,14 @@ export function rebindPositionOnInventoryChange(
         methodState.calculation_method_key === position.calculation_method_key;
 
     // BL-P5-01a: Trailer übernimmt keine Spot-Komponenten; Länge nur aus Trailer-Regel.
-    const targetIsTrailer = medium.kind === SWF_TRAILER_KIND;
-    const retainedComponents = targetIsTrailer ? [] : position.components;
+    const targetIsSwfLength = isSwfLengthKind(medium.kind);
+    const retainedComponents = targetIsSwfLength ? [] : position.components;
     const nextStrategy =
         retainedComponents.length > 0
             ? resolveStrategyFromRule(rule?.component_calculation_strategy)
             : null;
 
-    const nextLengthSeconds = targetIsTrailer
+    const nextLengthSeconds = targetIsSwfLength
         ? trailerLengthFromRule(
               rule?.default_length_seconds,
               position.length_seconds,

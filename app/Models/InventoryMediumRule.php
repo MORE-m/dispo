@@ -7,6 +7,7 @@ use Database\Factories\InventoryMediumRuleFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\CarbonInterface;
 
 /**
  * @property string|null $booking_code
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $lock_version
  * @property string|null $surcharge_percent NULL = nicht konfiguriert (BL-P5-01a), 0 = ausdrücklich 0 %
  * @property int|null $default_length_seconds
+ * @property CarbonInterface|null $swf_allonge_confirmed_at NULL = Allonge unbestätigt (PO-ALLONGE-1)
  * @property bool $is_discountable
  * @property bool $is_ae_eligible
  * @property ComponentCalculationStrategy $component_calculation_strategy
@@ -39,6 +41,7 @@ class InventoryMediumRule extends Model
         'is_ae_eligible',
         'component_calculation_strategy',
         'lock_version',
+        'swf_allonge_confirmed_at',
     ];
 
     /**
@@ -51,6 +54,7 @@ class InventoryMediumRule extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'surcharge_percent' => 'decimal:4',
+            'swf_allonge_confirmed_at' => 'datetime',
             'component_calculation_strategy' => ComponentCalculationStrategy::class,
             'sort' => 'integer',
             'lock_version' => 'integer',

@@ -78,6 +78,7 @@ final class InitialCatalogBootstrapper
             }
 
             $this->ensureSwfTrailerCategoryMethod($categoryIds);
+            $this->ensureAllongeMediumOverride();
         });
 
         return [
@@ -125,6 +126,68 @@ final class InitialCatalogBootstrapper
             ->whereKey($categoryId)
             ->whereNull('default_calculation_method_id')
             ->update(['default_calculation_method_id' => $average->id]);
+    }
+
+    /**
+     * PO-ALLONGE-1: nur Medium allonge auf Override mit genau einer Average-Zuordnung
+     * am Profil swf_allonge. Kategorie und Trailer bleiben unverändert.
+     * Idempotent; eine abweichende Override-Konfiguration wird nicht überschrieben.
+     */
+    private function ensureAllongeMediumOverride(): void
+    {
+        $medium = AdvertisingMedium::query()->where('code', 'allonge')->lockForUpdate()->first();
+        if ($medium === null) {
+            return;
+        }
+
+        if ($medium->kind !== CalculationKind::SwfAllonge) {
+            throw new RuntimeException(
+                'Allonge-Medium hat nicht die Berechnungsart swf_allonge. Bootstrap überschreibt das nicht.',
+            );
+        }
+
+        $average = CalculationMethod::query()->where('key', 'average')->first();
+        if ($average === null) {
+            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Allonge-Override.');
+        }
+
+        $assignments = AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $medium->id)
+            ->get();
+
+        $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
+            && (int) $medium->default_calculation_method_id === (int) $average->id
+            && $assignments->count() === 1
+            && (int) $assignments->first()->calculation_method_id === (int) $average->id
+            && $assignments->first()->engine_profile_key === EngineProfileRegistry::PROFILE_SWF_ALLONGE
+            && (bool) $assignments->first()->is_active;
+
+        if ($matches) {
+            return;
+        }
+
+        $canInstall = $medium->calculation_method_mode === CalculationMethodMode::Inherit
+            && $medium->default_calculation_method_id === null
+            && $assignments->isEmpty();
+
+        if (! $canInstall) {
+            throw new RuntimeException(
+                'Allonge-Methodenvertrag weicht ab und wird nicht überschrieben.',
+            );
+        }
+
+        $medium->calculation_method_mode = CalculationMethodMode::Override;
+        $medium->default_calculation_method_id = $average->id;
+        $medium->save();
+
+        $assignment = new AdvertisingMediumCalculationMethod;
+        $assignment->advertising_medium_id = $medium->id;
+        $assignment->calculation_method_id = $average->id;
+        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_ALLONGE;
+        $assignment->is_active = true;
+        $assignment->sort = 10;
+        $assignment->lock_version = 1;
+        $assignment->save();
     }
 
     /**
@@ -328,11 +391,21 @@ final class InitialCatalogBootstrapper
         if ($existingKind !== $expectedKind) {
             $mismatches[] = 'kind Ist='.($existingKind ?? 'null').' Soll='.($expectedKind ?? 'null');
         }
-        if ($existing->calculation_method_mode !== CalculationMethodMode::Inherit) {
-            $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=inherit';
-        }
-        if ($existing->default_calculation_method_id !== null) {
-            $mismatches[] = 'default_calculation_method_id Ist='.$existing->default_calculation_method_id.' Soll=null';
+        if ($definition['code'] === 'allonge') {
+            $averageId = CalculationMethod::query()->where('key', 'average')->value('id');
+            if ($existing->calculation_method_mode !== CalculationMethodMode::Override) {
+                $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=override';
+            }
+            if ((int) $existing->default_calculation_method_id !== (int) $averageId) {
+                $mismatches[] = 'default_calculation_method_id Ist='.(string) $existing->default_calculation_method_id.' Soll=average';
+            }
+        } else {
+            if ($existing->calculation_method_mode !== CalculationMethodMode::Inherit) {
+                $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=inherit';
+            }
+            if ($existing->default_calculation_method_id !== null) {
+                $mismatches[] = 'default_calculation_method_id Ist='.$existing->default_calculation_method_id.' Soll=null';
+            }
         }
         if ((int) $existing->default_length_seconds !== $definition['default_length_seconds']) {
             $mismatches[] = "default_length_seconds Ist={$existing->default_length_seconds} Soll={$definition['default_length_seconds']}";
@@ -355,7 +428,18 @@ final class InitialCatalogBootstrapper
         $methodCount = AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $existing->id)
             ->count();
-        if ($methodCount !== 0) {
+        if ($definition['code'] === 'allonge') {
+            $assignment = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $existing->id)
+                ->first();
+            if ($methodCount !== 1
+                || $assignment === null
+                || $assignment->engine_profile_key !== EngineProfileRegistry::PROFILE_SWF_ALLONGE
+                || ! $assignment->is_active
+            ) {
+                $mismatches[] = 'Allonge-Override fehlt oder weicht ab';
+            }
+        } elseif ($methodCount !== 0) {
             $mismatches[] = "Methoden-Zuordnungen vorhanden ({$methodCount})";
         }
 

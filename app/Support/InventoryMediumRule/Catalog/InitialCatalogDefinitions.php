@@ -105,7 +105,8 @@ final class InitialCatalogDefinitions
             // BL-P5-01a: einziges SWF-Medium mit Berechnungsart (Trailer × Durchschnitt, ohne Spotlängenindex).
             $row('Trailer/Vorpr. Element Station Voice', 'trailer_station_voice', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 140, CalculationKind::SwfTrailer),
             $row('Abbinder', 'abbinder', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 150),
-            $row('Allonge', 'allonge', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 160),
+            // PO-ALLONGE-1: einziges weiteres SWF-Medium mit Berechnungsart (Allonge × Durchschnitt).
+            $row('Allonge', 'allonge', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 160, CalculationKind::SwfAllonge),
             $row('Opener', 'opener', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 170),
             $row('Bumper', 'bumper', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 180),
             $row('Stinger', 'stinger', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 190),

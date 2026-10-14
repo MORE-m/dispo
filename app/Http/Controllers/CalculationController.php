@@ -460,6 +460,7 @@ class CalculationController extends Controller
                 'is_ae_eligible',
                 'is_active',
                 'component_calculation_strategy',
+                'swf_allonge_confirmed_at',
             ]);
 
         $historicalRuleIds = $calculation !== null
@@ -500,6 +501,7 @@ class CalculationController extends Controller
                     'is_ae_eligible',
                     'is_active',
                     'component_calculation_strategy',
+                    'swf_allonge_confirmed_at',
                 ]);
         }
 

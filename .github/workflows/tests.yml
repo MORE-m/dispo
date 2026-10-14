@@ -210,6 +210,9 @@ jobs:
       - name: Browser BL-P5-01a isolated tests
         run: npx playwright test -c playwright.blp501a.config.ts
 
+      - name: Browser PO-ALLONGE-1 isolated tests
+        run: npx playwright test -c playwright.po-allonge-1.config.ts --retries=0
+
       - name: Browser BL-P5-02a isolated tests
         run: npx playwright test -c playwright.blp502a.config.ts
 

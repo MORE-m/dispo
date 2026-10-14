@@ -28,6 +28,8 @@ type RuleDetail = {
     lock_version: number;
     must_not_plan: boolean;
     is_operative_complete: boolean;
+    show_allonge_confirmation?: boolean;
+    allonge_confirmation_label?: string | null;
 };
 
 type PlanningOption = { key: string; label: string };
@@ -76,6 +78,11 @@ export default function CombinationShow({
         <>
             <Head title={`Kombination #${rule.id}`} />
             <div className="flex flex-1 flex-col gap-6 p-6">
+                {rule.show_allonge_confirmation ? (
+                    <p data-test="allonge-confirmation-status">
+                        {rule.allonge_confirmation_label}
+                    </p>
+                ) : null}
                 <PageHeader
                     title={`${rule.inventory_name} × ${rule.advertising_medium_name}`}
                     description={`Status: ${rule.status_label}. Inventar/Werbemittel unveränderlich. Buchungskennzeichen nur hier pflegen – in der Kalkulation nicht sichtbar.`}

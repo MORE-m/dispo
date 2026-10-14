@@ -46,6 +46,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`](entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md) | PO Calendar × Tandem/Tridem (Akzeptiert A1, PR #128) |
 | [`reviews/swf-trailer-average-readiness/`](reviews/swf-trailer-average-readiness/) | Bericht Trailer × Average (PO-BLP501A-1 A1 + B1; auf `main` PR #129) |
 | [`readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md) | Feature-Readiness Trailer × Average (READY mit Daten-Vorbedingungen) |
+| [`readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`](readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md) | Allonge × Durchschnitt: umgesetzt auf diesem Branch, operativ offen |
+| [`reviews/po-allonge-1/README.md`](reviews/po-allonge-1/README.md) | Review des Allonge-Slices |
 | [`reviews/swf-trailer-average-data-readiness/`](reviews/swf-trailer-average-data-readiness/) | Bericht operative Daten-Readiness nach PR #129 |
 | [`readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`](readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md) | Operative Daten-Readiness / lokale Einrichtung `dispo_mat_core` |
 | [`entscheidungen/PO-BLP501A-1-swf-trailer-average.md`](entscheidungen/PO-BLP501A-1-swf-trailer-average.md) | PO Trailer × Average (**A1 + B1** akzeptiert; `main` PR #129) |

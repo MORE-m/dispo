@@ -779,7 +779,7 @@ final class CalculationWriter
                 totalSpotCount: (int) $item['total_spot_count'],
                 spotMethod: $item['spot_method'],
                 rows: $item['rows'],
-                lengthIndex: $item['freeze']->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER ? 100 : $lengthIndex,
+                lengthIndex: EngineProfileRegistry::usesAverageLengthWithoutIndex($item['freeze']->engineProfileKey) ? 100 : $lengthIndex,
                 timeRanges: $item['time_ranges'],
                 plannerEntries: $item['planner_entries'],
                 positionDiscounts: $item['position_discounts'],
@@ -854,17 +854,20 @@ final class CalculationWriter
                 $componentProfile,
             );
 
-            $isTrailer = $catalog['freeze']->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER;
-            if ($isTrailer && $normalizedComponents !== []) {
+            $isSwfLength = EngineProfileRegistry::usesAverageLengthWithoutIndex($catalog['freeze']->engineProfileKey);
+            $swfLengthLabel = $catalog['freeze']->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE
+                ? 'Allonge'
+                : 'Trailer';
+            if ($isSwfLength && $normalizedComponents !== []) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.components" => 'Trailer unterstützt keine Spot-Komponenten (Hauptspot/Allonge/Tandem/Tridem).',
+                    "positions.{$index}.components" => $swfLengthLabel.' unterstützt keine Spot-Komponenten (Hauptspot/Allonge/Tandem/Tridem).',
                 ]);
             }
 
             if ($normalizedComponents !== []) {
                 $length = array_sum(array_column($normalizedComponents, 'length_seconds'));
-            } elseif ($isTrailer) {
-                $length = $this->resolveTrailerLengthSeconds($position, $existingPosition, $catalog, (int) $index);
+            } elseif ($isSwfLength) {
+                $length = $this->resolveTrailerLengthSeconds($position, $existingPosition, $catalog, (int) $index, $swfLengthLabel);
             } else {
                 $length = (int) ($position['length_seconds']
                     ?? ($existingPosition !== null ? $existingPosition->length_seconds : null)
@@ -874,9 +877,9 @@ final class CalculationWriter
             }
 
             $settlement = $this->parseSettlementFromPayloadPosition($position, (int) $index);
-            if ($isTrailer && $settlement['mode'] !== PricingSettlementMode::Normal) {
+            if ($isSwfLength && $settlement['mode'] !== PricingSettlementMode::Normal) {
                 throw ValidationException::withMessages([
-                    "positions.{$index}.pricing_settlement_mode" => 'Festpreis-Abschluss ist für Trailer nicht freigegeben.',
+                    "positions.{$index}.pricing_settlement_mode" => 'Festpreis-Abschluss ist für '.$swfLengthLabel.' nicht freigegeben.',
                 ]);
             }
 
@@ -1871,11 +1874,17 @@ final class CalculationWriter
         ?CalculationPosition $existing,
         array $catalog,
         int $index,
+        string $label = 'Trailer',
     ): int {
         $payloadLength = $position['length_seconds'] ?? null;
-        $rebound = (bool) ($catalog['inventory_changed'] ?? false) || (bool) ($catalog['medium_changed'] ?? false);
+        $inventoryChanged = (bool) ($catalog['inventory_changed'] ?? false);
+        $mediumChanged = (bool) ($catalog['medium_changed'] ?? false);
+        $rebound = $inventoryChanged || $mediumChanged;
         $rule = $catalog['rule'] ?? null;
 
+        // Mitgesendete Länge gewinnt (Nutzerlänge nach Ziel-Default).
+        // Ohne Länge bei Inventar-/Mediumwechsel: Ziel-Default, nie Medium-Default 30.
+        // Preisjahr-Wechsel setzt rebound nicht und behält die gespeicherte Länge.
         if ($payloadLength !== null && $payloadLength !== '') {
             $length = (int) $payloadLength;
         } elseif ($existing !== null && ! $rebound) {
@@ -1884,13 +1893,13 @@ final class CalculationWriter
             $length = (int) $rule->default_length_seconds;
         } else {
             throw ValidationException::withMessages([
-                "positions.{$index}.length_seconds" => 'Für diesen Trailer ist keine Länge konfiguriert. Bitte eine Länge angeben oder in der Kombinationstabelle hinterlegen.',
+                "positions.{$index}.length_seconds" => "Für diese {$label} ist keine Länge konfiguriert. Bitte eine Länge angeben oder in der Kombinationstabelle hinterlegen.",
             ]);
         }
 
-        if ($length < 1) {
+        if ($length < 1 || $length > 3600) {
             throw ValidationException::withMessages([
-                "positions.{$index}.length_seconds" => 'Die Trailer-Länge muss mindestens 1 Sekunde betragen.',
+                "positions.{$index}.length_seconds" => "Die {$label}-Länge muss zwischen 1 und 3600 Sekunden liegen.",
             ]);
         }
 

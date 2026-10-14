@@ -39,7 +39,7 @@ final readonly class PositionInput
         public ?ComponentCalculationStrategy $componentCalculationStrategy = null,
         public PricingSettlementMode $pricingSettlementMode = PricingSettlementMode::Normal,
         public ?string $fixedPriceNn = null,
-        /** BL-P5-01a: swf_trailer rechnet ohne Spotlängenindex (Index fest 100). */
+        /** BL-P5-01a / PO-ALLONGE-1: swf_trailer und swf_allonge rechnen ohne Spotlängenindex (Index fest 100). */
         public ?string $engineProfileKey = null,
         /** BL-P5-02a: gepinnte Produktionszeilen (nur Spot Classic × Durchschnitt). */
         public array $productionLines = [],
@@ -55,6 +55,16 @@ final readonly class PositionInput
     public function isSwfTrailer(): bool
     {
         return $this->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER;
+    }
+
+    public function isSwfAllonge(): bool
+    {
+        return $this->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE;
+    }
+
+    public function usesAverageLengthWithoutIndex(): bool
+    {
+        return EngineProfileRegistry::usesAverageLengthWithoutIndex((string) $this->engineProfileKey);
     }
 
     public function hasComponents(): bool

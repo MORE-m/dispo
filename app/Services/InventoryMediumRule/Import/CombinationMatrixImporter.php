@@ -83,10 +83,13 @@ final class CombinationMatrixImporter
                     $rule->planning_responsibility_key = $row['planning_responsibility_key'];
                     $rule->hint_text = null;
                     $rule->sort = 0;
-                    // BL-P5-01a: Trailer – Länge/Aufschlag nie erfinden (NULL = nicht konfiguriert, fail-closed).
-                    $isTrailer = $medium->kind === CalculationKind::SwfTrailer;
-                    $rule->default_length_seconds = $isTrailer ? null : $medium->default_length_seconds;
-                    $rule->surcharge_percent = $isTrailer ? null : '0';
+                    // BL-P5-01a / PO-ALLONGE-1: Trailer und Allonge – Länge/Aufschlag nie erfinden.
+                    // Allonge-Bestätigung bleibt NULL. Import bestätigt nicht.
+                    $failClosed = $medium->kind === CalculationKind::SwfTrailer
+                        || $medium->kind === CalculationKind::SwfAllonge;
+                    $rule->default_length_seconds = $failClosed ? null : $medium->default_length_seconds;
+                    $rule->surcharge_percent = $failClosed ? null : '0';
+                    $rule->swf_allonge_confirmed_at = null;
                     $rule->is_discountable = (bool) $medium->is_discountable;
                     $rule->is_ae_eligible = (bool) $medium->is_ae_eligible;
                     $rule->component_calculation_strategy = ComponentCalculationStrategy::SharedTotalLength;

@@ -373,6 +373,11 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`,
   `docs/readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`,
   `docs/entscheidungen/PO-BLP501A-1-datenlieferung.md`
+- **PO-ALLONGE-1 (dieser Branch, nicht gemergt):** Allonge × Durchschnitt, dieselben
+  vier Sender; Bestätigung `swf_allonge_confirmed_at` nur durch Detail-Speichern;
+  Startwerte offen; operativ nicht eingerichtet; `BL-P5-01` bleibt teilweise; Dok
+  `docs/entscheidungen/PO-ALLONGE-1-kombinationspflege.md`,
+  `docs/readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
 - **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 

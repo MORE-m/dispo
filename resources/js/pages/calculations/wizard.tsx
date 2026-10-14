@@ -106,7 +106,8 @@ import {
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import {
-    isSwfTrailerMedium,
+    isSwfAllongeMedium,
+    isSwfLengthMedium,
     resolveComponentsAfterMediumChange,
     shouldClearTrailerSettlementForTargetMedium,
     trailerSettlementReset,
@@ -333,6 +334,7 @@ type Catalog = {
         is_ae_eligible: boolean;
         is_active: boolean;
         component_calculation_strategy?: string | null;
+        swf_allonge_confirmed_at?: string | null;
     }[];
     price_years_by_inventory?: Record<
         string,
@@ -650,11 +652,31 @@ function ruleFor(catalog: Catalog, inventoryId: number, mediumId: number) {
  * BL-P5-01a: Trailer (kind swf_trailer) kennt keine Spot-Komponenten
  * (Hauptspot/Allonge/Tandem/Tridem); Backend lehnt sie ab.
  */
+function allongeConfigurationHint(
+    catalog: Catalog,
+    position: { inventory_id: number; advertising_medium_id: number },
+): string | null {
+    if (!isSwfAllongeMedium(catalog, position.advertising_medium_id)) {
+        return null;
+    }
+
+    const rule = ruleFor(
+        catalog,
+        position.inventory_id,
+        position.advertising_medium_id,
+    );
+    if (rule?.swf_allonge_confirmed_at) {
+        return null;
+    }
+
+    return 'Die Allonge-Konfiguration für dieses Inventar ist nicht bestätigt. Kalkulation ist gesperrt, bis Länge und Aufschlag in der Kombination gespeichert sind.';
+}
+
 function mediumSupportsSpotComponents(
     catalog: Catalog,
     mediumId: number,
 ): boolean {
-    return !isSwfTrailerMedium(catalog, mediumId);
+    return !isSwfLengthMedium(catalog, mediumId);
 }
 
 function profileForMedium(
@@ -2171,7 +2193,7 @@ export default function CalculationWizard({
                     if (
                         next.advertising_medium_id !==
                             item.advertising_medium_id ||
-                        isSwfTrailerMedium(catalog, next.advertising_medium_id)
+                        isSwfLengthMedium(catalog, next.advertising_medium_id)
                     ) {
                         const componentState =
                             resolveComponentsAfterMediumChange(
@@ -2191,7 +2213,7 @@ export default function CalculationWizard({
                         };
 
                         if (
-                            isSwfTrailerMedium(
+                            isSwfLengthMedium(
                                 catalog,
                                 next.advertising_medium_id,
                             )
@@ -2280,10 +2302,11 @@ export default function CalculationWizard({
                         field_schema: null,
                     };
 
-                    if (isSwfTrailerMedium(catalog, medium.id)) {
+                    if (isSwfLengthMedium(catalog, medium.id)) {
                         next = {
                             ...next,
                             ...trailerSettlementReset(),
+                            production_lines: [],
                         };
                     }
                 }
@@ -3767,6 +3790,20 @@ export default function CalculationWizard({
                                                                     s
                                                                 </p>
                                                             )}
+                                                            {allongeConfigurationHint(
+                                                                catalog,
+                                                                position,
+                                                            ) ? (
+                                                                <p
+                                                                    className="text-sm text-amber-800"
+                                                                    data-test={`allonge-unconfirmed-${index}`}
+                                                                >
+                                                                    {allongeConfigurationHint(
+                                                                        catalog,
+                                                                        position,
+                                                                    )}
+                                                                </p>
+                                                            ) : null}
                                                             <FormField
                                                                 label="Preisjahr"
                                                                 htmlFor={`price-year-${index}`}
@@ -4126,7 +4163,7 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
-                                                            hideFixedPrice={isSwfTrailerMedium(
+                                                            hideFixedPrice={isSwfLengthMedium(
                                                                 catalog,
                                                                 position.advertising_medium_id,
                                                             )}

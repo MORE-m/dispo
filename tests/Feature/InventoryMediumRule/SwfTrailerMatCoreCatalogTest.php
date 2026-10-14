@@ -37,7 +37,8 @@ class SwfTrailerMatCoreCatalogTest extends TestCase
             ->whereNotNull('kind')
             ->pluck('code')
             ->all();
-        $this->assertSame(['trailer_station_voice'], $withKind);
+        sort($withKind);
+        $this->assertSame(['allonge', 'trailer_station_voice'], $withKind);
 
         $swf = AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS)
@@ -62,7 +63,7 @@ class SwfTrailerMatCoreCatalogTest extends TestCase
         $this->assertSame(CalculationKind::SwfTrailer, $trailer->kind);
         $this->assertTrue($bookability->evaluate($trailer)->isBookableForNewPositions);
 
-        foreach (['preseller', 'abbinder', 'allonge', 'promo_moderation', 'opener', 'stinger', 'bumper'] as $code) {
+        foreach (['preseller', 'abbinder', 'promo_moderation', 'opener', 'stinger', 'bumper'] as $code) {
             $other = AdvertisingMedium::query()->where('code', $code)->firstOrFail();
             $this->assertNull($other->kind, $code);
             $this->assertFalse($bookability->evaluate($other)->isBookableForNewPositions, $code);
