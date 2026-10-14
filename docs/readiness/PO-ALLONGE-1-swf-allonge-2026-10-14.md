@@ -22,6 +22,8 @@ bestätigenden Admin-Speicherungen je Inventar. Dieser Slice ändert
 - Live-Auflösung verlangt Länge, Aufschlag und Zeitpunkt.
 - Snapshot-Pfad prüft die aktuelle Bestätigung nicht erneut.
 - Wizard: nur Durchschnitt, Länge editierbar, kein Aufschlagsfeld, keine Spot-Komponenten.
+- Standardangebote bleiben auf Spot Classic begrenzt (From-Calc, Draft, Publish).
+- Der Wizard-Hinweis sperrt nur den Live-Pfad, nicht einen gültigen Snapshot.
 
 ## Belege
 

@@ -10,6 +10,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 const allongeMedium = 'Allonge';
 
+async function logout(page: Page) {
+    await page.locator('[data-test="sidebar-menu-button"]').click();
+    await page.locator('[data-test="logout-button"]').click();
+    await expect(page.getByRole('link', { name: 'Anmelden' })).toBeVisible({
+        timeout: 15_000,
+    });
+}
+
 async function login(page: Page, email = 'sales@example.com') {
     await page.goto('/login');
     await page.locator('#email').fill(email);
@@ -182,5 +190,118 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('390,00', {
             timeout: 20_000,
         });
+    });
+
+    test('gespeicherter Snapshot bleibt nach Entbestätigung nutzbar, Live-Rebind nicht', async ({
+        page,
+    }) => {
+        test.setTimeout(180_000);
+        await login(page);
+        await openNewCalculationStepTwo(page, 'Allonge Snapshot GmbH');
+        await selectAllonge(page, 0, 'ATA');
+        await page.locator('[data-test="position-length-seconds-0"]').fill('15');
+        await fillRange(page, 0, '10');
+        await waitForPreview(page);
+        await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('390,00', {
+            timeout: 20_000,
+        });
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 30_000 });
+        const calculationUrl = page.url();
+
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="dispo-order-create-open"]').click();
+        await page.locator('[data-test="dispo-order-submit"]').click();
+        await expect(page).toHaveURL(/\/dispoauftraege\/\d+$/, { timeout: 30_000 });
+        const dispoUrl = page.url();
+        await expect(page.locator('body')).toContainText('390,00');
+
+        await logout(page);
+        await login(page, 'admin@example.com');
+        await page.goto('/administration/kombinationen');
+        await page
+            .locator('[data-test="combination-filter-inventory"]')
+            .selectOption({ label: 'Allonge Testsender A (ATA)' });
+        const row = page
+            .locator('[data-test^="combination-row-"]')
+            .filter({
+                has: page.getByRole('cell', { name: 'Allonge', exact: true }),
+            })
+            .first();
+        await row.locator('[data-test^="combination-open-"]').click();
+        await page.locator('#surcharge_percent').fill('');
+        await page.locator('[data-test="combination-save-submit"]').click();
+        await expect(page.locator('[data-test="allonge-confirmation-status"]')).toContainText(
+            'nicht bestätigt',
+            { timeout: 20_000 },
+        );
+
+        await logout(page);
+        await login(page);
+        await page.goto(calculationUrl);
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
+        await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
+            'bleiben gültig',
+        );
+        await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).not.toContainText(
+            'gesperrt',
+        );
+        await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue('15');
+        await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('390,00', {
+            timeout: 20_000,
+        });
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(calculationUrl, { timeout: 30_000 });
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('390,00', {
+            timeout: 20_000,
+        });
+
+        await page.goto(dispoUrl);
+        await expect(page.locator('body')).toContainText('390,00');
+
+        await page.goto(calculationUrl);
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        const priceYear = page.locator('[data-test="position-price-year-0"]');
+        const currentYear = await priceYear.inputValue();
+        const otherYear = await priceYear
+            .locator('option:not([disabled])')
+            .evaluateAll(
+                (options, current) =>
+                    options
+                        .map((option) => (option as HTMLOptionElement).value)
+                        .find((value) => value !== '' && value !== current) ?? null,
+                currentYear,
+            );
+        if (otherYear !== null) {
+            await priceYear.selectOption(otherYear);
+            await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
+                'Kalkulation ist gesperrt',
+            );
+            await page.reload();
+            await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+            await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toBeVisible();
+        }
+        await page.getByRole('button', { name: 'Werbeelement hinzufügen' }).click();
+        await selectAllonge(page, 1, 'ATA');
+        await expect(page.locator('[data-test="allonge-unconfirmed-1"]')).toContainText(
+            'Kalkulation ist gesperrt',
+        );
+        await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
+        await page.locator('[data-test="wizard-save"]').click();
+        await expect(page).toHaveURL(calculationUrl, { timeout: 20_000 });
+        await expect(page.locator('body')).toContainText('nicht bestätigt', {
+            timeout: 20_000,
+        });
+        await page.reload();
+        await page.getByRole('button', { name: '2. Werbeelemente' }).click();
+        await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue('15');
+        await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toBeVisible();
+        await expect(page.locator('[data-test="position-length-seconds-1"]')).toHaveCount(0);
+        await page.goto(dispoUrl);
+        await expect(page.locator('body')).toContainText('390,00');
     });
 });

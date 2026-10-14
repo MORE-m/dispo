@@ -105,8 +105,8 @@ import {
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
+import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
 import {
-    isSwfAllongeMedium,
     isSwfLengthMedium,
     resolveComponentsAfterMediumChange,
     shouldClearTrailerSettlementForTargetMedium,
@@ -282,6 +282,9 @@ type PositionDraft = {
     price_list_status: string | null;
     pricing_settlement_mode: PricingSettlementMode;
     fixed_price_nn_input: string;
+    /** Gespeicherter Inventar-/Medium-Bezug für den Allonge-Snapshot-Hinweis. */
+    original_inventory_id: number | null;
+    original_advertising_medium_id: number | null;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -648,30 +651,6 @@ function ruleFor(catalog: Catalog, inventoryId: number, mediumId: number) {
     );
 }
 
-/**
- * BL-P5-01a: Trailer (kind swf_trailer) kennt keine Spot-Komponenten
- * (Hauptspot/Allonge/Tandem/Tridem); Backend lehnt sie ab.
- */
-function allongeConfigurationHint(
-    catalog: Catalog,
-    position: { inventory_id: number; advertising_medium_id: number },
-): string | null {
-    if (!isSwfAllongeMedium(catalog, position.advertising_medium_id)) {
-        return null;
-    }
-
-    const rule = ruleFor(
-        catalog,
-        position.inventory_id,
-        position.advertising_medium_id,
-    );
-    if (rule?.swf_allonge_confirmed_at) {
-        return null;
-    }
-
-    return 'Die Allonge-Konfiguration für dieses Inventar ist nicht bestätigt. Kalkulation ist gesperrt, bis Länge und Aufschlag in der Kombination gespeichert sind.';
-}
-
 function mediumSupportsSpotComponents(
     catalog: Catalog,
     mediumId: number,
@@ -840,6 +819,8 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
             custom_choice_meta: {},
             price_year: year,
             original_price_year: year,
+            original_inventory_id: null,
+            original_advertising_medium_id: null,
             original_price_list_id: expectedPriceListIdForYear(
                 catalog,
                 inventory.id,
@@ -1330,6 +1311,8 @@ export default function CalculationWizard({
                         position.needs_spot_redistribution,
                     price_year: pinnedYear,
                     original_price_year: position.price_year ?? pinnedYear,
+                    original_inventory_id: position.inventory_id,
+                    original_advertising_medium_id: position.advertising_medium_id,
                     original_price_list_id:
                         position.expected_price_list_id ?? null,
                     original_price_list_version:
@@ -2758,6 +2741,14 @@ export default function CalculationWizard({
                         budgetPriceYear ??
                         defaultPriceYear(catalog, item.inventory_id),
                     original_price_year: existing?.original_price_year ?? null,
+                    original_inventory_id:
+                        existing?.original_inventory_id ??
+                        existing?.inventory_id ??
+                        null,
+                    original_advertising_medium_id:
+                        existing?.original_advertising_medium_id ??
+                        existing?.advertising_medium_id ??
+                        null,
                     original_price_list_id:
                         existing?.original_price_list_id ?? null,
                     original_price_list_version:
@@ -3793,15 +3784,35 @@ export default function CalculationWizard({
                                                             {allongeConfigurationHint(
                                                                 catalog,
                                                                 position,
-                                                            ) ? (
+                                                            )?.tone ===
+                                                            'block' ? (
                                                                 <p
                                                                     className="text-sm text-amber-800"
                                                                     data-test={`allonge-unconfirmed-${index}`}
                                                                 >
-                                                                    {allongeConfigurationHint(
-                                                                        catalog,
-                                                                        position,
-                                                                    )}
+                                                                    {
+                                                                        allongeConfigurationHint(
+                                                                            catalog,
+                                                                            position,
+                                                                        )?.text
+                                                                    }
+                                                                </p>
+                                                            ) : null}
+                                                            {allongeConfigurationHint(
+                                                                catalog,
+                                                                position,
+                                                            )?.tone ===
+                                                            'snapshot' ? (
+                                                                <p
+                                                                    className="text-muted-foreground text-sm"
+                                                                    data-test={`allonge-snapshot-note-${index}`}
+                                                                >
+                                                                    {
+                                                                        allongeConfigurationHint(
+                                                                            catalog,
+                                                                            position,
+                                                                        )?.text
+                                                                    }
                                                                 </p>
                                                             ) : null}
                                                             <FormField

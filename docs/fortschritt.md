@@ -2,8 +2,9 @@
 
 Stand: 14. Oktober 2026 – Branch `feat/swf-allonge-average`. SWF-Medium Allonge × Durchschnitt
 gemäß PO-ALLONGE-1 ist auf diesem Branch umgesetzt, nicht gemergt und nicht deployed.
-Operative Startwerte und die Buchbarkeit der vier Sender sind nicht hergestellt.
-`BL-P5-01` bleibt teilweise.
+Review-Nachzug: Standardangebote lehnen Allonge serverseitig ab; der Wizard-Hinweis
+unterscheidet Live-Pfad und gespeicherten Snapshot. Operative Startwerte und die
+Buchbarkeit der vier Sender sind nicht hergestellt. `BL-P5-01` bleibt teilweise.
 
 Stand davor: 14. Oktober 2026 – zwei getrennte Nachzüge auf Basis `origin/main` @ `a1bfadac0243ab487f27ac824c70efc193174f28` (PR #140, Post-Merge-CI `38469887057` SUCCESS).
 Lokaler Betrieb, nicht im Git: `max_allowed_packet` der XAMPP-MariaDB dauerhaft 16 MiB, nach Neustart und neuer Verbindung geprüft. Sicherung nur als Verweis `local-backups/mysql-max-allowed-packet-20261014/`.

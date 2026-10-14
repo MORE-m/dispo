@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Services\StandardOffer\StandardOfferAverageContract;
+use App\Services\StandardOffer\StandardOfferSpotClassicBoundary;
 use App\Services\StandardOffer\StandardOfferWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -32,6 +33,7 @@ class StandardOfferController extends Controller
         private readonly CalculationController $calculations,
         private readonly CalculationWriter $calculationWriter,
         private readonly StandardOfferAverageContract $averageContract,
+        private readonly StandardOfferSpotClassicBoundary $spotClassicBoundary,
     ) {}
 
     public function index(Request $request): Response
@@ -417,6 +419,7 @@ class StandardOfferController extends Controller
             'dynamic_field_values' => $validated['dynamic_field_values'] ?? [],
             'positions' => $positions,
         ]);
+        $this->spotClassicBoundary->assertDraftPayload($payload);
 
         return [
             'title' => (string) ($validated['title'] ?? 'Standardangebot'),
