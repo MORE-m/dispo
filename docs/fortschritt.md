@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 14. Oktober 2026 – Branch `feat/swf-allonge-average`. SWF-Medium Allonge × Durchschnitt
+Stand: 15. Oktober 2026 – lokale Einrichtung von SWF-Allonge × Durchschnitt auf der bestehenden XAMPP-MariaDB `dispo_mat_core`.
+Code ist der Merge von PR #142, `092ac36a3a6e1f6f10c20b866cbcea90a3bcc647`. Das ist keine Fachfreigabe über die frühere Slice-Abnahme hinaus und kein Deploy.
+Migration `2026_10_14_140000_po_allonge_1_swf_allonge_confirmation` einmal angewendet. Die vier Allonge-Kombinationen sind über die Detailseite auf 10 s / 30 % bestätigt. Trailer bleibt 20 s / 30 %.
+Lokale Browser-Abnahme auf Port 8090: Vorschau, Speichern, Reload und Dispo `DA-2026-00007-01` zu `K-2026-00007`. Soll = Ist auf der Stundenbasis 08:00–08:59, Mo–Fr, 10 Spots: 7.280 + 2.210 + 1.040 + 130 = 10.660,00 €. Die Positionslänge bleibt für den Nutzer änderbar, der Aufschlag serverseitig. Nach den Änderungen steht die Kalkulation bei 17.485,00 €, der Dispo unverändert bei 10.660,00 €. Der Separatserver ist beendet; MariaDB und Port 8000 laufen weiter.
+Sicherung nur als Verweis: `local-backups/po-allonge-1-20261015-181638/`. Lokale technische Abnahme, kein Deploy und keine darüber hinausgehende Fachabnahme. `BL-P5-01` bleibt teilweise.
+Bericht: `docs/readiness/PO-ALLONGE-1-lokale-einrichtung-2026-10-15.md` und `docs/reviews/po-allonge-1-lokale-einrichtung/`.
+
+Stand davor: 14. Oktober 2026 – Branch `feat/swf-allonge-average`. SWF-Medium Allonge × Durchschnitt
 gemäß PO-ALLONGE-1 ist auf diesem Branch umgesetzt, nicht gemergt und nicht deployed.
 Review-Nachzug: Standardangebote lehnen Allonge serverseitig ab; der Wizard-Hinweis
 unterscheidet Live-Pfad und gespeicherten Snapshot. Die Vergleichsbasis wird nach
@@ -38,6 +45,8 @@ Phase 2 MAT-CORE (**02a/02b/02c** auf `main`); **BL-P2-03a** + CRM-Wizard-Picker
 Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
+
+**Lokale Allonge-Einrichtung 15. Oktober 2026:** Startwerte und Browser-Abnahme auf `dispo_mat_core`, kein Deploy. Der Absatz vom 14. Oktober bleibt der damalige Slice-Stand vor dem Merge.
 
 **Nachzug 14. Oktober 2026:** lokales Paketlimit dauerhaft, CRM-Importhinweis auf diesem Branch als Draft. Die Abschnitte darunter bleiben der jeweilige damalige Slice-Stand. Die Dokumentation der Einrichtung und des Smokes bleibt der Stand vom 13. Oktober. Technische lokale Prüfung, keine Fachabnahme, kein Deploy.
 Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
