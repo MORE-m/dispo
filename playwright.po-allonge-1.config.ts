@@ -32,9 +32,11 @@ export default defineConfig({
     workers: 1,
     forbidOnly: !!process.env.CI,
     retries: 0,
+    outputDir: 'test-results/po-allonge-1',
     use: {
         baseURL: e2eBaseUrl,
-        trace: 'on-first-retry',
+        trace: 'retain-on-failure',
+        screenshot: 'only-on-failure',
     },
     projects: [
         {
