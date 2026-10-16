@@ -213,6 +213,15 @@ jobs:
       - name: Browser PO-ALLONGE-1 isolated tests
         run: npx playwright test -c playwright.po-allonge-1.config.ts --retries=0
 
+      - name: Upload PO-ALLONGE-1 failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: po-allonge-1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/po-allonge-1/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Browser BL-P5-02a isolated tests
         run: npx playwright test -c playwright.blp502a.config.ts
 

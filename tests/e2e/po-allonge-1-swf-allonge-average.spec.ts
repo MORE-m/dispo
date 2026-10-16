@@ -9,6 +9,14 @@ import { expect, test, type Page } from '@playwright/test';
  */
 
 const allongeMedium = 'Allonge';
+const unconfirmedInventoryName = 'Allonge Testsender Unbestätigt';
+
+type AllongeCatalogExpectation = {
+    inventoryName: string;
+    /** null: Aufschlag fehlt. '0': ausdrücklich 0 %, nicht null. */
+    surchargePercent: null | '0';
+    confirmed: boolean;
+};
 
 async function logout(page: Page) {
     await page.locator('[data-test="sidebar-menu-button"]').click();
@@ -56,19 +64,152 @@ async function selectAllonge(page: Page, index: number, inventoryCode: string) {
         .selectOption({ label: allongeMedium });
 }
 
-async function reloadCatalogWithoutRemount(page: Page) {
-    const done = page.waitForResponse(
+function isCatalogPartial(headers: Record<string, string>): boolean {
+    return (headers['x-inertia-partial-data'] ?? '').includes('catalog');
+}
+
+/**
+ * Wartet auf den bestehenden Katalog-Reload, nicht nur auf die HTTP-Antwort.
+ *
+ * `waitForResponse` ist erfüllt, sobald die Antwort verfügbar ist. Inertia
+ * übernimmt die Props erst danach in `inertia:success` (nach setPage).
+ * Ein folgender Preisjahr-Wechsel liest sonst noch den vorherigen Katalog.
+ * Es wird kein zusätzlicher Produkt-Hook eingeführt.
+ */
+async function reloadCatalogWithoutRemount(
+    page: Page,
+    expected: AllongeCatalogExpectation,
+) {
+    const length = page.locator('[data-test="position-length-seconds-0"]');
+    const priceYear = page.locator('[data-test="position-price-year-0"]');
+    const lengthBefore = await length.inputValue();
+    const yearBefore = await priceYear.inputValue();
+    const responsePromise = page.waitForResponse(
         (response) =>
             response.request().method() === 'GET' &&
             response.ok() &&
-            (response.request().headers()['x-inertia-partial-data'] ?? '').includes(
-                'catalog',
-            ),
+            isCatalogPartial(response.request().headers()),
+        { timeout: 20_000 },
     );
-    await page.evaluate(() => {
-        window.dispatchEvent(new Event('dispo:reload-catalog'));
-    });
-    await done;
+    const applied = page.evaluate((expectation) => {
+        return new Promise<string>((resolve, reject) => {
+            let pending = 0;
+            let adopted = false;
+            let latest = 'noch kein Katalog in inertia:success';
+
+            const isCatalogVisit = (visit: { only?: string[] } | undefined) =>
+                Array.isArray(visit?.only) && visit.only.includes('catalog');
+
+            const cleanup = () => {
+                window.clearTimeout(timeout);
+                document.removeEventListener('inertia:start', onStart);
+                document.removeEventListener('inertia:success', onSuccess);
+                document.removeEventListener('inertia:finish', onFinish);
+            };
+
+            const settle = () => {
+                if (adopted && pending === 0) {
+                    cleanup();
+                    resolve(latest);
+                }
+            };
+
+            const timeout = window.setTimeout(() => {
+                cleanup();
+                reject(
+                    new Error(
+                        `Katalog-Reload nicht übernommen (${latest}).`,
+                    ),
+                );
+            }, 20_000);
+
+            const onStart = (event: Event) => {
+                const visit = (event as CustomEvent<{ visit?: { only?: string[] } }>)
+                    .detail?.visit;
+                if (isCatalogVisit(visit)) {
+                    pending += 1;
+                }
+            };
+
+            const onSuccess = (event: Event) => {
+                const catalog = (
+                    event as CustomEvent<{
+                        page?: {
+                            props?: {
+                                catalog?: {
+                                    inventories?: Array<{ id: number; name: string }>;
+                                    media?: Array<{ id: number; kind?: string | null }>;
+                                    rules?: Array<{
+                                        inventory_id: number;
+                                        advertising_medium_id: number;
+                                        surcharge_percent?: string | null;
+                                        swf_allonge_confirmed_at?: string | null;
+                                    }>;
+                                };
+                            };
+                        };
+                    }>
+                ).detail?.page?.props?.catalog;
+                if (!catalog) {
+                    return;
+                }
+
+                const inventory = catalog.inventories?.find(
+                    (item) => item.name === expectation.inventoryName,
+                );
+                const medium = catalog.media?.find(
+                    (item) => item.kind === 'swf_allonge',
+                );
+                const rule = catalog.rules?.find(
+                    (item) =>
+                        item.inventory_id === inventory?.id &&
+                        item.advertising_medium_id === medium?.id,
+                );
+                const surcharge = rule?.surcharge_percent ?? null;
+                const confirmed = Boolean(rule?.swf_allonge_confirmed_at);
+                const explicitZero =
+                    surcharge !== null &&
+                    surcharge !== '' &&
+                    Number(surcharge) === 0;
+                const missing = surcharge === null || surcharge === '';
+                const surchargeMatches =
+                    expectation.surchargePercent === '0'
+                        ? explicitZero
+                        : missing;
+                latest = `Aufschlag ${surcharge === null || surcharge === '' ? 'fehlt' : surcharge}, bestätigt ${confirmed ? 'ja' : 'nein'}`;
+                adopted = Boolean(
+                    inventory &&
+                        medium &&
+                        rule &&
+                        surchargeMatches &&
+                        confirmed === expectation.confirmed,
+                );
+                settle();
+            };
+
+            const onFinish = (event: Event) => {
+                const visit = (event as CustomEvent<{ visit?: { only?: string[] } }>)
+                    .detail?.visit;
+                if (!isCatalogVisit(visit)) {
+                    return;
+                }
+
+                pending = Math.max(0, pending - 1);
+                settle();
+            };
+
+            document.addEventListener('inertia:start', onStart);
+            document.addEventListener('inertia:success', onSuccess);
+            document.addEventListener('inertia:finish', onFinish);
+            window.dispatchEvent(new Event('dispo:reload-catalog'));
+        });
+    }, expected);
+
+    const response = await responsePromise;
+    await response.finished();
+    await applied;
+    await expect(length).toHaveValue(lengthBefore);
+    await expect(priceYear).toHaveValue(yearBefore);
 }
 
 async function setAllongeConfirmation(
@@ -420,7 +561,11 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
                 '30',
                 '',
             );
-            await reloadCatalogWithoutRemount(page);
+            await reloadCatalogWithoutRemount(page, {
+                inventoryName: unconfirmedInventoryName,
+                surchargePercent: null,
+                confirmed: false,
+            });
             await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue(
                 '15',
             );
@@ -448,7 +593,11 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
                 '30',
                 '0',
             );
-            await reloadCatalogWithoutRemount(page);
+            await reloadCatalogWithoutRemount(page, {
+                inventoryName: unconfirmedInventoryName,
+                surchargePercent: '0',
+                confirmed: true,
+            });
             await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
             await waitForPreview(page);
             await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText('300,00', {
@@ -469,7 +618,11 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
                 '30',
                 '',
             );
-            await reloadCatalogWithoutRemount(page);
+            await reloadCatalogWithoutRemount(page, {
+                inventoryName: unconfirmedInventoryName,
+                surchargePercent: null,
+                confirmed: false,
+            });
             await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
                 'bleiben gültig',
             );
@@ -506,7 +659,11 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
                 '30',
                 '0',
             );
-            await reloadCatalogWithoutRemount(page);
+            await reloadCatalogWithoutRemount(page, {
+                inventoryName: unconfirmedInventoryName,
+                surchargePercent: '0',
+                confirmed: true,
+            });
             await page.locator('[data-test="position-price-year-0"]').selectOption(nextYear);
             await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toHaveCount(0);
             await waitForPreview(page);
@@ -526,7 +683,11 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
                 '30',
                 '',
             );
-            await reloadCatalogWithoutRemount(page);
+            await reloadCatalogWithoutRemount(page, {
+                inventoryName: unconfirmedInventoryName,
+                surchargePercent: null,
+                confirmed: false,
+            });
             await expect(page.locator('[data-test="allonge-snapshot-note-0"]')).toContainText(
                 'bleiben gültig',
             );
