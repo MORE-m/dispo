@@ -3,12 +3,12 @@
 namespace Tests\Feature\Inertia;
 
 use App\Enums\Role;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Calculation;
 use App\Models\CrmAccount;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Inertia\Inertia;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -211,7 +211,10 @@ final class InertiaWizardVisitContractTest extends TestCase
         return [
             'X-Inertia' => 'true',
             'X-Requested-With' => 'XMLHttpRequest',
-            'X-Inertia-Version' => (string) Inertia::getVersion(),
+            // Die Middleware setzt die Asset-Version erst im Request. Vorher
+            // liefert Inertia::getVersion() leer, sobald public/build/manifest.json
+            // existiert, und der erste GET wird mit 409 beantwortet.
+            'X-Inertia-Version' => (string) app(HandleInertiaRequests::class)->version(request()),
             ...$extra,
         ];
     }
