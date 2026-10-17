@@ -264,8 +264,11 @@ function postedField(response: Response, field: string): string | null {
             return null;
         }
         const value = payload[field];
+        if (typeof value === 'string' || typeof value === 'number') {
+            return String(value);
+        }
 
-        return value === null || value === undefined ? null : String(value);
+        return null;
     }
 
     return new URLSearchParams(postData).get(field);
