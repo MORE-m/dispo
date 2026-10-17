@@ -379,7 +379,7 @@ return new class extends Migration
     {
         $kindColumn = collect(Schema::getColumns('advertising_media'))->firstWhere('name', 'kind');
 
-        return $kindColumn !== null && (bool) ($kindColumn['nullable'] ?? false);
+        return $kindColumn !== null && (bool) $kindColumn['nullable'];
     }
 
     /**
@@ -525,7 +525,7 @@ return new class extends Migration
     private function makeAdvertisingMediaKindNullable(): void
     {
         $column = collect(Schema::getColumns('advertising_media'))->firstWhere('name', 'kind');
-        if ($column !== null && ($column['nullable'] ?? false) === true) {
+        if ($column !== null && $column['nullable'] === true) {
             return;
         }
 
@@ -592,7 +592,7 @@ SQL);
         }
 
         $kindColumn = collect(Schema::getColumns('advertising_media'))->firstWhere('name', 'kind');
-        if ($kindColumn === null || ! ($kindColumn['nullable'] ?? false)) {
+        if ($kindColumn === null || ! $kindColumn['nullable']) {
             throw new RuntimeException('ADV-001c2: advertising_media.kind ist nicht nullable.');
         }
 

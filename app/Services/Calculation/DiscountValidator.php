@@ -65,7 +65,7 @@ final class DiscountValidator
             $complete[] = [
                 'type' => $type->value,
                 'custom_label' => $type->requiresCustomLabel() ? $customLabel : null,
-                'percent' => $numeric ?? (string) $percent,
+                'percent' => $numeric,
                 'sort' => count($complete),
             ];
         }

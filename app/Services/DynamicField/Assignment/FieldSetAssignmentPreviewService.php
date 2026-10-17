@@ -24,24 +24,31 @@ final class FieldSetAssignmentPreviewService
     ) {}
 
     /**
-     * @param  array{
-     *     process: FieldAppliesTo|string,
-     *     scope: FieldScope|string,
-     *     advertising_category_id?: int|null,
-     *     advertising_medium_id?: int|null,
-     *     candidate_assignment_id?: int|null,
-     *     strict?: bool
-     * }  $input
+     * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public function preview(array $input): array
     {
-        $process = $this->normalizeProcess($input['process']);
-        $scope = $this->normalizeScope($input['scope']);
+        $process = $this->normalizeProcess(
+            $input['process'] instanceof FieldAppliesTo || is_string($input['process'])
+                ? $input['process']
+                : '',
+        );
+        $scope = $this->normalizeScope(
+            $input['scope'] instanceof FieldScope || is_string($input['scope'])
+                ? $input['scope']
+                : '',
+        );
         $categoryId = $this->nullablePositiveInt($input['advertising_category_id'] ?? null);
         $mediumId = $this->nullablePositiveInt($input['advertising_medium_id'] ?? null);
         $candidateId = $this->nullablePositiveInt($input['candidate_assignment_id'] ?? null);
         $strict = (bool) ($input['strict'] ?? ($candidateId !== null));
+
+        if ($scope === FieldScope::Header && ($categoryId !== null || $mediumId !== null)) {
+            throw ValidationException::withMessages([
+                'scope' => 'Header-Preview unterstützt keine Kategorie-/Werbemittel-Kontexte.',
+            ]);
+        }
 
         if ($mediumId !== null) {
             $medium = AdvertisingMedium::query()->whereKey($mediumId)->first();
@@ -55,12 +62,6 @@ final class FieldSetAssignmentPreviewService
                 ]);
             }
             $categoryId = $mediumCategoryId;
-        }
-
-        if ($scope === FieldScope::Header && ($categoryId !== null || $mediumId !== null)) {
-            throw ValidationException::withMessages([
-                'scope' => 'Header-Preview unterstützt keine Kategorie-/Werbemittel-Kontexte.',
-            ]);
         }
 
         $sourcesPayload = [];
