@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 /**
  * PO-ALLONGE-1: SWF-Medium Allonge × Durchschnitt.
@@ -212,6 +212,76 @@ async function reloadCatalogWithoutRemount(
     await expect(priceYear).toHaveValue(yearBefore);
 }
 
+type CombinationIdentity = {
+    id: number;
+    inventory_name: string;
+    inventory_code: string | null;
+    advertising_medium_name: string;
+};
+
+type SavedAllongeRule = CombinationIdentity & {
+    default_length_seconds: number | null;
+    surcharge_percent: string | null;
+    allonge_confirmation_label: string | null;
+};
+
+function combinationLabel(rule: {
+    inventory_name: string;
+    inventory_code: string | null;
+}): string {
+    return rule.inventory_code
+        ? `${rule.inventory_name} (${rule.inventory_code})`
+        : rule.inventory_name;
+}
+
+function isInertiaGet(response: Response, pathnamePattern: RegExp): boolean {
+    const request = response.request();
+    if (request.method() !== 'GET' || !response.ok()) {
+        return false;
+    }
+    // Beim Redirect nach PUT liefert request.headers() nur einen Teil.
+    // X-Inertia steht dann zuverlässig auf der Antwort.
+    const inertia =
+        request.headers()['x-inertia'] === 'true' ||
+        response.headers()['x-inertia'] === 'true';
+    if (!inertia) {
+        return false;
+    }
+
+    return pathnamePattern.test(new URL(request.url()).pathname);
+}
+
+function postedField(response: Response, field: string): string | null {
+    const postData = response.request().postData();
+    if (postData === null) {
+        return null;
+    }
+
+    const contentType = response.request().headers()['content-type'] ?? '';
+    if (contentType.includes('application/json')) {
+        const payload = JSON.parse(postData) as Record<string, unknown>;
+        if (!Object.prototype.hasOwnProperty.call(payload, field)) {
+            return null;
+        }
+        const value = payload[field];
+        if (typeof value === 'string' || typeof value === 'number') {
+            return String(value);
+        }
+
+        return null;
+    }
+
+    return new URLSearchParams(postData).get(field);
+}
+
+/**
+ * Speichert Länge und Aufschlag der Allonge-Kombination des genannten Inventars.
+ *
+ * Der Inventarfilter lädt die Liste per Inertia nach. Solange diese Antwort
+ * fehlt, ist die erste Allonge-Zeile noch ein anderes Inventar.
+ * „bestätigt am“ kann außerdem schon von der zuvor geöffneten Kombination
+ * stammen und darf den gerade ausgelösten PUT nicht abschließen.
+ */
 async function setAllongeConfirmation(
     page: Page,
     inventoryLabel: string,
@@ -219,19 +289,86 @@ async function setAllongeConfirmation(
     surcharge: string,
 ) {
     await page.goto('/administration/kombinationen');
+    const filteredList = page.waitForResponse(
+        (response) =>
+            isInertiaGet(response, /^\/administration\/kombinationen$/) &&
+            new URL(response.request().url()).searchParams.has('inventory_id'),
+        { timeout: 20_000 },
+    );
     await page
         .locator('[data-test="combination-filter-inventory"]')
         .selectOption({ label: inventoryLabel });
-    const row = page
-        .locator('[data-test^="combination-row-"]')
-        .filter({
-            has: page.getByRole('cell', { name: 'Allonge', exact: true }),
-        })
-        .first();
-    await row.locator('[data-test^="combination-open-"]').click();
+    const listed = (await (await filteredList).json()) as {
+        props?: { rules?: CombinationIdentity[] };
+    };
+    const matches = (listed.props?.rules ?? []).filter(
+        (rule) =>
+            rule.advertising_medium_name === allongeMedium &&
+            combinationLabel(rule) === inventoryLabel,
+    );
+    expect(matches, `Allonge-Zeile für ${inventoryLabel}`).toHaveLength(1);
+    const rule = matches[0];
+
+    await page.locator(`[data-test="combination-open-${rule.id}"]`).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(
+        rule.inventory_name,
+        { timeout: 20_000 },
+    );
     await page.locator('#default_length_seconds').fill(length);
     await page.locator('#surcharge_percent').fill(surcharge);
+
+    const updateResponse = page.waitForResponse(
+        (response) => {
+            const request = response.request();
+
+            return (
+                (request.method() === 'PUT' || request.method() === 'POST') &&
+                new URL(request.url()).pathname ===
+                    `/administration/kombinationen/${rule.id}`
+            );
+        },
+        { timeout: 20_000 },
+    );
+    const savedDetail = page.waitForResponse(
+        (response) =>
+            isInertiaGet(
+                response,
+                new RegExp(`^/administration/kombinationen/${rule.id}$`),
+            ),
+        { timeout: 20_000 },
+    );
     await page.locator('[data-test="combination-save-submit"]').click();
+
+    const update = await updateResponse;
+    const updateStatus = update.status();
+    expect(
+        updateStatus,
+        updateStatus >= 400 ? await update.text() : `Speicherstatus ${updateStatus}`,
+    ).toBeLessThan(400);
+    expect(postedField(update, 'default_length_seconds')).toBe(length);
+    if (surcharge === '') {
+        expect(postedField(update, 'surcharge_percent')).toBe('');
+    } else {
+        expect(postedField(update, 'surcharge_percent')).toBe(surcharge);
+    }
+
+    const detail = await savedDetail;
+    const saved = (
+        (await detail.json()) as { props?: { rule?: SavedAllongeRule } }
+    ).props?.rule;
+    expect(saved).toBeTruthy();
+    expect(saved?.id).toBe(rule.id);
+    expect(combinationLabel(saved as SavedAllongeRule)).toBe(inventoryLabel);
+    expect(saved?.advertising_medium_name).toBe(allongeMedium);
+    expect(String(saved?.default_length_seconds)).toBe(length);
+    if (surcharge === '') {
+        expect(saved?.surcharge_percent).toBeNull();
+        expect(saved?.allonge_confirmation_label).toContain('nicht bestätigt');
+    } else {
+        expect(saved?.surcharge_percent).not.toBeNull();
+        expect(Number(saved?.surcharge_percent)).toBe(Number(surcharge));
+        expect(saved?.allonge_confirmation_label).toContain('bestätigt am');
+    }
     await expect(page.locator('[data-test="allonge-confirmation-status"]')).toContainText(
         surcharge === '' ? 'nicht bestätigt' : 'bestätigt am',
         { timeout: 20_000 },
