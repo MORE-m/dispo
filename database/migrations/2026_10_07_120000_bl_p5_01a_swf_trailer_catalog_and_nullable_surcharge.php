@@ -93,7 +93,7 @@ return new class extends Migration
     private function makeSurchargeNullable(): void
     {
         $column = collect(Schema::getColumns('inventory_medium_rules'))->firstWhere('name', 'surcharge_percent');
-        if ($column !== null && ($column['nullable'] ?? false) === true && ($column['default'] ?? null) === null) {
+        if ($column !== null && $column['nullable'] === true && ($column['default'] ?? null) === null) {
             return;
         }
 

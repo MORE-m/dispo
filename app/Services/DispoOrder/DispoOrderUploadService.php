@@ -200,7 +200,6 @@ final class DispoOrderUploadService
                 $user,
                 $expectedLockVersion,
                 $fieldKey,
-                $def,
                 $position,
                 $prepared,
             ): DispoOrderUpload {
