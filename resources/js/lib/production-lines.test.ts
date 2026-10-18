@@ -33,14 +33,31 @@ describe('production-lines', () => {
         expect(payload.remark).toBeNull();
     });
 
-    it('unterstützt Produktion nur für Spot Classic × Durchschnitt ohne Festpreis', () => {
+    it('unterstützt Produktion nur für Medium-Code spot_classic × Durchschnitt ohne Festpreis', () => {
         expect(
             productionSupported({
                 mediumKind: 'spot_classic',
+                mediumCode: 'spot_classic',
                 methodKey: 'average',
                 settlementMode: 'normal',
             }),
         ).toBe(true);
+        expect(
+            productionSupported({
+                mediumKind: 'spot_classic',
+                mediumCode: 'spot_single',
+                methodKey: 'average',
+                settlementMode: 'normal',
+            }),
+        ).toBe(false);
+        expect(
+            productionSupported({
+                mediumKind: 'spot_classic',
+                mediumCode: 'spot_first',
+                methodKey: 'average',
+                settlementMode: 'normal',
+            }),
+        ).toBe(false);
         expect(
             productionSupported({
                 mediumKind: 'swf_trailer',
@@ -51,6 +68,7 @@ describe('production-lines', () => {
         expect(
             productionSupported({
                 mediumKind: 'spot_classic',
+                mediumCode: 'spot_classic',
                 methodKey: 'calendar',
                 settlementMode: 'normal',
             }),
@@ -58,6 +76,7 @@ describe('production-lines', () => {
         expect(
             productionSupported({
                 mediumKind: 'spot_classic',
+                mediumCode: 'spot_classic',
                 methodKey: 'average',
                 settlementMode: 'fixed_price',
             }),

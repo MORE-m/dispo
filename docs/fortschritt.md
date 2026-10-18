@@ -1,12 +1,18 @@
 # Fortschritt V1
 
-Stand: 18. Oktober 2026 – **PO-SPOT-SURCHARGE-1 Phase 2** auf Feature-Branch (Draft-PR):
+Stand: 18. Oktober 2026 – **PO-SPOT-SINGLE-1** auf Feature-Branch (Draft-PR):
+`spot_single` mit `kind=spot_classic`, Fachaufschlag **+50 %**, Average + Calendar,
+MAT-003 (5 erlaubt / 3 ausgeschlossen), fail-closed, Calc-/Dispo-Snapshot,
+Produktion OUT (Code-Gate; schließt Erst/Letzt-Leak). Kein Deploy.
+Basis `main` @ `63a71d4…` (PR #160). Dok: `docs/readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md`.
+
+Stand davor: 18. Oktober 2026 – **PO-SPOT-SURCHARGE-1** auf `main` (PR #160):
 `spot_first` / `spot_last` mit `kind=spot_classic`, Fachaufschlag **+30 %**, Average + Calendar,
-fail-closed bei `NULL`/`≤0`, Calc-/Dispo-Snapshot. Kein Deploy. Basis `main` @ `26a0986…` (PR #159).
+fail-closed bei `NULL`/`≤0`, Calc-/Dispo-Snapshot. Kein Deploy.
 Dok: `docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`.
 
 Stand davor: 18. Oktober 2026 – **PO-GOLIVE-CUT-1-DEC** dokumentiert und gemergt (PR #159, Docs-only).
-Operative V1 in vier Stufen priorisiert. Nächster Auftrag war PO-SPOT-SURCHARGE-1 (dieser Slice).
+Operative V1 in vier Stufen priorisiert.
 
 Stand davor: 15. Oktober 2026 – lokale Einrichtung von SWF-Allonge × Durchschnitt auf der bestehenden XAMPP-MariaDB `dispo_mat_core`.
 Code ist der Merge von PR #142, `092ac36a3a6e1f6f10c20b866cbcea90a3bcc647`. Das ist keine Fachfreigabe über die frühere Slice-Abnahme hinaus und kein Deploy.
@@ -54,7 +60,9 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**PO-SPOT-SURCHARGE-1 Phase 2 (18. Oktober 2026):** Erst-/Letztplatzierung auf `spot_classic` (+30 %, Average/Calendar, fail-closed, Snapshots) – Draft-PR, kein Merge/Deploy. Single/Promo/Contest nicht begonnen.
+**PO-SPOT-SINGLE-1 (18. Oktober 2026):** Single-Spot auf `spot_classic` (+50 %, Average/Calendar, MAT-003, fail-closed, Snapshots, Produktion OUT) – Draft-PR, kein Merge/Deploy. Promo/Contest nicht begonnen.
+
+**PO-SPOT-SURCHARGE-1 (18. Oktober 2026):** Erst-/Letzt auf `main` (PR #160).
 
 **PO-GOLIVE-CUT-1-DEC (18. Oktober 2026):** Projektpriorisierung operative V1 akzeptiert und gemergt (PR #159, Docs-only).
 
@@ -64,13 +72,14 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
 
 Offen / zurückgestellt u. a. (Priorisierung laut PO-GOLIVE-CUT-1-DEC):
-Stufe 1: PO-SPOT-SURCHARGE-1 (Phase 2 Draft-PR), danach Single (MAT-003), Promo (Profil-Readiness);
+Stufe 1: Erst/Letzt erledigt (PR #160), Single Draft-PR (dieser Slice), danach Promo (Profil-Readiness);
 Stufe 2: minimale Benutzer-Admin-UI, Preis-/Katalogvalidierung, Betrieb/E2E;
 Stufe 3: SWF-Rest, OA/TKP, Social, Events (separate Readiness);
 Stufe 4 / sonst: Deploy BL-P5-01a/02a und BL-P2-03a, Produktion-Rest,
 Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest, Submit-Empfänger, Invalidierungsmails,
 Budget-Vorlagen, SPT-013 Abbinder, In-App, REP, ADV-001 Defaults, ADV-002,
-MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10; Interim-Nachweis = Detail+SPT-008).
+MAT-003-Vollabnahme (Single-Slice deckt operative 5/3-Zuordnung ab; Hinweistexte/Vollabnahme separat),
+REP-007 Dispo-PDF (Phase 10; Interim-Nachweis = Detail+SPT-008).
 
 ## CRM-Wizard-Picker / PO-BLP203-1 I1 (Oktober 2026)
 

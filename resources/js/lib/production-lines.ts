@@ -93,16 +93,19 @@ export function productionLinesPayload(
 }
 
 /**
- * Produktion ist nur für Spot Classic × Durchschnitt (normaler Preisabschluss) zulässig.
+ * Produktion nur für Medium-Code `spot_classic` × Durchschnitt (ohne Festpreis).
+ * Erst/Letzt/Single haben kind=spot_classic, sind aber produktionsseitig OUT (PO-SPOT-SINGLE-1).
  * Bestehende Zeilen bleiben bei anderen Auswahlen sichtbar; der Server blockiert, bis sie entfernt sind.
  */
 export function productionSupported(input: {
     mediumKind: string | null | undefined;
+    mediumCode?: string | null | undefined;
     methodKey: string | null | undefined;
     settlementMode: string | null | undefined;
 }): boolean {
     return (
         (input.mediumKind ?? 'spot_classic') === 'spot_classic' &&
+        (input.mediumCode ?? 'spot_classic') === 'spot_classic' &&
         input.methodKey === 'average' &&
         (input.settlementMode ?? 'normal') === 'normal'
     );

@@ -44,4 +44,5 @@ ohne die Entscheidung zu ersetzen.
 | [PO-BLP203-1](PO-BLP203-1-crm-salesforce-meridian.md) | CRM Salesforce/Meridian Erst-Slice (`BL-P2-03a`) | **Akzeptiert** (A1…H1 + **D1**; `main` PR #133/#134) |
 | [PO-BLP203-1-datenlieferung](PO-BLP203-1-datenlieferung.md) | Lokale CRM-Einrichtung (Export/Migration/Import) | **A/B/C lokal erledigt** (`dispo_mat_core`; Deploy offen) |
 | [PO-GOLIVE-CUT-1-DEC](PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung | **Akzeptiert für Projektpriorisierung**; Fachparameter bleiben Umsetzungsvoraussetzungen |
-| [PO-SPOT-SURCHARGE-1 Auftrag](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Nächster Slice Erst/Letzt (Readiness→Implementierung) | Auftrag vorbereitet |
+| [PO-SPOT-SURCHARGE-1 Auftrag](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Erst/Letzt auf `main` (PR #160) | umgesetzt |
+| [PO-SPOT-SINGLE-1 Auftrag](../readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md) | Single-Spot +50 % / MAT-003 | Draft-PR |

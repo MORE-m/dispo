@@ -167,9 +167,7 @@ trait CreatesEightSpotInventoryCalculabilityCatalog
             'code' => 'spot_classic',
             'sort' => 1,
         ]);
-        $spotSingle = AdvertisingMedium::factory()->create([
-            'name' => 'Single-Spot',
-            'code' => 'spot_single',
+        $spotSingle = AdvertisingMedium::factory()->spotSingle()->create([
             'sort' => 2,
         ]);
 
@@ -197,7 +195,8 @@ trait CreatesEightSpotInventoryCalculabilityCatalog
                     'inventory_id' => $inventory->id,
                     'advertising_medium_id' => $spotSingle->id,
                     'is_active' => true,
-                    'surcharge_percent' => '0.0000',
+                    // PO-SPOT-SINGLE-1: operativer Sollwert +50 % (Import-0 ist kein Live-Wert).
+                    'surcharge_percent' => '50.0000',
                 ]);
             }
 

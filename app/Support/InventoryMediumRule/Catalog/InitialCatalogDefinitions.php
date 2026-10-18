@@ -93,7 +93,8 @@ final class InitialCatalogDefinitions
             // PO-SPOT-SURCHARGE-1 Nachzug: Erst/Letzt auf spot_classic (historisch kind=null in PO-MAT-CORE-CATALOG-1).
             $row('Werbespot erstplatziert', 'spot_first', CanonicalAdvertisingCategories::SPOTS, 20, CalculationKind::SpotClassic),
             $row('Werbespot letztplatziert', 'spot_last', CanonicalAdvertisingCategories::SPOTS, 30, CalculationKind::SpotClassic),
-            $row('Single-Spot', 'spot_single', CanonicalAdvertisingCategories::SPOTS, 40),
+            // PO-SPOT-SINGLE-1 Nachzug: Single auf spot_classic (historisch kind=null in PO-MAT-CORE-CATALOG-1).
+            $row('Single-Spot', 'spot_single', CanonicalAdvertisingCategories::SPOTS, 40, CalculationKind::SpotClassic),
             $row('Showsponsoring-Single-Spot', 'spot_showsponsoring_single', CanonicalAdvertisingCategories::SPOTS, 50),
             $row('Tandem / Reminder', 'spot_tandem', CanonicalAdvertisingCategories::SPOTS, 60, CalculationKind::SpotClassic, SpotComponentProfile::Tandem),
             $row('Tridem', 'spot_tridem', CanonicalAdvertisingCategories::SPOTS, 70, CalculationKind::SpotClassic, SpotComponentProfile::Tridem),

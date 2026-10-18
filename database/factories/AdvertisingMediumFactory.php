@@ -82,6 +82,19 @@ class AdvertisingMediumFactory extends Factory
     }
 
     /**
+     * PO-SPOT-SINGLE-1: Single-Spot (kind=spot_classic, Code spot_single).
+     */
+    public function spotSingle(): static
+    {
+        return $this->state(fn (): array => [
+            'kind' => CalculationKind::SpotClassic,
+            'name' => 'Single-Spot',
+            'code' => 'spot_single',
+            'sort' => 40,
+        ]);
+    }
+
+    /**
      * BL-P5-01a: Trailer (kind=swf_trailer) in Kategorie special_advertising_formats.
      */
     public function swfTrailer(): static

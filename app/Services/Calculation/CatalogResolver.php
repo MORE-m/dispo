@@ -721,8 +721,8 @@ final class CatalogResolver
      * (NULL = nicht konfiguriert, fail-closed; 0 = ausdrücklich 0 %). Kein Fallback auf
      * Medium-Default oder ein anderes Inventar.
      * swf_allonge: zusätzlich swf_allonge_confirmed_at. Zahlen allein, auch 30/0, genügen nicht.
-     * spot_first / spot_last: Aufschlag muss vorhanden und positiv sein (NULL/0/negativ fail-closed).
-     * Spot Classic / Tandem / Tridem: NULL wie bisher als 0.
+     * spot_first / spot_last / spot_single: Aufschlag muss vorhanden und positiv sein
+     * (NULL/0/negativ fail-closed). Spot Classic / Tandem / Tridem: NULL wie bisher als 0.
      */
     private function liveSurchargePercent(
         InventoryMediumRule $rule,
@@ -752,18 +752,18 @@ final class CatalogResolver
             return (string) $rule->surcharge_percent;
         }
 
-        if (in_array((string) $medium->code, ['spot_first', 'spot_last'], true)) {
-            return $this->liveFirstLastSurchargePercent($rule, $inventory, $medium);
+        if (in_array((string) $medium->code, ['spot_first', 'spot_last', 'spot_single'], true)) {
+            return $this->livePositiveSurchargePercent($rule, $inventory, $medium);
         }
 
         return (string) ($rule->surcharge_percent ?? '0');
     }
 
     /**
-     * PO-SPOT-SURCHARGE-1: Erst-/Letztplatzierung – kein stilles 0 für fehlende/Import-Nullwerte.
-     * Positive administrativ gepflegte Werte bleiben zulässig; 30 % ist der Fach-Sollwert.
+     * PO-SPOT-SURCHARGE-1 / PO-SPOT-SINGLE-1: Erst/Letzt/Single – kein stilles 0.
+     * Positive administrativ gepflegte Werte bleiben zulässig (Sollwerte 30 % bzw. 50 %).
      */
-    private function liveFirstLastSurchargePercent(
+    private function livePositiveSurchargePercent(
         InventoryMediumRule $rule,
         Inventory $inventory,
         AdvertisingMedium $medium,
@@ -780,7 +780,7 @@ final class CatalogResolver
         if ((float) $rule->surcharge_percent <= 0) {
             throw ValidationException::withMessages([
                 'positions' => "Für {$inventory->name} × {$label} ist der Aufschlag ungültig "
-                    .'(0 % und negative Werte sind für Erst-/Letztplatzierung nicht zulässig). '
+                    .'(0 % und negative Werte sind für dieses Werbemittel nicht zulässig). '
                     .'Bitte einen positiven Aufschlag in der Kombinationstabelle hinterlegen.',
             ]);
         }

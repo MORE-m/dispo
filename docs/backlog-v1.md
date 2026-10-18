@@ -307,7 +307,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 4
 - **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; **Inventarauswahl einklappbar** PR **#112**; Rest offen: Abbinder/SPT-013, operative Blockplanung; REP-007 Dispo-PDF = Phase 10)
-- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** **PO-SPOT-SURCHARGE-1** Phase 2 (Erst/Letzt +30 % auf `spot_classic`) als Draft-PR; Single-Spot danach vorbehaltlich MAT-003. Nicht still in denselben Slice ziehen.
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** **PO-SPOT-SURCHARGE-1** auf `main` (PR #160, Erst/Letzt +30 %); **PO-SPOT-SINGLE-1** Draft-PR (Single +50 %, MAT-003 5/3). Promo nicht still in denselben Slice ziehen.
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
@@ -317,7 +317,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
 - **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
 - **Ergebnis Inventar-UI (PR #112, `012e125…`; Post-Merge-CI `36924662513` grün inkl. Inventar-Smoke):** nach erfolgreicher Inventarwahl klappen übrige Kacheln ein; „Anderes Inventar wählen“ klappt auf; Inventare ohne kalkulierbares Medium nicht wählbar; a11y/`motion-reduce`
-- **Offen (Rest von BL-P4-02):** Erst/Letzt (`PO-SPOT-SURCHARGE-1` Phase 2 Draft-PR); Single-Spot (MAT-003); Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10 (Interim-Nachweis laut CUT-1-DEC: Dispo-Detail + SPT-008)
+- **Ergebnis PO-SPOT-SINGLE-1 (Draft-PR):** `spot_single` × `spot_classic` +50 %; MAT-003 (5 erlaubt / 3 ausgeschlossen); Average/Calendar; fail-closed; Snapshots; Produktion OUT; SPT-010 Hinweis nur für Single
+- **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10 (Interim-Nachweis laut CUT-1-DEC: Dispo-Detail + SPT-008); MAT-003-Hinweistexte/Vollabnahme separat
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
