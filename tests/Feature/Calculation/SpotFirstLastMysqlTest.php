@@ -6,7 +6,7 @@ use App\Enums\Role;
 use App\Models\Calculation;
 use App\Models\User;
 use App\Services\DispoOrder\DispoOrderWriter;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesSpotFirstLastCatalog;
 use Tests\Support\MysqlTestDatabaseGuard;
@@ -14,11 +14,15 @@ use Tests\TestCase;
 
 /**
  * PO-SPOT-SURCHARGE-1: MySQL-Persistenz für kind, surcharge, Bookability, Snapshot.
+ *
+ * RefreshDatabase (nicht DatabaseMigrations): Slice-Migration down() ist fail-closed
+ * bei bestehenden Erst-/Letzt-Positionen; Rollback je Test wäre damit blockiert.
+ * Persistenz/Bookability werden hier trotzdem unter MySQL abgesichert.
  */
 class SpotFirstLastMysqlTest extends TestCase
 {
     use CreatesSpotFirstLastCatalog;
-    use DatabaseMigrations;
+    use RefreshDatabase;
 
     public function test_mysql_first_preview_store_reload_and_dispo_snapshot(): void
     {
@@ -105,10 +109,10 @@ class SpotFirstLastMysqlTest extends TestCase
 
     private function requireMysql(string $label): void
     {
-        if (DB::getDriverName() !== 'mysql') {
-            $this->markTestSkipped("{$label}: nur unter MySQL (aktuell ".DB::getDriverName().').');
-        }
+        MysqlTestDatabaseGuard::assertSafeBeforeDestructiveTraits();
 
-        MysqlTestDatabaseGuard::assertMysqlDatabaseIsDispoTest(DB::connection()->getDatabaseName());
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped($label.' erfordert MySQL (GitHub-Job mysql).');
+        }
     }
 }
