@@ -56,6 +56,32 @@ class AdvertisingMediumFactory extends Factory
     }
 
     /**
+     * PO-SPOT-SURCHARGE-1: Erstplatzierung (kind=spot_classic, Code spot_first).
+     */
+    public function spotFirst(): static
+    {
+        return $this->state(fn (): array => [
+            'kind' => CalculationKind::SpotClassic,
+            'name' => 'Werbespot erstplatziert',
+            'code' => 'spot_first',
+            'sort' => 20,
+        ]);
+    }
+
+    /**
+     * PO-SPOT-SURCHARGE-1: Letztplatzierung (kind=spot_classic, Code spot_last).
+     */
+    public function spotLast(): static
+    {
+        return $this->state(fn (): array => [
+            'kind' => CalculationKind::SpotClassic,
+            'name' => 'Werbespot letztplatziert',
+            'code' => 'spot_last',
+            'sort' => 30,
+        ]);
+    }
+
+    /**
      * BL-P5-01a: Trailer (kind=swf_trailer) in Kategorie special_advertising_formats.
      */
     public function swfTrailer(): static
