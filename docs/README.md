@@ -35,6 +35,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entwicklung-lokal-umgebung.md`](entwicklung-lokal-umgebung.md) | Kanonische lokale Workspace-Umgebung, Stilllegungen, Sicherungen |
 | [`blocker-und-entscheidungslog.md`](blocker-und-entscheidungslog.md) | Blocker und technische Detailentscheidungen |
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |
+| [`entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md`](entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung (akzeptiert für Projektpriorisierung) |
+| [`readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`](readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Nächster Auftrag Erst-/Letztplatzierung (Readiness→Implementierung) |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |

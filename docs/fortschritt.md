@@ -1,6 +1,12 @@
 # Fortschritt V1
 
-Stand: 15. Oktober 2026 – lokale Einrichtung von SWF-Allonge × Durchschnitt auf der bestehenden XAMPP-MariaDB `dispo_mat_core`.
+Stand: 18. Oktober 2026 – **PO-GOLIVE-CUT-1-DEC** dokumentiert (Docs-Branch, kein Produktcode).
+Operative V1 ist in vier Stufen priorisiert: Spot-/SWF-Kern inkl. Erst/Letzt (nach Werte-Readiness), Single (MAT-003), Promo (Profil-Readiness); Stufe 2 Benutzer-Admin-UI + Dispo-Interim-Nachweis (Detail+SPT-008-XLSX); Stufe 3 erweiterter Katalog (OA/Social/Events/weitere SWF) mit separater Readiness; Stufe 4 Begleitfunktionen inkl. Dispo-PDF.
+Nächster Auftrag: **PO-SPOT-SURCHARGE-1** (Erst/Letzt, Readiness→Implementierung).
+Basis `origin/main` @ `01c5e71…` (PR #158 lucide-react; keine Fachlogik). Kein Deploy.
+Dok: `docs/entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md`, `docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`.
+
+Stand davor: 15. Oktober 2026 – lokale Einrichtung von SWF-Allonge × Durchschnitt auf der bestehenden XAMPP-MariaDB `dispo_mat_core`.
 Code ist der Merge von PR #142, `092ac36a3a6e1f6f10c20b866cbcea90a3bcc647`. Das ist keine Fachfreigabe über die frühere Slice-Abnahme hinaus und kein Deploy.
 Migration `2026_10_14_140000_po_allonge_1_swf_allonge_confirmation` einmal angewendet. Die vier Allonge-Kombinationen sind über die Detailseite auf 10 s / 30 % bestätigt. Trailer bleibt 20 s / 30 %.
 Lokale Browser-Abnahme auf Port 8090: Vorschau, Speichern, Reload und Dispo `DA-2026-00007-01` zu `K-2026-00007`. Soll = Ist auf der Stundenbasis 08:00–08:59, Mo–Fr, 10 Spots: 7.280 + 2.210 + 1.040 + 130 = 10.660,00 €. Die Positionslänge bleibt für den Nutzer änderbar, der Aufschlag serverseitig. Nach den Änderungen steht die Kalkulation bei 17.485,00 €, der Dispo unverändert bei 10.660,00 €. Der Separatserver ist beendet; MariaDB und Port 8000 laufen weiter.
@@ -46,16 +52,21 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**Lokale Allonge-Einrichtung 15. Oktober 2026:** Startwerte und Browser-Abnahme auf `dispo_mat_core`, kein Deploy. Der Absatz vom 14. Oktober bleibt der damalige Slice-Stand vor dem Merge.
+**PO-GOLIVE-CUT-1-DEC (18. Oktober 2026):** Projektpriorisierung operative V1 akzeptiert (Docs-only). Nächster Arbeitsauftrag **PO-SPOT-SURCHARGE-1** (Erst/Letzt: Werte-Readiness, dann Implementierung). Kein Produktcode in diesem Nachzug.
 
-**Nachzug 14. Oktober 2026:** lokales Paketlimit dauerhaft, CRM-Importhinweis auf diesem Branch als Draft. Die Abschnitte darunter bleiben der jeweilige damalige Slice-Stand. Die Dokumentation der Einrichtung und des Smokes bleibt der Stand vom 13. Oktober. Technische lokale Prüfung, keine Fachabnahme, kein Deploy.
+**Stand davor – Lokale Allonge-Einrichtung 15. Oktober 2026:** Startwerte und Browser-Abnahme auf `dispo_mat_core`, kein Deploy. Der Absatz vom 14. Oktober bleibt der damalige Slice-Stand vor dem Merge.
+
+**Nachzug 14. Oktober 2026:** lokales Paketlimit dauerhaft, CRM-Importhinweis. Die Abschnitte darunter bleiben der jeweilige damalige Slice-Stand. Technische lokale Prüfung, keine Fachabnahme, kein Deploy.
 Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
 
-Offen / zurückgestellt u. a.:
-Deploy BL-P5-01a/02a und BL-P2-03a, SWF-Rest, Produktion-Rest,
+Offen / zurückgestellt u. a. (Priorisierung laut PO-GOLIVE-CUT-1-DEC):
+Stufe 1: PO-SPOT-SURCHARGE-1, danach Single (MAT-003), Promo (Profil-Readiness);
+Stufe 2: minimale Benutzer-Admin-UI, Preis-/Katalogvalidierung, Betrieb/E2E;
+Stufe 3: SWF-Rest, OA/TKP, Social, Events (separate Readiness);
+Stufe 4 / sonst: Deploy BL-P5-01a/02a und BL-P2-03a, Produktion-Rest,
 Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest, Submit-Empfänger, Invalidierungsmails,
 Budget-Vorlagen, SPT-013 Abbinder, In-App, REP, ADV-001 Defaults, ADV-002,
-MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10).
+MAT-003-Vollabnahme, REP-007 Dispo-PDF (Phase 10; Interim-Nachweis = Detail+SPT-008).
 
 ## CRM-Wizard-Picker / PO-BLP203-1 I1 (Oktober 2026)
 

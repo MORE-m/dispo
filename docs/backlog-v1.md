@@ -137,6 +137,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis:** nutzerbezogene Rabattgrenze und Sonderfreigabe-Flag; Überschreitung wird markiert, nicht umgangen
 - **Akzeptanz:** keine erfundenen Default-Grenzen; `null` bedeutet keine persönliche Grenze
 - **Tests:** Pest Lesen der Markierung berechtigt vs. Grenze überschritten; Flag-Policy siehe PO-AUTH-SPECIAL-APPROVE-1
+- **Hinweis PO-GOLIVE-CUT-1-DEC Stufe 2:** Vollständige Benutzer-Admin-UI (Anlegen/Rolle/Rabattgrenze/Aktivstatus)
+  ist noch nicht umgesetzt; Sonderfreigabe-Flag-Admin existiert. Separater Auftrag nach Spot-Kern.
 
 ### BL-P1-04 – Append-only-Audit
 
@@ -305,6 +307,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 4
 - **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; **Inventarauswahl einklappbar** PR **#112**; Rest offen: Abbinder/SPT-013, operative Blockplanung; REP-007 Dispo-PDF = Phase 10)
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Nächster Spot-Ausbau **PO-SPOT-SURCHARGE-1** (Erst/Letzt, Werte-Readiness→Implementierung); Single-Spot danach vorbehaltlich MAT-003. Nicht still in denselben Slice ziehen.
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
@@ -314,7 +317,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
 - **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
 - **Ergebnis Inventar-UI (PR #112, `012e125…`; Post-Merge-CI `36924662513` grün inkl. Inventar-Smoke):** nach erfolgreicher Inventarwahl klappen übrige Kacheln ein; „Anderes Inventar wählen“ klappt auf; Inventare ohne kalkulierbares Medium nicht wählbar; a11y/`motion-reduce`
-- **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10
+- **Offen (Rest von BL-P4-02):** Erst/Letzt (`PO-SPOT-SURCHARGE-1`, laut CUT-1-DEC Stufe 1); Single-Spot (MAT-003); Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10 (Interim-Nachweis laut CUT-1-DEC: Dispo-Detail + SPT-008)
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
@@ -359,8 +362,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P5-01 – SWF ohne Spotlängenindex
 
 - **Phase:** 5
-- **Status:** teilweise (Teilscope **`BL-P5-01a`** auf `main` PR #129 + lokal `dispo_mat_core`
-  eingerichtet; Paket nicht erledigt; Deploy/andere Umgebungen offen)
+- **Status:** teilweise (Teilscope **`BL-P5-01a`** Trailer auf `main` PR #129 + lokal eingerichtet;
+  **PO-ALLONGE-1** auf `main` PR #142 + lokal eingerichtet; Paket nicht erledigt; Deploy offen)
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Nächstes SWF nach Spot-Aufschlägen = Promo/Moderation
+  (Allonge-Muster, eigener Profil-Readiness-Auftrag); weitere SWF → Stufe 3 / separate Readiness
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
 - **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
@@ -373,11 +378,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`,
   `docs/readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`,
   `docs/entscheidungen/PO-BLP501A-1-datenlieferung.md`
-- **PO-ALLONGE-1 (dieser Branch, nicht gemergt):** Allonge × Durchschnitt, dieselben
+- **PO-ALLONGE-1 (`main` PR #142; lokal eingerichtet 15.10.):** Allonge × Durchschnitt, dieselben
   vier Sender; Bestätigung `swf_allonge_confirmed_at` nur durch Detail-Speichern;
-  Startwerte offen; operativ nicht eingerichtet; `BL-P5-01` bleibt teilweise; Dok
+  lokale Startwerte 10 s / 30 %; `BL-P5-01` bleibt teilweise; Dok
   `docs/entscheidungen/PO-ALLONGE-1-kombinationspflege.md`,
-  `docs/readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`
+  `docs/readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`,
+  `docs/readiness/PO-ALLONGE-1-lokale-einrichtung-2026-10-15.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
 - **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
@@ -852,6 +858,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 10
 - **Status:** offen
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Dispo-PDF (`REP-007`) = Stufe 4. Tag-1-Interim-Nachweis =
+  Dispo-Detailseite + SPT-008 Spotverteilung-XLSX (bereits umgesetzt). Kapitel-27-PDF-Layouts bleiben Liefergegenstand.
 - **Anforderungen:** `REP-005` bis `REP-007`, `AUD-002`
 - **Abhängigkeiten:** BL-P10-01, BL-P9-01
 - **Ergebnis:** interne PDFs (Dompdf/Blade), Excel/CSV, Download-Audit
@@ -864,6 +872,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 11
 - **Status:** blockiert
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Stufe 2 bereitet Produktivbetrieb und fachliche E2E-Abnahme vor
+  (Preis-/Katalogvalidierung, minimale Benutzer-Admin-UI, Interim-Nachweis). Deploy bleibt an Kap. 27 / ADR-003 gebunden.
 - **Anforderungen:** `AT-01` bis `AT-31`, Kapitel 24, Kapitel 27
 - **Abhängigkeiten:** BL-P10-02; Initialdaten Kapitel 27; ADR-003-Verifikation
 - **Ergebnis:** Berechtigungs-/Negativtests, Performance, Backup-Restore, Browser, Initialimport, Monitoring
