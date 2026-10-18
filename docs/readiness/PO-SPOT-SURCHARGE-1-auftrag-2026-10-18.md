@@ -1,9 +1,16 @@
 # Cursor-Auftrag: PO-SPOT-SURCHARGE-1 – Erst- und Letztplatzierung
 
-Status: **Auftrag vorbereitet** (Readiness zuerst, Implementierung erst nach Go)  
+Status: **Phase 2 in Umsetzung** (Draft-PR; Average + Calendar auf `spot_classic`, Fachaufschlag +30 %)  
 Stand: 18. Oktober 2026  
 Grundlage: [`PO-GOLIVE-CUT-1-DEC`](../entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md)  
 IDs: `PO-SPOT-SURCHARGE-1`, `spot_first`, `spot_last`, `SPT-011`, `PO-MAT-CORE-CATALOG-1`
+
+### Phase-1-Go (verbindlich)
+
+- Aufschlag Erst/Letzt: **+30 %** für alle freigegebenen Inventory×Medium-Regeln
+- Import-`0` ist kein operativer Fachwert → Migration/Importer setzen `30`; Runtime fail-closed bei `NULL`/`≤0`
+- Average + Calendar gemeinsam über Kategorie-Inherit (`kind=spot_classic`)
+- Single-Spot bleibt ausgeschlossen
 
 ## Ziel
 
@@ -54,6 +61,12 @@ IDs: `PO-SPOT-SURCHARGE-1`, `spot_first`, `spot_last`, `SPT-011`, `PO-MAT-CORE-C
 - Average und Calendar über bestehenden Spot-Pfad
 - keine Komponentenprofile; Index unverändert
 - bestehende Medien `spot_classic` / Tandem / Tridem unverändert
+
+### Katalog-Nachzug (nicht PO-MAT-CORE-CATALOG-1 umschreiben)
+
+Historisch setzte `PO-MAT-CORE-CATALOG-1` Erst/Letzt auf `kind=null`. Dieser Slice dokumentiert den **separaten Nachzug**:
+`InitialCatalogDefinitions` + Migration `2026_10_18_180000_po_spot_surcharge_1_first_last_catalog`
+setzen `kind=spot_classic` und `surcharge_percent=30` nur für `spot_first`/`spot_last`.
 
 ### Akzeptanzkriterien Phase 2
 

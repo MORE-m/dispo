@@ -23,6 +23,7 @@
         "test:e2e:blp403k": "playwright test -c playwright.blp403k.config.ts",
         "test:e2e:blp501a": "playwright test -c playwright.blp501a.config.ts",
         "test:e2e:po-allonge-1": "playwright test -c playwright.po-allonge-1.config.ts --retries=0",
+        "test:e2e:po-spot-surcharge-1": "playwright test -c playwright.po-spot-surcharge-1.config.ts --retries=0",
         "test:e2e:blp203a": "playwright test -c playwright.blp203a.config.ts",
         "test:e2e:crm-wizard-picker": "playwright test -c playwright.crm-wizard-picker.config.ts --retries=0",
         "test:e2e:calc-dispo-isolation-banner": "playwright test -c playwright.calc-dispo-isolation-banner.config.ts --retries=0",

@@ -365,7 +365,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory, $medium),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -581,7 +581,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory, $medium),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -704,7 +704,7 @@ final class CatalogResolver
             'total_spot_count' => $totalSpotCount,
             'spot_method' => $freeze->legacySpotMethod(),
             'freeze' => $freeze,
-            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory),
+            'surcharge_percent' => $this->liveSurchargePercent($rule, $freeze, $inventory, $medium),
             'is_discountable' => (bool) $rule->is_discountable && (bool) $medium->is_discountable,
             'is_ae_eligible' => (bool) $rule->is_ae_eligible && (bool) $medium->is_ae_eligible,
             'inventory_medium_rule_id' => $rule->id,
@@ -715,38 +715,73 @@ final class CatalogResolver
     }
 
     /**
-     * BL-P5-01a / SWF-004/005: Live-Aufschlag der Kombinationsregel.
+     * BL-P5-01a / SWF-004/005 / PO-SPOT-SURCHARGE-1: Live-Aufschlag der Kombinationsregel.
      *
      * swf_trailer: Länge UND Aufschlag müssen je Inventar ausdrücklich konfiguriert sein
      * (NULL = nicht konfiguriert, fail-closed; 0 = ausdrücklich 0 %). Kein Fallback auf
      * Medium-Default oder ein anderes Inventar.
      * swf_allonge: zusätzlich swf_allonge_confirmed_at. Zahlen allein, auch 30/0, genügen nicht.
-     * Spot Classic: NULL wie bisher als 0.
+     * spot_first / spot_last: Aufschlag muss vorhanden und positiv sein (NULL/0/negativ fail-closed).
+     * Spot Classic / Tandem / Tridem: NULL wie bisher als 0.
      */
     private function liveSurchargePercent(
         InventoryMediumRule $rule,
         CalculationMethodFreezeDescriptor $freeze,
         Inventory $inventory,
+        AdvertisingMedium $medium,
     ): string {
         if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE) {
             return $this->liveAllongeSurchargePercent($rule, $inventory);
         }
 
-        if ($freeze->engineProfileKey !== EngineProfileRegistry::PROFILE_SWF_TRAILER) {
-            return (string) ($rule->surcharge_percent ?? '0');
+        if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER) {
+            if ($rule->default_length_seconds === null) {
+                throw ValidationException::withMessages([
+                    'positions' => "Für {$inventory->name} ist keine Trailer-Länge konfiguriert. "
+                        .'Bitte die Länge in der Kombinationstabelle hinterlegen.',
+                ]);
+            }
+
+            if ($rule->surcharge_percent === null) {
+                throw ValidationException::withMessages([
+                    'positions' => "Für {$inventory->name} ist kein Trailer-Aufschlag konfiguriert (0 % ist zulässig, "
+                        .'wenn ausdrücklich hinterlegt). Bitte den Aufschlag in der Kombinationstabelle hinterlegen.',
+                ]);
+            }
+
+            return (string) $rule->surcharge_percent;
         }
 
-        if ($rule->default_length_seconds === null) {
-            throw ValidationException::withMessages([
-                'positions' => "Für {$inventory->name} ist keine Trailer-Länge konfiguriert. "
-                    .'Bitte die Länge in der Kombinationstabelle hinterlegen.',
-            ]);
+        if (in_array((string) $medium->code, ['spot_first', 'spot_last'], true)) {
+            return $this->liveFirstLastSurchargePercent($rule, $inventory, $medium);
         }
+
+        return (string) ($rule->surcharge_percent ?? '0');
+    }
+
+    /**
+     * PO-SPOT-SURCHARGE-1: Erst-/Letztplatzierung – kein stilles 0 für fehlende/Import-Nullwerte.
+     * Positive administrativ gepflegte Werte bleiben zulässig; 30 % ist der Fach-Sollwert.
+     */
+    private function liveFirstLastSurchargePercent(
+        InventoryMediumRule $rule,
+        Inventory $inventory,
+        AdvertisingMedium $medium,
+    ): string {
+        $label = trim((string) $medium->name) !== '' ? (string) $medium->name : (string) $medium->code;
 
         if ($rule->surcharge_percent === null) {
             throw ValidationException::withMessages([
-                'positions' => "Für {$inventory->name} ist kein Trailer-Aufschlag konfiguriert (0 % ist zulässig, "
-                    .'wenn ausdrücklich hinterlegt). Bitte den Aufschlag in der Kombinationstabelle hinterlegen.',
+                'positions' => "Für {$inventory->name} × {$label} ist kein Aufschlag konfiguriert. "
+                    .'Bitte einen positiven Aufschlag in der Kombinationstabelle hinterlegen.',
+            ]);
+        }
+
+        if ((float) $rule->surcharge_percent <= 0) {
+            throw ValidationException::withMessages([
+                'positions' => "Für {$inventory->name} × {$label} ist der Aufschlag ungültig "
+                    .'(0 % und negative Werte sind für Erst-/Letztplatzierung nicht zulässig). '
+                    .'Bitte einen positiven Aufschlag in der Kombinationstabelle hinterlegen.',
             ]);
         }
 

@@ -83,6 +83,15 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             CalculationKind::SpotClassic,
             AdvertisingMedium::query()->where('code', 'spot_classic')->firstOrFail()->kind,
         );
+        // PO-SPOT-SURCHARGE-1 Nachzug: Erst/Letzt ebenfalls spot_classic.
+        $this->assertSame(
+            CalculationKind::SpotClassic,
+            AdvertisingMedium::query()->where('code', 'spot_first')->firstOrFail()->kind,
+        );
+        $this->assertSame(
+            CalculationKind::SpotClassic,
+            AdvertisingMedium::query()->where('code', 'spot_last')->firstOrFail()->kind,
+        );
         $this->assertSame(
             SpotComponentProfile::Tandem,
             AdvertisingMedium::query()->where('code', 'spot_tandem')->firstOrFail()->component_profile,

@@ -1,10 +1,12 @@
 # Fortschritt V1
 
-Stand: 18. Oktober 2026 – **PO-GOLIVE-CUT-1-DEC** dokumentiert (Docs-Branch, kein Produktcode).
-Operative V1 ist in vier Stufen priorisiert: Spot-/SWF-Kern inkl. Erst/Letzt (nach Werte-Readiness), Single (MAT-003), Promo (Profil-Readiness); Stufe 2 Benutzer-Admin-UI + Dispo-Interim-Nachweis (Detail+SPT-008-XLSX); Stufe 3 erweiterter Katalog (OA/Social/Events/weitere SWF) mit separater Readiness; Stufe 4 Begleitfunktionen inkl. Dispo-PDF.
-Nächster Auftrag: **PO-SPOT-SURCHARGE-1** (Erst/Letzt, Readiness→Implementierung).
-Basis `origin/main` @ `01c5e71…` (PR #158 lucide-react; keine Fachlogik). Kein Deploy.
-Dok: `docs/entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md`, `docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`.
+Stand: 18. Oktober 2026 – **PO-SPOT-SURCHARGE-1 Phase 2** auf Feature-Branch (Draft-PR):
+`spot_first` / `spot_last` mit `kind=spot_classic`, Fachaufschlag **+30 %**, Average + Calendar,
+fail-closed bei `NULL`/`≤0`, Calc-/Dispo-Snapshot. Kein Deploy. Basis `main` @ `26a0986…` (PR #159).
+Dok: `docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`.
+
+Stand davor: 18. Oktober 2026 – **PO-GOLIVE-CUT-1-DEC** dokumentiert und gemergt (PR #159, Docs-only).
+Operative V1 in vier Stufen priorisiert. Nächster Auftrag war PO-SPOT-SURCHARGE-1 (dieser Slice).
 
 Stand davor: 15. Oktober 2026 – lokale Einrichtung von SWF-Allonge × Durchschnitt auf der bestehenden XAMPP-MariaDB `dispo_mat_core`.
 Code ist der Merge von PR #142, `092ac36a3a6e1f6f10c20b866cbcea90a3bcc647`. Das ist keine Fachfreigabe über die frühere Slice-Abnahme hinaus und kein Deploy.
@@ -52,7 +54,9 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**PO-GOLIVE-CUT-1-DEC (18. Oktober 2026):** Projektpriorisierung operative V1 akzeptiert (Docs-only). Nächster Arbeitsauftrag **PO-SPOT-SURCHARGE-1** (Erst/Letzt: Werte-Readiness, dann Implementierung). Kein Produktcode in diesem Nachzug.
+**PO-SPOT-SURCHARGE-1 Phase 2 (18. Oktober 2026):** Erst-/Letztplatzierung auf `spot_classic` (+30 %, Average/Calendar, fail-closed, Snapshots) – Draft-PR, kein Merge/Deploy. Single/Promo/Contest nicht begonnen.
+
+**PO-GOLIVE-CUT-1-DEC (18. Oktober 2026):** Projektpriorisierung operative V1 akzeptiert und gemergt (PR #159, Docs-only).
 
 **Stand davor – Lokale Allonge-Einrichtung 15. Oktober 2026:** Startwerte und Browser-Abnahme auf `dispo_mat_core`, kein Deploy. Der Absatz vom 14. Oktober bleibt der damalige Slice-Stand vor dem Merge.
 
@@ -60,7 +64,7 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
 
 Offen / zurückgestellt u. a. (Priorisierung laut PO-GOLIVE-CUT-1-DEC):
-Stufe 1: PO-SPOT-SURCHARGE-1, danach Single (MAT-003), Promo (Profil-Readiness);
+Stufe 1: PO-SPOT-SURCHARGE-1 (Phase 2 Draft-PR), danach Single (MAT-003), Promo (Profil-Readiness);
 Stufe 2: minimale Benutzer-Admin-UI, Preis-/Katalogvalidierung, Betrieb/E2E;
 Stufe 3: SWF-Rest, OA/TKP, Social, Events (separate Readiness);
 Stufe 4 / sonst: Deploy BL-P5-01a/02a und BL-P2-03a, Produktion-Rest,
