@@ -892,6 +892,7 @@ final class CalculationWriter
                 $catalog['freeze']->legacyKind(),
                 $settlement['mode'],
                 (int) $index,
+                (string) $catalog['medium']->code,
             );
 
             $resolved[] = [

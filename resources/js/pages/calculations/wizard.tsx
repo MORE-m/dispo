@@ -3754,6 +3754,13 @@ export default function CalculationWizard({
                                                                     htmlFor={`length-${index}`}
                                                                     hint={spotLengthSpt010Hint(
                                                                         position.length_seconds,
+                                                                        catalog.media.find(
+                                                                            (
+                                                                                item,
+                                                                            ) =>
+                                                                                item.id ===
+                                                                                position.advertising_medium_id,
+                                                                        )?.code,
                                                                     )}
                                                                 >
                                                                     <Input
@@ -5097,6 +5104,14 @@ export default function CalculationWizard({
                                                                             item.id ===
                                                                             position.advertising_medium_id,
                                                                     )?.kind,
+                                                                mediumCode:
+                                                                    catalog.media.find(
+                                                                        (
+                                                                            item,
+                                                                        ) =>
+                                                                            item.id ===
+                                                                            position.advertising_medium_id,
+                                                                    )?.code,
                                                                 methodKey:
                                                                     position.calculation_method_key,
                                                                 settlementMode:

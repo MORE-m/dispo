@@ -53,6 +53,9 @@ final class ProductionPriceResolver
     }
 
     /**
+     * Produktion nur für Medium-Code `spot_classic` (nicht Erst/Letzt/Single trotz kind=spot_classic).
+     * PO-SPOT-SINGLE-1 / Nachzug SURCHARGE-1: Code-Gate, kein reines Kind-Gate.
+     *
      * @param  list<array<string, mixed>>  $payloadLines  Roh-Payload (nur client_key/production_type/label/quantity/remark/sort werden gelesen)
      * @return list<ProductionLineInput>
      */
@@ -65,6 +68,7 @@ final class ProductionPriceResolver
         CalculationKind $kind,
         PricingSettlementMode $settlement,
         int $positionIndex = 0,
+        string $mediumCode = 'spot_classic',
     ): array {
         if ($payloadLines === []) {
             return [];
@@ -73,11 +77,12 @@ final class ProductionPriceResolver
         $field = "positions.{$positionIndex}.production_lines";
 
         if ($kind !== CalculationKind::SpotClassic
+            || $mediumCode !== 'spot_classic'
             || $spotMethod !== SpotCalculationMethod::Average
             || $settlement !== PricingSettlementMode::Normal
         ) {
             throw ValidationException::withMessages([
-                $field => 'Produktion ist nur für Spot Classic mit der Kalkulationsart Durchschnitt (ohne Festpreis) möglich. '
+                $field => 'Produktion ist nur für Werbespot (Spot Classic) mit der Kalkulationsart Durchschnitt (ohne Festpreis) möglich. '
                     .'Bitte die Produktionszeilen entfernen oder die Auswahl ändern.',
             ]);
         }

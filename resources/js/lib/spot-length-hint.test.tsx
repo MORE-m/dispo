@@ -13,16 +13,18 @@ afterEach(() => {
 
 function LengthField({
     lengthSeconds,
+    mediumCode = 'spot_single',
     onChange,
 }: {
     lengthSeconds: number;
+    mediumCode?: string;
     onChange?: (value: number) => void;
 }) {
     return (
         <FormField
             label="Länge (Sekunden)"
             htmlFor="length-0"
-            hint={spotLengthSpt010Hint(lengthSeconds)}
+            hint={spotLengthSpt010Hint(lengthSeconds, mediumCode)}
         >
             <Input
                 id="length-0"
@@ -38,18 +40,20 @@ function LengthField({
     );
 }
 
-describe('SPT-010 Spotlängen-Hinweis (BL-P4-02a)', () => {
-    it('zeigt keinen Hinweis bei 45 Sekunden', () => {
-        expect(spotLengthSpt010Hint(45)).toBeUndefined();
+describe('SPT-010 Spotlängen-Hinweis (BL-P4-02a / PO-SPOT-SINGLE-1)', () => {
+    it('zeigt keinen Hinweis bei 45 Sekunden für Single', () => {
+        expect(spotLengthSpt010Hint(45, 'spot_single')).toBeUndefined();
         render(<LengthField lengthSeconds={45} />);
         expect(screen.queryByText(SPT_010_LONG_SPOT_HINT)).toBeNull();
         expect(screen.getByLabelText('Länge (Sekunden)')).not.toBeDisabled();
         expect(screen.queryByRole('alert')).toBeNull();
     });
 
-    it('zeigt Hinweis bei 46 und 100 Sekunden ohne Sperre oder Fehler', () => {
-        expect(spotLengthSpt010Hint(46)).toBe(SPT_010_LONG_SPOT_HINT);
-        expect(spotLengthSpt010Hint(100)).toBe(SPT_010_LONG_SPOT_HINT);
+    it('zeigt Hinweis nur für spot_single bei >45 Sekunden ohne Sperre', () => {
+        expect(spotLengthSpt010Hint(46, 'spot_single')).toBe(SPT_010_LONG_SPOT_HINT);
+        expect(spotLengthSpt010Hint(100, 'spot_single')).toBe(SPT_010_LONG_SPOT_HINT);
+        expect(spotLengthSpt010Hint(46, 'spot_classic')).toBeUndefined();
+        expect(spotLengthSpt010Hint(46)).toBeUndefined();
 
         const { rerender } = render(<LengthField lengthSeconds={46} />);
         expect(screen.getByText(SPT_010_LONG_SPOT_HINT)).toBeTruthy();
