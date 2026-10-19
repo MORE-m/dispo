@@ -11,4 +11,7 @@ enum CalculationKind: string
 
     /** PO-ALLONGE-1: SWF-Medium Allonge (nur allonge × Durchschnitt), kein Spotlängenindex. */
     case SwfAllonge = 'swf_allonge';
+
+    /** PO-SWF-PROMO-1: SWF-Medium Promo/Moderation (nur promo_moderation × Durchschnitt), kein Spotlängenindex. */
+    case SwfPromo = 'swf_promo';
 }

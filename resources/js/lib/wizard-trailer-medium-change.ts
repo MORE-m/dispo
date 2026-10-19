@@ -23,8 +23,14 @@ export const SWF_TRAILER_KIND = 'swf_trailer';
 
 export const SWF_ALLONGE_KIND = 'swf_allonge';
 
+export const SWF_PROMO_KIND = 'swf_promo';
+
 export function isSwfLengthKind(kind: string | null | undefined): boolean {
-    return kind === SWF_TRAILER_KIND || kind === SWF_ALLONGE_KIND;
+    return (
+        kind === SWF_TRAILER_KIND ||
+        kind === SWF_ALLONGE_KIND ||
+        kind === SWF_PROMO_KIND
+    );
 }
 
 export type TrailerComponentProfiles = Record<

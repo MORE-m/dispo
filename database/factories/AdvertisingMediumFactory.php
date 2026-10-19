@@ -123,6 +123,21 @@ class AdvertisingMediumFactory extends Factory
         ]);
     }
 
+    /**
+     * PO-SWF-PROMO-1: Promo/Moderation (kind=swf_promo). Override-Zuordnung legt der Katalog-Helper an.
+     */
+    public function swfPromo(): static
+    {
+        return $this->state(fn (): array => [
+            'category_id' => fn (): int => $this->categoryId(CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS),
+            'kind' => CalculationKind::SwfPromo,
+            'name' => 'Promo/Moderation',
+            'code' => 'promo_moderation',
+            'default_length_seconds' => 20,
+            'sort' => 100,
+        ]);
+    }
+
     public function swfWithoutKind(string $name = 'Preseller', string $code = 'preseller'): static
     {
         return $this->state(fn (): array => [

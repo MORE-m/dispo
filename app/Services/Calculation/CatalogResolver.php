@@ -721,7 +721,7 @@ final class CatalogResolver
      * (NULL = nicht konfiguriert, fail-closed; 0 = ausdrücklich 0 %). Kein Fallback auf
      * Medium-Default oder ein anderes Inventar.
      * swf_allonge: zusätzlich swf_allonge_confirmed_at. Zahlen allein, auch 30/0, genügen nicht.
-     * spot_first / spot_last / spot_single: Aufschlag muss vorhanden und positiv sein
+     * spot_first / spot_last / spot_single / swf_promo: Aufschlag muss vorhanden und positiv sein
      * (NULL/0/negativ fail-closed). Spot Classic / Tandem / Tridem: NULL wie bisher als 0.
      */
     private function liveSurchargePercent(
@@ -732,6 +732,10 @@ final class CatalogResolver
     ): string {
         if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE) {
             return $this->liveAllongeSurchargePercent($rule, $inventory);
+        }
+
+        if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_PROMO) {
+            return $this->livePromoSurchargePercent($rule, $inventory, $medium);
         }
 
         if ($freeze->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_TRAILER) {
@@ -757,6 +761,24 @@ final class CatalogResolver
         }
 
         return (string) ($rule->surcharge_percent ?? '0');
+    }
+
+    /**
+     * PO-SWF-PROMO-1: Länge und positiver Aufschlag je Inventar erforderlich (kein Import-0).
+     */
+    private function livePromoSurchargePercent(
+        InventoryMediumRule $rule,
+        Inventory $inventory,
+        AdvertisingMedium $medium,
+    ): string {
+        if ($rule->default_length_seconds === null || (int) $rule->default_length_seconds <= 0) {
+            throw ValidationException::withMessages([
+                'positions' => "Für {$inventory->name} ist keine Promo/Moderation-Länge konfiguriert. "
+                    .'Bitte eine positive Länge in der Kombinationstabelle hinterlegen.',
+            ]);
+        }
+
+        return $this->livePositiveSurchargePercent($rule, $inventory, $medium);
     }
 
     /**

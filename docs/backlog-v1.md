@@ -364,9 +364,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 5
 - **Status:** teilweise (Teilscope **`BL-P5-01a`** Trailer auf `main` PR #129 + lokal eingerichtet;
-  **PO-ALLONGE-1** auf `main` PR #142 + lokal eingerichtet; Paket nicht erledigt; Deploy offen)
-- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Nächstes SWF nach Spot-Aufschlägen = Promo/Moderation
-  (Allonge-Muster, eigener Profil-Readiness-Auftrag); weitere SWF → Stufe 3 / separate Readiness
+  **PO-ALLONGE-1** auf `main` PR #142 + lokal eingerichtet;
+  **PO-SWF-PROMO-1** Feature-Branch/Draft-PR (Promo × Average); Paket nicht erledigt; Deploy offen)
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Promo-Slice in Umsetzung; weitere SWF → Stufe 3 / separate Readiness
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
 - **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
@@ -385,6 +385,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `docs/entscheidungen/PO-ALLONGE-1-kombinationspflege.md`,
   `docs/readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`,
   `docs/readiness/PO-ALLONGE-1-lokale-einrichtung-2026-10-15.md`
+- **PO-SWF-PROMO-1 (Feature-Branch / Draft-PR):** Promo/Moderation × Average, Profil `swf_promo`,
+  Initial 20 s / +50 %, vier Matrix-Inventare, kein Confirm-Feld, Calendar/Settlement/Produktion OUT;
+  `BL-P5-01` bleibt teilweise; Dok `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
 - **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
