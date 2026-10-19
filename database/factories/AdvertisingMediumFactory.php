@@ -138,6 +138,21 @@ class AdvertisingMediumFactory extends Factory
         ]);
     }
 
+    /**
+     * PO-SWF-CONTEST-1: Gewinnspiel/Pay-Off (kind=swf_contest). Override-Zuordnung legt der Katalog-Helper an.
+     */
+    public function swfContest(): static
+    {
+        return $this->state(fn (): array => [
+            'category_id' => fn (): int => $this->categoryId(CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS),
+            'kind' => CalculationKind::SwfContest,
+            'name' => 'Gewinnspiel/Pay-Off',
+            'code' => 'contest_payoff',
+            'default_length_seconds' => 25,
+            'sort' => 210,
+        ]);
+    }
+
     public function swfWithoutKind(string $name = 'Preseller', string $code = 'preseller'): static
     {
         return $this->state(fn (): array => [

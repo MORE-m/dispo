@@ -80,6 +80,7 @@ final class InitialCatalogBootstrapper
             $this->ensureSwfTrailerCategoryMethod($categoryIds);
             $this->ensureAllongeMediumOverride();
             $this->ensurePromoMediumOverride();
+            $this->ensureContestMediumOverride();
         });
 
         return [
@@ -246,6 +247,67 @@ final class InitialCatalogBootstrapper
         $assignment->advertising_medium_id = $medium->id;
         $assignment->calculation_method_id = $average->id;
         $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_PROMO;
+        $assignment->is_active = true;
+        $assignment->sort = 10;
+        $assignment->lock_version = 1;
+        $assignment->save();
+    }
+
+    /**
+     * PO-SWF-CONTEST-1: nur Medium contest_payoff auf Override mit Average / Profil swf_contest.
+     * Kategorie und Trailer bleiben unverändert. Idempotent.
+     */
+    private function ensureContestMediumOverride(): void
+    {
+        $medium = AdvertisingMedium::query()->where('code', 'contest_payoff')->lockForUpdate()->first();
+        if ($medium === null) {
+            return;
+        }
+
+        if ($medium->kind !== CalculationKind::SwfContest) {
+            throw new RuntimeException(
+                'Contest-Medium hat nicht die Berechnungsart swf_contest. Bootstrap überschreibt das nicht.',
+            );
+        }
+
+        $average = CalculationMethod::query()->where('key', 'average')->first();
+        if ($average === null) {
+            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Contest-Override.');
+        }
+
+        $assignments = AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $medium->id)
+            ->get();
+
+        $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
+            && (int) $medium->default_calculation_method_id === (int) $average->id
+            && $assignments->count() === 1
+            && (int) $assignments->first()->calculation_method_id === (int) $average->id
+            && $assignments->first()->engine_profile_key === EngineProfileRegistry::PROFILE_SWF_CONTEST
+            && (bool) $assignments->first()->is_active;
+
+        if ($matches) {
+            return;
+        }
+
+        $canInstall = $medium->calculation_method_mode === CalculationMethodMode::Inherit
+            && $medium->default_calculation_method_id === null
+            && $assignments->isEmpty();
+
+        if (! $canInstall) {
+            throw new RuntimeException(
+                'Contest-Methodenvertrag weicht ab und wird nicht überschrieben.',
+            );
+        }
+
+        $medium->calculation_method_mode = CalculationMethodMode::Override;
+        $medium->default_calculation_method_id = $average->id;
+        $medium->save();
+
+        $assignment = new AdvertisingMediumCalculationMethod;
+        $assignment->advertising_medium_id = $medium->id;
+        $assignment->calculation_method_id = $average->id;
+        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_CONTEST;
         $assignment->is_active = true;
         $assignment->sort = 10;
         $assignment->lock_version = 1;
@@ -453,7 +515,7 @@ final class InitialCatalogBootstrapper
         if ($existingKind !== $expectedKind) {
             $mismatches[] = 'kind Ist='.($existingKind ?? 'null').' Soll='.($expectedKind ?? 'null');
         }
-        if (in_array($definition['code'], ['allonge', 'promo_moderation'], true)) {
+        if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
             $averageId = CalculationMethod::query()->where('key', 'average')->value('id');
             if ($existing->calculation_method_mode !== CalculationMethodMode::Override) {
                 $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=override';
@@ -511,6 +573,17 @@ final class InitialCatalogBootstrapper
                 || ! $assignment->is_active
             ) {
                 $mismatches[] = 'Promo-Override fehlt oder weicht ab';
+            }
+        } elseif ($definition['code'] === 'contest_payoff') {
+            $assignment = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $existing->id)
+                ->first();
+            if ($methodCount !== 1
+                || $assignment === null
+                || $assignment->engine_profile_key !== EngineProfileRegistry::PROFILE_SWF_CONTEST
+                || ! $assignment->is_active
+            ) {
+                $mismatches[] = 'Contest-Override fehlt oder weicht ab';
             }
         } elseif ($methodCount !== 0) {
             $mismatches[] = "Methoden-Zuordnungen vorhanden ({$methodCount})";

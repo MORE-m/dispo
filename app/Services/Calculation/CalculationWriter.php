@@ -858,6 +858,7 @@ final class CalculationWriter
             $swfLengthLabel = match ($catalog['freeze']->engineProfileKey) {
                 EngineProfileRegistry::PROFILE_SWF_ALLONGE => 'Allonge',
                 EngineProfileRegistry::PROFILE_SWF_PROMO => 'Promo/Moderation',
+                EngineProfileRegistry::PROFILE_SWF_CONTEST => 'Gewinnspiel/Pay-Off',
                 default => 'Trailer',
             };
             if ($isSwfLength && $normalizedComponents !== []) {

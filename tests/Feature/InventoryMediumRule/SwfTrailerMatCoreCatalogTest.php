@@ -38,7 +38,7 @@ class SwfTrailerMatCoreCatalogTest extends TestCase
             ->pluck('code')
             ->all();
         sort($withKind);
-        $this->assertSame(['allonge', 'promo_moderation', 'trailer_station_voice'], $withKind);
+        $this->assertSame(['allonge', 'contest_payoff', 'promo_moderation', 'trailer_station_voice'], $withKind);
 
         $swf = AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS)

@@ -44,6 +44,7 @@ final readonly class CalculationMethodFreezeDescriptor
             EngineProfileRegistry::PROFILE_SWF_TRAILER => CalculationKind::SwfTrailer,
             EngineProfileRegistry::PROFILE_SWF_ALLONGE => CalculationKind::SwfAllonge,
             EngineProfileRegistry::PROFILE_SWF_PROMO => CalculationKind::SwfPromo,
+            EngineProfileRegistry::PROFILE_SWF_CONTEST => CalculationKind::SwfContest,
             default => throw new \InvalidArgumentException(
                 "Kein Legacy-kind für engine_profile_key „{$this->engineProfileKey}“.",
             ),
