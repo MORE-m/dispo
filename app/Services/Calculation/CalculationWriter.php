@@ -855,9 +855,11 @@ final class CalculationWriter
             );
 
             $isSwfLength = EngineProfileRegistry::usesAverageLengthWithoutIndex($catalog['freeze']->engineProfileKey);
-            $swfLengthLabel = $catalog['freeze']->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_ALLONGE
-                ? 'Allonge'
-                : 'Trailer';
+            $swfLengthLabel = match ($catalog['freeze']->engineProfileKey) {
+                EngineProfileRegistry::PROFILE_SWF_ALLONGE => 'Allonge',
+                EngineProfileRegistry::PROFILE_SWF_PROMO => 'Promo/Moderation',
+                default => 'Trailer',
+            };
             if ($isSwfLength && $normalizedComponents !== []) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.components" => $swfLengthLabel.' unterstützt keine Spot-Komponenten (Hauptspot/Allonge/Tandem/Tridem).',

@@ -58,10 +58,11 @@ final class AdvertisingMediumLiveBookability
             CalculationKind::SpotClassic => EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
             CalculationKind::SwfTrailer => EngineProfileRegistry::PROFILE_SWF_TRAILER,
             CalculationKind::SwfAllonge => EngineProfileRegistry::PROFILE_SWF_ALLONGE,
+            CalculationKind::SwfPromo => EngineProfileRegistry::PROFILE_SWF_PROMO,
             default => null,
         };
         if ($expectedProfile === null) {
-            return $this->blocked('Nur Spot Classic, Trailer und Allonge sind derzeit für neue Kalkulationen freigegeben.');
+            return $this->blocked('Nur Spot Classic, Trailer, Allonge und Promo/Moderation sind derzeit für neue Kalkulationen freigegeben.');
         }
 
         $medium->loadMissing([

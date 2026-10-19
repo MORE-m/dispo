@@ -86,14 +86,21 @@ final class CombinationMatrixImporter
                     // BL-P5-01a / PO-ALLONGE-1: Trailer und Allonge – Länge/Aufschlag nie erfinden.
                     // Allonge-Bestätigung bleibt NULL. Import bestätigt nicht.
                     // PO-SPOT-SURCHARGE-1 / PO-SPOT-SINGLE-1: Erst/Letzt +30 %, Single +50 % (kein Import-0).
+                    // PO-SWF-PROMO-1: Promo Create mit 20 s / +50 % (Reimport überschreibt Existing nicht).
                     $failClosed = $medium->kind === CalculationKind::SwfTrailer
                         || $medium->kind === CalculationKind::SwfAllonge;
                     $code = (string) $medium->code;
-                    $rule->default_length_seconds = $failClosed ? null : $medium->default_length_seconds;
+                    $isPromo = $medium->kind === CalculationKind::SwfPromo || $code === 'promo_moderation';
+                    $rule->default_length_seconds = match (true) {
+                        $failClosed => null,
+                        $isPromo => 20,
+                        default => $medium->default_length_seconds,
+                    };
                     $rule->surcharge_percent = match (true) {
                         $failClosed => null,
                         in_array($code, ['spot_first', 'spot_last'], true) => '30',
                         $code === 'spot_single' => '50',
+                        $isPromo => '50',
                         default => '0',
                     };
                     $rule->swf_allonge_confirmed_at = null;

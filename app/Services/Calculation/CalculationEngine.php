@@ -175,6 +175,15 @@ final class CalculationEngine
             );
         }
 
+        if ($position->isSwfPromo()
+            && ($position->spotMethod !== SpotCalculationMethod::Average
+                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
+        ) {
+            throw new \InvalidArgumentException(
+                'Promo/Moderation unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-SWF-PROMO-1).',
+            );
+        }
+
         return match ($position->spotMethod) {
             SpotCalculationMethod::Average => $this->calculateAveragePosition(
                 $position,

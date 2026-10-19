@@ -100,7 +100,8 @@ final class InitialCatalogDefinitions
             $row('Tridem', 'spot_tridem', CanonicalAdvertisingCategories::SPOTS, 70, CalculationKind::SpotClassic, SpotComponentProfile::Tridem),
             $row('Jobspot', 'jobspot', CanonicalAdvertisingCategories::SPOTS, 80),
             $row('Gegengeschäft', 'barter', CanonicalAdvertisingCategories::BARTER, 90),
-            $row('Promo/Moderation', 'promo_moderation', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 100),
+            // PO-SWF-PROMO-1: Promo/Moderation auf eigenem SWF-Profil (historisch kind=null).
+            $row('Promo/Moderation', 'promo_moderation', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 100, CalculationKind::SwfPromo),
             $row('Event-Tipp', 'event_tip', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 110),
             $row('Veranstaltungstipp', 'event_announcement', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 120),
             $row('Preseller', 'preseller', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 130),

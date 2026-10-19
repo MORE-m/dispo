@@ -53,9 +53,9 @@ class SwfAllongeCatalogTest extends TestCase
         $bookability = app(AdvertisingMediumLiveBookability::class);
         $this->assertTrue($bookability->evaluate($allonge)->isBookableForNewPositions);
         $this->assertSame('average', $bookability->evaluate($allonge)->calculationMethodKey);
-        $this->assertFalse($bookability->evaluate(
-            AdvertisingMedium::query()->where('code', 'promo_moderation')->firstOrFail(),
-        )->isBookableForNewPositions);
+        $promo = AdvertisingMedium::query()->where('code', 'promo_moderation')->firstOrFail();
+        $this->assertTrue($bookability->evaluate($promo)->isBookableForNewPositions);
+        $this->assertSame(EngineProfileRegistry::PROFILE_SWF_PROMO, $bookability->evaluate($promo)->engineProfileKey);
     }
 
     public function test_matrix_create_is_null_and_reimport_keeps_confirmed_values(): void

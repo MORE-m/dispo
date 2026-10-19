@@ -83,8 +83,8 @@ Betriebskritische Anforderungen (Sicherheit, Backup, SMTP, Domain, Rechtekern) s
 **Promo/Moderation (`promo_moderation`)**
 
 - eigenes SWF-Profil nach Allonge-Muster (nicht stilles Inherit auf `swf_trailer`)
-- Länge, Aufschlag und Bestätigungspflicht vor Implementierung verbindlich klären
-- eigener Auftrag nach Profil-Readiness (Arbeitstitel `PO-SWF-PROMO-1`)
+- Fachfreigabe V1: Referenzlänge 20 s, Initialaufschlag +50 %, kein Confirm-Feld
+- Auftrag `PO-SWF-PROMO-1` (Feature-Branch / Draft-PR; siehe Readiness)
 
 ## Verhältnis zu bestehenden Entscheidungen
 

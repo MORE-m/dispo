@@ -251,6 +251,12 @@ Der Aufschlag kommt nur aus der best채tigten Inventar-Kombination. Eine Nutzerl�
 allein schaltet eine unbest채tigte Kombination nicht frei. Das ist nicht die
 Spot-Allonge-Komponente. Startwerte bleiben offen. `BL-P5-01` bleibt teilweise.
 
+**PO-SWF-PROMO-1:** Promo/Moderation nutzt dasselbe SWF-Average ohne Spotl채ngenindex 체ber
+das eigene Profil `swf_promo` (nicht Trailer/Allonge). Initialwerte der Kombination:
+20 s / +50 % (administrativ 채nderbar). Kein Confirm-Feld; fehlende oder nicht positive
+L채nge/Aufschlag sind fail-closed. Nur Average; Calendar, Festpreis-Settlement und
+Produktion sind OUT. `BL-P5-01` bleibt teilweise.
+
 ## Online Audio und Podcast
 
 ```text

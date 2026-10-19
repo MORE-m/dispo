@@ -270,10 +270,11 @@ final class InventoryMediumRuleAdminWriter
             ]);
         }
 
-        // BL-P5-01a / PO-ALLONGE-1: NULL = nicht konfiguriert, 0 = ausdrücklich 0 %.
-        // Fehlendes Feld: Trailer und Allonge → NULL (nie still 0), übrige Medien → 0 wie bisher.
+        // BL-P5-01a / PO-ALLONGE-1 / PO-SWF-PROMO-1: NULL = nicht konfiguriert.
+        // Fehlendes Feld: SWF Trailer/Allonge/Promo → NULL (nie still 0), übrige Medien → 0 wie bisher.
         $isTrailer = $medium?->kind === CalculationKind::SwfTrailer
-            || $medium?->kind === CalculationKind::SwfAllonge;
+            || $medium?->kind === CalculationKind::SwfAllonge
+            || $medium?->kind === CalculationKind::SwfPromo;
         if (array_key_exists('surcharge_percent', $payload)) {
             $surchargeRaw = $payload['surcharge_percent'];
             $surcharge = $surchargeRaw === null || (is_string($surchargeRaw) && trim($surchargeRaw) === '')

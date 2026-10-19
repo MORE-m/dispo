@@ -34,6 +34,11 @@ final class EngineProfileRegistry
     public const PROFILE_SWF_ALLONGE = 'swf_allonge';
 
     /**
+     * PO-SWF-PROMO-1: SWF-Medium Promo/Moderation (nur Methode average; Spot-Sekundenpreise × Länge × Aufschlag, ohne Spotlängenindex).
+     */
+    public const PROFILE_SWF_PROMO = 'swf_promo';
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -82,15 +87,25 @@ final class EngineProfileRegistry
                 ],
             ],
         ],
+        self::PROFILE_SWF_PROMO => [
+            'average' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
+        ],
     ];
 
     /**
-     * Trailer und Allonge rechnen Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100), Index fest 100.
+     * Trailer, Allonge und Promo rechnen Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100), Index fest 100.
      */
     public static function usesAverageLengthWithoutIndex(string $engineProfileKey): bool
     {
         return $engineProfileKey === self::PROFILE_SWF_TRAILER
-            || $engineProfileKey === self::PROFILE_SWF_ALLONGE;
+            || $engineProfileKey === self::PROFILE_SWF_ALLONGE
+            || $engineProfileKey === self::PROFILE_SWF_PROMO;
     }
 
     public static function hasProfile(string $engineProfileKey): bool
