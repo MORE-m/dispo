@@ -14,4 +14,7 @@ enum CalculationKind: string
 
     /** PO-SWF-PROMO-1: SWF-Medium Promo/Moderation (nur promo_moderation × Durchschnitt), kein Spotlängenindex. */
     case SwfPromo = 'swf_promo';
+
+    /** PO-SWF-CONTEST-1: SWF-Medium Gewinnspiel/Pay-Off (nur contest_payoff × Durchschnitt), kein Spotlängenindex. */
+    case SwfContest = 'swf_contest';
 }

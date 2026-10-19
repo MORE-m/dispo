@@ -59,7 +59,7 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $categoryKey = AdvertisingCategory::query()->whereKey($medium->category_id)->value('key');
             $this->assertSame($definition['category_key'], $categoryKey);
             $this->assertSame($definition['kind']?->value, $medium->kind?->value);
-            if (in_array($definition['code'], ['allonge', 'promo_moderation'], true)) {
+            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
                 $this->assertSame(CalculationMethodMode::Override, $medium->calculation_method_mode);
                 $this->assertNotNull($medium->default_calculation_method_id);
             } else {
@@ -72,7 +72,7 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $this->assertSame($definition['component_profile']?->value, $medium->component_profile?->value);
             $this->assertTrue($medium->is_active);
             $this->assertSame(
-                in_array($definition['code'], ['allonge', 'promo_moderation'], true) ? 1 : 0,
+                in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true) ? 1 : 0,
                 AdvertisingMediumCalculationMethod::query()
                     ->where('advertising_medium_id', $medium->id)
                     ->count(),

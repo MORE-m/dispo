@@ -67,6 +67,11 @@ final readonly class PositionInput
         return $this->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_PROMO;
     }
 
+    public function isSwfContest(): bool
+    {
+        return $this->engineProfileKey === EngineProfileRegistry::PROFILE_SWF_CONTEST;
+    }
+
     public function usesAverageLengthWithoutIndex(): bool
     {
         return EngineProfileRegistry::usesAverageLengthWithoutIndex((string) $this->engineProfileKey);

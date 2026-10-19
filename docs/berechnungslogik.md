@@ -257,6 +257,12 @@ das eigene Profil `swf_promo` (nicht Trailer/Allonge). Initialwerte der Kombinat
 Länge/Aufschlag sind fail-closed. Nur Average; Calendar, Festpreis-Settlement und
 Produktion sind OUT. `BL-P5-01` bleibt teilweise.
 
+**PO-SWF-CONTEST-1:** Gewinnspiel/Pay-Off (`contest_payoff`, fachlich Gewinnspieldurchgang)
+nutzt dasselbe SWF-Average ohne Spotlängenindex über das eigene Profil `swf_contest`.
+Initialwerte der Kombination: 25 s / +50 % (administrativ änderbar). Kein Confirm-Feld;
+fehlende oder nicht positive Länge/Aufschlag sind fail-closed. Nur Average; Calendar,
+Festpreis-Settlement und Produktion sind OUT. `BL-P5-01` bleibt teilweise.
+
 ## Online Audio und Podcast
 
 ```text

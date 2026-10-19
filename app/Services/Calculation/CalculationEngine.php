@@ -184,6 +184,15 @@ final class CalculationEngine
             );
         }
 
+        if ($position->isSwfContest()
+            && ($position->spotMethod !== SpotCalculationMethod::Average
+                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
+        ) {
+            throw new \InvalidArgumentException(
+                'Gewinnspiel/Pay-Off unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-SWF-CONTEST-1).',
+            );
+        }
+
         return match ($position->spotMethod) {
             SpotCalculationMethod::Average => $this->calculateAveragePosition(
                 $position,

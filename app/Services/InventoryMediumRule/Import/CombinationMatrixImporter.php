@@ -91,9 +91,11 @@ final class CombinationMatrixImporter
                         || $medium->kind === CalculationKind::SwfAllonge;
                     $code = (string) $medium->code;
                     $isPromo = $medium->kind === CalculationKind::SwfPromo || $code === 'promo_moderation';
+                    $isContest = $medium->kind === CalculationKind::SwfContest || $code === 'contest_payoff';
                     $rule->default_length_seconds = match (true) {
                         $failClosed => null,
                         $isPromo => 20,
+                        $isContest => 25,
                         default => $medium->default_length_seconds,
                     };
                     $rule->surcharge_percent = match (true) {
@@ -101,6 +103,7 @@ final class CombinationMatrixImporter
                         in_array($code, ['spot_first', 'spot_last'], true) => '30',
                         $code === 'spot_single' => '50',
                         $isPromo => '50',
+                        $isContest => '50',
                         default => '0',
                     };
                     $rule->swf_allonge_confirmed_at = null;

@@ -114,7 +114,8 @@ final class InitialCatalogDefinitions
             $row('Bumper', 'bumper', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 180),
             $row('Stinger', 'stinger', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 190),
             $row('Closer', 'closer', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 200),
-            $row('Gewinnspiel/Pay-Off', 'contest_payoff', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 210),
+            // PO-SWF-CONTEST-1: Gewinnspiel/Pay-Off auf eigenem SWF-Profil (historisch kind=null).
+            $row('Gewinnspiel/Pay-Off', 'contest_payoff', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 210, CalculationKind::SwfContest),
             $row('Sondersendung (4x90Sek)', 'special_broadcast', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 220),
             $row('Influencer-Spot', 'influencer_spot', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 230),
             $row('Influencer-Spot als Single-Spot', 'influencer_single_spot', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS, 240),

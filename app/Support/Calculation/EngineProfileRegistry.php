@@ -39,6 +39,11 @@ final class EngineProfileRegistry
     public const PROFILE_SWF_PROMO = 'swf_promo';
 
     /**
+     * PO-SWF-CONTEST-1: SWF-Medium Gewinnspiel/Pay-Off (nur Methode average; Spot-Sekundenpreise × Länge × Aufschlag, ohne Spotlängenindex).
+     */
+    public const PROFILE_SWF_CONTEST = 'swf_contest';
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -96,16 +101,26 @@ final class EngineProfileRegistry
                 ],
             ],
         ],
+        self::PROFILE_SWF_CONTEST => [
+            'average' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
+        ],
     ];
 
     /**
-     * Trailer, Allonge und Promo rechnen Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100), Index fest 100.
+     * Trailer, Allonge, Promo und Contest rechnen Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100), Index fest 100.
      */
     public static function usesAverageLengthWithoutIndex(string $engineProfileKey): bool
     {
         return $engineProfileKey === self::PROFILE_SWF_TRAILER
             || $engineProfileKey === self::PROFILE_SWF_ALLONGE
-            || $engineProfileKey === self::PROFILE_SWF_PROMO;
+            || $engineProfileKey === self::PROFILE_SWF_PROMO
+            || $engineProfileKey === self::PROFILE_SWF_CONTEST;
     }
 
     public static function hasProfile(string $engineProfileKey): bool

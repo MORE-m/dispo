@@ -1,10 +1,16 @@
 # Fortschritt V1
 
-Stand: 19. Oktober 2026 – **PO-USER-ADMIN-1** auf Feature-Branch (Draft-PR):
+Stand: 19. Oktober 2026 – **PO-SWF-CONTEST-1** auf Feature-Branch (Draft-PR):
+`contest_payoff` (Gewinnspiel/Pay-Off = Gewinnspieldurchgang) mit eigenem Profil
+`swf_contest`, nur Average, Initial **25 s / +50 %**, vier Matrix-Inventare,
+fail-closed, Calc-/Dispo-Snapshot; Calendar/Settlement/Produktion/Komponenten OUT;
+kein Confirm-Feld. Kein Deploy.
+Dok: `docs/readiness/PO-SWF-CONTEST-1-auftrag-2026-10-19.md`.
+
+Stand davor: 19. Oktober 2026 – **PO-USER-ADMIN-1** auf `main` (PR #164):
 minimale Admin-Benutzerverwaltung (Liste/Anlegen/Bearbeiten: Rolle, Rabattgrenze,
 Sonderfreigabe über bestehenden Writer, `is_active` + Login-/Session-Sperre).
-Kein Delete/IAM/Contest/Deploy. Basis `main` @ `688ce9f…` (nach Promo-Merge PR #163).
-Dok: `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`.
+Kein Delete/IAM/Deploy.
 
 Stand davor: 19. Oktober 2026 – **PO-SWF-PROMO-1** auf `main` (PR #163):
 `promo_moderation` mit eigenem Profil `swf_promo`, nur Average, Initial **20 s / +50 %**,
