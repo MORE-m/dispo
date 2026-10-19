@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $discount_limit_percent
  * @property bool $can_special_approve
  * @property bool $can_view_dispo_orders Extra-Recht Dispo-Ansicht (AUTH-007 / BL-P9-02a); öffnet keinen Kalkulationszugang
+ * @property bool $is_active PO-USER-ADMIN-1: operativer Aktivstatus (kein Hard Delete)
  * @property string $password
  * @property string|null $remember_token
  * @property Carbon|null $created_at
@@ -42,6 +43,7 @@ class User extends Authenticatable
             'discount_limit_percent' => 'decimal:4',
             'can_special_approve' => 'boolean',
             'can_view_dispo_orders' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -166,6 +168,14 @@ class User extends Authenticatable
      * ausschließlich Admin (nicht allein Management).
      */
     public function canManageSpecialApproveRights(): bool
+    {
+        return $this->hasRole(Role::Admin);
+    }
+
+    /**
+     * PO-USER-ADMIN-1: Benutzerliste/-CRUD ausschließlich Admin (nicht allein Management).
+     */
+    public function canManageUsers(): bool
     {
         return $this->hasRole(Role::Admin);
     }

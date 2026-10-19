@@ -84,7 +84,7 @@ Betriebskritische Anforderungen (Sicherheit, Backup, SMTP, Domain, Rechtekern) s
 
 - eigenes SWF-Profil nach Allonge-Muster (nicht stilles Inherit auf `swf_trailer`)
 - Fachfreigabe V1: Referenzlänge 20 s, Initialaufschlag +50 %, kein Confirm-Feld
-- Auftrag `PO-SWF-PROMO-1` (Feature-Branch / Draft-PR; siehe Readiness)
+- Auftrag `PO-SWF-PROMO-1` auf `main` (PR #163; siehe Readiness)
 
 ## Verhältnis zu bestehenden Entscheidungen
 
@@ -105,11 +105,14 @@ Betriebskritische Anforderungen (Sicherheit, Backup, SMTP, Domain, Rechtekern) s
 - Tag-1-Pflicht für OA/Social/Events (Stufe 3, separate Readiness)
 - Pflicht-Dispo-PDF vor Produktivsetzung (Interim XLSX+Detail ist beschlossen; PDF bleibt Liefer-/Stufenpunkt)
 
-## Nächster Auftrag
+## Nächster Auftrag (Statusnachzug)
 
-**PO-SPOT-SURCHARGE-1 – Erst- und Letztplatzierung**  
-Zuerst Werte-/Konfigurations-Readiness, danach kleiner Implementierungsslice.  
-Auftragstext: [`docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md)
+Stufe-1-Medienkern auf `main` (Erst/Letzt #160, Single #161, Promo #163).  
+Aktueller Stufe-2-Ausschnitt: **PO-USER-ADMIN-1** (minimale Benutzer-Admin-UI).  
+Auftragstext: [`docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`](../readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md)
+
+Historisch erster Folgeschritt nach DEC-Akzeptanz war PO-SPOT-SURCHARGE-1
+([`docs/readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`](../readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md)).
 
 ## Nicht freigegeben durch dieses Dokument
 
