@@ -275,19 +275,16 @@ function postedField(response: Response, field: string): string | null {
 }
 
 /**
- * Speichert Länge und Aufschlag der Allonge-Kombination des genannten Inventars.
+ * Öffnet die Allonge-Kombination des genannten Inventars in der Admin-Detailansicht.
  *
  * Der Inventarfilter lädt die Liste per Inertia nach. Solange diese Antwort
- * fehlt, ist die erste Allonge-Zeile noch ein anderes Inventar.
- * „bestätigt am“ kann außerdem schon von der zuvor geöffneten Kombination
- * stammen und darf den gerade ausgelösten PUT nicht abschließen.
+ * fehlt, ist die erste Allonge-Zeile noch ein anderes Inventar (z. B. ATA
+ * statt ATU) – daher nie `.first()` vor der gefilterten Antwort.
  */
-async function setAllongeConfirmation(
+async function openAllongeCombinationDetail(
     page: Page,
     inventoryLabel: string,
-    length: string,
-    surcharge: string,
-) {
+): Promise<CombinationIdentity> {
     await page.goto('/administration/kombinationen');
     const filteredList = page.waitForResponse(
         (response) =>
@@ -314,6 +311,23 @@ async function setAllongeConfirmation(
         rule.inventory_name,
         { timeout: 20_000 },
     );
+
+    return rule;
+}
+
+/**
+ * Speichert Länge und Aufschlag der Allonge-Kombination des genannten Inventars.
+ *
+ * „bestätigt am“ kann schon von der zuvor geöffneten Kombination stammen und
+ * darf den gerade ausgelösten PUT nicht abschließen.
+ */
+async function setAllongeConfirmation(
+    page: Page,
+    inventoryLabel: string,
+    length: string,
+    surcharge: string,
+) {
+    const rule = await openAllongeCombinationDetail(page, inventoryLabel);
     await page.locator('#default_length_seconds').fill(length);
     await page.locator('#surcharge_percent').fill(surcharge);
 
@@ -425,17 +439,10 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
     test('Admin-Speichern bestätigt ausdrücklich 30/0 ohne Checkbox', async ({ page }) => {
         test.setTimeout(120_000);
         await login(page, 'admin@example.com');
-        await page.goto('/administration/kombinationen');
-        await page
-            .locator('[data-test="combination-filter-inventory"]')
-            .selectOption({ label: 'Allonge Testsender Unbestätigt (ATU)' });
-        const row = page
-            .locator('[data-test^="combination-row-"]')
-            .filter({
-                has: page.getByRole('cell', { name: 'Allonge', exact: true }),
-            })
-            .first();
-        await row.locator('[data-test^="combination-open-"]').click();
+        await openAllongeCombinationDetail(
+            page,
+            'Allonge Testsender Unbestätigt (ATU)',
+        );
         await expect(page.locator('[data-test="allonge-confirmation-status"]')).toContainText(
             'nicht bestätigt',
         );
@@ -553,17 +560,7 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
 
         await logout(page);
         await login(page, 'admin@example.com');
-        await page.goto('/administration/kombinationen');
-        await page
-            .locator('[data-test="combination-filter-inventory"]')
-            .selectOption({ label: 'Allonge Testsender A (ATA)' });
-        const row = page
-            .locator('[data-test^="combination-row-"]')
-            .filter({
-                has: page.getByRole('cell', { name: 'Allonge', exact: true }),
-            })
-            .first();
-        await row.locator('[data-test^="combination-open-"]').click();
+        await openAllongeCombinationDetail(page, 'Allonge Testsender A (ATA)');
         await page.locator('#surcharge_percent').fill('');
         await page.locator('[data-test="combination-save-submit"]').click();
         await expect(page.locator('[data-test="allonge-confirmation-status"]')).toContainText(
