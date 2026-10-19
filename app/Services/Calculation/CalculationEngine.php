@@ -157,40 +157,19 @@ final class CalculationEngine
         string $orderDiscountPercent,
         array $orderDiscounts = [],
     ): PositionResult {
-        if ($position->isSwfTrailer()
-            && ($position->spotMethod !== SpotCalculationMethod::Average
-                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
-        ) {
-            throw new \InvalidArgumentException(
-                'Trailer unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (BL-P5-01a).',
+        // PO-SWF-CALENDAR-1: SWF-Längenprofile erlauben Average + Calendar, Settlement bleibt OUT.
+        // Kein Medium-Hardcoding – Capability über Engine-Profil.
+        if ($position->usesAverageLengthWithoutIndex()) {
+            $methodAllowed = in_array(
+                $position->spotMethod,
+                [SpotCalculationMethod::Average, SpotCalculationMethod::Calendar],
+                true,
             );
-        }
-
-        if ($position->isSwfAllonge()
-            && ($position->spotMethod !== SpotCalculationMethod::Average
-                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
-        ) {
-            throw new \InvalidArgumentException(
-                'Allonge unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-ALLONGE-1).',
-            );
-        }
-
-        if ($position->isSwfPromo()
-            && ($position->spotMethod !== SpotCalculationMethod::Average
-                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
-        ) {
-            throw new \InvalidArgumentException(
-                'Promo/Moderation unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-SWF-PROMO-1).',
-            );
-        }
-
-        if ($position->isSwfContest()
-            && ($position->spotMethod !== SpotCalculationMethod::Average
-                || $position->pricingSettlementMode !== PricingSettlementMode::Normal)
-        ) {
-            throw new \InvalidArgumentException(
-                'Gewinnspiel/Pay-Off unterstützt nur die Kalkulationsart Durchschnitt ohne Festpreis-Abschluss (PO-SWF-CONTEST-1).',
-            );
+            if (! $methodAllowed || $position->pricingSettlementMode !== PricingSettlementMode::Normal) {
+                throw new \InvalidArgumentException(
+                    'SWF-Längenmedien unterstützen nur Durchschnitt und Kalender ohne Festpreis-Abschluss.',
+                );
+            }
         }
 
         return match ($position->spotMethod) {
@@ -460,7 +439,8 @@ final class CalculationEngine
     }
 
     /**
-     * SPT-009 Spotlängenindex nur für Spot Classic. swf_trailer und swf_allonge: nie Index, immer 100.
+     * SPT-009 Spotlängenindex nur für Spot Classic.
+     * SWF-Längenprofile (Average + Calendar): nie Index, immer 100 (PO-SWF-CALENDAR-1).
      */
     private function lengthIndexFor(PositionInput $position, int $lengthSeconds): int
     {

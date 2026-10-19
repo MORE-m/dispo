@@ -87,6 +87,16 @@ class E2ESwfAllongeAverageSeeder extends Seeder
         $assignment->lock_version = 1;
         $assignment->save();
 
+        $calendar = CalculationMethod::query()->where('key', 'calendar')->firstOrFail();
+        $calendarAssignment = new AdvertisingMediumCalculationMethod;
+        $calendarAssignment->advertising_medium_id = $allonge->id;
+        $calendarAssignment->calculation_method_id = $calendar->id;
+        $calendarAssignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_ALLONGE;
+        $calendarAssignment->is_active = true;
+        $calendarAssignment->sort = 20;
+        $calendarAssignment->lock_version = 1;
+        $calendarAssignment->save();
+
         $rows = [
             ['name' => 'Allonge Testsender A', 'code' => 'ATA', 'sort' => 1, 'length' => 10, 'surcharge' => '30', 'confirmed' => true],
             ['name' => 'Allonge Testsender Unbestätigt', 'code' => 'ATU', 'sort' => 2, 'length' => 30, 'surcharge' => '0', 'confirmed' => false],

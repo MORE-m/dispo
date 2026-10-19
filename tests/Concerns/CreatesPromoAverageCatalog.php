@@ -25,6 +25,8 @@ use App\Support\PriceList\PriceListCalendar;
  */
 trait CreatesPromoAverageCatalog
 {
+    use AddsSwfCalendarMethodAssignment;
+
     /**
      * @return array{
      *     organization: Organization,
@@ -57,6 +59,7 @@ trait CreatesPromoAverageCatalog
         $assignment->sort = 10;
         $assignment->lock_version = 1;
         $assignment->save();
+        $this->assignSwfMediumCalendar($promo, EngineProfileRegistry::PROFILE_SWF_PROMO);
 
         $spot = AdvertisingMedium::factory()->create();
 

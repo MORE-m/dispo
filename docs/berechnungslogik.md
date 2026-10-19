@@ -254,14 +254,20 @@ Spot-Allonge-Komponente. Startwerte bleiben offen. `BL-P5-01` bleibt teilweise.
 **PO-SWF-PROMO-1:** Promo/Moderation nutzt dasselbe SWF-Average ohne Spotlängenindex über
 das eigene Profil `swf_promo` (nicht Trailer/Allonge). Initialwerte der Kombination:
 20 s / +50 % (administrativ änderbar). Kein Confirm-Feld; fehlende oder nicht positive
-Länge/Aufschlag sind fail-closed. Nur Average; Calendar, Festpreis-Settlement und
-Produktion sind OUT. `BL-P5-01` bleibt teilweise.
+Länge/Aufschlag sind fail-closed. Produktion und Settlement bleiben OUT.
+`BL-P5-01` bleibt teilweise.
 
 **PO-SWF-CONTEST-1:** Gewinnspiel/Pay-Off (`contest_payoff`, fachlich Gewinnspieldurchgang)
 nutzt dasselbe SWF-Average ohne Spotlängenindex über das eigene Profil `swf_contest`.
 Initialwerte der Kombination: 25 s / +50 % (administrativ änderbar). Kein Confirm-Feld;
-fehlende oder nicht positive Länge/Aufschlag sind fail-closed. Nur Average; Calendar,
-Festpreis-Settlement und Produktion sind OUT. `BL-P5-01` bleibt teilweise.
+fehlende oder nicht positive Länge/Aufschlag sind fail-closed. Produktion und Settlement
+bleiben OUT. `BL-P5-01` bleibt teilweise.
+
+**PO-SWF-CALENDAR-1:** Die Profile `swf_trailer`, `swf_allonge`, `swf_promo` und
+`swf_contest` unterstützen zusätzlich **Calendar** ohne Spotlängenindex (effektiver
+Index 100). Formel je Slot: Sekundenpreis × Länge × Anzahl × (1 + surcharge/100).
+Average bleibt freigegeben. Settlement, Method-Key `fixed_price`, Produktion und
+Komponenten bleiben OUT. Allonge Confirm gilt auch für Calendar.
 
 ## Online Audio und Podcast
 

@@ -34,10 +34,14 @@ class SwfContestCatalogTest extends TestCase
         $assignments = AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $contest->id)
             ->with('calculationMethod')
+            ->orderBy('sort')
             ->get();
-        $this->assertCount(1, $assignments);
-        $this->assertSame('average', $assignments[0]->calculationMethod?->key);
-        $this->assertSame(EngineProfileRegistry::PROFILE_SWF_CONTEST, $assignments[0]->engine_profile_key);
+        $this->assertCount(2, $assignments);
+        $this->assertSame(['average', 'calendar'], $assignments->pluck('calculationMethod.key')->all());
+        $this->assertSame(
+            [EngineProfileRegistry::PROFILE_SWF_CONTEST, EngineProfileRegistry::PROFILE_SWF_CONTEST],
+            $assignments->pluck('engine_profile_key')->all(),
+        );
 
         $trailer = AdvertisingMedium::query()->where('code', 'trailer_station_voice')->firstOrFail();
         $this->assertSame(CalculationKind::SwfTrailer, $trailer->kind);

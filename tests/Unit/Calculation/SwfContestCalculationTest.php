@@ -42,19 +42,13 @@ class SwfContestCalculationTest extends TestCase
         $this->assertSame('775.00', $result->mediaGross);
     }
 
-    public function test_contest_rejects_calendar_and_fixed_price(): void
+    public function test_contest_rejects_fixed_price_settlement(): void
     {
-        $engine = new CalculationEngine;
-
-        try {
-            $engine->calculatePosition($this->contest(25, '50', 10, '2.0000', method: SpotCalculationMethod::Calendar), '0');
-            $this->fail('Calendar hätte abgelehnt werden müssen.');
-        } catch (InvalidArgumentException) {
-            $this->assertTrue(true);
-        }
-
         $this->expectException(InvalidArgumentException::class);
-        $engine->calculatePosition($this->contest(25, '50', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice), '0');
+        (new CalculationEngine)->calculatePosition(
+            $this->contest(25, '50', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice),
+            '0',
+        );
     }
 
     private function contest(

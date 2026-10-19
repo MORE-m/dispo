@@ -423,9 +423,10 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         await expect(page.locator('[data-test="allonge-unconfirmed-0"]')).toContainText(
             'nicht bestätigt',
         );
+        // PO-SWF-CALENDAR-1: Calendar-Option sichtbar; Confirm bleibt fail-closed.
         await expect(
             page.locator('[data-test="calculation-method-radio-0-calendar"]'),
-        ).toHaveCount(0);
+        ).toBeVisible();
         await fillRange(page, 0, '10');
         await waitForPreview(page);
         await page.getByRole('button', { name: '3. Konditionen' }).click();

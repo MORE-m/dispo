@@ -32,6 +32,8 @@ use App\Support\PriceList\PriceListCalendar;
  */
 trait CreatesTrailerAverageCatalog
 {
+    use AddsSwfCalendarMethodAssignment;
+
     /**
      * @return array{
      *     organization: Organization,
@@ -49,6 +51,7 @@ trait CreatesTrailerAverageCatalog
     protected function createTrailerAverageCatalog(): array
     {
         $this->assignSwfCategoryAverageToTrailerProfile();
+        $this->assignSwfCategoryCalendarToTrailerProfile();
 
         $organization = Organization::factory()->create();
         $trailer = AdvertisingMedium::factory()->swfTrailer()->create();

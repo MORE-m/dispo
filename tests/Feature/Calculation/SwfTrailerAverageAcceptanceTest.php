@@ -336,21 +336,12 @@ class SwfTrailerAverageAcceptanceTest extends TestCase
         $this->preview($this->sales(), $payload)->assertStatus(422);
     }
 
-    public function test_calendar_fixed_price_and_components_are_rejected_for_trailer(): void
+    public function test_fixed_price_and_components_are_rejected_for_trailer(): void
     {
         $catalog = $this->createTrailerAverageCatalog();
         $user = $this->sales();
 
-        $calendar = $this->trailerPayload([[
-            'inventory_id' => $catalog['a']->id,
-            'advertising_medium_id' => $catalog['trailer']->id,
-            'spot_method' => 'calendar',
-            'position_discount_percent' => '0',
-            'ae_percent' => '0',
-            'planner_entries' => [['date' => now()->toDateString(), 'hour' => 8, 'spot_count' => 2]],
-        ]]);
-        $this->preview($user, $calendar)->assertStatus(422);
-
+        // PO-SWF-CALENDAR-1: Calendar freigegeben; Settlement/Komponenten bleiben OUT.
         $fixed = $this->trailerPayload([
             $this->trailerPosition($catalog['a'], $catalog['trailer'], 10, [
                 'pricing_settlement_mode' => 'fixed_price',

@@ -92,8 +92,8 @@ final class InitialCatalogBootstrapper
     }
 
     /**
-     * BL-P5-01a: Kategorie special_advertising_formats → average (Profil swf_trailer),
-     * Standardmethode average. Idempotent; vorhandene Zuordnungen/Defaults werden nicht überschrieben.
+     * BL-P5-01a / PO-SWF-CALENDAR-1: Kategorie special_advertising_formats → average + calendar
+     * (Profil swf_trailer), Standardmethode average. Idempotent; abweichende Verträge nicht überschreiben.
      *
      * @param  array<string, int>  $categoryIds
      */
@@ -105,24 +105,23 @@ final class InitialCatalogBootstrapper
         }
 
         $average = CalculationMethod::query()->where('key', 'average')->first();
-        if ($average === null) {
-            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Initialkatalog-Bootstrap.');
+        $calendar = CalculationMethod::query()->where('key', 'calendar')->first();
+        if ($average === null || $calendar === null) {
+            throw new RuntimeException('Berechnungsmethoden „average“/„calendar“ fehlen für den Initialkatalog-Bootstrap.');
         }
 
-        $exists = AdvertisingCategoryCalculationMethod::query()
-            ->where('advertising_category_id', $categoryId)
-            ->where('calculation_method_id', $average->id)
-            ->exists();
-        if (! $exists) {
-            $assignment = new AdvertisingCategoryCalculationMethod;
-            $assignment->advertising_category_id = $categoryId;
-            $assignment->calculation_method_id = $average->id;
-            $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_TRAILER;
-            $assignment->is_active = true;
-            $assignment->sort = 10;
-            $assignment->lock_version = 1;
-            $assignment->save();
-        }
+        $this->ensureCategoryMethodAssignment(
+            $categoryId,
+            (int) $average->id,
+            EngineProfileRegistry::PROFILE_SWF_TRAILER,
+            10,
+        );
+        $this->ensureCategoryMethodAssignment(
+            $categoryId,
+            (int) $calendar->id,
+            EngineProfileRegistry::PROFILE_SWF_TRAILER,
+            20,
+        );
 
         AdvertisingCategory::query()
             ->whereKey($categoryId)
@@ -130,188 +129,161 @@ final class InitialCatalogBootstrapper
             ->update(['default_calculation_method_id' => $average->id]);
     }
 
+    private function ensureCategoryMethodAssignment(
+        int $categoryId,
+        int $calculationMethodId,
+        string $engineProfileKey,
+        int $sort,
+    ): void {
+        $exists = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $categoryId)
+            ->where('calculation_method_id', $calculationMethodId)
+            ->where('engine_profile_key', $engineProfileKey)
+            ->exists();
+        if ($exists) {
+            return;
+        }
+
+        $assignment = new AdvertisingCategoryCalculationMethod;
+        $assignment->advertising_category_id = $categoryId;
+        $assignment->calculation_method_id = $calculationMethodId;
+        $assignment->engine_profile_key = $engineProfileKey;
+        $assignment->is_active = true;
+        $assignment->sort = $sort;
+        $assignment->lock_version = 1;
+        $assignment->save();
+    }
+
     /**
-     * PO-ALLONGE-1: nur Medium allonge auf Override mit genau einer Average-Zuordnung
-     * am Profil swf_allonge. Kategorie und Trailer bleiben unverändert.
-     * Idempotent; eine abweichende Override-Konfiguration wird nicht überschrieben.
+     * PO-ALLONGE-1 / PO-SWF-CALENDAR-1: Medium allonge → Override Average+Calendar / Profil swf_allonge.
      */
     private function ensureAllongeMediumOverride(): void
     {
-        $medium = AdvertisingMedium::query()->where('code', 'allonge')->lockForUpdate()->first();
-        if ($medium === null) {
-            return;
-        }
-
-        if ($medium->kind !== CalculationKind::SwfAllonge) {
-            throw new RuntimeException(
-                'Allonge-Medium hat nicht die Berechnungsart swf_allonge. Bootstrap überschreibt das nicht.',
-            );
-        }
-
-        $average = CalculationMethod::query()->where('key', 'average')->first();
-        if ($average === null) {
-            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Allonge-Override.');
-        }
-
-        $assignments = AdvertisingMediumCalculationMethod::query()
-            ->where('advertising_medium_id', $medium->id)
-            ->get();
-
-        $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
-            && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $assignments->count() === 1
-            && (int) $assignments->first()->calculation_method_id === (int) $average->id
-            && $assignments->first()->engine_profile_key === EngineProfileRegistry::PROFILE_SWF_ALLONGE
-            && (bool) $assignments->first()->is_active;
-
-        if ($matches) {
-            return;
-        }
-
-        $canInstall = $medium->calculation_method_mode === CalculationMethodMode::Inherit
-            && $medium->default_calculation_method_id === null
-            && $assignments->isEmpty();
-
-        if (! $canInstall) {
-            throw new RuntimeException(
-                'Allonge-Methodenvertrag weicht ab und wird nicht überschrieben.',
-            );
-        }
-
-        $medium->calculation_method_mode = CalculationMethodMode::Override;
-        $medium->default_calculation_method_id = $average->id;
-        $medium->save();
-
-        $assignment = new AdvertisingMediumCalculationMethod;
-        $assignment->advertising_medium_id = $medium->id;
-        $assignment->calculation_method_id = $average->id;
-        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_ALLONGE;
-        $assignment->is_active = true;
-        $assignment->sort = 10;
-        $assignment->lock_version = 1;
-        $assignment->save();
+        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+            mediumCode: 'allonge',
+            expectedKind: CalculationKind::SwfAllonge,
+            engineProfile: EngineProfileRegistry::PROFILE_SWF_ALLONGE,
+            label: 'Allonge',
+        );
     }
 
     /**
-     * PO-SWF-PROMO-1: nur Medium promo_moderation auf Override mit Average / Profil swf_promo.
-     * Kategorie und Trailer bleiben unverändert. Idempotent.
+     * PO-SWF-PROMO-1 / PO-SWF-CALENDAR-1: Medium promo_moderation → Override Average+Calendar / Profil swf_promo.
      */
     private function ensurePromoMediumOverride(): void
     {
-        $medium = AdvertisingMedium::query()->where('code', 'promo_moderation')->lockForUpdate()->first();
-        if ($medium === null) {
-            return;
-        }
-
-        if ($medium->kind !== CalculationKind::SwfPromo) {
-            throw new RuntimeException(
-                'Promo-Medium hat nicht die Berechnungsart swf_promo. Bootstrap überschreibt das nicht.',
-            );
-        }
-
-        $average = CalculationMethod::query()->where('key', 'average')->first();
-        if ($average === null) {
-            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Promo-Override.');
-        }
-
-        $assignments = AdvertisingMediumCalculationMethod::query()
-            ->where('advertising_medium_id', $medium->id)
-            ->get();
-
-        $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
-            && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $assignments->count() === 1
-            && (int) $assignments->first()->calculation_method_id === (int) $average->id
-            && $assignments->first()->engine_profile_key === EngineProfileRegistry::PROFILE_SWF_PROMO
-            && (bool) $assignments->first()->is_active;
-
-        if ($matches) {
-            return;
-        }
-
-        $canInstall = $medium->calculation_method_mode === CalculationMethodMode::Inherit
-            && $medium->default_calculation_method_id === null
-            && $assignments->isEmpty();
-
-        if (! $canInstall) {
-            throw new RuntimeException(
-                'Promo-Methodenvertrag weicht ab und wird nicht überschrieben.',
-            );
-        }
-
-        $medium->calculation_method_mode = CalculationMethodMode::Override;
-        $medium->default_calculation_method_id = $average->id;
-        $medium->save();
-
-        $assignment = new AdvertisingMediumCalculationMethod;
-        $assignment->advertising_medium_id = $medium->id;
-        $assignment->calculation_method_id = $average->id;
-        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_PROMO;
-        $assignment->is_active = true;
-        $assignment->sort = 10;
-        $assignment->lock_version = 1;
-        $assignment->save();
+        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+            mediumCode: 'promo_moderation',
+            expectedKind: CalculationKind::SwfPromo,
+            engineProfile: EngineProfileRegistry::PROFILE_SWF_PROMO,
+            label: 'Promo',
+        );
     }
 
     /**
-     * PO-SWF-CONTEST-1: nur Medium contest_payoff auf Override mit Average / Profil swf_contest.
-     * Kategorie und Trailer bleiben unverändert. Idempotent.
+     * PO-SWF-CONTEST-1 / PO-SWF-CALENDAR-1: Medium contest_payoff → Override Average+Calendar / Profil swf_contest.
      */
     private function ensureContestMediumOverride(): void
     {
-        $medium = AdvertisingMedium::query()->where('code', 'contest_payoff')->lockForUpdate()->first();
+        $this->ensureSwfLengthMediumAverageAndCalendarOverride(
+            mediumCode: 'contest_payoff',
+            expectedKind: CalculationKind::SwfContest,
+            engineProfile: EngineProfileRegistry::PROFILE_SWF_CONTEST,
+            label: 'Contest',
+        );
+    }
+
+    /**
+     * Installiert oder ergänzt Override mit Average (Default) + Calendar am angegebenen SWF-Profil.
+     * Idempotent. Bekannter Vorzustand (nur Average) wird um Calendar ergänzt; sonst fail-closed.
+     */
+    private function ensureSwfLengthMediumAverageAndCalendarOverride(
+        string $mediumCode,
+        CalculationKind $expectedKind,
+        string $engineProfile,
+        string $label,
+    ): void {
+        $medium = AdvertisingMedium::query()->where('code', $mediumCode)->lockForUpdate()->first();
         if ($medium === null) {
             return;
         }
 
-        if ($medium->kind !== CalculationKind::SwfContest) {
+        if ($medium->kind !== $expectedKind) {
             throw new RuntimeException(
-                'Contest-Medium hat nicht die Berechnungsart swf_contest. Bootstrap überschreibt das nicht.',
+                "{$label}-Medium hat nicht die Berechnungsart {$expectedKind->value}. Bootstrap überschreibt das nicht.",
             );
         }
 
         $average = CalculationMethod::query()->where('key', 'average')->first();
-        if ($average === null) {
-            throw new RuntimeException('Berechnungsmethode „average“ fehlt für den Contest-Override.');
+        $calendar = CalculationMethod::query()->where('key', 'calendar')->first();
+        if ($average === null || $calendar === null) {
+            throw new RuntimeException("Berechnungsmethoden „average“/„calendar“ fehlen für den {$label}-Override.");
         }
 
         $assignments = AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $medium->id)
             ->get();
 
+        $hasAverage = $assignments->contains(
+            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $average->id
+                && $row->engine_profile_key === $engineProfile
+                && (bool) $row->is_active,
+        );
+        $hasCalendar = $assignments->contains(
+            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === (int) $calendar->id
+                && $row->engine_profile_key === $engineProfile
+                && (bool) $row->is_active,
+        );
+
         $matches = $medium->calculation_method_mode === CalculationMethodMode::Override
             && (int) $medium->default_calculation_method_id === (int) $average->id
-            && $assignments->count() === 1
-            && (int) $assignments->first()->calculation_method_id === (int) $average->id
-            && $assignments->first()->engine_profile_key === EngineProfileRegistry::PROFILE_SWF_CONTEST
-            && (bool) $assignments->first()->is_active;
+            && $hasAverage
+            && $hasCalendar
+            && $assignments->count() === 2;
 
         if ($matches) {
             return;
         }
 
-        $canInstall = $medium->calculation_method_mode === CalculationMethodMode::Inherit
+        $canInstallFresh = $medium->calculation_method_mode === CalculationMethodMode::Inherit
             && $medium->default_calculation_method_id === null
             && $assignments->isEmpty();
 
-        if (! $canInstall) {
+        $canUpgradeAverageOnly = $medium->calculation_method_mode === CalculationMethodMode::Override
+            && (int) $medium->default_calculation_method_id === (int) $average->id
+            && $hasAverage
+            && ! $hasCalendar
+            && $assignments->count() === 1;
+
+        if (! $canInstallFresh && ! $canUpgradeAverageOnly) {
             throw new RuntimeException(
-                'Contest-Methodenvertrag weicht ab und wird nicht überschrieben.',
+                "{$label}-Methodenvertrag weicht ab und wird nicht überschrieben.",
             );
         }
 
-        $medium->calculation_method_mode = CalculationMethodMode::Override;
-        $medium->default_calculation_method_id = $average->id;
-        $medium->save();
+        if ($canInstallFresh) {
+            $medium->calculation_method_mode = CalculationMethodMode::Override;
+            $medium->default_calculation_method_id = $average->id;
+            $medium->save();
 
-        $assignment = new AdvertisingMediumCalculationMethod;
-        $assignment->advertising_medium_id = $medium->id;
-        $assignment->calculation_method_id = $average->id;
-        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_CONTEST;
-        $assignment->is_active = true;
-        $assignment->sort = 10;
-        $assignment->lock_version = 1;
-        $assignment->save();
+            $averageAssignment = new AdvertisingMediumCalculationMethod;
+            $averageAssignment->advertising_medium_id = $medium->id;
+            $averageAssignment->calculation_method_id = $average->id;
+            $averageAssignment->engine_profile_key = $engineProfile;
+            $averageAssignment->is_active = true;
+            $averageAssignment->sort = 10;
+            $averageAssignment->lock_version = 1;
+            $averageAssignment->save();
+        }
+
+        $calendarAssignment = new AdvertisingMediumCalculationMethod;
+        $calendarAssignment->advertising_medium_id = $medium->id;
+        $calendarAssignment->calculation_method_id = $calendar->id;
+        $calendarAssignment->engine_profile_key = $engineProfile;
+        $calendarAssignment->is_active = true;
+        $calendarAssignment->sort = 20;
+        $calendarAssignment->lock_version = 1;
+        $calendarAssignment->save();
     }
 
     /**
@@ -552,38 +524,29 @@ final class InitialCatalogBootstrapper
         $methodCount = AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $existing->id)
             ->count();
-        if ($definition['code'] === 'allonge') {
-            $assignment = AdvertisingMediumCalculationMethod::query()
+        if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
+            $expectedProfile = match ($definition['code']) {
+                'allonge' => EngineProfileRegistry::PROFILE_SWF_ALLONGE,
+                'promo_moderation' => EngineProfileRegistry::PROFILE_SWF_PROMO,
+                default => EngineProfileRegistry::PROFILE_SWF_CONTEST,
+            };
+            $keys = AdvertisingMediumCalculationMethod::query()
                 ->where('advertising_medium_id', $existing->id)
-                ->first();
-            if ($methodCount !== 1
-                || $assignment === null
-                || $assignment->engine_profile_key !== EngineProfileRegistry::PROFILE_SWF_ALLONGE
-                || ! $assignment->is_active
-            ) {
-                $mismatches[] = 'Allonge-Override fehlt oder weicht ab';
-            }
-        } elseif ($definition['code'] === 'promo_moderation') {
-            $assignment = AdvertisingMediumCalculationMethod::query()
-                ->where('advertising_medium_id', $existing->id)
-                ->first();
-            if ($methodCount !== 1
-                || $assignment === null
-                || $assignment->engine_profile_key !== EngineProfileRegistry::PROFILE_SWF_PROMO
-                || ! $assignment->is_active
-            ) {
-                $mismatches[] = 'Promo-Override fehlt oder weicht ab';
-            }
-        } elseif ($definition['code'] === 'contest_payoff') {
-            $assignment = AdvertisingMediumCalculationMethod::query()
-                ->where('advertising_medium_id', $existing->id)
-                ->first();
-            if ($methodCount !== 1
-                || $assignment === null
-                || $assignment->engine_profile_key !== EngineProfileRegistry::PROFILE_SWF_CONTEST
-                || ! $assignment->is_active
-            ) {
-                $mismatches[] = 'Contest-Override fehlt oder weicht ab';
+                ->where('engine_profile_key', $expectedProfile)
+                ->where('is_active', true)
+                ->with('calculationMethod')
+                ->get()
+                ->pluck('calculationMethod.key')
+                ->sort()
+                ->values()
+                ->all();
+            // PO-SWF-CALENDAR-1: Average + Calendar am jeweiligen SWF-Profil.
+            if ($methodCount !== 2 || $keys !== ['average', 'calendar']) {
+                $mismatches[] = match ($definition['code']) {
+                    'allonge' => 'Allonge-Override fehlt oder weicht ab',
+                    'promo_moderation' => 'Promo-Override fehlt oder weicht ab',
+                    default => 'Contest-Override fehlt oder weicht ab',
+                };
             }
         } elseif ($methodCount !== 0) {
             $mismatches[] = "Methoden-Zuordnungen vorhanden ({$methodCount})";

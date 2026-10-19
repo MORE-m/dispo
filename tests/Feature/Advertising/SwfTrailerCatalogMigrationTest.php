@@ -54,6 +54,10 @@ class SwfTrailerCatalogMigrationTest extends TestCase
         $migration->down();
 
         // Legacy-Zustand vor BL-P5-01a: Trailer kind=NULL, Regeln mit Länge 30 / Aufschlag 0.
+        // PO-SWF-CALENDAR-1: Calendar-Zuordnung aus Testkatalog/Migration entfernen für Legacy-Setup.
+        AdvertisingCategoryCalculationMethod::query()
+            ->where('engine_profile_key', 'swf_trailer')
+            ->delete();
         $this->assertNull(AdvertisingMedium::query()->whereKey($catalog['trailer']->id)->value('kind'));
         $this->assertSame(
             0,
@@ -218,8 +222,9 @@ class SwfTrailerCatalogMigrationTest extends TestCase
             ->firstOrFail();
         $average = CalculationMethod::query()->where('key', 'average')->firstOrFail();
         $this->assertSame($average->id, (int) $category->fresh()->default_calculation_method_id);
+        // PO-SWF-CALENDAR-1: Testkatalog legt Average + Calendar am Trailer-Profil an.
         $this->assertSame(
-            1,
+            2,
             AdvertisingCategoryCalculationMethod::query()
                 ->where('advertising_category_id', $category->id)
                 ->where('engine_profile_key', 'swf_trailer')
@@ -229,13 +234,14 @@ class SwfTrailerCatalogMigrationTest extends TestCase
         $migration->down();
 
         // Default kann vor/durch Migration gesetzt sein – down() entfernt ihn nicht still.
+        // Trailer-Migration down entfernt nur Average; Calendar (PO-SWF-CALENDAR-1) bleibt.
         $this->assertSame($average->id, (int) $category->fresh()->default_calculation_method_id);
-        $this->assertSame(
-            0,
-            AdvertisingCategoryCalculationMethod::query()
-                ->where('advertising_category_id', $category->id)
-                ->where('engine_profile_key', 'swf_trailer')
-                ->count(),
-        );
+        $remaining = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $category->id)
+            ->where('engine_profile_key', 'swf_trailer')
+            ->with('calculationMethod')
+            ->get();
+        $this->assertCount(1, $remaining);
+        $this->assertSame('calendar', $remaining[0]->calculationMethod?->key);
     }
 }

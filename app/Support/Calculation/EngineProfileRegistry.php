@@ -82,9 +82,24 @@ final class EngineProfileRegistry
                     'v1' => EngineCapabilityStatus::Released,
                 ],
             ],
+            // PO-SWF-CALENDAR-1: Calendar ohne Spotlängenindex (SWF-001).
+            'calendar' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
         ],
         self::PROFILE_SWF_ALLONGE => [
             'average' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
+            'calendar' => [
                 'pair_status' => EngineCapabilityStatus::Released,
                 'current_released_version' => 'v1',
                 'versions' => [
@@ -100,9 +115,23 @@ final class EngineProfileRegistry
                     'v1' => EngineCapabilityStatus::Released,
                 ],
             ],
+            'calendar' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
         ],
         self::PROFILE_SWF_CONTEST => [
             'average' => [
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Released,
+                ],
+            ],
+            'calendar' => [
                 'pair_status' => EngineCapabilityStatus::Released,
                 'current_released_version' => 'v1',
                 'versions' => [
@@ -113,14 +142,23 @@ final class EngineProfileRegistry
     ];
 
     /**
-     * Trailer, Allonge, Promo und Contest rechnen Anzahl × Ø-Sekundenpreis × Länge × (1 + Aufschlag/100), Index fest 100.
+     * SWF-Längenprofile (Trailer/Allonge/Promo/Contest): Länge × Aufschlag ohne Spotlängenindex
+     * (Index fest 100) für Average und Calendar. Settlement bleibt OUT (PO-SWF-CALENDAR-1).
      */
-    public static function usesAverageLengthWithoutIndex(string $engineProfileKey): bool
+    public static function usesLengthWithoutIndex(string $engineProfileKey): bool
     {
         return $engineProfileKey === self::PROFILE_SWF_TRAILER
             || $engineProfileKey === self::PROFILE_SWF_ALLONGE
             || $engineProfileKey === self::PROFILE_SWF_PROMO
             || $engineProfileKey === self::PROFILE_SWF_CONTEST;
+    }
+
+    /**
+     * @deprecated Alias für {@see usesLengthWithoutIndex()} (Average- und Calendar-Pfad).
+     */
+    public static function usesAverageLengthWithoutIndex(string $engineProfileKey): bool
+    {
+        return self::usesLengthWithoutIndex($engineProfileKey);
     }
 
     public static function hasProfile(string $engineProfileKey): bool

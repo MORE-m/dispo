@@ -27,19 +27,13 @@ class SwfAllongeCalculationTest extends TestCase
         $this->assertSame(100, $result->lengthIndex);
     }
 
-    public function test_allonge_rejects_calendar_and_fixed_price(): void
+    public function test_allonge_rejects_fixed_price_settlement(): void
     {
-        $engine = new CalculationEngine;
-
-        try {
-            $engine->calculatePosition($this->allonge(15, '30', 10, '2.0000', method: SpotCalculationMethod::Calendar), '0');
-            $this->fail('Calendar hätte abgelehnt werden müssen.');
-        } catch (InvalidArgumentException) {
-            $this->assertTrue(true);
-        }
-
         $this->expectException(InvalidArgumentException::class);
-        $engine->calculatePosition($this->allonge(15, '30', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice), '0');
+        (new CalculationEngine)->calculatePosition(
+            $this->allonge(15, '30', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice),
+            '0',
+        );
     }
 
     private function allonge(
