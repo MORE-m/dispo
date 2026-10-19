@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Policies\DispoOrderPolicy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\CreatesSavedCalculation;
 use Tests\Concerns\CreatesSpotClassicCatalog;
@@ -364,7 +365,7 @@ class UserAdminTest extends TestCase
     public function test_no_delete_route(): void
     {
         $this->assertFalse(
-            collect(\Illuminate\Support\Facades\Route::getRoutes())->contains(
+            collect(Route::getRoutes())->contains(
                 fn ($route): bool => str_contains((string) $route->getName(), 'administration.users.destroy')
                     || (in_array('DELETE', $route->methods(), true)
                         && str_contains($route->uri(), 'administration/benutzer')),
