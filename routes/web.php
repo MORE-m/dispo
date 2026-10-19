@@ -17,6 +17,7 @@ use App\Http\Controllers\Administration\PriceListAdminController;
 use App\Http\Controllers\Administration\PriceListImportController;
 use App\Http\Controllers\Administration\ProductionPriceListAdminController;
 use App\Http\Controllers\Administration\SpecialApproveRightAdminController;
+use App\Http\Controllers\Administration\UserAdminController;
 use App\Http\Controllers\AdministrationAccessController;
 use App\Http\Controllers\CalculationController;
 use App\Http\Controllers\Crm\CrmAccountController;
@@ -308,6 +309,17 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.production-prices.copy');
 
         // PO-AUTH-SPECIAL-APPROVE-1: Sonderfreigaberecht (nur Admin, Gate im Controller)
+        Route::get('administration/benutzer', [UserAdminController::class, 'index'])
+            ->name('administration.users.index');
+        Route::get('administration/benutzer/neu', [UserAdminController::class, 'create'])
+            ->name('administration.users.create');
+        Route::post('administration/benutzer', [UserAdminController::class, 'store'])
+            ->name('administration.users.store');
+        Route::get('administration/benutzer/{user}/bearbeiten', [UserAdminController::class, 'edit'])
+            ->name('administration.users.edit');
+        Route::put('administration/benutzer/{user}', [UserAdminController::class, 'update'])
+            ->name('administration.users.update');
+
         Route::get('administration/sonderfreigaben', [SpecialApproveRightAdminController::class, 'index'])
             ->name('administration.special-approve-rights.index');
         Route::put('administration/sonderfreigaben/{user}', [SpecialApproveRightAdminController::class, 'update'])

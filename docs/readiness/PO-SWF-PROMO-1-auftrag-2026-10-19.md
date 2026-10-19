@@ -1,6 +1,6 @@
 # PO-SWF-PROMO-1 – Promo/Moderation × Average
 
-Stand: 19. Oktober 2026 · Feature-Branch · Draft-PR · **kein** Merge · **kein** Deploy
+Stand: 19. Oktober 2026 · auf `main` (PR #163) · **kein** Deploy
 
 ## Ziel
 

@@ -71,6 +71,10 @@ class AppServiceProvider extends ServiceProvider
             return $user->canManageSpecialApproveRights();
         });
 
+        Gate::define('manage-users', function (User $user): bool {
+            return $user->canManageUsers();
+        });
+
         Gate::define('view-notification-outbox', function (User $user): bool {
             return $user->canViewNotificationOutbox();
         });

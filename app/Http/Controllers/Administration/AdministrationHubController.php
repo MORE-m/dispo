@@ -20,6 +20,7 @@ class AdministrationHubController extends Controller
         $this->authorize('access-administration');
 
         $canManageSpecialApprove = $request->user()?->can('manage-special-approve-rights') ?? false;
+        $canManageUsers = $request->user()?->can('manage-users') ?? false;
         $canViewNotificationOutbox = $request->user()?->can('view-notification-outbox') ?? false;
 
         return Inertia::render('administration/index', [
@@ -74,6 +75,13 @@ class AdministrationHubController extends Controller
                         ? '/administration/crm/import'
                         : null,
                     'available' => $request->user()?->can('import-crm-accounts') ?? false,
+                ],
+                [
+                    'key' => 'users',
+                    'title' => 'Benutzer',
+                    'description' => 'Benutzer anlegen und pflegen: Rolle, Rabattgrenze, Sonderfreigabe, Aktivstatus (nur Admin).',
+                    'href' => $canManageUsers ? '/administration/benutzer' : null,
+                    'available' => $canManageUsers,
                 ],
                 [
                     'key' => 'special-approve-rights',

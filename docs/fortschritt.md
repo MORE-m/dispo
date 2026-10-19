@@ -1,10 +1,16 @@
 # Fortschritt V1
 
-Stand: 19. Oktober 2026 – **PO-SWF-PROMO-1** auf Feature-Branch (Draft-PR):
+Stand: 19. Oktober 2026 – **PO-USER-ADMIN-1** auf Feature-Branch (Draft-PR):
+minimale Admin-Benutzerverwaltung (Liste/Anlegen/Bearbeiten: Rolle, Rabattgrenze,
+Sonderfreigabe über bestehenden Writer, `is_active` + Login-/Session-Sperre).
+Kein Delete/IAM/Contest/Deploy. Basis `main` @ `688ce9f…` (nach Promo-Merge PR #163).
+Dok: `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`.
+
+Stand davor: 19. Oktober 2026 – **PO-SWF-PROMO-1** auf `main` (PR #163):
 `promo_moderation` mit eigenem Profil `swf_promo`, nur Average, Initial **20 s / +50 %**,
 vier Matrix-Inventare, fail-closed, Calc-/Dispo-Snapshot; Calendar/Settlement/Produktion/
 Komponenten OUT; kein Confirm-Feld. Kein Deploy.
-Basis `main` @ `50264f3…`. Dok: `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`.
+Dok: `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`.
 
 Stand davor: 18. Oktober 2026 – **PO-SPOT-SINGLE-1** auf `main` (PR #161):
 `spot_single` mit `kind=spot_classic`, Fachaufschlag **+50 %**, Average + Calendar,
@@ -65,7 +71,10 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**PO-SWF-PROMO-1 (19. Oktober 2026):** Promo/Moderation × Average (`swf_promo`, 20 s / +50 %, vier Inventare, fail-closed, Snapshots) – Draft-PR, kein Merge/Deploy. Contest/Event-Tipp/weitere SWF nicht begonnen. `BL-P5-01` bleibt teilweise.
+**PO-USER-ADMIN-1 (19. Oktober 2026):** minimale Benutzer-Admin-UI – Draft-PR, kein Merge/Deploy.
+Stufe 2 bleibt darüber hinaus offen (Preis-/Katalogvalidierung, Betrieb/E2E-Vorbereitung).
+
+**PO-SWF-PROMO-1 (19. Oktober 2026):** Promo auf `main` (PR #163). Contest/Event-Tipp/weitere SWF nicht begonnen. `BL-P5-01` bleibt teilweise.
 
 **PO-SPOT-SINGLE-1 (18. Oktober 2026):** Single auf `main` (PR #161).
 
@@ -79,8 +88,8 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 Nicht daraus abgeleitet: `BL-P2-03` vollständig, `BL-P5-01` vollständig, `BL-P5-02` vollständig, `CRM-004`, Auto-Matching, Deploy.
 
 Offen / zurückgestellt u. a. (Priorisierung laut PO-GOLIVE-CUT-1-DEC):
-Stufe 1: Erst/Letzt (PR #160), Single (PR #161), Promo Draft-PR (dieser Slice); Contest/weitere SWF offen;
-Stufe 2: minimale Benutzer-Admin-UI, Preis-/Katalogvalidierung, Betrieb/E2E;
+Stufe 1 Medienkern: Erst/Letzt (PR #160), Single (PR #161), Promo (PR #163) – Contest/weitere SWF offen;
+Stufe 2: Benutzer-Admin (dieser Slice Draft-PR), Preis-/Katalogvalidierung, Betrieb/E2E;
 Stufe 3: SWF-Rest, OA/TKP, Social, Events (separate Readiness);
 Stufe 4 / sonst: Deploy BL-P5-01a/02a und BL-P2-03a, Produktion-Rest,
 Kontakte (`CRM-004`), CRM-API/E-Mail-Ingest, Submit-Empfänger, Invalidierungsmails,

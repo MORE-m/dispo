@@ -27,9 +27,17 @@ class UserFactory extends Factory
             'discount_limit_percent' => null,
             'can_special_approve' => false,
             'can_view_dispo_orders' => false,
+            'is_active' => true,
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
     }
 
     public function role(Role $role): static
