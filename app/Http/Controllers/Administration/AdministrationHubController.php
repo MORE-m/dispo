@@ -26,13 +26,6 @@ class AdministrationHubController extends Controller
         return Inertia::render('administration/index', [
             'modules' => [
                 [
-                    'key' => 'users',
-                    'title' => 'Benutzer',
-                    'description' => 'Benutzer anlegen und pflegen: Rolle, Rabattgrenze, Sonderfreigabe, Aktivstatus (nur Admin).',
-                    'href' => $canManageUsers ? '/administration/benutzer' : null,
-                    'available' => $canManageUsers,
-                ],
-                [
                     'key' => 'dynamic-fields',
                     'title' => 'Dynamische Felder',
                     'description' => 'Systemfeld-Revisionen und Kern-Feldset-Versionen (DF-3.1).',
@@ -82,6 +75,13 @@ class AdministrationHubController extends Controller
                         ? '/administration/crm/import'
                         : null,
                     'available' => $request->user()?->can('import-crm-accounts') ?? false,
+                ],
+                [
+                    'key' => 'users',
+                    'title' => 'Benutzer',
+                    'description' => 'Benutzer anlegen und pflegen: Rolle, Rabattgrenze, Sonderfreigabe, Aktivstatus (nur Admin).',
+                    'href' => $canManageUsers ? '/administration/benutzer' : null,
+                    'available' => $canManageUsers,
                 ],
                 [
                     'key' => 'special-approve-rights',
