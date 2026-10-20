@@ -83,6 +83,27 @@ class PoCalcTkp1aMysqlSchemaTest extends TestCase
         $this->assertSame('12.5000', (string) $stored->list_tkp);
         $this->assertSame('8.1250', (string) $stored->minimum_tkp);
 
+        $boundaryList = OaTkpPriceList::query()->create([
+            'year' => 2027,
+            'name' => 'Fixture Boundary',
+            'version' => '2027.1',
+            'revision_number' => 1,
+            'lock_version' => 1,
+            'status' => PriceListStatus::Draft,
+        ]);
+        OaTkpPriceListItem::query()->create([
+            'oa_tkp_price_list_id' => $boundaryList->id,
+            'advertising_medium_id' => $mediumId,
+            'inventory_id' => $inventoryId,
+            'list_tkp' => '999999999999.9999',
+            'minimum_tkp' => '999999999999.9999',
+        ]);
+        $boundary = OaTkpPriceListItem::query()
+            ->where('oa_tkp_price_list_id', $boundaryList->id)
+            ->firstOrFail();
+        $this->assertSame('999999999999.9999', (string) $boundary->list_tkp);
+        $this->assertSame('999999999999.9999', (string) $boundary->minimum_tkp);
+
         $this->expectException(QueryException::class);
         OaTkpPriceListItem::query()->create([
             'oa_tkp_price_list_id' => $list->id,

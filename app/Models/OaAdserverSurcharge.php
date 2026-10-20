@@ -38,7 +38,7 @@ class OaAdserverSurcharge extends Model
     protected function casts(): array
     {
         return [
-            'tkp_amount' => 'decimal:4',
+            // tkp_amount als Decimal-String (kein Float-Cast; siehe OaTkpPriceListItem).
             'revision_number' => 'integer',
             'is_active' => 'boolean',
             'scope_json' => 'array',

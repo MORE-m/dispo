@@ -7,6 +7,7 @@ use App\Models\AdvertisingMedium;
 use App\Models\Inventory;
 use App\Models\OaTkpPriceList;
 use App\Models\OaTkpPriceListItem;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,15 +17,6 @@ use Illuminate\Support\Facades\DB;
  */
 final class OaTkpPriceListImporter
 {
-    /** @var list<string> */
-    private const CORE_MEDIA = [
-        'pre_stream',
-        'in_stream',
-        'pre_stream_influencer',
-        'in_stream_influencer',
-        'midroll_music_environment',
-    ];
-
     /**
      * @param  array<string, mixed>  $payload
      * @return array{price_list_id: int|null, items_written: int, dry_run: bool}
@@ -67,14 +59,14 @@ final class OaTkpPriceListImporter
             $line = $index + 1;
             $mediumCode = trim((string) ($item['medium_code'] ?? ''));
             $inventoryCode = trim((string) ($item['inventory_code'] ?? ''));
-            $listTkp = $this->normalizePositiveDecimal($item['list_tkp'] ?? null);
-            $minimumTkp = $this->normalizePositiveDecimal($item['minimum_tkp'] ?? null);
+            $listTkp = OaTkpImportDecimal::normalizePositive($item['list_tkp'] ?? null);
+            $minimumTkp = OaTkpImportDecimal::normalizePositive($item['minimum_tkp'] ?? null);
 
             if ($mediumCode === '') {
                 $errors[] = "Item {$line}: medium_code fehlt.";
             } elseif ($mediumCode === 'native_ad') {
                 $errors[] = "Item {$line}: native_ad ist OUT für TKP-Kern.";
-            } elseif (! in_array($mediumCode, self::CORE_MEDIA, true)) {
+            } elseif (! OaTkpCoreMedia::contains($mediumCode)) {
                 $errors[] = "Item {$line}: medium_code „{$mediumCode}“ ist kein TKP-Kernmedium.";
             }
 
@@ -90,12 +82,16 @@ final class OaTkpPriceListImporter
             }
 
             if ($listTkp === null) {
-                $errors[] = "Item {$line}: list_tkp ungültig (muss > 0 sein).";
+                $errors[] = "Item {$line}: list_tkp ungültig (muss > 0, max. 4 NK, ≤ ".OaTkpImportDecimal::MAX.' sein).';
             }
             if ($minimumTkp === null) {
-                $errors[] = "Item {$line}: minimum_tkp ungültig (muss > 0 sein).";
+                $errors[] = "Item {$line}: minimum_tkp ungültig (muss > 0, max. 4 NK, ≤ ".OaTkpImportDecimal::MAX.' sein).';
             }
-            if ($listTkp !== null && $minimumTkp !== null && (float) $minimumTkp > (float) $listTkp) {
+            if (
+                $listTkp !== null
+                && $minimumTkp !== null
+                && OaTkpImportDecimal::compare($minimumTkp, $listTkp) > 0
+            ) {
                 $errors[] = "Item {$line}: minimum_tkp darf list_tkp nicht überschreiten.";
             }
 
@@ -187,23 +183,5 @@ final class OaTkpPriceListImporter
             'items_written' => count($resolvedItems),
             'dry_run' => false,
         ];
-    }
-
-    private function normalizePositiveDecimal(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        $asFloat = (float) $value;
-        if ($asFloat <= 0) {
-            return null;
-        }
-
-        return number_format($asFloat, 4, '.', '');
     }
 }

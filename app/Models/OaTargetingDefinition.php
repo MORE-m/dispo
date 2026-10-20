@@ -40,7 +40,7 @@ class OaTargetingDefinition extends Model
     {
         return [
             'category' => OaTargetingCategory::class,
-            'tkp_surcharge' => 'decimal:4',
+            // tkp_surcharge als Decimal-String (kein Float-Cast; siehe OaTkpPriceListItem).
             'revision_number' => 'integer',
             'is_active' => 'boolean',
             'valid_from' => 'date',

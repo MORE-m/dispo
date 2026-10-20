@@ -26,7 +26,7 @@ final class OaTargetingDefinitionImporter
             $name = trim((string) ($row['name'] ?? ''));
             $category = trim((string) ($row['category'] ?? ''));
             $revision = (int) ($row['revision_number'] ?? 1);
-            $surcharge = $this->normalizeDecimal($row['tkp_surcharge'] ?? null);
+            $surcharge = OaTkpImportDecimal::normalizeNonNegative($row['tkp_surcharge'] ?? null);
 
             if ($code === '') {
                 $errors[] = "Zeile {$line}: code fehlt.";
@@ -74,7 +74,7 @@ final class OaTargetingDefinitionImporter
                 $payload = [
                     'name' => trim((string) $row['name']),
                     'category' => OaTargetingCategory::from(trim((string) $row['category'])),
-                    'tkp_surcharge' => $this->normalizeDecimal($row['tkp_surcharge']),
+                    'tkp_surcharge' => OaTkpImportDecimal::normalizeNonNegative($row['tkp_surcharge']),
                     'is_active' => (bool) ($row['is_active'] ?? true),
                     'valid_from' => $row['valid_from'] ?? null,
                     'valid_to' => $row['valid_to'] ?? null,
@@ -100,18 +100,5 @@ final class OaTargetingDefinitionImporter
         });
 
         return ['created' => $created, 'updated' => $updated, 'dry_run' => false];
-    }
-
-    private function normalizeDecimal(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (! is_numeric($value)) {
-            return null;
-        }
-
-        return number_format((float) $value, 4, '.', '');
     }
 }

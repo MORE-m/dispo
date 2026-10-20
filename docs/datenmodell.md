@@ -312,7 +312,8 @@ Unterobjekte werden typbezogen normalisiert:
 - **PO-CALC-TKP-1A Stammdaten (ohne Engine):** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
-  `oa_adserver_surcharges` (konfigurierbar). Registry `oa_tkp`/`tkp` = planned,
+  `oa_adserver_surcharges` (konfigurierbar). Assignment: TKP-Kernmedien → Medium-Override
+  `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry `oa_tkp`/`tkp` = planned,
 - `SocialElement` und `InfluencerItem`,
 - `PriceComponent` für Produktion, Sonstiges, Fremdkosten und Booster.
 

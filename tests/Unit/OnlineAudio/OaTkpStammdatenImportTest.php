@@ -10,6 +10,7 @@ use App\Models\OaTkpPriceList;
 use App\Models\OaTkpPriceListItem;
 use App\Services\OnlineAudio\Import\OaPlatformImporter;
 use App\Services\OnlineAudio\Import\OaTargetingDefinitionImporter;
+use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
 use App\Services\OnlineAudio\Import\OaTkpPriceListImporter;
 use App\Services\OnlineAudio\Import\OaTkpStammdatenImportException;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
@@ -93,7 +94,7 @@ class OaTkpStammdatenImportTest extends TestCase
         ]);
         $this->assertSame(1, $result['created']);
         $row = OaTargetingDefinition::query()->firstOrFail();
-        $this->assertSame('1.2500', (string) $row->tkp_surcharge);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $row->tkp_surcharge, '1.2500'));
         $this->assertSame(OaTargetingCategory::Technisch, $row->category);
     }
 
@@ -155,6 +156,57 @@ class OaTkpStammdatenImportTest extends TestCase
         $this->assertTrue($dry['dry_run']);
         $this->assertSame(0, OaTkpPriceList::query()->count());
 
+        $equalMin = $importer->import([
+            'year' => 2026,
+            'revision_number' => 2,
+            'status' => PriceListStatus::Draft->value,
+            'items' => [[
+                'medium_code' => 'pre_stream',
+                'inventory_code' => 'inv_more_kombi_online_audio',
+                'list_tkp' => '8.0000',
+                'minimum_tkp' => '8.0000',
+            ]],
+        ], dryRun: true);
+        $this->assertTrue($equalMin['dry_run']);
+
+        try {
+            $importer->import([
+                'year' => 2026,
+                'revision_number' => 1,
+                'status' => PriceListStatus::Draft->value,
+                'items' => [[
+                    'medium_code' => 'pre_stream',
+                    'inventory_code' => 'inv_more_kombi_online_audio',
+                    'list_tkp' => '8.0000',
+                    'minimum_tkp' => '8.0001',
+                ]],
+            ]);
+            $this->fail('Expected minimum > list rejection for 8.0001');
+        } catch (OaTkpStammdatenImportException $e) {
+            $this->assertTrue(
+                collect($e->errors)->contains(fn (string $msg): bool => str_contains($msg, 'minimum_tkp')),
+            );
+        }
+
+        try {
+            $importer->import([
+                'year' => 2026,
+                'revision_number' => 1,
+                'status' => PriceListStatus::Draft->value,
+                'items' => [[
+                    'medium_code' => 'pre_stream',
+                    'inventory_code' => 'inv_more_kombi_online_audio',
+                    'list_tkp' => '999999999999.9999',
+                    'minimum_tkp' => '0.00005',
+                ]],
+            ]);
+            $this->fail('Expected excess scale rejection');
+        } catch (OaTkpStammdatenImportException $e) {
+            $this->assertTrue(
+                collect($e->errors)->contains(fn (string $msg): bool => str_contains($msg, 'minimum_tkp')),
+            );
+        }
+
         $written = $importer->import([
             'year' => 2026,
             'revision_number' => 1,
@@ -163,7 +215,7 @@ class OaTkpStammdatenImportTest extends TestCase
             'items' => [[
                 'medium_code' => 'pre_stream',
                 'inventory_code' => 'inv_more_kombi_online_audio',
-                'list_tkp' => '12.5000',
+                'list_tkp' => '12.5',
                 'minimum_tkp' => '8.0000',
             ]],
         ]);
@@ -171,7 +223,40 @@ class OaTkpStammdatenImportTest extends TestCase
         $this->assertSame(1, $written['items_written']);
         $this->assertSame(1, OaTkpPriceListItem::query()->count());
         $item = OaTkpPriceListItem::query()->firstOrFail();
-        $this->assertSame('12.5000', (string) $item->list_tkp);
-        $this->assertSame('8.0000', (string) $item->minimum_tkp);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $item->list_tkp, '12.5000'));
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $item->minimum_tkp, '8.0000'));
+
+        // Grenzwerte: Import-Validierung (Persistenz exakt unter MySQL, siehe PoCalcTkp1aMysqlSchemaTest).
+        $maxDry = $importer->import([
+            'year' => 2026,
+            'revision_number' => 3,
+            'status' => PriceListStatus::Draft->value,
+            'items' => [[
+                'medium_code' => 'in_stream',
+                'inventory_code' => 'inv_more_kombi_online_audio',
+                'list_tkp' => '999999999999.9999',
+                'minimum_tkp' => '999999999999.9999',
+            ]],
+        ], dryRun: true);
+        $this->assertSame(1, $maxDry['items_written']);
+
+        try {
+            $importer->import([
+                'year' => 2026,
+                'revision_number' => 3,
+                'status' => PriceListStatus::Draft->value,
+                'items' => [[
+                    'medium_code' => 'in_stream',
+                    'inventory_code' => 'inv_more_kombi_online_audio',
+                    'list_tkp' => '1000000000000.0000',
+                    'minimum_tkp' => '1.0000',
+                ]],
+            ], dryRun: true);
+            $this->fail('Expected overflow rejection');
+        } catch (OaTkpStammdatenImportException $e) {
+            $this->assertTrue(
+                collect($e->errors)->contains(fn (string $msg): bool => str_contains($msg, 'list_tkp')),
+            );
+        }
     }
 }

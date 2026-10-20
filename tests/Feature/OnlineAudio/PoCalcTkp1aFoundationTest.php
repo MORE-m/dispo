@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OnlineAudio;
 
+use App\Enums\CalculationMethodMode;
 use App\Enums\EngineCapabilityStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingCategory;
@@ -21,15 +22,17 @@ use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use App\Support\Calculation\EngineProfileRegistry;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
- * PO-CALC-TKP-1A: Schema, Assignment, Registry planned, fail-closed Bookability.
+ * PO-CALC-TKP-1A: Schema, Medium-Assignments, Registry planned, fail-closed Bookability.
  */
 class PoCalcTkp1aFoundationTest extends TestCase
 {
@@ -55,29 +58,43 @@ class PoCalcTkp1aFoundationTest extends TestCase
     }
 
     #[Test]
-    public function online_audio_category_assigns_tkp_oa_tkp_while_registry_stays_planned(): void
+    public function core_media_have_tkp_oa_tkp_override_while_registry_stays_planned(): void
     {
-        // Assignment entsteht mit OA-Medien (Migration-Gate) bzw. Katalog-Bootstrap.
         $this->seed(InitialCatalogMatCoreSeeder::class);
 
+        $methodId = (int) CalculationMethod::query()->where('key', 'tkp')->value('id');
         $categoryId = (int) AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
             ->value('id');
-        $methodId = (int) CalculationMethod::query()->where('key', 'tkp')->value('id');
 
-        $assignment = AdvertisingCategoryCalculationMethod::query()
-            ->where('advertising_category_id', $categoryId)
-            ->where('calculation_method_id', $methodId)
-            ->firstOrFail();
+        $this->assertSame(
+            0,
+            AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $categoryId)
+                ->where('calculation_method_id', $methodId)
+                ->count(),
+        );
 
-        $this->assertSame(EngineProfileRegistry::PROFILE_OA_TKP, $assignment->engine_profile_key);
-        $this->assertTrue($assignment->is_active);
+        foreach (OaTkpCoreMedia::codes() as $code) {
+            $medium = AdvertisingMedium::query()->where('code', $code)->firstOrFail();
+            $this->assertSame(CalculationMethodMode::Override, $medium->calculation_method_mode, $code);
+            $this->assertSame($methodId, (int) $medium->default_calculation_method_id, $code);
+
+            $assignment = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $medium->id)
+                ->where('calculation_method_id', $methodId)
+                ->firstOrFail();
+            $this->assertSame(EngineProfileRegistry::PROFILE_OA_TKP, $assignment->engine_profile_key);
+            $this->assertTrue($assignment->is_active);
+
+            $this->assertSame(
+                EngineProfileRegistry::PROFILE_OA_TKP,
+                $this->effectiveEngineProfile($medium, 'tkp'),
+                $code,
+            );
+        }
 
         $this->assertTrue(EngineProfileRegistry::hasProfile(EngineProfileRegistry::PROFILE_OA_TKP));
-        $this->assertTrue(EngineProfileRegistry::hasMethodForProfile(
-            EngineProfileRegistry::PROFILE_OA_TKP,
-            'tkp',
-        ));
         $this->assertSame(
             EngineCapabilityStatus::Planned,
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
@@ -85,7 +102,6 @@ class PoCalcTkp1aFoundationTest extends TestCase
         $this->assertNull(
             EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
-
         $pairs = EngineProfileRegistry::pairsForMethodKey('tkp');
         $this->assertCount(1, $pairs);
         $this->assertSame('oa_tkp', $pairs[0]['engine_profile_key']);
@@ -94,16 +110,35 @@ class PoCalcTkp1aFoundationTest extends TestCase
     }
 
     #[Test]
-    public function native_ad_has_no_medium_override_to_oa_tkp(): void
+    public function native_ad_has_no_effective_tkp_oa_tkp_assignment(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
 
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
-        $overrideCount = AdvertisingMediumCalculationMethod::query()
-            ->where('advertising_medium_id', $native->id)
-            ->count();
-        $this->assertSame(0, $overrideCount);
+        $this->assertSame(CalculationMethodMode::Inherit, $native->calculation_method_mode);
         $this->assertNull($native->kind);
+
+        $methodId = (int) CalculationMethod::query()->where('key', 'tkp')->value('id');
+        $this->assertSame(
+            0,
+            AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $native->id)
+                ->where('calculation_method_id', $methodId)
+                ->count(),
+        );
+
+        $categoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
+            ->value('id');
+        $this->assertSame(
+            0,
+            AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $categoryId)
+                ->where('calculation_method_id', $methodId)
+                ->count(),
+        );
+
+        $this->assertNull($this->effectiveEngineProfile($native, 'tkp'));
     }
 
     #[Test]
@@ -124,6 +159,10 @@ class PoCalcTkp1aFoundationTest extends TestCase
             || str_contains($reason, 'nicht für neue Kalkulationen freigegeben'),
             $reason,
         );
+
+        $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
+        $nativeResult = app(AdvertisingMediumLiveBookability::class)->evaluate($native, 'tkp');
+        $this->assertFalse($nativeResult->isBookableForNewPositions);
     }
 
     #[Test]
@@ -191,6 +230,26 @@ class PoCalcTkp1aFoundationTest extends TestCase
                 $messages,
             );
         }
+    }
+
+    private function effectiveEngineProfile(AdvertisingMedium $medium, string $methodKey): ?string
+    {
+        $medium->load([
+            'category',
+            'defaultCalculationMethod',
+            'category.defaultCalculationMethod',
+            'calculationMethodAssignments.calculationMethod',
+            'category.calculationMethodAssignments.calculationMethod',
+        ]);
+
+        $resolver = app(AdvertisingMediumLiveBookability::class);
+        $method = new ReflectionMethod($resolver, 'resolveActiveEngineProfileKey');
+        $method->setAccessible(true);
+
+        /** @var string|null $profile */
+        $profile = $method->invoke($resolver, $medium, $methodKey, null, null);
+
+        return $profile;
     }
 
     private function ensureOaInventoryRule(AdvertisingMedium $medium): int

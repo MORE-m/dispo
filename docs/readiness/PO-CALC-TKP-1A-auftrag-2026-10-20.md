@@ -15,15 +15,21 @@ Technisches Stammdatenfundament für den späteren TKP-Kern:
 | `oa_targeting_definitions` | Targeting-Katalog mit absolutem `tkp_surcharge` |
 | `oa_adserver_surcharges` | konfigurierbarer Adserver-TKP (Scope JSON; ohne operativen Seed) |
 
-Kategorie-Assignment:
+Methoden-Assignment (Medium-Override, nicht Kategorie):
 
-`online_audio` → Method `tkp` / Profile `oa_tkp`
+| Medium | `tkp` / `oa_tkp` |
+|---|---|
+| `pre_stream`, `in_stream`, `pre_stream_influencer`, `in_stream_influencer`, `midroll_music_environment` | ja |
+| `native_ad` | **nein** (FD-NATIVE) |
+
+Kein Category Assignment `online_audio → tkp`, damit Native nicht erbt.
 
 Registry:
 
 `oa_tkp` × `tkp` = **planned** (keine Version, kein Release)
 
-Import-Grundlage: `App\Services\OnlineAudio\Import\*` (Fixtures erlaubt, keine produktiven Fake-Seeds).
+Import-Grundlage: `App\Services\OnlineAudio\Import\*` (Fixtures erlaubt, keine produktiven Fake-Seeds;
+Decimal ohne Float via `OaTkpImportDecimal` / GEN-002).
 
 ## Bewusst OUT
 

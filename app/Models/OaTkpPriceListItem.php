@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * PO-CALC-TKP-1A: Listen-/Mindest-TKP je Medium × Inventar innerhalb einer Listenrevision.
  *
+ * Decimal-Felder ohne Laravel-`decimal:`-Cast (vermeidet Float-Korruption an decimal(16,4)).
+ *
  * @property int $id
  * @property int $oa_tkp_price_list_id
  * @property int $advertising_medium_id
@@ -24,17 +26,6 @@ class OaTkpPriceListItem extends Model
         'list_tkp',
         'minimum_tkp',
     ];
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'list_tkp' => 'decimal:4',
-            'minimum_tkp' => 'decimal:4',
-        ];
-    }
 
     /**
      * @return BelongsTo<OaTkpPriceList, $this>
