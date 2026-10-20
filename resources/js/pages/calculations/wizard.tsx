@@ -2310,7 +2310,9 @@ export default function CalculationWizard({
                             production_lines: [],
                         };
                     }
-                    if (!mediumSupportsFixedPriceSettlement(catalog, medium.id)) {
+                    if (
+                        !mediumSupportsFixedPriceSettlement(catalog, medium.id)
+                    ) {
                         next = {
                             ...next,
                             ...trailerSettlementReset(),
