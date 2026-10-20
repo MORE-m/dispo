@@ -44,6 +44,11 @@ final class EngineProfileRegistry
     public const PROFILE_SWF_CONTEST = 'swf_contest';
 
     /**
+     * PO-CALC-TKP-1A: Online-Audio-TKP-Kern (Stammdaten vorbereitet; Pair bleibt planned bis Engine-Freigabe).
+     */
+    public const PROFILE_OA_TKP = 'oa_tkp';
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -53,6 +58,14 @@ final class EngineProfileRegistry
      * }>>
      */
     private const CATALOG = [
+        self::PROFILE_OA_TKP => [
+            // PO-CALC-TKP-1A: Stammdaten/Assignment ja; keine Engine-Version, kein Release.
+            'tkp' => [
+                'pair_status' => EngineCapabilityStatus::Planned,
+                'current_released_version' => null,
+                'versions' => [],
+            ],
+        ],
         self::PROFILE_SPOT_CLASSIC => [
             'average' => [
                 'pair_status' => EngineCapabilityStatus::Released,

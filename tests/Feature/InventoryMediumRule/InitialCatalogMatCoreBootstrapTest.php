@@ -15,6 +15,7 @@ use App\Models\Organization;
 use App\Services\InventoryMediumRule\Catalog\InitialCatalogBootstrapper;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use App\Support\InventoryMediumRule\Catalog\InitialCatalogDefinitions;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -60,7 +61,9 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $categoryKey = AdvertisingCategory::query()->whereKey($medium->category_id)->value('key');
             $this->assertSame($definition['category_key'], $categoryKey);
             $this->assertSame($definition['kind']?->value, $medium->kind?->value);
-            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
+            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)
+                || OaTkpCoreMedia::contains($definition['code'])
+            ) {
                 $this->assertSame(CalculationMethodMode::Override, $medium->calculation_method_mode);
                 $this->assertNotNull($medium->default_calculation_method_id);
             } else {
@@ -73,7 +76,7 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $this->assertSame($definition['component_profile']?->value, $medium->component_profile?->value);
             $this->assertTrue($medium->is_active);
             // PO-SWF-CALENDAR-1: Allonge/Promo/Contest Override → average + calendar.
-            // Trailer und alle übrigen Medien: Inherit (keine Medium-Zuordnungen).
+            // PO-CALC-TKP-1A: TKP-Kernmedien Override → tkp/oa_tkp; Native bleibt Inherit.
             $methodKeys = AdvertisingMediumCalculationMethod::query()
                 ->where('advertising_medium_id', $medium->id)
                 ->with('calculationMethod')
@@ -83,6 +86,8 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
                 ->all();
             if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
                 $this->assertSame(['average', 'calendar'], $methodKeys, $definition['code']);
+            } elseif (OaTkpCoreMedia::contains($definition['code'])) {
+                $this->assertSame(['tkp'], $methodKeys, $definition['code']);
             } else {
                 $this->assertSame([], $methodKeys, $definition['code']);
             }
@@ -101,6 +106,20 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
                 ->get()
                 ->pluck('calculationMethod.key')
                 ->all(),
+        );
+
+        // PO-CALC-TKP-1A: kein Category Assignment; TKP nur an Kernmedien (Native OUT).
+        $oaCategoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
+            ->value('id');
+        $oaCategoryTkp = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $oaCategoryId)
+            ->whereHas('calculationMethod', fn ($q) => $q->where('key', 'tkp'))
+            ->count();
+        $this->assertSame(0, $oaCategoryTkp);
+        $this->assertSame(
+            CalculationMethodMode::Inherit,
+            AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail()->calculation_method_mode,
         );
         $this->assertSame(
             CalculationMethodMode::Inherit,

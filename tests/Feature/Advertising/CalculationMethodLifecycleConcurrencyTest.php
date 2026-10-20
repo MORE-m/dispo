@@ -126,7 +126,8 @@ class CalculationMethodLifecycleConcurrencyTest extends TestCase
         $this->requireMysql('C-RACE-METHOD-02');
 
         $admin = User::factory()->role(Role::Admin)->create();
-        $method = CalculationMethod::query()->where('key', 'tkp')->firstOrFail();
+        // free_position: kein aktives Kategorie-Assignment (tkp hat seit PO-CALC-TKP-1A online_audio).
+        $method = CalculationMethod::query()->where('key', 'free_position')->firstOrFail();
         $spots = AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::SPOTS)
             ->firstOrFail();

@@ -16,6 +16,7 @@ use App\Support\Advertising\CanonicalAdvertisingCategories;
 use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\Inventory\InventoryCodeValidator;
 use App\Support\InventoryMediumRule\Catalog\InitialCatalogDefinitions;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use App\Support\Organization\SingletonOrganizationResolver;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -78,6 +79,7 @@ final class InitialCatalogBootstrapper
             }
 
             $this->ensureSwfTrailerCategoryMethod($categoryIds);
+            $this->ensureOnlineAudioTkpCoreMediumOverrides();
             $this->ensureAllongeMediumOverride();
             $this->ensurePromoMediumOverride();
             $this->ensureContestMediumOverride();
@@ -89,6 +91,116 @@ final class InitialCatalogBootstrapper
             'media_created' => $mediaCreated,
             'media_unchanged' => $mediaUnchanged,
         ];
+    }
+
+    /**
+     * PO-CALC-TKP-1A: TKP/oa_tkp nur an TKP-Kernmedien (Override), nicht an Kategorie.
+     * native_ad bleibt ohne TKP-Zuordnung (FD-NATIVE). Idempotent; fail-closed.
+     */
+    private function ensureOnlineAudioTkpCoreMediumOverrides(): void
+    {
+        $tkp = CalculationMethod::query()->where('key', 'tkp')->first();
+        if ($tkp === null) {
+            throw new RuntimeException('Berechnungsmethode „tkp“ fehlt für den Initialkatalog-Bootstrap.');
+        }
+
+        $categoryId = AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
+            ->value('id');
+        if ($categoryId !== null) {
+            $categoryTkp = AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', (int) $categoryId)
+                ->where('calculation_method_id', (int) $tkp->id)
+                ->get();
+            if ($categoryTkp->isNotEmpty()) {
+                // Alte Phase-A-Variante (Kategorie-Assignment) entfernen — Native darf nicht erben.
+                AdvertisingCategoryCalculationMethod::query()
+                    ->where('advertising_category_id', (int) $categoryId)
+                    ->where('calculation_method_id', (int) $tkp->id)
+                    ->delete();
+            }
+        }
+
+        foreach (OaTkpCoreMedia::codes() as $code) {
+            $this->ensureOaTkpMediumOverride($code, (int) $tkp->id);
+        }
+
+        $native = AdvertisingMedium::query()->where('code', 'native_ad')->lockForUpdate()->first();
+        if ($native !== null) {
+            $nativeTkp = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $native->id)
+                ->where('calculation_method_id', (int) $tkp->id)
+                ->exists();
+            if ($nativeTkp) {
+                throw new RuntimeException(
+                    'PO-CALC-TKP-1A: native_ad darf keine tkp-Medium-Zuordnung haben.',
+                );
+            }
+        }
+    }
+
+    private function ensureOaTkpMediumOverride(string $mediumCode, int $tkpMethodId): void
+    {
+        $medium = AdvertisingMedium::query()->where('code', $mediumCode)->lockForUpdate()->first();
+        if ($medium === null) {
+            return;
+        }
+
+        $assignments = AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $medium->id)
+            ->get();
+
+        $tkpRows = $assignments->filter(
+            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === $tkpMethodId,
+        );
+
+        if ($tkpRows->count() > 1) {
+            throw new RuntimeException(
+                "PO-CALC-TKP-1A: Medium „{$mediumCode}“ hat mehrdeutige tkp-Zuordnungen.",
+            );
+        }
+
+        if ($tkpRows->count() === 1) {
+            $row = $tkpRows->first();
+            if ((string) $row->engine_profile_key !== EngineProfileRegistry::PROFILE_OA_TKP) {
+                throw new RuntimeException(
+                    "PO-CALC-TKP-1A: Medium „{$mediumCode}“/tkp hat abweichendes Profil (erwartet oa_tkp).",
+                );
+            }
+            if ($medium->calculation_method_mode !== CalculationMethodMode::Override
+                || (int) $medium->default_calculation_method_id !== $tkpMethodId
+                || $assignments->count() !== 1
+            ) {
+                throw new RuntimeException(
+                    "PO-CALC-TKP-1A: Medium „{$mediumCode}“ hat abweichenden Override-Vertrag.",
+                );
+            }
+
+            return;
+        }
+
+        $canInstallFresh = $medium->calculation_method_mode === CalculationMethodMode::Inherit
+            && $medium->default_calculation_method_id === null
+            && $assignments->isEmpty();
+
+        if (! $canInstallFresh) {
+            throw new RuntimeException(
+                "PO-CALC-TKP-1A: Medium „{$mediumCode}“ weicht ab und wird nicht überschrieben.",
+            );
+        }
+
+        $medium->calculation_method_mode = CalculationMethodMode::Override;
+        $medium->default_calculation_method_id = $tkpMethodId;
+        $medium->save();
+
+        $assignment = new AdvertisingMediumCalculationMethod;
+        $assignment->advertising_medium_id = $medium->id;
+        $assignment->calculation_method_id = $tkpMethodId;
+        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_OA_TKP;
+        $assignment->is_active = true;
+        $assignment->sort = 10;
+        $assignment->lock_version = 1;
+        $assignment->save();
     }
 
     /**
@@ -495,6 +607,14 @@ final class InitialCatalogBootstrapper
             if ((int) $existing->default_calculation_method_id !== (int) $averageId) {
                 $mismatches[] = 'default_calculation_method_id Ist='.(string) $existing->default_calculation_method_id.' Soll=average';
             }
+        } elseif (OaTkpCoreMedia::contains($definition['code'])) {
+            $tkpId = CalculationMethod::query()->where('key', 'tkp')->value('id');
+            if ($existing->calculation_method_mode !== CalculationMethodMode::Override) {
+                $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=override';
+            }
+            if ((int) $existing->default_calculation_method_id !== (int) $tkpId) {
+                $mismatches[] = 'default_calculation_method_id Ist='.(string) $existing->default_calculation_method_id.' Soll=tkp';
+            }
         } else {
             if ($existing->calculation_method_mode !== CalculationMethodMode::Inherit) {
                 $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=inherit';
@@ -547,6 +667,18 @@ final class InitialCatalogBootstrapper
                     'promo_moderation' => 'Promo-Override fehlt oder weicht ab',
                     default => 'Contest-Override fehlt oder weicht ab',
                 };
+            }
+        } elseif (OaTkpCoreMedia::contains($definition['code'])) {
+            $keys = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $existing->id)
+                ->where('engine_profile_key', EngineProfileRegistry::PROFILE_OA_TKP)
+                ->where('is_active', true)
+                ->with('calculationMethod')
+                ->get()
+                ->pluck('calculationMethod.key')
+                ->all();
+            if ($methodCount !== 1 || $keys !== ['tkp']) {
+                $mismatches[] = 'OA-TKP-Override fehlt oder weicht ab';
             }
         } elseif ($methodCount !== 0) {
             $mismatches[] = "Methoden-Zuordnungen vorhanden ({$methodCount})";
