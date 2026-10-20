@@ -132,7 +132,7 @@ class SwfCalendarAcceptanceTest extends TestCase
         $this->assertSame('775.00', $again->json('totals.media_gross'));
     }
 
-    public function test_settlement_still_rejected_for_promo_calendar(): void
+    public function test_settlement_accepted_for_promo_calendar(): void
     {
         $catalog = $this->createPromoAverageCatalog();
         $user = User::factory()->role(Role::Sales)->create();
@@ -143,7 +143,11 @@ class SwfCalendarAcceptanceTest extends TestCase
         $payload['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
         $payload['positions'][0]['fixed_price_nn'] = '100.00';
 
-        $this->actingAs($user)->postJson(route('calculations.preview'), $payload)->assertStatus(422);
+        // 2 × 2 × 20 × 1,5 = 120 Baseline → N/N 100
+        $preview = $this->actingAs($user)->postJson(route('calculations.preview'), $payload);
+        $preview->assertOk();
+        $this->assertSame('120.00', $preview->json('totals.media_gross'));
+        $this->assertSame('100.00', $preview->json('totals.positions.0.nn_invest'));
     }
 
     public function test_year_crossing_fail_closed(): void

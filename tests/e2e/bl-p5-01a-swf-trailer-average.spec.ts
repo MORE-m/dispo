@@ -240,7 +240,7 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
         );
     });
 
-    test('Spot Festpreis → Trailer: Normal-Abschluss, keine Festpreiswahl', async ({
+    test('Spot Festpreis → Trailer: Settlement bleibt erhalten', async ({
         page,
     }) => {
         test.setTimeout(120_000);
@@ -267,11 +267,10 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
 
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
-        ).toHaveCount(0);
-        await expect(
-            page.locator('[data-test="pricing-settlement-radio-0-normal"]'),
         ).toBeChecked();
-        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveCount(0);
+        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
+            '400,00',
+        );
 
         await fillRange(page, 0, '8', '9', '10');
         await waitForPreview(page);
@@ -281,7 +280,7 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
         );
     });
 
-    test('Spot Festpreis-Validierungsfehler → Trailer: Fehler weg, Preview/Save/Reload', async ({
+    test('Spot Festpreis-Validierungsfehler → Trailer: Settlement bleibt, N/N nachziehbar', async ({
         page,
     }) => {
         test.setTimeout(180_000);
@@ -322,13 +321,9 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
 
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
-        ).toHaveCount(0);
-        await expect(
-            page.locator('[data-test="pricing-settlement-radio-0-normal"]'),
         ).toBeChecked();
-        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveCount(0);
+        await page.locator('[data-test="fixed-price-nn-0"]').fill('400,00');
         await expect(page.locator('[data-test="preview-error"]')).toHaveCount(0);
-        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
 
         await expectTrailerUi(page, 0, '20');
         await waitForPreview(page);
@@ -344,11 +339,14 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
         await page.reload();
         await page.getByRole('button', { name: '2. Werbeelemente' }).click();
         await expectTrailerUi(page, 0, '20');
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
+        ).toBeChecked();
         await expect(page.locator('[data-test="range-gross-0-0"]')).toContainText(
             grossA,
             { timeout: 20_000 },
         );
-        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
+        await expect(page.locator('[data-test="preview-error"]')).toHaveCount(0);
     });
 
     test('Trailer Inventar A → B: Ziel-Länge, Ziel-Aufschlag, Zielpreise', async ({

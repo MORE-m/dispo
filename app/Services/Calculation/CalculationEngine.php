@@ -157,17 +157,22 @@ final class CalculationEngine
         string $orderDiscountPercent,
         array $orderDiscounts = [],
     ): PositionResult {
-        // PO-SWF-CALENDAR-1: SWF-Längenprofile erlauben Average + Calendar, Settlement bleibt OUT.
-        // Kein Medium-Hardcoding – Capability über Engine-Profil.
+        // PO-SWF-SETTLEMENT-1: SWF-Längenprofile Average|Calendar + Normal|Fixed Settlement.
+        // Method-Key fixed_price bleibt OUT (Match unten). Kein Medium-Hardcoding.
         if ($position->usesAverageLengthWithoutIndex()) {
             $methodAllowed = in_array(
                 $position->spotMethod,
                 [SpotCalculationMethod::Average, SpotCalculationMethod::Calendar],
                 true,
             );
-            if (! $methodAllowed || $position->pricingSettlementMode !== PricingSettlementMode::Normal) {
+            $settlementAllowed = in_array(
+                $position->pricingSettlementMode,
+                [PricingSettlementMode::Normal, PricingSettlementMode::FixedPrice],
+                true,
+            );
+            if (! $methodAllowed || ! $settlementAllowed) {
                 throw new \InvalidArgumentException(
-                    'SWF-Längenmedien unterstützen nur Durchschnitt und Kalender ohne Festpreis-Abschluss.',
+                    'SWF-Längenmedien unterstützen nur Durchschnitt und Kalender mit normalem oder Festpreis-Abschluss.',
                 );
             }
         }

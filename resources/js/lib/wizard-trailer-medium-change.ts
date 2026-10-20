@@ -1,11 +1,10 @@
 /**
- * BL-P5-01a Review-Nachzug: Mediumwechsel hin zu Trailer (swf_trailer).
+ * BL-P5-01a / PO-SWF-SETTLEMENT-1: Mediumwechsel hin zu SWF-Längenmedien.
  *
- * Trailer kennt keine Spot-Komponenten und kein Festpreis-Settlement.
- * Beim Eintritt müssen Komponenten/Strategie entfernt und die Länge aus der
- * inventarspezifischen Trailer-Regel genommen werden (kein Medium-Default-Fallback).
- * Spot-Komponenten dürfen für Trailer nicht aus dem Stash wiederhergestellt werden;
- * der Stash bleibt für den Rückwechsel auf Spot/Tandem/Tridem erhalten.
+ * SWF kennt keine Spot-Komponenten. Festpreis-Settlement (pricing_settlement_mode)
+ * ist für die vier operativen SWF freigegeben und bleibt beim Wechsel Spot↔SWF
+ * erhalten. Beim Eintritt: Komponenten/Strategie entfernen; Länge aus der
+ * inventarspezifischen Regel (kein Medium-Default-Fallback).
  */
 
 import {
@@ -227,7 +226,7 @@ export function resolveComponentsAfterMediumChange(
     return { components, strategy, length_seconds };
 }
 
-/** Settlement-Reset beim Wechsel auf Trailer (kein Festpreis). */
+/** Settlement-Reset, wenn Zielmedium kein Festpreis-Settlement unterstützt. */
 export function trailerSettlementReset(): {
     pricing_settlement_mode: 'normal';
     fixed_price_nn_input: string;
@@ -239,9 +238,21 @@ export function trailerSettlementReset(): {
 }
 
 /**
- * Entscheidet außerhalb des React-State-Updaters, ob Festpreis-Validierung
- * nach Inventar-/Mediumwechsel bereinigt werden muss (Ziel = Trailer).
- * Keine Abhängigkeit von synchroner Ausführung von setState-Updatern.
+ * Spot Classic (inkl. Erst/Letzt/Single/Tandem/Tridem) und operative SWF
+ * unterstützen pricing_settlement_mode=fixed_price. Andere Medien: nein.
+ */
+export function mediumSupportsFixedPriceSettlement(
+    catalog: TrailerMediumChangeCatalog,
+    mediumId: number,
+): boolean {
+    const kind = catalog.media.find((item) => item.id === mediumId)?.kind;
+
+    return isSwfLengthKind(kind) || kind === 'spot_classic';
+}
+
+/**
+ * Festpreis-Validierung bereinigen / Settlement resetten, wenn Zielmedium
+ * Settlement nicht unterstützt (PO-SWF-SETTLEMENT-1: SWF behält Settlement).
  */
 export function shouldClearTrailerSettlementForTargetMedium(
     catalog: TrailerMediumChangeCatalog,
@@ -251,5 +262,5 @@ export function shouldClearTrailerSettlementForTargetMedium(
         return false;
     }
 
-    return isSwfLengthMedium(catalog, targetMediumId);
+    return !mediumSupportsFixedPriceSettlement(catalog, targetMediumId);
 }

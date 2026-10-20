@@ -28,6 +28,12 @@ const catalog: TrailerMediumChangeCatalog = {
             default_length_seconds: 30,
             component_profile: 'tandem',
         },
+        {
+            id: 99,
+            kind: null,
+            default_length_seconds: 30,
+            component_profile: null,
+        },
     ],
     rules: [
         {
@@ -243,8 +249,9 @@ describe('resolveComponentsAfterMediumChange (Trailer)', () => {
         expect(result.components).toEqual([]);
         expect(result.strategy).toBeNull();
         expect(result.length_seconds).toBe(10);
+        // PO-SWF-SETTLEMENT-1: Allonge behält Settlement – kein Clear.
         expect(shouldClearTrailerSettlementForTargetMedium(allongeCatalog, 4)).toBe(
-            true,
+            false,
         );
     });
 });
@@ -265,12 +272,15 @@ describe('trailerLengthFromRule / trailerSettlementReset', () => {
 });
 
 describe('shouldClearTrailerSettlementForTargetMedium', () => {
-    it('ist true nur für Trailer-Zielmedium (direkt oder nach Inventar-Rebind)', () => {
+    it('ist false für Spot und operative SWF; true nur ohne Settlement-Support', () => {
         expect(shouldClearTrailerSettlementForTargetMedium(catalog, 2)).toBe(
-            true,
+            false,
         );
         expect(shouldClearTrailerSettlementForTargetMedium(catalog, 1)).toBe(
             false,
+        );
+        expect(shouldClearTrailerSettlementForTargetMedium(catalog, 99)).toBe(
+            true,
         );
         expect(
             shouldClearTrailerSettlementForTargetMedium(catalog, null),

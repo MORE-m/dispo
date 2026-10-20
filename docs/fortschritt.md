@@ -1,17 +1,22 @@
 # Fortschritt V1
 
-Stand: 19. Oktober 2026 – **PO-SWF-CALENDAR-1** auf Feature-Branch (Draft-PR):
-Calendar freigeschaltet für die vier operativen SWF-Profile (`swf_trailer`,
-`swf_allonge`, `swf_promo`, `swf_contest`) ohne Spotlängenindex (SWF-001).
-Average bleibt operational. Settlement / Method-Key `fixed_price` /
-Produktion / Komponenten weiterhin OUT. Eine Familien-E2E (Promo). Kein Deploy.
+Stand: 20. Oktober 2026 – **PO-SWF-SETTLEMENT-1** auf Feature-Branch (Draft-PR):
+Festpreis-Settlement (`pricing_settlement_mode=fixed_price` / `fixed_price_nn`)
+für die vier operativen SWF-Profile × Average + Calendar. Spot-Settlement-Kern
+wiederverwendet; Method-Key `fixed_price` / TKP / Free Position / Produktion /
+Komponenten weiterhin OUT. Familien-E2E Promo Calendar + Fixed. Kein Deploy.
+Dok: `docs/readiness/PO-SWF-SETTLEMENT-1-auftrag-2026-10-19.md`.
+
+Stand davor: 19. Oktober 2026 – **PO-SWF-CALENDAR-1** auf `main` (PR #166):
+Calendar freigeschaltet für die vier operativen SWF-Profile ohne Spotlängenindex.
+Settlement damals OUT (jetzt über PO-SWF-SETTLEMENT-1). Kein Deploy.
 Dok: `docs/readiness/PO-SWF-CALENDAR-1-auftrag-2026-10-19.md`.
 
 Stand davor: 19. Oktober 2026 – **PO-SWF-CONTEST-1** auf `main` (PR #165):
 `contest_payoff` (Gewinnspiel/Pay-Off = Gewinnspieldurchgang) mit eigenem Profil
 `swf_contest`, nur Average, Initial **25 s / +50 %**, vier Matrix-Inventare,
 fail-closed, Calc-/Dispo-Snapshot; Calendar/Settlement damals OUT (jetzt
-Calendar über PO-SWF-CALENDAR-1). Kein Deploy.
+Calendar + Settlement freigeschaltet). Kein Deploy.
 Dok: `docs/readiness/PO-SWF-CONTEST-1-auftrag-2026-10-19.md`.
 
 Stand davor: 19. Oktober 2026 – **PO-USER-ADMIN-1** auf `main` (PR #164):

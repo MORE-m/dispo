@@ -879,11 +879,18 @@ final class CalculationWriter
                     ?? 30);
             }
 
+            // PO-SWF-SETTLEMENT-1: Festpreis-Abschluss für Spot Classic + operative SWF.
+            // Method-Key fixed_price bleibt OUT; nicht freigegebene Medien fail-closed.
             $settlement = $this->parseSettlementFromPayloadPosition($position, (int) $index);
-            if ($isSwfLength && $settlement['mode'] !== PricingSettlementMode::Normal) {
-                throw ValidationException::withMessages([
-                    "positions.{$index}.pricing_settlement_mode" => 'Festpreis-Abschluss ist für '.$swfLengthLabel.' nicht freigegeben.',
-                ]);
+            if ($settlement['mode'] === PricingSettlementMode::FixedPrice) {
+                $profileKey = $catalog['freeze']->engineProfileKey;
+                $settlementAllowed = $profileKey === EngineProfileRegistry::PROFILE_SPOT_CLASSIC
+                    || EngineProfileRegistry::supportsFixedPriceSettlement($profileKey);
+                if (! $settlementAllowed) {
+                    throw ValidationException::withMessages([
+                        "positions.{$index}.pricing_settlement_mode" => 'Festpreis-Abschluss ist für dieses Medium nicht freigegeben.',
+                    ]);
+                }
             }
 
             $productionLines = $this->productionPrices->resolveLinesForPosition(
