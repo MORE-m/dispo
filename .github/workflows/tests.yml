@@ -285,6 +285,18 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Browser PO-SWF-SETTLEMENT-1 isolated tests
+        run: npx playwright test -c playwright.po-swf-settlement-1.config.ts --retries=0
+
+      - name: Upload PO-SWF-SETTLEMENT-1 failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: po-swf-settlement-1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/po-swf-settlement-1/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Browser BL-P5-02a isolated tests
         run: npx playwright test -c playwright.blp502a.config.ts
 

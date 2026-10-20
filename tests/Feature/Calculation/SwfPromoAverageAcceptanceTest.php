@@ -137,10 +137,13 @@ class SwfPromoAverageAcceptanceTest extends TestCase
             $this->promoPosition($catalog['c'], $catalog['promo'], 10, ['length_seconds' => 20]),
         ]))->assertStatus(422);
 
-        // PO-SWF-CALENDAR-1: Calendar ist freigegeben; Settlement bleibt OUT.
-        $this->actingAs($user)->postJson(route('calculations.preview'), $this->promoPayload([
-            array_merge($base, ['pricing_settlement_mode' => 'fixed_price', 'fixed_price_nn' => '100.00']),
-        ]))->assertStatus(422);
+        // PO-SWF-SETTLEMENT-1: Settlement freigegeben; Produktion/Komponenten bleiben OUT.
+        $settled = $this->actingAs($user)->postJson(route('calculations.preview'), $this->promoPayload([
+            array_merge($base, ['pricing_settlement_mode' => 'fixed_price', 'fixed_price_nn' => '450.00']),
+        ]));
+        $settled->assertOk();
+        $this->assertSame('600.00', $settled->json('totals.media_gross'));
+        $this->assertSame('450.00', $settled->json('totals.positions.0.nn_invest'));
 
         $this->actingAs($user)->postJson(route('calculations.preview'), $this->promoPayload([
             array_merge($base, ['production_lines' => [[

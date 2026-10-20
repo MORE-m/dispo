@@ -109,6 +109,7 @@ import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint
 import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
 import {
     isSwfLengthMedium,
+    mediumSupportsFixedPriceSettlement,
     resolveComponentsAfterMediumChange,
     shouldClearTrailerSettlementForTargetMedium,
     trailerSettlementReset,
@@ -2214,7 +2215,7 @@ export default function CalculationWizard({
                         };
 
                         if (
-                            isSwfLengthMedium(
+                            !mediumSupportsFixedPriceSettlement(
                                 catalog,
                                 next.advertising_medium_id,
                             )
@@ -2306,8 +2307,13 @@ export default function CalculationWizard({
                     if (isSwfLengthMedium(catalog, medium.id)) {
                         next = {
                             ...next,
-                            ...trailerSettlementReset(),
                             production_lines: [],
+                        };
+                    }
+                    if (!mediumSupportsFixedPriceSettlement(catalog, medium.id)) {
+                        next = {
+                            ...next,
+                            ...trailerSettlementReset(),
                         };
                     }
                 }
@@ -4197,10 +4203,12 @@ export default function CalculationWizard({
                                                                 position.fixed_price_nn_input
                                                             }
                                                             disabled={!canEdit}
-                                                            hideFixedPrice={isSwfLengthMedium(
-                                                                catalog,
-                                                                position.advertising_medium_id,
-                                                            )}
+                                                            hideFixedPrice={
+                                                                !mediumSupportsFixedPriceSettlement(
+                                                                    catalog,
+                                                                    position.advertising_medium_id,
+                                                                )
+                                                            }
                                                             showFixedPriceValidation={
                                                                 settlementValidationTouched[
                                                                     index

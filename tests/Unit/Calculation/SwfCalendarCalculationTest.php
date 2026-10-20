@@ -9,7 +9,6 @@ use App\Services\Calculation\CalculationEngine;
 use App\Services\Calculation\PlannerEntryInput;
 use App\Services\Calculation\PositionInput;
 use App\Support\Calculation\EngineProfileRegistry;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -105,16 +104,20 @@ class SwfCalendarCalculationTest extends TestCase
     }
 
     #[DataProvider('swfProfiles')]
-    public function test_settlement_still_rejected_for_calendar(string $profile): void
+    public function test_settlement_accepted_for_calendar(string $profile): void
     {
-        $this->expectException(InvalidArgumentException::class);
-
-        (new CalculationEngine)->calculatePosition(
+        $result = (new CalculationEngine)->calculatePosition(
             $this->swfCalendar($profile, 20, '30', [
-                new PlannerEntryInput('2026-09-14', 8, 2, DayGroup::MoFr, '2.0000'),
+                new PlannerEntryInput('2026-09-14', 8, 10, DayGroup::MoFr, '2.0000'),
             ], settlement: PricingSettlementMode::FixedPrice),
             '0',
         );
+
+        // 10 × 2 × 20 × 1,3 = 520 → fixed_nn 100
+        $this->assertSame('520.00', $result->mediaGross);
+        $this->assertSame('100.00', $result->nnInvest);
+        $this->assertSame(100, $result->lengthIndex);
+        $this->assertSame(PricingSettlementMode::FixedPrice, $result->pricingSettlementMode);
     }
 
     public function test_spot_classic_calendar_still_applies_length_index(): void

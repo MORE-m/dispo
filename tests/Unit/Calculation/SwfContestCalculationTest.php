@@ -10,7 +10,6 @@ use App\Services\Calculation\PlanRowInput;
 use App\Services\Calculation\PositionInput;
 use App\Services\Calculation\TimeRangeInput;
 use App\Support\Calculation\EngineProfileRegistry;
-use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
@@ -42,13 +41,16 @@ class SwfContestCalculationTest extends TestCase
         $this->assertSame('775.00', $result->mediaGross);
     }
 
-    public function test_contest_rejects_fixed_price_settlement(): void
+    public function test_contest_accepts_fixed_price_settlement(): void
     {
-        $this->expectException(InvalidArgumentException::class);
-        (new CalculationEngine)->calculatePosition(
+        $result = (new CalculationEngine)->calculatePosition(
             $this->contest(25, '50', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice),
             '0',
         );
+
+        $this->assertSame('750.00', $result->mediaGross);
+        $this->assertSame('100.00', $result->nnInvest);
+        $this->assertSame(100, $result->lengthIndex);
     }
 
     private function contest(

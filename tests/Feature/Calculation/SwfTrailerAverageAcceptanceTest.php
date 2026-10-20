@@ -336,19 +336,22 @@ class SwfTrailerAverageAcceptanceTest extends TestCase
         $this->preview($this->sales(), $payload)->assertStatus(422);
     }
 
-    public function test_fixed_price_and_components_are_rejected_for_trailer(): void
+    public function test_components_are_rejected_for_trailer_settlement_is_allowed(): void
     {
         $catalog = $this->createTrailerAverageCatalog();
         $user = $this->sales();
 
-        // PO-SWF-CALENDAR-1: Calendar freigegeben; Settlement/Komponenten bleiben OUT.
+        // PO-SWF-SETTLEMENT-1: Festpreis-Abschluss freigegeben; Komponenten bleiben OUT.
         $fixed = $this->trailerPayload([
             $this->trailerPosition($catalog['a'], $catalog['trailer'], 10, [
                 'pricing_settlement_mode' => 'fixed_price',
                 'fixed_price_nn' => '400.00',
             ]),
         ]);
-        $this->preview($user, $fixed)->assertStatus(422);
+        $preview = $this->preview($user, $fixed);
+        $preview->assertOk();
+        $this->assertSame('520.00', $preview->json('totals.media_gross'));
+        $this->assertSame('400.00', $preview->json('totals.positions.0.nn_invest'));
 
         $components = $this->trailerPayload([
             $this->trailerPosition($catalog['a'], $catalog['trailer'], 10, [

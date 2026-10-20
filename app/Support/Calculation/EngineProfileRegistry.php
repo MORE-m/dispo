@@ -143,7 +143,8 @@ final class EngineProfileRegistry
 
     /**
      * SWF-Längenprofile (Trailer/Allonge/Promo/Contest): Länge × Aufschlag ohne Spotlängenindex
-     * (Index fest 100) für Average und Calendar. Settlement bleibt OUT (PO-SWF-CALENDAR-1).
+     * (Index fest 100) für Average und Calendar. Settlement (pricing_settlement_mode) ist für
+     * dieselben Profile freigegeben (PO-SWF-SETTLEMENT-1); Method-Key fixed_price bleibt OUT.
      */
     public static function usesLengthWithoutIndex(string $engineProfileKey): bool
     {
@@ -151,6 +152,15 @@ final class EngineProfileRegistry
             || $engineProfileKey === self::PROFILE_SWF_ALLONGE
             || $engineProfileKey === self::PROFILE_SWF_PROMO
             || $engineProfileKey === self::PROFILE_SWF_CONTEST;
+    }
+
+    /**
+     * PO-SWF-SETTLEMENT-1: Festpreis-Abschluss (pricing_settlement_mode) für operative SWF.
+     * Identisch zur Längen-ohne-Index-Menge – keine automatische Freigabe anderer Medien.
+     */
+    public static function supportsFixedPriceSettlement(string $engineProfileKey): bool
+    {
+        return self::usesLengthWithoutIndex($engineProfileKey);
     }
 
     /**

@@ -10,7 +10,6 @@ use App\Services\Calculation\PlanRowInput;
 use App\Services\Calculation\PositionInput;
 use App\Services\Calculation\TimeRangeInput;
 use App\Support\Calculation\EngineProfileRegistry;
-use InvalidArgumentException;
 use Tests\TestCase;
 
 /**
@@ -84,27 +83,16 @@ class SwfTrailerCalculationTest extends TestCase
         $this->assertSame('780.00', $engine->calculatePosition($twoHours, '0')->mediaGross);
     }
 
-    public function test_trailer_rejects_fixed_price_settlement(): void
+    public function test_trailer_accepts_fixed_price_settlement(): void
     {
-        $fixed = new PositionInput(
-            inventoryId: 1,
-            inventoryName: 'Test',
-            positionKey: 'p',
-            lengthSeconds: 20,
-            surchargePercent: '30',
-            positionDiscountPercent: '0',
-            aePercent: '0',
-            isDiscountable: true,
-            isAeEligible: true,
-            totalSpotCount: 1,
-            spotMethod: SpotCalculationMethod::Average,
-            rows: [],
-            pricingSettlementMode: PricingSettlementMode::FixedPrice,
-            fixedPriceNn: '100.00',
-            engineProfileKey: EngineProfileRegistry::PROFILE_SWF_TRAILER,
+        $result = (new CalculationEngine)->calculatePosition(
+            $this->trailer(20, '30', 10, '2.0000', settlement: PricingSettlementMode::FixedPrice),
+            '0',
         );
-        $this->expectException(InvalidArgumentException::class);
-        (new CalculationEngine)->calculatePosition($fixed, '0');
+
+        $this->assertSame('520.00', $result->mediaGross);
+        $this->assertSame('100.00', $result->nnInvest);
+        $this->assertSame(100, $result->lengthIndex);
     }
 
     private function trailer(
@@ -114,6 +102,7 @@ class SwfTrailerCalculationTest extends TestCase
         string $secondPrice,
         ?int $lengthIndex = null,
         string $profile = EngineProfileRegistry::PROFILE_SWF_TRAILER,
+        PricingSettlementMode $settlement = PricingSettlementMode::Normal,
     ): PositionInput {
         return new PositionInput(
             inventoryId: 1,
@@ -132,6 +121,8 @@ class SwfTrailerCalculationTest extends TestCase
             timeRanges: [new TimeRangeInput(8, 9, DayGroup::MoFr, $spots, [
                 new PlanRowInput(8, DayGroup::MoFr, 0, $secondPrice),
             ])],
+            pricingSettlementMode: $settlement,
+            fixedPriceNn: $settlement === PricingSettlementMode::FixedPrice ? '100.00' : null,
             engineProfileKey: $profile,
         );
     }

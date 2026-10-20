@@ -469,7 +469,7 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         ).toHaveCount(0);
         await expect(
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
-        ).toHaveCount(0);
+        ).toBeVisible();
         await page.locator('[data-test="position-length-seconds-0"]').fill('15');
         await fillRange(page, 0, '10');
         await waitForPreview(page);
@@ -505,7 +505,7 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         await expect(page.locator('[data-test="dispo-order-position-components-0"]')).toHaveCount(0);
     });
 
-    test('Wechsel von Spot mit Allonge-Komponente räumt Komponenten und Festpreis ab', async ({
+    test('Wechsel von Spot mit Allonge-Komponente räumt Komponenten, behält Settlement', async ({
         page,
     }) => {
         test.setTimeout(180_000);
@@ -521,10 +521,14 @@ test.describe.serial('PO-ALLONGE-1 SWF Allonge × Durchschnitt', () => {
         await page.locator('[data-test="spot-component-length-main_spot-0"]').fill('20');
         await page.locator('[data-test="spot-components-add-allonge-0"]').click();
         await page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]').check();
+        await page.locator('[data-test="fixed-price-nn-0"]').fill('300,00');
         await page.locator('[data-test="position-medium-0"]').selectOption({ label: allongeMedium });
 
         await expect(page.locator('[data-test="spot-components-section-0"]')).toHaveCount(0);
-        await expect(page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]')).toHaveCount(0);
+        await expect(
+            page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
+        ).toBeChecked();
+        await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue('300,00');
         await expect(page.locator('[data-test="position-length-seconds-0"]')).toHaveValue('10');
         await page.locator('[data-test="position-length-seconds-0"]').fill('15');
         await fillRange(page, 0, '10');
