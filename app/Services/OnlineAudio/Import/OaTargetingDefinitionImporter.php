@@ -12,16 +12,7 @@ use Illuminate\Support\Facades\DB;
 final class OaTargetingDefinitionImporter
 {
     /**
-     * @param  list<array{
-     *     code: string,
-     *     name: string,
-     *     category: string,
-     *     tkp_surcharge: string|float|int,
-     *     revision_number?: int,
-     *     is_active?: bool,
-     *     valid_from?: string|null,
-     *     valid_to?: string|null
-     * }>  $rows
+     * @param  list<array<string, mixed>>  $rows
      * @return array{created: int, updated: int, dry_run: bool}
      */
     public function import(array $rows, bool $dryRun = false): array

@@ -11,13 +11,7 @@ use Illuminate\Support\Facades\DB;
 final class OaPlatformImporter
 {
     /**
-     * @param  list<array{
-     *     code: string,
-     *     name: string,
-     *     is_active?: bool,
-     *     sort?: int,
-     *     is_adserver_relevant?: bool
-     * }>  $rows
+     * @param  list<array<string, mixed>>  $rows
      * @return array{created: int, updated: int, dry_run: bool}
      */
     public function import(array $rows, bool $dryRun = false): array

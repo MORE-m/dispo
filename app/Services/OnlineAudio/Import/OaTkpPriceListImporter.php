@@ -26,20 +26,7 @@ final class OaTkpPriceListImporter
     ];
 
     /**
-     * @param  array{
-     *     year: int,
-     *     name?: string,
-     *     version?: string,
-     *     revision_number?: int,
-     *     status?: string,
-     *     valid_from?: string|null,
-     *     items: list<array{
-     *         medium_code: string,
-     *         inventory_code: string,
-     *         list_tkp: string|float|int,
-     *         minimum_tkp: string|float|int
-     *     }>
-     * }  $payload
+     * @param  array<string, mixed>  $payload
      * @return array{price_list_id: int|null, items_written: int, dry_run: bool}
      */
     public function import(array $payload, bool $dryRun = false): array
@@ -61,16 +48,22 @@ final class OaTkpPriceListImporter
             $errors[] = 'status ungültig (draft|active|archived).';
         }
 
-        $items = $payload['items'] ?? null;
-        if (! is_array($items) || $items === []) {
+        $itemsRaw = $payload['items'] ?? null;
+        $items = is_array($itemsRaw) ? $itemsRaw : [];
+        if ($items === []) {
             $errors[] = 'items fehlen.';
-            $items = [];
         }
 
         $seenPairs = [];
         $resolvedItems = [];
 
         foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                $errors[] = 'Item '.($index + 1).': ungültige Struktur.';
+
+                continue;
+            }
+
             $line = $index + 1;
             $mediumCode = trim((string) ($item['medium_code'] ?? ''));
             $inventoryCode = trim((string) ($item['inventory_code'] ?? ''));
@@ -102,7 +95,7 @@ final class OaTkpPriceListImporter
             if ($minimumTkp === null) {
                 $errors[] = "Item {$line}: minimum_tkp ungültig (muss > 0 sein).";
             }
-            if ($listTkp !== null && $minimumTkp !== null && bccomp($minimumTkp, $listTkp, 4) === 1) {
+            if ($listTkp !== null && $minimumTkp !== null && (float) $minimumTkp > (float) $listTkp) {
                 $errors[] = "Item {$line}: minimum_tkp darf list_tkp nicht überschreiten.";
             }
 
@@ -206,11 +199,11 @@ final class OaTkpPriceListImporter
             return null;
         }
 
-        $normalized = number_format((float) $value, 4, '.', '');
-        if (bccomp($normalized, '0', 4) !== 1) {
+        $asFloat = (float) $value;
+        if ($asFloat <= 0) {
             return null;
         }
 
-        return $normalized;
+        return number_format($asFloat, 4, '.', '');
     }
 }
