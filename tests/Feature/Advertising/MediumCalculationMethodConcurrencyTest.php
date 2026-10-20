@@ -240,18 +240,19 @@ class MediumCalculationMethodConcurrencyTest extends TestCase
         $medium = $this->mediumWithOverrideSetup(
             $this->spotMedium('race_med_methods_deact_m_'.bin2hex(random_bytes(2))),
         );
-        $tkp = CalculationMethod::query()->where('key', 'tkp')->firstOrFail();
-        $this->assertTrue($tkp->is_active);
+        // free_position: kein aktives Kategorie-Assignment (tkp hat seit PO-CALC-TKP-1A online_audio).
+        $method = CalculationMethod::query()->where('key', 'free_position')->firstOrFail();
+        $this->assertTrue($method->is_active);
 
         $desired = $this->buildDesiredFromCurrent($medium);
         $desired['assignments'][] = [
-            'calculation_method_id' => (int) $tkp->id,
+            'calculation_method_id' => (int) $method->id,
             'is_active' => true,
             'sort' => 95,
         ];
         $previewApply = $this->previewPayload($medium, $desired);
         $previewDeactivate = app(CalculationMethodImpactPreviewService::class)
-            ->previewDeactivate($tkp->fresh());
+            ->previewDeactivate($method->fresh());
         $this->assertTrue($previewDeactivate['can_proceed']);
 
         $results = $this->runParallelWorkers(
@@ -265,8 +266,8 @@ class MediumCalculationMethodConcurrencyTest extends TestCase
                 'action' => 'deactivate_method',
                 'payload' => [
                     'actor_id' => $admin->id,
-                    'method_id' => $tkp->id,
-                    'lock_version' => $tkp->lock_version,
+                    'method_id' => $method->id,
+                    'lock_version' => $method->lock_version,
                     'fingerprint' => $previewDeactivate['fingerprint'],
                     'orchestration' => [
                         'wait_before' => ['holder_medium_locked'],
@@ -280,14 +281,14 @@ class MediumCalculationMethodConcurrencyTest extends TestCase
         $this->assertNoDeadlockOrLockTimeout($results);
         $this->assertValidSerialOutcomes($results, ['replace_medium_methods', 'deactivate_method']);
 
-        $tkp->refresh();
-        $activeTkp = AdvertisingMediumCalculationMethod::query()
+        $method->refresh();
+        $activeAssignment = AdvertisingMediumCalculationMethod::query()
             ->where('advertising_medium_id', $medium->id)
-            ->where('calculation_method_id', $tkp->id)
+            ->where('calculation_method_id', $method->id)
             ->where('is_active', true)
             ->exists();
-        if (! $tkp->is_active) {
-            $this->assertFalse($activeTkp);
+        if (! $method->is_active) {
+            $this->assertFalse($activeAssignment);
         }
     }
 

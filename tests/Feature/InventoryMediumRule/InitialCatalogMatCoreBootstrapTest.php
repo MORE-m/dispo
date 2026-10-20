@@ -102,6 +102,18 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
                 ->pluck('calculationMethod.key')
                 ->all(),
         );
+
+        // PO-CALC-TKP-1A: online_audio → tkp / oa_tkp (Assignment, nicht Release).
+        $oaCategoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
+            ->value('id');
+        $oaAssignments = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $oaCategoryId)
+            ->with('calculationMethod')
+            ->orderBy('sort')
+            ->get();
+        $this->assertSame(['tkp'], $oaAssignments->pluck('calculationMethod.key')->all());
+        $this->assertSame(['oa_tkp'], $oaAssignments->pluck('engine_profile_key')->all());
         $this->assertSame(
             CalculationMethodMode::Inherit,
             AdvertisingMedium::query()->where('code', 'trailer_station_voice')->firstOrFail()->calculation_method_mode,

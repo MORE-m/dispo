@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 20. Oktober 2026 – **PO-SWF-SETTLEMENT-1** auf Feature-Branch (Draft-PR):
+Stand: 20. Oktober 2026 – **PO-CALC-TKP-1A** auf Feature-Branch (Draft-PR):
+OA/TKP-Stammdatenfundament (`oa_platforms`, TKP-Preislisten, Targeting,
+Adserver-Konfig), Kategorie `online_audio` → `tkp`/`oa_tkp`, Registry **planned**.
+Keine Engine, kein Method-Release, keine operative Buchbarkeit, keine Fake-Preise.
+Offene FDs (FEST/ADSERVER/PLAT/NATIVE) unverändert. Kein Deploy.
+Dok: `docs/readiness/PO-CALC-TKP-1A-auftrag-2026-10-20.md`.
+
+Stand davor: 20. Oktober 2026 – **PO-SWF-SETTLEMENT-1** auf `main` (PR #167):
 Festpreis-Settlement (`pricing_settlement_mode=fixed_price` / `fixed_price_nn`)
 für die vier operativen SWF-Profile × Average + Calendar. Spot-Settlement-Kern
 wiederverwendet; Method-Key `fixed_price` / TKP / Free Position / Produktion /

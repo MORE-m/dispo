@@ -307,8 +307,12 @@ Unterobjekte werden typbezogen normalisiert:
   Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
 - `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
   (ohne Kalenderdatum; Erklärungs-/Legacy-Pfad Durchschnitt),
-- `PlatformAllocation` für Online-Audio-Mengen,
-- `TargetingSelection` für technische/DMP-Targetings,
+- `PlatformAllocation` für Online-Audio-Mengen (Positionsstruktur Phase B; noch nicht implementiert),
+- `TargetingSelection` für technische/DMP-Targetings (Phase B; noch nicht implementiert),
+- **PO-CALC-TKP-1A Stammdaten (ohne Engine):** `oa_platforms`, `oa_tkp_price_lists` /
+  `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
+  keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
+  `oa_adserver_surcharges` (konfigurierbar). Registry `oa_tkp`/`tkp` = planned,
 - `SocialElement` und `InfluencerItem`,
 - `PriceComponent` für Produktion, Sonstiges, Fremdkosten und Booster.
 

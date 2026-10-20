@@ -77,7 +77,12 @@ class EngineProfileRegistryTest extends TestCase
     #[Test]
     public function pairs_for_method_key_lists_zero_one_or_more_profiles_deterministically(): void
     {
-        $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('tkp'));
+        // PO-CALC-TKP-1A: oa_tkp/tkp geplant, nicht released.
+        $tkpPairs = EngineProfileRegistry::pairsForMethodKey('tkp');
+        $this->assertCount(1, $tkpPairs);
+        $this->assertSame('oa_tkp', $tkpPairs[0]['engine_profile_key']);
+        $this->assertSame('planned', $tkpPairs[0]['pair_status']);
+        $this->assertNull($tkpPairs[0]['current_released_version']);
         $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('free_position'));
 
         $average = EngineProfileRegistry::pairsForMethodKey('average');
