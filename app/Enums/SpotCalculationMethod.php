@@ -11,6 +11,8 @@ enum SpotCalculationMethod: string
     case Average = 'average';
     case Calendar = 'calendar';
     case FixedPrice = 'fixed_price';
+    /** PO-CALC-TKP-1B: Normal-TKP (Legacy-Spiegel; Registry bleibt planned). */
+    case Tkp = 'tkp';
 
     public function label(): string
     {
@@ -18,6 +20,7 @@ enum SpotCalculationMethod: string
             self::Average => 'Durchschnitt',
             self::Calendar => 'Kalenderplaner',
             self::FixedPrice => 'Festpreis',
+            self::Tkp => 'TKP',
         };
     }
 

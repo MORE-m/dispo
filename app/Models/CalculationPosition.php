@@ -26,6 +26,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $calculation_method_name
  * @property string|null $algorithm_version
  * @property int $total_spot_count
+ * @property int|null $impressions
+ * @property string|null $basis_tkp
+ * @property string|null $list_tkp_snapshot
+ * @property string|null $minimum_tkp_snapshot
+ * @property string|null $final_tkp
+ * @property string|null $targeting_surcharge_total
+ * @property bool|null $below_minimum_tkp
+ * @property int|null $oa_tkp_price_list_id
+ * @property string|null $oa_tkp_price_list_version
+ * @property int|null $oa_tkp_price_list_year
+ * @property int|null $oa_tkp_price_list_revision
  * @property bool $needs_spot_redistribution
  * @property int $inventory_id
  * @property string|null $inventory_name
@@ -41,11 +52,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read Collection<int, CalculationPositionPlannerEntry> $plannerEntries
  * @property-read Collection<int, CalculationPositionComponent> $components
  * @property-read Collection<int, CalculationPositionDiscount> $discounts
+ * @property-read Collection<int, CalculationPositionOaPlatformAllocation> $oaPlatformAllocations
+ * @property-read Collection<int, CalculationPositionOaTargetingSelection> $oaTargetingSelections
  * @property int $length_seconds
  * @property string|null $component_calculation_strategy
  * @property SpotComponentProfile|null $component_profile
  * @property string $position_discount_percent
  * @property string $ae_percent
+ * @property string $surcharge_percent
+ * @property string $media_gross
+ * @property string $position_discount_amount
+ * @property string $order_discount_amount
+ * @property string $ae_amount
+ * @property string $nn_invest
  */
 class CalculationPosition extends Model
 {
@@ -71,12 +90,23 @@ class CalculationPosition extends Model
         'planning_responsibility_label',
         'combination_hint_text',
         'price_list_id',
+        'oa_tkp_price_list_id',
+        'oa_tkp_price_list_version',
+        'oa_tkp_price_list_year',
+        'oa_tkp_price_list_revision',
         'kind',
         'spot_method',
         'length_seconds',
         'component_calculation_strategy',
         'component_profile',
         'total_spot_count',
+        'impressions',
+        'basis_tkp',
+        'list_tkp_snapshot',
+        'minimum_tkp_snapshot',
+        'final_tkp',
+        'targeting_surcharge_total',
+        'below_minimum_tkp',
         'needs_spot_redistribution',
         'average_second_price',
         'length_index',
@@ -117,6 +147,10 @@ class CalculationPosition extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'needs_spot_redistribution' => 'boolean',
+            'impressions' => 'integer',
+            'below_minimum_tkp' => 'boolean',
+            'oa_tkp_price_list_year' => 'integer',
+            'oa_tkp_price_list_revision' => 'integer',
             'media_gross' => 'decimal:2',
             'production_gross' => 'decimal:2',
             'production_nn_invest' => 'decimal:2',
@@ -238,6 +272,30 @@ class CalculationPosition extends Model
     public function discounts(): HasMany
     {
         return $this->hasMany(CalculationPositionDiscount::class)->orderBy('sort')->orderBy('id');
+    }
+
+    /**
+     * PO-CALC-TKP-1B: eingefrorene Plattform-Impressions.
+     *
+     * @return HasMany<CalculationPositionOaPlatformAllocation, $this>
+     */
+    public function oaPlatformAllocations(): HasMany
+    {
+        return $this->hasMany(CalculationPositionOaPlatformAllocation::class)
+            ->orderBy('sort')
+            ->orderBy('id');
+    }
+
+    /**
+     * PO-CALC-TKP-1B: eingefrorene Targeting-Auswahlen.
+     *
+     * @return HasMany<CalculationPositionOaTargetingSelection, $this>
+     */
+    public function oaTargetingSelections(): HasMany
+    {
+        return $this->hasMany(CalculationPositionOaTargetingSelection::class)
+            ->orderBy('sort')
+            ->orderBy('id');
     }
 
     /**

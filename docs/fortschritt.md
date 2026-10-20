@@ -1,11 +1,14 @@
 # Fortschritt V1
 
-Stand: 20. Oktober 2026 – **PO-CALC-TKP-1A** auf Feature-Branch (Draft-PR):
-OA/TKP-Stammdatenfundament (`oa_platforms`, TKP-Preislisten, Targeting,
-Adserver-Konfig). TKP-Kernmedien (Pre-/In-Stream, Influencer, Mid-Roll) →
-Medium-Override `tkp`/`oa_tkp`; **kein** Category Assignment (Native OUT).
-Registry **planned**. Decimal-Import ohne Float. Keine Engine, kein Release,
-keine Buchbarkeit, keine Fake-Preise. Offene FDs unverändert. Kein Deploy.
+Stand: 20. Oktober 2026 – **PO-CALC-TKP-1B** auf Feature-Branch (Draft-PR):
+Normal-TKP-Engine (`OaTkpNormalEngine` v1) + Price Resolver + interner
+Save/Reload/Snapshot-Pfad. Registry `oa_tkp`/`tkp` bleibt **planned**
+(v1 = implemented, kein Bookability-Release). Adserver/Festpreis/Wizard OUT.
+Dok: `docs/readiness/PO-CALC-TKP-1B-auftrag-2026-10-20.md`.
+
+Stand davor: 20. Oktober 2026 – **PO-CALC-TKP-1A** auf `main` (PR #168):
+OA/TKP-Stammdatenfundament. TKP-Kernmedien Medium-Override `tkp`/`oa_tkp`;
+Native OUT. Registry planned. Decimal-Import ohne Float.
 Dok: `docs/readiness/PO-CALC-TKP-1A-auftrag-2026-10-20.md`.
 
 Stand davor: 20. Oktober 2026 – **PO-SWF-SETTLEMENT-1** auf `main` (PR #167):
