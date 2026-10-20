@@ -2141,6 +2141,12 @@ export default function CalculationWizard({
 
         if (clearTrailerSettlement) {
             clearTrailerSettlementValidationForIndex(index);
+        } else if (
+            patch.fixed_price_nn_input !== undefined &&
+            String(patch.fixed_price_nn_input).trim() !== ''
+        ) {
+            // Settlement bleibt (z. B. Spot→SWF): N/N-Eingabe räumt Festpreis-Banner.
+            clearTrailerSettlementValidationForIndex(index);
         }
 
         setPositions((current) =>

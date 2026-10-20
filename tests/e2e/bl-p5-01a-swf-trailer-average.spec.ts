@@ -323,7 +323,7 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
         ).toBeChecked();
         await page.locator('[data-test="fixed-price-nn-0"]').fill('400,00');
-        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
+        await expect(page.locator('[data-test="preview-error"]')).toHaveCount(0);
 
         await expectTrailerUi(page, 0, '20');
         await waitForPreview(page);
@@ -346,7 +346,7 @@ test.describe.serial('BL-P5-01a SWF Trailer × Durchschnitt', () => {
             grossA,
             { timeout: 20_000 },
         );
-        await expect(page.locator('body')).not.toContainText('Festpreis erfordert');
+        await expect(page.locator('[data-test="preview-error"]')).toHaveCount(0);
     });
 
     test('Trailer Inventar A → B: Ziel-Länge, Ziel-Aufschlag, Zielpreise', async ({
