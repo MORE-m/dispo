@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation\OaTkp;
 
+use App\Enums\DiscountType;
 use App\Services\Calculation\Decimal;
 use App\Services\Calculation\DiscountInput;
 use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
@@ -192,7 +193,7 @@ final class OaTkpNormalEngine
             return [];
         }
 
-        return [new DiscountInput(type: \App\Enums\DiscountType::Quantity, percent: $legacyPercent)];
+        return [new DiscountInput(type: DiscountType::Quantity, percent: $legacyPercent)];
     }
 
     /**

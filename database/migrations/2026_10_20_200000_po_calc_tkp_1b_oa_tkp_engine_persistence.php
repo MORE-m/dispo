@@ -52,9 +52,7 @@ return new class extends Migration
         if (! Schema::hasTable('calculation_position_oa_platform_allocations')) {
             Schema::create('calculation_position_oa_platform_allocations', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('calculation_position_id')
-                    ->constrained('calculation_positions')
-                    ->cascadeOnDelete();
+                $table->unsignedBigInteger('calculation_position_id');
                 $table->unsignedBigInteger('oa_platform_id')->nullable();
                 $table->string('platform_code', 64);
                 $table->string('platform_name');
@@ -62,6 +60,10 @@ return new class extends Migration
                 $table->unsignedInteger('sort')->default(0);
                 $table->timestamps();
 
+                $table->foreign('calculation_position_id', 'calc_pos_oa_plat_alloc_pos_fk')
+                    ->references('id')
+                    ->on('calculation_positions')
+                    ->cascadeOnDelete();
                 $table->index(
                     ['calculation_position_id', 'sort'],
                     'calc_pos_oa_plat_alloc_sort_idx',
@@ -72,9 +74,7 @@ return new class extends Migration
         if (! Schema::hasTable('calculation_position_oa_targeting_selections')) {
             Schema::create('calculation_position_oa_targeting_selections', function (Blueprint $table): void {
                 $table->id();
-                $table->foreignId('calculation_position_id')
-                    ->constrained('calculation_positions')
-                    ->cascadeOnDelete();
+                $table->unsignedBigInteger('calculation_position_id');
                 $table->unsignedBigInteger('oa_targeting_definition_id')->nullable();
                 $table->string('targeting_code', 64);
                 $table->string('targeting_name');
@@ -84,6 +84,10 @@ return new class extends Migration
                 $table->unsignedInteger('sort')->default(0);
                 $table->timestamps();
 
+                $table->foreign('calculation_position_id', 'calc_pos_oa_tgt_sel_pos_fk')
+                    ->references('id')
+                    ->on('calculation_positions')
+                    ->cascadeOnDelete();
                 $table->index(
                     ['calculation_position_id', 'sort'],
                     'calc_pos_oa_tgt_sel_sort_idx',

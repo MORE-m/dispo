@@ -13,6 +13,7 @@ use App\Models\CalculationPositionOaPlatformAllocation;
 use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\User;
 use App\Services\Calculation\CalculationNumberSequencer;
+use App\Services\Calculation\DiscountInput;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\EngineProfileRegistry;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ final class OaTkpCalculationPersister
     ) {}
 
     /**
-     * @param  list<\App\Services\Calculation\DiscountInput>  $orderDiscounts
+     * @param  list<DiscountInput>  $orderDiscounts
      */
     public function preview(
         OaTkpPositionInput $position,
@@ -42,7 +43,7 @@ final class OaTkpCalculationPersister
     }
 
     /**
-     * @param  list<\App\Services\Calculation\DiscountInput>  $orderDiscounts
+     * @param  list<DiscountInput>  $orderDiscounts
      */
     public function create(
         User $advisor,

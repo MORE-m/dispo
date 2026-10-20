@@ -307,15 +307,17 @@ Unterobjekte werden typbezogen normalisiert:
   Rabattzeilen (Art, optionale Bezeichnung, Prozent, Sortierung),
 - `SpotClassicPlanRow` als Stunden-Snapshot der aufgelösten Preisstunden
   (ohne Kalenderdatum; Erklärungs-/Legacy-Pfad Durchschnitt),
-- `PlatformAllocation` für Online-Audio-Mengen (Positionsstruktur Phase B; noch nicht implementiert),
-- `TargetingSelection` für technische/DMP-Targetings (Phase B; noch nicht implementiert),
-- **PO-CALC-TKP-1A Stammdaten (ohne Engine):** `oa_platforms`, `oa_tkp_price_lists` /
+- **PO-CALC-TKP-1B Persistenz:** `calculation_position_oa_platform_allocations`
+  (platform_code/name + impressions; Summe = Positions-Impressions) und
+  `calculation_position_oa_targeting_selections` (code/name/category + surcharge-Snapshot);
+  Positionsfelder u. a. `impressions`, `basis_tkp`, `list_tkp_snapshot`,
+  `minimum_tkp_snapshot`, `final_tkp`, `below_minimum_tkp`, Price-List-Identity,
+- **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
-  `oa_adserver_surcharges` (konfigurierbar). Assignment: TKP-Kernmedien → Medium-Override
-  `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry `oa_tkp`/`tkp` = planned
-  (Phase B: Engine `v1` implemented, nicht released). Positionsfelder Impressions/TKP-Snapshots
-  sowie `calculation_position_oa_platform_allocations` / `_oa_targeting_selections`,
+  `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
+  Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
+  `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
 - `SocialElement` und `InfluencerItem`,
 - `PriceComponent` für Produktion, Sonstiges, Fremdkosten und Booster.
 
