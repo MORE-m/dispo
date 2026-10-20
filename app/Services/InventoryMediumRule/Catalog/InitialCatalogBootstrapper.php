@@ -78,6 +78,7 @@ final class InitialCatalogBootstrapper
             }
 
             $this->ensureSwfTrailerCategoryMethod($categoryIds);
+            $this->ensureOnlineAudioTkpCategoryMethod($categoryIds);
             $this->ensureAllongeMediumOverride();
             $this->ensurePromoMediumOverride();
             $this->ensureContestMediumOverride();
@@ -89,6 +90,52 @@ final class InitialCatalogBootstrapper
             'media_created' => $mediaCreated,
             'media_unchanged' => $mediaUnchanged,
         ];
+    }
+
+    /**
+     * PO-CALC-TKP-1A: Kategorie online_audio → tkp / oa_tkp (planned; kein Release).
+     * Idempotent; abweichende Verträge fail-closed.
+     *
+     * @param  array<string, int>  $categoryIds
+     */
+    private function ensureOnlineAudioTkpCategoryMethod(array $categoryIds): void
+    {
+        $categoryId = $categoryIds[CanonicalAdvertisingCategories::ONLINE_AUDIO] ?? null;
+        if ($categoryId === null) {
+            return;
+        }
+
+        $tkp = CalculationMethod::query()->where('key', 'tkp')->first();
+        if ($tkp === null) {
+            throw new RuntimeException('Berechnungsmethode „tkp“ fehlt für den Initialkatalog-Bootstrap.');
+        }
+
+        $existing = AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $categoryId)
+            ->where('calculation_method_id', (int) $tkp->id)
+            ->get();
+
+        if ($existing->count() > 1) {
+            throw new RuntimeException('PO-CALC-TKP-1A: mehrdeutige online_audio/tkp-Zuordnung.');
+        }
+
+        if ($existing->count() === 1) {
+            $row = $existing->first();
+            if ((string) $row->engine_profile_key !== EngineProfileRegistry::PROFILE_OA_TKP) {
+                throw new RuntimeException(
+                    'PO-CALC-TKP-1A: online_audio/tkp hat abweichendes engine_profile_key (erwartet oa_tkp).',
+                );
+            }
+
+            return;
+        }
+
+        $this->ensureCategoryMethodAssignment(
+            $categoryId,
+            (int) $tkp->id,
+            EngineProfileRegistry::PROFILE_OA_TKP,
+            10,
+        );
     }
 
     /**

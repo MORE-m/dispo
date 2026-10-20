@@ -26,6 +26,13 @@ return new class extends Migration
         $this->assertPrerequisites();
 
         DB::transaction(function (): void {
+            // Wie SWF-Trailer: Assignment erst wenn OA-Kernmedien existieren
+            // (sonst brechen historische ADV-001c2-Down-Guards / Migrationstests).
+            // InitialCatalogBootstrapper stellt die Zuordnung nach Katalog-Seed sicher.
+            if (! DB::table('advertising_media')->where('code', 'pre_stream')->exists()) {
+                return;
+            }
+
             $categoryId = (int) DB::table('advertising_categories')
                 ->where('key', self::CATEGORY_KEY)
                 ->value('id');

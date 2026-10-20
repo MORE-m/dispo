@@ -57,6 +57,9 @@ class PoCalcTkp1aFoundationTest extends TestCase
     #[Test]
     public function online_audio_category_assigns_tkp_oa_tkp_while_registry_stays_planned(): void
     {
+        // Assignment entsteht mit OA-Medien (Migration-Gate) bzw. Katalog-Bootstrap.
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+
         $categoryId = (int) AdvertisingCategory::query()
             ->where('key', CanonicalAdvertisingCategories::ONLINE_AUDIO)
             ->value('id');
