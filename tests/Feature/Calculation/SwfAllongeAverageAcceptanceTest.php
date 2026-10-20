@@ -292,16 +292,13 @@ class SwfAllongeAverageAcceptanceTest extends TestCase
         $this->assertSame('390.00', (string) Calculation::query()->firstOrFail()->media_gross);
     }
 
-    public function test_calendar_fixed_price_production_and_components_are_rejected(): void
+    public function test_fixed_price_production_and_components_are_rejected(): void
     {
         $catalog = $this->createAllongeAverageCatalog();
         $user = User::factory()->role(Role::Sales)->create();
         $base = $this->allongePosition($catalog['a'], $catalog['allonge'], 10, ['length_seconds' => 15]);
 
-        $this->actingAs($user)->postJson(route('calculations.preview'), $this->allongePayload([
-            array_merge($base, ['spot_method' => 'calendar', 'planner_entries' => [['date' => now()->toDateString(), 'hour' => 8, 'spot_count' => 2]]]),
-        ]))->assertStatus(422);
-
+        // PO-SWF-CALENDAR-1: Calendar freigegeben; Settlement/Produktion/Komponenten bleiben OUT.
         $this->actingAs($user)->postJson(route('calculations.preview'), $this->allongePayload([
             array_merge($base, ['pricing_settlement_mode' => 'fixed_price', 'fixed_price_nn' => '100.00']),
         ]))->assertStatus(422);

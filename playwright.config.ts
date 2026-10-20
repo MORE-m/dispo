@@ -57,6 +57,7 @@ export default defineConfig({
         '**/po-spot-single-1-*.spec.ts',
         '**/po-swf-promo-1-*.spec.ts',
         '**/po-swf-contest-1-*.spec.ts',
+        '**/po-swf-calendar-1-*.spec.ts',
         '**/bl-p5-02a-*.spec.ts',
         '**/spt-008-*.spec.ts',
         '**/dsp-dcp-001-*.spec.ts',

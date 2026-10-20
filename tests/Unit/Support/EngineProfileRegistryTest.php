@@ -99,20 +99,25 @@ class EngineProfileRegistryTest extends TestCase
         $this->assertSame('released', $average[4]['pair_status']);
         $this->assertSame('v1', $average[4]['current_released_version']);
 
-        // SWF-Profile kennen weder calendar noch fixed_price.
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_trailer', 'calendar'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_trailer', 'fixed_price'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_allonge', 'calendar'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_allonge', 'fixed_price'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_promo', 'calendar'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_promo', 'fixed_price'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_contest', 'calendar'));
-        $this->assertFalse(EngineProfileRegistry::hasMethodForProfile('swf_contest', 'fixed_price'));
+        // PO-SWF-CALENDAR-1: SWF-Profile haben calendar released; fixed_price bleibt OUT.
+        foreach (['swf_trailer', 'swf_allonge', 'swf_promo', 'swf_contest'] as $profile) {
+            $this->assertTrue(EngineProfileRegistry::hasMethodForProfile($profile, 'calendar'));
+            $this->assertSame(
+                EngineCapabilityStatus::Released,
+                EngineProfileRegistry::pairStatus($profile, 'calendar'),
+            );
+            $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion($profile, 'calendar'));
+            $this->assertFalse(EngineProfileRegistry::hasMethodForProfile($profile, 'fixed_price'));
+        }
 
-        $keys = array_column(EngineProfileRegistry::pairsForMethodKey('calendar'), 'engine_profile_key');
-        $sorted = $keys;
+        $calendarKeys = array_column(EngineProfileRegistry::pairsForMethodKey('calendar'), 'engine_profile_key');
+        $this->assertSame(
+            ['spot_classic', 'swf_allonge', 'swf_contest', 'swf_promo', 'swf_trailer'],
+            $calendarKeys,
+        );
+        $sorted = $calendarKeys;
         sort($sorted);
-        $this->assertSame($sorted, $keys);
+        $this->assertSame($sorted, $calendarKeys);
     }
 
     #[Test]

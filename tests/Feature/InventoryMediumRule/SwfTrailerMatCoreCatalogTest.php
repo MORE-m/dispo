@@ -46,15 +46,17 @@ class SwfTrailerMatCoreCatalogTest extends TestCase
         $assignments = AdvertisingCategoryCalculationMethod::query()
             ->where('advertising_category_id', $swf->id)
             ->with('calculationMethod')
+            ->orderBy('sort')
             ->get();
-        $this->assertCount(1, $assignments);
-        $this->assertSame('average', $assignments[0]->calculationMethod?->key);
-        $this->assertSame('swf_trailer', $assignments[0]->engine_profile_key);
+        // PO-SWF-CALENDAR-1: average + calendar am Profil swf_trailer.
+        $this->assertCount(2, $assignments);
+        $this->assertSame(['average', 'calendar'], $assignments->pluck('calculationMethod.key')->all());
+        $this->assertSame(['swf_trailer', 'swf_trailer'], $assignments->pluck('engine_profile_key')->all());
 
         // Idempotent.
         app(InitialCatalogBootstrapper::class)->bootstrap();
         $this->assertSame(
-            1,
+            2,
             AdvertisingCategoryCalculationMethod::query()->where('advertising_category_id', $swf->id)->count(),
         );
 

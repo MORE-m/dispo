@@ -7,6 +7,7 @@ use App\Enums\CalculationMethodMode;
 use App\Enums\InventoryType;
 use App\Enums\SpotComponentProfile;
 use App\Models\AdvertisingCategory;
+use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\Inventory;
@@ -71,13 +72,40 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $this->assertSame($definition['is_ae_eligible'], $medium->is_ae_eligible);
             $this->assertSame($definition['component_profile']?->value, $medium->component_profile?->value);
             $this->assertTrue($medium->is_active);
-            $this->assertSame(
-                in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true) ? 1 : 0,
-                AdvertisingMediumCalculationMethod::query()
-                    ->where('advertising_medium_id', $medium->id)
-                    ->count(),
-            );
+            // PO-SWF-CALENDAR-1: Allonge/Promo/Contest Override → average + calendar.
+            // Trailer und alle übrigen Medien: Inherit (keine Medium-Zuordnungen).
+            $methodKeys = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $medium->id)
+                ->with('calculationMethod')
+                ->orderBy('sort')
+                ->get()
+                ->pluck('calculationMethod.key')
+                ->all();
+            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
+                $this->assertSame(['average', 'calendar'], $methodKeys, $definition['code']);
+            } else {
+                $this->assertSame([], $methodKeys, $definition['code']);
+            }
         }
+
+        // Trailer (Inherit): Kategorie special_advertising_formats trägt average + calendar.
+        $swfCategoryId = (int) AdvertisingCategory::query()
+            ->where('key', CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS)
+            ->value('id');
+        $this->assertSame(
+            ['average', 'calendar'],
+            AdvertisingCategoryCalculationMethod::query()
+                ->where('advertising_category_id', $swfCategoryId)
+                ->with('calculationMethod')
+                ->orderBy('sort')
+                ->get()
+                ->pluck('calculationMethod.key')
+                ->all(),
+        );
+        $this->assertSame(
+            CalculationMethodMode::Inherit,
+            AdvertisingMedium::query()->where('code', 'trailer_station_voice')->firstOrFail()->calculation_method_mode,
+        );
 
         $this->assertSame(
             CalculationKind::SpotClassic,

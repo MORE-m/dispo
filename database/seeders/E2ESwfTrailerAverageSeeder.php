@@ -147,6 +147,23 @@ class E2ESwfTrailerAverageSeeder extends Seeder
         $assignment->lock_version = 1;
         $assignment->save();
 
+        $calendar = CalculationMethod::query()->where('key', 'calendar')->firstOrFail();
+        if (! AdvertisingCategoryCalculationMethod::query()
+            ->where('advertising_category_id', $category->id)
+            ->where('calculation_method_id', $calendar->id)
+            ->where('engine_profile_key', EngineProfileRegistry::PROFILE_SWF_TRAILER)
+            ->exists()
+        ) {
+            $calendarAssignment = new AdvertisingCategoryCalculationMethod;
+            $calendarAssignment->advertising_category_id = $category->id;
+            $calendarAssignment->calculation_method_id = $calendar->id;
+            $calendarAssignment->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_TRAILER;
+            $calendarAssignment->is_active = true;
+            $calendarAssignment->sort = 20;
+            $calendarAssignment->lock_version = 1;
+            $calendarAssignment->save();
+        }
+
         $category->default_calculation_method_id = $average->id;
         $category->save();
     }

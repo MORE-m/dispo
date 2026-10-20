@@ -155,13 +155,7 @@ class SwfContestAverageAcceptanceTest extends TestCase
             $this->contestPosition($catalog['c'], $catalog['contest'], 10, ['length_seconds' => 25]),
         ]))->assertStatus(422);
 
-        $this->actingAs($user)->postJson(route('calculations.preview'), $this->contestPayload([
-            array_merge($base, [
-                'spot_method' => 'calendar',
-                'planner_entries' => [['date' => now()->toDateString(), 'hour' => 8, 'spot_count' => 2]],
-            ]),
-        ]))->assertStatus(422);
-
+        // PO-SWF-CALENDAR-1: Calendar freigegeben; Settlement bleibt OUT.
         $this->actingAs($user)->postJson(route('calculations.preview'), $this->contestPayload([
             array_merge($base, ['pricing_settlement_mode' => 'fixed_price', 'fixed_price_nn' => '100.00']),
         ]))->assertStatus(422);

@@ -84,32 +84,8 @@ class SwfTrailerCalculationTest extends TestCase
         $this->assertSame('780.00', $engine->calculatePosition($twoHours, '0')->mediaGross);
     }
 
-    public function test_trailer_rejects_calendar_and_fixed_price_settlement(): void
+    public function test_trailer_rejects_fixed_price_settlement(): void
     {
-        $engine = new CalculationEngine;
-
-        $calendar = new PositionInput(
-            inventoryId: 1,
-            inventoryName: 'Test',
-            positionKey: 'p',
-            lengthSeconds: 20,
-            surchargePercent: '30',
-            positionDiscountPercent: '0',
-            aePercent: '0',
-            isDiscountable: true,
-            isAeEligible: true,
-            totalSpotCount: 1,
-            spotMethod: SpotCalculationMethod::Calendar,
-            rows: [],
-            engineProfileKey: EngineProfileRegistry::PROFILE_SWF_TRAILER,
-        );
-        try {
-            $engine->calculatePosition($calendar, '0');
-            $this->fail('Calendar muss für Trailer abgelehnt werden.');
-        } catch (InvalidArgumentException $exception) {
-            $this->assertStringContainsString('Trailer', $exception->getMessage());
-        }
-
         $fixed = new PositionInput(
             inventoryId: 1,
             inventoryName: 'Test',
@@ -128,7 +104,7 @@ class SwfTrailerCalculationTest extends TestCase
             engineProfileKey: EngineProfileRegistry::PROFILE_SWF_TRAILER,
         );
         $this->expectException(InvalidArgumentException::class);
-        $engine->calculatePosition($fixed, '0');
+        (new CalculationEngine)->calculatePosition($fixed, '0');
     }
 
     private function trailer(

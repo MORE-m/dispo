@@ -85,6 +85,16 @@ class E2ESwfPromoAverageSeeder extends Seeder
         $promoAssignment->lock_version = 1;
         $promoAssignment->save();
 
+        $calendar = CalculationMethod::query()->where('key', 'calendar')->firstOrFail();
+        $promoCalendar = new AdvertisingMediumCalculationMethod;
+        $promoCalendar->advertising_medium_id = $promo->id;
+        $promoCalendar->calculation_method_id = $calendar->id;
+        $promoCalendar->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_PROMO;
+        $promoCalendar->is_active = true;
+        $promoCalendar->sort = 20;
+        $promoCalendar->lock_version = 1;
+        $promoCalendar->save();
+
         $trailer = AdvertisingMedium::factory()->create([
             'code' => 'trailer_station_voice',
             'name' => 'Trailer/Vorpr. Element Station Voice',
@@ -106,6 +116,16 @@ class E2ESwfPromoAverageSeeder extends Seeder
             $catAssignment->sort = 10;
             $catAssignment->lock_version = 1;
             $catAssignment->save();
+        }
+        if (! $swfCategory->calculationMethodAssignments()->where('calculation_method_id', $calendar->id)->exists()) {
+            $catCalendar = new AdvertisingCategoryCalculationMethod;
+            $catCalendar->advertising_category_id = $swfCategoryId;
+            $catCalendar->calculation_method_id = $calendar->id;
+            $catCalendar->engine_profile_key = EngineProfileRegistry::PROFILE_SWF_TRAILER;
+            $catCalendar->is_active = true;
+            $catCalendar->sort = 20;
+            $catCalendar->lock_version = 1;
+            $catCalendar->save();
         }
 
         $hamburg = Inventory::factory()->create([

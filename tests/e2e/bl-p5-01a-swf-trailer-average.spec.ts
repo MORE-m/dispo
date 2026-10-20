@@ -82,10 +82,13 @@ async function fillRange(
 }
 
 async function expectTrailerUi(page: Page, index: number, length: string) {
-    // Nur Durchschnitt; kein Kalender, keine Spot-Komponenten, keine Festpreis-Abwicklung.
+    // PO-SWF-CALENDAR-1: Average + Calendar freigegeben; keine Spot-Komponenten / kein Festpreis.
+    await expect(
+        page.locator(`[data-test="calculation-method-radio-${index}-average"]`),
+    ).toBeVisible();
     await expect(
         page.locator(`[data-test="calculation-method-radio-${index}-calendar"]`),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(
         page.locator(`[data-test="spot-components-activate-${index}"]`),
     ).toHaveCount(0);
