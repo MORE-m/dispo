@@ -17,6 +17,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Kein Adserver (FD-OA-ADSERVER). Keine Plattform-Preiswirkung (FD-OA-PLAT).
  * Kein Festpreis. Commercial: Position-/Order-Rabatt → AE → N/N → OA-Payfaktor.
+ *
+ * AE nur wenn calculation.ae_enabled ∧ position.is_ae_eligible (Spot-Semantik).
  */
 final class OaTkpNormalEngine
 {
@@ -29,9 +31,11 @@ final class OaTkpNormalEngine
         OaTkpPositionInput $input,
         array $orderDiscounts = [],
         string $orderDiscountPercent = '0',
+        bool $aeEnabled = true,
     ): OaTkpPositionResult {
         $this->assertImpressions($input->impressions);
-        $this->assertPlatformAllocationSum($input->impressions, $input->platformAllocations);
+        $this->assertPlatformAllocations($input->impressions, $input->platformAllocations);
+        $this->assertTargetings($input->targetings);
 
         $basis = $this->requirePositiveTkp($input->basisTkp, 'basis_tkp');
         $list = $this->requirePositiveTkp($input->listTkp, 'list_tkp');
@@ -68,7 +72,12 @@ final class OaTkpNormalEngine
             $input,
             $orderDiscounts,
             $orderDiscountPercent,
+            $aeEnabled,
         );
+
+        $persistedAePercent = ($aeEnabled && $input->isAeEligible)
+            ? $input->aePercent
+            : '0';
 
         return new OaTkpPositionResult(
             impressions: $input->impressions,
@@ -99,9 +108,13 @@ final class OaTkpNormalEngine
             advertisingMediumId: $input->advertisingMediumId,
             advertisingMediumCode: $input->advertisingMediumCode,
             advertisingMediumName: $input->advertisingMediumName,
-            aePercent: $input->aePercent,
+            aePercent: $persistedAePercent,
             isDiscountable: $input->isDiscountable,
             isAeEligible: $input->isAeEligible,
+            appliedPositionDiscounts: $commercial['applied_position_discounts'],
+            appliedOrderDiscounts: $commercial['applied_order_discounts'],
+            effectivePositionDiscountPercent: $commercial['effective_position_discount_percent'],
+            effectiveOrderDiscountPercent: $commercial['effective_order_discount_percent'],
             advertisingCategoryId: $input->advertisingCategoryId,
             advertisingCategoryKey: $input->advertisingCategoryKey,
             advertisingCategoryName: $input->advertisingCategoryName,
@@ -120,7 +133,11 @@ final class OaTkpNormalEngine
      *     ae_amount: string,
      *     nn_invest: string,
      *     effective_discount_percent: string,
-     *     effective_pay_factor_percent: string|null
+     *     effective_pay_factor_percent: string|null,
+     *     applied_position_discounts: list<DiscountInput>,
+     *     applied_order_discounts: list<DiscountInput>,
+     *     effective_position_discount_percent: string,
+     *     effective_order_discount_percent: string
      * }
      */
     private function finalizeCommercial(
@@ -128,6 +145,7 @@ final class OaTkpNormalEngine
         OaTkpPositionInput $input,
         array $orderDiscounts,
         string $orderDiscountPercent,
+        bool $aeEnabled,
     ): array {
         $positionDiscounts = $input->isDiscountable
             ? $this->resolveDiscountList($input->positionDiscounts, $input->positionDiscountPercent)
@@ -146,7 +164,7 @@ final class OaTkpNormalEngine
             ? $afterPosition
             : $orderSequence[array_key_last($orderSequence)]['remaining'];
 
-        $aeAmountInternal = $input->isAeEligible
+        $aeAmountInternal = ($aeEnabled && $input->isAeEligible)
             ? Decimal::mul($afterOrder, Decimal::percentFactor($input->aePercent))
             : '0';
         $nnInternal = Decimal::sub($afterOrder, $aeAmountInternal);
@@ -176,7 +194,28 @@ final class OaTkpNormalEngine
             'nn_invest' => Decimal::roundMoney($nnInternal),
             'effective_discount_percent' => Decimal::roundPrice($effectiveDiscount),
             'effective_pay_factor_percent' => $payFactor,
+            'applied_position_discounts' => $positionDiscounts,
+            'applied_order_discounts' => $appliedOrder,
+            'effective_position_discount_percent' => $this->effectivePercentFromDiscounts($positionDiscounts),
+            'effective_order_discount_percent' => $this->effectivePercentFromDiscounts($appliedOrder),
         ];
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function effectivePercentFromDiscounts(array $discounts): string
+    {
+        if ($discounts === []) {
+            return '0';
+        }
+
+        $factor = '1';
+        foreach ($discounts as $discount) {
+            $factor = Decimal::mul($factor, Decimal::oneMinusPercent($discount->percent));
+        }
+
+        return Decimal::roundPrice(Decimal::mul(Decimal::sub('1', $factor), '100'));
     }
 
     /**
@@ -226,17 +265,33 @@ final class OaTkpNormalEngine
     /**
      * @param  list<OaTkpPlatformAllocationInput>  $allocations
      */
-    private function assertPlatformAllocationSum(int $impressions, array $allocations): void
+    private function assertPlatformAllocations(int $impressions, array $allocations): void
     {
         if ($allocations === []) {
-            return;
+            throw ValidationException::withMessages([
+                'positions' => 'Plattformverteilung ist Pflicht (OA-006): mindestens eine Allocation.',
+            ]);
         }
 
+        $seenCodes = [];
         $sum = 0;
         foreach ($allocations as $allocation) {
-            if ($allocation->impressions < 0) {
+            $code = trim($allocation->platformCode);
+            if ($code === '') {
                 throw ValidationException::withMessages([
-                    'positions' => 'Plattform-Impressions dürfen nicht negativ sein.',
+                    'positions' => 'Plattform-Code darf nicht leer sein.',
+                ]);
+            }
+            if (isset($seenCodes[$code])) {
+                throw ValidationException::withMessages([
+                    'positions' => "Plattform „{$code}“ darf pro Position nur einmal vorkommen.",
+                ]);
+            }
+            $seenCodes[$code] = true;
+
+            if ($allocation->impressions < 1) {
+                throw ValidationException::withMessages([
+                    'positions' => 'Jede Plattform-Allocation benötigt Impressions > 0.',
                 ]);
             }
             $sum += $allocation->impressions;
@@ -246,6 +301,28 @@ final class OaTkpNormalEngine
             throw ValidationException::withMessages([
                 'positions' => "Summe der Plattform-Impressions ({$sum}) muss Positions-Impressions ({$impressions}) entsprechen.",
             ]);
+        }
+    }
+
+    /**
+     * @param  list<OaTkpTargetingSelectionInput>  $targetings
+     */
+    private function assertTargetings(array $targetings): void
+    {
+        $seenCodes = [];
+        foreach ($targetings as $targeting) {
+            $code = trim($targeting->code);
+            if ($code === '') {
+                throw ValidationException::withMessages([
+                    'positions' => 'Targeting-Code darf nicht leer sein.',
+                ]);
+            }
+            if (isset($seenCodes[$code])) {
+                throw ValidationException::withMessages([
+                    'positions' => "Targeting „{$code}“ darf pro Position nur einmal ausgewählt werden.",
+                ]);
+            }
+            $seenCodes[$code] = true;
         }
     }
 

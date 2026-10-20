@@ -8,7 +8,9 @@ use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Models\Calculation;
+use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
+use App\Models\CalculationPositionDiscount;
 use App\Models\CalculationPositionOaPlatformAllocation;
 use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\User;
@@ -23,6 +25,9 @@ use Illuminate\Support\Facades\DB;
  *
  * Umgeht bewusst LiveBookability/Registry-Release (Pair bleibt planned).
  * Nicht für öffentlichen HTTP-Preview/Wizard bestimmt.
+ *
+ * Rabattzeilen nutzen denselben Persistenzvertrag wie CalculationWriter
+ * (`CalculationPositionDiscount` / `CalculationOrderDiscount`).
  */
 final class OaTkpCalculationPersister
 {
@@ -38,8 +43,14 @@ final class OaTkpCalculationPersister
         OaTkpPositionInput $position,
         array $orderDiscounts = [],
         string $orderDiscountPercent = '0',
+        bool $aeEnabled = true,
     ): OaTkpPositionResult {
-        return $this->engine->calculatePosition($position, $orderDiscounts, $orderDiscountPercent);
+        return $this->engine->calculatePosition(
+            $position,
+            $orderDiscounts,
+            $orderDiscountPercent,
+            $aeEnabled,
+        );
     }
 
     /**
@@ -52,9 +63,14 @@ final class OaTkpCalculationPersister
         string $orderDiscountPercent = '0',
         bool $aeEnabled = true,
     ): Calculation {
-        $result = $this->engine->calculatePosition($position, $orderDiscounts, $orderDiscountPercent);
+        $result = $this->engine->calculatePosition(
+            $position,
+            $orderDiscounts,
+            $orderDiscountPercent,
+            $aeEnabled,
+        );
 
-        return DB::transaction(function () use ($advisor, $result, $orderDiscountPercent, $aeEnabled): Calculation {
+        return DB::transaction(function () use ($advisor, $result, $aeEnabled): Calculation {
             [$year, $seq, $number] = $this->numbers->next();
 
             $calculation = new Calculation;
@@ -65,7 +81,7 @@ final class OaTkpCalculationPersister
                 'status' => CalculationStatus::Draft,
                 'planning_mode' => PlanningMode::Manual,
                 'advisor_id' => $advisor->id,
-                'order_discount_percent' => $orderDiscountPercent,
+                'order_discount_percent' => $result->effectiveOrderDiscountPercent,
                 'ae_enabled' => $aeEnabled,
                 'media_gross' => $result->mediaGross,
                 'position_discount_total' => $result->positionDiscountAmount,
@@ -77,16 +93,23 @@ final class OaTkpCalculationPersister
             ]);
             $calculation->save();
 
+            $this->persistOrderDiscounts($calculation, $result->appliedOrderDiscounts);
             $this->persistPosition($calculation, $result);
 
-            return $calculation->fresh(['positions.oaPlatformAllocations', 'positions.oaTargetingSelections'])
-                ?? $calculation;
+            return $calculation->fresh([
+                'orderDiscounts',
+                'positions.discounts',
+                'positions.oaPlatformAllocations',
+                'positions.oaTargetingSelections',
+            ]) ?? $calculation;
         });
     }
 
     public function reload(Calculation $calculation): Calculation
     {
         return $calculation->fresh([
+            'orderDiscounts',
+            'positions.discounts',
             'positions.oaPlatformAllocations',
             'positions.oaTargetingSelections',
         ]) ?? $calculation;
@@ -122,7 +145,7 @@ final class OaTkpCalculationPersister
             'length_seconds' => 0,
             'total_spot_count' => 0,
             'surcharge_percent' => '0',
-            'position_discount_percent' => '0',
+            'position_discount_percent' => $result->effectivePositionDiscountPercent,
             'ae_percent' => $result->aePercent,
             'is_discountable' => $result->isDiscountable,
             'is_ae_eligible' => $result->isAeEligible,
@@ -149,6 +172,8 @@ final class OaTkpCalculationPersister
         ]);
         $position->save();
 
+        $this->persistPositionDiscounts($position, $result->appliedPositionDiscounts);
+
         foreach ($result->platformAllocations as $index => $allocation) {
             CalculationPositionOaPlatformAllocation::query()->create([
                 'calculation_position_id' => $position->id,
@@ -170,6 +195,38 @@ final class OaTkpCalculationPersister
                 'tkp_surcharge_snapshot' => $targeting->tkpSurcharge,
                 'targeting_revision_number' => $targeting->revisionNumber,
                 'sort' => $targeting->sort > 0 ? $targeting->sort : (($index + 1) * 10),
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function persistPositionDiscounts(CalculationPosition $position, array $discounts): void
+    {
+        foreach ($discounts as $index => $discount) {
+            CalculationPositionDiscount::query()->create([
+                'calculation_position_id' => $position->id,
+                'type' => $discount->type,
+                'custom_label' => $discount->customLabel,
+                'percent' => $discount->percent,
+                'sort' => $index,
+            ]);
+        }
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     */
+    private function persistOrderDiscounts(Calculation $calculation, array $discounts): void
+    {
+        foreach ($discounts as $index => $discount) {
+            CalculationOrderDiscount::query()->create([
+                'calculation_id' => $calculation->id,
+                'type' => $discount->type,
+                'custom_label' => $discount->customLabel,
+                'percent' => $discount->percent,
+                'sort' => $index,
             ]);
         }
     }

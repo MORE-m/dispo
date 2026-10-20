@@ -32,11 +32,10 @@ class OaTkpNormalEngineTest extends TestCase
             impressions: 100_000,
             basisTkp: '10.0000',
             targetings: [
-                new OaTkpTargetingSelectionInput('fix_a', 'A', 'technisch', '2.0000'),
-                new OaTkpTargetingSelectionInput('fix_b', 'B', 'dmp', '1.5000'),
+                new OaTkpTargetingSelectionInput('fixture_a', 'A', 'technisch', '2.0000'),
+                new OaTkpTargetingSelectionInput('fixture_b', 'B', 'dmp', '1.5000'),
             ],
             positionDiscountPercent: '10',
-            orderDiscountPercent: '5',
             aePercent: '15',
         );
 
@@ -44,6 +43,7 @@ class OaTkpNormalEngineTest extends TestCase
             $input,
             orderDiscounts: [new DiscountInput(DiscountType::Quantity, '5')],
             orderDiscountPercent: '5',
+            aeEnabled: true,
         );
 
         $this->assertSame('13.5000', $result->finalTkp);
@@ -56,7 +56,8 @@ class OaTkpNormalEngineTest extends TestCase
         $this->assertSame('1154.25', $result->afterOrderDiscount);
         $this->assertSame('173.14', $result->aeAmount);
         $this->assertSame('981.11', $result->nnInvest);
-        $this->assertNotNull($result->effectivePayFactorPercent);
+        // Payfaktor aus interner Präzision (vor Money-Rundung): 981.1125/1350×100
+        $this->assertSame('72.6750', $result->effectivePayFactorPercent);
         $this->assertFalse($result->belowMinimumTkp);
     }
 
@@ -68,12 +69,38 @@ class OaTkpNormalEngineTest extends TestCase
             basisTkp: '10.0000',
             aePercent: '0',
             isAeEligible: false,
-        ));
+        ), aeEnabled: true);
 
         $this->assertSame('10.0000', $result->finalTkp);
         $this->assertSame('0.0000', $result->targetingSurchargeTotal);
         $this->assertSame('1000.00', $result->mediaGross);
         $this->assertSame('1000.00', $result->nnInvest);
+        $this->assertSame('100.0000', $result->effectivePayFactorPercent);
+    }
+
+    #[Test]
+    public function empty_platform_allocations_are_rejected(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->engine->calculatePosition($this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            allocations: [],
+        ));
+    }
+
+    #[Test]
+    public function zero_impression_allocation_is_rejected(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->engine->calculatePosition($this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            allocations: [
+                new OaTkpPlatformAllocationInput('fixture_a', 'A', 100_000),
+                new OaTkpPlatformAllocationInput('fixture_b', 'B', 0),
+            ],
+        ));
     }
 
     #[Test]
@@ -83,21 +110,110 @@ class OaTkpNormalEngineTest extends TestCase
             impressions: 100_000,
             basisTkp: '10.0000',
             allocations: [
-                new OaTkpPlatformAllocationInput('fix_a', 'A', 60_000),
-                new OaTkpPlatformAllocationInput('fix_b', 'B', 40_000),
+                new OaTkpPlatformAllocationInput('fixture_a', 'A', 60_000),
+                new OaTkpPlatformAllocationInput('fixture_b', 'B', 40_000),
             ],
         );
         $this->assertSame(100_000, $this->engine->calculatePosition($ok)->impressions);
+
+        try {
+            $this->engine->calculatePosition($this->baseInput(
+                impressions: 100_000,
+                basisTkp: '10.0000',
+                allocations: [
+                    new OaTkpPlatformAllocationInput('fixture_a', 'A', 60_000),
+                    new OaTkpPlatformAllocationInput('fixture_b', 'B', 39_999),
+                ],
+            ));
+            $this->fail('Expected ValidationException for sum too small');
+        } catch (ValidationException) {
+            // expected
+        }
 
         $this->expectException(ValidationException::class);
         $this->engine->calculatePosition($this->baseInput(
             impressions: 100_000,
             basisTkp: '10.0000',
             allocations: [
-                new OaTkpPlatformAllocationInput('fix_a', 'A', 60_000),
-                new OaTkpPlatformAllocationInput('fix_b', 'B', 39_999),
+                new OaTkpPlatformAllocationInput('fixture_a', 'A', 60_000),
+                new OaTkpPlatformAllocationInput('fixture_b', 'B', 40_001),
             ],
         ));
+    }
+
+    #[Test]
+    public function duplicate_platform_code_is_rejected(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->engine->calculatePosition($this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            allocations: [
+                new OaTkpPlatformAllocationInput('fixture_a', 'A', 60_000),
+                new OaTkpPlatformAllocationInput('fixture_a', 'A again', 40_000),
+            ],
+        ));
+    }
+
+    #[Test]
+    public function duplicate_targeting_code_is_rejected(): void
+    {
+        $this->expectException(ValidationException::class);
+        $this->engine->calculatePosition($this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('geo', 'Geo', 'technisch', '2.0000'),
+                new OaTkpTargetingSelectionInput('geo', 'Geo again', 'technisch', '2.0000'),
+            ],
+        ));
+    }
+
+    #[Test]
+    public function ae_requires_enabled_and_eligible(): void
+    {
+        $base = $this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            aePercent: '15',
+            isAeEligible: true,
+        );
+
+        $disabled = $this->engine->calculatePosition($base, aeEnabled: false);
+        $this->assertSame('0.00', $disabled->aeAmount);
+        $this->assertSame('1000.00', $disabled->nnInvest);
+        $this->assertSame('100.0000', $disabled->effectivePayFactorPercent);
+        $this->assertSame('0', $disabled->aePercent);
+
+        $ineligible = $this->engine->calculatePosition(
+            $this->baseInput(
+                impressions: 100_000,
+                basisTkp: '10.0000',
+                aePercent: '15',
+                isAeEligible: false,
+            ),
+            aeEnabled: true,
+        );
+        $this->assertSame('0.00', $ineligible->aeAmount);
+        $this->assertSame('1000.00', $ineligible->nnInvest);
+        $this->assertSame('0', $ineligible->aePercent);
+
+        $bothOff = $this->engine->calculatePosition(
+            $this->baseInput(
+                impressions: 100_000,
+                basisTkp: '10.0000',
+                aePercent: '15',
+                isAeEligible: false,
+            ),
+            aeEnabled: false,
+        );
+        $this->assertSame('0.00', $bothOff->aeAmount);
+
+        $bothOn = $this->engine->calculatePosition($base, aeEnabled: true);
+        $this->assertSame('150.00', $bothOn->aeAmount);
+        $this->assertSame('850.00', $bothOn->nnInvest);
+        $this->assertSame('85.0000', $bothOn->effectivePayFactorPercent);
+        $this->assertSame('15', $bothOn->aePercent);
     }
 
     #[Test]
@@ -130,7 +246,7 @@ class OaTkpNormalEngineTest extends TestCase
     }
 
     /**
-     * @param  list<OaTkpPlatformAllocationInput>  $allocations
+     * @param  list<OaTkpPlatformAllocationInput>|null  $allocations
      * @param  list<OaTkpTargetingSelectionInput>  $targetings
      */
     private function baseInput(
@@ -138,13 +254,18 @@ class OaTkpNormalEngineTest extends TestCase
         string $basisTkp,
         string $listTkp = '12.0000',
         string $minimumTkp = '8.0000',
-        array $allocations = [],
+        ?array $allocations = null,
         array $targetings = [],
         string $positionDiscountPercent = '0',
-        string $orderDiscountPercent = '0',
         string $aePercent = '15',
         bool $isAeEligible = true,
     ): OaTkpPositionInput {
+        if ($allocations === null) {
+            $allocations = [
+                new OaTkpPlatformAllocationInput('fixture_default', 'Default', $impressions),
+            ];
+        }
+
         return new OaTkpPositionInput(
             inventoryId: 1,
             inventoryCode: 'inv_fixture',

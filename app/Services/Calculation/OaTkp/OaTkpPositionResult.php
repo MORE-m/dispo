@@ -2,17 +2,23 @@
 
 namespace App\Services\Calculation\OaTkp;
 
+use App\Services\Calculation\DiscountInput;
+
 /**
  * PO-CALC-TKP-1B: Ergebnis einer Normal-TKP-Position inkl. Commercial.
  *
  * @param  list<OaTkpPlatformAllocationInput>  $platformAllocations
  * @param  list<OaTkpTargetingSelectionInput>  $targetings
+ * @param  list<DiscountInput>  $appliedPositionDiscounts
+ * @param  list<DiscountInput>  $appliedOrderDiscounts
  */
 final readonly class OaTkpPositionResult
 {
     /**
      * @param  list<OaTkpPlatformAllocationInput>  $platformAllocations
      * @param  list<OaTkpTargetingSelectionInput>  $targetings
+     * @param  list<DiscountInput>  $appliedPositionDiscounts
+     * @param  list<DiscountInput>  $appliedOrderDiscounts
      */
     public function __construct(
         public int $impressions,
@@ -46,6 +52,10 @@ final readonly class OaTkpPositionResult
         public string $aePercent,
         public bool $isDiscountable,
         public bool $isAeEligible,
+        public array $appliedPositionDiscounts = [],
+        public array $appliedOrderDiscounts = [],
+        public string $effectivePositionDiscountPercent = '0',
+        public string $effectiveOrderDiscountPercent = '0',
         public ?int $advertisingCategoryId = null,
         public ?string $advertisingCategoryKey = null,
         public ?string $advertisingCategoryName = null,

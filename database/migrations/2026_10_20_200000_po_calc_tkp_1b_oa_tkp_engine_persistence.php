@@ -64,6 +64,10 @@ return new class extends Migration
                     ->references('id')
                     ->on('calculation_positions')
                     ->cascadeOnDelete();
+                $table->unique(
+                    ['calculation_position_id', 'platform_code'],
+                    'calc_pos_oa_plat_alloc_code_uq',
+                );
                 $table->index(
                     ['calculation_position_id', 'sort'],
                     'calc_pos_oa_plat_alloc_sort_idx',
@@ -88,6 +92,10 @@ return new class extends Migration
                     ->references('id')
                     ->on('calculation_positions')
                     ->cascadeOnDelete();
+                $table->unique(
+                    ['calculation_position_id', 'targeting_code'],
+                    'calc_pos_oa_tgt_sel_code_uq',
+                );
                 $table->index(
                     ['calculation_position_id', 'sort'],
                     'calc_pos_oa_tgt_sel_sort_idx',

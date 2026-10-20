@@ -2,16 +2,19 @@
 
 namespace Tests\Feature\OnlineAudio;
 
+use App\Enums\DiscountType;
 use App\Enums\OaTargetingCategory;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
 use App\Models\Inventory;
 use App\Models\OaPlatform;
 use App\Models\OaTargetingDefinition;
 use App\Models\OaTkpPriceList;
 use App\Models\OaTkpPriceListItem;
 use App\Models\User;
+use App\Services\Calculation\DiscountInput;
 use App\Services\Calculation\OaTkp\OaTkpCalculationPersister;
 use App\Services\Calculation\OaTkp\OaTkpPlatformAllocationInput;
 use App\Services\Calculation\OaTkp\OaTkpPositionInput;
@@ -98,79 +101,32 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
     #[Test]
     public function save_reload_and_snapshot_isolation_for_price_and_targeting(): void
     {
-        $this->seed(InitialCatalogMatCoreSeeder::class);
-        $user = User::factory()->role(Role::Sales)->create();
-        $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
-        $inventory = Inventory::query()->where('code', 'inv_more_kombi_online_audio')->firstOrFail();
-
-        $list = $this->createActivePriceList(
-            2026,
-            1,
-            (int) $medium->id,
-            (int) $inventory->id,
-            '12.0000',
-            '8.0000',
-        );
-
-        $targeting = OaTargetingDefinition::query()->create([
-            'code' => 'fixture_tgt',
-            'name' => 'Fixture Targeting',
-            'category' => OaTargetingCategory::Technisch,
-            'tkp_surcharge' => '2.0000',
-            'revision_number' => 1,
-            'is_active' => true,
-        ]);
-
-        $platform = OaPlatform::query()->create([
-            'code' => 'fixture_plat_a',
-            'name' => 'Fixture Platform A',
-            'is_active' => true,
-            'sort' => 1,
-            'is_adserver_relevant' => false,
-        ]);
-
-        $input = new OaTkpPositionInput(
-            inventoryId: (int) $inventory->id,
-            inventoryCode: (string) $inventory->code,
-            inventoryName: (string) $inventory->name,
-            advertisingMediumId: (int) $medium->id,
-            advertisingMediumCode: (string) $medium->code,
-            advertisingMediumName: (string) $medium->name,
+        $ctx = $this->seedContext();
+        $input = $this->positionInput(
+            $ctx,
             impressions: 100_000,
             basisTkp: '10.0000',
             listTkp: '12.0000',
             minimumTkp: '8.0000',
-            oaTkpPriceListId: (int) $list->id,
-            oaTkpPriceListVersion: (string) $list->version,
-            oaTkpPriceListYear: (int) $list->year,
-            oaTkpPriceListRevision: (int) $list->revision_number,
-            platformAllocations: [
-                new OaTkpPlatformAllocationInput(
-                    platformCode: (string) $platform->code,
-                    platformName: (string) $platform->name,
-                    impressions: 100_000,
-                    oaPlatformId: (int) $platform->id,
-                ),
-            ],
             targetings: [
                 new OaTkpTargetingSelectionInput(
-                    code: (string) $targeting->code,
-                    name: (string) $targeting->name,
-                    category: $targeting->category->value,
-                    tkpSurcharge: (string) $targeting->tkp_surcharge,
-                    revisionNumber: (int) $targeting->revision_number,
-                    oaTargetingDefinitionId: (int) $targeting->id,
+                    code: (string) $ctx['targeting']->code,
+                    name: (string) $ctx['targeting']->name,
+                    category: $ctx['targeting']->category->value,
+                    tkpSurcharge: (string) $ctx['targeting']->tkp_surcharge,
+                    revisionNumber: (int) $ctx['targeting']->revision_number,
+                    oaTargetingDefinitionId: (int) $ctx['targeting']->id,
                 ),
             ],
             isAeEligible: false,
         );
 
         $persister = app(OaTkpCalculationPersister::class);
-        $preview = $persister->preview($input);
+        $preview = $persister->preview($input, aeEnabled: false);
         $this->assertSame('12.0000', $preview->finalTkp);
         $this->assertSame('1200.00', $preview->mediaGross);
 
-        $calculation = $persister->create($user, $input, aeEnabled: false);
+        $calculation = $persister->create($ctx['user'], $input, aeEnabled: false);
         $reloaded = $persister->reload($calculation);
         $position = $reloaded->positions->firstOrFail();
 
@@ -183,6 +139,8 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
         $this->assertSame(0, OaTkpImportDecimal::compare((string) $position->targeting_surcharge_total, '2.0000'));
         $this->assertSame('1200.00', (string) $position->media_gross);
         $this->assertFalse((bool) $position->below_minimum_tkp);
+        $this->assertFalse((bool) $reloaded->ae_enabled);
+        $this->assertSame('0.00', (string) $reloaded->ae_total);
         $this->assertCount(1, $position->oaPlatformAllocations);
         $this->assertCount(1, $position->oaTargetingSelections);
         $this->assertSame(
@@ -193,10 +151,9 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
             ),
         );
 
-        // Stammdaten ändern → alte Calc unverändert.
-        $targeting->tkp_surcharge = '3.0000';
-        $targeting->save();
-        OaTkpPriceListItem::query()->where('oa_tkp_price_list_id', $list->id)->update([
+        $ctx['targeting']->tkp_surcharge = '3.0000';
+        $ctx['targeting']->save();
+        OaTkpPriceListItem::query()->where('oa_tkp_price_list_id', $ctx['list']->id)->update([
             'list_tkp' => '20.0000',
             'minimum_tkp' => '15.0000',
         ]);
@@ -214,37 +171,149 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
             ),
         );
 
-        // Neue Preview nutzt neue Targeting-Werte, wenn Input aktualisiert wird.
-        $newInput = new OaTkpPositionInput(
-            inventoryId: (int) $inventory->id,
-            inventoryCode: (string) $inventory->code,
-            inventoryName: (string) $inventory->name,
-            advertisingMediumId: (int) $medium->id,
-            advertisingMediumCode: (string) $medium->code,
-            advertisingMediumName: (string) $medium->name,
+        $newInput = $this->positionInput(
+            $ctx,
             impressions: 100_000,
             basisTkp: '10.0000',
             listTkp: '20.0000',
             minimumTkp: '15.0000',
-            oaTkpPriceListId: (int) $list->id,
-            oaTkpPriceListVersion: (string) $list->version,
-            oaTkpPriceListYear: (int) $list->year,
-            oaTkpPriceListRevision: (int) $list->revision_number,
             targetings: [
                 new OaTkpTargetingSelectionInput(
-                    code: (string) $targeting->code,
-                    name: (string) $targeting->name,
-                    category: $targeting->category->value,
-                    tkpSurcharge: (string) $targeting->fresh()->tkp_surcharge,
-                    revisionNumber: (int) $targeting->revision_number,
-                    oaTargetingDefinitionId: (int) $targeting->id,
+                    code: (string) $ctx['targeting']->code,
+                    name: (string) $ctx['targeting']->name,
+                    category: $ctx['targeting']->category->value,
+                    tkpSurcharge: (string) $ctx['targeting']->fresh()->tkp_surcharge,
+                    revisionNumber: (int) $ctx['targeting']->revision_number,
+                    oaTargetingDefinitionId: (int) $ctx['targeting']->id,
                 ),
             ],
             isAeEligible: false,
         );
-        $newPreview = $persister->preview($newInput);
+        $newPreview = $persister->preview($newInput, aeEnabled: false);
         $this->assertSame('13.0000', $newPreview->finalTkp);
         $this->assertSame('1300.00', $newPreview->mediaGross);
+    }
+
+    #[Test]
+    public function structured_discounts_are_persisted_and_reloadable(): void
+    {
+        $ctx = $this->seedContext();
+        $positionDiscounts = [
+            new DiscountInput(DiscountType::Quantity, '5', null, 0),
+            new DiscountInput(DiscountType::Special, '10', 'Kampagne', 1),
+        ];
+        $orderDiscounts = [
+            new DiscountInput(DiscountType::Quantity, '3', null, 0),
+            new DiscountInput(DiscountType::Other, '2', 'Agentur', 1),
+        ];
+
+        $input = $this->positionInput(
+            $ctx,
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            listTkp: '12.0000',
+            minimumTkp: '8.0000',
+            positionDiscounts: $positionDiscounts,
+            isAeEligible: true,
+            aePercent: '15',
+        );
+
+        $persister = app(OaTkpCalculationPersister::class);
+        $beforeCount = Calculation::query()->count();
+        $calculation = $persister->create(
+            $ctx['user'],
+            $input,
+            orderDiscounts: $orderDiscounts,
+            aeEnabled: true,
+        );
+
+        $this->assertSame($beforeCount + 1, Calculation::query()->count());
+        $this->assertTrue($calculation->relationLoaded('orderDiscounts'));
+        $this->assertTrue($calculation->positions->firstOrFail()->relationLoaded('discounts'));
+
+        $reloaded = $persister->reload($calculation);
+        $position = $reloaded->positions->firstOrFail();
+
+        $this->assertCount(2, $position->discounts);
+        $this->assertSame(DiscountType::Quantity, $position->discounts->sortBy('sort')->values()[0]->type);
+        $this->assertSame('5.0000', (string) $position->discounts->sortBy('sort')->values()[0]->percent);
+        $this->assertSame(DiscountType::Special, $position->discounts->sortBy('sort')->values()[1]->type);
+        $this->assertSame('10.0000', (string) $position->discounts->sortBy('sort')->values()[1]->percent);
+        $this->assertSame('Kampagne', $position->discounts->sortBy('sort')->values()[1]->custom_label);
+        // sequenziell: 1−(0.95×0.90)=14.5%
+        $this->assertSame('14.5000', (string) $position->position_discount_percent);
+
+        $this->assertCount(2, $reloaded->orderDiscounts);
+        $orderRows = $reloaded->orderDiscounts->sortBy('sort')->values();
+        $this->assertSame(DiscountType::Quantity, $orderRows[0]->type);
+        $this->assertSame('3.0000', (string) $orderRows[0]->percent);
+        $this->assertSame(DiscountType::Other, $orderRows[1]->type);
+        $this->assertSame('Agentur', $orderRows[1]->custom_label);
+        // sequenziell: 1−(0.97×0.98)=4.94%
+        $this->assertSame('4.9400', (string) $reloaded->order_discount_percent);
+
+        $this->assertTrue((bool) $reloaded->ae_enabled);
+        $this->assertSame('15.0000', (string) $position->ae_percent);
+        $this->assertNotSame('0.00', (string) $reloaded->ae_total);
+        $this->assertNotSame('0.00', (string) $position->nn_invest);
+    }
+
+    #[Test]
+    public function ae_disabled_persists_zero_ae_even_when_eligible(): void
+    {
+        $ctx = $this->seedContext();
+        $input = $this->positionInput(
+            $ctx,
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            listTkp: '12.0000',
+            minimumTkp: '8.0000',
+            isAeEligible: true,
+            aePercent: '15',
+        );
+
+        $calculation = app(OaTkpCalculationPersister::class)->create(
+            $ctx['user'],
+            $input,
+            aeEnabled: false,
+        );
+        $reloaded = app(OaTkpCalculationPersister::class)->reload($calculation);
+        $position = $reloaded->positions->firstOrFail();
+
+        $this->assertFalse((bool) $reloaded->ae_enabled);
+        $this->assertSame('0.00', (string) $reloaded->ae_total);
+        $this->assertSame('0.00', (string) $position->ae_amount);
+        $this->assertSame('0.0000', (string) $position->ae_percent);
+        $this->assertSame('1000.00', (string) $position->nn_invest);
+        $this->assertSame('100.0000', (string) $position->effective_pay_factor_percent);
+    }
+
+    #[Test]
+    public function invalid_allocations_do_not_create_calculation(): void
+    {
+        $ctx = $this->seedContext();
+        $before = Calculation::query()->count();
+
+        try {
+            app(OaTkpCalculationPersister::class)->create(
+                $ctx['user'],
+                $this->positionInput(
+                    $ctx,
+                    impressions: 100_000,
+                    basisTkp: '10.0000',
+                    listTkp: '12.0000',
+                    minimumTkp: '8.0000',
+                    allocations: [],
+                    isAeEligible: false,
+                ),
+                aeEnabled: false,
+            );
+            $this->fail('Expected ValidationException');
+        } catch (ValidationException) {
+            // expected
+        }
+
+        $this->assertSame($before, Calculation::query()->count());
     }
 
     #[Test]
@@ -272,6 +341,107 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
 
         $this->assertContains($response->status(), [422, 403]);
         $this->assertNotSame(500, $response->status());
+    }
+
+    /**
+     * @return array{
+     *     user: User,
+     *     medium: AdvertisingMedium,
+     *     inventory: Inventory,
+     *     list: OaTkpPriceList,
+     *     targeting: OaTargetingDefinition,
+     *     platform: OaPlatform
+     * }
+     */
+    private function seedContext(): array
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $user = User::factory()->role(Role::Sales)->create();
+        $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
+        $inventory = Inventory::query()->where('code', 'inv_more_kombi_online_audio')->firstOrFail();
+        $list = $this->createActivePriceList(
+            2026,
+            1,
+            (int) $medium->id,
+            (int) $inventory->id,
+            '12.0000',
+            '8.0000',
+        );
+        $targeting = OaTargetingDefinition::query()->create([
+            'code' => 'fixture_tgt',
+            'name' => 'Fixture Targeting',
+            'category' => OaTargetingCategory::Technisch,
+            'tkp_surcharge' => '2.0000',
+            'revision_number' => 1,
+            'is_active' => true,
+        ]);
+        $platform = OaPlatform::query()->create([
+            'code' => 'fixture_plat_a',
+            'name' => 'Fixture Platform A',
+            'is_active' => true,
+            'sort' => 1,
+            'is_adserver_relevant' => false,
+        ]);
+
+        return compact('user', 'medium', 'inventory', 'list', 'targeting', 'platform');
+    }
+
+    /**
+     * @param  array{
+     *     medium: AdvertisingMedium,
+     *     inventory: Inventory,
+     *     list: OaTkpPriceList,
+     *     platform: OaPlatform
+     * }  $ctx
+     * @param  list<OaTkpPlatformAllocationInput>|null  $allocations
+     * @param  list<OaTkpTargetingSelectionInput>  $targetings
+     * @param  list<DiscountInput>  $positionDiscounts
+     */
+    private function positionInput(
+        array $ctx,
+        int $impressions,
+        string $basisTkp,
+        string $listTkp,
+        string $minimumTkp,
+        ?array $allocations = null,
+        array $targetings = [],
+        array $positionDiscounts = [],
+        bool $isAeEligible = true,
+        string $aePercent = '15',
+    ): OaTkpPositionInput {
+        if ($allocations === null) {
+            $allocations = [
+                new OaTkpPlatformAllocationInput(
+                    platformCode: (string) $ctx['platform']->code,
+                    platformName: (string) $ctx['platform']->name,
+                    impressions: $impressions,
+                    oaPlatformId: (int) $ctx['platform']->id,
+                ),
+            ];
+        }
+
+        return new OaTkpPositionInput(
+            inventoryId: (int) $ctx['inventory']->id,
+            inventoryCode: (string) $ctx['inventory']->code,
+            inventoryName: (string) $ctx['inventory']->name,
+            advertisingMediumId: (int) $ctx['medium']->id,
+            advertisingMediumCode: (string) $ctx['medium']->code,
+            advertisingMediumName: (string) $ctx['medium']->name,
+            impressions: $impressions,
+            basisTkp: $basisTkp,
+            listTkp: $listTkp,
+            minimumTkp: $minimumTkp,
+            oaTkpPriceListId: (int) $ctx['list']->id,
+            oaTkpPriceListVersion: (string) $ctx['list']->version,
+            oaTkpPriceListYear: (int) $ctx['list']->year,
+            oaTkpPriceListRevision: (int) $ctx['list']->revision_number,
+            platformAllocations: $allocations,
+            targetings: $targetings,
+            positionDiscounts: $positionDiscounts,
+            aePercent: $aePercent,
+            isDiscountable: true,
+            isAeEligible: $isAeEligible,
+        );
     }
 
     private function createActivePriceList(
