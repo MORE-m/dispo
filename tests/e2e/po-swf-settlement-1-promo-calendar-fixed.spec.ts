@@ -11,7 +11,11 @@ const promoMedium = 'Promo/Moderation';
 const monday = '2026-09-14';
 const hour8 = 8;
 const grossPromo = '300,00';
-const fixedNn = '225,00';
+/** Eingabe im Formular (mit Nachkommastellen). */
+const fixedNnInput = '225,00';
+/** Nach Reload formatiert `formatFixedPriceNnInput` ganze Euro ohne ,00. */
+const fixedNnReload = '225';
+const fixedNnPreview = '225,00';
 
 async function login(page: Page, email = 'sales@example.com') {
     await page.goto('/login');
@@ -114,18 +118,18 @@ test.describe.serial('PO-SWF-SETTLEMENT-1 Promo Calendar Fixed', () => {
         await page
             .locator('[data-test="pricing-settlement-radio-0-fixed_price"]')
             .check();
-        await page.locator('[data-test="fixed-price-nn-0"]').fill(fixedNn);
+        await page.locator('[data-test="fixed-price-nn-0"]').fill(fixedNnInput);
         await waitForPreview(page);
 
         await expect(
             page.locator('[data-test="fixed-price-nn-preview-0"]'),
-        ).toContainText(fixedNn, { timeout: 20_000 });
+        ).toContainText(fixedNnPreview, { timeout: 20_000 });
 
         await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await waitForPreview(page);
         await expect(
             page.locator('[data-test="preview-net-total"]').first(),
-        ).toContainText(fixedNn, { timeout: 20_000 });
+        ).toContainText(fixedNnPreview, { timeout: 20_000 });
 
         await page.locator('[data-test="wizard-save"]').click();
         await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, {
@@ -141,7 +145,7 @@ test.describe.serial('PO-SWF-SETTLEMENT-1 Promo Calendar Fixed', () => {
             page.locator('[data-test="pricing-settlement-radio-0-fixed_price"]'),
         ).toBeChecked();
         await expect(page.locator('[data-test="fixed-price-nn-0"]')).toHaveValue(
-            fixedNn,
+            fixedNnReload,
         );
         await expect(
             page.locator(`[data-test="planner-cell-spots-0-${monday}-${hour8}"]`),
@@ -153,6 +157,6 @@ test.describe.serial('PO-SWF-SETTLEMENT-1 Promo Calendar Fixed', () => {
         await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
         await expect(
             page.locator('[data-test="preview-net-total"]').first(),
-        ).toContainText(fixedNn, { timeout: 20_000 });
+        ).toContainText(fixedNnPreview, { timeout: 20_000 });
     });
 });
