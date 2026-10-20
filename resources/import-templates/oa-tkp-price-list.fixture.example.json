@@ -1,17 +1,17 @@
 {
-  "_comment": "PO-CALC-TKP-1A TEMPLATE ONLY – keine operativen Fachwerte. Formatbeispiel für späteren Import.",
-  "year": 2026,
-  "name": "OA TKP 2026 (TEMPLATE)",
-  "version": "2026.1",
-  "revision_number": 1,
-  "status": "draft",
-  "valid_from": "2026-01-01",
-  "items": [
-    {
-      "medium_code": "pre_stream",
-      "inventory_code": "inv_more_kombi_online_audio",
-      "list_tkp": "0.0001",
-      "minimum_tkp": "0.0001"
-    }
-  ]
+    "_comment": "PO-CALC-TKP-1A TEMPLATE ONLY – keine operativen Fachwerte. Formatbeispiel für späteren Import.",
+    "year": 2026,
+    "name": "OA TKP 2026 (TEMPLATE)",
+    "version": "2026.1",
+    "revision_number": 1,
+    "status": "draft",
+    "valid_from": "2026-01-01",
+    "items": [
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "0.0001",
+            "minimum_tkp": "0.0001"
+        }
+    ]
 }
