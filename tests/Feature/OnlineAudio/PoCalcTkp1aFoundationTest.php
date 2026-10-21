@@ -221,8 +221,12 @@ class PoCalcTkp1aFoundationTest extends TestCase
             $this->fail('Expected ValidationException');
         } catch (ValidationException $e) {
             $messages = collect($e->errors())->flatten()->implode(' ');
+            // PO-CALC-TKP-1D1: Writer verarbeitet TKP intern (Registry bleibt planned); ohne
+            // OA-Preisliste/Impressions bleibt der Pfad fail-closed mit ValidationException.
             $this->assertTrue(
-                str_contains($messages, 'noch nicht freigegeben')
+                str_contains($messages, 'Keine aktive OA-TKP-Preislistenrevision')
+                || str_contains($messages, 'Impressions')
+                || str_contains($messages, 'noch nicht freigegeben')
                 || str_contains($messages, 'nicht mehr verfügbar')
                 || str_contains($messages, 'nicht verfügbar')
                 || str_contains($messages, 'Keine freigegebene')

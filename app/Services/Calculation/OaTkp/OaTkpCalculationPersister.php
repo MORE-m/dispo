@@ -15,6 +15,7 @@ use App\Models\CalculationPositionOaPlatformAllocation;
 use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\User;
 use App\Services\Calculation\CalculationNumberSequencer;
+use App\Services\Calculation\CalculationWriter;
 use App\Services\Calculation\DiscountInput;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
@@ -26,6 +27,10 @@ use Illuminate\Support\Facades\DB;
  *
  * Umgeht bewusst LiveBookability/Registry-Release (Pair bleibt planned).
  * Nicht für öffentlichen HTTP-Preview/Wizard bestimmt.
+ *
+ * PO-CALC-TKP-1D1: Nach D1 nur noch Testsupport (Engine-/Persistenz-Fixtures).
+ * Der Produktpfad ist {@see CalculationWriter} mit
+ * {@see OaTkpWriterPositionResolver}; hier keine neue Fachlogik ergänzen.
  *
  * Rabattzeilen nutzen denselben Persistenzvertrag wie CalculationWriter
  * (`CalculationPositionDiscount` / `CalculationOrderDiscount`).

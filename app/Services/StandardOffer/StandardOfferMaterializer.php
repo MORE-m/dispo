@@ -47,8 +47,16 @@ final class StandardOfferMaterializer
             ]);
         }
 
-        $totals = $this->calculations->totalsFromPayload($payload, $user);
         $resolved = $this->calculations->resolvedPositions($payload);
+        foreach ($resolved as $index => $item) {
+            // PO-CALC-TKP-1D1: Standardangebote bleiben Spot-only (TKP fail-closed).
+            if (($item['is_oa_tkp'] ?? false) === true) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}" => 'TKP-Positionen sind in Standardangeboten nicht verfügbar.',
+                ]);
+            }
+        }
+        $totals = $this->calculations->totalsFromPayload($payload, $user);
 
         $freezeInputs = [];
         foreach ($resolved as $index => $item) {

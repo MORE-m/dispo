@@ -14,12 +14,14 @@ use App\Models\CalculationPositionTimeRange;
 use App\Models\DispoOrderPosition;
 use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\Decimal;
+use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
 use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Inventory\InventoryIdentity;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Snapshot-Mapping aus gespeicherten Kalkulationswerten – keine Neuberechnung.
@@ -93,6 +95,10 @@ final class DispoOrderSnapshotMapper
     public function positionFromCalculationPosition(CalculationPosition $position, int $sort): array
     {
         $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'plannerEntries', 'components', 'discounts']);
+
+        // PO-CALC-TKP-1D1 Nachzug: bis D3 kein unvollständiger OA-Dispo-Snapshot.
+        // Zentral im Mapper, damit createFromCalculation / Produktion / weitere Caller denselben Gate nutzen.
+        $this->assertOaTkpNotHandOffUntilD3($position);
 
         // Dispoerzeugung ist Mutation: Descriptor muss ausführbar sein.
         $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
@@ -301,5 +307,21 @@ final class DispoOrderSnapshotMapper
                 'nn_invest' => (string) $position->nn_invest,
             ])->all(),
         ];
+    }
+
+    /**
+     * PO-CALC-TKP-1D1 / vor D3: OA-TKP-Positionen nicht an Disposition übergeben.
+     * Erkennung über gespeicherten Freeze (engine_profile_key × calculation_method_key), nicht Medium-Code.
+     * D3 ersetzt diesen Gate durch den vollständigen OA-Dispo-Snapshot.
+     */
+    private function assertOaTkpNotHandOffUntilD3(CalculationPosition $position): void
+    {
+        if (! OaTkpWriterPositionResolver::isStoredOaTkp($position)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'position_ids' => 'TKP-Positionen können noch nicht an die Disposition übergeben werden.',
+        ]);
     }
 }
