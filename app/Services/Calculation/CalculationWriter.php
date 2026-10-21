@@ -2869,27 +2869,16 @@ final class CalculationWriter
         $inventoryIds = [];
         $years = [];
         $hasOaTkp = false;
-        $existingById = $existing?->positions->keyBy('id') ?? collect();
-        $existingByClient = $existing?->positions->keyBy('client_key') ?? collect();
 
+        // Spot-Lock-Pfad: keine Positionen vor den Inventory-/PriceList-Locks laden
+        // (sonst kann MySQL-RR den Concurrent-Activate/Rebind-Vertrag stören).
         foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
             if (! is_array($position)) {
                 continue;
             }
-
-            $existingPosition = null;
-            if (isset($position['id'])) {
-                $existingPosition = $existingById->get((int) $position['id']);
-            } elseif (isset($position['client_key'])) {
-                $existingPosition = $existingByClient->get((string) $position['client_key']);
-            }
-
-            if (OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)
-                || OaTkpWriterPositionResolver::isStoredOaTkp($existingPosition)
-            ) {
+            if (OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)) {
                 $hasOaTkp = true;
             }
-
             $inventoryId = (int) ($position['inventory_id'] ?? 0);
             if ($inventoryId > 0) {
                 $inventoryIds[$inventoryId] = $inventoryId;
@@ -2915,6 +2904,9 @@ final class CalculationWriter
                 ->exists();
         }
         if ($hasOaTkp) {
+            if ($existing !== null && ! $existing->relationLoaded('positions')) {
+                $existing->load('positions');
+            }
             OaTkpWriterPositionResolver::lockOaPriceListsForYears(
                 OaTkpWriterPositionResolver::yearsToLockForPayload($payload, $existing),
             );
