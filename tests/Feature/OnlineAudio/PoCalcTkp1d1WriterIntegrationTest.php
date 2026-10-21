@@ -579,6 +579,345 @@ class PoCalcTkp1d1WriterIntegrationTest extends TestCase
         ], $fresh->load('positions'));
     }
 
+    #[Test]
+    public function create_with_explicit_price_year_requires_expected_token(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $year = PriceListCalendar::currentYear();
+
+        try {
+            $writer->create($this->payload([
+                $this->oaPosition($ctx, ['price_year' => $year]),
+            ]), $ctx['user']);
+            $this->fail('Create mit explizitem price_year ohne Expected-Token muss 422 sein.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.expected_oa_tkp_price_list_id', $exception->errors());
+        }
+
+        try {
+            $writer->create($this->payload([
+                $this->oaPosition($ctx, [
+                    'price_year' => $year,
+                    'expected_oa_tkp_price_list_id' => 999_999_999,
+                ]),
+            ]), $ctx['user']);
+            $this->fail('Create mit falschem Expected-Token muss Conflict sein.');
+        } catch (PriceListSelectionConflictException) {
+            // erwartet
+        }
+
+        $ok = $writer->create($this->payload([
+            $this->oaPosition($ctx, [
+                'price_year' => $year,
+                'expected_oa_tkp_price_list_id' => (int) $ctx['list']->id,
+            ]),
+        ]), $ctx['user']);
+        $this->assertSame((int) $ctx['list']->id, (int) $ok->positions->firstOrFail()->oa_tkp_price_list_id);
+    }
+
+    #[Test]
+    public function medium_and_inventory_rebind_require_expected_token(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $mediumB = AdvertisingMedium::query()->where('code', 'in_stream')->firstOrFail();
+        $inventoryB = Inventory::factory()->create([
+            'name' => 'D1 OA Inventory B',
+            'code' => 'D1OA_INV_B',
+            'is_active' => true,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => (int) $ctx['inventory']->id,
+            'advertising_medium_id' => (int) $mediumB->id,
+        ]);
+        InventoryMediumRule::factory()->create([
+            'inventory_id' => $inventoryB->id,
+            'advertising_medium_id' => (int) $mediumB->id,
+        ]);
+
+        // Eine Active-Revision/Jahr: zusätzliche Items auf derselben Liste.
+        OaTkpPriceListItem::query()->create([
+            'oa_tkp_price_list_id' => (int) $ctx['list']->id,
+            'advertising_medium_id' => (int) $mediumB->id,
+            'inventory_id' => (int) $ctx['inventory']->id,
+            'list_tkp' => '18.0000',
+            'minimum_tkp' => '11.0000',
+        ]);
+        OaTkpPriceListItem::query()->create([
+            'oa_tkp_price_list_id' => (int) $ctx['list']->id,
+            'advertising_medium_id' => (int) $mediumB->id,
+            'inventory_id' => (int) $inventoryB->id,
+            'list_tkp' => '21.0000',
+            'minimum_tkp' => '13.0000',
+        ]);
+
+        $calculation = $writer->create($this->payload([$this->oaPosition($ctx)]), $ctx['user']);
+        $activeListId = (int) $ctx['list']->id;
+        $locked = (int) $calculation->lock_version;
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        $payload['lock_version'] = $locked;
+        $payload['positions'][0]['advertising_medium_id'] = (int) $mediumB->id;
+        $payload['positions'][0]['schema_fingerprint'] = $this->positionSchemaFingerprintFor(
+            $calculation->fresh(),
+            (int) $mediumB->id,
+        );
+        unset($payload['positions'][0]['expected_oa_tkp_price_list_id']);
+
+        try {
+            $writer->update($calculation->fresh(), $payload, $ctx['user']);
+            $this->fail('Medium-Rebind ohne Token muss 422 sein.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.expected_oa_tkp_price_list_id', $exception->errors());
+        }
+        $this->assertSame(1, (int) $calculation->fresh()->lock_version);
+        $this->assertSame($activeListId, (int) $calculation->fresh()->positions->firstOrFail()->oa_tkp_price_list_id);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $calculation->fresh()->positions->firstOrFail()->list_tkp_snapshot, '12.0000'));
+
+        $payload['positions'][0]['expected_oa_tkp_price_list_id'] = 999_999_999;
+        try {
+            $writer->update($calculation->fresh(), $payload, $ctx['user']);
+            $this->fail('Medium-Rebind mit falschem Token muss Conflict sein.');
+        } catch (PriceListSelectionConflictException) {
+            // erwartet
+        }
+        $this->assertSame(1, (int) $calculation->fresh()->lock_version);
+
+        $payload['positions'][0]['expected_oa_tkp_price_list_id'] = $activeListId;
+        $afterMedium = $writer->update($calculation->fresh(), $payload, $ctx['user']);
+        $this->assertSame($activeListId, (int) $afterMedium->positions->firstOrFail()->oa_tkp_price_list_id);
+        $this->assertSame('oa_tkp', $afterMedium->positions->firstOrFail()->engine_profile_key);
+        $this->assertSame('tkp', $afterMedium->positions->firstOrFail()->calculation_method_key);
+        $this->assertSame('v1', $afterMedium->positions->firstOrFail()->algorithm_version);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $afterMedium->positions->firstOrFail()->list_tkp_snapshot, '18.0000'));
+
+        $payload = $writer->payloadFromCalculation($afterMedium->fresh());
+        $payload['lock_version'] = $afterMedium->lock_version;
+        $payload['positions'][0]['inventory_id'] = (int) $inventoryB->id;
+        unset($payload['positions'][0]['expected_oa_tkp_price_list_id']);
+
+        try {
+            $writer->update($afterMedium->fresh(), $payload, $ctx['user']);
+            $this->fail('Inventory-Rebind ohne Token muss 422 sein.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.expected_oa_tkp_price_list_id', $exception->errors());
+        }
+
+        $payload['positions'][0]['expected_oa_tkp_price_list_id'] = 999_999_999;
+        try {
+            $writer->update($afterMedium->fresh(), $payload, $ctx['user']);
+            $this->fail('Inventory-Rebind mit falschem Token muss Conflict sein.');
+        } catch (PriceListSelectionConflictException) {
+            // erwartet
+        }
+
+        $payload['positions'][0]['expected_oa_tkp_price_list_id'] = $activeListId;
+        $afterInventory = $writer->update($afterMedium->fresh(), $payload, $ctx['user']);
+        $this->assertSame($activeListId, (int) $afterInventory->positions->firstOrFail()->oa_tkp_price_list_id);
+        $this->assertSame((int) $inventoryB->id, (int) $afterInventory->positions->firstOrFail()->inventory_id);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $afterInventory->positions->firstOrFail()->list_tkp_snapshot, '21.0000'));
+    }
+
+    #[Test]
+    public function year_rebind_without_expected_token_is_rejected(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->payload([$this->oaPosition($ctx)]), $ctx['user']);
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $nextList = $this->createActivePriceList(
+            $nextYear,
+            1,
+            (int) $ctx['medium']->id,
+            (int) $ctx['inventory']->id,
+            '14.0000',
+            '9.0000',
+        );
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'][0]['price_year'] = $nextYear;
+        unset($payload['positions'][0]['expected_oa_tkp_price_list_id']);
+
+        try {
+            $writer->update($calculation->fresh(), $payload, $ctx['user']);
+            $this->fail('Year-Rebind ohne Token muss 422 sein.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('positions.0.expected_oa_tkp_price_list_id', $exception->errors());
+        }
+        $this->assertSame(1, (int) $calculation->fresh()->lock_version);
+        $this->assertSame((int) $ctx['list']->id, (int) $calculation->fresh()->positions->firstOrFail()->oa_tkp_price_list_id);
+        $this->assertSame($nextYear, (int) $nextList->year);
+    }
+
+    #[Test]
+    public function targeting_code_only_keeps_historical_revision_pin(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_targeting_selections' => [['targeting_code' => 'fixture_tgt']],
+            ]),
+        ]), $ctx['user']);
+
+        $rev1Id = (int) $ctx['targeting']->id;
+        $this->assertSame(0, OaTkpImportDecimal::compare(
+            (string) $calculation->positions->firstOrFail()->final_tkp,
+            '12.0000',
+        ));
+
+        $ctx['targeting']->update(['is_active' => false]);
+        $rev2 = OaTargetingDefinition::query()->create([
+            'code' => 'fixture_tgt',
+            'name' => 'Fixture Targeting Rev2',
+            'category' => OaTargetingCategory::Technisch,
+            'tkp_surcharge' => '5.0000',
+            'revision_number' => 2,
+            'is_active' => true,
+        ]);
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'][0]['oa_targeting_selections'] = [['targeting_code' => 'fixture_tgt']];
+        unset($payload['positions'][0]['oa_targeting_selections'][0]['oa_targeting_definition_id']);
+
+        $updated = $writer->update($calculation->fresh(), $payload, $ctx['user']);
+        $selection = $updated->positions->firstOrFail()->oaTargetingSelections->firstOrFail();
+        $this->assertSame($rev1Id, (int) $selection->oa_targeting_definition_id);
+        $this->assertSame(1, (int) $selection->targeting_revision_number);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $selection->tkp_surcharge_snapshot, '2.0000'));
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $updated->positions->firstOrFail()->final_tkp, '12.0000'));
+
+        // Bewusster Wechsel auf Revision 2 per ID.
+        $payload = $writer->payloadFromCalculation($updated->fresh());
+        $payload['lock_version'] = $updated->lock_version;
+        $payload['positions'][0]['oa_targeting_selections'] = [
+            ['oa_targeting_definition_id' => (int) $rev2->id, 'targeting_code' => 'fixture_tgt'],
+        ];
+        $switched = $writer->update($updated->fresh(), $payload, $ctx['user']);
+        $this->assertSame((int) $rev2->id, (int) $switched->positions->firstOrFail()->oaTargetingSelections->firstOrFail()->oa_targeting_definition_id);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $switched->positions->firstOrFail()->final_tkp, '15.0000'));
+
+        // ID/Code-Konflikt.
+        $payload = $writer->payloadFromCalculation($switched->fresh());
+        $payload['lock_version'] = $switched->lock_version;
+        $payload['positions'][0]['oa_targeting_selections'] = [
+            ['oa_targeting_definition_id' => (int) $rev2->id, 'targeting_code' => 'other_code'],
+        ];
+        $this->expectException(ValidationException::class);
+        $writer->update($switched->fresh(), $payload, $ctx['user']);
+    }
+
+    #[Test]
+    public function inactive_historical_targeting_pin_survives_code_only_update(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $calculation = $writer->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_targeting_selections' => [['oa_targeting_definition_id' => (int) $ctx['targeting']->id]],
+            ]),
+        ]), $ctx['user']);
+        $ctx['targeting']->update(['is_active' => false]);
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'][0]['oa_targeting_selections'] = [['targeting_code' => 'fixture_tgt']];
+        $updated = $writer->update($calculation->fresh(), $payload, $ctx['user']);
+        $this->assertSame((int) $ctx['targeting']->id, (int) $updated->positions->firstOrFail()->oaTargetingSelections->firstOrFail()->oa_targeting_definition_id);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $updated->positions->firstOrFail()->final_tkp, '12.0000'));
+    }
+
+    #[Test]
+    public function lock_years_include_pinned_non_current_and_mixed_years(): void
+    {
+        $ctx = $this->seedContext();
+        $nextYear = PriceListCalendar::currentYear() + 1;
+        $current = PriceListCalendar::currentYear();
+        $years = OaTkpWriterPositionResolver::yearsToLockForPayload([
+            'positions' => [
+                [
+                    'id' => 1,
+                    'calculation_method_key' => 'tkp',
+                ],
+                [
+                    'calculation_method_key' => 'tkp',
+                    'price_year' => $current,
+                ],
+            ],
+        ], null);
+        $this->assertSame([$current], $years);
+
+        $writer = app(CalculationWriter::class);
+        $nextList = $this->createActivePriceList(
+            $nextYear,
+            1,
+            (int) $ctx['medium']->id,
+            (int) $ctx['inventory']->id,
+            '14.0000',
+            '9.0000',
+        );
+        $calculation = $writer->create($this->payload([
+            $this->oaPosition($ctx, [
+                'price_year' => $nextYear,
+                'expected_oa_tkp_price_list_id' => (int) $nextList->id,
+            ]),
+            $this->oaPosition($ctx, [
+                'price_year' => $current,
+                'expected_oa_tkp_price_list_id' => (int) $ctx['list']->id,
+                'impressions' => 50_000,
+                'oa_platform_allocations' => [['oa_platform_id' => (int) $ctx['platform']->id, 'impressions' => 50_000]],
+            ]),
+        ]), $ctx['user']);
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        unset($payload['positions'][0]['price_year'], $payload['positions'][1]['price_year']);
+        $lockedYears = OaTkpWriterPositionResolver::yearsToLockForPayload($payload, $calculation->fresh()->load('positions'));
+        $this->assertSame([$current, $nextYear], $lockedYears);
+    }
+
+    #[Test]
+    public function removing_last_oa_position_clears_under_min_reason_and_children(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+        $spot = $this->createSpotFixture();
+
+        $calculation = $writer->create($this->payload([
+            $this->spotPosition($spot),
+            $this->oaPosition($ctx, [
+                'basis_tkp' => '5.0000',
+                'oa_targeting_selections' => [['targeting_code' => 'fixture_tgt']],
+            ]),
+        ]), $ctx['user']);
+
+        $this->assertTrue((bool) $calculation->requires_special_approval);
+        $this->assertNotEmpty($calculation->special_approval_reasons);
+        $oaId = (int) $calculation->positions->firstWhere('engine_profile_key', 'oa_tkp')->id;
+        $this->assertGreaterThan(0, CalculationPositionOaPlatformAllocation::query()->where('calculation_position_id', $oaId)->count());
+        $this->assertGreaterThan(0, CalculationPositionOaTargetingSelection::query()->where('calculation_position_id', $oaId)->count());
+
+        $payload = $writer->payloadFromCalculation($calculation->fresh());
+        $payload['lock_version'] = $calculation->lock_version;
+        $payload['positions'] = array_values(array_filter(
+            $payload['positions'],
+            fn (array $position): bool => ($position['calculation_method_key'] ?? $position['spot_method'] ?? '') !== 'tkp',
+        ));
+
+        $updated = $writer->update($calculation->fresh(), $payload, $ctx['user']);
+        $this->assertCount(1, $updated->positions);
+        $this->assertSame('spot_classic', $updated->positions->firstOrFail()->engine_profile_key);
+        $this->assertFalse((bool) $updated->requires_special_approval);
+        $this->assertTrue(
+            $updated->special_approval_reasons === null || $updated->special_approval_reasons === [],
+        );
+        $this->assertSame(0, CalculationPosition::query()->whereKey($oaId)->count());
+        $this->assertSame(0, CalculationPositionOaPlatformAllocation::query()->where('calculation_position_id', $oaId)->count());
+        $this->assertSame(0, CalculationPositionOaTargetingSelection::query()->where('calculation_position_id', $oaId)->count());
+    }
+
     /**
      * @param  list<array<string, mixed>>  $positions
      * @param  array<string, mixed>  $overrides

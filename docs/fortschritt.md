@@ -1,12 +1,10 @@
 # Fortschritt V1
 
-Stand: 21. Oktober 2026 – **PO-CALC-TKP-1D1** auf Feature-Branch:
-Normal-TKP in `CalculationWriter` integriert (Variante A; Dispatch per Freeze
-`oa_tkp`/`tkp`, `OaTkpWriterPositionResolver`, Server-Preis-/Plattform-/Targeting-
-Auflösung, Pin/Rebind, Child-Sync, Sonderfreigabe nach Persist über Assessor).
-Registry `oa_tkp`/`tkp` bleibt **planned**; HTTP (Preview/Store/Update/Budget) bleibt
-fail-closed; kein Wizard/UI/Dispo/Release. Dok:
-`docs/readiness/PO-CALC-TKP-1D1-auftrag-2026-10-21.md`.
+Stand: 21. Oktober 2026 – **PO-CALC-TKP-1D1** Nachzug auf Feature-Branch:
+Dispo-Handoff für `oa_tkp`/`tkp` fail-closed bis D3; Expected-Token analog Spot;
+Targeting code-only hält historischen Pin; Lock-Jahre inkl. gepinnter Nicht-Current-
+Jahre. Writer-Integration unverändert; Registry planned; kein Wizard/UI/D3/Release.
+Dok: `docs/readiness/PO-CALC-TKP-1D1-auftrag-2026-10-21.md`.
 
 Stand davor: 21. Oktober 2026 – **PO-CALC-TKP-1C1** auf Feature-Branch (Draft-PR):
 Under-Min-Sonderfreigabe technisch integriert (`SpecialApprovalReasonCode::OaTkpBasisBelowMinimum`,

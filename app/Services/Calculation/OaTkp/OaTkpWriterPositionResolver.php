@@ -8,6 +8,7 @@ use App\Enums\PricingSettlementMode;
 use App\Enums\SpotCalculationMethod;
 use App\Exceptions\PriceListSelectionConflictException;
 use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
@@ -53,11 +54,7 @@ final class OaTkpWriterPositionResolver
      */
     public static function lockOaPriceListsForYears(array $years): void
     {
-        $unique = array_values(array_unique(array_filter(
-            array_map(static fn ($year): int => (int) $year, $years),
-            static fn (int $year): bool => $year >= 2000,
-        )));
-        sort($unique);
+        $unique = self::normalizeLockYears($years);
 
         if ($unique === []) {
             return;
@@ -68,6 +65,76 @@ final class OaTkpWriterPositionResolver
             ->orderBy('id')
             ->lockForUpdate()
             ->get(['id']);
+    }
+
+    /**
+     * Jahre, die vor OA-Resolver-Reads gelockt werden müssen:
+     * explizites price_year, gepinntes oa_tkp_price_list_year, Default current für neue OA.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<int>
+     */
+    public static function yearsToLockForPayload(array $payload, ?Calculation $existing = null): array
+    {
+        $years = [];
+        $existingById = $existing?->positions->keyBy('id') ?? collect();
+        $existingByClient = $existing?->positions->keyBy('client_key') ?? collect();
+        $hasOa = false;
+
+        foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            $existingPosition = null;
+            if (isset($position['id'])) {
+                $existingPosition = $existingById->get((int) $position['id']);
+            } elseif (isset($position['client_key'])) {
+                $existingPosition = $existingByClient->get((string) $position['client_key']);
+            }
+
+            $isOa = self::payloadSignalsOaTkp($position) || self::isStoredOaTkp($existingPosition);
+            if (! $isOa) {
+                continue;
+            }
+            $hasOa = true;
+
+            if (PriceListYearSelection::hasExplicitPriceYear($position)) {
+                $years[] = (int) $position['price_year'];
+            } elseif ($existingPosition !== null && $existingPosition->oa_tkp_price_list_year !== null) {
+                $years[] = (int) $existingPosition->oa_tkp_price_list_year;
+            } else {
+                $years[] = PriceListCalendar::currentYear();
+            }
+        }
+
+        // Header-only / Payload ohne OA-Marker: bestehende OA-Jahre trotzdem sperren.
+        if (! $hasOa && $existing !== null) {
+            foreach ($existing->positions as $stored) {
+                if (self::isStoredOaTkp($stored) && $stored->oa_tkp_price_list_year !== null) {
+                    $years[] = (int) $stored->oa_tkp_price_list_year;
+                }
+            }
+        }
+
+        $normalized = self::normalizeLockYears($years);
+
+        return $normalized === [] ? [PriceListCalendar::currentYear()] : $normalized;
+    }
+
+    /**
+     * @param  list<int>|array<int, int>  $years
+     * @return list<int>
+     */
+    private static function normalizeLockYears(array $years): array
+    {
+        $unique = array_values(array_unique(array_filter(
+            array_map(static fn ($year): int => (int) $year, $years),
+            static fn (int $year): bool => $year >= 2000,
+        )));
+        sort($unique);
+
+        return $unique;
     }
 
     /**
@@ -218,12 +285,14 @@ final class OaTkpWriterPositionResolver
                 (string) $medium->code,
             );
 
-            $expected = $position['expected_oa_tkp_price_list_id'] ?? null;
-            if ($expected !== null && $expected !== '' && (int) $expected !== (int) $active['price_list_id']) {
-                throw new PriceListSelectionConflictException(
-                    'Die aktive OA-TKP-Preisliste hat sich geändert. Bitte neu laden und bewusst speichern.',
-                );
-            }
+            // Analog Spot PO-PRI-YEAR-1: Token Pflicht bei explizitem price_year (Create)
+            // oder bei Rebind einer bestehenden Position; Default-Jahr ohne Token ok.
+            $this->assertExpectedOaTkpPriceList(
+                $position['expected_oa_tkp_price_list_id'] ?? null,
+                (int) $active['price_list_id'],
+                required: $existing !== null || PriceListYearSelection::hasExplicitPriceYear($position),
+                errorKey: "{$prefix}.expected_oa_tkp_price_list_id",
+            );
 
             $listTkp = $active['list_tkp'];
             $minimumTkp = $active['minimum_tkp'];
@@ -515,6 +584,32 @@ final class OaTkpWriterPositionResolver
     }
 
     /**
+     * Expected-Token analog Spot: fehlt bei Pflicht → 422; Mismatch → Conflict (409).
+     */
+    private function assertExpectedOaTkpPriceList(
+        mixed $expected,
+        int $activePriceListId,
+        bool $required,
+        string $errorKey,
+    ): void {
+        if ($expected === null || $expected === '') {
+            if ($required) {
+                throw ValidationException::withMessages([
+                    $errorKey => 'Die erwartete OA-TKP-Preisliste fehlt. Bitte neu laden und bewusst speichern.',
+                ]);
+            }
+
+            return;
+        }
+
+        if ((int) $expected !== $activePriceListId) {
+            throw new PriceListSelectionConflictException(
+                'Die aktive OA-TKP-Preisliste hat sich geändert. Bitte neu laden und bewusst speichern.',
+            );
+        }
+    }
+
+    /**
      * @param  array<string, mixed>  $position
      * @return list<OaTkpTargetingSelectionInput>
      */
@@ -527,14 +622,18 @@ final class OaTkpWriterPositionResolver
             ]);
         }
 
-        $stored = $existing === null
+        $storedRows = $existing === null
             ? collect()
-            : $existing->oaTargetingSelections()->get()->filter(fn ($s): bool => $s->oa_targeting_definition_id !== null)
-                ->keyBy(fn ($s): int => (int) $s->oa_targeting_definition_id);
+            : $existing->oaTargetingSelections()->get()
+                ->filter(fn ($s): bool => $s->oa_targeting_definition_id !== null && trim((string) $s->targeting_code) !== '');
+
+        $storedById = $storedRows->keyBy(fn ($s): int => (int) $s->oa_targeting_definition_id);
+        $storedByCode = $storedRows->keyBy(fn ($s): string => (string) $s->targeting_code);
 
         $today = Carbon::today();
         $inputs = [];
-        $seen = [];
+        $seenIds = [];
+        $seenCodes = [];
         foreach (array_values($rows) as $i => $row) {
             $rowKey = "{$prefix}.oa_targeting_selections.{$i}";
             if (! is_array($row)) {
@@ -552,66 +651,123 @@ final class OaTkpWriterPositionResolver
                 ]);
             }
 
+            // Fall A: gespeicherte Definition-ID → historischen Snapshot halten (auch wenn inactive).
             if ($id !== null) {
                 $definition = OaTargetingDefinition::query()->find($id);
-                if ($definition !== null && $code !== '' && $definition->code !== $code) {
-                    $definition = null;
+                if ($definition === null) {
+                    throw ValidationException::withMessages([$rowKey => 'Unbekanntes Targeting.']);
                 }
-            } else {
-                $definition = OaTargetingDefinition::query()
-                    ->where('code', $code)
-                    ->where('is_active', true)
-                    ->orderByDesc('revision_number')
-                    ->first();
+                if ($code !== '' && $definition->code !== $code) {
+                    throw ValidationException::withMessages([
+                        $rowKey => 'Targeting-ID und Targeting-Code passen nicht zusammen.',
+                    ]);
+                }
+
+                $keep = $storedById->get($id);
+                if ($keep !== null) {
+                    $pinCode = (string) $keep->targeting_code;
+                    if (isset($seenIds[$id]) || isset($seenCodes[$pinCode])) {
+                        throw ValidationException::withMessages([
+                            $rowKey => 'Targeting darf pro Position nur einmal ausgewählt werden.',
+                        ]);
+                    }
+                    $seenIds[$id] = true;
+                    $seenCodes[$pinCode] = true;
+                    $inputs[] = $this->targetingInputFromStored($keep, ($i + 1) * 10);
+
+                    continue;
+                }
+
+                // Fall D: bewusste neue Definition-ID → aktuelle Stammdaten, muss aktiv/gültig sein.
+                if (! $definition->is_active
+                    || ($definition->valid_from !== null && $definition->valid_from->greaterThan($today))
+                    || ($definition->valid_to !== null && $definition->valid_to->lessThan($today))
+                ) {
+                    throw ValidationException::withMessages([$rowKey => 'Das Targeting ist nicht aktiv oder nicht gültig.']);
+                }
+
+                if (isset($seenIds[(int) $definition->id]) || isset($seenCodes[(string) $definition->code])) {
+                    throw ValidationException::withMessages([
+                        $rowKey => 'Targeting darf pro Position nur einmal ausgewählt werden.',
+                    ]);
+                }
+                $seenIds[(int) $definition->id] = true;
+                $seenCodes[(string) $definition->code] = true;
+                $inputs[] = $this->targetingInputFromDefinition($definition, ($i + 1) * 10);
+
+                continue;
             }
+
+            // Fall B: code-only + gespeicherter gleicher Code → historischen Snapshot halten.
+            $keepByCode = $storedByCode->get($code);
+            if ($keepByCode !== null) {
+                $keepId = (int) $keepByCode->oa_targeting_definition_id;
+                if (isset($seenIds[$keepId]) || isset($seenCodes[$code])) {
+                    throw ValidationException::withMessages([
+                        $rowKey => 'Targeting darf pro Position nur einmal ausgewählt werden.',
+                    ]);
+                }
+                $seenIds[$keepId] = true;
+                $seenCodes[$code] = true;
+                $inputs[] = $this->targetingInputFromStored($keepByCode, ($i + 1) * 10);
+
+                continue;
+            }
+
+            // Fall C: neue Auswahl nur per Code → höchste aktive Revision.
+            $definition = OaTargetingDefinition::query()
+                ->where('code', $code)
+                ->where('is_active', true)
+                ->orderByDesc('revision_number')
+                ->first();
 
             if ($definition === null) {
                 throw ValidationException::withMessages([$rowKey => 'Unbekanntes Targeting.']);
             }
 
-            if (isset($seen[(int) $definition->id])) {
-                throw ValidationException::withMessages([
-                    $rowKey => 'Targeting darf pro Position nur einmal ausgewählt werden.',
-                ]);
-            }
-            $seen[(int) $definition->id] = true;
-
-            // Unverändert gewählte Targetings behalten ihren Snapshot (Aufschlag/Revision),
-            // damit Header-Änderungen den Preis nicht still verschieben.
-            $keep = $stored->get((int) $definition->id);
-            if ($keep !== null) {
-                $inputs[] = new OaTkpTargetingSelectionInput(
-                    code: (string) $keep->targeting_code,
-                    name: (string) $keep->targeting_name,
-                    category: (string) $keep->targeting_category,
-                    tkpSurcharge: (string) $keep->tkp_surcharge_snapshot,
-                    revisionNumber: (int) $keep->targeting_revision_number,
-                    oaTargetingDefinitionId: (int) $definition->id,
-                    sort: ($i + 1) * 10,
-                );
-
-                continue;
-            }
-
-            if (! $definition->is_active
-                || ($definition->valid_from !== null && $definition->valid_from->greaterThan($today))
+            if (($definition->valid_from !== null && $definition->valid_from->greaterThan($today))
                 || ($definition->valid_to !== null && $definition->valid_to->lessThan($today))
             ) {
                 throw ValidationException::withMessages([$rowKey => 'Das Targeting ist nicht aktiv oder nicht gültig.']);
             }
 
-            $inputs[] = new OaTkpTargetingSelectionInput(
-                code: (string) $definition->code,
-                name: (string) $definition->name,
-                category: $definition->category->value,
-                tkpSurcharge: (string) $definition->tkp_surcharge,
-                revisionNumber: (int) $definition->revision_number,
-                oaTargetingDefinitionId: (int) $definition->id,
-                sort: ($i + 1) * 10,
-            );
+            if (isset($seenIds[(int) $definition->id]) || isset($seenCodes[(string) $definition->code])) {
+                throw ValidationException::withMessages([
+                    $rowKey => 'Targeting darf pro Position nur einmal ausgewählt werden.',
+                ]);
+            }
+            $seenIds[(int) $definition->id] = true;
+            $seenCodes[(string) $definition->code] = true;
+            $inputs[] = $this->targetingInputFromDefinition($definition, ($i + 1) * 10);
         }
 
         return $inputs;
+    }
+
+    private function targetingInputFromStored(object $keep, int $sort): OaTkpTargetingSelectionInput
+    {
+        return new OaTkpTargetingSelectionInput(
+            code: (string) $keep->targeting_code,
+            name: (string) $keep->targeting_name,
+            category: (string) $keep->targeting_category,
+            tkpSurcharge: (string) $keep->tkp_surcharge_snapshot,
+            revisionNumber: (int) $keep->targeting_revision_number,
+            oaTargetingDefinitionId: (int) $keep->oa_targeting_definition_id,
+            sort: $sort,
+        );
+    }
+
+    private function targetingInputFromDefinition(OaTargetingDefinition $definition, int $sort): OaTkpTargetingSelectionInput
+    {
+        return new OaTkpTargetingSelectionInput(
+            code: (string) $definition->code,
+            name: (string) $definition->name,
+            category: $definition->category->value,
+            tkpSurcharge: (string) $definition->tkp_surcharge,
+            revisionNumber: (int) $definition->revision_number,
+            oaTargetingDefinitionId: (int) $definition->id,
+            sort: $sort,
+        );
     }
 
     /**

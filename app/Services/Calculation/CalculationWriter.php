@@ -2869,13 +2869,27 @@ final class CalculationWriter
         $inventoryIds = [];
         $years = [];
         $hasOaTkp = false;
+        $existingById = $existing?->positions->keyBy('id') ?? collect();
+        $existingByClient = $existing?->positions->keyBy('client_key') ?? collect();
+
         foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
             if (! is_array($position)) {
                 continue;
             }
-            if (OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)) {
+
+            $existingPosition = null;
+            if (isset($position['id'])) {
+                $existingPosition = $existingById->get((int) $position['id']);
+            } elseif (isset($position['client_key'])) {
+                $existingPosition = $existingByClient->get((string) $position['client_key']);
+            }
+
+            if (OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)
+                || OaTkpWriterPositionResolver::isStoredOaTkp($existingPosition)
+            ) {
                 $hasOaTkp = true;
             }
+
             $inventoryId = (int) ($position['inventory_id'] ?? 0);
             if ($inventoryId > 0) {
                 $inventoryIds[$inventoryId] = $inventoryId;
@@ -2884,6 +2898,7 @@ final class CalculationWriter
                 $years[] = (int) $position['price_year'];
             }
         }
+
         if ($years === []) {
             $years[] = PriceListCalendar::currentYear();
         }
@@ -2891,8 +2906,7 @@ final class CalculationWriter
         sort($ids);
         PriceListYearSelection::lockInventoriesForLiveBinding($ids, $years);
 
-        // PO-CALC-TKP-1D1: OA-TKP-Preislisten (Jahr) vor nicht-lockenden Reads sperren.
-        // Bestehende OA-Positionen ohne Methodenschlüssel im Payload zählen mit (gesperrter Read).
+        // PO-CALC-TKP-1D1: OA-TKP-Preislisten inkl. gepinnter Nicht-Current-Jahre sperren.
         if (! $hasOaTkp && $existing !== null) {
             $hasOaTkp = CalculationPosition::query()
                 ->where('calculation_id', $existing->id)
@@ -2901,7 +2915,9 @@ final class CalculationWriter
                 ->exists();
         }
         if ($hasOaTkp) {
-            OaTkpWriterPositionResolver::lockOaPriceListsForYears($years);
+            OaTkpWriterPositionResolver::lockOaPriceListsForYears(
+                OaTkpWriterPositionResolver::yearsToLockForPayload($payload, $existing),
+            );
         }
     }
 
