@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 20. Oktober 2026 – **PO-CALC-TKP-1B** auf Feature-Branch (Draft-PR):
+Stand: 21. Oktober 2026 – **PO-CALC-TKP-1C1** auf Feature-Branch (Draft-PR):
+Under-Min-Sonderfreigabe technisch integriert (`SpecialApprovalReasonCode::OaTkpBasisBelowMinimum`,
+Assessor-Decimals `basis_tkp`/`minimum_tkp_snapshot`, Persister setzt
+`requires_special_approval`/`special_approval_reasons` via Assessor). TKP weiterhin
+**planned** und nicht Nutzer-operational. Kein Wizard/Release/Dispo-Vollsnapshot/
+Nutzerbegründung. Dok: `docs/readiness/PO-CALC-TKP-1C1-auftrag-2026-10-21.md`.
+
+Stand davor: 20. Oktober 2026 – **PO-CALC-TKP-1B** auf `main` (PR #169):
 Normal-TKP-Engine (`OaTkpNormalEngine` v1) + Price Resolver + interner
 Save/Reload/Snapshot-Pfad. Registry `oa_tkp`/`tkp` bleibt **planned**
 (v1 = implemented, kein Bookability-Release). Adserver/Festpreis/Wizard OUT.

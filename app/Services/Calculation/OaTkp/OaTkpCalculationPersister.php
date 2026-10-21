@@ -16,6 +16,7 @@ use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\User;
 use App\Services\Calculation\CalculationNumberSequencer;
 use App\Services\Calculation\DiscountInput;
+use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Support\Calculation\CalculationMethodFreezeDescriptor;
 use App\Support\Calculation\EngineProfileRegistry;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +35,7 @@ final class OaTkpCalculationPersister
     public function __construct(
         private readonly OaTkpNormalEngine $engine = new OaTkpNormalEngine,
         private readonly CalculationNumberSequencer $numbers = new CalculationNumberSequencer,
+        private readonly SpecialApprovalAssessor $specialApproval = new SpecialApprovalAssessor,
     ) {}
 
     /**
@@ -73,6 +75,9 @@ final class OaTkpCalculationPersister
         return DB::transaction(function () use ($advisor, $result, $aeEnabled): Calculation {
             [$year, $seq, $number] = $this->numbers->next();
 
+            $limit = $advisor->discount_limit_percent;
+            $limitString = $limit === null || $limit === '' ? null : (string) $limit;
+
             $calculation = new Calculation;
             $calculation->fill([
                 'number' => $number,
@@ -89,12 +94,29 @@ final class OaTkpCalculationPersister
                 'ae_total' => $result->aeAmount,
                 'nn_invest' => $result->nnInvest,
                 'requires_special_approval' => false,
+                'special_approval_reasons' => null,
+                'personal_discount_limit_percent' => $limitString,
                 'lock_version' => 1,
             ]);
             $calculation->save();
 
             $this->persistOrderDiscounts($calculation, $result->appliedOrderDiscounts);
             $this->persistPosition($calculation, $result);
+
+            $calculation->load([
+                'positions.inventory',
+                'positions.discounts',
+                'positions.productionLines',
+            ]);
+            $assessment = $this->specialApproval->assessFromCalculation(
+                $calculation,
+                $calculation->positions,
+            );
+            $calculation->requires_special_approval = $assessment->requiresSpecialApproval;
+            $calculation->special_approval_reasons = $assessment->reasons === []
+                ? null
+                : $assessment->reasons;
+            $calculation->save();
 
             return $calculation->fresh([
                 'orderDiscounts',

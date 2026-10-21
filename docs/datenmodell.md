@@ -311,7 +311,11 @@ Unterobjekte werden typbezogen normalisiert:
   (platform_code/name + impressions; Summe = Positions-Impressions) und
   `calculation_position_oa_targeting_selections` (code/name/category + surcharge-Snapshot);
   Positionsfelder u. a. `impressions`, `basis_tkp`, `list_tkp_snapshot`,
-  `minimum_tkp_snapshot`, `final_tkp`, `below_minimum_tkp`, Price-List-Identity,
+  `minimum_tkp_snapshot`, `final_tkp`, `below_minimum_tkp` (Marker, nicht
+  Approval-SoT), Price-List-Identity. **PO-CALC-TKP-1C1:** Under-Min-Sonderfreigabe
+  über `SpecialApprovalAssessor` (`oa_tkp_basis_below_minimum`); SoT =
+  Decimal-Vergleich `basis_tkp` &lt; `minimum_tkp_snapshot` (kein Live-Lookup;
+  Targeting heilt nicht; Partial Selection positionsbezogen),
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
