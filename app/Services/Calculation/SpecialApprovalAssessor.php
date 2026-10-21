@@ -226,7 +226,8 @@ final class SpecialApprovalAssessor
             return [];
         }
 
-        $label = $position->inventory?->name
+        $inventoryName = $position->inventory !== null ? $position->inventory->name : null;
+        $label = $inventoryName
             ?? (is_string($position->inventory_name) && $position->inventory_name !== ''
                 ? $position->inventory_name
                 : null);
