@@ -9,6 +9,7 @@ use App\Enums\DiscountType;
 use App\Enums\SpotCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
+use App\Support\Calculation\OaTkpHttpReleaseGuard;
 use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -46,6 +47,9 @@ final class BudgetSpotProposalService
      */
     private function proposeWithinTransaction(array $payload, ?Calculation $existing = null): array
     {
+        // PO-CALC-TKP-1D1: Budgetvorschlag ist Spot-only (TKP fail-closed, auch bei Bestandspositionen).
+        OaTkpHttpReleaseGuard::assertBudgetNotTkp($payload, $existing);
+
         $target = Decimal::roundMoney((string) $payload['target_budget_nn']);
         if (Decimal::cmp($target, '0') <= 0) {
             throw ValidationException::withMessages([

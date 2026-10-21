@@ -9,6 +9,7 @@ use App\Enums\ComponentCalculationStrategy;
 use App\Enums\DiscountType;
 use App\Enums\PlanningMode;
 use App\Enums\PricingSettlementMode;
+use App\Enums\SpecialApprovalReasonCode;
 use App\Enums\SpotCalculationMethod;
 use App\Enums\SpotComponentProfile;
 use App\Enums\SpotComponentRole;
@@ -19,6 +20,8 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionOaPlatformAllocation;
+use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionProductionLine;
 use App\Models\CalculationPositionTimeRange;
@@ -27,6 +30,11 @@ use App\Models\Inventory;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Calculation\OaTkp\OaTkpNormalEngine;
+use App\Services\Calculation\OaTkp\OaTkpPlatformAllocationInput;
+use App\Services\Calculation\OaTkp\OaTkpPositionResult;
+use App\Services\Calculation\OaTkp\OaTkpTargetingSelectionInput;
+use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Services\Crm\CrmOrderHeaderBinder;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
@@ -56,6 +64,9 @@ final class CalculationWriter
         private readonly ComponentValidator $componentValidator,
         private readonly ProductionPriceResolver $productionPrices,
         private readonly CrmOrderHeaderBinder $crmHeaders,
+        private readonly OaTkpWriterPositionResolver $oaTkpPositions = new OaTkpWriterPositionResolver,
+        private readonly OaTkpNormalEngine $oaTkpEngine = new OaTkpNormalEngine,
+        private readonly SpecialApprovalAssessor $specialApproval = new SpecialApprovalAssessor,
     ) {}
 
     /**
@@ -130,7 +141,7 @@ final class CalculationWriter
 
             // Inventare/Jahre sperren, bevor nicht-lockende Reads den RR-Snapshot setzen.
             // Sonst kann activePriceList eine vor Aktivierung sichtbare Active lesen.
-            $this->lockInventoriesForPayloadLiveBinding($payload);
+            $this->lockInventoriesForPayloadLiveBinding($payload, $locked);
 
             $locked->load(['positions.planRows', 'positions.timeRanges', 'positions.discounts', 'orderDiscounts']);
             $this->assertClientFingerprintsForGen3Update($locked, $payload);
@@ -178,6 +189,16 @@ final class CalculationWriter
 
                 abort_unless($lockedProposal->calculation_id === $lockedCalculation->id, 404);
                 abort_if($lockedProposal->applied_at !== null, 422, 'Der Vorschlag wurde bereits übernommen.');
+
+                // PO-CALC-TKP-1D1: Budgetvorschlag ist Spot-only; TKP-Positionen fail-closed.
+                $lockedCalculation->loadMissing('positions');
+                if ($lockedCalculation->positions->contains(
+                    fn (CalculationPosition $position): bool => $this->isOaTkpStoredPosition($position),
+                )) {
+                    throw ValidationException::withMessages([
+                        'positions' => 'Budgetvorschläge sind für Kalkulationen mit TKP-Positionen nicht verfügbar.',
+                    ]);
+                }
 
                 if ($lockedProposal->lock_version !== null && $lockedProposal->lock_version !== $lockedCalculation->lock_version) {
                     throw ValidationException::withMessages([
@@ -261,11 +282,13 @@ final class CalculationWriter
         $existingById = $calculation->positions->keyBy('id');
         $existingByClient = $calculation->positions->keyBy('client_key');
 
-        $totals = $this->totalsFromPayload($payload, $user, $isCreate ? null : $calculation);
         $resolved = $this->resolvedPositions($payload, $isCreate ? null : $calculation);
+        /** @var array<int, OaTkpPositionResult> $oaResults */
+        $oaResults = [];
+        $totals = $this->totalsFromResolved($resolved, $payload, $user, $isCreate ? null : $calculation, $oaResults);
 
         foreach ($resolved as $index => $item) {
-            if ($item['needs_spot_redistribution'] && $item['time_ranges'] !== []) {
+            if (($item['is_oa_tkp'] ?? false) !== true && $item['needs_spot_redistribution'] && $item['time_ranges'] !== []) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.time_ranges" => 'Bitte verteile die bisherige Gesamtspotzahl auf die Preiszeiträume.',
                 ]);
@@ -298,48 +321,53 @@ final class CalculationWriter
             $previousInventoryName = $existing === null ? '' : trim((string) ($existing->inventory_name ?? ''));
             $previousInventoryCode = $existing === null ? '' : trim((string) ($existing->inventory_code ?? ''));
 
+            $isOa = ($item['is_oa_tkp'] ?? false) === true;
             $position = $existing ?? new CalculationPosition;
-            $position->fill([
-                'client_key' => $clientKey,
-                'inventory_id' => $item['inventory']->id,
-                'advertising_medium_id' => $item['medium']->id,
-                'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
-                // MAT-CORE-1: serverseitiger Kombinations-Freeze (nie aus Client-Payload).
-                'booking_code' => $item['booking_code'] ?? null,
-                'planning_responsibility_key' => $item['planning_responsibility_key'] ?? null,
-                'planning_responsibility_label' => $item['planning_responsibility_label'] ?? null,
-                'combination_hint_text' => $item['combination_hint_text'] ?? null,
-                'price_list_id' => $item['priceList']->id,
-                'kind' => $item['freeze']->legacyKind(),
-                'spot_method' => $item['freeze']->legacySpotMethod(),
-                'length_seconds' => (int) $item['length_seconds'],
-                'component_calculation_strategy' => $item['component_calculation_strategy']?->value,
-                'component_profile' => $item['component_profile'],
-                'total_spot_count' => (int) $item['total_spot_count'],
-                'needs_spot_redistribution' => $item['needs_spot_redistribution'] && $item['time_ranges'] === [],
-                'average_second_price' => $result->averageSecondPrice,
-                'length_index' => $result->lengthIndex,
-                'surcharge_percent' => $item['surcharge_percent'],
-                'position_discount_percent' => $item['is_discountable']
-                    ? $this->effectivePercentFromDiscounts($item['position_discounts'])
-                    : 0,
-                'ae_percent' => $item['is_ae_eligible'] ? $item['ae_percent'] : 0,
-                'is_discountable' => $item['is_discountable'],
-                'is_ae_eligible' => $item['is_ae_eligible'],
-                'price_list_version' => $item['priceList']->version,
-                'media_gross' => $result->mediaGross,
-                'production_gross' => $result->productionGross,
-                'production_nn_invest' => $result->productionNnInvest,
-                'position_discount_amount' => $result->positionDiscountAmount,
-                'order_discount_amount' => $result->orderDiscountAmount,
-                'ae_amount' => $result->aeAmount,
-                'nn_invest' => $result->nnInvest,
-                'pricing_settlement_mode' => $result->pricingSettlementMode->value,
-                'fixed_price_nn' => $result->fixedPriceNn,
-                'effective_pay_factor_percent' => $result->effectivePayFactorPercent,
-                'effective_total_discount_percent' => $result->effectiveDiscountPercent,
-                'sort' => $index,
-            ]);
+            if ($isOa) {
+                $this->fillOaTkpPosition($position, $item, $oaResults[$index], $clientKey, $index);
+            } else {
+                $position->fill([
+                    'client_key' => $clientKey,
+                    'inventory_id' => $item['inventory']->id,
+                    'advertising_medium_id' => $item['medium']->id,
+                    'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
+                    // MAT-CORE-1: serverseitiger Kombinations-Freeze (nie aus Client-Payload).
+                    'booking_code' => $item['booking_code'] ?? null,
+                    'planning_responsibility_key' => $item['planning_responsibility_key'] ?? null,
+                    'planning_responsibility_label' => $item['planning_responsibility_label'] ?? null,
+                    'combination_hint_text' => $item['combination_hint_text'] ?? null,
+                    'price_list_id' => $item['priceList']->id,
+                    'kind' => $item['freeze']->legacyKind(),
+                    'spot_method' => $item['freeze']->legacySpotMethod(),
+                    'length_seconds' => (int) $item['length_seconds'],
+                    'component_calculation_strategy' => $item['component_calculation_strategy']?->value,
+                    'component_profile' => $item['component_profile'],
+                    'total_spot_count' => (int) $item['total_spot_count'],
+                    'needs_spot_redistribution' => $item['needs_spot_redistribution'] && $item['time_ranges'] === [],
+                    'average_second_price' => $result->averageSecondPrice,
+                    'length_index' => $result->lengthIndex,
+                    'surcharge_percent' => $item['surcharge_percent'],
+                    'position_discount_percent' => $item['is_discountable']
+                        ? $this->effectivePercentFromDiscounts($item['position_discounts'])
+                        : 0,
+                    'ae_percent' => $item['is_ae_eligible'] ? $item['ae_percent'] : 0,
+                    'is_discountable' => $item['is_discountable'],
+                    'is_ae_eligible' => $item['is_ae_eligible'],
+                    'price_list_version' => $item['priceList']->version,
+                    'media_gross' => $result->mediaGross,
+                    'production_gross' => $result->productionGross,
+                    'production_nn_invest' => $result->productionNnInvest,
+                    'position_discount_amount' => $result->positionDiscountAmount,
+                    'order_discount_amount' => $result->orderDiscountAmount,
+                    'ae_amount' => $result->aeAmount,
+                    'nn_invest' => $result->nnInvest,
+                    'pricing_settlement_mode' => $result->pricingSettlementMode->value,
+                    'fixed_price_nn' => $result->fixedPriceNn,
+                    'effective_pay_factor_percent' => $result->effectivePayFactorPercent,
+                    'effective_total_discount_percent' => $result->effectiveDiscountPercent,
+                    'sort' => $index,
+                ]);
+            }
             $this->stampInventoryIdentity(
                 $position,
                 $item['inventory'],
@@ -378,6 +406,16 @@ final class CalculationWriter
                 $payload['positions'][$index]['client_key'] = $position->client_key;
             }
 
+            if ($isOa) {
+                // PO-CALC-TKP-1D1: kein Plan-/Komponenten-/Produktionspfad; Reste entfernen.
+                $this->deleteSpotChildren($position);
+                $this->syncOaPlatformAllocations($position, $oaResults[$index]->platformAllocations);
+                $this->syncOaTargetingSelections($position, $oaResults[$index]->targetings);
+                $this->syncPositionDiscounts($position, $item['position_discounts']);
+
+                continue;
+            }
+
             if ($item['spot_method'] === SpotCalculationMethod::Calendar) {
                 $position->timeRanges()->delete();
                 $this->syncPlannerEntries($position, $result);
@@ -410,6 +448,8 @@ final class CalculationWriter
                     $this->deletePlannerEntries($orphan);
                     $orphan->components()->delete();
                     $orphan->productionLines()->delete();
+                    $orphan->oaPlatformAllocations()->delete();
+                    $orphan->oaTargetingSelections()->delete();
                     $orphan->discounts()->delete();
                     $orphan->fieldValues()->delete();
                     $orphan->delete();
@@ -420,6 +460,149 @@ final class CalculationWriter
 
         $calculation->load('positions');
         $this->dynamicFields->syncFromPayload($calculation, $payload);
+
+        if ($calculation->positions->contains(
+            fn (CalculationPosition $position): bool => $this->isOaTkpStoredPosition($position),
+        )) {
+            $this->reassessSpecialApprovalFromStoredPositions($calculation);
+        }
+    }
+
+    private function isOaTkpStoredPosition(CalculationPosition $position): bool
+    {
+        return OaTkpWriterPositionResolver::isStoredOaTkp($position);
+    }
+
+    /**
+     * PO-CALC-TKP-1D1: Sonderfreigabe bei OA-TKP-Kalkulationen kanonisch aus den persistierten
+     * Positionen (Rabattgrenzen + Under-Min, COM-002 / OA-001/002) neu bewerten.
+     */
+    private function reassessSpecialApprovalFromStoredPositions(Calculation $calculation): void
+    {
+        $calculation->requires_special_approval = false;
+        $calculation->special_approval_reasons = null;
+
+        $positions = $calculation->positions()->get();
+        $calculation->setRelation('positions', $positions);
+
+        $assessment = $this->specialApproval->assessFromCalculation($calculation, $positions);
+        $calculation->requires_special_approval = $assessment->requiresSpecialApproval;
+        $calculation->special_approval_reasons = $assessment->reasons === [] ? null : $assessment->reasons;
+        $calculation->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function fillOaTkpPosition(
+        CalculationPosition $position,
+        array $item,
+        OaTkpPositionResult $oa,
+        string $clientKey,
+        int $index,
+    ): void {
+        $position->forceFill([
+            'client_key' => $clientKey,
+            'inventory_id' => $item['inventory']->id,
+            'advertising_medium_id' => $item['medium']->id,
+            'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
+            'booking_code' => $item['booking_code'] ?? null,
+            'planning_responsibility_key' => $item['planning_responsibility_key'] ?? null,
+            'planning_responsibility_label' => $item['planning_responsibility_label'] ?? null,
+            'combination_hint_text' => $item['combination_hint_text'] ?? null,
+            'price_list_id' => null,
+            'price_list_version' => null,
+            'kind' => $item['freeze']->legacyKind(),
+            'spot_method' => $item['freeze']->legacySpotMethod(),
+            'length_seconds' => 0,
+            'total_spot_count' => 0,
+            'needs_spot_redistribution' => false,
+            'component_calculation_strategy' => null,
+            'component_profile' => null,
+            'average_second_price' => null,
+            'length_index' => null,
+            'surcharge_percent' => '0',
+            'position_discount_percent' => $oa->effectivePositionDiscountPercent,
+            'ae_percent' => $oa->aePercent,
+            'is_discountable' => $oa->isDiscountable,
+            'is_ae_eligible' => $oa->isAeEligible,
+            'impressions' => $oa->impressions,
+            'basis_tkp' => $oa->basisTkp,
+            'list_tkp_snapshot' => $oa->listTkp,
+            'minimum_tkp_snapshot' => $oa->minimumTkp,
+            'final_tkp' => $oa->finalTkp,
+            'targeting_surcharge_total' => $oa->targetingSurchargeTotal,
+            'below_minimum_tkp' => $oa->belowMinimumTkp,
+            'oa_tkp_price_list_id' => $oa->oaTkpPriceListId,
+            'oa_tkp_price_list_version' => $oa->oaTkpPriceListVersion,
+            'oa_tkp_price_list_year' => $oa->oaTkpPriceListYear,
+            'oa_tkp_price_list_revision' => $oa->oaTkpPriceListRevision,
+            'media_gross' => $oa->mediaGross,
+            'production_gross' => '0.00',
+            'production_nn_invest' => '0.00',
+            'position_discount_amount' => $oa->positionDiscountAmount,
+            'order_discount_amount' => $oa->orderDiscountAmount,
+            'ae_amount' => $oa->aeAmount,
+            'nn_invest' => $oa->nnInvest,
+            'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
+            'fixed_price_nn' => null,
+            'effective_pay_factor_percent' => $oa->effectivePayFactorPercent,
+            'effective_total_discount_percent' => $oa->effectiveDiscountPercent,
+            'sort' => $index,
+        ]);
+    }
+
+    private function deleteSpotChildren(CalculationPosition $position): void
+    {
+        $position->planRows()->delete();
+        $position->timeRanges()->delete();
+        $this->deletePlannerEntries($position);
+        $position->components()->delete();
+        $position->productionLines()->delete();
+    }
+
+    /**
+     * @param  list<OaTkpPlatformAllocationInput>  $allocations
+     */
+    private function syncOaPlatformAllocations(CalculationPosition $position, array $allocations): void
+    {
+        $position->oaPlatformAllocations()->delete();
+
+        foreach ($allocations as $index => $allocation) {
+            CalculationPositionOaPlatformAllocation::query()->create([
+                'calculation_position_id' => $position->id,
+                'oa_platform_id' => $allocation->oaPlatformId,
+                'platform_code' => $allocation->platformCode,
+                'platform_name' => $allocation->platformName,
+                'impressions' => $allocation->impressions,
+                'sort' => $allocation->sort > 0 ? $allocation->sort : (($index + 1) * 10),
+            ]);
+        }
+
+        $position->unsetRelation('oaPlatformAllocations');
+    }
+
+    /**
+     * @param  list<OaTkpTargetingSelectionInput>  $targetings
+     */
+    private function syncOaTargetingSelections(CalculationPosition $position, array $targetings): void
+    {
+        $position->oaTargetingSelections()->delete();
+
+        foreach ($targetings as $index => $targeting) {
+            CalculationPositionOaTargetingSelection::query()->create([
+                'calculation_position_id' => $position->id,
+                'oa_targeting_definition_id' => $targeting->oaTargetingDefinitionId,
+                'targeting_code' => $targeting->code,
+                'targeting_name' => $targeting->name,
+                'targeting_category' => $targeting->category,
+                'tkp_surcharge_snapshot' => $targeting->tkpSurcharge,
+                'targeting_revision_number' => $targeting->revisionNumber,
+                'sort' => $targeting->sort > 0 ? $targeting->sort : (($index + 1) * 10),
+            ]);
+        }
+
+        $position->unsetRelation('oaTargetingSelections');
     }
 
     /**
@@ -739,6 +922,8 @@ final class CalculationWriter
     }
 
     /**
+     * Nur Spot-/SWF-Positionen (PO-CALC-TKP-1D1: OA-TKP-Positionen gehen nie in die Spot-Engine).
+     *
      * @param  array<string, mixed>  $payload
      * @return list<PositionInput>
      */
@@ -748,50 +933,10 @@ final class CalculationWriter
         $inputs = [];
 
         foreach ($resolved as $index => $item) {
-            $payloadPosition = $payload['positions'][$index] ?? [];
-            $positionKey = isset($payloadPosition['id'])
-                ? 'id:'.((int) $payloadPosition['id'])
-                : ($payloadPosition['client_key'] ?? 'new:'.$index);
-
-            $existingPosition = null;
-            if (isset($payloadPosition['id'])) {
-                $existingPosition = $existing?->positions->firstWhere('id', (int) $payloadPosition['id']);
-            } elseif (isset($payloadPosition['client_key'])) {
-                $existingPosition = $existing?->positions->firstWhere('client_key', (string) $payloadPosition['client_key']);
+            if (($item['is_oa_tkp'] ?? false) === true) {
+                continue;
             }
-
-            $lengthSeconds = (int) $item['length_seconds'];
-            $lengthIndex = $this->resolveLengthIndex($lengthSeconds, $existingPosition);
-            $componentInputs = $this->componentInputsFromResolved($item['components']);
-
-            // BL-P5-02a Review: validierte Positionsrabatte ungefiltert an die Engine übergeben.
-            // Medien wendet sie nur bei Träger-is_discountable an; Produktion je Zeilenflag.
-            $inputs[] = new PositionInput(
-                inventoryId: $item['inventory']->id,
-                inventoryName: $item['inventory']->name,
-                positionKey: (string) $positionKey,
-                lengthSeconds: $lengthSeconds,
-                surchargePercent: (string) $item['surcharge_percent'],
-                positionDiscountPercent: $this->effectivePercentFromDiscounts($item['position_discounts']),
-                aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
-                isDiscountable: $item['is_discountable'],
-                isAeEligible: $item['is_ae_eligible'],
-                totalSpotCount: (int) $item['total_spot_count'],
-                spotMethod: $item['spot_method'],
-                rows: $item['rows'],
-                lengthIndex: EngineProfileRegistry::usesAverageLengthWithoutIndex($item['freeze']->engineProfileKey) ? 100 : $lengthIndex,
-                timeRanges: $item['time_ranges'],
-                plannerEntries: $item['planner_entries'],
-                positionDiscounts: $item['position_discounts'],
-                needsSpotRedistribution: $item['needs_spot_redistribution'],
-                components: $componentInputs,
-                componentCalculationStrategy: $item['component_calculation_strategy'],
-                pricingSettlementMode: $item['pricing_settlement_mode'],
-                fixedPriceNn: $item['fixed_price_nn'],
-                engineProfileKey: $item['freeze']->engineProfileKey,
-                productionLines: $item['production_lines'],
-                productionAePercent: $item['production_ae_percent'],
-            );
+            $inputs[] = $this->positionInputFromResolved($payload, (int) $index, $item, $existing);
         }
 
         return $inputs;
@@ -799,22 +944,241 @@ final class CalculationWriter
 
     /**
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $item
+     */
+    private function positionInputFromResolved(array $payload, int $index, array $item, ?Calculation $existing): PositionInput
+    {
+        $payloadPosition = $payload['positions'][$index] ?? [];
+        $positionKey = isset($payloadPosition['id'])
+            ? 'id:'.((int) $payloadPosition['id'])
+            : ($payloadPosition['client_key'] ?? 'new:'.$index);
+
+        $existingPosition = null;
+        if (isset($payloadPosition['id'])) {
+            $existingPosition = $existing?->positions->firstWhere('id', (int) $payloadPosition['id']);
+        } elseif (isset($payloadPosition['client_key'])) {
+            $existingPosition = $existing?->positions->firstWhere('client_key', (string) $payloadPosition['client_key']);
+        }
+
+        $lengthSeconds = (int) $item['length_seconds'];
+        $lengthIndex = $this->resolveLengthIndex($lengthSeconds, $existingPosition);
+        $componentInputs = $this->componentInputsFromResolved($item['components']);
+
+        // BL-P5-02a Review: validierte Positionsrabatte ungefiltert an die Engine übergeben.
+        // Medien wendet sie nur bei Träger-is_discountable an; Produktion je Zeilenflag.
+        return new PositionInput(
+            inventoryId: $item['inventory']->id,
+            inventoryName: $item['inventory']->name,
+            positionKey: (string) $positionKey,
+            lengthSeconds: $lengthSeconds,
+            surchargePercent: (string) $item['surcharge_percent'],
+            positionDiscountPercent: $this->effectivePercentFromDiscounts($item['position_discounts']),
+            aePercent: $item['is_ae_eligible'] ? (string) $item['ae_percent'] : '0',
+            isDiscountable: $item['is_discountable'],
+            isAeEligible: $item['is_ae_eligible'],
+            totalSpotCount: (int) $item['total_spot_count'],
+            spotMethod: $item['spot_method'],
+            rows: $item['rows'],
+            lengthIndex: EngineProfileRegistry::usesAverageLengthWithoutIndex($item['freeze']->engineProfileKey) ? 100 : $lengthIndex,
+            timeRanges: $item['time_ranges'],
+            plannerEntries: $item['planner_entries'],
+            positionDiscounts: $item['position_discounts'],
+            needsSpotRedistribution: $item['needs_spot_redistribution'],
+            components: $componentInputs,
+            componentCalculationStrategy: $item['component_calculation_strategy'],
+            pricingSettlementMode: $item['pricing_settlement_mode'],
+            fixedPriceNn: $item['fixed_price_nn'],
+            engineProfileKey: $item['freeze']->engineProfileKey,
+            productionLines: $item['production_lines'],
+            productionAePercent: $item['production_ae_percent'],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
      */
     public function totalsFromPayload(array $payload, User $user, ?Calculation $existing = null): CalculationTotals
     {
-        $inputs = $this->positionInputsFromPayload($payload, $existing);
+        $resolved = $this->resolvedPositions($payload, $existing);
+        $oaResults = [];
+
+        return $this->totalsFromResolved($resolved, $payload, $user, $existing, $oaResults);
+    }
+
+    /**
+     * Spot-/SWF über CalculationEngine, Normal-TKP über OaTkpNormalEngine (Dispatch per Freeze, nicht Medium-Code).
+     *
+     * @param  list<array<string, mixed>>  $resolved
+     * @param  array<string, mixed>  $payload
+     * @param  array<int, OaTkpPositionResult>  $oaResults  Index → OA-Ergebnis (Out-Parameter für fillAndPersist)
+     */
+    private function totalsFromResolved(
+        array $resolved,
+        array $payload,
+        User $user,
+        ?Calculation $existing,
+        array &$oaResults,
+    ): CalculationTotals {
+        $oaResults = [];
         $target = $payload['target_budget_nn'] ?? null;
-
+        $targetString = $target === null || $target === '' ? null : (string) $target;
+        $limit = $user->discount_limit_percent === null ? null : (string) $user->discount_limit_percent;
         $orderDiscounts = $this->orderDiscountInputs($payload);
+        $orderPercent = $this->effectivePercentFromDiscounts($orderDiscounts);
+        $aeEnabled = (bool) ($payload['ae_enabled'] ?? false);
 
-        return $this->engine->calculate(
-            $inputs,
-            $this->effectivePercentFromDiscounts($orderDiscounts),
-            $target === null || $target === '' ? null : (string) $target,
-            $user->discount_limit_percent === null ? null : (string) $user->discount_limit_percent,
-            $orderDiscounts,
-            (bool) ($payload['ae_enabled'] ?? false),
+        $spotInputs = [];
+        $hasOa = false;
+        foreach ($resolved as $index => $item) {
+            if (($item['is_oa_tkp'] ?? false) === true) {
+                $hasOa = true;
+
+                continue;
+            }
+            $spotInputs[] = $this->positionInputFromResolved($payload, (int) $index, $item, $existing);
+        }
+
+        if (! $hasOa) {
+            return $this->engine->calculate($spotInputs, $orderPercent, $targetString, $limit, $orderDiscounts, $aeEnabled);
+        }
+
+        // Zielbudget wird erst über alle Positionen (Spot + OA) gebildet.
+        $spotTotals = $this->engine->calculate($spotInputs, $orderPercent, null, $limit, $orderDiscounts, $aeEnabled);
+
+        $positions = [];
+        $reasons = $spotTotals->specialApprovalReasons;
+        $mediaGross = $spotTotals->mediaGross;
+        $positionDiscountTotal = $spotTotals->positionDiscountTotal;
+        $orderDiscountTotal = $spotTotals->orderDiscountTotal;
+        $aeTotal = $spotTotals->aeTotal;
+        $nnInvest = $spotTotals->nnInvest;
+        $afterPositionTotal = $spotTotals->afterPositionDiscountTotal;
+        $afterOrderTotal = $spotTotals->afterOrderDiscountTotal;
+        $aeEligibleBase = $spotTotals->aeEligibleBase;
+
+        $spotCursor = 0;
+        foreach ($resolved as $index => $item) {
+            if (($item['is_oa_tkp'] ?? false) !== true) {
+                $positions[] = $spotTotals->positions[$spotCursor];
+                $spotCursor++;
+
+                continue;
+            }
+
+            $oa = $this->oaTkpEngine->calculatePosition($item['oa_input'], $orderDiscounts, $orderPercent, $aeEnabled);
+            $oaResults[(int) $index] = $oa;
+            $positions[] = $this->positionResultFromOa($oa);
+
+            $mediaGross = Decimal::roundMoney(Decimal::add($mediaGross, $oa->mediaGross));
+            $positionDiscountTotal = Decimal::roundMoney(Decimal::add($positionDiscountTotal, $oa->positionDiscountAmount));
+            $orderDiscountTotal = Decimal::roundMoney(Decimal::add($orderDiscountTotal, $oa->orderDiscountAmount));
+            $aeTotal = Decimal::roundMoney(Decimal::add($aeTotal, $oa->aeAmount));
+            $nnInvest = Decimal::roundMoney(Decimal::add($nnInvest, $oa->nnInvest));
+            $afterPositionTotal = Decimal::roundMoney(Decimal::add($afterPositionTotal, $oa->afterPositionDiscount));
+            $afterOrderTotal = Decimal::roundMoney(Decimal::add($afterOrderTotal, $oa->afterOrderDiscount));
+            if ($oa->isAeEligible) {
+                $aeEligibleBase = Decimal::roundMoney(Decimal::add($aeEligibleBase, $oa->afterOrderDiscount));
+            }
+
+            $payloadPosition = $payload['positions'][$index] ?? [];
+            $positionKey = isset($payloadPosition['id'])
+                ? 'id:'.((int) $payloadPosition['id'])
+                : (string) ($payloadPosition['client_key'] ?? 'new:'.$index);
+
+            $reasons = array_merge(
+                $reasons,
+                $this->specialApproval->reasonsForRates(
+                    $oa->effectivePositionDiscountPercent,
+                    $oa->effectiveOrderDiscountPercent,
+                    $oa->effectiveDiscountPercent,
+                    $limit,
+                    null,
+                    $positionKey,
+                    $oa->inventoryName,
+                ),
+            );
+
+            // PO-CALC-TKP-1C1: Under-Min aus Decimals (Vorschau); nach Persist bewertet der Assessor kanonisch neu.
+            if (Decimal::cmp($oa->basisTkp, $oa->minimumTkp, Decimal::PRICE_SCALE) < 0) {
+                $reasons[] = [
+                    'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+                    'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
+                    'position_id' => isset($payloadPosition['id']) ? (int) $payloadPosition['id'] : null,
+                    'position_key' => $positionKey,
+                    'position_label' => $oa->inventoryName,
+                    'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
+                    'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
+                ];
+            }
+        }
+
+        $assessment = SpecialApprovalAssessment::fromReasons($reasons);
+        $roundedTarget = $targetString === null ? null : Decimal::roundMoney($targetString);
+        $budgetDelta = $roundedTarget === null ? null : Decimal::roundMoney(Decimal::sub($roundedTarget, $nnInvest));
+
+        return new CalculationTotals(
+            mediaGross: $mediaGross,
+            positionDiscountTotal: $positionDiscountTotal,
+            orderDiscountTotal: $orderDiscountTotal,
+            aeTotal: $aeTotal,
+            nnInvest: $nnInvest,
+            targetBudgetNn: $roundedTarget,
+            budgetDelta: $budgetDelta,
+            requiresSpecialApproval: $assessment->requiresSpecialApproval,
+            positions: $positions,
+            aeEnabled: $aeEnabled,
+            orderDiscounts: $this->orderDiscountBreakdown($afterPositionTotal, $orderDiscounts),
+            afterPositionDiscountTotal: $afterPositionTotal,
+            afterOrderDiscountTotal: $afterOrderTotal,
+            aeEligibleBase: $aeEligibleBase,
+            specialApprovalReasons: $assessment->reasons,
         );
+    }
+
+    /**
+     * Adapter: OA-Ergebnis → PositionResult (keine Spot-Felder).
+     */
+    private function positionResultFromOa(OaTkpPositionResult $oa): PositionResult
+    {
+        return new PositionResult(
+            mediaGross: $oa->mediaGross,
+            positionDiscountAmount: $oa->positionDiscountAmount,
+            afterPositionDiscount: $oa->afterPositionDiscount,
+            orderDiscountAmount: $oa->orderDiscountAmount,
+            afterOrderDiscount: $oa->afterOrderDiscount,
+            aeAmount: $oa->aeAmount,
+            nnInvest: $oa->nnInvest,
+            effectiveDiscountPercent: $oa->effectiveDiscountPercent,
+            spotCount: 0,
+            lengthIndex: 100,
+            rows: [],
+            pricingSettlementMode: PricingSettlementMode::Normal,
+            effectivePayFactorPercent: $oa->effectivePayFactorPercent,
+        );
+    }
+
+    /**
+     * @param  list<DiscountInput>  $discounts
+     * @return list<array{type: string, label: string, percent: string, amount: string, remaining: string}>
+     */
+    private function orderDiscountBreakdown(string $startAmount, array $discounts): array
+    {
+        $remaining = $startAmount;
+        $rows = [];
+
+        foreach ($discounts as $discount) {
+            $next = Decimal::mul($remaining, Decimal::oneMinusPercent($discount->percent));
+            $rows[] = [
+                'type' => $discount->type->value,
+                'label' => $discount->displayName(),
+                'percent' => Decimal::roundPrice($discount->percent),
+                'amount' => Decimal::roundMoney(Decimal::sub($remaining, $next)),
+                'remaining' => Decimal::roundMoney($next),
+            ];
+            $remaining = $next;
+        }
+
+        return $rows;
     }
 
     /**
@@ -834,6 +1198,19 @@ final class CalculationWriter
                 $existingPosition = $existingById->get((int) $position['id']);
             } elseif (isset($position['client_key'])) {
                 $existingPosition = $existingByClient->get((string) $position['client_key']);
+            }
+
+            // PO-CALC-TKP-1D1: Dispatch über Methode/Freeze (kein Medium-Code-Branching).
+            if (OaTkpWriterPositionResolver::isOaTkpRequest($position, $existingPosition)) {
+                $resolved[] = $this->oaTkpPositions->resolve($position, $existingPosition, (int) $index, $payload);
+
+                continue;
+            }
+
+            if (OaTkpWriterPositionResolver::isStoredOaTkp($existingPosition)) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}" => 'Eine TKP-Position kann nicht auf eine andere Berechnungsmethode umgestellt werden.',
+                ]);
             }
 
             $catalog = $this->catalog->resolvePosition($position, $existingPosition, (int) $index);
@@ -1283,6 +1660,51 @@ final class CalculationWriter
             === $this->normalizePositionsForCompare($this->payloadFromCalculation($calculation)['positions']);
     }
 
+    /**
+     * PO-CALC-TKP-1D1: OA-TKP-Felder gehören zum Header-only-Vergleich (sonst würden
+     * Basis-/Impressions-/Plattform-/Targeting-Änderungen still verworfen).
+     *
+     * @param  array<string, mixed>  $position
+     * @return array<string, mixed>|null
+     */
+    private function normalizeOaTkpForCompare(array $position): ?array
+    {
+        $isOa = (string) ($position['calculation_method_key'] ?? $position['spot_method'] ?? '') === 'tkp';
+        if (! $isOa) {
+            return null;
+        }
+
+        $platforms = [];
+        foreach (is_array($position['oa_platform_allocations'] ?? null) ? $position['oa_platform_allocations'] : [] as $row) {
+            $row = is_array($row) ? $row : [];
+            $platforms[] = [
+                'oa_platform_id' => isset($row['oa_platform_id']) ? (int) $row['oa_platform_id'] : null,
+                'platform_code' => (string) ($row['platform_code'] ?? ''),
+                'impressions' => is_scalar($row['impressions'] ?? null) ? (string) $row['impressions'] : '',
+            ];
+        }
+
+        $targetings = [];
+        foreach (is_array($position['oa_targeting_selections'] ?? null) ? $position['oa_targeting_selections'] : [] as $row) {
+            $row = is_array($row) ? $row : [];
+            $targetings[] = [
+                'oa_targeting_definition_id' => isset($row['oa_targeting_definition_id']) ? (int) $row['oa_targeting_definition_id'] : null,
+                'targeting_code' => (string) ($row['targeting_code'] ?? ''),
+            ];
+        }
+
+        return [
+            'price_year' => isset($position['price_year']) ? (int) $position['price_year'] : null,
+            'impressions' => is_scalar($position['impressions'] ?? null) ? (string) $position['impressions'] : '',
+            'basis_tkp' => $this->normalizeQuantityForCompare($position['basis_tkp'] ?? null),
+            'expected_oa_tkp_price_list_id' => isset($position['expected_oa_tkp_price_list_id'])
+                ? (int) $position['expected_oa_tkp_price_list_id']
+                : null,
+            'oa_platform_allocations' => $platforms,
+            'oa_targeting_selections' => $targetings,
+        ];
+    }
+
     private function normalizeQuantityForCompare(mixed $quantity): string
     {
         if ($quantity === null || $quantity === '') {
@@ -1394,6 +1816,7 @@ final class CalculationWriter
             }
 
             $normalized[] = [
+                'oa_tkp' => $this->normalizeOaTkpForCompare($position),
                 'id' => isset($position['id']) ? (int) $position['id'] : null,
                 'production_lines' => $productionLines,
                 'client_key' => $position['client_key'] ?? null,
@@ -1462,6 +1885,7 @@ final class CalculationWriter
             }
 
             $positions[] = [
+                ...$this->oaTkpPayloadFields($position),
                 'id' => $position->id,
                 'client_key' => $position->client_key,
                 'inventory_id' => $position->inventory_id,
@@ -1538,6 +1962,52 @@ final class CalculationWriter
             'dynamic_field_values' => $this->dynamicFields->headerValuesForPayload($calculation),
             'positions' => $positions,
         ];
+    }
+
+    /**
+     * PO-CALC-TKP-1D1: Reload-Felder für OA-TKP-Positionen (editierbare IDs + serverseitige Anzeige).
+     *
+     * @return array<string, mixed>
+     */
+    private function oaTkpPayloadFields(CalculationPosition $position): array
+    {
+        if (! $this->isOaTkpStoredPosition($position)) {
+            return [];
+        }
+
+        return [
+            'calculation_method_key' => $position->calculation_method_key,
+            'engine_profile_key' => $position->engine_profile_key,
+            'price_year' => $position->oa_tkp_price_list_year,
+            'expected_oa_tkp_price_list_id' => $position->oa_tkp_price_list_id,
+            'impressions' => $position->impressions,
+            'basis_tkp' => $this->tkpDisplay($position->basis_tkp),
+            'list_tkp_snapshot' => $this->tkpDisplay($position->list_tkp_snapshot),
+            'minimum_tkp_snapshot' => $this->tkpDisplay($position->minimum_tkp_snapshot),
+            'final_tkp' => $this->tkpDisplay($position->final_tkp),
+            'oa_platform_allocations' => $position->oaPlatformAllocations->map(
+                fn (CalculationPositionOaPlatformAllocation $allocation): array => [
+                    'oa_platform_id' => $allocation->oa_platform_id,
+                    'platform_code' => $allocation->platform_code,
+                    'impressions' => $allocation->impressions,
+                ],
+            )->values()->all(),
+            'oa_targeting_selections' => $position->oaTargetingSelections->map(
+                fn (CalculationPositionOaTargetingSelection $selection): array => [
+                    'oa_targeting_definition_id' => $selection->oa_targeting_definition_id,
+                    'targeting_code' => $selection->targeting_code,
+                ],
+            )->values()->all(),
+        ];
+    }
+
+    private function tkpDisplay(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Decimal::roundPrice((string) $value);
     }
 
     /**
@@ -2119,6 +2589,8 @@ final class CalculationWriter
             'positions.plannerEntries',
             'positions.components',
             'positions.productionLines',
+            'positions.oaPlatformAllocations',
+            'positions.oaTargetingSelections',
         ];
     }
 
@@ -2392,13 +2864,17 @@ final class CalculationWriter
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function lockInventoriesForPayloadLiveBinding(array $payload): void
+    private function lockInventoriesForPayloadLiveBinding(array $payload, ?Calculation $existing = null): void
     {
         $inventoryIds = [];
         $years = [];
+        $hasOaTkp = false;
         foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
             if (! is_array($position)) {
                 continue;
+            }
+            if (OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)) {
+                $hasOaTkp = true;
             }
             $inventoryId = (int) ($position['inventory_id'] ?? 0);
             if ($inventoryId > 0) {
@@ -2414,6 +2890,19 @@ final class CalculationWriter
         $ids = array_values($inventoryIds);
         sort($ids);
         PriceListYearSelection::lockInventoriesForLiveBinding($ids, $years);
+
+        // PO-CALC-TKP-1D1: OA-TKP-Preislisten (Jahr) vor nicht-lockenden Reads sperren.
+        // Bestehende OA-Positionen ohne Methodenschlüssel im Payload zählen mit (gesperrter Read).
+        if (! $hasOaTkp && $existing !== null) {
+            $hasOaTkp = CalculationPosition::query()
+                ->where('calculation_id', $existing->id)
+                ->where('engine_profile_key', EngineProfileRegistry::PROFILE_OA_TKP)
+                ->lockForUpdate()
+                ->exists();
+        }
+        if ($hasOaTkp) {
+            OaTkpWriterPositionResolver::lockOaPriceListsForYears($years);
+        }
     }
 
     private function assertPersistedPriceListsMatchCurrentCatalog(Calculation $calculation, BudgetProposal $proposal): void

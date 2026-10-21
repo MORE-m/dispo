@@ -316,6 +316,19 @@ Unterobjekte werden typbezogen normalisiert:
   über `SpecialApprovalAssessor` (`oa_tkp_basis_below_minimum`); SoT =
   Decimal-Vergleich `basis_tkp` &lt; `minimum_tkp_snapshot` (kein Live-Lookup;
   Targeting heilt nicht; Partial Selection positionsbezogen),
+- **PO-CALC-TKP-1D1 Writer-Integration:** `CalculationWriter` verarbeitet Positionen mit
+  Freeze `oa_tkp`/`tkp` über `OaTkpWriterPositionResolver` + `OaTkpNormalEngine`
+  (Spot/SWF weiter über `CalculationEngine`; kein Medium-Code-Branching, Berechtigung
+  über aktive Medium-Zuordnung `oa_tkp` × `tkp`). Server-autoritativ: Listen-/Mindest-TKP
+  (Pin bei unverändertem Medium/Inventar/Preisjahr, sonst Rebind auf aktive OA-Revision;
+  `expected_oa_tkp_price_list_id` → 409), Plattformen (`oa_platform_allocations`) und
+  Targetings (`oa_targeting_selections`) aus Stammdaten; Client-`list_tkp`/`minimum_tkp`/
+  `final_tkp`/Aufschlag/Namen werden ignoriert. Positionen: `price_list_id = NULL`,
+  `length_seconds = 0`, `total_spot_count = 0`, kein Plan-/Komponenten-/Produktionspfad;
+  Kinder (`calculation_position_oa_platform_allocations`/`…_targeting_selections`) werden
+  delete+recreate synchronisiert. Sonderfreigabe nach Persist kanonisch über
+  `SpecialApprovalAssessor`. Registry bleibt planned; HTTP/Budget/Standardangebot
+  fail-closed. `OaTkpCalculationPersister` ist nur noch Testsupport.
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),

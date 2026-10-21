@@ -38,6 +38,7 @@ use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\SpotComponentProfileContract;
+use App\Support\Calculation\OaTkpHttpReleaseGuard;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use App\Support\Inventory\InventoryIdentity;
 use App\Support\PriceList\PriceListCalendar;
@@ -94,7 +95,9 @@ class CalculationController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $calculation = $this->writer->create($request->payload(), $user);
+        $payload = $request->payload();
+        OaTkpHttpReleaseGuard::assertAllowed($payload);
+        $calculation = $this->writer->create($payload, $user);
 
         return redirect()
             ->route('calculations.edit', $calculation)
@@ -141,7 +144,9 @@ class CalculationController extends Controller
 
         /** @var User $user */
         $user = $request->user();
-        $this->writer->update($calculation, $request->payload(), $user);
+        $payload = $request->payload();
+        OaTkpHttpReleaseGuard::assertAllowed($payload, $calculation);
+        $this->writer->update($calculation, $payload, $user);
 
         return redirect()
             ->route('calculations.edit', $calculation)
@@ -163,8 +168,11 @@ class CalculationController extends Controller
             $this->authorize('create', Calculation::class);
         }
 
+        $payload = $request->payload();
+        OaTkpHttpReleaseGuard::assertAllowed($payload, $existing);
+
         return response()->json([
-            'totals' => $this->writer->preview($request->payload(), $user, $existing)->toArray(),
+            'totals' => $this->writer->preview($payload, $user, $existing)->toArray(),
         ]);
     }
 
