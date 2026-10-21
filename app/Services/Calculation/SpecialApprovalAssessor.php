@@ -5,7 +5,9 @@ namespace App\Services\Calculation;
 use App\Enums\SpecialApprovalReasonCode;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
+use App\Support\Calculation\EngineProfileRegistry;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Kanonische Sonderfreigabe-Regeln für Kalkulation und Dispo-Snapshot (COM-002).
@@ -193,7 +195,58 @@ final class SpecialApprovalAssessor
         return array_merge(
             $reasons,
             $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
+            $this->oaTkpBelowMinimumReasonsFromStoredPosition($position),
         );
+    }
+
+    /**
+     * PO-CALC-TKP-1C1: Under-Min aus Positions-Snapshot-Decimals (OA-001/002).
+     * Boolean below_minimum_tkp ist nur Marker, nicht kanonisch.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function oaTkpBelowMinimumReasonsFromStoredPosition(CalculationPosition $position): array
+    {
+        if (! $this->isStoredOaTkpPosition($position)) {
+            return [];
+        }
+
+        $basisRaw = $position->basis_tkp;
+        $minimumRaw = $position->minimum_tkp_snapshot;
+        if ($basisRaw === null || $basisRaw === '' || $minimumRaw === null || $minimumRaw === '') {
+            throw ValidationException::withMessages([
+                'positions' => 'OA-TKP-Position ohne gültigen Basis-/Mindest-TKP-Snapshot ist nicht bewertbar.',
+            ]);
+        }
+
+        $basis = Decimal::roundPrice((string) $basisRaw);
+        $minimum = Decimal::roundPrice((string) $minimumRaw);
+
+        if (Decimal::cmp($basis, $minimum, Decimal::PRICE_SCALE) >= 0) {
+            return [];
+        }
+
+        $inventoryName = $position->inventory !== null ? $position->inventory->name : null;
+        $label = $inventoryName
+            ?? (is_string($position->inventory_name) && $position->inventory_name !== ''
+                ? $position->inventory_name
+                : null);
+
+        return [[
+            'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+            'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
+            'position_id' => (int) $position->id,
+            'position_key' => 'id:'.$position->id,
+            'position_label' => $label,
+            'basis_tkp' => $basis,
+            'minimum_tkp' => $minimum,
+        ]];
+    }
+
+    private function isStoredOaTkpPosition(CalculationPosition $position): bool
+    {
+        return (string) ($position->engine_profile_key ?? '') === EngineProfileRegistry::PROFILE_OA_TKP
+            && (string) ($position->calculation_method_key ?? '') === 'tkp';
     }
 
     /**
@@ -283,6 +336,7 @@ final class SpecialApprovalAssessor
             SpecialApprovalReasonCode::PositionDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value,
+            SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
         ];
 
         $inherited = [];
