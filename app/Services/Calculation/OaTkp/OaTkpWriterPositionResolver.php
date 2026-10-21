@@ -10,6 +10,7 @@ use App\Exceptions\PriceListSelectionConflictException;
 use App\Models\AdvertisingMedium;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
+use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\OaPlatform;
@@ -744,7 +745,7 @@ final class OaTkpWriterPositionResolver
         return $inputs;
     }
 
-    private function targetingInputFromStored(object $keep, int $sort): OaTkpTargetingSelectionInput
+    private function targetingInputFromStored(CalculationPositionOaTargetingSelection $keep, int $sort): OaTkpTargetingSelectionInput
     {
         return new OaTkpTargetingSelectionInput(
             code: (string) $keep->targeting_code,
