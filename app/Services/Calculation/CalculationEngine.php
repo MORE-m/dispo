@@ -191,6 +191,10 @@ final class CalculationEngine
             SpotCalculationMethod::FixedPrice => throw new \InvalidArgumentException(
                 'Kalkulationsart '.$position->spotMethod->value.' ist in UX-GATE-B noch nicht implementiert.',
             ),
+            // PO-CALC-TKP-1B: eigener Rechenkern OaTkpNormalEngine — Spot-Engine bleibt fail-closed.
+            SpotCalculationMethod::Tkp => throw new \InvalidArgumentException(
+                'Kalkulationsart tkp gehört zur OA-TKP-Engine (OaTkpNormalEngine), nicht zur Spot-CalculationEngine.',
+            ),
         };
     }
 

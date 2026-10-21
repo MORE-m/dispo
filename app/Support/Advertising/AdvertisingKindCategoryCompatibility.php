@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
  * PO-ALLONGE-1: SwfAllonge ebenso, nur das Medium allonge.
  * PO-SWF-PROMO-1: SwfPromo ebenso, nur das Medium promo_moderation.
  * PO-SWF-CONTEST-1: SwfContest ebenso, nur das Medium contest_payoff.
+ * PO-CALC-TKP-1B: OaTkp an „online_audio“ (interne Persistenz; Bookability planned).
  * Weitere Kinds sind eigene spätere Fachslices.
  */
 final class AdvertisingKindCategoryCompatibility
@@ -28,6 +29,7 @@ final class AdvertisingKindCategoryCompatibility
             CalculationKind::SwfAllonge => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
             CalculationKind::SwfPromo => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
             CalculationKind::SwfContest => [CanonicalAdvertisingCategories::SPECIAL_ADVERTISING_FORMATS],
+            CalculationKind::OaTkp => [CanonicalAdvertisingCategories::ONLINE_AUDIO],
         };
     }
 

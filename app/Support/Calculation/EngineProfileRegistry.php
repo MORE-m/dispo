@@ -59,11 +59,13 @@ final class EngineProfileRegistry
      */
     private const CATALOG = [
         self::PROFILE_OA_TKP => [
-            // PO-CALC-TKP-1A: Stammdaten/Assignment ja; keine Engine-Version, kein Release.
+            // PO-CALC-TKP-1B: Engine v1 implementiert; Pair bleibt planned (kein Bookability-Release).
             'tkp' => [
                 'pair_status' => EngineCapabilityStatus::Planned,
                 'current_released_version' => null,
-                'versions' => [],
+                'versions' => [
+                    'v1' => EngineCapabilityStatus::Implemented,
+                ],
             ],
         ],
         self::PROFILE_SPOT_CLASSIC => [

@@ -17,4 +17,10 @@ enum CalculationKind: string
 
     /** PO-SWF-CONTEST-1: SWF-Medium Gewinnspiel/Pay-Off (nur contest_payoff × Durchschnitt), kein Spotlängenindex. */
     case SwfContest = 'swf_contest';
+
+    /**
+     * PO-CALC-TKP-1B: Online-Audio Normal-TKP (Positions-Freeze-Spiegel).
+     * Medium-kind im Katalog bleibt null; Bookability bleibt planned/fail-closed.
+     */
+    case OaTkp = 'oa_tkp';
 }
