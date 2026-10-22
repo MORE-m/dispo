@@ -28,6 +28,14 @@ type SummaryPosition = {
     nn_invest?: string;
     time_ranges?: SummaryRange[];
     position_discounts?: SummaryDiscount[];
+    method_result?: {
+        method: string;
+        tkp?: {
+            final_tkp?: string;
+            impressions?: number;
+            below_minimum_tkp?: boolean;
+        };
+    } | null;
 };
 
 type SummaryTotals = {
@@ -71,11 +79,18 @@ export function CalculationSummaryPanel({
         inventory_name?: string | null;
         total_spot_count: number;
         length_seconds: number;
+        calculation_method_key?: string | null;
+        impressions_input?: string;
     }[];
     inventories: InventoryRef[];
     className?: string;
 }) {
-    const hasPositions = positions.some((p) => p.total_spot_count > 0);
+    const hasPositions = positions.some(
+        (p) =>
+            p.total_spot_count > 0 ||
+            p.calculation_method_key === 'tkp' ||
+            (p.impressions_input != null && p.impressions_input !== ''),
+    );
     const showLoading = Boolean(loading);
     const showAe = aeEnabled || Number(totals?.ae_total ?? 0) > 0;
     const orderDiscounts = totals?.order_discounts ?? [];
@@ -137,8 +152,42 @@ export function CalculationSummaryPanel({
                                                 <p className="truncate text-sm font-medium">
                                                     {displayName}
                                                 </p>
-                                                {position.total_spot_count >
-                                                0 ? (
+                                                {position.calculation_method_key ===
+                                                'tkp' ? (
+                                                    <p className="text-muted-foreground text-xs">
+                                                        {total?.method_result
+                                                            ?.tkp
+                                                            ?.final_tkp !=
+                                                            null &&
+                                                        total.method_result.tkp
+                                                            .impressions !=
+                                                            null ? (
+                                                            <>
+                                                                {new Intl.NumberFormat(
+                                                                    'de-DE',
+                                                                ).format(
+                                                                    total
+                                                                        .method_result
+                                                                        .tkp
+                                                                        .impressions,
+                                                                )}{' '}
+                                                                Impressions
+                                                                <br />
+                                                                TKP{' '}
+                                                                {
+                                                                    total
+                                                                        .method_result
+                                                                        .tkp
+                                                                        .final_tkp
+                                                                }{' '}
+                                                                €
+                                                            </>
+                                                        ) : (
+                                                            'TKP-Angaben noch unvollständig'
+                                                        )}
+                                                    </p>
+                                                ) : position.total_spot_count >
+                                                  0 ? (
                                                     <p className="text-muted-foreground text-xs">
                                                         {
                                                             position.total_spot_count

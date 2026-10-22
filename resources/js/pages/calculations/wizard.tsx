@@ -104,6 +104,21 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import {
+    buildOaTkpPositionPayload,
+    draftHasTkpPositions,
+    emptyOaTkpDraftFields,
+    formatImpressions,
+    formatTkpDisplay,
+    hydrateOaTkpFromSaved,
+    isOaTkpPreviewReady,
+    isSelectableForCalculationWizardPosition,
+    isTkpPosition,
+    type OaPlatformCatalogRow,
+    type OaTargetingCatalogRow,
+    type OaTkpMethodResult,
+} from '@/lib/oa-tkp-wizard';
+import { OaTkpPositionEditor } from '@/components/oa-tkp-position-editor';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
 import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
@@ -168,6 +183,8 @@ import {
     expectedPriceListIdForYear,
     expectedPriceListIdsForBudget,
     priceYearDirty,
+    requireCurrentPriceYear,
+    requireNextPriceYear,
     resolveDisplayedPriceYearOptions,
     restoreOriginalPriceListPin,
     type OriginalPriceListPin,
@@ -291,6 +308,21 @@ type PositionDraft = {
     saved_inventory_id: number | null;
     saved_advertising_medium_id: number | null;
     saved_price_year: number | null;
+    /** PO-CALC-TKP-1D2b */
+    expected_oa_tkp_price_list_id: number | null;
+    impressions_input: string;
+    basis_tkp: string;
+    list_tkp_snapshot: string | null;
+    minimum_tkp_snapshot: string | null;
+    final_tkp: string | null;
+    targeting_surcharge_total: string | null;
+    below_minimum_tkp: boolean;
+    oa_platform_allocations: import('@/lib/oa-tkp-wizard').OaPlatformAllocationDraft[];
+    oa_targeting_selections: import('@/lib/oa-tkp-wizard').OaTargetingSelectionDraft[];
+    original_oa_tkp_price_list_id: number | null;
+    original_oa_list_tkp: string | null;
+    original_oa_minimum_tkp: string | null;
+    original_oa_price_year: number | null;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -366,6 +398,8 @@ type Catalog = {
             second_price: string;
         }>
     >;
+    oa_platforms?: OaPlatformCatalogRow[];
+    oa_targetings?: OaTargetingCatalogRow[];
 };
 
 type Totals = {
@@ -435,7 +469,16 @@ type Totals = {
         effective_discount_before_ae_percent?: string | null;
         ae_amount?: string | null;
         after_order_discount?: string | null;
+        method_result?: {
+            method: string;
+            tkp?: OaTkpMethodResult;
+        } | null;
     }[];
+    special_approval_reasons?: Array<{
+        code: string;
+        message?: string;
+        [key: string]: unknown;
+    }>;
 };
 
 type Proposal = BudgetSpotProposal;
@@ -556,6 +599,29 @@ type SavedCalculation = {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
         };
+        engine_profile_key?: string | null;
+        expected_oa_tkp_price_list_id?: number | null;
+        impressions?: number | null;
+        basis_tkp?: string | null;
+        list_tkp_snapshot?: string | null;
+        minimum_tkp_snapshot?: string | null;
+        final_tkp?: string | null;
+        targeting_surcharge_total?: string | null;
+        below_minimum_tkp?: boolean;
+        oa_platform_allocations?: Array<{
+            oa_platform_id?: number | null;
+            platform_code?: string | null;
+            platform_name?: string | null;
+            impressions?: number | null;
+        }>;
+        oa_targeting_selections?: Array<{
+            oa_targeting_definition_id?: number | null;
+            targeting_code?: string | null;
+            targeting_name?: string | null;
+            targeting_category?: string | null;
+            tkp_surcharge_snapshot?: string | null;
+            targeting_revision_number?: number | null;
+        }>;
     }[];
 };
 
@@ -776,11 +842,21 @@ function methodOptionsForTemplate(
     };
 }
 
-function firstValidPosition(catalog: Catalog): PositionDraft | null {
-    // ADV-001c4b: erstes aktives, buchbares Medium mit Inventarregel (kein Code-Hardcode).
+function firstValidPosition(
+    catalog: Catalog,
+    oaTkpWizardCapability = false,
+): PositionDraft | null {
+    // 1) regulär released/bookable  2) sonst planned TKP unter Capability
     const preferredMedium =
         catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
-        null;
+        (oaTkpWizardCapability
+            ? (catalog.media.find((item) =>
+                  isSelectableForCalculationWizardPosition(
+                      item,
+                      oaTkpWizardCapability,
+                  ),
+              ) ?? null)
+            : null);
 
     if (!preferredMedium) {
         return null;
@@ -863,6 +939,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                     year,
                 ).find((option) => option.year === year)?.status ?? null,
             ...defaultPricingSettlementDraft(),
+            ...emptyOaTkpDraftFields(year),
         };
     }
 
@@ -971,6 +1048,7 @@ export default function CalculationWizard({
     dispoOrderRevision = null,
     linkedDispoOrders = null,
     standardOffer = null,
+    oa_tkp_wizard_capability = false,
 }: {
     catalog: Catalog;
     component_profiles: ComponentProfilesProp;
@@ -987,6 +1065,7 @@ export default function CalculationWizard({
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
     linkedDispoOrders?: LinkedDispoOrdersProp | null;
+    oa_tkp_wizard_capability?: boolean;
     standardOffer?: {
         mode: 'create' | 'edit';
         offer_id: number | null;
@@ -1007,6 +1086,9 @@ export default function CalculationWizard({
 }) {
     const flash = usePage().props.flash;
     const isStandardOffer = standardOffer !== null;
+    /** Soft-Open nur Kalkulationswizard – nie Standard Offers. */
+    const oaTkpCapabilityEnabled =
+        oa_tkp_wizard_capability === true && !isStandardOffer;
     const [templateTitle, setTemplateTitle] = useState(
         standardOffer?.title ?? 'Standardangebot',
     );
@@ -1427,6 +1509,12 @@ export default function CalculationWizard({
                     production_lines: productionLinesFromSaved(
                         position.production_lines,
                     ),
+                    ...(isTkpPosition({
+                        calculation_method_key:
+                            methodState.calculation_method_key,
+                    })
+                        ? hydrateOaTkpFromSaved(position)
+                        : emptyOaTkpDraftFields(pinnedYear)),
                 };
             });
         }
@@ -1435,7 +1523,7 @@ export default function CalculationWizard({
             return [];
         }
 
-        const first = firstValidPosition(catalog);
+        const first = firstValidPosition(catalog, oaTkpCapabilityEnabled);
         return first
             ? [
                   withForcedProfileComponentsIfNeeded(
@@ -1789,6 +1877,64 @@ export default function CalculationWizard({
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
+                      const dynamicFieldValues = {
+                          period_open: position.period_open,
+                          position_flight_period:
+                              position.flight_period_start ||
+                              position.flight_period_end
+                                  ? {
+                                        start:
+                                            position.flight_period_start || null,
+                                        end:
+                                            position.flight_period_end || null,
+                                    }
+                                  : null,
+                          ...Object.fromEntries(
+                              customPositionTextFieldsFromSchema(
+                                  schemaFieldsForPosition(
+                                      position,
+                                      fieldSchema,
+                                      existingGen3,
+                                  ),
+                              ).map((field) => [
+                                  field.key,
+                                  position.custom_fields[field.key] ?? '',
+                              ]),
+                          ),
+                          ...choiceValuesForPayload(
+                              customPositionChoiceFieldsFromSchema(
+                                  schemaFieldsForPosition(
+                                      position,
+                                      fieldSchema,
+                                      existingGen3,
+                                  ),
+                              ),
+                              position.custom_choice_fields,
+                              new Set(
+                                  Object.keys(position.custom_choice_touched),
+                              ),
+                              position.custom_choice_meta,
+                          ).payload,
+                      };
+
+                      if (isTkpPosition(position)) {
+                          return buildOaTkpPositionPayload({
+                              ...position,
+                              position_discounts: payloadDiscounts(
+                                  position.position_discounts,
+                              ),
+                              dynamic_field_values:
+                                  dynamicFieldValues as Record<
+                                      string,
+                                      | string
+                                      | number
+                                      | boolean
+                                      | null
+                                      | Record<string, string | null>
+                                  >,
+                          });
+                      }
+
                       const timing = positionTimingPayload(
                           position.calculation_method_key,
                           position.time_ranges,
@@ -2007,8 +2153,18 @@ export default function CalculationWizard({
             ? (templateRequestPayload ?? { ...payload, title: templateTitle })
             : payload,
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
-        blocked: busy || proposalLoading,
+        blocked:
+            busy ||
+            proposalLoading ||
+            (!isBudgetSetup &&
+                positions.some(
+                    (position) =>
+                        isTkpPosition(position) &&
+                        !isOaTkpPreviewReady(position),
+                )),
     });
+    const hasTkpPositions = draftHasTkpPositions(positions);
+    const tkpSaveBlocked = hasTkpPositions && !isStandardOffer;
     const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
@@ -2038,11 +2194,24 @@ export default function CalculationWizard({
                 .map((rule) => rule.advertising_medium_id),
         );
 
-        return catalog.media.filter(
-            (medium) =>
-                isSelectableForNewWizardPositions(medium) &&
-                mediumIds.has(medium.id),
-        );
+        const allowTkpSoftOpen =
+            oaTkpCapabilityEnabled &&
+            planningMode === 'manual' &&
+            !isBudgetSetup;
+
+        return catalog.media.filter((medium) => {
+            if (!mediumIds.has(medium.id)) {
+                return false;
+            }
+            if (allowTkpSoftOpen) {
+                return isSelectableForCalculationWizardPosition(
+                    medium,
+                    oaTkpCapabilityEnabled,
+                );
+            }
+
+            return isSelectableForNewWizardPositions(medium);
+        });
     }
 
     const unplannableInventoryIds = useMemo(() => {
@@ -2308,6 +2477,11 @@ export default function CalculationWizard({
                         component_calculation_strategy: componentState.strategy,
                         schema_fingerprint: null,
                         field_schema: null,
+                        ...(methodState.calculation_method_key === 'tkp'
+                            ? isTkpPosition(item)
+                                ? {}
+                                : emptyOaTkpDraftFields(item.price_year)
+                            : emptyOaTkpDraftFields(item.price_year)),
                     };
 
                     if (isSwfLengthMedium(catalog, medium.id)) {
@@ -2342,6 +2516,13 @@ export default function CalculationWizard({
     }
 
     function save() {
+        if (tkpSaveBlocked) {
+            setSaveError(
+                'TKP befindet sich noch in der Vorschauphase. Speichern wird mit der späteren Produktfreigabe aktiviert.',
+            );
+            return;
+        }
+
         if (headerRuntime.integrityError) {
             setSaveError(
                 `Speichern nicht möglich: ${headerRuntime.integrityError}`,
@@ -2817,6 +2998,11 @@ export default function CalculationWizard({
                         existing?.custom_choice_touched ?? {},
                     custom_choice_meta: existing?.custom_choice_meta ?? {},
                     ...defaultPricingSettlementDraft(),
+                    ...emptyOaTkpDraftFields(
+                        proposal.price_year ??
+                            budgetPriceYear ??
+                            defaultPriceYear(catalog, item.inventory_id),
+                    ),
                 };
             }),
         );
@@ -2849,7 +3035,12 @@ export default function CalculationWizard({
     const summaryTotals = displayTotals ?? savedDisplayTotals ?? null;
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
-        catalog.media.some((item) => isSelectableForNewWizardPositions(item));
+        catalog.media.some((item) =>
+            isSelectableForCalculationWizardPosition(
+                item,
+                oaTkpCapabilityEnabled,
+            ),
+        );
     const catalogMissing =
         planningMode === 'manual' &&
         positions.length === 0 &&
@@ -3120,8 +3311,14 @@ export default function CalculationWizard({
                                                         planningMode ===
                                                         'budget'
                                                     }
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        hasTkpPositions
+                                                    }
                                                     onChange={() => {
+                                                        if (hasTkpPositions) {
+                                                            return;
+                                                        }
                                                         setPlanningMode(
                                                             'budget',
                                                         );
@@ -4178,6 +4375,12 @@ export default function CalculationWizard({
                                                                         ...initialTimingFieldsForMethod(
                                                                             key,
                                                                         ),
+                                                                        ...(key ===
+                                                                        'tkp'
+                                                                            ? emptyOaTkpDraftFields(
+                                                                                  position.price_year,
+                                                                              )
+                                                                            : {}),
                                                                     },
                                                                 );
                                                             }}
@@ -4200,6 +4403,68 @@ export default function CalculationWizard({
                                                             }
                                                         />
 
+                                                        {isTkpPosition(
+                                                            position,
+                                                        ) ? (
+                                                            <OaTkpPositionEditor
+                                                                positionIndex={
+                                                                    index
+                                                                }
+                                                                position={
+                                                                    position
+                                                                }
+                                                                platforms={
+                                                                    catalog.oa_platforms ??
+                                                                    []
+                                                                }
+                                                                targetings={
+                                                                    catalog.oa_targetings ??
+                                                                    []
+                                                                }
+                                                                currentPriceYear={requireCurrentPriceYear(
+                                                                    catalog,
+                                                                )}
+                                                                nextPriceYear={requireNextPriceYear(
+                                                                    catalog,
+                                                                )}
+                                                                methodResult={
+                                                                    totals
+                                                                        ?.positions?.[
+                                                                        index
+                                                                    ]
+                                                                        ?.method_result
+                                                                        ?.tkp ??
+                                                                    null
+                                                                }
+                                                                mediaGross={
+                                                                    totals
+                                                                        ?.positions?.[
+                                                                        index
+                                                                    ]
+                                                                        ?.media_gross
+                                                                }
+                                                                fieldErrors={
+                                                                    fieldErrors
+                                                                }
+                                                                canEdit={canEdit}
+                                                                showActivePickers={
+                                                                    oaTkpCapabilityEnabled
+                                                                }
+                                                                onChange={(
+                                                                    patch,
+                                                                ) =>
+                                                                    updatePosition(
+                                                                        index,
+                                                                        patch,
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : null}
+
+                                                        {!isTkpPosition(
+                                                            position,
+                                                        ) ? (
+                                                          <>
                                                         <PricingSettlementSection
                                                             positionIndex={
                                                                 index
@@ -4874,6 +5139,8 @@ export default function CalculationWizard({
                                                                 data-test="preview-loading"
                                                             />
                                                         ) : null}
+                                                          </>
+                                                        ) : null}
                                                     </CardContent>
                                                 </Card>
                                             </section>
@@ -4886,7 +5153,10 @@ export default function CalculationWizard({
                                             className="w-full border-dashed"
                                             onClick={() => {
                                                 const next =
-                                                    firstValidPosition(catalog);
+                                                    firstValidPosition(
+                                                        catalog,
+                                                        oaTkpCapabilityEnabled,
+                                                    );
                                                 if (next) {
                                                     setPositions([
                                                         ...positions,
@@ -5318,11 +5588,22 @@ export default function CalculationWizard({
                                             Zusammenfassung
                                         </CardTitle>
                                         {calculation?.id &&
-                                        canCreateDispoOrder ? (
+                                        canCreateDispoOrder &&
+                                        !hasTkpPositions ? (
                                             <DispoOrderCreateAction
                                                 calculationId={calculation.id}
                                                 revision={dispoOrderRevision}
                                             />
+                                        ) : null}
+                                        {hasTkpPositions ? (
+                                            <p
+                                                className="text-muted-foreground text-xs"
+                                                data-test="oa-tkp-dispo-blocked"
+                                            >
+                                                TKP-Positionen können erst nach
+                                                Abschluss der Dispo-Integration
+                                                übergeben werden.
+                                            </p>
                                         ) : null}
                                     </CardHeader>
                                     <CardContent
@@ -5393,29 +5674,53 @@ export default function CalculationWizard({
                                                                 }
                                                             </p>
                                                             <p className="text-muted-foreground mt-1">
-                                                                {
-                                                                    position.total_spot_count
-                                                                }{' '}
-                                                                Spots à{' '}
-                                                                {
-                                                                    position.length_seconds
-                                                                }
-                                                                s · Pos.-Rab.{' '}
-                                                                {
-                                                                    position.position_discount_percent
-                                                                }
-                                                                % · AE{' '}
-                                                                {
-                                                                    position.ae_percent
-                                                                }
-                                                                %
+                                                                {position.spot_method ===
+                                                                    'tkp' ||
+                                                                (position as { calculation_method_key?: string })
+                                                                    .calculation_method_key ===
+                                                                    'tkp' ? (
+                                                                    <>
+                                                                        TKP-Position
+                                                                        · Brutto{' '}
+                                                                        {money(
+                                                                            position.media_gross,
+                                                                        )}{' '}
+                                                                        · N/N{' '}
+                                                                        {money(
+                                                                            position.nn_invest,
+                                                                        )}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        {
+                                                                            position.total_spot_count
+                                                                        }{' '}
+                                                                        Spots à{' '}
+                                                                        {
+                                                                            position.length_seconds
+                                                                        }
+                                                                        s ·
+                                                                        Pos.-Rab.{' '}
+                                                                        {
+                                                                            position.position_discount_percent
+                                                                        }
+                                                                        % · AE{' '}
+                                                                        {
+                                                                            position.ae_percent
+                                                                        }
+                                                                        %
+                                                                    </>
+                                                                )}
                                                             </p>
                                                             <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                                {(position
-                                                                    .time_ranges
-                                                                    ?.length
-                                                                    ? position.time_ranges
-                                                                    : []
+                                                                {(position.spot_method ===
+                                                                    'tkp'
+                                                                    ? []
+                                                                    : position
+                                                                            .time_ranges
+                                                                            ?.length
+                                                                      ? position.time_ranges
+                                                                      : []
                                                                 ).map(
                                                                     (range) => (
                                                                         <li
@@ -5521,9 +5826,8 @@ export default function CalculationWizard({
                                                 ) : null}
                                                 {displayTotals.requires_special_approval ? (
                                                     <StatusBanner tone="warning">
-                                                        Die persönliche
-                                                        Rabattgrenze ist
-                                                        überschritten.
+                                                        Sonderfreigabe
+                                                        erforderlich.
                                                     </StatusBanner>
                                                 ) : null}
                                                 {positions.map(
@@ -5548,14 +5852,43 @@ export default function CalculationWizard({
                                                                     )}
                                                                 </p>
                                                                 <p className="text-muted-foreground mt-1">
-                                                                    {
-                                                                        position.total_spot_count
-                                                                    }{' '}
-                                                                    Spots à{' '}
-                                                                    {
-                                                                        position.length_seconds
-                                                                    }
-                                                                    s
+                                                                    {isTkpPosition(
+                                                                        position,
+                                                                    ) ? (
+                                                                        <>
+                                                                            Methode
+                                                                            TKP
+                                                                            ·{' '}
+                                                                            {position.impressions_input !==
+                                                                            ''
+                                                                                ? `${formatImpressions(Number(position.impressions_input) || 0)} Impressions`
+                                                                                : 'Impressions offen'}
+                                                                            {result
+                                                                                ?.method_result
+                                                                                ?.tkp
+                                                                                ?.final_tkp
+                                                                                ? ` · TKP ${formatTkpDisplay(result.method_result.tkp.final_tkp)}`
+                                                                                : ''}
+                                                                            {result?.media_gross
+                                                                                ? ` · Brutto ${money(result.media_gross)}`
+                                                                                : ''}
+                                                                            {result?.nn_invest
+                                                                                ? ` · N/N ${money(result.nn_invest)}`
+                                                                                : ''}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            {
+                                                                                position.total_spot_count
+                                                                            }{' '}
+                                                                            Spots
+                                                                            à{' '}
+                                                                            {
+                                                                                position.length_seconds
+                                                                            }
+                                                                            s
+                                                                        </>
+                                                                    )}
                                                                 </p>
                                                                 <ul className="text-muted-foreground mt-2 list-inside list-disc">
                                                                     {(
@@ -5752,26 +6085,40 @@ export default function CalculationWizard({
                             </Button>
                         ) : null}
                         {canEdit && showSaveButton ? (
-                            <Button
-                                type="button"
-                                onClick={save}
-                                disabled={
-                                    busy ||
-                                    schemaStillLoading ||
-                                    headerRuntime.integrityError !== null ||
-                                    (planningMode === 'budget' &&
-                                        positions.length === 0 &&
-                                        !isBudgetSetup)
-                                }
-                                variant={
-                                    step === steps.length - 1
-                                        ? 'default'
-                                        : 'secondary'
-                                }
-                                data-test="wizard-save"
-                            >
-                                Speichern
-                            </Button>
+                            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                                {tkpSaveBlocked ? (
+                                    <p
+                                        className="text-muted-foreground max-w-sm text-right text-xs"
+                                        data-test="oa-tkp-save-blocked"
+                                    >
+                                        TKP befindet sich noch in der
+                                        Vorschauphase. Speichern wird mit der
+                                        späteren Produktfreigabe aktiviert.
+                                    </p>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    onClick={save}
+                                    disabled={
+                                        busy ||
+                                        schemaStillLoading ||
+                                        tkpSaveBlocked ||
+                                        headerRuntime.integrityError !==
+                                            null ||
+                                        (planningMode === 'budget' &&
+                                            positions.length === 0 &&
+                                            !isBudgetSetup)
+                                    }
+                                    variant={
+                                        step === steps.length - 1
+                                            ? 'default'
+                                            : 'secondary'
+                                    }
+                                    data-test="wizard-save"
+                                >
+                                    Speichern
+                                </Button>
+                            </div>
                         ) : null}
                         {isStandardOffer &&
                         canEdit &&
