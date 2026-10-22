@@ -6,6 +6,7 @@ import {
     emptyOaTkpDraftFields,
     hasDuplicatePlatformIds,
     hasDuplicateTargetingCodes,
+    hydrateOaTkpFromSaved,
     isActiveTargetingBlockedByHistorical,
     isOaTkpPreviewReady,
     isSelectableForCalculationWizardPosition,
@@ -128,6 +129,38 @@ describe('oa-tkp-wizard helpers', () => {
                 },
             ]),
         ).toBe(true);
+    });
+
+    it('hydrates saved OA selections as historical', () => {
+        const hydrated = hydrateOaTkpFromSaved({
+            expected_oa_tkp_price_list_id: 10,
+            impressions: 50_000,
+            basis_tkp: '9.0000',
+            list_tkp_snapshot: '12.0000',
+            minimum_tkp_snapshot: '8.0000',
+            price_year: 2026,
+            oa_platform_allocations: [
+                {
+                    oa_platform_id: 3,
+                    platform_code: 'legacy',
+                    platform_name: 'Legacy',
+                    impressions: 50_000,
+                },
+            ],
+            oa_targeting_selections: [
+                {
+                    oa_targeting_definition_id: 4,
+                    targeting_code: 'geo',
+                    targeting_name: 'Geo',
+                    targeting_revision_number: 1,
+                },
+            ],
+        });
+
+        expect(hydrated.oa_platform_allocations[0]?.historical).toBe(true);
+        expect(hydrated.oa_targeting_selections[0]?.historical).toBe(true);
+        expect(hydrated.original_oa_tkp_price_list_id).toBe(10);
+        expect(hydrated.list_tkp_snapshot).toBe('12.0000');
     });
 
     it('detects rebind and restores original pin', () => {
