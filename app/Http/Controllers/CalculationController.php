@@ -365,10 +365,8 @@ class CalculationController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @param  bool  $forCalculationWizard  true = Soft-Open OA-TKP Options/Props unter Capability; false = Standard Offers (kein Soft-Open)
+     * @return array<string, mixed>
      */
     private function wizardProps(Request $request, ?Calculation $calculation, bool $forCalculationWizard = true): array
     {

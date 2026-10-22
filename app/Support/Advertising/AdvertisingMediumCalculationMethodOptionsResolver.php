@@ -90,8 +90,8 @@ final class AdvertisingMediumCalculationMethodOptionsResolver
         }
 
         if ($defaultKey === null && $includeWizardPlannedTkp) {
-            foreach ($methods as $index => $row) {
-                if (($row['is_default'] ?? false) === true) {
+            foreach ($methods as $row) {
+                if ($row['is_default'] === true) {
                     $defaultKey = $row['key'];
                     break;
                 }

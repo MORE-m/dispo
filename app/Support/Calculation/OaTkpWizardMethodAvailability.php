@@ -70,7 +70,9 @@ final class OaTkpWizardMethodAvailability
     {
         $assignments = $medium->calculation_method_mode === CalculationMethodMode::Override
             ? $medium->calculationMethodAssignments
-            : ($medium->category?->calculationMethodAssignments ?? collect());
+            : ($medium->category !== null
+                ? $medium->category->calculationMethodAssignments
+                : collect());
 
         foreach ($assignments as $assignment) {
             if (! (bool) ($assignment->is_active ?? false)) {
