@@ -106,14 +106,16 @@ import {
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
 import {
     buildOaTkpPositionPayload,
+    draftBlocksOaTkpPreview,
     draftHasTkpPositions,
     emptyOaTkpDraftFields,
     formatImpressions,
     formatTkpDisplay,
     hydrateOaTkpFromSaved,
-    isOaTkpPreviewReady,
     isSelectableForCalculationWizardPosition,
     isTkpPosition,
+    oaTkpDraftPatchAfterResolvedMethod,
+    oaTkpDraftPatchOnMethodSelect,
     type OaPlatformCatalogRow,
     type OaTargetingCatalogRow,
     type OaTkpMethodResult,
@@ -2156,12 +2158,7 @@ export default function CalculationWizard({
         blocked:
             busy ||
             proposalLoading ||
-            (!isBudgetSetup &&
-                positions.some(
-                    (position) =>
-                        isTkpPosition(position) &&
-                        !isOaTkpPreviewReady(position),
-                )),
+            (!isBudgetSetup && draftBlocksOaTkpPreview(positions)),
     });
     const hasTkpPositions = draftHasTkpPositions(positions);
     const tkpSaveBlocked = hasTkpPositions && !isStandardOffer;
@@ -2477,11 +2474,11 @@ export default function CalculationWizard({
                         component_calculation_strategy: componentState.strategy,
                         schema_fingerprint: null,
                         field_schema: null,
-                        ...(methodState.calculation_method_key === 'tkp'
-                            ? isTkpPosition(item)
-                                ? {}
-                                : emptyOaTkpDraftFields(item.price_year)
-                            : emptyOaTkpDraftFields(item.price_year)),
+                        ...oaTkpDraftPatchAfterResolvedMethod(
+                            item,
+                            methodState.calculation_method_key,
+                            item.price_year,
+                        ),
                     };
 
                     if (isSwfLengthMedium(catalog, medium.id)) {
@@ -4375,12 +4372,10 @@ export default function CalculationWizard({
                                                                         ...initialTimingFieldsForMethod(
                                                                             key,
                                                                         ),
-                                                                        ...(key ===
-                                                                        'tkp'
-                                                                            ? emptyOaTkpDraftFields(
-                                                                                  position.price_year,
-                                                                              )
-                                                                            : {}),
+                                                                        ...oaTkpDraftPatchOnMethodSelect(
+                                                                            key,
+                                                                            position.price_year,
+                                                                        ),
                                                                     },
                                                                 );
                                                             }}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildOaTkpPositionPayload,
+    draftBlocksOaTkpPreview,
     draftHasTkpPositions,
     emptyOaTkpDraftFields,
     hasDuplicatePlatformIds,
@@ -11,6 +12,8 @@ import {
     isTkpPosition,
     isValidBasisTkpInput,
     needsOaTkpRebind,
+    oaTkpDraftPatchAfterResolvedMethod,
+    oaTkpDraftPatchOnMethodSelect,
     parsePositiveIntegerInput,
     platformAllocationSum,
     restoreOriginalOaTkpPin,
@@ -19,7 +22,9 @@ import {
 describe('oa-tkp-wizard helpers', () => {
     it('detects TKP only by method key', () => {
         expect(isTkpPosition({ calculation_method_key: 'tkp' })).toBe(true);
-        expect(isTkpPosition({ calculation_method_key: 'average' })).toBe(false);
+        expect(isTkpPosition({ calculation_method_key: 'average' })).toBe(
+            false,
+        );
         expect(isTkpPosition({ calculation_method_key: null })).toBe(false);
     });
 
@@ -231,8 +236,49 @@ describe('oa-tkp-wizard helpers', () => {
             ],
         };
         expect(isOaTkpPreviewReady(incomplete)).toBe(false);
+        expect(draftBlocksOaTkpPreview([incomplete])).toBe(true);
 
         incomplete.oa_platform_allocations[0]!.impressions_input = '100000';
         expect(isOaTkpPreviewReady(incomplete)).toBe(true);
+        expect(draftBlocksOaTkpPreview([incomplete])).toBe(false);
+        expect(
+            draftBlocksOaTkpPreview([
+                {
+                    ...emptyOaTkpDraftFields(2026),
+                    calculation_method_key: 'average',
+                    inventory_id: 1,
+                    advertising_medium_id: 2,
+                    price_year: 2026,
+                    saved_inventory_id: null,
+                    saved_advertising_medium_id: null,
+                    saved_price_year: null,
+                },
+            ]),
+        ).toBe(false);
+    });
+
+    it('resolves OA draft patches on method transitions without inventing defaults', () => {
+        const spot = {
+            calculation_method_key: 'average' as string | null,
+        };
+        const tkp = { calculation_method_key: 'tkp' as string | null };
+
+        const toTkp = oaTkpDraftPatchAfterResolvedMethod(spot, 'tkp', 2026);
+        expect(toTkp.impressions_input).toBe('');
+        expect(toTkp.basis_tkp).toBe('');
+        expect(toTkp.oa_platform_allocations).toEqual([]);
+
+        expect(oaTkpDraftPatchAfterResolvedMethod(tkp, 'tkp', 2026)).toEqual(
+            {},
+        );
+
+        const leave = oaTkpDraftPatchAfterResolvedMethod(tkp, 'average', 2026);
+        expect(leave.impressions_input).toBe('');
+        expect(leave.expected_oa_tkp_price_list_id).toBeNull();
+
+        expect(
+            oaTkpDraftPatchOnMethodSelect('tkp', 2026).impressions_input,
+        ).toBe('');
+        expect(oaTkpDraftPatchOnMethodSelect('average', 2026)).toEqual({});
     });
 });

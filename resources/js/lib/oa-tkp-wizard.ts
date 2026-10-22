@@ -167,6 +167,35 @@ export function emptyOaTkpDraftFields(
     };
 }
 
+/**
+ * Medium-/Inventory-Resolve: Zielmethode TKP → OA-Draft nur neu, wenn vorher nicht TKP.
+ * Verlassen von TKP → OA-Felder leeren (kein Restzustand an Spot-Position).
+ */
+export function oaTkpDraftPatchAfterResolvedMethod(
+    previous: Pick<OaTkpPositionFields, 'calculation_method_key'>,
+    nextMethodKey: string | null | undefined,
+    priceYear: number,
+): Partial<OaTkpPositionFields> {
+    if (nextMethodKey === OA_TKP_METHOD_KEY) {
+        return isTkpPosition(previous) ? {} : emptyOaTkpDraftFields(priceYear);
+    }
+
+    return emptyOaTkpDraftFields(priceYear);
+}
+
+/**
+ * Explizite Methodenwahl im Selector: bei TKP immer frisch initialisieren.
+ * Bei Nicht-TKP keine OA-Felder anfassen (Spot-Pfad unverändert).
+ */
+export function oaTkpDraftPatchOnMethodSelect(
+    nextMethodKey: string,
+    priceYear: number,
+): Partial<OaTkpPositionFields> {
+    return nextMethodKey === OA_TKP_METHOD_KEY
+        ? emptyOaTkpDraftFields(priceYear)
+        : {};
+}
+
 export function parsePositiveIntegerInput(raw: string): number | null {
     const trimmed = raw.trim();
     if (trimmed === '' || !/^\d+$/.test(trimmed)) {
@@ -390,6 +419,13 @@ export function draftHasTkpPositions(
     positions: Array<Pick<OaTkpPositionFields, 'calculation_method_key'>>,
 ): boolean {
     return positions.some((position) => isTkpPosition(position));
+}
+
+/** True, wenn mindestens eine TKP-Position noch nicht preview-ready ist. */
+export function draftBlocksOaTkpPreview(
+    positions: OaTkpPositionFields[],
+): boolean {
+    return positions.some((position) => !isOaTkpPreviewReady(position));
 }
 
 export type OaTkpPreviewPayloadPosition = {
