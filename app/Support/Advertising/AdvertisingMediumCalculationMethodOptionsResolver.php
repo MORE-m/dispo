@@ -7,21 +7,31 @@ use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\CalculationMethod;
+use App\Support\Calculation\OaTkpWizardMethodAvailability;
 
 /**
  * ADV-001c4a: auswählbare Berechnungsmethoden eines Werbemittels.
  *
  * Selectability ausschließlich über {@see AdvertisingMediumLiveBookability}
  * (keine parallele Released-/Buchbarkeitsdefinition). Unabhängig vom Inventar.
+ *
+ * PO-CALC-TKP-1D2a: optional Soft-Open für planned TKP nur im Kalkulationswizard
+ * ({@see OaTkpWizardMethodAvailability}), nicht für Standard Offers / Admin.
  */
 final class AdvertisingMediumCalculationMethodOptionsResolver
 {
     public function __construct(
         private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
+        private readonly OaTkpWizardMethodAvailability $oaTkpWizardAvailability = new OaTkpWizardMethodAvailability,
     ) {}
 
-    public function resolve(AdvertisingMedium $medium): AdvertisingMediumCalculationMethodOptions
-    {
+    /**
+     * @param  bool  $includeWizardPlannedTkp  Nur Kalkulationswizard: Capability Soft-Open für OA-TKP.
+     */
+    public function resolve(
+        AdvertisingMedium $medium,
+        bool $includeWizardPlannedTkp = false,
+    ): AdvertisingMediumCalculationMethodOptions {
         $medium->loadMissing([
             'category',
             'defaultCalculationMethod',
@@ -58,6 +68,14 @@ final class AdvertisingMediumCalculationMethodOptionsResolver
             ];
         }
 
+        if ($includeWizardPlannedTkp) {
+            $tkpOption = $this->oaTkpWizardAvailability->optionForMedium($medium);
+            if ($tkpOption !== null && ! isset($seen[$tkpOption['key']])) {
+                $seen[$tkpOption['key']] = true;
+                $methods[] = $tkpOption;
+            }
+        }
+
         $defaultKey = null;
         $defaultEvaluation = $this->liveBookability->evaluate($medium, null);
         if ($defaultEvaluation->isBookableForNewPositions) {
@@ -66,6 +84,15 @@ final class AdvertisingMediumCalculationMethodOptionsResolver
                 if ($row['key'] === $candidateDefault) {
                     $defaultKey = $candidateDefault;
                     $methods[$index]['is_default'] = true;
+                    break;
+                }
+            }
+        }
+
+        if ($defaultKey === null && $includeWizardPlannedTkp) {
+            foreach ($methods as $row) {
+                if ($row['is_default'] === true) {
+                    $defaultKey = $row['key'];
                     break;
                 }
             }

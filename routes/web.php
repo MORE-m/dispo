@@ -40,6 +40,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('kalkulationen/neu', [CalculationController::class, 'create'])->name('calculations.create');
     Route::post('kalkulationen', [CalculationController::class, 'store'])->name('calculations.store');
     Route::post('kalkulationen/vorschau', [CalculationController::class, 'preview'])->name('calculations.preview');
+    Route::get('kalkulationen/oa-tkp/pricing-metadata', [CalculationController::class, 'oaTkpPricingMetadata'])
+        ->name('calculations.oa-tkp.pricing-metadata');
     Route::post('kalkulationen/budget-vorschlag', [CalculationController::class, 'proposeBudget'])->name('calculations.budget-propose');
     Route::post('kalkulationen/feldschema', [CalculationController::class, 'fieldSchema'])
         ->name('calculations.field-schema');

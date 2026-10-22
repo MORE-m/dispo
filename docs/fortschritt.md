@@ -1,9 +1,15 @@
 # Fortschritt V1
 
-Stand: 21. Oktober 2026 – **PO-CALC-TKP-1D1** Nachzug auf Feature-Branch:
+Stand: 22. Oktober 2026 – **PO-CALC-TKP-1D2a** auf Feature-Branch:
+D2a stellt TKP Preview-/Metadata-/Reload-Verträge bereit. Registry bleibt planned;
+HTTP Store/Update bleiben geschlossen; React TKP Editor folgt in D2b.
+Capability `dispo.oa_tkp_wizard_capability` (Default false). Soft-Open nur Preview/
+Method-Options (Calc-Wizard)/Metadata. Dok: `docs/readiness/PO-CALC-TKP-1D2a-auftrag-2026-10-22.md`.
+
+Stand davor: 21. Oktober 2026 – **PO-CALC-TKP-1D1** auf `main` (PR #171):
 Dispo-Handoff für `oa_tkp`/`tkp` fail-closed bis D3; Expected-Token analog Spot;
 Targeting code-only hält historischen Pin; Lock-Jahre inkl. gepinnter Nicht-Current-
-Jahre. Writer-Integration unverändert; Registry planned; kein Wizard/UI/D3/Release.
+Jahre. Writer-Integration; Registry planned; kein Wizard/UI/D3/Release.
 Dok: `docs/readiness/PO-CALC-TKP-1D1-auftrag-2026-10-21.md`.
 
 Stand davor: 21. Oktober 2026 – **PO-CALC-TKP-1C1** auf Feature-Branch (Draft-PR):
