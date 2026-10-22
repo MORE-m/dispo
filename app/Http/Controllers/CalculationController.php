@@ -25,6 +25,8 @@ use App\Models\DispoOrder;
 use App\Models\FieldDefinition;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
+use App\Models\OaPlatform;
+use App\Models\OaTargetingDefinition;
 use App\Models\PriceList;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
@@ -32,6 +34,9 @@ use App\Services\Audit\AuditLogger;
 use App\Services\Calculation\BudgetProposalFingerprint;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
+use App\Services\Calculation\Decimal;
+use App\Services\Calculation\OaTkp\OaTkpPricingMetadataService;
+use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
 use App\Services\DynamicField\CalculationDynamicFieldWriter;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
@@ -39,6 +44,7 @@ use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\Calculation\OaTkpHttpReleaseGuard;
+use App\Support\Calculation\OaTkpWizardCapability;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use App\Support\Inventory\InventoryIdentity;
 use App\Support\PriceList\PriceListCalendar;
@@ -64,6 +70,7 @@ class CalculationController extends Controller
         private readonly ConfigurationSnapshotFreezeService $freeze,
         private readonly AdvertisingMediumLiveBookability $liveBookability = new AdvertisingMediumLiveBookability,
         private readonly AdvertisingMediumCalculationMethodOptionsResolver $methodOptionsResolver = new AdvertisingMediumCalculationMethodOptionsResolver,
+        private readonly OaTkpPricingMetadataService $oaTkpPricingMetadata = new OaTkpPricingMetadataService,
     ) {}
 
     public function index(Request $request): Response
@@ -86,7 +93,7 @@ class CalculationController extends Controller
     {
         $this->authorize('create', Calculation::class);
 
-        return Inertia::render('calculations/wizard', $this->wizardProps($request, null));
+        return Inertia::render('calculations/wizard', $this->wizardProps($request, null, forCalculationWizard: true));
     }
 
     public function store(CalculationPayloadRequest $request): RedirectResponse
@@ -96,7 +103,7 @@ class CalculationController extends Controller
         /** @var User $user */
         $user = $request->user();
         $payload = $request->payload();
-        OaTkpHttpReleaseGuard::assertAllowed($payload);
+        OaTkpHttpReleaseGuard::assertMutationAllowed($payload);
         $calculation = $this->writer->create($payload, $user);
 
         return redirect()
@@ -116,6 +123,8 @@ class CalculationController extends Controller
             'positions.inventory',
             'positions.advertisingMedium',
             'positions.priceList',
+            'positions.oaPlatformAllocations',
+            'positions.oaTargetingSelections',
             'positions.fieldValues.snapshotFieldDefinition',
             'positions.effectiveConfigurationSnapshot.fieldDefinitions',
             'positions.effectiveConfigurationSnapshot.rules',
@@ -125,17 +134,19 @@ class CalculationController extends Controller
             'fieldValues.snapshotFieldDefinition',
         ]);
 
-        return Inertia::render('calculations/wizard', $this->wizardProps($request, $calculation));
+        return Inertia::render('calculations/wizard', $this->wizardProps($request, $calculation, forCalculationWizard: true));
     }
 
     /**
      * Shared Inertia props for Kalkulations- und Standardangebots-Wizard.
      *
+     * Standard Offers: kein OA-TKP Soft-Open (Capability beeinflusst SO nicht).
+     *
      * @return array<string, mixed>
      */
     public function buildWizardProps(Request $request, ?Calculation $calculation = null): array
     {
-        return $this->wizardProps($request, $calculation);
+        return $this->wizardProps($request, $calculation, forCalculationWizard: false);
     }
 
     public function update(CalculationPayloadRequest $request, Calculation $calculation): RedirectResponse
@@ -145,7 +156,7 @@ class CalculationController extends Controller
         /** @var User $user */
         $user = $request->user();
         $payload = $request->payload();
-        OaTkpHttpReleaseGuard::assertAllowed($payload, $calculation);
+        OaTkpHttpReleaseGuard::assertMutationAllowed($payload, $calculation);
         $this->writer->update($calculation, $payload, $user);
 
         return redirect()
@@ -169,11 +180,33 @@ class CalculationController extends Controller
         }
 
         $payload = $request->payload();
-        OaTkpHttpReleaseGuard::assertAllowed($payload, $existing);
+        OaTkpHttpReleaseGuard::assertPreviewAllowed($payload, $existing);
 
         return response()->json([
             'totals' => $this->writer->preview($payload, $user, $existing)->toArray(),
         ]);
+    }
+
+    /**
+     * PO-CALC-TKP-1D2a: readonly OA-TKP Pricing Metadata (Expected-Token-Kandidat für Rebind).
+     */
+    public function oaTkpPricingMetadata(Request $request): JsonResponse
+    {
+        $this->authorize('create', Calculation::class);
+
+        $validated = $request->validate([
+            'advertising_medium_id' => ['required', 'integer', 'min:1'],
+            'inventory_id' => ['required', 'integer', 'min:1'],
+            'price_year' => ['nullable', 'integer'],
+        ]);
+
+        $metadata = $this->oaTkpPricingMetadata->resolve(
+            (int) $validated['advertising_medium_id'],
+            (int) $validated['inventory_id'],
+            isset($validated['price_year']) ? (int) $validated['price_year'] : null,
+        );
+
+        return response()->json(['metadata' => $metadata]);
     }
 
     /**
@@ -334,9 +367,43 @@ class CalculationController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function wizardProps(Request $request, ?Calculation $calculation): array
+    /**
+     * @param  bool  $forCalculationWizard  true = Soft-Open OA-TKP Options/Props unter Capability; false = Standard Offers (kein Soft-Open)
+     */
+    private function wizardProps(Request $request, ?Calculation $calculation, bool $forCalculationWizard = true): array
     {
-        $calculation?->loadMissing(['positions.planRows', 'positions.timeRanges', 'positions.plannerEntries', 'positions.components', 'positions.discounts', 'positions.productionLines', 'positions.inventory', 'orderDiscounts', 'budgetProposals']);
+        $calculation?->loadMissing([
+            'positions.planRows',
+            'positions.timeRanges',
+            'positions.plannerEntries',
+            'positions.components',
+            'positions.discounts',
+            'positions.productionLines',
+            'positions.inventory',
+            'positions.oaPlatformAllocations',
+            'positions.oaTargetingSelections',
+            'orderDiscounts',
+            'budgetProposals',
+        ]);
+
+        $includeWizardPlannedTkp = $forCalculationWizard
+            && OaTkpWizardCapability::allowsWizardPreviewSurface()
+            && ! OaTkpWizardCapability::pairIsReleased();
+
+        $oaReloadByPositionId = [];
+        if ($calculation !== null) {
+            foreach ($this->writer->payloadFromCalculation($calculation)['positions'] ?? [] as $reloadPosition) {
+                if (! is_array($reloadPosition) || ! isset($reloadPosition['id'])) {
+                    continue;
+                }
+                if (! OaTkpWriterPositionResolver::isStoredOaTkp(
+                    $calculation->positions->firstWhere('id', (int) $reloadPosition['id']),
+                )) {
+                    continue;
+                }
+                $oaReloadByPositionId[(int) $reloadPosition['id']] = $reloadPosition;
+            }
+        }
 
         $latestBudgetProposal = null;
         $appliedBudgetProposal = null;
@@ -434,9 +501,11 @@ class CalculationController extends Controller
             ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id', 'component_profile']);
 
         $media = $activeMedia->concat($historicalMedia)->values()->map(
-            function (AdvertisingMedium $medium): array {
+            function (AdvertisingMedium $medium) use ($includeWizardPlannedTkp): array {
                 $bookability = $this->liveBookability->payloadForMedium($medium);
-                $methodOptions = $this->methodOptionsResolver->resolve($medium)->toPayload();
+                $methodOptions = $this->methodOptionsResolver
+                    ->resolve($medium, includeWizardPlannedTkp: $includeWizardPlannedTkp)
+                    ->toPayload();
 
                 return [
                     'id' => $medium->id,
@@ -591,6 +660,41 @@ class CalculationController extends Controller
         $inventoryIds = $inventories->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $priceYearsByInventory = PriceListYearSelection::optionsByInventoryIds($inventoryIds);
 
+        $oaCatalog = $forCalculationWizard && OaTkpWizardCapability::allowsWizardPreviewSurface()
+            ? [
+                'oa_platforms' => OaPlatform::query()
+                    ->active()
+                    ->get(['id', 'code', 'name', 'sort'])
+                    ->map(fn (OaPlatform $platform): array => [
+                        'id' => (int) $platform->id,
+                        'code' => (string) $platform->code,
+                        'name' => (string) $platform->name,
+                        'sort' => (int) $platform->sort,
+                    ])
+                    ->values()
+                    ->all(),
+                'oa_targetings' => OaTargetingDefinition::query()
+                    ->active()
+                    ->orderBy('category')
+                    ->orderBy('name')
+                    ->orderBy('code')
+                    ->get(['id', 'code', 'name', 'category', 'tkp_surcharge', 'revision_number'])
+                    ->map(fn (OaTargetingDefinition $targeting): array => [
+                        'id' => (int) $targeting->id,
+                        'code' => (string) $targeting->code,
+                        'name' => (string) $targeting->name,
+                        'category' => $targeting->category->value,
+                        'tkp_surcharge' => Decimal::roundPrice((string) $targeting->tkp_surcharge),
+                        'revision_number' => (int) $targeting->revision_number,
+                    ])
+                    ->values()
+                    ->all(),
+            ]
+            : [
+                'oa_platforms' => [],
+                'oa_targetings' => [],
+            ];
+
         return [
             'catalog' => [
                 'inventories' => $inventories,
@@ -603,7 +707,10 @@ class CalculationController extends Controller
                 ),
                 'current_price_year' => PriceListCalendar::currentYear(),
                 'next_price_year' => PriceListCalendar::nextYear(),
+                'oa_platforms' => $oaCatalog['oa_platforms'],
+                'oa_targetings' => $oaCatalog['oa_targetings'],
             ],
+            'oa_tkp_wizard_capability' => OaTkpWizardCapability::isEnabled(),
             'component_profiles' => $this->componentProfilesProp(),
             'dayGroups' => DayGroup::options(),
             'discountTypes' => DiscountType::options(),
@@ -635,13 +742,15 @@ class CalculationController extends Controller
                     'custom_label' => $discount->custom_label,
                     'percent' => (string) $discount->percent,
                 ])->all(),
-                'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($calculation): array {
+                'positions' => $calculation->positions->map(function (CalculationPosition $position) use ($calculation, $oaReloadByPositionId): array {
                     $snapshot = $calculation->configurationSnapshot;
                     $positionFieldSchema = $this->positionFieldSchemaProp($calculation, $position);
                     $position->loadMissing('priceList');
                     $pinnedList = $position->priceList;
+                    $isOa = OaTkpWriterPositionResolver::isStoredOaTkp($position);
+                    $oaReload = $oaReloadByPositionId[(int) $position->id] ?? [];
 
-                    return [
+                    $base = [
                         'id' => $position->id,
                         'client_key' => $position->client_key,
                         'inventory_id' => $position->inventory_id,
@@ -666,7 +775,9 @@ class CalculationController extends Controller
                         ])->values()->all(),
                         'total_spot_count' => $position->total_spot_count,
                         'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
-                        'price_year' => $pinnedList !== null ? (int) $pinnedList->year : null,
+                        'price_year' => $isOa
+                            ? ($oaReload['price_year'] ?? $position->oa_tkp_price_list_year)
+                            : ($pinnedList !== null ? (int) $pinnedList->year : null),
                         'price_list_version' => $position->price_list_version,
                         'price_list_status' => $pinnedList?->status?->value,
                         'expected_price_list_id' => $position->price_list_id,
@@ -714,6 +825,25 @@ class CalculationController extends Controller
                             ? ['period_open' => true]
                             : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
                     ];
+
+                    if (! $isOa) {
+                        return $base;
+                    }
+
+                    // Kanonischer Reload aus payloadFromCalculation (eine Quelle).
+                    return array_merge($base, [
+                        'engine_profile_key' => $oaReload['engine_profile_key'] ?? $position->engine_profile_key,
+                        'expected_oa_tkp_price_list_id' => $oaReload['expected_oa_tkp_price_list_id'] ?? $position->oa_tkp_price_list_id,
+                        'impressions' => $oaReload['impressions'] ?? $position->impressions,
+                        'basis_tkp' => $oaReload['basis_tkp'] ?? null,
+                        'list_tkp_snapshot' => $oaReload['list_tkp_snapshot'] ?? null,
+                        'minimum_tkp_snapshot' => $oaReload['minimum_tkp_snapshot'] ?? null,
+                        'final_tkp' => $oaReload['final_tkp'] ?? null,
+                        'targeting_surcharge_total' => $oaReload['targeting_surcharge_total'] ?? null,
+                        'below_minimum_tkp' => $oaReload['below_minimum_tkp'] ?? (bool) $position->below_minimum_tkp,
+                        'oa_platform_allocations' => $oaReload['oa_platform_allocations'] ?? [],
+                        'oa_targeting_selections' => $oaReload['oa_targeting_selections'] ?? [],
+                    ]);
                 })->all(),
             ],
             'savedSummary' => $savedSummary,

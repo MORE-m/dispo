@@ -1136,7 +1136,7 @@ final class CalculationWriter
     }
 
     /**
-     * Adapter: OA-Ergebnis → PositionResult (keine Spot-Felder).
+     * Adapter: OA-Ergebnis → PositionResult (Commercial generisch + additive method_result).
      */
     private function positionResultFromOa(OaTkpPositionResult $oa): PositionResult
     {
@@ -1154,6 +1154,19 @@ final class CalculationWriter
             rows: [],
             pricingSettlementMode: PricingSettlementMode::Normal,
             effectivePayFactorPercent: $oa->effectivePayFactorPercent,
+            methodResult: [
+                'method' => OaTkpWriterPositionResolver::METHOD_KEY,
+                'tkp' => [
+                    'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
+                    'list_tkp' => Decimal::roundPrice($oa->listTkp),
+                    'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
+                    'targeting_surcharge_total' => Decimal::roundPrice($oa->targetingSurchargeTotal),
+                    'final_tkp' => Decimal::roundPrice($oa->finalTkp),
+                    'below_minimum_tkp' => $oa->belowMinimumTkp,
+                    'impressions' => $oa->impressions,
+                    'price_year' => $oa->oaTkpPriceListYear,
+                ],
+            ],
         );
     }
 
@@ -1985,17 +1998,27 @@ final class CalculationWriter
             'list_tkp_snapshot' => $this->tkpDisplay($position->list_tkp_snapshot),
             'minimum_tkp_snapshot' => $this->tkpDisplay($position->minimum_tkp_snapshot),
             'final_tkp' => $this->tkpDisplay($position->final_tkp),
+            'targeting_surcharge_total' => $this->tkpDisplay($position->targeting_surcharge_total),
+            'below_minimum_tkp' => (bool) $position->below_minimum_tkp,
+            // Historical Snapshots für Edit-Anzeige (auch wenn Stammdatum inactive).
             'oa_platform_allocations' => $position->oaPlatformAllocations->map(
                 fn (CalculationPositionOaPlatformAllocation $allocation): array => [
                     'oa_platform_id' => $allocation->oa_platform_id,
                     'platform_code' => $allocation->platform_code,
+                    'platform_name' => $allocation->platform_name,
                     'impressions' => $allocation->impressions,
+                    'sort' => (int) $allocation->sort,
                 ],
             )->values()->all(),
             'oa_targeting_selections' => $position->oaTargetingSelections->map(
                 fn (CalculationPositionOaTargetingSelection $selection): array => [
                     'oa_targeting_definition_id' => $selection->oa_targeting_definition_id,
                     'targeting_code' => $selection->targeting_code,
+                    'targeting_name' => $selection->targeting_name,
+                    'targeting_category' => $selection->targeting_category,
+                    'tkp_surcharge_snapshot' => $this->tkpDisplay($selection->tkp_surcharge_snapshot),
+                    'targeting_revision_number' => (int) $selection->targeting_revision_number,
+                    'sort' => (int) $selection->sort,
                 ],
             )->values()->all(),
         ];

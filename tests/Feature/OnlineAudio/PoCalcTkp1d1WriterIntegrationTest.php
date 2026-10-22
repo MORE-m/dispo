@@ -109,21 +109,14 @@ class PoCalcTkp1d1WriterIntegrationTest extends TestCase
         $this->assertSame('12.0000', $reloadedPosition['list_tkp_snapshot']);
         $this->assertSame('8.0000', $reloadedPosition['minimum_tkp_snapshot']);
         $this->assertSame('12.0000', $reloadedPosition['final_tkp']);
-        $this->assertSame(
-            [[
-                'oa_platform_id' => (int) $ctx['platform']->id,
-                'platform_code' => 'fixture_plat_a',
-                'impressions' => 100_000,
-            ]],
-            $reloadedPosition['oa_platform_allocations'],
-        );
-        $this->assertSame(
-            [[
-                'oa_targeting_definition_id' => (int) $ctx['targeting']->id,
-                'targeting_code' => 'fixture_tgt',
-            ]],
-            $reloadedPosition['oa_targeting_selections'],
-        );
+        $this->assertSame((int) $ctx['platform']->id, $reloadedPosition['oa_platform_allocations'][0]['oa_platform_id']);
+        $this->assertSame('fixture_plat_a', $reloadedPosition['oa_platform_allocations'][0]['platform_code']);
+        $this->assertSame('Fixture Platform A', $reloadedPosition['oa_platform_allocations'][0]['platform_name']);
+        $this->assertSame(100_000, $reloadedPosition['oa_platform_allocations'][0]['impressions']);
+        $this->assertSame((int) $ctx['targeting']->id, $reloadedPosition['oa_targeting_selections'][0]['oa_targeting_definition_id']);
+        $this->assertSame('fixture_tgt', $reloadedPosition['oa_targeting_selections'][0]['targeting_code']);
+        $this->assertSame('Fixture Targeting', $reloadedPosition['oa_targeting_selections'][0]['targeting_name']);
+        $this->assertSame('2.0000', $reloadedPosition['oa_targeting_selections'][0]['tkp_surcharge_snapshot']);
 
         // Reload-Roundtrip ohne Änderung: gleiche Beträge (Header-only-Pfad bleibt Pin).
         $reloaded['lock_version'] = $calculation->lock_version;

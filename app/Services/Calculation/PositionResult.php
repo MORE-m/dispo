@@ -48,6 +48,13 @@ final readonly class PositionResult
         public string $productionOrderDiscountAmount = '0.00',
         public string $productionAeAmount = '0.00',
         public string $productionAeEligibleBase = '0.00',
+        /**
+         * PO-CALC-TKP-1D2a: additive methodenspezifische Preview-Details.
+         * Spot/SWF: null. OA-TKP: { method: 'tkp', tkp: {...} }.
+         *
+         * @var array{method: string, tkp?: array<string, mixed>}|null
+         */
+        public ?array $methodResult = null,
     ) {}
 
     /**
@@ -95,6 +102,8 @@ final readonly class PositionResult
                 static fn (ProductionLineResult $line): array => $line->toArray(),
                 $this->productionLines,
             ),
+            // Additive; bestehende Clients ignorieren unbekannte Keys.
+            'method_result' => $this->methodResult,
         ];
     }
 }

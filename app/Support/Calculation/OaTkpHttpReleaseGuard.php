@@ -2,17 +2,16 @@
 
 namespace App\Support\Calculation;
 
-use App\Enums\EngineCapabilityStatus;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use Illuminate\Validation\ValidationException;
 
 /**
- * PO-CALC-TKP-1D1: HTTP bleibt fail-closed, solange das Pair oa_tkp × tkp nicht Released ist.
+ * PO-CALC-TKP-1D1/1D2a: HTTP-Gates für Normal-TKP.
  *
- * Der CalculationWriter kann Normal-TKP intern verarbeiten (Tests/Services); Preview,
- * Store und Update über HTTP weisen TKP weiterhin mit 422 ab.
+ * Preview kann unter {@see OaTkpWizardCapability} soft-offen sein (Pair bleibt planned).
+ * Store/Update bleiben bis Domain-Release fail-closed – Capability öffnet Persistenz nicht.
  */
 final class OaTkpHttpReleaseGuard
 {
@@ -21,33 +20,42 @@ final class OaTkpHttpReleaseGuard
     /**
      * @param  array<string, mixed>  $payload
      */
-    public static function assertAllowed(array $payload, ?Calculation $existing = null): void
+    public static function assertPreviewAllowed(array $payload, ?Calculation $existing = null): void
     {
-        if (EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, OaTkpWriterPositionResolver::METHOD_KEY)
-            === EngineCapabilityStatus::Released
-        ) {
+        if (OaTkpWizardCapability::allowsWizardPreviewSurface()) {
             return;
         }
 
-        foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
-            if (is_array($position) && OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)) {
-                self::reject();
-            }
+        self::rejectIfTkpPresent($payload, $existing);
+    }
+
+    /**
+     * HTTP Create/Update: nur bei Registry-Release.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function assertMutationAllowed(array $payload, ?Calculation $existing = null): void
+    {
+        if (OaTkpWizardCapability::allowsHttpMutation()) {
+            return;
         }
 
-        if ($existing !== null) {
-            $existing->loadMissing('positions');
-            if ($existing->positions->contains(
-                fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position),
-            )) {
-                self::reject();
-            }
-        }
+        self::rejectIfTkpPresent($payload, $existing);
+    }
+
+    /**
+     * @deprecated Use assertMutationAllowed / assertPreviewAllowed. Kept for call-site clarity during D2a.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public static function assertAllowed(array $payload, ?Calculation $existing = null): void
+    {
+        self::assertMutationAllowed($payload, $existing);
     }
 
     /**
      * Budgetvorschlag/-übernahme ist Spot-only: TKP im Payload oder in Bestandspositionen
-     * wird unabhängig vom Release-Status abgewiesen.
+     * wird unabhängig von Release und Wizard-Capability abgewiesen.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -65,6 +73,27 @@ final class OaTkpHttpReleaseGuard
                 fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position),
             )) {
                 self::rejectBudget();
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private static function rejectIfTkpPresent(array $payload, ?Calculation $existing): void
+    {
+        foreach (is_array($payload['positions'] ?? null) ? $payload['positions'] : [] as $position) {
+            if (is_array($position) && OaTkpWriterPositionResolver::payloadSignalsOaTkp($position)) {
+                self::reject();
+            }
+        }
+
+        if ($existing !== null) {
+            $existing->loadMissing('positions');
+            if ($existing->positions->contains(
+                fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position),
+            )) {
+                self::reject();
             }
         }
     }

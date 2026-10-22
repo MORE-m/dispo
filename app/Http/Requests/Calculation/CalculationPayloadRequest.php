@@ -257,7 +257,19 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.engine_profile_key' => ['prohibited'],
             'positions.*.calculation_method_name' => ['prohibited'],
             'positions.*.algorithm_version' => ['prohibited'],
-            'positions.*.length_seconds' => ['required', 'integer', 'min:1', 'max:3600'],
+            // PO-CALC-TKP-1D2a: Spotlänge Pflicht nur für Nicht-TKP (siehe withValidator).
+            'positions.*.length_seconds' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:3600'],
+            // PO-CALC-TKP-1D2a: OA-TKP Input-Felder (server-authoritative Preise bleiben Resolver).
+            'positions.*.expected_oa_tkp_price_list_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'positions.*.impressions' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'positions.*.basis_tkp' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'positions.*.oa_platform_allocations' => ['sometimes', 'nullable', 'array'],
+            'positions.*.oa_platform_allocations.*.oa_platform_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'positions.*.oa_platform_allocations.*.platform_code' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'positions.*.oa_platform_allocations.*.impressions' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'positions.*.oa_targeting_selections' => ['sometimes', 'nullable', 'array'],
+            'positions.*.oa_targeting_selections.*.oa_targeting_definition_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'positions.*.oa_targeting_selections.*.targeting_code' => ['sometimes', 'nullable', 'string', 'max:64'],
             'positions.*.component_calculation_strategy' => ['sometimes', 'nullable', 'string', Rule::enum(ComponentCalculationStrategy::class)],
             'positions.*.components' => ['sometimes', 'nullable', 'array'],
             'positions.*.components.*.role' => ['required_with:positions.*.components', 'string'],
@@ -347,6 +359,7 @@ class CalculationPayloadRequest extends FormRequest
             $this->validateDynamicPeriods($validator);
             $this->validateDynamicFieldKeys($validator);
             $this->validatePositionMethodKeys($validator);
+            $this->validateLengthSecondsForNonTkp($validator);
             // PO-32b-1: leere Custom-Pflichtfelder blockieren Calc Create/Update
             // nicht allein deshalb; Snapshot-Regeln/Typvalidierung bleiben aktiv.
 
@@ -430,6 +443,25 @@ class CalculationPayloadRequest extends FormRequest
                 }
 
                 $method = SpotCalculationMethod::tryFrom($methodKey) ?? SpotCalculationMethod::Average;
+
+                // PO-CALC-TKP-1D2a: TKP ohne Spot-Timing/Komponenten/Settlement-Pflicht.
+                if ($method === SpotCalculationMethod::Tkp) {
+                    try {
+                        $discountValidator->validated(
+                            $position['position_discounts'] ?? [],
+                            "positions.{$index}.position_discounts",
+                        );
+                    } catch (ValidationException $exception) {
+                        foreach ($exception->errors() as $key => $messages) {
+                            foreach ($messages as $message) {
+                                $validator->errors()->add($key, $message);
+                            }
+                        }
+                    }
+
+                    continue;
+                }
+
                 $profile = null;
                 $mediumId = (int) ($position['advertising_medium_id'] ?? 0);
                 if ($mediumId > 0) {
@@ -621,6 +653,39 @@ class CalculationPayloadRequest extends FormRequest
                         $validator->errors()->add("positions.{$index}.calculation_method_key", $message);
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * PO-CALC-TKP-1D2a: Spotlänge bleibt Pflicht für Spot/SWF; TKP-Positionen ohne length_seconds.
+     */
+    private function validateLengthSecondsForNonTkp(Validator $validator): void
+    {
+        $normalizer = app(CalculationPositionMethodKeyNormalizer::class);
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            try {
+                $normalized = $normalizer->normalize($position);
+            } catch (ValidationException) {
+                continue;
+            }
+
+            $methodKey = (string) ($normalized['key'] ?? '');
+            if ($methodKey === SpotCalculationMethod::Tkp->value) {
+                continue;
+            }
+
+            $length = $position['length_seconds'] ?? null;
+            if ($length === null || $length === '' || (int) $length < 1) {
+                $validator->errors()->add(
+                    "positions.{$index}.length_seconds",
+                    'Die Spotlänge ist erforderlich.',
+                );
             }
         }
     }
