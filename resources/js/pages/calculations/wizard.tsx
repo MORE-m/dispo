@@ -104,6 +104,23 @@ import {
     type CalculationMethodOptions,
 } from '@/lib/calculation-method-draft';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import {
+    buildOaTkpPositionPayload,
+    draftBlocksOaTkpPreview,
+    draftHasTkpPositions,
+    emptyOaTkpDraftFields,
+    formatImpressions,
+    formatTkpDisplay,
+    hydrateOaTkpFromSaved,
+    isSelectableForCalculationWizardPosition,
+    isTkpPosition,
+    oaTkpDraftPatchAfterResolvedMethod,
+    oaTkpDraftPatchOnMethodSelect,
+    type OaPlatformCatalogRow,
+    type OaTargetingCatalogRow,
+    type OaTkpMethodResult,
+} from '@/lib/oa-tkp-wizard';
+import { OaTkpPositionEditor } from '@/components/oa-tkp-position-editor';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
 import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
@@ -168,6 +185,8 @@ import {
     expectedPriceListIdForYear,
     expectedPriceListIdsForBudget,
     priceYearDirty,
+    requireCurrentPriceYear,
+    requireNextPriceYear,
     resolveDisplayedPriceYearOptions,
     restoreOriginalPriceListPin,
     type OriginalPriceListPin,
@@ -291,6 +310,21 @@ type PositionDraft = {
     saved_inventory_id: number | null;
     saved_advertising_medium_id: number | null;
     saved_price_year: number | null;
+    /** PO-CALC-TKP-1D2b */
+    expected_oa_tkp_price_list_id: number | null;
+    impressions_input: string;
+    basis_tkp: string;
+    list_tkp_snapshot: string | null;
+    minimum_tkp_snapshot: string | null;
+    final_tkp: string | null;
+    targeting_surcharge_total: string | null;
+    below_minimum_tkp: boolean;
+    oa_platform_allocations: import('@/lib/oa-tkp-wizard').OaPlatformAllocationDraft[];
+    oa_targeting_selections: import('@/lib/oa-tkp-wizard').OaTargetingSelectionDraft[];
+    original_oa_tkp_price_list_id: number | null;
+    original_oa_list_tkp: string | null;
+    original_oa_minimum_tkp: string | null;
+    original_oa_price_year: number | null;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -366,6 +400,8 @@ type Catalog = {
             second_price: string;
         }>
     >;
+    oa_platforms?: OaPlatformCatalogRow[];
+    oa_targetings?: OaTargetingCatalogRow[];
 };
 
 type Totals = {
@@ -435,7 +471,16 @@ type Totals = {
         effective_discount_before_ae_percent?: string | null;
         ae_amount?: string | null;
         after_order_discount?: string | null;
+        method_result?: {
+            method: string;
+            tkp?: OaTkpMethodResult;
+        } | null;
     }[];
+    special_approval_reasons?: Array<{
+        code: string;
+        message?: string;
+        [key: string]: unknown;
+    }>;
 };
 
 type Proposal = BudgetSpotProposal;
@@ -556,6 +601,29 @@ type SavedCalculation = {
             period_open?: boolean;
             position_flight_period?: PeriodValue;
         };
+        engine_profile_key?: string | null;
+        expected_oa_tkp_price_list_id?: number | null;
+        impressions?: number | null;
+        basis_tkp?: string | null;
+        list_tkp_snapshot?: string | null;
+        minimum_tkp_snapshot?: string | null;
+        final_tkp?: string | null;
+        targeting_surcharge_total?: string | null;
+        below_minimum_tkp?: boolean;
+        oa_platform_allocations?: Array<{
+            oa_platform_id?: number | null;
+            platform_code?: string | null;
+            platform_name?: string | null;
+            impressions?: number | null;
+        }>;
+        oa_targeting_selections?: Array<{
+            oa_targeting_definition_id?: number | null;
+            targeting_code?: string | null;
+            targeting_name?: string | null;
+            targeting_category?: string | null;
+            tkp_surcharge_snapshot?: string | null;
+            targeting_revision_number?: number | null;
+        }>;
     }[];
 };
 
@@ -776,11 +844,21 @@ function methodOptionsForTemplate(
     };
 }
 
-function firstValidPosition(catalog: Catalog): PositionDraft | null {
-    // ADV-001c4b: erstes aktives, buchbares Medium mit Inventarregel (kein Code-Hardcode).
+function firstValidPosition(
+    catalog: Catalog,
+    oaTkpWizardCapability = false,
+): PositionDraft | null {
+    // 1) regulär released/bookable  2) sonst planned TKP unter Capability
     const preferredMedium =
         catalog.media.find((item) => isSelectableForNewWizardPositions(item)) ??
-        null;
+        (oaTkpWizardCapability
+            ? (catalog.media.find((item) =>
+                  isSelectableForCalculationWizardPosition(
+                      item,
+                      oaTkpWizardCapability,
+                  ),
+              ) ?? null)
+            : null);
 
     if (!preferredMedium) {
         return null;
@@ -863,6 +941,7 @@ function firstValidPosition(catalog: Catalog): PositionDraft | null {
                     year,
                 ).find((option) => option.year === year)?.status ?? null,
             ...defaultPricingSettlementDraft(),
+            ...emptyOaTkpDraftFields(year),
         };
     }
 
@@ -971,6 +1050,7 @@ export default function CalculationWizard({
     dispoOrderRevision = null,
     linkedDispoOrders = null,
     standardOffer = null,
+    oa_tkp_wizard_capability = false,
 }: {
     catalog: Catalog;
     component_profiles: ComponentProfilesProp;
@@ -987,6 +1067,7 @@ export default function CalculationWizard({
     canCreateDispoOrder?: boolean;
     dispoOrderRevision?: DispoOrderRevisionContext | null;
     linkedDispoOrders?: LinkedDispoOrdersProp | null;
+    oa_tkp_wizard_capability?: boolean;
     standardOffer?: {
         mode: 'create' | 'edit';
         offer_id: number | null;
@@ -1007,6 +1088,9 @@ export default function CalculationWizard({
 }) {
     const flash = usePage().props.flash;
     const isStandardOffer = standardOffer !== null;
+    /** Soft-Open nur Kalkulationswizard – nie Standard Offers. */
+    const oaTkpCapabilityEnabled =
+        oa_tkp_wizard_capability === true && !isStandardOffer;
     const [templateTitle, setTemplateTitle] = useState(
         standardOffer?.title ?? 'Standardangebot',
     );
@@ -1427,6 +1511,12 @@ export default function CalculationWizard({
                     production_lines: productionLinesFromSaved(
                         position.production_lines,
                     ),
+                    ...(isTkpPosition({
+                        calculation_method_key:
+                            methodState.calculation_method_key,
+                    })
+                        ? hydrateOaTkpFromSaved(position)
+                        : emptyOaTkpDraftFields(pinnedYear)),
                 };
             });
         }
@@ -1435,7 +1525,7 @@ export default function CalculationWizard({
             return [];
         }
 
-        const first = firstValidPosition(catalog);
+        const first = firstValidPosition(catalog, oaTkpCapabilityEnabled);
         return first
             ? [
                   withForcedProfileComponentsIfNeeded(
@@ -1789,6 +1879,64 @@ export default function CalculationWizard({
             positions: isBudgetSetup
                 ? []
                 : positions.map((position) => {
+                      const dynamicFieldValues = {
+                          period_open: position.period_open,
+                          position_flight_period:
+                              position.flight_period_start ||
+                              position.flight_period_end
+                                  ? {
+                                        start:
+                                            position.flight_period_start ||
+                                            null,
+                                        end: position.flight_period_end || null,
+                                    }
+                                  : null,
+                          ...Object.fromEntries(
+                              customPositionTextFieldsFromSchema(
+                                  schemaFieldsForPosition(
+                                      position,
+                                      fieldSchema,
+                                      existingGen3,
+                                  ),
+                              ).map((field) => [
+                                  field.key,
+                                  position.custom_fields[field.key] ?? '',
+                              ]),
+                          ),
+                          ...choiceValuesForPayload(
+                              customPositionChoiceFieldsFromSchema(
+                                  schemaFieldsForPosition(
+                                      position,
+                                      fieldSchema,
+                                      existingGen3,
+                                  ),
+                              ),
+                              position.custom_choice_fields,
+                              new Set(
+                                  Object.keys(position.custom_choice_touched),
+                              ),
+                              position.custom_choice_meta,
+                          ).payload,
+                      };
+
+                      if (isTkpPosition(position)) {
+                          return buildOaTkpPositionPayload({
+                              ...position,
+                              position_discounts: payloadDiscounts(
+                                  position.position_discounts,
+                              ),
+                              dynamic_field_values:
+                                  dynamicFieldValues as Record<
+                                      string,
+                                      | string
+                                      | number
+                                      | boolean
+                                      | null
+                                      | Record<string, string | null>
+                                  >,
+                          });
+                      }
+
                       const timing = positionTimingPayload(
                           position.calculation_method_key,
                           position.time_ranges,
@@ -2007,8 +2155,13 @@ export default function CalculationWizard({
             ? (templateRequestPayload ?? { ...payload, title: templateTitle })
             : payload,
         enabled: canEdit && (planningMode !== 'budget' || budgetPreviewReady),
-        blocked: busy || proposalLoading,
+        blocked:
+            busy ||
+            proposalLoading ||
+            (!isBudgetSetup && draftBlocksOaTkpPreview(positions)),
     });
+    const hasTkpPositions = draftHasTkpPositions(positions);
+    const tkpSaveBlocked = hasTkpPositions && !isStandardOffer;
     const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);
@@ -2038,11 +2191,24 @@ export default function CalculationWizard({
                 .map((rule) => rule.advertising_medium_id),
         );
 
-        return catalog.media.filter(
-            (medium) =>
-                isSelectableForNewWizardPositions(medium) &&
-                mediumIds.has(medium.id),
-        );
+        const allowTkpSoftOpen =
+            oaTkpCapabilityEnabled &&
+            planningMode === 'manual' &&
+            !isBudgetSetup;
+
+        return catalog.media.filter((medium) => {
+            if (!mediumIds.has(medium.id)) {
+                return false;
+            }
+            if (allowTkpSoftOpen) {
+                return isSelectableForCalculationWizardPosition(
+                    medium,
+                    oaTkpCapabilityEnabled,
+                );
+            }
+
+            return isSelectableForNewWizardPositions(medium);
+        });
     }
 
     const unplannableInventoryIds = useMemo(() => {
@@ -2308,6 +2474,11 @@ export default function CalculationWizard({
                         component_calculation_strategy: componentState.strategy,
                         schema_fingerprint: null,
                         field_schema: null,
+                        ...oaTkpDraftPatchAfterResolvedMethod(
+                            item,
+                            methodState.calculation_method_key,
+                            item.price_year,
+                        ),
                     };
 
                     if (isSwfLengthMedium(catalog, medium.id)) {
@@ -2342,6 +2513,13 @@ export default function CalculationWizard({
     }
 
     function save() {
+        if (tkpSaveBlocked) {
+            setSaveError(
+                'TKP befindet sich noch in der Vorschauphase. Speichern wird mit der späteren Produktfreigabe aktiviert.',
+            );
+            return;
+        }
+
         if (headerRuntime.integrityError) {
             setSaveError(
                 `Speichern nicht möglich: ${headerRuntime.integrityError}`,
@@ -2817,6 +2995,11 @@ export default function CalculationWizard({
                         existing?.custom_choice_touched ?? {},
                     custom_choice_meta: existing?.custom_choice_meta ?? {},
                     ...defaultPricingSettlementDraft(),
+                    ...emptyOaTkpDraftFields(
+                        proposal.price_year ??
+                            budgetPriceYear ??
+                            defaultPriceYear(catalog, item.inventory_id),
+                    ),
                 };
             }),
         );
@@ -2849,7 +3032,12 @@ export default function CalculationWizard({
     const summaryTotals = displayTotals ?? savedDisplayTotals ?? null;
     const hasActiveCatalog =
         catalog.inventories.some((item) => item.is_active) &&
-        catalog.media.some((item) => isSelectableForNewWizardPositions(item));
+        catalog.media.some((item) =>
+            isSelectableForCalculationWizardPosition(
+                item,
+                oaTkpCapabilityEnabled,
+            ),
+        );
     const catalogMissing =
         planningMode === 'manual' &&
         positions.length === 0 &&
@@ -3120,8 +3308,14 @@ export default function CalculationWizard({
                                                         planningMode ===
                                                         'budget'
                                                     }
-                                                    disabled={!canEdit}
+                                                    disabled={
+                                                        !canEdit ||
+                                                        hasTkpPositions
+                                                    }
                                                     onChange={() => {
+                                                        if (hasTkpPositions) {
+                                                            return;
+                                                        }
                                                         setPlanningMode(
                                                             'budget',
                                                         );
@@ -4178,6 +4372,10 @@ export default function CalculationWizard({
                                                                         ...initialTimingFieldsForMethod(
                                                                             key,
                                                                         ),
+                                                                        ...oaTkpDraftPatchOnMethodSelect(
+                                                                            key,
+                                                                            position.price_year,
+                                                                        ),
                                                                     },
                                                                 );
                                                             }}
@@ -4200,679 +4398,755 @@ export default function CalculationWizard({
                                                             }
                                                         />
 
-                                                        <PricingSettlementSection
-                                                            positionIndex={
-                                                                index
-                                                            }
-                                                            mode={
-                                                                position.pricing_settlement_mode
-                                                            }
-                                                            fixedPriceNnInput={
-                                                                position.fixed_price_nn_input
-                                                            }
-                                                            disabled={!canEdit}
-                                                            hideFixedPrice={
-                                                                !mediumSupportsFixedPriceSettlement(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                )
-                                                            }
-                                                            showFixedPriceValidation={
-                                                                settlementValidationTouched[
-                                                                    index
-                                                                ] === true
-                                                            }
-                                                            fieldError={
-                                                                fieldErrors[
-                                                                    `positions.${index}.fixed_price_nn`
-                                                                ]?.[0] ??
-                                                                fieldErrors[
-                                                                    `positions.${index}.pricing_settlement_mode`
-                                                                ]?.[0]
-                                                            }
-                                                            onModeChange={(
-                                                                pricing_settlement_mode,
-                                                            ) => {
-                                                                if (
-                                                                    pricing_settlement_mode ===
-                                                                    'fixed_price'
-                                                                ) {
-                                                                    setSettlementValidationTouched(
-                                                                        (
-                                                                            current,
-                                                                        ) => ({
-                                                                            ...current,
-                                                                            [index]: true,
-                                                                        }),
-                                                                    );
-                                                                }
-                                                                updatePosition(
-                                                                    index,
-                                                                    {
-                                                                        pricing_settlement_mode,
-                                                                    },
-                                                                );
-                                                            }}
-                                                            onFixedPriceInputChange={(
-                                                                fixed_price_nn_input,
-                                                            ) =>
-                                                                updatePosition(
-                                                                    index,
-                                                                    {
-                                                                        fixed_price_nn_input,
-                                                                    },
-                                                                )
-                                                            }
-                                                        />
-
-                                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                                            {rulesIntegrityError ? (
-                                                                <p
-                                                                    className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
-                                                                    data-test={`calculation-rules-integrity-${position.client_key}`}
-                                                                    role="alert"
-                                                                >
-                                                                    {
-                                                                        rulesIntegrityError
-                                                                    }
-                                                                </p>
-                                                            ) : null}
-                                                            {positionRuntime.isFieldVisible(
-                                                                'position_flight_period',
-                                                            ) ? (
-                                                                <FormField
-                                                                    label={
-                                                                        (positionFields.find(
-                                                                            (
-                                                                                field,
-                                                                            ) =>
-                                                                                field.key ===
-                                                                                'position_flight_period',
-                                                                        )
-                                                                            ?.label ??
-                                                                            'Flugzeitraum') +
-                                                                        (positionRuntime.isFieldRequired(
-                                                                            'position_flight_period',
-                                                                        )
-                                                                            ? ' *'
-                                                                            : '')
-                                                                    }
-                                                                    htmlFor={`flight-start-${index}`}
-                                                                    hint={
-                                                                        positionFields.find(
-                                                                            (
-                                                                                field,
-                                                                            ) =>
-                                                                                field.key ===
-                                                                                'position_flight_period',
-                                                                        )
-                                                                            ?.help_text ??
-                                                                        undefined
-                                                                    }
-                                                                >
-                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                        <Input
-                                                                            id={`flight-start-${index}`}
-                                                                            type="date"
-                                                                            value={
-                                                                                position.flight_period_start
-                                                                            }
-                                                                            disabled={
-                                                                                !canEdit ||
-                                                                                rulesIntegrityError !==
-                                                                                    null
-                                                                            }
-                                                                            data-test={`flight-period-start-${index}`}
-                                                                            onChange={(
-                                                                                event,
-                                                                            ) =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        flight_period_start:
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                        <Input
-                                                                            id={`flight-end-${index}`}
-                                                                            type="date"
-                                                                            value={
-                                                                                position.flight_period_end
-                                                                            }
-                                                                            disabled={
-                                                                                !canEdit ||
-                                                                                rulesIntegrityError !==
-                                                                                    null
-                                                                            }
-                                                                            data-test={`flight-period-end-${index}`}
-                                                                            onChange={(
-                                                                                event,
-                                                                            ) =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        flight_period_end:
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    </div>
-                                                                </FormField>
-                                                            ) : null}
-                                                            {visiblePositionTextFields.length >
-                                                                0 ||
-                                                            visiblePositionChoiceFields.length >
-                                                                0 ? (
-                                                                <div
-                                                                    className="space-y-3 sm:col-span-2"
-                                                                    data-test={`calculation-custom-position-fields-${position.client_key}`}
-                                                                >
-                                                                    <h3 className="text-sm font-semibold">
-                                                                        Weitere
-                                                                        Angaben
-                                                                    </h3>
-                                                                    <SchemaTextFields
-                                                                        fields={
-                                                                            visiblePositionTextFields
-                                                                        }
-                                                                        values={
-                                                                            position.custom_fields
-                                                                        }
-                                                                        errors={
-                                                                            fieldErrors
-                                                                        }
-                                                                        errorKeyPrefixes={[
-                                                                            `positions.${index}.dynamic_field_values`,
-                                                                        ]}
-                                                                        disabled={
-                                                                            !canEdit ||
-                                                                            rulesIntegrityError !==
-                                                                                null
-                                                                        }
-                                                                        idPrefix={`calc-pos-custom-${position.client_key}`}
-                                                                        onChange={(
-                                                                            key,
-                                                                            value,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    custom_fields:
-                                                                                        {
-                                                                                            ...position.custom_fields,
-                                                                                            [key]: value,
-                                                                                        },
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <SchemaChoiceFields
-                                                                        fields={
-                                                                            visiblePositionChoiceFields
-                                                                        }
-                                                                        values={
-                                                                            position.custom_choice_fields
-                                                                        }
-                                                                        errors={
-                                                                            fieldErrors
-                                                                        }
-                                                                        errorKeyPrefixes={[
-                                                                            `positions.${index}.dynamic_field_values`,
-                                                                        ]}
-                                                                        disabled={
-                                                                            !canEdit ||
-                                                                            rulesIntegrityError !==
-                                                                                null
-                                                                        }
-                                                                        idPrefix={`calc-pos-choice-${position.client_key}`}
-                                                                        onChange={(
-                                                                            key,
-                                                                            value,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    custom_choice_fields:
-                                                                                        {
-                                                                                            ...position.custom_choice_fields,
-                                                                                            [key]: value,
-                                                                                        },
-                                                                                    custom_choice_touched:
-                                                                                        {
-                                                                                            ...position.custom_choice_touched,
-                                                                                            [key]: true,
-                                                                                        },
-                                                                                    custom_choice_meta:
-                                                                                        {
-                                                                                            ...position.custom_choice_meta,
-                                                                                            [key]: {
-                                                                                                initPayloadSafe: true,
-                                                                                                issue: null,
-                                                                                            },
-                                                                                        },
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </div>
-                                                            ) : null}
-                                                            {canEdit &&
-                                                            positions.length >
-                                                                1 ? (
-                                                                <div className="flex items-end">
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="outline"
-                                                                        size="sm"
-                                                                        onClick={() =>
-                                                                            removePosition(
-                                                                                index,
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Entfernen
-                                                                    </Button>
-                                                                </div>
-                                                            ) : null}
-                                                        </div>
-
-                                                        {(() => {
-                                                            // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
-                                                            // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
-                                                            const positionProfile =
-                                                                profileForMedium(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                );
-                                                            const forcedProfile =
-                                                                isForcedProfile(
-                                                                    positionProfile,
-                                                                );
-                                                            const profileMeta =
-                                                                positionProfile
-                                                                    ? component_profiles[
-                                                                          positionProfile
-                                                                      ]
-                                                                    : undefined;
-
-                                                            const showForcedProfileUi =
-                                                                forcedProfile;
-                                                            const showOptionalComponentsUi =
-                                                                !forcedProfile &&
-                                                                position
-                                                                    .components
-                                                                    .length > 0;
-
-                                                            return (
-                                                                <div className="space-y-2">
-                                                                    {!forcedProfile &&
-                                                                    mediumSupportsSpotComponents(
-                                                                        catalog,
-                                                                        position.advertising_medium_id,
-                                                                    ) &&
-                                                                    position
-                                                                        .components
-                                                                        .length ===
-                                                                        0 &&
-                                                                    canEdit ? (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            data-test={`spot-components-activate-${index}`}
-                                                                            onClick={() => {
-                                                                                const rule =
-                                                                                    ruleFor(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        position.advertising_medium_id,
-                                                                                    );
-                                                                                const next =
-                                                                                    activateComponentsFromLength(
-                                                                                        position.length_seconds,
-                                                                                    );
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            next,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                next,
-                                                                                            ),
-                                                                                        component_calculation_strategy:
-                                                                                            position.component_calculation_strategy ??
-                                                                                            resolveStrategyFromRule(
-                                                                                                rule?.component_calculation_strategy,
-                                                                                            ),
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Spot-Komponenten
-                                                                            aktivieren
-                                                                        </Button>
-                                                                    ) : null}
-                                                                    {showForcedProfileUi ||
-                                                                    showOptionalComponentsUi ? (
-                                                                        <SpotComponentsSection
-                                                                            positionIndex={
-                                                                                index
-                                                                            }
-                                                                            profile={
-                                                                                showForcedProfileUi
-                                                                                    ? positionProfile
-                                                                                    : null
-                                                                            }
-                                                                            profileLabel={
-                                                                                showForcedProfileUi
-                                                                                    ? profileMeta?.label
-                                                                                    : undefined
-                                                                            }
-                                                                            profileMeta={
-                                                                                showForcedProfileUi &&
-                                                                                profileMeta
-                                                                                    ? {
-                                                                                          unit_label:
-                                                                                              profileMeta.unit_label,
-                                                                                          unit_count:
-                                                                                              profileMeta.unit_count,
-                                                                                          slots: profileMeta.slots,
-                                                                                      }
-                                                                                    : undefined
-                                                                            }
-                                                                            unitCount={positionUnitCount(
-                                                                                position,
-                                                                            )}
-                                                                            components={
-                                                                                position.components
-                                                                            }
-                                                                            strategy={
-                                                                                position.component_calculation_strategy ??
-                                                                                'shared_total_length'
-                                                                            }
-                                                                            canEdit={
-                                                                                canEdit
-                                                                            }
-                                                                            positionMediaGross={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.media_gross
-                                                                            }
-                                                                            componentResults={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.components
-                                                                            }
-                                                                            lengthIndex={
-                                                                                displayTotals
-                                                                                    ?.positions?.[
-                                                                                    index
-                                                                                ]
-                                                                                    ?.length_index
-                                                                            }
-                                                                            errors={
-                                                                                fieldErrors
-                                                                            }
-                                                                            onChange={(
-                                                                                components,
-                                                                            ) =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components,
-                                                                                        length_seconds:
-                                                                                            totalComponentLength(
-                                                                                                components,
-                                                                                            ),
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                            onDeactivate={() =>
-                                                                                updatePosition(
-                                                                                    index,
-                                                                                    {
-                                                                                        components:
-                                                                                            [],
-                                                                                        component_calculation_strategy:
-                                                                                            null,
-                                                                                    },
-                                                                                )
-                                                                            }
-                                                                        />
-                                                                    ) : null}
-                                                                </div>
-                                                            );
-                                                        })()}
-
-                                                        {(() => {
-                                                            const positionProfile =
-                                                                profileForMedium(
-                                                                    catalog,
-                                                                    position.advertising_medium_id,
-                                                                );
-                                                            const profileMeta =
-                                                                positionProfile
-                                                                    ? component_profiles[
-                                                                          positionProfile
-                                                                      ]
-                                                                    : undefined;
-
-                                                            if (!profileMeta) {
-                                                                return null;
-                                                            }
-
-                                                            return (
-                                                                <p
-                                                                    className="text-muted-foreground text-xs"
-                                                                    data-test={`spot-units-hint-${index}`}
-                                                                >
-                                                                    {
-                                                                        profileMeta.unit_label
-                                                                    }{' '}
-                                                                    (Spot-Anzahlen
-                                                                    unten
-                                                                    entsprechen{' '}
-                                                                    {
-                                                                        profileMeta.unit_label
-                                                                    }
-                                                                    )
-                                                                </p>
-                                                            );
-                                                        })()}
-
-                                                        {isCalendarCalculationMethod(
-                                                            position.calculation_method_key,
+                                                        {isTkpPosition(
+                                                            position,
                                                         ) ? (
-                                                            <SpotCalendarPlanner
+                                                            <OaTkpPositionEditor
                                                                 positionIndex={
                                                                     index
                                                                 }
-                                                                entries={
-                                                                    position.planner_entries
+                                                                position={
+                                                                    position
                                                                 }
-                                                                canEdit={
-                                                                    canEdit
+                                                                platforms={
+                                                                    catalog.oa_platforms ??
+                                                                    []
                                                                 }
-                                                                fieldErrors={
-                                                                    fieldErrors
+                                                                targetings={
+                                                                    catalog.oa_targetings ??
+                                                                    []
                                                                 }
-                                                                entryTotals={
-                                                                    displayTotals
-                                                                        ?.positions[
+                                                                currentPriceYear={requireCurrentPriceYear(
+                                                                    catalog,
+                                                                )}
+                                                                nextPriceYear={requireNextPriceYear(
+                                                                    catalog,
+                                                                )}
+                                                                methodResult={
+                                                                    totals
+                                                                        ?.positions?.[
                                                                         index
                                                                     ]
-                                                                        ?.planner_entries
+                                                                        ?.method_result
+                                                                        ?.tkp ??
+                                                                    null
                                                                 }
-                                                                positionMediaGross={
-                                                                    displayTotals
-                                                                        ?.positions[
+                                                                mediaGross={
+                                                                    totals
+                                                                        ?.positions?.[
                                                                         index
                                                                     ]
                                                                         ?.media_gross
                                                                 }
-                                                                priceListHours={
-                                                                    catalog
-                                                                        .price_list_hours_by_id?.[
-                                                                        String(
-                                                                            position.expected_price_list_id ??
-                                                                                '',
-                                                                        )
-                                                                    ] ?? []
-                                                                }
-                                                                priceYear={
-                                                                    position.price_year
-                                                                }
-                                                                onChange={(
-                                                                    planner_entries,
-                                                                ) =>
-                                                                    updatePosition(
-                                                                        index,
-                                                                        {
-                                                                            planner_entries,
-                                                                            total_spot_count:
-                                                                                totalPlannerSpotCount(
-                                                                                    planner_entries,
-                                                                                ),
-                                                                        },
-                                                                    )
-                                                                }
-                                                            />
-                                                        ) : (
-                                                            <PriceTimeRanges
-                                                                positionIndex={
-                                                                    index
-                                                                }
-                                                                ranges={
-                                                                    position.time_ranges
-                                                                }
-                                                                dayGroups={
-                                                                    dayGroups
+                                                                fieldErrors={
+                                                                    fieldErrors
                                                                 }
                                                                 canEdit={
                                                                     canEdit
                                                                 }
-                                                                fieldErrors={
-                                                                    fieldErrors
-                                                                }
-                                                                rangeTotals={
-                                                                    displayTotals
-                                                                        ?.positions[
-                                                                        index
-                                                                    ]
-                                                                        ?.time_ranges
-                                                                }
-                                                                legacyTotalSpotCount={
-                                                                    position.needs_spot_redistribution
-                                                                        ? position.total_spot_count
-                                                                        : null
-                                                                }
-                                                                needsRedistribution={
-                                                                    position.needs_spot_redistribution
+                                                                showActivePickers={
+                                                                    oaTkpCapabilityEnabled
                                                                 }
                                                                 onChange={(
-                                                                    time_ranges,
+                                                                    patch,
                                                                 ) =>
                                                                     updatePosition(
                                                                         index,
-                                                                        {
-                                                                            time_ranges,
-                                                                            total_spot_count:
-                                                                                totalSpotCount(
-                                                                                    time_ranges,
-                                                                                ),
-                                                                        },
+                                                                        patch,
                                                                     )
                                                                 }
                                                             />
-                                                        )}
+                                                        ) : null}
 
-                                                        {displayTotals
-                                                            ?.positions[
-                                                            index
-                                                        ] && !previewLoading ? (
-                                                            <PositionPriceSummary
-                                                                positionIndex={
+                                                        {!isTkpPosition(
+                                                            position,
+                                                        ) ? (
+                                                            <>
+                                                                <PricingSettlementSection
+                                                                    positionIndex={
+                                                                        index
+                                                                    }
+                                                                    mode={
+                                                                        position.pricing_settlement_mode
+                                                                    }
+                                                                    fixedPriceNnInput={
+                                                                        position.fixed_price_nn_input
+                                                                    }
+                                                                    disabled={
+                                                                        !canEdit
+                                                                    }
+                                                                    hideFixedPrice={
+                                                                        !mediumSupportsFixedPriceSettlement(
+                                                                            catalog,
+                                                                            position.advertising_medium_id,
+                                                                        )
+                                                                    }
+                                                                    showFixedPriceValidation={
+                                                                        settlementValidationTouched[
+                                                                            index
+                                                                        ] ===
+                                                                        true
+                                                                    }
+                                                                    fieldError={
+                                                                        fieldErrors[
+                                                                            `positions.${index}.fixed_price_nn`
+                                                                        ]?.[0] ??
+                                                                        fieldErrors[
+                                                                            `positions.${index}.pricing_settlement_mode`
+                                                                        ]?.[0]
+                                                                    }
+                                                                    onModeChange={(
+                                                                        pricing_settlement_mode,
+                                                                    ) => {
+                                                                        if (
+                                                                            pricing_settlement_mode ===
+                                                                            'fixed_price'
+                                                                        ) {
+                                                                            setSettlementValidationTouched(
+                                                                                (
+                                                                                    current,
+                                                                                ) => ({
+                                                                                    ...current,
+                                                                                    [index]: true,
+                                                                                }),
+                                                                            );
+                                                                        }
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                pricing_settlement_mode,
+                                                                            },
+                                                                        );
+                                                                    }}
+                                                                    onFixedPriceInputChange={(
+                                                                        fixed_price_nn_input,
+                                                                    ) =>
+                                                                        updatePosition(
+                                                                            index,
+                                                                            {
+                                                                                fixed_price_nn_input,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                />
+
+                                                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                                                    {rulesIntegrityError ? (
+                                                                        <p
+                                                                            className="text-destructive text-sm sm:col-span-2 lg:col-span-3"
+                                                                            data-test={`calculation-rules-integrity-${position.client_key}`}
+                                                                            role="alert"
+                                                                        >
+                                                                            {
+                                                                                rulesIntegrityError
+                                                                            }
+                                                                        </p>
+                                                                    ) : null}
+                                                                    {positionRuntime.isFieldVisible(
+                                                                        'position_flight_period',
+                                                                    ) ? (
+                                                                        <FormField
+                                                                            label={
+                                                                                (positionFields.find(
+                                                                                    (
+                                                                                        field,
+                                                                                    ) =>
+                                                                                        field.key ===
+                                                                                        'position_flight_period',
+                                                                                )
+                                                                                    ?.label ??
+                                                                                    'Flugzeitraum') +
+                                                                                (positionRuntime.isFieldRequired(
+                                                                                    'position_flight_period',
+                                                                                )
+                                                                                    ? ' *'
+                                                                                    : '')
+                                                                            }
+                                                                            htmlFor={`flight-start-${index}`}
+                                                                            hint={
+                                                                                positionFields.find(
+                                                                                    (
+                                                                                        field,
+                                                                                    ) =>
+                                                                                        field.key ===
+                                                                                        'position_flight_period',
+                                                                                )
+                                                                                    ?.help_text ??
+                                                                                undefined
+                                                                            }
+                                                                        >
+                                                                            <div className="grid grid-cols-2 gap-2">
+                                                                                <Input
+                                                                                    id={`flight-start-${index}`}
+                                                                                    type="date"
+                                                                                    value={
+                                                                                        position.flight_period_start
+                                                                                    }
+                                                                                    disabled={
+                                                                                        !canEdit ||
+                                                                                        rulesIntegrityError !==
+                                                                                            null
+                                                                                    }
+                                                                                    data-test={`flight-period-start-${index}`}
+                                                                                    onChange={(
+                                                                                        event,
+                                                                                    ) =>
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                flight_period_start:
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                            },
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                                <Input
+                                                                                    id={`flight-end-${index}`}
+                                                                                    type="date"
+                                                                                    value={
+                                                                                        position.flight_period_end
+                                                                                    }
+                                                                                    disabled={
+                                                                                        !canEdit ||
+                                                                                        rulesIntegrityError !==
+                                                                                            null
+                                                                                    }
+                                                                                    data-test={`flight-period-end-${index}`}
+                                                                                    onChange={(
+                                                                                        event,
+                                                                                    ) =>
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                flight_period_end:
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                            },
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                        </FormField>
+                                                                    ) : null}
+                                                                    {visiblePositionTextFields.length >
+                                                                        0 ||
+                                                                    visiblePositionChoiceFields.length >
+                                                                        0 ? (
+                                                                        <div
+                                                                            className="space-y-3 sm:col-span-2"
+                                                                            data-test={`calculation-custom-position-fields-${position.client_key}`}
+                                                                        >
+                                                                            <h3 className="text-sm font-semibold">
+                                                                                Weitere
+                                                                                Angaben
+                                                                            </h3>
+                                                                            <SchemaTextFields
+                                                                                fields={
+                                                                                    visiblePositionTextFields
+                                                                                }
+                                                                                values={
+                                                                                    position.custom_fields
+                                                                                }
+                                                                                errors={
+                                                                                    fieldErrors
+                                                                                }
+                                                                                errorKeyPrefixes={[
+                                                                                    `positions.${index}.dynamic_field_values`,
+                                                                                ]}
+                                                                                disabled={
+                                                                                    !canEdit ||
+                                                                                    rulesIntegrityError !==
+                                                                                        null
+                                                                                }
+                                                                                idPrefix={`calc-pos-custom-${position.client_key}`}
+                                                                                onChange={(
+                                                                                    key,
+                                                                                    value,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            custom_fields:
+                                                                                                {
+                                                                                                    ...position.custom_fields,
+                                                                                                    [key]: value,
+                                                                                                },
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                            <SchemaChoiceFields
+                                                                                fields={
+                                                                                    visiblePositionChoiceFields
+                                                                                }
+                                                                                values={
+                                                                                    position.custom_choice_fields
+                                                                                }
+                                                                                errors={
+                                                                                    fieldErrors
+                                                                                }
+                                                                                errorKeyPrefixes={[
+                                                                                    `positions.${index}.dynamic_field_values`,
+                                                                                ]}
+                                                                                disabled={
+                                                                                    !canEdit ||
+                                                                                    rulesIntegrityError !==
+                                                                                        null
+                                                                                }
+                                                                                idPrefix={`calc-pos-choice-${position.client_key}`}
+                                                                                onChange={(
+                                                                                    key,
+                                                                                    value,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            custom_choice_fields:
+                                                                                                {
+                                                                                                    ...position.custom_choice_fields,
+                                                                                                    [key]: value,
+                                                                                                },
+                                                                                            custom_choice_touched:
+                                                                                                {
+                                                                                                    ...position.custom_choice_touched,
+                                                                                                    [key]: true,
+                                                                                                },
+                                                                                            custom_choice_meta:
+                                                                                                {
+                                                                                                    ...position.custom_choice_meta,
+                                                                                                    [key]: {
+                                                                                                        initPayloadSafe: true,
+                                                                                                        issue: null,
+                                                                                                    },
+                                                                                                },
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </div>
+                                                                    ) : null}
+                                                                    {canEdit &&
+                                                                    positions.length >
+                                                                        1 ? (
+                                                                        <div className="flex items-end">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="outline"
+                                                                                size="sm"
+                                                                                onClick={() =>
+                                                                                    removePosition(
+                                                                                        index,
+                                                                                    )
+                                                                                }
+                                                                            >
+                                                                                Entfernen
+                                                                            </Button>
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+
+                                                                {(() => {
+                                                                    // BL-P4-03c/03f/03h/03k: Hauptspot+Allonge und Tandem/Tridem im Vorlagenmodus.
+                                                                    // Calendar-Vorlagen: optionale Allonge und Forced-Profile (Tandem/Tridem) erlaubt.
+                                                                    const positionProfile =
+                                                                        profileForMedium(
+                                                                            catalog,
+                                                                            position.advertising_medium_id,
+                                                                        );
+                                                                    const forcedProfile =
+                                                                        isForcedProfile(
+                                                                            positionProfile,
+                                                                        );
+                                                                    const profileMeta =
+                                                                        positionProfile
+                                                                            ? component_profiles[
+                                                                                  positionProfile
+                                                                              ]
+                                                                            : undefined;
+
+                                                                    const showForcedProfileUi =
+                                                                        forcedProfile;
+                                                                    const showOptionalComponentsUi =
+                                                                        !forcedProfile &&
+                                                                        position
+                                                                            .components
+                                                                            .length >
+                                                                            0;
+
+                                                                    return (
+                                                                        <div className="space-y-2">
+                                                                            {!forcedProfile &&
+                                                                            mediumSupportsSpotComponents(
+                                                                                catalog,
+                                                                                position.advertising_medium_id,
+                                                                            ) &&
+                                                                            position
+                                                                                .components
+                                                                                .length ===
+                                                                                0 &&
+                                                                            canEdit ? (
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="outline"
+                                                                                    size="sm"
+                                                                                    data-test={`spot-components-activate-${index}`}
+                                                                                    onClick={() => {
+                                                                                        const rule =
+                                                                                            ruleFor(
+                                                                                                catalog,
+                                                                                                position.inventory_id,
+                                                                                                position.advertising_medium_id,
+                                                                                            );
+                                                                                        const next =
+                                                                                            activateComponentsFromLength(
+                                                                                                position.length_seconds,
+                                                                                            );
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                components:
+                                                                                                    next,
+                                                                                                length_seconds:
+                                                                                                    totalComponentLength(
+                                                                                                        next,
+                                                                                                    ),
+                                                                                                component_calculation_strategy:
+                                                                                                    position.component_calculation_strategy ??
+                                                                                                    resolveStrategyFromRule(
+                                                                                                        rule?.component_calculation_strategy,
+                                                                                                    ),
+                                                                                            },
+                                                                                        );
+                                                                                    }}
+                                                                                >
+                                                                                    Spot-Komponenten
+                                                                                    aktivieren
+                                                                                </Button>
+                                                                            ) : null}
+                                                                            {showForcedProfileUi ||
+                                                                            showOptionalComponentsUi ? (
+                                                                                <SpotComponentsSection
+                                                                                    positionIndex={
+                                                                                        index
+                                                                                    }
+                                                                                    profile={
+                                                                                        showForcedProfileUi
+                                                                                            ? positionProfile
+                                                                                            : null
+                                                                                    }
+                                                                                    profileLabel={
+                                                                                        showForcedProfileUi
+                                                                                            ? profileMeta?.label
+                                                                                            : undefined
+                                                                                    }
+                                                                                    profileMeta={
+                                                                                        showForcedProfileUi &&
+                                                                                        profileMeta
+                                                                                            ? {
+                                                                                                  unit_label:
+                                                                                                      profileMeta.unit_label,
+                                                                                                  unit_count:
+                                                                                                      profileMeta.unit_count,
+                                                                                                  slots: profileMeta.slots,
+                                                                                              }
+                                                                                            : undefined
+                                                                                    }
+                                                                                    unitCount={positionUnitCount(
+                                                                                        position,
+                                                                                    )}
+                                                                                    components={
+                                                                                        position.components
+                                                                                    }
+                                                                                    strategy={
+                                                                                        position.component_calculation_strategy ??
+                                                                                        'shared_total_length'
+                                                                                    }
+                                                                                    canEdit={
+                                                                                        canEdit
+                                                                                    }
+                                                                                    positionMediaGross={
+                                                                                        displayTotals
+                                                                                            ?.positions?.[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.media_gross
+                                                                                    }
+                                                                                    componentResults={
+                                                                                        displayTotals
+                                                                                            ?.positions?.[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.components
+                                                                                    }
+                                                                                    lengthIndex={
+                                                                                        displayTotals
+                                                                                            ?.positions?.[
+                                                                                            index
+                                                                                        ]
+                                                                                            ?.length_index
+                                                                                    }
+                                                                                    errors={
+                                                                                        fieldErrors
+                                                                                    }
+                                                                                    onChange={(
+                                                                                        components,
+                                                                                    ) =>
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                components,
+                                                                                                length_seconds:
+                                                                                                    totalComponentLength(
+                                                                                                        components,
+                                                                                                    ),
+                                                                                            },
+                                                                                        )
+                                                                                    }
+                                                                                    onDeactivate={() =>
+                                                                                        updatePosition(
+                                                                                            index,
+                                                                                            {
+                                                                                                components:
+                                                                                                    [],
+                                                                                                component_calculation_strategy:
+                                                                                                    null,
+                                                                                            },
+                                                                                        )
+                                                                                    }
+                                                                                />
+                                                                            ) : null}
+                                                                        </div>
+                                                                    );
+                                                                })()}
+
+                                                                {(() => {
+                                                                    const positionProfile =
+                                                                        profileForMedium(
+                                                                            catalog,
+                                                                            position.advertising_medium_id,
+                                                                        );
+                                                                    const profileMeta =
+                                                                        positionProfile
+                                                                            ? component_profiles[
+                                                                                  positionProfile
+                                                                              ]
+                                                                            : undefined;
+
+                                                                    if (
+                                                                        !profileMeta
+                                                                    ) {
+                                                                        return null;
+                                                                    }
+
+                                                                    return (
+                                                                        <p
+                                                                            className="text-muted-foreground text-xs"
+                                                                            data-test={`spot-units-hint-${index}`}
+                                                                        >
+                                                                            {
+                                                                                profileMeta.unit_label
+                                                                            }{' '}
+                                                                            (Spot-Anzahlen
+                                                                            unten
+                                                                            entsprechen{' '}
+                                                                            {
+                                                                                profileMeta.unit_label
+                                                                            }
+                                                                            )
+                                                                        </p>
+                                                                    );
+                                                                })()}
+
+                                                                {isCalendarCalculationMethod(
+                                                                    position.calculation_method_key,
+                                                                ) ? (
+                                                                    <SpotCalendarPlanner
+                                                                        positionIndex={
+                                                                            index
+                                                                        }
+                                                                        entries={
+                                                                            position.planner_entries
+                                                                        }
+                                                                        canEdit={
+                                                                            canEdit
+                                                                        }
+                                                                        fieldErrors={
+                                                                            fieldErrors
+                                                                        }
+                                                                        entryTotals={
+                                                                            displayTotals
+                                                                                ?.positions[
+                                                                                index
+                                                                            ]
+                                                                                ?.planner_entries
+                                                                        }
+                                                                        positionMediaGross={
+                                                                            displayTotals
+                                                                                ?.positions[
+                                                                                index
+                                                                            ]
+                                                                                ?.media_gross
+                                                                        }
+                                                                        priceListHours={
+                                                                            catalog
+                                                                                .price_list_hours_by_id?.[
+                                                                                String(
+                                                                                    position.expected_price_list_id ??
+                                                                                        '',
+                                                                                )
+                                                                            ] ??
+                                                                            []
+                                                                        }
+                                                                        priceYear={
+                                                                            position.price_year
+                                                                        }
+                                                                        onChange={(
+                                                                            planner_entries,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    planner_entries,
+                                                                                    total_spot_count:
+                                                                                        totalPlannerSpotCount(
+                                                                                            planner_entries,
+                                                                                        ),
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <PriceTimeRanges
+                                                                        positionIndex={
+                                                                            index
+                                                                        }
+                                                                        ranges={
+                                                                            position.time_ranges
+                                                                        }
+                                                                        dayGroups={
+                                                                            dayGroups
+                                                                        }
+                                                                        canEdit={
+                                                                            canEdit
+                                                                        }
+                                                                        fieldErrors={
+                                                                            fieldErrors
+                                                                        }
+                                                                        rangeTotals={
+                                                                            displayTotals
+                                                                                ?.positions[
+                                                                                index
+                                                                            ]
+                                                                                ?.time_ranges
+                                                                        }
+                                                                        legacyTotalSpotCount={
+                                                                            position.needs_spot_redistribution
+                                                                                ? position.total_spot_count
+                                                                                : null
+                                                                        }
+                                                                        needsRedistribution={
+                                                                            position.needs_spot_redistribution
+                                                                        }
+                                                                        onChange={(
+                                                                            time_ranges,
+                                                                        ) =>
+                                                                            updatePosition(
+                                                                                index,
+                                                                                {
+                                                                                    time_ranges,
+                                                                                    total_spot_count:
+                                                                                        totalSpotCount(
+                                                                                            time_ranges,
+                                                                                        ),
+                                                                                },
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                )}
+
+                                                                {displayTotals
+                                                                    ?.positions[
                                                                     index
-                                                                }
-                                                                averageSecondPrice={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .average_second_price
-                                                                }
-                                                                mediaGross={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .media_gross
-                                                                }
-                                                                nnInvest={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ].nn_invest
-                                                                }
-                                                                pricingSettlementMode={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .pricing_settlement_mode
-                                                                }
-                                                                effectivePayFactorPercent={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .effective_pay_factor_percent
-                                                                }
-                                                                effectiveDiscountPercent={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .effective_discount_percent
-                                                                }
-                                                                effectiveDiscountBeforeAePercent={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .effective_discount_before_ae_percent
-                                                                }
-                                                                aeAmount={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ].ae_amount
-                                                                }
-                                                                afterOrderDiscount={
-                                                                    displayTotals
-                                                                        .positions[
-                                                                        index
-                                                                    ]
-                                                                        .after_order_discount
-                                                                }
-                                                            />
-                                                        ) : previewLoading ? (
-                                                            <LoadingState
-                                                                label="Berechnet"
-                                                                data-test="preview-loading"
-                                                            />
+                                                                ] &&
+                                                                !previewLoading ? (
+                                                                    <PositionPriceSummary
+                                                                        positionIndex={
+                                                                            index
+                                                                        }
+                                                                        averageSecondPrice={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .average_second_price
+                                                                        }
+                                                                        mediaGross={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .media_gross
+                                                                        }
+                                                                        nnInvest={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .nn_invest
+                                                                        }
+                                                                        pricingSettlementMode={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .pricing_settlement_mode
+                                                                        }
+                                                                        effectivePayFactorPercent={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .effective_pay_factor_percent
+                                                                        }
+                                                                        effectiveDiscountPercent={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .effective_discount_percent
+                                                                        }
+                                                                        effectiveDiscountBeforeAePercent={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .effective_discount_before_ae_percent
+                                                                        }
+                                                                        aeAmount={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .ae_amount
+                                                                        }
+                                                                        afterOrderDiscount={
+                                                                            displayTotals
+                                                                                .positions[
+                                                                                index
+                                                                            ]
+                                                                                .after_order_discount
+                                                                        }
+                                                                    />
+                                                                ) : previewLoading ? (
+                                                                    <LoadingState
+                                                                        label="Berechnet"
+                                                                        data-test="preview-loading"
+                                                                    />
+                                                                ) : null}
+                                                            </>
                                                         ) : null}
                                                     </CardContent>
                                                 </Card>
@@ -4885,8 +5159,10 @@ export default function CalculationWizard({
                                             variant="outline"
                                             className="w-full border-dashed"
                                             onClick={() => {
-                                                const next =
-                                                    firstValidPosition(catalog);
+                                                const next = firstValidPosition(
+                                                    catalog,
+                                                    oaTkpCapabilityEnabled,
+                                                );
                                                 if (next) {
                                                     setPositions([
                                                         ...positions,
@@ -5318,11 +5594,22 @@ export default function CalculationWizard({
                                             Zusammenfassung
                                         </CardTitle>
                                         {calculation?.id &&
-                                        canCreateDispoOrder ? (
+                                        canCreateDispoOrder &&
+                                        !hasTkpPositions ? (
                                             <DispoOrderCreateAction
                                                 calculationId={calculation.id}
                                                 revision={dispoOrderRevision}
                                             />
+                                        ) : null}
+                                        {hasTkpPositions ? (
+                                            <p
+                                                className="text-muted-foreground text-xs"
+                                                data-test="oa-tkp-dispo-blocked"
+                                            >
+                                                TKP-Positionen können erst nach
+                                                Abschluss der Dispo-Integration
+                                                übergeben werden.
+                                            </p>
                                         ) : null}
                                     </CardHeader>
                                     <CardContent
@@ -5393,29 +5680,57 @@ export default function CalculationWizard({
                                                                 }
                                                             </p>
                                                             <p className="text-muted-foreground mt-1">
-                                                                {
-                                                                    position.total_spot_count
-                                                                }{' '}
-                                                                Spots à{' '}
-                                                                {
-                                                                    position.length_seconds
-                                                                }
-                                                                s · Pos.-Rab.{' '}
-                                                                {
-                                                                    position.position_discount_percent
-                                                                }
-                                                                % · AE{' '}
-                                                                {
-                                                                    position.ae_percent
-                                                                }
-                                                                %
+                                                                {position.spot_method ===
+                                                                    'tkp' ||
+                                                                (
+                                                                    position as {
+                                                                        calculation_method_key?: string;
+                                                                    }
+                                                                )
+                                                                    .calculation_method_key ===
+                                                                    'tkp' ? (
+                                                                    <>
+                                                                        TKP-Position
+                                                                        · Brutto{' '}
+                                                                        {money(
+                                                                            position.media_gross,
+                                                                        )}{' '}
+                                                                        · N/N{' '}
+                                                                        {money(
+                                                                            position.nn_invest,
+                                                                        )}
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        {
+                                                                            position.total_spot_count
+                                                                        }{' '}
+                                                                        Spots à{' '}
+                                                                        {
+                                                                            position.length_seconds
+                                                                        }
+                                                                        s ·
+                                                                        Pos.-Rab.{' '}
+                                                                        {
+                                                                            position.position_discount_percent
+                                                                        }
+                                                                        % · AE{' '}
+                                                                        {
+                                                                            position.ae_percent
+                                                                        }
+                                                                        %
+                                                                    </>
+                                                                )}
                                                             </p>
                                                             <ul className="text-muted-foreground mt-2 list-inside list-disc">
-                                                                {(position
-                                                                    .time_ranges
-                                                                    ?.length
-                                                                    ? position.time_ranges
-                                                                    : []
+                                                                {(position.spot_method ===
+                                                                'tkp'
+                                                                    ? []
+                                                                    : position
+                                                                            .time_ranges
+                                                                            ?.length
+                                                                      ? position.time_ranges
+                                                                      : []
                                                                 ).map(
                                                                     (range) => (
                                                                         <li
@@ -5521,9 +5836,8 @@ export default function CalculationWizard({
                                                 ) : null}
                                                 {displayTotals.requires_special_approval ? (
                                                     <StatusBanner tone="warning">
-                                                        Die persönliche
-                                                        Rabattgrenze ist
-                                                        überschritten.
+                                                        Sonderfreigabe
+                                                        erforderlich.
                                                     </StatusBanner>
                                                 ) : null}
                                                 {positions.map(
@@ -5548,14 +5862,43 @@ export default function CalculationWizard({
                                                                     )}
                                                                 </p>
                                                                 <p className="text-muted-foreground mt-1">
-                                                                    {
-                                                                        position.total_spot_count
-                                                                    }{' '}
-                                                                    Spots à{' '}
-                                                                    {
-                                                                        position.length_seconds
-                                                                    }
-                                                                    s
+                                                                    {isTkpPosition(
+                                                                        position,
+                                                                    ) ? (
+                                                                        <>
+                                                                            Methode
+                                                                            TKP
+                                                                            ·{' '}
+                                                                            {position.impressions_input !==
+                                                                            ''
+                                                                                ? `${formatImpressions(Number(position.impressions_input) || 0)} Impressions`
+                                                                                : 'Impressions offen'}
+                                                                            {result
+                                                                                ?.method_result
+                                                                                ?.tkp
+                                                                                ?.final_tkp
+                                                                                ? ` · TKP ${formatTkpDisplay(result.method_result.tkp.final_tkp)}`
+                                                                                : ''}
+                                                                            {result?.media_gross
+                                                                                ? ` · Brutto ${money(result.media_gross)}`
+                                                                                : ''}
+                                                                            {result?.nn_invest
+                                                                                ? ` · N/N ${money(result.nn_invest)}`
+                                                                                : ''}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            {
+                                                                                position.total_spot_count
+                                                                            }{' '}
+                                                                            Spots
+                                                                            à{' '}
+                                                                            {
+                                                                                position.length_seconds
+                                                                            }
+                                                                            s
+                                                                        </>
+                                                                    )}
                                                                 </p>
                                                                 <ul className="text-muted-foreground mt-2 list-inside list-disc">
                                                                     {(
@@ -5752,26 +6095,39 @@ export default function CalculationWizard({
                             </Button>
                         ) : null}
                         {canEdit && showSaveButton ? (
-                            <Button
-                                type="button"
-                                onClick={save}
-                                disabled={
-                                    busy ||
-                                    schemaStillLoading ||
-                                    headerRuntime.integrityError !== null ||
-                                    (planningMode === 'budget' &&
-                                        positions.length === 0 &&
-                                        !isBudgetSetup)
-                                }
-                                variant={
-                                    step === steps.length - 1
-                                        ? 'default'
-                                        : 'secondary'
-                                }
-                                data-test="wizard-save"
-                            >
-                                Speichern
-                            </Button>
+                            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                                {tkpSaveBlocked ? (
+                                    <p
+                                        className="text-muted-foreground max-w-sm text-right text-xs"
+                                        data-test="oa-tkp-save-blocked"
+                                    >
+                                        TKP befindet sich noch in der
+                                        Vorschauphase. Speichern wird mit der
+                                        späteren Produktfreigabe aktiviert.
+                                    </p>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    onClick={save}
+                                    disabled={
+                                        busy ||
+                                        schemaStillLoading ||
+                                        tkpSaveBlocked ||
+                                        headerRuntime.integrityError !== null ||
+                                        (planningMode === 'budget' &&
+                                            positions.length === 0 &&
+                                            !isBudgetSetup)
+                                    }
+                                    variant={
+                                        step === steps.length - 1
+                                            ? 'default'
+                                            : 'secondary'
+                                    }
+                                    data-test="wizard-save"
+                                >
+                                    Speichern
+                                </Button>
+                            </div>
                         ) : null}
                         {isStandardOffer &&
                         canEdit &&
