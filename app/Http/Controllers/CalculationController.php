@@ -389,7 +389,12 @@ class CalculationController extends Controller
             && ! OaTkpWizardCapability::pairIsReleased();
 
         $oaReloadByPositionId = [];
-        if ($calculation !== null) {
+        $hasStoredOaTkp = $calculation !== null
+            && $calculation->positions->contains(
+                fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position),
+            );
+        // Nur bei OA-Positionen: vermeidet unnötigen Reload-Pfad und bricht Spot/DF-3-Edit nicht.
+        if ($hasStoredOaTkp) {
             foreach ($this->writer->payloadFromCalculation($calculation)['positions'] ?? [] as $reloadPosition) {
                 if (! is_array($reloadPosition) || ! isset($reloadPosition['id'])) {
                     continue;
