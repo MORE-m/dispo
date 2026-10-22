@@ -67,10 +67,7 @@ export function OaTkpPositionEditor({
 
     const priceYearOptions = useMemo(() => {
         const years = new Set(availableYears);
-        if (
-            position.original_oa_price_year != null &&
-            onOriginalTriple
-        ) {
+        if (position.original_oa_price_year != null && onOriginalTriple) {
             years.add(position.original_oa_price_year);
         }
         years.add(position.price_year);
@@ -165,7 +162,15 @@ export function OaTkpPositionEditor({
             onChange({ price_year: preferred });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [availableYears, yearsLoading, position.price_year, rebind, showActivePickers, canEdit, currentPriceYear]);
+    }, [
+        availableYears,
+        yearsLoading,
+        position.price_year,
+        rebind,
+        showActivePickers,
+        canEdit,
+        currentPriceYear,
+    ]);
 
     const distribution = platformDistributionStatus(
         position.impressions_input,
@@ -184,8 +189,7 @@ export function OaTkpPositionEditor({
     const activePlatformOptions = platforms.filter(
         (platform) =>
             !position.oa_platform_allocations.some(
-                (row) =>
-                    row.oa_platform_id === platform.id && !row.historical,
+                (row) => row.oa_platform_id === platform.id && !row.historical,
             ),
     );
 
@@ -286,16 +290,15 @@ export function OaTkpPositionEditor({
     }, [targetings]);
 
     return (
-        <div
-            className="space-y-6"
-            data-test={`oa-tkp-editor-${positionIndex}`}
-        >
+        <div className="space-y-6" data-test={`oa-tkp-editor-${positionIndex}`}>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <FormField
                     label="Impressions"
                     htmlFor={`oa-tkp-impressions-${positionIndex}`}
                     error={
-                        fieldErrors[`positions.${positionIndex}.impressions`]?.[0]
+                        fieldErrors[
+                            `positions.${positionIndex}.impressions`
+                        ]?.[0]
                     }
                 >
                     <Input
@@ -338,7 +341,9 @@ export function OaTkpPositionEditor({
                     label="Preislistenjahr"
                     htmlFor={`oa-tkp-price-year-${positionIndex}`}
                     error={
-                        fieldErrors[`positions.${positionIndex}.price_year`]?.[0] ??
+                        fieldErrors[
+                            `positions.${positionIndex}.price_year`
+                        ]?.[0] ??
                         fieldErrors[
                             `positions.${positionIndex}.expected_oa_tkp_price_list_id`
                         ]?.[0]
@@ -383,7 +388,10 @@ export function OaTkpPositionEditor({
             ) : null}
 
             <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <ReadonlyMetric label="Listen-TKP" value={formatTkpDisplay(listTkp)} />
+                <ReadonlyMetric
+                    label="Listen-TKP"
+                    value={formatTkpDisplay(listTkp)}
+                />
                 <ReadonlyMetric
                     label="Mindest-TKP"
                     value={formatTkpDisplay(minTkp)}
@@ -472,7 +480,8 @@ export function OaTkpPositionEditor({
                                                 (item) => item.id === id,
                                             );
                                             updateAllocation(rowIndex, {
-                                                oa_platform_id: platform?.id ?? null,
+                                                oa_platform_id:
+                                                    platform?.id ?? null,
                                                 platform_code:
                                                     platform?.code ?? null,
                                                 platform_name:

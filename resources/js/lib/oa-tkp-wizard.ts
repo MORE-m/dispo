@@ -101,9 +101,9 @@ export function isTkpPosition(
     return position.calculation_method_key === OA_TKP_METHOD_KEY;
 }
 
-export function mediumOffersTkpMethod(
-    medium: { calculation_method_options?: CalculationMethodOptions | null },
-): boolean {
+export function mediumOffersTkpMethod(medium: {
+    calculation_method_options?: CalculationMethodOptions | null;
+}): boolean {
     const methods = medium.calculation_method_options?.methods ?? [];
 
     return methods.some((method) => method.key === OA_TKP_METHOD_KEY);
@@ -195,7 +195,10 @@ export function isValidBasisTkpInput(raw: string): boolean {
 
     const whole = match[1] ?? '0';
     const significant = whole.replace(/^0+/, '') || '0';
-    if (significant === '0' && (match[2] === undefined || /^0+$/.test(match[2]))) {
+    if (
+        significant === '0' &&
+        (match[2] === undefined || /^0+$/.test(match[2]))
+    ) {
         return false;
     }
 
@@ -273,7 +276,8 @@ export function isOaTkpTripleUnchanged(
 
     return (
         position.inventory_id === position.saved_inventory_id &&
-        position.advertising_medium_id === position.saved_advertising_medium_id &&
+        position.advertising_medium_id ===
+            position.saved_advertising_medium_id &&
         position.price_year === position.saved_price_year
     );
 }
@@ -437,7 +441,8 @@ export function buildOaTkpPositionPayload(
         id?: number | null;
     },
 ): OaTkpPreviewPayloadPosition {
-    const impressions = parsePositiveIntegerInput(position.impressions_input) ?? 0;
+    const impressions =
+        parsePositiveIntegerInput(position.impressions_input) ?? 0;
 
     return {
         id: position.id ?? null,

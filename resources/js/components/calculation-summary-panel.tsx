@@ -156,8 +156,7 @@ export function CalculationSummaryPanel({
                                                 'tkp' ? (
                                                     <p className="text-muted-foreground text-xs">
                                                         {total?.method_result
-                                                            ?.tkp
-                                                            ?.final_tkp !=
+                                                            ?.tkp?.final_tkp !=
                                                             null &&
                                                         total.method_result.tkp
                                                             .impressions !=
