@@ -5,6 +5,7 @@ namespace App\Services\DispoOrder;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
+use App\Services\Calculation\Decimal;
 use App\Support\Inventory\InventoryIdentity;
 
 final class DispoOrderPositionAdoptionService
@@ -67,6 +68,13 @@ final class DispoOrderPositionAdoptionService
                 'id' => $position->id,
                 'inventory_name' => InventoryIdentity::displayName($position),
                 'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
+                // PO-CALC-TKP-1D3b: additive OA-Identität aus gespeicherten Calc-Werten.
+                'calculation_method_key' => $position->calculation_method_key,
+                'engine_profile_key' => $position->engine_profile_key,
+                'impressions' => $position->impressions === null ? null : (int) $position->impressions,
+                'final_tkp' => $position->final_tkp === null || trim((string) $position->final_tkp) === ''
+                    ? null
+                    : Decimal::roundPrice((string) $position->final_tkp),
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,
                 'nn_invest' => (string) $position->nn_invest,

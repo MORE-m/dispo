@@ -6,8 +6,7 @@ import {
     DISPO_ORDERS_CACHE_TAG,
     flushDispoOrderInertiaCache,
 } from '@/lib/dispo-order-inertia-cache';
-import { formatPlannerEntriesSummary } from '@/lib/dispo-planner-display';
-import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import { formatDispoAdoptionPositionDetail } from '@/lib/dispo-order-adoption-display';
 import {
     firstValidationMessage,
     mapValidationErrors,
@@ -29,6 +28,10 @@ type SelectablePosition = {
     id: number;
     inventory_name: string;
     advertising_medium_name: string;
+    calculation_method_key?: string | null;
+    engine_profile_key?: string | null;
+    impressions?: number | null;
+    final_tkp?: string | null;
     length_seconds: number;
     total_spot_count: number;
     nn_invest: string;
@@ -57,27 +60,6 @@ type PositionsResponse = {
         rejection_reason: string | null;
     };
 };
-
-function formatTimeRanges(ranges: SelectablePosition['time_ranges']): string {
-    if (ranges.length === 0) {
-        return '–';
-    }
-
-    return ranges
-        .map(
-            (range) =>
-                `${formatHour(range.start_hour)}–${formatInclusiveEnd(range.end_hour_exclusive)} · ${range.spot_count} Spots`,
-        )
-        .join('; ');
-}
-
-function formatPositionTiming(position: SelectablePosition): string {
-    if (position.planner_entries && position.planner_entries.length > 0) {
-        return formatPlannerEntriesSummary(position.planner_entries);
-    }
-
-    return formatTimeRanges(position.time_ranges);
-}
 
 function defaultSelectedIds(
     positions: SelectablePosition[],
@@ -355,16 +337,11 @@ export function DispoOrderCreateDialog({
                                                                 position.advertising_medium_name
                                                             }
                                                         </Label>
-                                                        <p className="text-muted-foreground text-xs">
-                                                            {
-                                                                position.total_spot_count
-                                                            }{' '}
-                                                            Spots ·{' '}
-                                                            {
-                                                                position.length_seconds
-                                                            }
-                                                            s ·{' '}
-                                                            {formatPositionTiming(
+                                                        <p
+                                                            className="text-muted-foreground text-xs"
+                                                            data-test={`dispo-order-position-detail-${position.id}`}
+                                                        >
+                                                            {formatDispoAdoptionPositionDetail(
                                                                 position,
                                                             )}
                                                         </p>

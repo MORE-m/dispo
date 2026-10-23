@@ -63,6 +63,8 @@ eine automatische Korrektur oder Ersetzung eines Altauftrags.
 - UI: Dialog „Dispoauftrag anlegen“ lädt wählbare Positionen inkl.
   `already_adopted` / `adoptions`.
   - Service: `DispoOrderPositionAdoptionService::selectablePositions`
+    (ab D3b additiv OA: `calculation_method_key`, `engine_profile_key`,
+    `impressions`, `final_tkp` aus gespeicherten Calc-Werten)
   - UI: `resources/js/components/dispo-order-create-dialog.tsx`
   - Test: `…::test_adopted_positions_are_reported`
 
