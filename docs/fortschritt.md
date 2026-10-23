@@ -1,10 +1,17 @@
 # Fortschritt V1
 
-Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3a** auf Feature-Branch:
+Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3b** auf Feature-Branch (Draft-PR):
+Adoption-API + Dispo-Create-Dialog für gespeicherte OA-TKP-Positionen.
+Wizard-Guard: Create bei persistierter Kalkulation (Spot/OA/Mixed); Preview-only
+ohne Speicherung bleibt ohne Handoff. Registry planned; HTTP Store/Update geschlossen.
+D3c Show-Darstellung und D3d Härte folgen. Dok:
+`docs/readiness/PO-CALC-TKP-1D3b-auftrag-2026-10-23.md`.
+
+Stand davor: 23. Oktober 2026 – **PO-CALC-TKP-1D3a** auf `main` (PR #174,
+Merge `99eea365f0782522b850fb7f820e710961655edf`):
 Serverseitiger OA-Dispo-Snapshot + Mapper-Handoff. D1-Gate ersetzt durch
 vollständigen OA-Zweig. Registry planned; HTTP Store/Update geschlossen.
-Dispo-UI (D3b/c) und Härte (D3d) folgen. Dok:
-`docs/readiness/PO-CALC-TKP-1D3a-auftrag-2026-10-23.md`.
+Dok: `docs/readiness/PO-CALC-TKP-1D3a-auftrag-2026-10-23.md`.
 
 Stand davor: 22. Oktober 2026 – **PO-CALC-TKP-1D2b** auf `main` (PR #173):
 D2b liefert vollständige TKP Wizard UI + Preview. Persistenz bleibt bewusst geschlossen.

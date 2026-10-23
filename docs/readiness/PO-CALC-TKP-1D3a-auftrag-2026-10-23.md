@@ -1,7 +1,8 @@
 # PO-CALC-TKP-1D3a – OA Dispo Snapshot Contract + Mapper
 
-Stand: 23. Oktober 2026 (Feature-Branch)  
-Base: `87924b770e2b4d583e5a0061e85b4330f432369b`
+Stand: 23. Oktober 2026 – **auf `main`** (PR #174)  
+Merge-Commit: `99eea365f0782522b850fb7f820e710961655edf`  
+Base vor Merge: `87924b770e2b4d583e5a0061e85b4330f432369b`
 
 ## Ziel
 
@@ -19,9 +20,9 @@ in revisionssichere Dispo-Snapshots übernehmen. Spot-Handoff unverändert.
 - Keine Spotproduktion für OA
 - Tests via `CalculationWriter`-Fixtures; Registry/HTTP Store-Update bleiben closed
 
-## OUT
+## OUT (folgt in späteren Slices)
 
-- D3b Dispo-Dialog / Adoption-UI
+- D3b Dispo-Dialog / Adoption-UI → **PO-CALC-TKP-1D3b**
 - D3c Dispo-Show („0 Spots“-Darstellung)
 - D3d operative Härte / Playwright
 - D4 Registry Release + HTTP Persistenz
@@ -29,5 +30,5 @@ in revisionssichere Dispo-Snapshots übernehmen. Spot-Handoff unverändert.
 
 ## Statuszeile
 
-> D3a implementiert serverseitige OA-Dispo-Snapshots. UI folgt in D3b/D3c;
+> D3a ist auf `main` (PR #174). UI-Auswahl/Create folgt in D3b; Show in D3c;
 > Härte in D3d; Persistenz-Nutzerpfad in D4.

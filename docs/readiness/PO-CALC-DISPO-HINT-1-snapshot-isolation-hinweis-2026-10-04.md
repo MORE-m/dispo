@@ -23,7 +23,7 @@ Entscheidung: `docs/entscheidungen/PO-CALC-DISPO-LIFECYCLE-1-calc-edit-nach-disp
 |---|---|
 | Calc nach Dispo-Create | bleibt editierbar |
 | Bestehende Dispoaufträge | unverändert bei Calc-Änderung |
-| Neuer Create | übernimmt aktuellen Stand der ausgewählten Positionen |
+| Neuer Create | übernimmt den zuletzt gespeicherten Stand der ausgewählten Positionen (keine Wizard-Drafts) |
 | Auto-Ersatz / Auto-Storno | nein |
 | Hinweis | erklärt Trennung; **kein** Nachweis einer konkreten Abweichung |
 
@@ -31,7 +31,9 @@ Entscheidung: `docs/entscheidungen/PO-CALC-DISPO-LIFECYCLE-1-calc-edit-nach-disp
 
 **Create-Dialog (immer, sobald Positionen geladen):**
 
-> Der neue Dispoauftrag übernimmt den aktuellen Stand der ausgewählten Positionen. Spätere Änderungen an der Kalkulation ändern diesen Auftrag nicht.
+> Für den Dispoauftrag werden die zuletzt gespeicherten Kalkulationspositionen verwendet. Nicht gespeicherte Änderungen im Wizard werden nicht übernommen. Spätere gespeicherte Änderungen an der Kalkulation ändern diesen Auftrag ebenfalls nicht.
+
+(Präzisierung D3b: „aktueller Stand“ = persistierte Adoption-API, nicht Wizard-Draft.)
 
 **Create-Dialog (zusätzlich, wenn bereits Aufträge zur Calc existieren – via `already_adopted`/`adoptions`):**
 

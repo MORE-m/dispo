@@ -5593,23 +5593,18 @@ export default function CalculationWizard({
                                         >
                                             Zusammenfassung
                                         </CardTitle>
+                                        {/*
+                                          PO-CALC-TKP-1D3b: Create nur bei persistierter Kalkulation.
+                                          Der Dialog lädt gespeicherte Positionen vom Server (Spot/OA/Mixed).
+                                          Preview-only / ungespeicherte OA-Drafts haben keine calculation.id
+                                          bzw. erscheinen nicht in der Adoption-API – kein produktiver Handoff.
+                                        */}
                                         {calculation?.id &&
-                                        canCreateDispoOrder &&
-                                        !hasTkpPositions ? (
+                                        canCreateDispoOrder ? (
                                             <DispoOrderCreateAction
                                                 calculationId={calculation.id}
                                                 revision={dispoOrderRevision}
                                             />
-                                        ) : null}
-                                        {hasTkpPositions ? (
-                                            <p
-                                                className="text-muted-foreground text-xs"
-                                                data-test="oa-tkp-dispo-blocked"
-                                            >
-                                                TKP-Positionen können erst nach
-                                                Abschluss der Dispo-Integration
-                                                übergeben werden.
-                                            </p>
                                         ) : null}
                                     </CardHeader>
                                     <CardContent

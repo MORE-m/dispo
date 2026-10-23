@@ -37,9 +37,14 @@ test('Vertrieb legt Dispoauftrag aus Kalkulation an', async ({ page }) => {
     await openDispoOrderDialog(page);
     await expect(page.locator('[data-test="dispo-order-create-dialog"]')).toBeVisible();
     await expect(
-        page.locator('[data-test="dispo-order-create-isolation-hint"]'),
+        page.locator('[data-test="dispo-order-create-saved-positions-hint"]'),
     ).toContainText(
-        'Der neue Dispoauftrag übernimmt den aktuellen Stand der ausgewählten Positionen.',
+        'Für den Dispoauftrag werden die zuletzt gespeicherten Kalkulationspositionen verwendet.',
+    );
+    await expect(
+        page.locator('[data-test="dispo-order-create-saved-positions-hint"]'),
+    ).toContainText(
+        'Nicht gespeicherte Änderungen im Wizard werden nicht übernommen.',
     );
     await expect(
         page.locator('[data-test="dispo-order-create-no-replace-hint"]'),
