@@ -25,6 +25,7 @@ import {
     type CommunicationEntry,
 } from '@/components/dispo-order-communication-history';
 import { DispoOrderInvoiceEndMonths } from '@/components/dispo-order-invoice-end-months';
+import { DispoOrderOaTkpSnapshotPanel } from '@/components/dispo-order-oa-tkp-snapshot-panel';
 import {
     DispoOrderOperationalStatusActions,
     type OperationalStatusTarget,
@@ -85,6 +86,10 @@ import {
     formatPlannerEntryLine,
     sortPlannerEntriesForDisplay,
 } from '@/lib/dispo-planner-display';
+import {
+    formatDispoShowPositionMeta,
+    isOaTkpDispoShowPosition,
+} from '@/lib/dispo-order-oa-show-display';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
     applyEffectiveRequired,
@@ -164,6 +169,8 @@ type OrderPosition = {
     combination_hint_text?: string | null;
     spot_method: string;
     spot_method_label: string;
+    engine_profile_key?: string | null;
+    calculation_method_key?: string | null;
     length_seconds: number;
     component_calculation_strategy?: string | null;
     component_profile?: 'tandem' | 'tridem' | null;
@@ -177,6 +184,33 @@ type OrderPosition = {
         media_gross?: string | null;
     }>;
     total_spot_count: number;
+    impressions?: number | null;
+    basis_tkp?: string | null;
+    list_tkp_snapshot?: string | null;
+    minimum_tkp_snapshot?: string | null;
+    final_tkp?: string | null;
+    targeting_surcharge_total?: string | null;
+    below_minimum_tkp?: boolean | null;
+    oa_tkp_price_list_id?: number | null;
+    oa_tkp_price_list_version?: string | null;
+    oa_tkp_price_list_year?: number | null;
+    oa_tkp_price_list_revision?: number | null;
+    oa_platform_allocations_snapshot?: Array<{
+        oa_platform_id?: number;
+        platform_code?: string | null;
+        platform_name?: string | null;
+        impressions?: number;
+        sort?: number;
+    }> | null;
+    oa_targeting_selections_snapshot?: Array<{
+        oa_targeting_definition_id?: number;
+        targeting_code?: string | null;
+        targeting_name?: string | null;
+        targeting_category?: string | null;
+        tkp_surcharge_snapshot?: string | null;
+        targeting_revision_number?: number | null;
+        sort?: number;
+    }> | null;
     price_list_version: string | null;
     media_gross: string;
     position_discount_amount: string;
@@ -2177,14 +2211,18 @@ export default function DispoOrderShow({
                                             ? ` · Hinweis: ${position.combination_hint_text}`
                                             : ''}
                                     </p>
-                                    <p className="text-muted-foreground mt-1 text-xs">
-                                        {position.spot_method_label} ·{' '}
-                                        {position.total_spot_count} Spots ·{' '}
-                                        {position.length_seconds}s
-                                        {position.price_list_version
-                                            ? ` · Preisliste ${position.price_list_version}`
-                                            : ''}
+                                    <p
+                                        className="text-muted-foreground mt-1 text-xs"
+                                        data-test={`dispo-order-position-meta-${index}`}
+                                    >
+                                        {formatDispoShowPositionMeta(position)}
                                     </p>
+                                    {isOaTkpDispoShowPosition(position) ? (
+                                        <DispoOrderOaTkpSnapshotPanel
+                                            position={position}
+                                            index={index}
+                                        />
+                                    ) : null}
                                     <DispoOrderInvoiceEndMonths
                                         orderId={order.id}
                                         positionId={position.id}
@@ -2201,7 +2239,8 @@ export default function DispoOrderShow({
                                         }
                                         canEdit={canUpdateInvoiceEndMonths}
                                     />
-                                    {position.components &&
+                                    {!isOaTkpDispoShowPosition(position) &&
+                                    position.components &&
                                     position.components.length > 0 ? (
                                         <div
                                             className="text-muted-foreground mt-2 space-y-1 text-xs"
@@ -2576,7 +2615,8 @@ export default function DispoOrderShow({
                                             )}
                                         </div>
                                     ) : null}
-                                    {position.time_ranges.length > 0 ? (
+                                    {!isOaTkpDispoShowPosition(position) &&
+                                    position.time_ranges.length > 0 ? (
                                         <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
                                             {position.time_ranges.map(
                                                 (range) => (
@@ -2600,7 +2640,8 @@ export default function DispoOrderShow({
                                             )}
                                         </ul>
                                     ) : null}
-                                    {position.planner_entries &&
+                                    {!isOaTkpDispoShowPosition(position) &&
+                                    position.planner_entries &&
                                     position.planner_entries.length > 0 ? (
                                         <ul
                                             className="text-muted-foreground mt-2 space-y-0.5 text-xs"

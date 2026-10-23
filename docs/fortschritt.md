@@ -1,11 +1,16 @@
 # Fortschritt V1
 
-Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3b** auf Feature-Branch (Draft-PR):
+Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3c** auf Feature-Branch (Draft-PR):
+OA-Dispo-Show aus eingefrorenem Snapshot (Impressions/TKP/Platforms/Targetings/
+Preisidentität). Spot-Anzeige unverändert; Mixed in einem Auftrag. Material/
+Completion/Status unverändert (D3d). Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3c-auftrag-2026-10-23.md`.
+
+Stand davor: 23. Oktober 2026 – **PO-CALC-TKP-1D3b** auf `main` (PR #175,
+Merge `6e4f9bbfbc0e800429bee6c87a1c876c22d64158`):
 Adoption-API + Dispo-Create-Dialog für gespeicherte OA-TKP-Positionen.
-Wizard-Guard: Create bei persistierter Kalkulation (Spot/OA/Mixed); Preview-only
-ohne Speicherung bleibt ohne Handoff. Registry planned; HTTP Store/Update geschlossen.
-D3c Show-Darstellung und D3d Härte folgen. Dok:
-`docs/readiness/PO-CALC-TKP-1D3b-auftrag-2026-10-23.md`.
+Wizard-Guard: Create bei persistierter Kalkulation; Draft-vs-Saved-Hinweis.
+Dok: `docs/readiness/PO-CALC-TKP-1D3b-auftrag-2026-10-23.md`.
 
 Stand davor: 23. Oktober 2026 – **PO-CALC-TKP-1D3a** auf `main` (PR #174,
 Merge `99eea365f0782522b850fb7f820e710961655edf`):

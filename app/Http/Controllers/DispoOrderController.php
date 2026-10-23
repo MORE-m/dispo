@@ -31,6 +31,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\DispoOrderUpload;
 use App\Models\User;
+use App\Services\Calculation\Decimal;
 use App\Services\DispoOrder\DispoOrderApprovalService;
 use App\Services\DispoOrder\DispoOrderCancellationService;
 use App\Services\DispoOrder\DispoOrderCompletedReopenService;
@@ -907,6 +908,8 @@ class DispoOrderController extends Controller
                     'combination_hint_text' => $position->combination_hint_text,
                     'spot_method' => $position->spot_method->value,
                     'spot_method_label' => $position->spot_method->label(),
+                    'engine_profile_key' => $position->engine_profile_key,
+                    'calculation_method_key' => $position->calculation_method_key,
                     'length_seconds' => $position->length_seconds,
                     'component_calculation_strategy' => $position->component_calculation_strategy,
                     'component_profile' => $position->component_profile?->value,
@@ -919,6 +922,39 @@ class DispoOrderController extends Controller
                             : null),
                     'components' => $position->components_snapshot ?? [],
                     'total_spot_count' => $position->total_spot_count,
+                    // PO-CALC-TKP-1D3c: eingefrorene OA-Snapshot-Felder (read-only Show).
+                    'impressions' => $position->impressions === null ? null : (int) $position->impressions,
+                    'basis_tkp' => $this->nullableRoundPrice($position->basis_tkp),
+                    'list_tkp_snapshot' => $this->nullableRoundPrice($position->list_tkp_snapshot),
+                    'minimum_tkp_snapshot' => $this->nullableRoundPrice($position->minimum_tkp_snapshot),
+                    'final_tkp' => $this->nullableRoundPrice($position->final_tkp),
+                    'targeting_surcharge_total' => $this->nullableRoundPrice($position->targeting_surcharge_total),
+                    'below_minimum_tkp' => $position->below_minimum_tkp === null
+                        ? null
+                        : (bool) $position->below_minimum_tkp,
+                    'oa_tkp_price_list_id' => $position->oa_tkp_price_list_id === null
+                        ? null
+                        : (int) $position->oa_tkp_price_list_id,
+                    'oa_tkp_price_list_version' => $position->oa_tkp_price_list_version,
+                    'oa_tkp_price_list_year' => $position->oa_tkp_price_list_year === null
+                        ? null
+                        : (int) $position->oa_tkp_price_list_year,
+                    'oa_tkp_price_list_revision' => $position->oa_tkp_price_list_revision === null
+                        ? null
+                        : (int) $position->oa_tkp_price_list_revision,
+                    'oa_platform_allocations_snapshot' => $position->oa_platform_allocations_snapshot ?? [],
+                    'oa_targeting_selections_snapshot' => array_map(
+                        static function (array $row): array {
+                            if (isset($row['tkp_surcharge_snapshot']) && $row['tkp_surcharge_snapshot'] !== null && $row['tkp_surcharge_snapshot'] !== '') {
+                                $row['tkp_surcharge_snapshot'] = Decimal::roundPrice((string) $row['tkp_surcharge_snapshot']);
+                            }
+
+                            return $row;
+                        },
+                        is_array($position->oa_targeting_selections_snapshot)
+                            ? $position->oa_targeting_selections_snapshot
+                            : [],
+                    ),
                     'price_list_version' => $position->price_list_version,
                     'media_gross' => (string) $position->media_gross,
                     'position_discount_amount' => (string) $position->position_discount_amount,
@@ -945,6 +981,15 @@ class DispoOrderController extends Controller
                 ];
             })->all(),
         ];
+    }
+
+    private function nullableRoundPrice(mixed $value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        return Decimal::roundPrice((string) $value);
     }
 
     /**
