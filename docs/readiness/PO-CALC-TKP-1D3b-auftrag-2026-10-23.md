@@ -25,6 +25,17 @@ Gespeicherte OA-TKP-Positionen im bestehenden Dispo-Create-Dialog auswählen und
 - D4 Registry Release + HTTP Persistenz
 - Budget/SO TKP; neue Mutation-Hintertüren
 
+## Draft vs. Saved
+
+Create-Dialog und Adoption-API lesen ausschließlich persistierte Positionen
+(`GET dispo-orders.positions` → DB). Wizard-Drafts (ungespeicherte TKP-/Spot-
+Änderungen) fließen nicht ein. UX-Hinweis im Dialog:
+
+> Für den Dispoauftrag werden die zuletzt gespeicherten Kalkulationspositionen
+> verwendet. Nicht gespeicherte Änderungen im Wizard werden nicht übernommen.
+
+Kein zusätzlicher Dirty-State-Mechanismus; der Hinweis gilt immer beim Create.
+
 ## Statuszeile
 
 > D3b macht gespeicherte OA-Positionen im Create-Dialog auswählbar.

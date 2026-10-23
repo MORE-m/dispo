@@ -123,9 +123,14 @@ describe('DispoOrderCreateDialog', () => {
         });
 
         expect(
-            screen.getByTestId('dispo-order-create-isolation-hint'),
+            screen.getByTestId('dispo-order-create-saved-positions-hint'),
         ).toHaveTextContent(
-            'Der neue Dispoauftrag übernimmt den aktuellen Stand der ausgewählten Positionen. Spätere Änderungen an der Kalkulation ändern diesen Auftrag nicht.',
+            'Für den Dispoauftrag werden die zuletzt gespeicherten Kalkulationspositionen verwendet. Nicht gespeicherte Änderungen im Wizard werden nicht übernommen.',
+        );
+        expect(
+            screen.getByTestId('dispo-order-create-saved-positions-hint'),
+        ).toHaveTextContent(
+            'Spätere gespeicherte Änderungen an der Kalkulation ändern diesen Auftrag ebenfalls nicht.',
         );
         expect(
             screen.getByTestId('dispo-order-create-no-replace-hint'),

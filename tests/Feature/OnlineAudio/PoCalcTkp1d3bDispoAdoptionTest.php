@@ -123,6 +123,48 @@ class PoCalcTkp1d3bDispoAdoptionTest extends TestCase
     }
 
     #[Test]
+    public function adoption_api_reflects_only_persisted_calculation_positions(): void
+    {
+        $ctx = $this->seedContext();
+        $calc = app(CalculationWriter::class)->create($this->payload([
+            $this->oaPosition($ctx),
+        ]), $ctx['user']);
+        $oa = $calc->positions->firstOrFail();
+
+        $before = $this->actingAs($ctx['user'])
+            ->getJson(route('dispo-orders.positions', $calc))
+            ->assertOk()
+            ->json('positions.0');
+
+        $this->assertSame(100_000, (int) $before['impressions']);
+        $this->assertSame(
+            Decimal::roundPrice((string) $oa->final_tkp),
+            $before['final_tkp'],
+        );
+
+        // Simuliert eine gespeicherte Calc-Änderung (nicht Wizard-Draft).
+        $oa->forceFill([
+            'impressions' => 250_000,
+            'final_tkp' => '12.5000',
+        ])->save();
+
+        $after = $this->actingAs($ctx['user'])
+            ->getJson(route('dispo-orders.positions', $calc->fresh()))
+            ->assertOk()
+            ->json('positions.0');
+
+        $this->assertSame(250_000, (int) $after['impressions']);
+        $this->assertSame('12.5000', $after['final_tkp']);
+        $this->assertSame((int) $oa->id, (int) $after['id']);
+        $this->assertCount(
+            1,
+            $this->actingAs($ctx['user'])
+                ->getJson(route('dispo-orders.positions', $calc->fresh()))
+                ->json('positions'),
+        );
+    }
+
+    #[Test]
     public function already_adopted_oa_positions_remain_selectable_for_repeat_handoff(): void
     {
         $ctx = $this->seedContext();

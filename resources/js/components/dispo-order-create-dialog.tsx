@@ -257,10 +257,12 @@ export function DispoOrderCreateDialog({
                         data-test="dispo-order-create-isolation-hint"
                         role="note"
                     >
-                        <p>
-                            Der neue Dispoauftrag übernimmt den aktuellen Stand
-                            der ausgewählten Positionen. Spätere Änderungen an
-                            der Kalkulation ändern diesen Auftrag nicht.
+                        <p data-test="dispo-order-create-saved-positions-hint">
+                            Für den Dispoauftrag werden die zuletzt gespeicherten
+                            Kalkulationspositionen verwendet. Nicht gespeicherte
+                            Änderungen im Wizard werden nicht übernommen.
+                            Spätere gespeicherte Änderungen an der Kalkulation
+                            ändern diesen Auftrag ebenfalls nicht.
                         </p>
                         {hasExistingDispoOrders ? (
                             <p data-test="dispo-order-create-no-replace-hint">
