@@ -944,9 +944,9 @@ class DispoOrderController extends Controller
                         : (int) $position->oa_tkp_price_list_revision,
                     'oa_platform_allocations_snapshot' => $position->oa_platform_allocations_snapshot ?? [],
                     'oa_targeting_selections_snapshot' => array_map(
-                        static function (array $row): array {
-                            if (isset($row['tkp_surcharge_snapshot']) && $row['tkp_surcharge_snapshot'] !== null && $row['tkp_surcharge_snapshot'] !== '') {
-                                $row['tkp_surcharge_snapshot'] = Decimal::roundPrice((string) $row['tkp_surcharge_snapshot']);
+                        function (array $row): array {
+                            if (array_key_exists('tkp_surcharge_snapshot', $row)) {
+                                $row['tkp_surcharge_snapshot'] = $this->nullableRoundPrice($row['tkp_surcharge_snapshot']);
                             }
 
                             return $row;
