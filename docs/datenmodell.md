@@ -357,6 +357,13 @@ in `dispo_order_positions` persistiert (u. a. `time_ranges_snapshot`; ab
 PR **#58**). Ab **BL-P4-02d** zusätzlich `pricing_settlement_mode` und
 `fixed_price_nn` im Positions-Snapshot (Parität zu `CalculationPosition`). Ab
 **BL-P4-02e** zusätzlich `component_profile` (Parität zu `CalculationPosition`).
+Ab **PO-CALC-TKP-1D3a** additiv OA-TKP-Snapshot-Felder auf `dispo_order_positions`:
+`impressions`, `basis_tkp`, `list_tkp_snapshot`, `minimum_tkp_snapshot`, `final_tkp`,
+`targeting_surcharge_total`, `below_minimum_tkp`, `oa_tkp_price_list_id` /
+`version` / `year` / `revision`, JSON `oa_platform_allocations_snapshot` und
+`oa_targeting_selections_snapshot` (historische Werte aus der Calc, keine Live-
+Auflösung). Spot-Spalten unverändert; OA nutzt `length_seconds=0` /
+`total_spot_count=0` ohne Spotproduktion. Dispo-UI-Darstellung folgt in D3b/D3c.
 Ab **DSP-DCP-001** speichert `dispo_orders` additiv den eingefrorenen abgeleiteten
 Kampagnenzeitraum (`derived_campaign_period_start`/`end`/`status`/`at`/`snapshot`).
 Das Dyn-Feld `campaign_period` bleibt unverändert Calc-Origin und wird nicht

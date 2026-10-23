@@ -26,8 +26,8 @@ Normal-TKP (`oa_tkp` × `tkp`) in den gemeinsamen `CalculationWriter` integriere
   - `yearsToLockForPayload` inkl. gepinnter Nicht-Current-Jahre; Lock nach id
 - Writer: Spot + OA gemischt, Child-Sync, Orphan-Cleanup, Reload, Assessor nach Persist
 - Fail-closed: HTTP (`OaTkpHttpReleaseGuard`), Budget, Standardangebote
-- **Dispo vor D3:** `DispoOrderSnapshotMapper` rejectet Freeze `oa_tkp`×`tkp`
-  (kein unvollständiger OA-Dispo-Snapshot; D3 ersetzt diesen Gate)
+- **Dispo vor D3:** `DispoOrderSnapshotMapper` rejectete Freeze `oa_tkp`×`tkp`
+  (ersetzt in **PO-CALC-TKP-1D3a** durch vollständigen OA-Snapshot-Zweig)
 - Tests: Writer-Integration + `PoCalcTkp1d1DispoGateTest`
 
 ## OUT (bewusst nicht)
