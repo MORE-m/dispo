@@ -1,9 +1,15 @@
 # Fortschritt V1
 
-Stand: 22. Oktober 2026 – **PO-CALC-TKP-1D2b** auf Feature-Branch:
+Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3a** auf Feature-Branch:
+Serverseitiger OA-Dispo-Snapshot + Mapper-Handoff. D1-Gate ersetzt durch
+vollständigen OA-Zweig. Registry planned; HTTP Store/Update geschlossen.
+Dispo-UI (D3b/c) und Härte (D3d) folgen. Dok:
+`docs/readiness/PO-CALC-TKP-1D3a-auftrag-2026-10-23.md`.
+
+Stand davor: 22. Oktober 2026 – **PO-CALC-TKP-1D2b** auf `main` (PR #173):
 D2b liefert vollständige TKP Wizard UI + Preview. Persistenz bleibt bewusst geschlossen.
-Capability Soft-Open; Registry planned; Store/Update/Budget/SO/Dispo blocked.
-Dok: `docs/readiness/PO-CALC-TKP-1D2b-auftrag-2026-10-22.md`.
+Capability Soft-Open; Registry planned; Store/Update/Budget/SO blocked;
+Dispo-UI bis D3 geschützt. Dok: `docs/readiness/PO-CALC-TKP-1D2b-auftrag-2026-10-22.md`.
 
 Stand davor: 22. Oktober 2026 – **PO-CALC-TKP-1D2a** auf `main` (PR #172):
 D2a stellt TKP Preview-/Metadata-/Reload-Verträge bereit. Registry bleibt planned;

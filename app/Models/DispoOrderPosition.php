@@ -36,11 +36,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $derived_component_airings
  * @property int $total_spot_count
  * @property int $length_seconds
+ * @property int|null $impressions
+ * @property string|null $basis_tkp
+ * @property string|null $list_tkp_snapshot
+ * @property string|null $minimum_tkp_snapshot
+ * @property string|null $final_tkp
+ * @property string|null $targeting_surcharge_total
+ * @property bool|null $below_minimum_tkp
+ * @property int|null $oa_tkp_price_list_id
+ * @property string|null $oa_tkp_price_list_version
+ * @property int|null $oa_tkp_price_list_year
+ * @property int|null $oa_tkp_price_list_revision
  * @property array<int, array<string, mixed>>|null $plan_rows_snapshot
  * @property array<int, array<string, mixed>>|null $time_ranges_snapshot
  * @property array<int, mixed>|null $planner_entries_snapshot
  * @property array<int, array<string, mixed>>|null $components_snapshot
  * @property array<int, array<string, mixed>>|null $position_discounts_snapshot
+ * @property array<int, array<string, mixed>>|null $oa_platform_allocations_snapshot
+ * @property array<int, array<string, mixed>>|null $oa_targeting_selections_snapshot
  * @property list<int>|null $invoice_end_months
  * @property string|null $line_role
  * @property string|null $production_type
@@ -88,8 +101,19 @@ class DispoOrderPosition extends Model
         'component_profile',
         'derived_component_airings',
         'total_spot_count',
+        'impressions',
+        'basis_tkp',
+        'list_tkp_snapshot',
+        'minimum_tkp_snapshot',
+        'final_tkp',
+        'targeting_surcharge_total',
+        'below_minimum_tkp',
         'needs_spot_redistribution',
         'price_list_id',
+        'oa_tkp_price_list_id',
+        'oa_tkp_price_list_version',
+        'oa_tkp_price_list_year',
+        'oa_tkp_price_list_revision',
         'price_list_version',
         'price_list_name',
         'average_second_price',
@@ -113,6 +137,8 @@ class DispoOrderPosition extends Model
         'planner_entries_snapshot',
         'components_snapshot',
         'position_discounts_snapshot',
+        'oa_platform_allocations_snapshot',
+        'oa_targeting_selections_snapshot',
         'line_role',
         'production_type',
         'production_label',
@@ -140,6 +166,15 @@ class DispoOrderPosition extends Model
             'is_discountable' => 'boolean',
             'is_ae_eligible' => 'boolean',
             'needs_spot_redistribution' => 'boolean',
+            'impressions' => 'integer',
+            'basis_tkp' => 'decimal:4',
+            'list_tkp_snapshot' => 'decimal:4',
+            'minimum_tkp_snapshot' => 'decimal:4',
+            'final_tkp' => 'decimal:4',
+            'targeting_surcharge_total' => 'decimal:4',
+            'below_minimum_tkp' => 'boolean',
+            'oa_tkp_price_list_year' => 'integer',
+            'oa_tkp_price_list_revision' => 'integer',
             'media_gross' => 'decimal:2',
             'position_discount_amount' => 'decimal:2',
             'order_discount_amount' => 'decimal:2',
@@ -154,6 +189,8 @@ class DispoOrderPosition extends Model
             'planner_entries_snapshot' => 'array',
             'components_snapshot' => 'array',
             'position_discounts_snapshot' => 'array',
+            'oa_platform_allocations_snapshot' => 'array',
+            'oa_targeting_selections_snapshot' => 'array',
             'invoice_end_months' => 'array',
             'production_quantity' => 'decimal:4',
             'production_unit_price' => 'decimal:2',

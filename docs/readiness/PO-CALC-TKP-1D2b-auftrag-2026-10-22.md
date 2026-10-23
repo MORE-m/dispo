@@ -1,6 +1,6 @@
 # PO-CALC-TKP-1D2b – React TKP Wizard UI
 
-Stand: 22. Oktober 2026 (Feature-Branch)
+Stand: 22. Oktober 2026 (`main`, PR #173)
 
 ## Ziel
 

@@ -8,6 +8,8 @@ use App\Models\CalculationOrderDiscount;
 use App\Models\CalculationPosition;
 use App\Models\CalculationPositionComponent;
 use App\Models\CalculationPositionDiscount;
+use App\Models\CalculationPositionOaPlatformAllocation;
+use App\Models\CalculationPositionOaTargetingSelection;
 use App\Models\CalculationPositionPlannerEntry;
 use App\Models\CalculationPositionProductionLine;
 use App\Models\CalculationPositionTimeRange;
@@ -94,12 +96,33 @@ final class DispoOrderSnapshotMapper
      */
     public function positionFromCalculationPosition(CalculationPosition $position, int $sort): array
     {
-        $position->loadMissing(['inventory', 'advertisingMedium', 'priceList', 'planRows', 'timeRanges', 'plannerEntries', 'components', 'discounts']);
+        $position->loadMissing([
+            'inventory',
+            'advertisingMedium',
+            'priceList',
+            'planRows',
+            'timeRanges',
+            'plannerEntries',
+            'components',
+            'discounts',
+            'oaPlatformAllocations',
+            'oaTargetingSelections',
+        ]);
 
-        // PO-CALC-TKP-1D1 Nachzug: bis D3 kein unvollständiger OA-Dispo-Snapshot.
-        // Zentral im Mapper, damit createFromCalculation / Produktion / weitere Caller denselben Gate nutzen.
-        $this->assertOaTkpNotHandOffUntilD3($position);
+        if (OaTkpWriterPositionResolver::isStoredOaTkp($position)) {
+            return $this->oaTkpPositionFromCalculationPosition($position, $sort);
+        }
 
+        return $this->spotPositionFromCalculationPosition($position, $sort);
+    }
+
+    /**
+     * Spot-/SWF-Mediazeile (bisheriger Mapper-Pfad).
+     *
+     * @return array<string, mixed>
+     */
+    private function spotPositionFromCalculationPosition(CalculationPosition $position, int $sort): array
+    {
         // Dispoerzeugung ist Mutation: Descriptor muss ausführbar sein.
         $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
 
@@ -134,8 +157,19 @@ final class DispoOrderSnapshotMapper
                 )
                 : null,
             'total_spot_count' => $position->total_spot_count,
+            'impressions' => null,
+            'basis_tkp' => null,
+            'list_tkp_snapshot' => null,
+            'minimum_tkp_snapshot' => null,
+            'final_tkp' => null,
+            'targeting_surcharge_total' => null,
+            'below_minimum_tkp' => null,
             'needs_spot_redistribution' => (bool) $position->needs_spot_redistribution,
             'price_list_id' => $position->price_list_id,
+            'oa_tkp_price_list_id' => null,
+            'oa_tkp_price_list_version' => null,
+            'oa_tkp_price_list_year' => null,
+            'oa_tkp_price_list_revision' => null,
             'price_list_version' => $position->price_list_version,
             'price_list_name' => $position->priceList?->name,
             'average_second_price' => $position->average_second_price === null ? null : (string) $position->average_second_price,
@@ -205,6 +239,122 @@ final class DispoOrderSnapshotMapper
                     'percent' => (string) $discount->percent,
                 ]
             )->all(),
+            'oa_platform_allocations_snapshot' => null,
+            'oa_targeting_selections_snapshot' => null,
+        ];
+    }
+
+    /**
+     * PO-CALC-TKP-1D3a: OA-TKP-Mediazeile aus gespeicherten Calc-Werten (keine Neuberechnung).
+     *
+     * @return array<string, mixed>
+     */
+    private function oaTkpPositionFromCalculationPosition(CalculationPosition $position, int $sort): array
+    {
+        $this->assertStoredOaTkpSnapshotComplete($position);
+
+        $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
+
+        $platformSnapshot = $position->oaPlatformAllocations
+            ->sortBy('sort')
+            ->values()
+            ->map(fn (CalculationPositionOaPlatformAllocation $row): array => [
+                'oa_platform_id' => $row->oa_platform_id,
+                'platform_code' => $row->platform_code,
+                'platform_name' => $row->platform_name,
+                'impressions' => (int) $row->impressions,
+                'sort' => (int) $row->sort,
+            ])
+            ->all();
+
+        $targetingSnapshot = $position->oaTargetingSelections
+            ->sortBy('sort')
+            ->values()
+            ->map(fn (CalculationPositionOaTargetingSelection $row): array => [
+                'oa_targeting_definition_id' => $row->oa_targeting_definition_id,
+                'targeting_code' => $row->targeting_code,
+                'targeting_name' => $row->targeting_name,
+                'targeting_category' => $row->targeting_category,
+                'tkp_surcharge_snapshot' => Decimal::roundPrice((string) $row->tkp_surcharge_snapshot),
+                'targeting_revision_number' => (int) $row->targeting_revision_number,
+                'sort' => (int) $row->sort,
+            ])
+            ->all();
+
+        return [
+            'line_role' => DispoOrderPosition::LINE_ROLE_MEDIA,
+            'calculation_position_id' => $position->id,
+            'sort' => $sort,
+            'inventory_id' => $position->inventory_id,
+            'inventory_name' => InventoryIdentity::displayName($position),
+            'inventory_code' => InventoryIdentity::displayCode($position),
+            'advertising_medium_id' => $position->advertising_medium_id,
+            'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
+            'advertising_medium_code' => $position->advertisingMedium->code ?? null,
+            'booking_code' => $position->booking_code,
+            'planning_responsibility_key' => $position->planning_responsibility_key,
+            'planning_responsibility_label' => $position->planning_responsibility_label,
+            'combination_hint_text' => $position->combination_hint_text,
+            'kind' => $freeze->legacyKind()->value,
+            'spot_method' => $freeze->legacySpotMethod()->value,
+            'engine_profile_key' => $freeze->engineProfileKey,
+            'calculation_method_key' => $freeze->calculationMethodKey,
+            'calculation_method_name' => $freeze->calculationMethodName,
+            'algorithm_version' => $freeze->algorithmVersion,
+            'length_seconds' => 0,
+            'component_calculation_strategy' => null,
+            'component_profile' => null,
+            'derived_component_airings' => null,
+            'total_spot_count' => 0,
+            'impressions' => (int) $position->impressions,
+            'basis_tkp' => Decimal::roundPrice((string) $position->basis_tkp),
+            'list_tkp_snapshot' => Decimal::roundPrice((string) $position->list_tkp_snapshot),
+            'minimum_tkp_snapshot' => Decimal::roundPrice((string) $position->minimum_tkp_snapshot),
+            'final_tkp' => Decimal::roundPrice((string) $position->final_tkp),
+            'targeting_surcharge_total' => Decimal::roundPrice((string) $position->targeting_surcharge_total),
+            'below_minimum_tkp' => (bool) $position->below_minimum_tkp,
+            'needs_spot_redistribution' => false,
+            'price_list_id' => null,
+            'oa_tkp_price_list_id' => $position->oa_tkp_price_list_id,
+            'oa_tkp_price_list_version' => $position->oa_tkp_price_list_version,
+            'oa_tkp_price_list_year' => $position->oa_tkp_price_list_year,
+            'oa_tkp_price_list_revision' => $position->oa_tkp_price_list_revision,
+            'price_list_version' => null,
+            'price_list_name' => null,
+            'average_second_price' => null,
+            'length_index' => null,
+            'surcharge_percent' => (string) ($position->surcharge_percent ?? '0'),
+            'position_discount_percent' => (string) $position->position_discount_percent,
+            'ae_percent' => (string) $position->ae_percent,
+            'is_discountable' => $position->is_discountable,
+            'is_ae_eligible' => $position->is_ae_eligible,
+            'media_gross' => (string) $position->media_gross,
+            'position_discount_amount' => (string) $position->position_discount_amount,
+            'order_discount_amount' => (string) $position->order_discount_amount,
+            'ae_amount' => (string) $position->ae_amount,
+            // OA ohne Spotproduktion: nn_invest der Position ist medienrein.
+            'nn_invest' => (string) $position->nn_invest,
+            'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
+            'fixed_price_nn' => null,
+            'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
+                ? null
+                : (string) $position->effective_pay_factor_percent,
+            'effective_total_discount_percent' => $position->effective_total_discount_percent === null
+                ? null
+                : (string) $position->effective_total_discount_percent,
+            'plan_rows_snapshot' => [],
+            'time_ranges_snapshot' => [],
+            'planner_entries_snapshot' => [],
+            'components_snapshot' => [],
+            'position_discounts_snapshot' => $position->discounts->map(
+                fn (CalculationPositionDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ]
+            )->all(),
+            'oa_platform_allocations_snapshot' => $platformSnapshot,
+            'oa_targeting_selections_snapshot' => $targetingSnapshot,
         ];
     }
 
@@ -217,7 +367,13 @@ final class DispoOrderSnapshotMapper
      */
     public function productionFromLine(CalculationPosition $carrier, CalculationPositionProductionLine $line, int $sort): array
     {
-        $base = $this->positionFromCalculationPosition($carrier, $sort);
+        if (OaTkpWriterPositionResolver::isStoredOaTkp($carrier)) {
+            throw ValidationException::withMessages([
+                'position_ids' => 'TKP-Positionen besitzen keine Spotproduktion und können nicht als Produktionszeile übernommen werden.',
+            ]);
+        }
+
+        $base = $this->spotPositionFromCalculationPosition($carrier, $sort);
         $label = trim($line->label) !== '' ? $line->label : 'Spotproduktion';
 
         return array_merge($base, [
@@ -310,18 +466,62 @@ final class DispoOrderSnapshotMapper
     }
 
     /**
-     * PO-CALC-TKP-1D1 / vor D3: OA-TKP-Positionen nicht an Disposition übergeben.
-     * Erkennung über gespeicherten Freeze (engine_profile_key × calculation_method_key), nicht Medium-Code.
-     * D3 ersetzt diesen Gate durch den vollständigen OA-Dispo-Snapshot.
+     * PO-CALC-TKP-1D3a: gespeicherte OA-Position muss vollständigen Handoff-Snapshot tragen.
+     * Keine Neuberechnung; fehlende Persistenzfelder → fail-closed + TX-Rollback.
      */
-    private function assertOaTkpNotHandOffUntilD3(CalculationPosition $position): void
+    private function assertStoredOaTkpSnapshotComplete(CalculationPosition $position): void
     {
-        if (! OaTkpWriterPositionResolver::isStoredOaTkp($position)) {
-            return;
+        $message = 'TKP-Position ist unvollständig und kann nicht an die Disposition übergeben werden.';
+
+        if ($position->impressions === null || (int) $position->impressions < 1) {
+            throw ValidationException::withMessages(['position_ids' => $message]);
         }
 
-        throw ValidationException::withMessages([
-            'position_ids' => 'TKP-Positionen können noch nicht an die Disposition übergeben werden.',
-        ]);
+        foreach ([
+            'basis_tkp',
+            'list_tkp_snapshot',
+            'minimum_tkp_snapshot',
+            'final_tkp',
+            'targeting_surcharge_total',
+        ] as $field) {
+            $value = $position->{$field};
+            if ($value === null || trim((string) $value) === '') {
+                throw ValidationException::withMessages(['position_ids' => $message]);
+            }
+        }
+
+        if (
+            $position->oa_tkp_price_list_id === null
+            || $position->oa_tkp_price_list_year === null
+            || $position->oa_tkp_price_list_revision === null
+            || $position->oa_tkp_price_list_version === null
+            || trim((string) $position->oa_tkp_price_list_version) === ''
+        ) {
+            throw ValidationException::withMessages(['position_ids' => $message]);
+        }
+
+        $allocations = $position->oaPlatformAllocations;
+        if ($allocations->isEmpty()) {
+            throw ValidationException::withMessages(['position_ids' => $message]);
+        }
+
+        $sum = 0;
+        foreach ($allocations as $row) {
+            $impressions = (int) $row->impressions;
+            if ($impressions < 1 || trim((string) $row->platform_code) === '') {
+                throw ValidationException::withMessages(['position_ids' => $message]);
+            }
+            $sum += $impressions;
+        }
+
+        if ($sum !== (int) $position->impressions) {
+            throw ValidationException::withMessages(['position_ids' => $message]);
+        }
+
+        foreach ($position->oaTargetingSelections as $row) {
+            if (trim((string) $row->targeting_code) === '') {
+                throw ValidationException::withMessages(['position_ids' => $message]);
+            }
+        }
     }
 }
