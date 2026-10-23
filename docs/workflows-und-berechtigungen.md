@@ -49,9 +49,9 @@ Ein Dispoauftrag entsteht nur aus der Kundenkalkulation (`DSP-007`).
 - Die Kalkulation bleibt nach Dispo-Create bearbeitbar.
 - Jeder Dispoauftrag behält den bei seiner Erstellung übernommenen Stand;
   spätere Calc-Änderungen synchronisieren ihn nicht (`DSP-003`).
-- Ein neuer Dispoauftrag übernimmt den aktuellen Stand der ausgewählten
-  Positionen (`DSP-002`) und ersetzt oder storniert bestehende Aufträge
-  nicht automatisch.
+- Ein neuer Dispoauftrag übernimmt den zuletzt gespeicherten Stand der
+  ausgewählten Positionen (`DSP-002`; keine ungespeicherten Wizard-Drafts)
+  und ersetzt oder storniert bestehende Aufträge nicht automatisch.
 - Nach Ablehnung: bestehender Nachbesserungs-/Revisionspfad.
 - UI-Hinweise: Create-Dialog, Dispo-Detail und Kalkulations-Wizard
   (`PO-CALC-DISPO-HINT-1`, inkl. Folgeslice Banner).
