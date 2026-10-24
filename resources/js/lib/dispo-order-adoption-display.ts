@@ -1,15 +1,20 @@
-import {
-    formatImpressions,
-    formatTkpDisplay,
-    OA_TKP_METHOD_KEY,
-} from '@/lib/oa-tkp-wizard';
+import { formatImpressions, formatTkpDisplay } from '@/lib/oa-tkp-wizard';
 import { formatPlannerEntriesSummary } from '@/lib/dispo-planner-display';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
+import {
+    isInconsistentMethodPair,
+    isOaTkpMethodPair,
+    METHOD_INCONSISTENCY_MESSAGE,
+    type DispoMethodClassification,
+} from '@/lib/dispo-position-method-classification';
 
 /** Minimale Felder für die Positionszeile im Dispo-Create-Dialog. */
 export type DispoAdoptionPositionDisplay = {
     calculation_method_key?: string | null;
     engine_profile_key?: string | null;
+    method_classification?: DispoMethodClassification | null;
+    method_inconsistency_message?: string | null;
+    adoptable?: boolean;
     impressions?: number | null;
     final_tkp?: string | null;
     length_seconds: number;
@@ -28,16 +33,32 @@ export type DispoAdoptionPositionDisplay = {
     }[];
 };
 
+/** PO-CALC-TKP-1D3d-1: AND-Vertrag (tkp ∧ oa_tkp), keine OR-Erkennung mehr. */
 export function isOaTkpAdoptionPosition(
     position: Pick<
         DispoAdoptionPositionDisplay,
-        'calculation_method_key' | 'engine_profile_key'
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
     >,
 ): boolean {
-    return (
-        position.calculation_method_key === OA_TKP_METHOD_KEY ||
-        position.engine_profile_key === 'oa_tkp'
-    );
+    return isOaTkpMethodPair(position);
+}
+
+export function isInconsistentAdoptionPosition(
+    position: Pick<
+        DispoAdoptionPositionDisplay,
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
+        | 'adoptable'
+    >,
+): boolean {
+    if (position.adoptable === false) {
+        return true;
+    }
+
+    return isInconsistentMethodPair(position);
 }
 
 function formatTimeRanges(
@@ -64,11 +85,19 @@ function formatPositionTiming(position: DispoAdoptionPositionDisplay): string {
 }
 
 /**
- * Sekundärzeile der Positionsauswahl: Spot unverändert, OA ohne Spotlänge/-anzahl.
+ * Sekundärzeile der Positionsauswahl: Spot unverändert, OA ohne Spotlänge/-anzahl,
+ * inkonsistente Paare ohne Spot-/OA-Scheinwerte.
  */
 export function formatDispoAdoptionPositionDetail(
     position: DispoAdoptionPositionDisplay,
 ): string {
+    if (isInconsistentAdoptionPosition(position)) {
+        return (
+            position.method_inconsistency_message?.trim() ||
+            METHOD_INCONSISTENCY_MESSAGE
+        );
+    }
+
     if (isOaTkpAdoptionPosition(position)) {
         const parts: string[] = [];
 

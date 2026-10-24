@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
     formatDispoShowPositionMeta,
     formatOaPriceListIdentity,
+    isInconsistentDispoShowPosition,
     isOaTkpDispoShowPosition,
 } from '@/lib/dispo-order-oa-show-display';
+import { METHOD_INCONSISTENCY_MESSAGE } from '@/lib/dispo-position-method-classification';
 
 describe('dispo-order-oa-show-display', () => {
     it('detects OA via method keys not spot sentinels', () => {
@@ -15,7 +17,7 @@ describe('dispo-order-oa-show-display', () => {
         ).toBe(true);
         expect(
             isOaTkpDispoShowPosition({
-                calculation_method_key: 'spot_classic',
+                calculation_method_key: 'average',
                 engine_profile_key: 'spot_classic',
             }),
         ).toBe(false);
@@ -29,7 +31,7 @@ describe('dispo-order-oa-show-display', () => {
 
     it('formats spot meta with spots and length', () => {
         const meta = formatDispoShowPositionMeta({
-            calculation_method_key: 'spot_classic',
+            calculation_method_key: 'average',
             engine_profile_key: 'spot_classic',
             spot_method_label: 'Durchschnitt',
             total_spot_count: 10,
@@ -54,6 +56,25 @@ describe('dispo-order-oa-show-display', () => {
         expect(meta).toContain('12,5000 €');
         expect(meta).not.toContain('Spots');
         expect(meta).not.toContain('0s');
+    });
+
+    it('formats inconsistent historical pairs without spot fallback', () => {
+        expect(
+            isInconsistentDispoShowPosition({
+                calculation_method_key: 'tkp',
+                engine_profile_key: 'spot_classic',
+            }),
+        ).toBe(true);
+
+        const meta = formatDispoShowPositionMeta({
+            calculation_method_key: 'tkp',
+            engine_profile_key: 'spot_classic',
+            spot_method_label: 'TKP',
+            total_spot_count: 0,
+            length_seconds: 0,
+        });
+        expect(meta).toBe(METHOD_INCONSISTENCY_MESSAGE);
+        expect(meta).not.toMatch(/\b0\s*Spots\b/);
     });
 
     it('formats frozen price list identity', () => {

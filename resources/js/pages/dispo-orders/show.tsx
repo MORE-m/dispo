@@ -88,8 +88,10 @@ import {
 } from '@/lib/dispo-planner-display';
 import {
     formatDispoShowPositionMeta,
+    isInconsistentDispoShowPosition,
     isOaTkpDispoShowPosition,
 } from '@/lib/dispo-order-oa-show-display';
+import type { DispoMethodClassification } from '@/lib/dispo-position-method-classification';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
     applyEffectiveRequired,
@@ -171,6 +173,8 @@ type OrderPosition = {
     spot_method_label: string;
     engine_profile_key?: string | null;
     calculation_method_key?: string | null;
+    method_classification?: DispoMethodClassification | null;
+    method_inconsistency_message?: string | null;
     length_seconds: number;
     component_calculation_strategy?: string | null;
     component_profile?: 'tandem' | 'tridem' | null;
@@ -2212,8 +2216,18 @@ export default function DispoOrderShow({
                                             : ''}
                                     </p>
                                     <p
-                                        className="text-muted-foreground mt-1 text-xs"
+                                        className={
+                                            isInconsistentDispoShowPosition(
+                                                position,
+                                            )
+                                                ? 'text-destructive mt-1 text-xs'
+                                                : 'text-muted-foreground mt-1 text-xs'
+                                        }
                                         data-test={`dispo-order-position-meta-${index}`}
+                                        data-method-classification={
+                                            position.method_classification ??
+                                            undefined
+                                        }
                                     >
                                         {formatDispoShowPositionMeta(position)}
                                     </p>
@@ -2240,6 +2254,9 @@ export default function DispoOrderShow({
                                         canEdit={canUpdateInvoiceEndMonths}
                                     />
                                     {!isOaTkpDispoShowPosition(position) &&
+                                    !isInconsistentDispoShowPosition(
+                                        position,
+                                    ) &&
                                     position.components &&
                                     position.components.length > 0 ? (
                                         <div
@@ -2616,6 +2633,9 @@ export default function DispoOrderShow({
                                         </div>
                                     ) : null}
                                     {!isOaTkpDispoShowPosition(position) &&
+                                    !isInconsistentDispoShowPosition(
+                                        position,
+                                    ) &&
                                     position.time_ranges.length > 0 ? (
                                         <ul className="text-muted-foreground mt-2 space-y-0.5 text-xs">
                                             {position.time_ranges.map(
@@ -2641,6 +2661,9 @@ export default function DispoOrderShow({
                                         </ul>
                                     ) : null}
                                     {!isOaTkpDispoShowPosition(position) &&
+                                    !isInconsistentDispoShowPosition(
+                                        position,
+                                    ) &&
                                     position.planner_entries &&
                                     position.planner_entries.length > 0 ? (
                                         <ul

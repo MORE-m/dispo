@@ -404,7 +404,7 @@ describe('DispoOrderCreateDialog', () => {
                             id: 1,
                             inventory_name: 'Radio Hamburg',
                             advertising_medium_name: 'Spot',
-                            calculation_method_key: 'spot_classic',
+                            calculation_method_key: 'average',
                             engine_profile_key: 'spot_classic',
                             impressions: null,
                             final_tkp: null,

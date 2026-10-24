@@ -1,7 +1,8 @@
 # PO-CALC-TKP-1D3c – OA Dispo-Show und Snapshot-Anzeige
 
-Stand: 23. Oktober 2026 (Feature-Branch / Draft-PR)  
-Base: `6e4f9bbfbc0e800429bee6c87a1c876c22d64158` (D3b auf `main`)
+Stand: 24. Oktober 2026 – **auf `main`** (PR #176, Merge
+`3081741bf70186ca8fa47189e0a0cd9acb0036df`)  
+Base zur Umsetzung: `6e4f9bbfbc0e800429bee6c87a1c876c22d64158` (D3b auf `main`)
 
 ## Ziel
 

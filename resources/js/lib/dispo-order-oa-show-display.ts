@@ -1,12 +1,16 @@
+import { formatImpressions, formatTkpDisplay } from '@/lib/oa-tkp-wizard';
 import {
-    formatImpressions,
-    formatTkpDisplay,
-    OA_TKP_METHOD_KEY,
-} from '@/lib/oa-tkp-wizard';
+    isInconsistentMethodPair,
+    isOaTkpMethodPair,
+    METHOD_INCONSISTENCY_MESSAGE,
+    type DispoMethodClassification,
+} from '@/lib/dispo-position-method-classification';
 
 export type DispoShowOaPosition = {
     calculation_method_key?: string | null;
     engine_profile_key?: string | null;
+    method_classification?: DispoMethodClassification | null;
+    method_inconsistency_message?: string | null;
     impressions?: number | null;
     final_tkp?: string | null;
     basis_tkp?: string | null;
@@ -42,23 +46,40 @@ export type DispoShowOaPosition = {
     price_list_version?: string | null;
 };
 
-/** Methodenschlüssel aus Dispo-Snapshot – keine Erkennung über Spot-Sentinel-Werte. */
+/** Methodenschlüssel aus Dispo-Snapshot – AND-Vertrag; kein Spot-Sentinel. */
 export function isOaTkpDispoShowPosition(
     position: Pick<
         DispoShowOaPosition,
-        'calculation_method_key' | 'engine_profile_key'
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
     >,
 ): boolean {
-    return (
-        position.calculation_method_key === OA_TKP_METHOD_KEY &&
-        position.engine_profile_key === 'oa_tkp'
-    );
+    return isOaTkpMethodPair(position);
+}
+
+export function isInconsistentDispoShowPosition(
+    position: Pick<
+        DispoShowOaPosition,
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
+    >,
+): boolean {
+    return isInconsistentMethodPair(position);
 }
 
 /** Kompakte Meta-Zeile unter Inventory/Medium. */
 export function formatDispoShowPositionMeta(
     position: DispoShowOaPosition,
 ): string {
+    if (isInconsistentDispoShowPosition(position)) {
+        return (
+            position.method_inconsistency_message?.trim() ||
+            METHOD_INCONSISTENCY_MESSAGE
+        );
+    }
+
     if (isOaTkpDispoShowPosition(position)) {
         const parts: string[] = ['TKP'];
 
