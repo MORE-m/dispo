@@ -51,6 +51,9 @@ Produktiv nutzbare Grundlage ohne Admin-UI:
   operativer `derived_campaign_period_*` aus Frozen Positionen abgeleitet und
   eingefroren. `campaign_period` bleibt Calc-Origin und wird dabei weder
   überschrieben noch umgedeutet. Draft-Sync darf Derived nicht neu berechnen.
+  Non-Calendar inkl. **OA-TKP** (`spot_method=tkp`) nutzt `period_open` /
+  `position_flight_period` (Flight-Pfad). D3d-2a sichert diesen Vertrag
+  regressionsseitig ab, ohne neue Flight-Pflichten.
 
 ## Umsetzungsstand DF-3.1 (Admin Systemfelder / Kern-Feldsets)
 

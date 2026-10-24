@@ -293,8 +293,10 @@ Additiver Frozen Zeitraum am Dispoauftrag, getrennt von Calc-Origin-`campaign_pe
 Ableitung in Create/Revision aus Frozen Positionen; Status inkl. `legacy` für Bestand
 ohne Backfill. Spätere Rechnungslogik nur bei `complete` – keine Automatik hier.
 
-Tests: `DispoOrderCampaignPeriodDeriverTest`, `DerivedCampaignPeriodFeatureTest`
-(+ MySQL); Vitest `resources/js/lib/derived-campaign-period.test.ts`.
+Tests: `DispoOrderCampaignPeriodDeriverTest` (inkl. OA-TKP Flight),
+`DerivedCampaignPeriodFeatureTest` (+ MySQL Average/Calendar),
+`PoCalcTkp1d3d2aFlightContractTest`, `DispoOrderCompletionReadinessPeriodStateTest`;
+Vitest `resources/js/lib/derived-campaign-period.test.ts`.
 
 E2E: `npm run test:e2e:dspdcp001` bzw.
 `npx playwright test -c playwright.dspdcp001.config.ts` (Port **8034**, DB

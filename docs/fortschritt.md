@@ -1,6 +1,15 @@
 # Fortschritt V1
 
-Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-1** auf Feature-Branch (Draft-PR):
+Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2a** auf Feature-Branch (Draft-PR):
+bestehenden OA-TKP-Flight-Vertrag (Non-Calendar / `period_open` +
+`position_flight_period`) durch Unit-/Feature-Tests und Doku abgesichert.
+**Keine** neuen Pflichtfelder, **keine** Status-/Completion-Gates.
+Offene Fachentscheidung D3d-2b (ob/wann geschlossener OA-Flight Pflicht).
+Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3d2a-auftrag-2026-10-24.md`.
+
+Stand davor: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-1** auf `main` (PR #185,
+Merge `4d64ac21664055b8a810e1ecedb2222eacfbc448`):
 einheitliche Method-/Engine-Klassifikation; Adoption AND statt OR; fail-closed
 Handoff/Show bei inkonsistenten Paaren. Material/Completion/Perioden unverändert
 (D3d-2/3). Registry planned; HTTP Store/Update geschlossen.
@@ -793,12 +802,15 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Calc-Origin-`campaign_period` unverändert (read-only, kopiert) | **umgesetzt** (`main`, PR #69) |
 | Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
 | Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
+| OA-TKP (`spot_method=tkp`): gleicher Non-Calendar-Flight-Pfad | **bestätigt** (D3d-2a Tests; keine neuen Pflichten) |
 | Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
 | Freeze in Create-TX nach Snapshots + Dyn-Feld-Capture | **umgesetzt** |
 | Kein Backfill / Legacy ohne Datumswerte | **umgesetzt** |
 | UI getrennt + Konflikt-Hinweis (nicht blockierend) | **umgesetzt** |
+| Completion: `open` überspringt Invoice-Ende; `invalid` blockiert | **unverändert** (DSP-DCP-001 / BL-P8-02d; D3d-2a Regression) |
 | Rechnung nur bei `complete` vorbereitet, Automatik **nicht** | **dokumentiert** |
 | Abbinder / Kunden-Calc-Export | **bewusst nicht** |
+| OA-Flight grundsätzlich verpflichtend (Härte) | **offen** (Fachentscheidung D3d-2b) |
 | Manuelle Abnahme | **Abnahmebeleg ungeklärt** (PR #69 Body „offen“ vs. früherer Abschlussbericht „bestätigt“ – ohne vorliegenden Protokollbeleg weder als abgenommen noch allein wegen Checkboxen als widerlegt führen) |
 
 ## SPT-008 – Dispo Spotplanungs-XLSX (September 2026)

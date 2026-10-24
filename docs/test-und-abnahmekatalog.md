@@ -99,11 +99,19 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - Quellen: Calendar=`planner_entries_snapshot` (`spot_count≥1`); Average/Nicht-Calendar=
   `position_flight_period` nur bei `period_open=false` und vollständigem Zeitraum;
   `time_ranges_snapshot` **nie** als Kalenderdaten
+- **OA-TKP** (`spot_method=tkp` / Engine `oa_tkp`): derselbe Non-Calendar-Flight-Pfad
+  (kein Calendar-Planner). `period_open=true` bleibt derzeit erlaubt (Derived `open`).
+  **D3d-2a** bestätigt/testet den bestehenden Vertrag; **keine** neuen Pflichtfelder
+  und **keine** neuen Status-Gates. Mögliche spätere OA-Flight-Pflicht = Fachentscheidung
+  **D3d-2b**.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
+- Completion (BL-P8-02d): Positions-`open` überspringt Invoice-Ende; `invalid` blockiert –
+  methodenagnostisch (auch für `tkp`)
 - Spätere Rechnungslogik nur bei `complete` vorbereitet – **keine** Rechnungsautomatik
-- Unit/Feature/MySQL: `*CampaignPeriod*`; Vitest: `derived-campaign-period.test.ts`
+- Unit/Feature/MySQL: `*CampaignPeriod*`; OA: `PoCalcTkp1d3d2aFlightContractTest`,
+  `DispoOrderCompletionReadinessPeriodStateTest`; Vitest: `derived-campaign-period.test.ts`
 - E2E: `npm run test:e2e:dspdcp001` (`playwright.dspdcp001.config.ts`, Port **8034**,
   Seeder `E2EDerivedCampaignPeriodSeeder`)
 - Merge: PR **#69** auf `main` (`7f0ea7b…`)

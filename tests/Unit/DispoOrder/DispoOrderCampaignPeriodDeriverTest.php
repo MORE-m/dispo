@@ -324,6 +324,196 @@ class DispoOrderCampaignPeriodDeriverTest extends TestCase
         $this->assertSame('2026-08-05', $result->end);
     }
 
+    /**
+     * PO-CALC-TKP-1D3d-2a: OA-TKP nutzt denselben Non-Calendar-Flight-Pfad wie Average.
+     */
+    public function test_oa_tkp_closed_flight_contributes(): void
+    {
+        $position = $this->flightPosition(
+            60,
+            0,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-04-01',
+            flightEnd: '2026-04-30',
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'Pre-Stream',
+        );
+
+        $result = $this->deriver()->deriveFromPositions(collect([$position]));
+
+        $this->assertSame(DerivedCampaignPeriodStatus::Complete, $result->status);
+        $this->assertSame('2026-04-01', $result->start);
+        $this->assertSame('2026-04-30', $result->end);
+        $this->assertSame(SpotCalculationMethod::Tkp->value, $result->provenance['positions'][0]['spot_method']);
+        $this->assertSame(DerivedCampaignPeriodContract::SOURCE_FLIGHT, $result->provenance['positions'][0]['source']);
+        $this->assertSame(DerivedCampaignPeriodContract::RESULT_CONTRIBUTING, $result->provenance['positions'][0]['result']);
+    }
+
+    public function test_oa_tkp_period_open_is_unresolved(): void
+    {
+        $position = $this->flightPosition(
+            61,
+            0,
+            SpotCalculationMethod::Tkp,
+            periodOpen: true,
+            flightStart: '2026-04-01',
+            flightEnd: '2026-04-30',
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'Pre-Stream',
+        );
+
+        $result = $this->deriver()->deriveFromPositions(collect([$position]));
+
+        $this->assertSame(DerivedCampaignPeriodStatus::Open, $result->status);
+        $this->assertNull($result->start);
+        $this->assertNull($result->end);
+        $this->assertSame(
+            DerivedCampaignPeriodContract::REASON_PERIOD_OPEN,
+            $result->provenance['positions'][0]['unresolved_reason'],
+        );
+    }
+
+    public function test_oa_tkp_missing_incomplete_invalid_flight(): void
+    {
+        $missingOpen = $this->flightPosition(
+            70,
+            0,
+            SpotCalculationMethod::Tkp,
+            periodOpen: null,
+            flightStart: '2026-04-01',
+            flightEnd: '2026-04-30',
+            includePeriodOpen: false,
+        );
+        $missingFlight = $this->flightPosition(
+            71,
+            1,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: null,
+            flightEnd: null,
+            includeFlight: false,
+        );
+        $bothNull = $this->flightPosition(
+            72,
+            2,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: null,
+            flightEnd: null,
+        );
+        $incomplete = $this->flightPosition(
+            73,
+            3,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-04-01',
+            flightEnd: null,
+        );
+        $invalid = $this->flightPosition(
+            74,
+            4,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-04-30',
+            flightEnd: '2026-04-01',
+        );
+
+        $cases = [
+            [$missingOpen, DerivedCampaignPeriodContract::REASON_FLIGHT_MISSING],
+            [$missingFlight, DerivedCampaignPeriodContract::REASON_FLIGHT_MISSING],
+            [$bothNull, DerivedCampaignPeriodContract::REASON_FLIGHT_MISSING],
+            [$incomplete, DerivedCampaignPeriodContract::REASON_FLIGHT_INCOMPLETE],
+            [$invalid, DerivedCampaignPeriodContract::REASON_FLIGHT_INVALID],
+        ];
+
+        foreach ($cases as [$position, $reason]) {
+            $result = $this->deriver()->deriveFromPositions(collect([$position]));
+            $this->assertSame(DerivedCampaignPeriodStatus::Open, $result->status);
+            $this->assertSame($reason, $result->provenance['positions'][0]['unresolved_reason'], 'id '.$position->id);
+            $this->assertSame(SpotCalculationMethod::Tkp->value, $result->provenance['positions'][0]['spot_method']);
+        }
+    }
+
+    public function test_two_oa_tkp_flights_form_min_max_envelope(): void
+    {
+        $early = $this->flightPosition(
+            80,
+            0,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-02-01',
+            flightEnd: '2026-02-15',
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'Pre-Stream',
+        );
+        $late = $this->flightPosition(
+            81,
+            1,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-05-10',
+            flightEnd: '2026-05-20',
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'In-Stream',
+        );
+
+        $result = $this->deriver()->deriveFromPositions(collect([$early, $late]));
+
+        $this->assertSame(DerivedCampaignPeriodStatus::Complete, $result->status);
+        $this->assertSame('2026-02-01', $result->start);
+        $this->assertSame('2026-05-20', $result->end);
+        $this->assertSame(2, $result->provenance['contributing_count']);
+        $this->assertSame(DerivedCampaignPeriodContract::SOURCE_FLIGHT, $result->provenance['positions'][0]['source']);
+        $this->assertSame(DerivedCampaignPeriodContract::SOURCE_FLIGHT, $result->provenance['positions'][1]['source']);
+    }
+
+    public function test_mixed_spot_calendar_and_oa_tkp_flight(): void
+    {
+        $calendar = $this->calendarPosition(90, 0, [
+            ['date' => '2026-03-01', 'hour' => 8, 'spot_count' => 1],
+            ['date' => '2026-03-10', 'hour' => 9, 'spot_count' => 1],
+        ]);
+        $oaClosed = $this->flightPosition(
+            91,
+            1,
+            SpotCalculationMethod::Tkp,
+            periodOpen: false,
+            flightStart: '2026-01-15',
+            flightEnd: '2026-01-31',
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'Pre-Stream',
+        );
+        $oaOpen = $this->flightPosition(
+            92,
+            2,
+            SpotCalculationMethod::Tkp,
+            periodOpen: true,
+            flightStart: null,
+            flightEnd: null,
+            inventoryName: 'MORE Kombi Online Audio',
+            mediumName: 'In-Stream',
+        );
+
+        $complete = $this->deriver()->deriveFromPositions(collect([$calendar, $oaClosed]));
+        $this->assertSame(DerivedCampaignPeriodStatus::Complete, $complete->status);
+        $this->assertSame('2026-01-15', $complete->start);
+        $this->assertSame('2026-03-10', $complete->end);
+        $this->assertSame(DerivedCampaignPeriodContract::SOURCE_PLANNER, $complete->provenance['positions'][0]['source']);
+        $this->assertSame(DerivedCampaignPeriodContract::SOURCE_FLIGHT, $complete->provenance['positions'][1]['source']);
+
+        $partial = $this->deriver()->deriveFromPositions(collect([$calendar, $oaOpen]));
+        $this->assertSame(DerivedCampaignPeriodStatus::Partial, $partial->status);
+        $this->assertSame('2026-03-01', $partial->start);
+        $this->assertSame('2026-03-10', $partial->end);
+        $this->assertSame(1, $partial->provenance['contributing_count']);
+        $this->assertSame(1, $partial->provenance['unresolved_count']);
+        $this->assertSame(
+            DerivedCampaignPeriodContract::REASON_PERIOD_OPEN,
+            $partial->provenance['positions'][1]['unresolved_reason'],
+        );
+    }
+
     private function deriver(): DispoOrderCampaignPeriodDeriver
     {
         return app(DispoOrderCampaignPeriodDeriver::class);
@@ -357,6 +547,8 @@ class DispoOrderCampaignPeriodDeriverTest extends TestCase
         ?string $flightEnd,
         bool $includePeriodOpen = true,
         bool $includeFlight = true,
+        string $inventoryName = 'Radio Hamburg',
+        string $mediumName = 'Spot Classic',
     ): DispoOrderPosition {
         $values = collect();
 
@@ -381,8 +573,8 @@ class DispoOrderCampaignPeriodDeriverTest extends TestCase
 
         $position = new DispoOrderPosition([
             'sort' => $sort,
-            'inventory_name' => 'Radio Hamburg',
-            'advertising_medium_name' => 'Spot Classic',
+            'inventory_name' => $inventoryName,
+            'advertising_medium_name' => $mediumName,
             'spot_method' => $method,
         ]);
         $position->id = $id;
