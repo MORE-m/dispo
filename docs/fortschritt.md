@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 23. Oktober 2026 – **PO-CALC-TKP-1D3c** auf Feature-Branch (Draft-PR):
+Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-1** auf Feature-Branch (Draft-PR):
+einheitliche Method-/Engine-Klassifikation; Adoption AND statt OR; fail-closed
+Handoff/Show bei inkonsistenten Paaren. Material/Completion/Perioden unverändert
+(D3d-2/3). Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3d1-auftrag-2026-10-24.md`.
+
+Stand davor: 24. Oktober 2026 – **PO-CALC-TKP-1D3c** auf `main` (PR #176,
+Merge `3081741bf70186ca8fa47189e0a0cd9acb0036df`):
 OA-Dispo-Show aus eingefrorenem Snapshot (Impressions/TKP/Platforms/Targetings/
 Preisidentität). Spot-Anzeige unverändert; Mixed in einem Auftrag. Material/
 Completion/Status unverändert (D3d). Registry planned; HTTP Store/Update geschlossen.

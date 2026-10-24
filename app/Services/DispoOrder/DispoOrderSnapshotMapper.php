@@ -16,11 +16,11 @@ use App\Models\CalculationPositionTimeRange;
 use App\Models\DispoOrderPosition;
 use App\Models\SpotClassicPlanRow;
 use App\Services\Calculation\Decimal;
-use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Services\Calculation\SpecialApprovalAssessor;
 use App\Services\Calculation\StoredPositionTotals;
 use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
+use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\Inventory\InventoryIdentity;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -109,11 +109,13 @@ final class DispoOrderSnapshotMapper
             'oaTargetingSelections',
         ]);
 
-        if (OaTkpWriterPositionResolver::isStoredOaTkp($position)) {
-            return $this->oaTkpPositionFromCalculationPosition($position, $sort);
-        }
+        // PO-CALC-TKP-1D3d-1: inkonsistente Paare nicht still in den Spot-Pfad leiten.
+        DispoPositionMethodClassifier::assertAdoptable($position);
 
-        return $this->spotPositionFromCalculationPosition($position, $sort);
+        return match (DispoPositionMethodClassifier::classifyPosition($position)) {
+            DispoPositionMethodClassifier::KIND_OA_TKP => $this->oaTkpPositionFromCalculationPosition($position, $sort),
+            default => $this->spotPositionFromCalculationPosition($position, $sort),
+        };
     }
 
     /**
@@ -367,11 +369,13 @@ final class DispoOrderSnapshotMapper
      */
     public function productionFromLine(CalculationPosition $carrier, CalculationPositionProductionLine $line, int $sort): array
     {
-        if (OaTkpWriterPositionResolver::isStoredOaTkp($carrier)) {
+        $carrierKind = DispoPositionMethodClassifier::classifyPosition($carrier);
+        if ($carrierKind === DispoPositionMethodClassifier::KIND_OA_TKP) {
             throw ValidationException::withMessages([
                 'position_ids' => 'TKP-Positionen besitzen keine Spotproduktion und können nicht als Produktionszeile übernommen werden.',
             ]);
         }
+        DispoPositionMethodClassifier::assertAdoptable($carrier);
 
         $base = $this->spotPositionFromCalculationPosition($carrier, $sort);
         $label = trim($line->label) !== '' ? $line->label : 'Spotproduktion';

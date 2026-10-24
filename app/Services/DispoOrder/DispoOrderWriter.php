@@ -11,6 +11,7 @@ use App\Models\DispoOrderPosition;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
+use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use Illuminate\Database\QueryException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -189,6 +190,11 @@ final class DispoOrderWriter
             throw ValidationException::withMessages([
                 'position_ids' => 'Eine oder mehrere Positionen gehören nicht zu dieser Kalkulation.',
             ]);
+        }
+
+        // PO-CALC-TKP-1D3d-1: vor Persistenz fail-closed – kein Teil-Dispo bei Mixed mit Corrupt-Paar.
+        foreach ($selected as $position) {
+            DispoPositionMethodClassifier::assertAdoptable($position);
         }
 
         [$year, $orgSeq, $calcSeq, $number] = $this->numbers->next($calculation);

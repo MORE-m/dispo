@@ -51,6 +51,7 @@ use App\Services\DispoOrder\SpotDistributionExport\SpotDistributionExportService
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\DispoOrder\DerivedCampaignPeriodPresenter;
+use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\DispoOrder\InvoiceEndMonthsContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -910,6 +911,8 @@ class DispoOrderController extends Controller
                     'spot_method_label' => $position->spot_method->label(),
                     'engine_profile_key' => $position->engine_profile_key,
                     'calculation_method_key' => $position->calculation_method_key,
+                    // PO-CALC-TKP-1D3d-1: Read-only Klassifikation für Show (kein Spot-Fallback bei Corrupt).
+                    ...$this->serializeMethodClassification($position),
                     'length_seconds' => $position->length_seconds,
                     'component_calculation_strategy' => $position->component_calculation_strategy,
                     'component_profile' => $position->component_profile?->value,
@@ -1076,6 +1079,24 @@ class DispoOrderController extends Controller
             'is_completion_override' => (bool) $event->is_completion_override,
             'completion_override_violations' => $event->completion_override_violations ?? [],
             'lock_version_after' => $event->lock_version_after,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     method_classification: string,
+     *     method_inconsistency_message: string|null
+     * }
+     */
+    private function serializeMethodClassification(DispoOrderPosition $position): array
+    {
+        $classification = DispoPositionMethodClassifier::classifyPosition($position);
+
+        return [
+            'method_classification' => $classification,
+            'method_inconsistency_message' => $classification === DispoPositionMethodClassifier::KIND_INCONSISTENT
+                ? DispoPositionMethodClassifier::inconsistencyMessage()
+                : null,
         ];
     }
 

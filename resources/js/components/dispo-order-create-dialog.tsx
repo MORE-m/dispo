@@ -6,7 +6,11 @@ import {
     DISPO_ORDERS_CACHE_TAG,
     flushDispoOrderInertiaCache,
 } from '@/lib/dispo-order-inertia-cache';
-import { formatDispoAdoptionPositionDetail } from '@/lib/dispo-order-adoption-display';
+import {
+    formatDispoAdoptionPositionDetail,
+    isInconsistentAdoptionPosition,
+} from '@/lib/dispo-order-adoption-display';
+import type { DispoMethodClassification } from '@/lib/dispo-position-method-classification';
 import {
     firstValidationMessage,
     mapValidationErrors,
@@ -30,6 +34,9 @@ type SelectablePosition = {
     advertising_medium_name: string;
     calculation_method_key?: string | null;
     engine_profile_key?: string | null;
+    method_classification?: DispoMethodClassification | null;
+    method_inconsistency_message?: string | null;
+    adoptable?: boolean;
     impressions?: number | null;
     final_tkp?: string | null;
     length_seconds: number;
@@ -51,6 +58,10 @@ type SelectablePosition = {
     adoptions: { dispo_order_id: number; dispo_order_number: string }[];
 };
 
+function isAdoptablePosition(position: SelectablePosition): boolean {
+    return !isInconsistentAdoptionPosition(position);
+}
+
 type PositionsResponse = {
     positions: SelectablePosition[];
     preferred_position_ids?: number[];
@@ -66,7 +77,8 @@ function defaultSelectedIds(
     preferredIds: number[] | undefined,
     isRevision: boolean,
 ): number[] {
-    const available = new Set(positions.map((position) => position.id));
+    const adoptable = positions.filter(isAdoptablePosition);
+    const available = new Set(adoptable.map((position) => position.id));
 
     if (isRevision && preferredIds && preferredIds.length > 0) {
         const preferred = preferredIds.filter((id) => available.has(id));
@@ -76,10 +88,10 @@ function defaultSelectedIds(
     }
 
     if (isRevision) {
-        return positions.map((position) => position.id);
+        return adoptable.map((position) => position.id);
     }
 
-    return positions
+    return adoptable
         .filter((position) => !position.already_adopted)
         .map((position) => position.id);
 }
@@ -165,9 +177,19 @@ export function DispoOrderCreateDialog({
         };
     }, [calculationId, open, revision]);
 
+    const adoptablePositions = useMemo(
+        () => positions.filter(isAdoptablePosition),
+        [positions],
+    );
+
     const allSelected = useMemo(
-        () => positions.length > 0 && selectedIds.length === positions.length,
-        [positions.length, selectedIds.length],
+        () =>
+            adoptablePositions.length > 0 &&
+            selectedIds.length === adoptablePositions.length &&
+            adoptablePositions.every((position) =>
+                selectedIds.includes(position.id),
+            ),
+        [adoptablePositions, selectedIds],
     );
 
     const hasExistingDispoOrders = useMemo(
@@ -180,6 +202,11 @@ export function DispoOrderCreateDialog({
     );
 
     function togglePosition(id: number, checked: boolean) {
+        const position = positions.find((row) => row.id === id);
+        if (position && !isAdoptablePosition(position)) {
+            return;
+        }
+
         setSelectedIds((current) =>
             checked
                 ? [...new Set([...current, id])]
@@ -188,7 +215,9 @@ export function DispoOrderCreateDialog({
     }
 
     function toggleAll(checked: boolean) {
-        setSelectedIds(checked ? positions.map((position) => position.id) : []);
+        setSelectedIds(
+            checked ? adoptablePositions.map((position) => position.id) : [],
+        );
     }
 
     function handleSubmit() {
@@ -305,17 +334,23 @@ export function DispoOrderCreateDialog({
                                             position.id,
                                         );
                                         const inputId = `dispo-position-${position.id}`;
+                                        const blocked =
+                                            !isAdoptablePosition(position);
 
                                         return (
                                             <li
                                                 key={position.id}
                                                 className="rounded-lg border p-4"
                                                 data-test={`dispo-order-position-${position.id}`}
+                                                data-adoptable={
+                                                    blocked ? '0' : '1'
+                                                }
                                             >
                                                 <div className="flex items-start gap-3">
                                                     <Checkbox
                                                         id={inputId}
                                                         checked={checked}
+                                                        disabled={blocked}
                                                         onCheckedChange={(
                                                             value,
                                                         ) =>
@@ -340,7 +375,11 @@ export function DispoOrderCreateDialog({
                                                             }
                                                         </Label>
                                                         <p
-                                                            className="text-muted-foreground text-xs"
+                                                            className={
+                                                                blocked
+                                                                    ? 'text-destructive text-xs'
+                                                                    : 'text-muted-foreground text-xs'
+                                                            }
                                                             data-test={`dispo-order-position-detail-${position.id}`}
                                                         >
                                                             {formatDispoAdoptionPositionDetail(

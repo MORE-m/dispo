@@ -6,6 +6,7 @@ use App\Models\Calculation;
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
 use App\Services\Calculation\Decimal;
+use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\Inventory\InventoryIdentity;
 
 final class DispoOrderPositionAdoptionService
@@ -63,6 +64,8 @@ final class DispoOrderPositionAdoptionService
 
         return array_values($calculation->positions->map(function (CalculationPosition $position) use ($adoptions): array {
             $existing = $adoptions[$position->id] ?? [];
+            $classification = DispoPositionMethodClassifier::classifyPosition($position);
+            $adoptable = $classification !== DispoPositionMethodClassifier::KIND_INCONSISTENT;
 
             return [
                 'id' => $position->id,
@@ -71,6 +74,12 @@ final class DispoOrderPositionAdoptionService
                 // PO-CALC-TKP-1D3b: additive OA-Identität aus gespeicherten Calc-Werten.
                 'calculation_method_key' => $position->calculation_method_key,
                 'engine_profile_key' => $position->engine_profile_key,
+                // PO-CALC-TKP-1D3d-1: serverseitige Methodenkonsistenz für Create-Dialog.
+                'method_classification' => $classification,
+                'adoptable' => $adoptable,
+                'method_inconsistency_message' => $adoptable
+                    ? null
+                    : DispoPositionMethodClassifier::inconsistencyMessage(),
                 'impressions' => $position->impressions === null ? null : (int) $position->impressions,
                 'final_tkp' => $position->final_tkp === null || trim((string) $position->final_tkp) === ''
                     ? null
