@@ -363,8 +363,9 @@ Ab **PO-CALC-TKP-1D3a** additiv OA-TKP-Snapshot-Felder auf `dispo_order_position
 `version` / `year` / `revision`, JSON `oa_platform_allocations_snapshot` und
 `oa_targeting_selections_snapshot` (historische Werte aus der Calc, keine Live-
 Auflösung). Spot-Spalten unverändert; OA nutzt `length_seconds=0` /
-`total_spot_count=0` ohne Spotproduktion. Adoption-API/Create-Dialog (D3b) nutzen
-gespeicherte `impressions`/`final_tkp`; Dispo-Show-Darstellung folgt in D3c.
+`total_spot_count=0` ohne Spotproduktion. Adoption-API/Create-Dialog (D3b) und
+Dispo-Show (D3c) nutzen die eingefrorenen Snapshot-Felder (`impressions`, TKP,
+Platform-/Targeting-JSON, OA-Preislistenidentität).
 Ab **DSP-DCP-001** speichert `dispo_orders` additiv den eingefrorenen abgeleiteten
 Kampagnenzeitraum (`derived_campaign_period_start`/`end`/`status`/`at`/`snapshot`).
 Das Dyn-Feld `campaign_period` bleibt unverändert Calc-Origin und wird nicht
