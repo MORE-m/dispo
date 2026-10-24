@@ -726,9 +726,16 @@ class Adv001c2DualWriteAndHistoricalFreezeTest extends TestCase
             $this->fail('Erwartete ValidationException bei unbekanntem Profil.');
         } catch (ValidationException $exception) {
             $this->assertSame(422, $exception->status);
-            $message = implode(' ', $exception->errors()['positions'] ?? []);
+            // PO-CALC-TKP-1D3d-1: unbekannte Profile fail-closed über Method-Klassifikation
+            // (position_ids), historisch auch Freeze-Resolver (positions).
+            $errors = $exception->errors();
+            $message = implode(' ', [
+                ...($errors['position_ids'] ?? []),
+                ...($errors['positions'] ?? []),
+            ]);
             $this->assertTrue(
-                str_contains($message, 'fachlich ungültig')
+                str_contains($message, 'Methoden-/Engine-Kombination')
+                || str_contains($message, 'fachlich ungültig')
                 || str_contains($message, 'unbekannt und kann nicht ausgeführt werden'),
                 "Unerwartete Meldung: {$message}",
             );
