@@ -55,6 +55,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<int, array<string, mixed>>|null $oa_platform_allocations_snapshot
  * @property array<int, array<string, mixed>>|null $oa_targeting_selections_snapshot
  * @property list<int>|null $invoice_end_months
+ * @property string|null $operational_flight_start
+ * @property string|null $operational_flight_end
  * @property string|null $line_role
  * @property string|null $production_type
  * @property string|null $production_label
@@ -192,6 +194,9 @@ class DispoOrderPosition extends Model
             'oa_platform_allocations_snapshot' => 'array',
             'oa_targeting_selections_snapshot' => 'array',
             'invoice_end_months' => 'array',
+            // PO-CALC-TKP-1D3d-2b-1: nicht fillable – nur OperationalFlightService.
+            'operational_flight_start' => 'date:Y-m-d',
+            'operational_flight_end' => 'date:Y-m-d',
             'production_quantity' => 'decimal:4',
             'production_unit_price' => 'decimal:2',
             'production_line_gross' => 'decimal:2',

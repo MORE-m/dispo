@@ -36,11 +36,11 @@ durch gezielte Tests und Dokumentation absichern.
 - Neue Flight-UI
 - MySQL-OA-Duplikat (Flight-JSON bereits über Average-MySQL abgedeckt; OA-Pfad SQLite-Feature)
 
-## Fachentscheidung offen (D3d-2b)
+## Fachentscheidung (Nachzug)
 
-Ob und ab welchem Lifecycle-Punkt ein **geschlossener** OA-Flight verpflichtend
-sein soll (`period_open=false` + gültiger Zeitraum), ist **nicht** in D3d-2a
-entschieden. D3d-2a bestätigt und testet nur den Ist-Vertrag.
+**FD-D3d-2-01** ist nach D3d-2a beschlossen und wird in **D3d-2b** umgesetzt
+(operativer Flight getrennt vom Calc-/Handoff-Snapshot). D3d-2a selbst bleibt
+die Absicherung des bestehenden Calc-Origin-/Derived-Vertrags ohne Gates.
 
 ## Statuszeile
 

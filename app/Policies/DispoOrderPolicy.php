@@ -200,6 +200,14 @@ class DispoOrderPolicy
     }
 
     /**
+     * Verbindlicher Kampagnenzeitraum (operativ) je OA-TKP-Position (PO-CALC-TKP-1D3d-2b-1).
+     */
+    public function updateOperationalFlight(User $user, DispoOrder $dispoOrder): bool
+    {
+        return $user->hasAnyRole(Role::Disposition, Role::Admin, Role::Management);
+    }
+
+    /**
      * Abschluss disposed → completed (BL-P8-02d / PO-BLP802D-1).
      */
     public function complete(User $user, DispoOrder $dispoOrder): bool

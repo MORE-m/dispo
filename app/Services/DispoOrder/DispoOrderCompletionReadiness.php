@@ -9,6 +9,7 @@ use App\Models\DispoOrderPosition;
 use App\Services\DynamicField\DispoOrderDynamicFieldWriter;
 use App\Support\DispoOrder\DerivedCampaignPeriodContract;
 use App\Support\DispoOrder\InvoiceEndMonthsContract;
+use App\Support\DispoOrder\OperationalFlightContract;
 use Throwable;
 
 /**
@@ -21,6 +22,8 @@ final class DispoOrderCompletionReadiness
     public const string CHECK_OPEN_SALES_INQUIRY = 'open_sales_inquiry';
 
     public const string CHECK_INVOICE_END_MONTHS = 'invoice_end_months';
+
+    public const string CHECK_OA_OPERATIONAL_FLIGHT = OperationalFlightContract::CHECK_KEY;
 
     public const string CHECK_CUSTOMER_CONFIRMATION = 'customer_confirmation';
 
@@ -57,6 +60,7 @@ final class DispoOrderCompletionReadiness
             $this->checkRequiredFields($order),
             $this->checkOpenSalesInquiry($order),
             $this->checkInvoiceEndMonths($order),
+            $this->checkOaOperationalFlight($order),
             $this->checkCustomerConfirmation($order),
             $this->checkApprovals($order),
         ];
@@ -198,6 +202,27 @@ final class DispoOrderCompletionReadiness
         return [
             'key' => self::CHECK_INVOICE_END_MONTHS,
             'label' => 'Rechnung per Ende',
+            'passed' => $violations === [],
+            'violations' => $violations,
+        ];
+    }
+
+    /**
+     * UI-/Readiness-Anzeige. Der harte Guard gegen forceComplete liegt in CompletionService.
+     *
+     * @return array{key: string, label: string, passed: bool, violations: list<array{message: string}>}
+     */
+    private function checkOaOperationalFlight(DispoOrder $order): array
+    {
+        $messages = OperationalFlightContract::collectMissingFlightMessages($order);
+        $violations = array_map(
+            static fn (string $message): array => ['message' => $message],
+            $messages,
+        );
+
+        return [
+            'key' => self::CHECK_OA_OPERATIONAL_FLIGHT,
+            'label' => OperationalFlightContract::LABEL,
             'passed' => $violations === [],
             'violations' => $violations,
         ];

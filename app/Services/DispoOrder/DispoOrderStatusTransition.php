@@ -199,6 +199,21 @@ final class DispoOrderStatusTransition
         return in_array($status, self::invoiceEndEditableStatuses(), true);
     }
 
+    /**
+     * Statusfenster für operativen OA-Flight (PO-CALC-TKP-1D3d-2b-1) – identisch Invoice-Ende.
+     *
+     * @return list<DispoOrderStatus>
+     */
+    public static function operationalFlightEditableStatuses(): array
+    {
+        return self::invoiceEndEditableStatuses();
+    }
+
+    public static function isOperationalFlightEditable(DispoOrderStatus $status): bool
+    {
+        return in_array($status, self::operationalFlightEditableStatuses(), true);
+    }
+
     public static function requiresReason(DispoOrderStatus $from, DispoOrderStatus $to): bool
     {
         return self::isDisposedReopen($from, $to)
