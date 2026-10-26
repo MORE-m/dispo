@@ -461,14 +461,18 @@ Ein Abschluss ist nur zulässig, wenn:
 - alle aktuell sichtbaren Pflichtfelder erfüllt sind,
 - keine Rückfrage offen ist,
 - Rechnung-per-Ende bei konkretem Zeitraum gepflegt ist,
+- bei OA-TKP-Media-Positionen ein gültiger operativer Kampagnenzeitraum vorliegt
+  (hart, nicht per Admin-`forceComplete` übersteuerbar; PO-CALC-TKP-1D3d-2b),
 - Kundenbestätigung oder freigegebene Ausnahme vorliegt,
 - alle erforderlichen Freigaben gültig sind.
 
-**BL-P8-02d / PO-BLP802D-1:** Serverseitige Completion-Readiness prüft genau diese
-fünf Punkte (Frozen Dyn-Felder, offene SalesInquiry, Frozen Period +
-`invoice_end_months`, genehmigte 02c-Ausnahme mit Ack, gültige Approved-Freigabe).
-Übergang nur bewusst `disposed → completed` (Disposition/Admin/GF).
-Admin darf den Abschluss mit Pflichtbegründung erzwingen. Verletzte Prüfungen,
+**BL-P8-02d / PO-BLP802D-1 (+ D3d-2b):** Serverseitige Completion-Readiness prüft
+genau diese **sechs** Punkte: `required_fields`, `open_sales_inquiry`,
+`invoice_end_months`, `oa_operational_flight`, `customer_confirmation`,
+`approvals`. Es gibt **kein** Material-/Upload-Completion-Gate
+(PO-CALC-TKP-1D3d-3a). Übergang nur bewusst `disposed → completed`
+(Disposition/Admin/GF). Admin darf die übrigen fehlgeschlagenen Checks mit
+Pflichtbegründung übersteuern; der OA-Ops-Flight bleibt hart. Verletzte Prüfungen,
 Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed war in
 02d terminal; Reopen/Storno folgen in **BL-P8-02e**.
 
@@ -476,8 +480,10 @@ Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed war in
 
 Disposition darf operative Felder, Materialstatus, Rechnung-per-Ende,
 verbindlichen OA-Kampagnenzeitraum (operativ, PO-CALC-TKP-1D3d-2b) und Kommentare
-bearbeiten. Kaufmännische Werte werden nicht durch die Disposition korrigiert;
-hierfür ist eine Rückfrage an Vertrieb erforderlich.
+bearbeiten. OA nutzt denselben auftragsbezogenen Materialworkflow wie Spot/SWF
+(Uploads ändern den Status nicht automatisch; keine Spotproduktion für OA;
+PO-CALC-TKP-1D3d-3a). Kaufmännische Werte werden nicht durch die Disposition
+korrigiert; hierfür ist eine Rückfrage an Vertrieb erforderlich.
 
 ## Benachrichtigungen
 

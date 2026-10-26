@@ -1,11 +1,17 @@
 # Fortschritt V1
 
-Stand: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-2** auf Feature-Branch (Draft-PR):
+Stand: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-3a** auf Feature-Branch (Draft-PR):
+OA-Material-/Completion-Vertrag abgesichert (Tests + Doku). Keine neuen
+Materialpflichten, kein Material-Gate, keine Spotproduktion für OA.
+Completion-Matrix: sechs Checks; Ops-Flight bleibt hart. D3d-4/D4 offen.
+Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3d3a-auftrag-2026-10-26.md`.
+
+Stand davor: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-2** auf `main` (PR #188,
+Merge `7b0951fd20a02abd55f80dd468ad6220056f2082`):
 React-UI für den verbindlichen operativen OA-Kampagnenzeitraum im Dispo-Show
 (`DispoOrderOperationalFlightEditor`). Snapshot unveränderlich; bewusste
-Übernahme aus gültigem Handoff-Flight nur in Edit-Felder; Speichern über
-bestehenden PUT. D3d-2b-1 Backend bleibt auf `main`. D3d-3/D3d-4/D4 offen.
-Registry planned; HTTP Store/Update geschlossen.
+Übernahme aus gültigem Handoff-Flight nur in Edit-Felder.
 Dok: `docs/readiness/PO-CALC-TKP-1D3d2b2-auftrag-2026-10-26.md`.
 
 Stand davor: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-1** auf `main` (PR #187,
@@ -819,7 +825,8 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
 | Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
 | OA-TKP (`spot_method=tkp`): gleicher Non-Calendar-Flight-Pfad | **bestätigt** (D3d-2a Tests) |
-| OA operativer Flight (getrennt, Positions-Spalten) | **umgesetzt** Backend D3d-2b-1 + UI D3d-2b-2 (Feature-Branch) |
+| OA operativer Flight (getrennt, Positions-Spalten) | **umgesetzt** Backend D3d-2b-1 + UI D3d-2b-2 (`main`) |
+| OA Material-/Completion-Vertrag (kein Material-Gate, keine Spotproduktion) | **abgesichert** D3d-3a (Feature-Branch) |
 | Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
 | Freeze in Create-TX nach Snapshots + Dyn-Feld-Capture | **umgesetzt** |
 | Kein Backfill / Legacy ohne Datumswerte | **umgesetzt** |
