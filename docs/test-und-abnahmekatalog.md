@@ -108,14 +108,21 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - **D3d-2b-2:** React-Show-UI `DispoOrderOperationalFlightEditor`; Snapshot
   unveränderlich; Übernahme aus gültigem Handoff nur in Edit-Felder; Speichern
   über PUT `operativer-flight`. Vitest: `dispo-order-operational-flight*.test.*`
+- **D3d-3a:** OA nutzt bestehenden auftragsbezogenen Materialworkflow; keine
+  Spotproduktion; kein Material-Completion-Gate. Tests:
+  `PoCalcTkp1d3d3aMaterialCompletionContractTest`
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
-- Completion (BL-P8-02d): Positions-`open` überspringt Invoice-Ende; `invalid` blockiert –
-  methodenagnostisch (auch für `tkp`); OA-Ops-Flight zusätzlich hart
+- Completion (BL-P8-02d + D3d-2b): **sechs** Checks
+  (`required_fields`, `open_sales_inquiry`, `invoice_end_months`,
+  `oa_operational_flight`, `customer_confirmation`, `approvals`); Positions-`open`
+  überspringt Invoice-Ende; `invalid` blockiert – methodenagnostisch (auch für
+  `tkp`); OA-Ops-Flight zusätzlich hart; **kein** Material-Gate
 - Spätere Rechnungslogik nur bei `complete` vorbereitet – **keine** Rechnungsautomatik
 - Unit/Feature/MySQL: `*CampaignPeriod*`; OA: `PoCalcTkp1d3d2aFlightContractTest`,
-  `PoCalcTkp1d3d2b1OperationalFlightTest`, `OperationalFlightContractTest`,
+  `PoCalcTkp1d3d2b1OperationalFlightTest`, `PoCalcTkp1d3d3aMaterialCompletionContractTest`,
+  `OperationalFlightContractTest`,
   `DispoOrderCompletionReadinessPeriodStateTest`; Vitest: `derived-campaign-period.test.ts`
 - E2E: `npm run test:e2e:dspdcp001` (`playwright.dspdcp001.config.ts`, Port **8034**,
   Seeder `E2EDerivedCampaignPeriodSeeder`)
