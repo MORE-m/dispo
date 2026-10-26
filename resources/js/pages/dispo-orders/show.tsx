@@ -1319,7 +1319,7 @@ export default function DispoOrderShow({
                 (canTransitionOperationalStatus ||
                     order.status === 'disposed') ? (
                     <p
-                        className="text-amber-900 text-sm"
+                        className="text-sm text-amber-900"
                         data-test="dispo-order-oa-operational-flight-blocker-hint"
                     >
                         Vor „Disponiert“ und vor dem Abschluss muss für jede
