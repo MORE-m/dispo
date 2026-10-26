@@ -416,6 +416,14 @@ Status `Abgeschlossen` über bewussten Abschluss `disposed → completed`
 Kein Backfill. Completed war in diesem Slice terminal (kein Reopen/Storno);
 folgt in BL-P8-02e.
 
+**PO-CALC-TKP-1D3d-2b-1 (Oktober 2026):** An `dispo_order_positions` additiv
+nullable `operational_flight_start` / `operational_flight_end` (date).
+Getrennt von Calc-Origin-DF (`period_open` / `position_flight_period`) und
+`derived_campaign_period_*`. Initial immer null (kein Prefill aus Handoff).
+Pflicht nur für OA-TKP-Media-Positionen vor Übergang nach `disposed`; zusätzlich
+hartes Gate vor `completed` (nicht durch Admin-`forceComplete` übersteuerbar).
+Spot/SWF unverändert. Kein Backfill historischer Aufträge.
+
 **BL-P8-02e / PO-BLP802E-1 (September 2026):** Keine neue Tabelle. Storno und
 Completed-Reopen nutzen bestehende `dispo_order_status_events` (`reason`,
 `is_reopen`, Actor, from/to, `lock_version_after`). Cancel-Summary aus letztem

@@ -100,17 +100,19 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `position_flight_period` nur bei `period_open=false` und vollständigem Zeitraum;
   `time_ranges_snapshot` **nie** als Kalenderdaten
 - **OA-TKP** (`spot_method=tkp` / Engine `oa_tkp`): derselbe Non-Calendar-Flight-Pfad
-  (kein Calendar-Planner). `period_open=true` bleibt derzeit erlaubt (Derived `open`).
-  **D3d-2a** bestätigt/testet den bestehenden Vertrag; **keine** neuen Pflichtfelder
-  und **keine** neuen Status-Gates. Mögliche spätere OA-Flight-Pflicht = Fachentscheidung
-  **D3d-2b**.
+  für Calc-Origin/Handoff/Derived (**D3d-2a**). `period_open=true` bleibt für Derived erlaubt.
+- **FD-D3d-2-01 / D3d-2b-1:** zusätzlicher **operativer** Flight
+  (`operational_flight_start`/`end` an `dispo_order_positions`), getrennt vom Snapshot.
+  Pflicht vor `disposed` je OA-TKP-Media-Position; hartes Gate vor `completed`
+  (nicht durch `forceComplete` übersteuerbar). Kein Prefill. UI-Edit = D3d-2b-2.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
 - Completion (BL-P8-02d): Positions-`open` überspringt Invoice-Ende; `invalid` blockiert –
-  methodenagnostisch (auch für `tkp`)
+  methodenagnostisch (auch für `tkp`); OA-Ops-Flight zusätzlich hart
 - Spätere Rechnungslogik nur bei `complete` vorbereitet – **keine** Rechnungsautomatik
 - Unit/Feature/MySQL: `*CampaignPeriod*`; OA: `PoCalcTkp1d3d2aFlightContractTest`,
+  `PoCalcTkp1d3d2b1OperationalFlightTest`, `OperationalFlightContractTest`,
   `DispoOrderCompletionReadinessPeriodStateTest`; Vitest: `derived-campaign-period.test.ts`
 - E2E: `npm run test:e2e:dspdcp001` (`playwright.dspdcp001.config.ts`, Port **8034**,
   Seeder `E2EDerivedCampaignPeriodSeeder`)

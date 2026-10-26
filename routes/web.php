@@ -100,6 +100,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('dispo-orders.transition-status');
     Route::put('dispoauftraege/{dispoOrder}/positionen/{position}/rechnung-per-ende', [DispoOrderController::class, 'updateInvoiceEndMonths'])
         ->name('dispo-orders.positions.invoice-end');
+    Route::put('dispoauftraege/{dispoOrder}/positionen/{position}/operativer-flight', [DispoOrderController::class, 'updateOperationalFlight'])
+        ->name('dispo-orders.positions.operational-flight');
     Route::post('dispoauftraege/{dispoOrder}/abschliessen', [DispoOrderController::class, 'complete'])
         ->name('dispo-orders.complete');
     Route::post('dispoauftraege/{dispoOrder}/wieder-oeffnen', [DispoOrderController::class, 'reopenCompleted'])

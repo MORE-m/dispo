@@ -1,10 +1,18 @@
 # Fortschritt V1
 
-Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2a** auf Feature-Branch (Draft-PR):
+Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-1** auf Feature-Branch (Draft-PR):
+operativer verbindlicher Kampagnenzeitraum für OA-TKP (Backend/API/Gates).
+FD-D3d-2-01 beschlossen: vor `disposed` Pflicht je OA-Position; `completed`
+zusätzlich hart abgesichert (nicht per `forceComplete` umgehbar). Calc-/Handoff-/
+Derived-Snapshots unverändert; kein Prefill. UI-Edit folgt in D3d-2b-2.
+Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3d2b1-auftrag-2026-10-24.md`.
+
+Stand davor: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2a** auf `main` (PR #186,
+Merge `5673dd7e89eb413bee70b66c7d6aef7df54dc932`):
 bestehenden OA-TKP-Flight-Vertrag (Non-Calendar / `period_open` +
 `position_flight_period`) durch Unit-/Feature-Tests und Doku abgesichert.
-**Keine** neuen Pflichtfelder, **keine** Status-/Completion-Gates.
-Offene Fachentscheidung D3d-2b (ob/wann geschlossener OA-Flight Pflicht).
+**Keine** neuen Pflichtfelder, **keine** Status-/Completion-Gates in 2a.
 Registry planned; HTTP Store/Update geschlossen.
 Dok: `docs/readiness/PO-CALC-TKP-1D3d2a-auftrag-2026-10-24.md`.
 
@@ -802,15 +810,16 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Calc-Origin-`campaign_period` unverändert (read-only, kopiert) | **umgesetzt** (`main`, PR #69) |
 | Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
 | Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
-| OA-TKP (`spot_method=tkp`): gleicher Non-Calendar-Flight-Pfad | **bestätigt** (D3d-2a Tests; keine neuen Pflichten) |
+| OA-TKP (`spot_method=tkp`): gleicher Non-Calendar-Flight-Pfad | **bestätigt** (D3d-2a Tests) |
+| OA operativer Flight (getrennt, Positions-Spalten) | **umgesetzt** Backend D3d-2b-1 (UI D3d-2b-2 offen) |
 | Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
 | Freeze in Create-TX nach Snapshots + Dyn-Feld-Capture | **umgesetzt** |
 | Kein Backfill / Legacy ohne Datumswerte | **umgesetzt** |
 | UI getrennt + Konflikt-Hinweis (nicht blockierend) | **umgesetzt** |
-| Completion: `open` überspringt Invoice-Ende; `invalid` blockiert | **unverändert** (DSP-DCP-001 / BL-P8-02d; D3d-2a Regression) |
+| Completion: `open` überspringt Invoice-Ende; `invalid` blockiert | **unverändert** (DSP-DCP-001 / BL-P8-02d) |
+| OA Ops-Flight vor `disposed` + hart vor `completed` | **umgesetzt** (FD-D3d-2-01 / D3d-2b-1) |
 | Rechnung nur bei `complete` vorbereitet, Automatik **nicht** | **dokumentiert** |
 | Abbinder / Kunden-Calc-Export | **bewusst nicht** |
-| OA-Flight grundsätzlich verpflichtend (Härte) | **offen** (Fachentscheidung D3d-2b) |
 | Manuelle Abnahme | **Abnahmebeleg ungeklärt** (PR #69 Body „offen“ vs. früherer Abschlussbericht „bestätigt“ – ohne vorliegenden Protokollbeleg weder als abgenommen noch allein wegen Checkboxen als widerlegt führen) |
 
 ## SPT-008 – Dispo Spotplanungs-XLSX (September 2026)

@@ -8,6 +8,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Support\DispoOrder\OperationalFlightContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -62,6 +63,11 @@ final class DispoOrderOperationalStatusService
                 throw ValidationException::withMessages([
                     'reason' => 'Eine Begründung ist für die Wiederöffnung erforderlich.',
                 ]);
+            }
+
+            // PO-CALC-TKP-1D3d-2b-1 / FD-D3d-2-01: OA-Ops-Flight vor disposed (auch direkter Service-Aufruf).
+            if ($target === DispoOrderStatus::Disposed) {
+                OperationalFlightContract::assertAllOaPositionsHaveValidFlight($locked);
             }
 
             $locked->status = $target;

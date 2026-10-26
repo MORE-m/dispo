@@ -20,6 +20,7 @@ use App\Http\Requests\DispoOrder\UpdateCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderDraftRequest;
 use App\Http\Requests\DispoOrder\UpdateDispoOrderPositionCustomsRequest;
 use App\Http\Requests\DispoOrder\UpdateInvoiceEndMonthsRequest;
+use App\Http\Requests\DispoOrder\UpdateOperationalFlightRequest;
 use App\Http\Requests\DispoOrder\UploadCustomerConfirmationRequest;
 use App\Http\Requests\DispoOrder\UploadDispoOrderDynamicFieldRequest;
 use App\Http\Requests\DispoOrder\UploadDispoOrderMaterialRequest;
@@ -40,6 +41,7 @@ use App\Services\DispoOrder\DispoOrderCompletionService;
 use App\Services\DispoOrder\DispoOrderCustomerConfirmationService;
 use App\Services\DispoOrder\DispoOrderGeneralCommentService;
 use App\Services\DispoOrder\DispoOrderInvoiceEndService;
+use App\Services\DispoOrder\DispoOrderOperationalFlightService;
 use App\Services\DispoOrder\DispoOrderOperationalStatusService;
 use App\Services\DispoOrder\DispoOrderPositionAdoptionService;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
@@ -53,6 +55,7 @@ use App\Support\Advertising\SpotComponentProfileContract;
 use App\Support\DispoOrder\DerivedCampaignPeriodPresenter;
 use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\DispoOrder\InvoiceEndMonthsContract;
+use App\Support\DispoOrder\OperationalFlightContract;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -73,6 +76,7 @@ class DispoOrderController extends Controller
         private readonly DispoOrderCustomerConfirmationService $customerConfirmation,
         private readonly DispoOrderUploadService $uploads,
         private readonly DispoOrderInvoiceEndService $invoiceEnd,
+        private readonly DispoOrderOperationalFlightService $operationalFlight,
         private readonly DispoOrderCompletionService $completion,
         private readonly DispoOrderCompletedReopenService $completedReopen,
         private readonly DispoOrderCancellationService $cancellation,
@@ -180,6 +184,8 @@ class DispoOrderController extends Controller
         $canAddComment = $user?->can('addComment', $dispoOrder) ?? false;
         $canUpdateInvoiceEndMonths = ($user?->can('updateInvoiceEndMonths', $dispoOrder) ?? false)
             && DispoOrderStatusTransition::isInvoiceEndEditable($dispoOrder->status);
+        $canUpdateOperationalFlight = ($user?->can('updateOperationalFlight', $dispoOrder) ?? false)
+            && DispoOrderStatusTransition::isOperationalFlightEditable($dispoOrder->status);
         $canComplete = ($user?->can('complete', $dispoOrder) ?? false)
             && $dispoOrder->status === DispoOrderStatus::Disposed;
         $canForceComplete = ($user?->can('forceComplete', $dispoOrder) ?? false)
@@ -234,6 +240,7 @@ class DispoOrderController extends Controller
                 ? $this->serializeComment($openSalesInquiry)
                 : null,
             'canUpdateInvoiceEndMonths' => $canUpdateInvoiceEndMonths,
+            'canUpdateOperationalFlight' => $canUpdateOperationalFlight,
             'canComplete' => $canComplete,
             'canForceComplete' => $canForceComplete,
             'canReopenCompleted' => $canReopenCompleted,
@@ -565,6 +572,30 @@ class DispoOrderController extends Controller
         );
 
         return $this->respondSuccess($request, $order, 'Rechnung per Ende gespeichert.');
+    }
+
+    public function updateOperationalFlight(
+        UpdateOperationalFlightRequest $request,
+        DispoOrder $dispoOrder,
+        DispoOrderPosition $position,
+    ): JsonResponse|RedirectResponse {
+        /** @var User $user */
+        $user = $request->user();
+
+        $order = $this->operationalFlight->update(
+            $dispoOrder,
+            $position,
+            $user,
+            $request->expectedLockVersion(),
+            $request->flightStart(),
+            $request->flightEnd(),
+        );
+
+        return $this->respondSuccess(
+            $request,
+            $order,
+            OperationalFlightContract::LABEL.' gespeichert.',
+        );
     }
 
     public function complete(
@@ -979,6 +1010,13 @@ class DispoOrderController extends Controller
                     'invoice_end_months' => $months,
                     'invoice_end_month_labels' => InvoiceEndMonthsContract::labelsFor($months),
                     'invoice_end_period_state' => $periodState,
+                    'operational_flight_start' => OperationalFlightContract::dateToIso(
+                        $position->operational_flight_start,
+                    ),
+                    'operational_flight_end' => OperationalFlightContract::dateToIso(
+                        $position->operational_flight_end,
+                    ),
+                    'operational_flight_valid' => OperationalFlightContract::positionHasValidFlight($position),
                     'dynamic_field_values' => $dynamicValues['positions'][(int) $position->id] ?? [],
                     'dynamic_field_captured' => $dynamicValues['positions_captured'][(int) $position->id] ?? [],
                 ];

@@ -9,6 +9,7 @@ use App\Models\DispoOrder;
 use App\Models\DispoOrderStatusEvent;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Support\DispoOrder\OperationalFlightContract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -57,6 +58,9 @@ final class DispoOrderCompletionService
                     ),
                 ]);
             }
+
+            // PO-CALC-TKP-1D3d-2b-1: hartes Gate – nicht durch forceComplete übersteuerbar.
+            OperationalFlightContract::assertAllOaPositionsHaveValidFlight($locked);
 
             $evaluation = $this->readiness->evaluate($locked);
             $isOverride = false;
