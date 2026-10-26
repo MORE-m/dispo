@@ -26,6 +26,7 @@ import {
 } from '@/components/dispo-order-communication-history';
 import { DispoOrderInvoiceEndMonths } from '@/components/dispo-order-invoice-end-months';
 import { DispoOrderOaTkpSnapshotPanel } from '@/components/dispo-order-oa-tkp-snapshot-panel';
+import { DispoOrderOperationalFlightEditor } from '@/components/dispo-order-operational-flight-editor';
 import {
     DispoOrderOperationalStatusActions,
     type OperationalStatusTarget,
@@ -248,6 +249,9 @@ type OrderPosition = {
     invoice_end_months?: number[] | null;
     invoice_end_month_labels?: string[];
     invoice_end_period_state?: 'open' | 'concrete' | 'invalid';
+    operational_flight_start?: string | null;
+    operational_flight_end?: string | null;
+    operational_flight_valid?: boolean;
     dynamic_field_values?: Record<string, unknown> & {
         period_open?: boolean | null;
         position_flight_period?: PeriodValue;
@@ -419,6 +423,7 @@ export default function DispoOrderShow({
     canAddComment = false,
     openSalesInquiry = null,
     canUpdateInvoiceEndMonths = false,
+    canUpdateOperationalFlight = false,
     canComplete = false,
     canForceComplete = false,
     canReopenCompleted = false,
@@ -452,6 +457,7 @@ export default function DispoOrderShow({
     canAddComment?: boolean;
     openSalesInquiry?: OpenSalesInquiry | null;
     canUpdateInvoiceEndMonths?: boolean;
+    canUpdateOperationalFlight?: boolean;
     canComplete?: boolean;
     canForceComplete?: boolean;
     canReopenCompleted?: boolean;
@@ -1305,6 +1311,23 @@ export default function DispoOrderShow({
                     uploads={uploads}
                     canArchive={canArchiveUpload}
                 />
+                {order.positions.some(
+                    (position) =>
+                        isOaTkpDispoShowPosition(position) &&
+                        position.operational_flight_valid !== true,
+                ) &&
+                (canTransitionOperationalStatus ||
+                    order.status === 'disposed') ? (
+                    <p
+                        className="text-sm text-amber-900"
+                        data-test="dispo-order-oa-operational-flight-blocker-hint"
+                    >
+                        Vor „Disponiert“ und vor dem Abschluss muss für jede
+                        Online-Audio-TKP-Position ein verbindlicher
+                        Kampagnenzeitraum (operativ) festgelegt sein.
+                    </p>
+                ) : null}
+
                 <DispoOrderOperationalStatusActions
                     orderId={order.id}
                     lockVersion={order.lock_version}
@@ -2336,7 +2359,20 @@ export default function DispoOrderShow({
                                             </ul>
                                         </div>
                                     ) : null}
-                                    <div className="text-muted-foreground mt-2 space-y-1 text-xs">
+                                    <div
+                                        className="text-muted-foreground mt-2 space-y-1 text-xs"
+                                        data-test={
+                                            isOaTkpDispoShowPosition(position)
+                                                ? `dispo-order-calc-origin-flight-${position.id}`
+                                                : undefined
+                                        }
+                                    >
+                                        {isOaTkpDispoShowPosition(position) ? (
+                                            <p className="text-foreground text-sm font-medium">
+                                                Kalkulationszeitraum
+                                                (ursprünglicher Snapshot)
+                                            </p>
+                                        ) : null}
                                         <p>
                                             {periodOpenLabel}:{' '}
                                             {!periodOpenCaptured
@@ -2358,7 +2394,46 @@ export default function DispoOrderShow({
                                                 {flightPeriodHelp}
                                             </p>
                                         ) : null}
+                                        {isOaTkpDispoShowPosition(position) ? (
+                                            <p className="text-muted-foreground/80">
+                                                Read-only aus der Kalkulation;
+                                                wird durch den operativen
+                                                Zeitraum nicht verändert.
+                                            </p>
+                                        ) : null}
                                     </div>
+                                    {isOaTkpDispoShowPosition(position) ? (
+                                        <DispoOrderOperationalFlightEditor
+                                            orderId={order.id}
+                                            positionId={position.id}
+                                            lockVersion={order.lock_version}
+                                            flightStart={
+                                                position.operational_flight_start ??
+                                                null
+                                            }
+                                            flightEnd={
+                                                position.operational_flight_end ??
+                                                null
+                                            }
+                                            flightValid={
+                                                position.operational_flight_valid ===
+                                                true
+                                            }
+                                            canEdit={canUpdateOperationalFlight}
+                                            handoffFlightSource={{
+                                                periodOpen:
+                                                    typeof periodOpen ===
+                                                    'boolean'
+                                                        ? periodOpen
+                                                        : null,
+                                                periodOpenCaptured,
+                                                flight:
+                                                    positionValues.position_flight_period ??
+                                                    null,
+                                                flightCaptured,
+                                            }}
+                                        />
+                                    ) : null}
                                     {showCalcOrigin ? (
                                         <div
                                             className="mt-4 space-y-3"
