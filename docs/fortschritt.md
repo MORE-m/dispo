@@ -1,11 +1,19 @@
 # Fortschritt V1
 
-Stand: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-1** auf Feature-Branch (Draft-PR):
-operativer verbindlicher Kampagnenzeitraum für OA-TKP (Backend/API/Gates).
-FD-D3d-2-01 beschlossen: vor `disposed` Pflicht je OA-Position; `completed`
-zusätzlich hart abgesichert (nicht per `forceComplete` umgehbar). Calc-/Handoff-/
-Derived-Snapshots unverändert; kein Prefill. UI-Edit folgt in D3d-2b-2.
+Stand: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-2** auf Feature-Branch (Draft-PR):
+React-UI für den verbindlichen operativen OA-Kampagnenzeitraum im Dispo-Show
+(`DispoOrderOperationalFlightEditor`). Snapshot unveränderlich; bewusste
+Übernahme aus gültigem Handoff-Flight nur in Edit-Felder; Speichern über
+bestehenden PUT. D3d-2b-1 Backend bleibt auf `main`. D3d-3/D3d-4/D4 offen.
 Registry planned; HTTP Store/Update geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D3d2b2-auftrag-2026-10-26.md`.
+
+Stand davor: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-2b-1** auf `main` (PR #187,
+Merge `cb012b11c501445f047d06c3d45a15098f27fd15`):
+operativer verbindlicher Kampagnenzeitraum für OA-TKP (Backend/API/Gates).
+FD-D3d-2-01: vor `disposed` Pflicht je OA-Position; `completed` hart abgesichert
+(nicht per `forceComplete` umgehbar). Calc-/Handoff-/Derived-Snapshots
+unverändert; kein Prefill. UI-Edit = D3d-2b-2.
 Dok: `docs/readiness/PO-CALC-TKP-1D3d2b1-auftrag-2026-10-24.md`.
 
 Stand davor: 24. Oktober 2026 – **PO-CALC-TKP-1D3d-2a** auf `main` (PR #186,
@@ -811,7 +819,7 @@ danach optional: `php artisan db:seed --class=CombinationMatrixMatCoreSeeder`
 | Additives Derived-Modell an `dispo_orders` | **umgesetzt** |
 | Quellen: Calendar=`planner_entries_snapshot`, Average=`position_flight_period` | **umgesetzt** |
 | OA-TKP (`spot_method=tkp`): gleicher Non-Calendar-Flight-Pfad | **bestätigt** (D3d-2a Tests) |
-| OA operativer Flight (getrennt, Positions-Spalten) | **umgesetzt** Backend D3d-2b-1 (UI D3d-2b-2 offen) |
+| OA operativer Flight (getrennt, Positions-Spalten) | **umgesetzt** Backend D3d-2b-1 + UI D3d-2b-2 (Feature-Branch) |
 | Status `complete`/`partial`/`open`/`legacy` + Provenienz-JSON | **umgesetzt** |
 | Freeze in Create-TX nach Snapshots + Dyn-Feld-Capture | **umgesetzt** |
 | Kein Backfill / Legacy ohne Datumswerte | **umgesetzt** |

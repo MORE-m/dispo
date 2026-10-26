@@ -104,7 +104,10 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - **FD-D3d-2-01 / D3d-2b-1:** zusätzlicher **operativer** Flight
   (`operational_flight_start`/`end` an `dispo_order_positions`), getrennt vom Snapshot.
   Pflicht vor `disposed` je OA-TKP-Media-Position; hartes Gate vor `completed`
-  (nicht durch `forceComplete` übersteuerbar). Kein Prefill. UI-Edit = D3d-2b-2.
+  (nicht durch `forceComplete` übersteuerbar). Kein Prefill.
+- **D3d-2b-2:** React-Show-UI `DispoOrderOperationalFlightEditor`; Snapshot
+  unveränderlich; Übernahme aus gültigem Handoff nur in Edit-Felder; Speichern
+  über PUT `operativer-flight`. Vitest: `dispo-order-operational-flight*.test.*`
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

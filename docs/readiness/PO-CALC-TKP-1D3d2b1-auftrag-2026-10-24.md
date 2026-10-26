@@ -1,7 +1,8 @@
 # PO-CALC-TKP-1D3d-2b-1 – Operativer Flight-Service und Abschluss-Gates
 
-Stand: 24. Oktober 2026 (Feature-Branch / Draft-PR)  
-Base: `5673dd7e89eb413bee70b66c7d6aef7df54dc932` (D3d-2a auf `main`, PR #186)
+Stand: 26. Oktober 2026 – auf `main` (PR #187,
+Merge `cb012b11c501445f047d06c3d45a15098f27fd15`)  
+Base war: `5673dd7e89eb413bee70b66c7d6aef7df54dc932` (D3d-2a, PR #186)
 
 ## Ziel
 
@@ -36,5 +37,5 @@ Backend für den verbindlichen operativen Kampagnenzeitraum (OA-TKP) gemäß
 
 ## Statuszeile
 
-> D3d-2b-1 liefert Backend, API und Abschluss-Gates für den operativen OA-Flight.
-> Die editierbare Show-Oberfläche folgt in D3d-2b-2.
+> D3d-2b-1 Backend/API/Gates abgeschlossen auf `main`.
+> Die editierbare Show-Oberfläche ist D3d-2b-2.

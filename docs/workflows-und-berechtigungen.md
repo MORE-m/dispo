@@ -474,7 +474,8 @@ Benutzer und Zeitpunkt werden im Audit gespeichert (`STA-006`). Completed war in
 
 ## Dispositionsrechte
 
-Disposition darf operative Felder, Materialstatus, Rechnung-per-Ende und Kommentare
+Disposition darf operative Felder, Materialstatus, Rechnung-per-Ende,
+verbindlichen OA-Kampagnenzeitraum (operativ, PO-CALC-TKP-1D3d-2b) und Kommentare
 bearbeiten. Kaufmännische Werte werden nicht durch die Disposition korrigiert;
 hierfür ist eine Rückfrage an Vertrieb erforderlich.
 
