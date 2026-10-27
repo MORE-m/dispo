@@ -9,6 +9,7 @@ use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
 use App\Services\OnlineAudio\Import\OaTkpPriceListDraftImportGuard;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -24,6 +25,9 @@ use Tests\TestCase;
  * committed Drafts sehen. Unter SQLite: früh skip ohne Migration (kein
  * RefreshDatabaseState-Poisoning der SQLite-Suite).
  *
+ * Nach der Klasse: RefreshDatabaseState zurücksetzen, damit Folgetests
+ * wieder migrate:fresh fahren (committed Seed-Reste sonst giftig für MySQL-Suite).
+ *
  * @group mysql
  */
 class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
@@ -31,6 +35,12 @@ class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
     use RefreshDatabase;
 
     private bool $skipBecauseNotMysql = false;
+
+    public static function tearDownAfterClass(): void
+    {
+        RefreshDatabaseState::$migrated = false;
+        parent::tearDownAfterClass();
+    }
 
     /**
      * @return list<string>
