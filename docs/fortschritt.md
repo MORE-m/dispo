@@ -1,11 +1,17 @@
 # Fortschritt V1
 
-Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-2** auf Feature-Branch (Draft-PR):
+Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-1** auf Feature-Branch (Draft-PR, nur Doku):
+Go-live-Stammdaten-Analyse + leere Importvorlagen (41 Paare × 2026/2027, keine
+erfundenen TKPs). Live: Zuordnungen ok, Preislisten/Plattformen/Targetings = 0.
+Registry planned; kein Import, kein D4d. Folge-Slice spezifiziert: D4c-2 Import-CLI.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c1-auftrag-2026-10-27.md`,
+`docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`,
+`docs/readiness/import-templates/`.
+
+Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-2** auf `main` (PR #192,
+Merge `2364085b0b387a7b68199f9a4f6db7fca8e0ad57`):
 Positive HTTP-Integrationsabsicherung für OA-TKP Create/Update über die regulären
-Controller (`calculations.store` / `calculations.update`). Release nur isoliert
-per D4b-1-Fake; **produktive Registry bleibt planned**, HTTP Store/Update ohne Fake
-weiterhin 422. Kein Catalog-Flip, kein Preislistenimport, kein HTTP-Bypass, kein
-Deploy, kein D4d. Tests: `PoCalcTkp1d4b2HttpCreateUpdateTest`.
+Controller; Release nur isoliert per D4b-1-Fake. Produktive Registry planned.
 Dok: `docs/readiness/PO-CALC-TKP-1D4b2-auftrag-2026-10-27.md`.
 
 Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-1** auf `main` (PR #191,

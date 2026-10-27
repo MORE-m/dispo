@@ -1,14 +1,1 @@
-{
-  "_readme": "Array für OaTargetingDefinitionImporter. Erster Release darf ohne Targetings starten.",
-  "_validation": {
-    "code": "Pflicht",
-    "name": "Pflicht",
-    "category": "technisch|dmp",
-    "tkp_surcharge": ">=0, Punkt, max 4 NK",
-    "revision_number": "optional int >=1, default 1",
-    "is_active": "optional bool, default true",
-    "valid_from": "optional date|null",
-    "valid_to": "optional date|null"
-  },
-  "targetings": []
-}
+[]

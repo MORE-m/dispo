@@ -196,12 +196,15 @@ Keine Admin-UI nötig für den ersten Go-live, solange Fachdaten als JSON/CSV→
 
 ## Kleinster sinnvoller nächster Schritt
 
-**Fachbereich liefert ausgefüllte Vorlagen** (Preise 2026 [+ optional 2027], Plattformen, optional Targetings) ohne Systemänderung.  
-Parallel optional: Slice **Import-CLI + Dry-Run-Protokoll** (gesonderte Freigabe) – noch **kein** produktiver Import und **kein** D4d.
+1. **D4c-1-Doku-PR** (dieser Branch) nach PO-Abnahme mergen.  
+2. **Fachbereich** füllt Vorlagen (Preise, Plattformen, optional Targetings).  
+3. Technischer Folge-Slice **D4c-2** (Import-CLI) laut  
+   `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md` – erst nach gesonderter Freigabe implementieren.  
+4. Danach erst kontrollierter Import; **D4d** weiter separat.
 
 ## OUT dieses Auftrags
 
 - Produktiver Import
 - Registry-Freigabe / D4d
-- Deploy / Merge dieses Analyse-Branches (Doku optional separat)
+- D4c-2-Implementierung
 - Erfundene TKPs / Demo-Plattformen als Stammdaten

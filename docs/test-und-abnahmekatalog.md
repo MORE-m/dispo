@@ -129,6 +129,13 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Tests: `PoCalcTkp1d4b2HttpCreateUpdateTest`. Produktive Persistenz geschlossen;
   echte Stammdaten fehlen; D4d offen.
   Dok: `docs/readiness/PO-CALC-TKP-1D4b2-auftrag-2026-10-27.md`.
+- **D4c-1:** Go-live-Stammdaten-Readiness + leere Importvorlagen (41 Paare,
+  2026/2027, keine erfundenen TKPs). Domain-Importer vorhanden; CLI fehlt → D4c-2.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4c1-auftrag-2026-10-27.md`,
+  `docs/readiness/import-templates/`.
+- **D4c-2 (Spezifikation):** Sichere Artisan-Import-CLI über bestehende Importer +
+  atomare Activate/Archive. Noch nicht implementiert.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
