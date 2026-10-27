@@ -421,6 +421,23 @@ export function draftHasTkpPositions(
     return positions.some((position) => isTkpPosition(position));
 }
 
+/**
+ * PO-CALC-TKP-1D4b-1: UI-Save-Sperre nur über serverseitiges Registry-Release-Signal.
+ * Capability/Preview allein öffnen Speichern nicht. Standardangebote bleiben
+ * wie bisher UI-seitig nicht über diesen Blocker gesperrt (Server rejectet TKP).
+ */
+export function isOaTkpSaveBlocked(options: {
+    hasTkpPositions: boolean;
+    httpMutationAllowed: boolean;
+    isStandardOffer: boolean;
+}): boolean {
+    if (!options.hasTkpPositions || options.isStandardOffer) {
+        return false;
+    }
+
+    return !options.httpMutationAllowed;
+}
+
 /** True, wenn mindestens eine TKP-Position noch nicht preview-ready ist. */
 export function draftBlocksOaTkpPreview(
     positions: OaTkpPositionFields[],

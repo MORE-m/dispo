@@ -9,6 +9,7 @@ import {
     hydrateOaTkpFromSaved,
     isActiveTargetingBlockedByHistorical,
     isOaTkpPreviewReady,
+    isOaTkpSaveBlocked,
     isSelectableForCalculationWizardPosition,
     isTkpPosition,
     isValidBasisTkpInput,
@@ -27,6 +28,42 @@ describe('oa-tkp-wizard helpers', () => {
             false,
         );
         expect(isTkpPosition({ calculation_method_key: null })).toBe(false);
+    });
+
+    it('blocks OA save only via registry mutation signal (not capability alone)', () => {
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: true,
+                httpMutationAllowed: false,
+                isStandardOffer: false,
+            }),
+        ).toBe(true);
+
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: true,
+                httpMutationAllowed: true,
+                isStandardOffer: false,
+            }),
+        ).toBe(false);
+
+        // Spot / method switch away from TKP: never method-blocked.
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: false,
+                httpMutationAllowed: false,
+                isStandardOffer: false,
+            }),
+        ).toBe(false);
+
+        // Standardangebote: UI-Blocker unverändert aus; Server rejectet TKP.
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: true,
+                httpMutationAllowed: true,
+                isStandardOffer: true,
+            }),
+        ).toBe(false);
     });
 
     it('soft-opens selection under capability when methods include tkp', () => {

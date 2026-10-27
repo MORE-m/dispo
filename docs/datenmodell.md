@@ -329,6 +329,10 @@ Unterobjekte werden typbezogen normalisiert:
   delete+recreate synchronisiert. Sonderfreigabe nach Persist kanonisch über
   `SpecialApprovalAssessor`. Registry bleibt planned; HTTP/Budget/Standardangebot
   fail-closed. `OaTkpCalculationPersister` ist nur noch Testsupport.
+- **PO-CALC-TKP-1D4b-1 Save-Gate:** Wizard-Prop `oa_tkp_http_mutation_allowed` =
+  `OaTkpWizardCapability::allowsHttpMutation()` (Registry-Release). UI-Save und
+  HTTP-Guard nutzen dasselbe Signal; Capability Soft-Open öffnet Speichern nicht.
+  Produktive Speicherung bleibt gesperrt bis D4d.
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
