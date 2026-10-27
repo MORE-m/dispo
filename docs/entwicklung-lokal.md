@@ -303,6 +303,17 @@ E2E: `npm run test:e2e:dspdcp001` bzw.
 `database/e2e-derived-campaign-period.sqlite`, Seeder `E2EDerivedCampaignPeriodSeeder`
 – niemals Dev-DB `dispo`).
 
+## PO-CALC-TKP-1D3d-4 – OA Playwright Smoke
+
+Isolierter Browser-Smoke für OA-TKP Dispo (Handoff, Snapshot, Ops-Flight,
+disposed-Gate, Material, Mixed, HTTP-Store-Negativ). Testdaten nur über
+`CalculationWriter` im Seeder – kein HTTP-Persistenz-Bypass.
+
+E2E: `npm run test:e2e:po-calc-tkp-d3d4` bzw.
+`npx playwright test -c playwright.po-calc-tkp-d3d4.config.ts` (Port **8073**, DB
+`database/e2e-po-calc-tkp-d3d4.sqlite`, Seeder `E2EOaTkpDispoSeeder` – niemals
+Dev-DB `dispo`).
+
 ## BL-P8-02a – Operativer Statuskern
 
 Operative Statusübergänge bis Disponiert inkl. Wiederöffnung mit Pflichtbegründung.

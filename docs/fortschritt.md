@@ -1,9 +1,19 @@
 # Fortschritt V1
 
-Stand: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-3a** auf Feature-Branch (Draft-PR):
+Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D3d-4** auf Feature-Branch (Draft-PR):
+dauerhaft eingecheckter OA-TKP Playwright-Smoke (isoliert Port **8073**,
+`playwright.po-calc-tkp-d3d4.config.ts`, Seeder `E2EOaTkpDispoSeeder`).
+Handoff, Snapshot/Show, Ops-Flight (Adopt ohne Auto-Save), disposed-Gate,
+Material-Upload ohne Statuswechsel, Mixed Spot+OA, HTTP-Store-Negativtest,
+Rechte/409. Testdaten nur über `CalculationWriter` (kein produktiver HTTP-Bypass,
+keine Registry-Manipulation). Registry planned; HTTP Store/Update geschlossen;
+D4 offen. Dok: `docs/readiness/PO-CALC-TKP-1D3d4-auftrag-2026-10-27.md`.
+
+Stand davor: 26. Oktober 2026 – **PO-CALC-TKP-1D3d-3a** auf `main` (PR #189,
+Merge `23e9f0c775bb52f46e4ded343987b64e9c3b9a07`):
 OA-Material-/Completion-Vertrag abgesichert (Tests + Doku). Keine neuen
 Materialpflichten, kein Material-Gate, keine Spotproduktion für OA.
-Completion-Matrix: sechs Checks; Ops-Flight bleibt hart. D3d-4/D4 offen.
+Completion-Matrix: sechs Checks; Ops-Flight bleibt hart.
 Registry planned; HTTP Store/Update geschlossen.
 Dok: `docs/readiness/PO-CALC-TKP-1D3d3a-auftrag-2026-10-26.md`.
 

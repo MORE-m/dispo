@@ -25,6 +25,7 @@
         "test:e2e:po-allonge-1": "playwright test -c playwright.po-allonge-1.config.ts --retries=0",
         "test:e2e:po-spot-surcharge-1": "playwright test -c playwright.po-spot-surcharge-1.config.ts --retries=0",
         "test:e2e:po-spot-single-1": "playwright test -c playwright.po-spot-single-1.config.ts --retries=0",
+        "test:e2e:po-calc-tkp-d3d4": "playwright test -c playwright.po-calc-tkp-d3d4.config.ts --retries=0",
         "test:e2e:po-swf-promo-1": "playwright test -c playwright.po-swf-promo-1.config.ts --retries=0",
         "test:e2e:po-swf-contest-1": "playwright test -c playwright.po-swf-contest-1.config.ts --retries=0",
         "test:e2e:blp203a": "playwright test -c playwright.blp203a.config.ts",
