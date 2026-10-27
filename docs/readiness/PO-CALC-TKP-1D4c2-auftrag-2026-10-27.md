@@ -1,8 +1,38 @@
 # PO-CALC-TKP-1D4c-2 – Sichere OA-TKP-Stammdaten-Import-CLI
 
-Stand: 27. Oktober 2026 (**Spezifikation – keine Implementierung in diesem Slice**)  
-Voraussetzung: D4c-1 Doku/Vorlagen; Base erwartet nach Merge von D4c-1 bzw. `2364085…` + D4c-1-Docs  
-**Kein produktiver Import, kein Deploy, keine Registry-Freigabe, kein D4d.**
+Stand: 27. Oktober 2026 (**Implementierung auf Feature-Branch / Draft-PR**)  
+Base: `2d5591469994ba8de9a9e148caa9bfd618241611` (D4c-1 auf `main`, PR #193)  
+**Kein produktiver Import, kein Deploy, keine Registry-Freigabe, kein D4d. STOP vor Merge.**
+
+## Implementierungsstatus (D4c-2)
+
+| Baustein | Status |
+|---|---|
+| `oa:import-platforms` / `oa:import-targetings` / `oa:import-price-list` | umgesetzt |
+| Draft-only + Non-Draft-Overwrite-Guard (Preislisten-CLI) | `OaTkpPriceListDraftImportGuard` |
+| `oa:activate-price-list --year --revision [--archive-previous] [--dry-run]` | umgesetzt |
+| `OaTkpPriceListActivationService` + MySQL `GET_LOCK` Jahres-Sperre | umgesetzt |
+| Feature-Tests Import/Activate | `PoCalcTkp1d4c2ImportCliTest` |
+| MySQL-Concurrency | `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest` + Worker |
+| HTTP / Registry / produktiver Import | **OUT** |
+
+### Operativer Ablauf
+
+1. Fachwerte liefern (D4c-1-Vorlagen)  
+2. JSON prüfen  
+3. Dry-Run (`--dry-run`)  
+4. Draft importieren  
+5. Draft fachlich abnehmen  
+6. Vorgänger kontrolliert archivieren (`--archive-previous`) und neue Revision aktivieren  
+7. Resolver prüfen  
+8. Erst danach separates D4d-Go/No-Go  
+
+### Operatives Rollback (fehlerhafte Aktivierung)
+
+1. Korrektur als **neue Draft-Revision** importieren (keine Überschreibung von `archived`/`active`)  
+2. `oa:activate-price-list --year=… --revision=… --archive-previous`  
+3. Historische Pins/Snapshots in Kalkulationen bleiben unverändert  
+4. Kein Delete von Preislisten/Items
 
 ## Ziel
 
@@ -147,7 +177,7 @@ Keine produktiven Daten; keine E2E-Registry-Freigabe.
 5. MySQL Parallel-/Lock-Tests  
 6. Pin-Regression + Doku Rollback + CI  
 
-**STOP:** Keine Implementierung ohne gesonderte PO-Freigabe dieses Auftrags.
+**Hinweis:** Spezifikation oben bleibt der Vertrag; Umsetzungsstatus siehe Abschnitt „Implementierungsstatus“. Merge nur nach PO-Abnahme.
 
 ## OUT
 
@@ -157,3 +187,8 @@ Keine produktiven Daten; keine E2E-Registry-Freigabe.
 - Deploy-Automatisierung
 - Adserver-Surcharge-Importer
 - Reporting
+
+## Statuszeile
+
+> D4c-2: Sichere OA-Import-CLI + atomare Activate/Archive implementiert (Draft-PR).
+> Registry planned; kein produktiver Import; D4d offen.

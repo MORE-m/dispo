@@ -38,6 +38,28 @@ Nur Felddefinitionen und leere Matrizen. **Keine erfundenen Fachwerte.**
 1. CSV-Matrix 2026 (und ggf. 2027) mit echten TKPs befüllen
 2. Plattform-CSV befüllen; Targetings nur wenn verkauft
 3. Technisch: CSV → JSON gemäß Skeleton
-4. Import erst nach D4c-2-CLI / PO-Freigabe; Activate getrennt vom Draft-Import
+4. Dry-Run und Import über D4c-2-CLI (siehe unten); Activate getrennt vom Draft-Import
+5. Erst nach erfolgreicher Aktivierung und Resolver-Prüfung: separates D4d-Go/No-Go
 
 CSV-Trenner: `;` (Excel DE). Dezimaltrenner in Werten: `.`
+
+## D4c-2 CLI (operativ)
+
+```bash
+php artisan oa:import-platforms path.json --dry-run
+php artisan oa:import-platforms path.json
+
+php artisan oa:import-targetings path.json --dry-run
+php artisan oa:import-targetings path.json
+
+php artisan oa:import-price-list path.json --dry-run   # nur status=draft
+php artisan oa:import-price-list path.json
+
+php artisan oa:activate-price-list --year=2026 --revision=1 --dry-run
+php artisan oa:activate-price-list --year=2026 --revision=1 --archive-previous
+```
+
+- Preislisten-CLI akzeptiert **nur** `status=draft`; überschreibt keine `active`/`archived` Revision.
+- Aktivierung ist **nie** Teil des Imports; Vorgänger nur mit `--archive-previous`.
+- Keine Demo-/Skeleton-Werte als operative Preise übernehmen.
+- Rollback fehlerhafter Aktivierung: neue Draft-Revision importieren, dann Activate mit `--archive-previous` (historische Pins bleiben).
