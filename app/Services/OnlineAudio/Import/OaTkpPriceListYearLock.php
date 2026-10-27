@@ -4,12 +4,14 @@ namespace App\Services\OnlineAudio\Import;
 
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 /**
- * PO-CALC-TKP-1D4c-2: Jahres-Sperre für OA-TKP-Aktivierung.
+ * PO-CALC-TKP-1D4c-2: Jahres-Sperre für OA-TKP Draft-Import und Aktivierung.
  *
- * MySQL: GET_LOCK – funktioniert auch ohne bestehende Zeilen für das Jahr.
- * SQLite: No-Op (Concurrency nur auf MySQL nachgewiesen).
+ * MySQL: GET_LOCK/RELEASE_LOCK auf derselben Connection (verbindungsgebunden).
+ * SQLite: bewusst No-Op nur für isolierte Tests (Concurrency auf MySQL nachgewiesen).
+ * Andere Treiber: fail-closed – keine scheinbar sichere Aktivierung ohne Sperre.
  */
 final class OaTkpPriceListYearLock
 {
@@ -22,10 +24,22 @@ final class OaTkpPriceListYearLock
         }
 
         $driver = DB::connection()->getDriverName();
-        if ($driver !== 'mysql') {
+
+        if ($driver === 'sqlite') {
+            // Test-Sonderweg: keine echte Concurrency-Absicherung.
             $this->heldName = $this->lockName($year);
 
             return;
+        }
+
+        if ($driver !== 'mysql') {
+            throw new OaTkpStammdatenImportException(
+                'OA-TKP-Jahres-Sperre nicht verfügbar.',
+                [
+                    "Datenbanktreiber „{$driver}“ unterstützt keine OA-TKP-Jahres-Sperre."
+                    .' Erlaubt sind MySQL (GET_LOCK) und SQLite (nur Tests).',
+                ],
+            );
         }
 
         $name = $this->lockName($year);
@@ -33,8 +47,8 @@ final class OaTkpPriceListYearLock
         $locked = isset($rows[0]->locked) ? (int) $rows[0]->locked : 0;
         if ($locked !== 1) {
             throw new OaTkpStammdatenImportException(
-                'OA-TKP-Aktivierung konnte nicht gesperrt werden.',
-                ["Jahr {$year}: GET_LOCK fehlgeschlagen oder Timeout (parallele Aktivierung?)."],
+                'OA-TKP-Jahres-Sperre konnte nicht erworben werden.',
+                ["Jahr {$year}: GET_LOCK fehlgeschlagen oder Timeout (parallele Import/Aktivierung?)."],
             );
         }
 
@@ -54,7 +68,11 @@ final class OaTkpPriceListYearLock
             return;
         }
 
-        DB::select('SELECT RELEASE_LOCK(?) AS released', [$name]);
+        try {
+            DB::select('SELECT RELEASE_LOCK(?) AS released', [$name]);
+        } catch (Throwable) {
+            // Verbindung verloren → MySQL gibt den Lock automatisch frei.
+        }
     }
 
     private function lockName(int $year): string

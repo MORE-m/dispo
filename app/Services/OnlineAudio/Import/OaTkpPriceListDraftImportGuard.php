@@ -10,11 +10,16 @@ use App\Models\OaTkpPriceList;
  *
  * Der Domain-Importer darf weiterhin andere Status (API-Kompatibilität); der CLI-Pfad
  * erzwingt ausschließlich Draft und blockiert firstOrNew auf non-draft Revisionen.
+ *
+ * Statusprüfung und Mutation teilen dieselbe Jahres-Sperre wie die Aktivierung,
+ * damit paralleles Activate die Revision nicht zwischen Check und Write „active“ setzen
+ * und der Import sie anschließend überschreiben kann.
  */
 final class OaTkpPriceListDraftImportGuard
 {
     public function __construct(
         private readonly OaTkpPriceListImporter $importer,
+        private readonly OaTkpPriceListYearLock $yearLock,
     ) {}
 
     /**
@@ -40,7 +45,27 @@ final class OaTkpPriceListDraftImportGuard
 
         $year = (int) ($payload['year'] ?? 0);
         $revision = (int) ($payload['revision_number'] ?? 1);
+        $payload['status'] = PriceListStatus::Draft->value;
 
+        if ($dryRun) {
+            $this->assertRevisionIsDraftOrAbsent($year, $revision);
+
+            return $this->importer->import($payload, true);
+        }
+
+        $this->yearLock->acquire($year);
+
+        try {
+            $this->assertRevisionIsDraftOrAbsent($year, $revision);
+
+            return $this->importer->import($payload, false);
+        } finally {
+            $this->yearLock->release();
+        }
+    }
+
+    private function assertRevisionIsDraftOrAbsent(int $year, int $revision): void
+    {
         $existing = OaTkpPriceList::query()
             ->where('year', $year)
             ->where('revision_number', $revision)
@@ -54,9 +79,5 @@ final class OaTkpPriceListDraftImportGuard
                 ],
             );
         }
-
-        $payload['status'] = PriceListStatus::Draft->value;
-
-        return $this->importer->import($payload, $dryRun);
     }
 }

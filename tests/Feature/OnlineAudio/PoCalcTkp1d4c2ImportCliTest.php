@@ -15,11 +15,14 @@ use App\Models\OaTkpPriceList;
 use App\Models\User;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
+use App\Services\OnlineAudio\Import\OaTkpPriceListYearLock;
+use App\Services\OnlineAudio\Import\OaTkpStammdatenImportException;
 use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\Calculation\OaTkpWizardCapability;
 use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -312,6 +315,32 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
             (int) OaTkpPriceList::query()->where('year', 2026)->where('status', PriceListStatus::Active)->value('id'),
             $pinnedListId,
         );
+    }
+
+    #[Test]
+    public function year_lock_fails_closed_for_unsupported_driver(): void
+    {
+        $previous = (string) config('database.default');
+        config([
+            'database.default' => 'oa_tkp_unsupported',
+            'database.connections.oa_tkp_unsupported' => [
+                'driver' => 'sqlsrv',
+                'host' => '127.0.0.1',
+                'database' => 'unused',
+                'username' => 'unused',
+                'password' => '',
+            ],
+        ]);
+        DB::purge('oa_tkp_unsupported');
+        DB::setDefaultConnection('oa_tkp_unsupported');
+
+        try {
+            $this->expectException(OaTkpStammdatenImportException::class);
+            (new OaTkpPriceListYearLock)->acquire(2026, 1);
+        } finally {
+            DB::setDefaultConnection($previous);
+            DB::purge('oa_tkp_unsupported');
+        }
     }
 
     #[Test]

@@ -12,8 +12,10 @@ Base: `2d5591469994ba8de9a9e148caa9bfd618241611` (D4c-1 auf `main`, PR #193)
 | Draft-only + Non-Draft-Overwrite-Guard (Preislisten-CLI) | `OaTkpPriceListDraftImportGuard` |
 | `oa:activate-price-list --year --revision [--archive-previous] [--dry-run]` | umgesetzt |
 | `OaTkpPriceListActivationService` + MySQL `GET_LOCK` Jahres-Sperre | umgesetzt |
+| Draft-Import hält dieselbe Jahres-Sperre (Import↔Activate-Race) | `OaTkpPriceListDraftImportGuard` |
+| Nicht-MySQL/Nicht-SQLite-Treiber | fail-closed (keine Pseudo-Sperre) |
 | Feature-Tests Import/Activate | `PoCalcTkp1d4c2ImportCliTest` |
-| MySQL-Concurrency | `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest` + Worker |
+| MySQL-Concurrency | `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest` + Activate-/Import-Worker |
 | HTTP / Registry / produktiver Import | **OUT** |
 
 ### Operativer Ablauf
