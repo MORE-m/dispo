@@ -1,13 +1,22 @@
 # Fortschritt V1
 
-Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-1** auf Feature-Branch (Draft-PR):
+Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-2** auf Feature-Branch (Draft-PR):
+Positive HTTP-Integrationsabsicherung für OA-TKP Create/Update über die regulären
+Controller (`calculations.store` / `calculations.update`). Release nur isoliert
+per D4b-1-Fake; **produktive Registry bleibt planned**, HTTP Store/Update ohne Fake
+weiterhin 422. Kein Catalog-Flip, kein Preislistenimport, kein HTTP-Bypass, kein
+Deploy, kein D4d. Tests: `PoCalcTkp1d4b2HttpCreateUpdateTest`.
+Dok: `docs/readiness/PO-CALC-TKP-1D4b2-auftrag-2026-10-27.md`.
+
+Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-1** auf `main` (PR #191,
+Merge `825542a6f0670894e866740d1e6d1bd9bcbb19fb`):
 OA-TKP Save-UI an dasselbe Registry-Release-Signal wie HTTP Mutation gekoppelt
 (`oa_tkp_http_mutation_allowed` ← `OaTkpWizardCapability::allowsHttpMutation()`).
 **Die UI ist für einen zukünftigen Registry-Release vorbereitet; die produktive
 OA-Speicherung bleibt gesperrt.** Registry `oa_tkp`/`tkp` bleibt **planned**,
 `current_released_version=null`, `v1=implemented`. Kein Preislistenimport, kein
-HTTP-Bypass, kein LiveBookability-Change. Budget/SO-TKP geschlossen. D4b-2 und
-D4d offen. Dok: `docs/readiness/PO-CALC-TKP-1D4b1-auftrag-2026-10-27.md`.
+HTTP-Bypass, kein LiveBookability-Change. Budget/SO-TKP geschlossen.
+Dok: `docs/readiness/PO-CALC-TKP-1D4b1-auftrag-2026-10-27.md`.
 
 Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D3d-4** auf `main` (PR #190,
 Merge `96de1c035301c910bc6b2e37f79a4df4f4f6ce1b`):

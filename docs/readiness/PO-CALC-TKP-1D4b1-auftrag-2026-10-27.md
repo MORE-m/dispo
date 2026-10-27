@@ -55,4 +55,4 @@ Capability allein öffnet Speichern **nicht**.
 ## Statuszeile
 
 > D4b-1: Save-UI an Registry-Release-Signal gekoppelt. Registry planned; HTTP Store
-> geschlossen; D4b-2 und D4d offen.
+> geschlossen. Positive HTTP-Absicherung = D4b-2; produktive Freigabe = D4d.

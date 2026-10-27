@@ -333,6 +333,10 @@ Unterobjekte werden typbezogen normalisiert:
   `OaTkpWizardCapability::allowsHttpMutation()` (Registry-Release). UI-Save und
   HTTP-Guard nutzen dasselbe Signal; Capability Soft-Open öffnet Speichern nicht.
   Produktive Speicherung bleibt gesperrt bis D4d.
+- **PO-CALC-TKP-1D4b-2 HTTP Create/Update:** Positive Persistenz über
+  `CalculationController` store/update ist testseitig mit Fake-Release abgesichert
+  (kein zweiter Store-Pfad). Produktive Registry bleibt planned; ohne Fake weiterhin
+  422. Pinning/Expected-Token/Lock/Method-Switch unverändert.
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
