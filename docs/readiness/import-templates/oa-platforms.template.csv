@@ -1,0 +1,2 @@
+code;name;is_active;sort;is_adserver_relevant;notes
+;;;;;# PFLICHT: code, name. is_active default true. sort int. is_adserver_relevant default false. Keine Demo-/E2E-Codes. Nur fachlich freigegebene Plattformen.

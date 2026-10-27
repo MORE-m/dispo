@@ -1,0 +1,2 @@
+code;name;category;tkp_surcharge;revision_number;is_active;valid_from;valid_to;notes
+;;;;1;;;;# OPTIONAL für ersten Release. category nur technisch|dmp. tkp_surcharge absolut ≥0 max 4 NK Punkt. Keine fiktiven Aufschläge.

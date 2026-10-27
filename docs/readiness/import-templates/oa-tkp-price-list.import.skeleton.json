@@ -1,0 +1,20 @@
+{
+    "_readme": "PO-CALC-TKP-1D4c-1 Import-Skeleton. Keine Platzhalter-TKPs. items aus Fachmatrix befüllen. status zuerst draft. Activate erst nach Abnahme und Archivierung anderer active Revision desselben Jahres.",
+    "_validation": {
+        "year": "int 2000-2100, hier 2026 oder 2027",
+        "revision_number": "int >= 1",
+        "status": "draft|active|archived – Go-live-Import startet als draft",
+        "items[].medium_code": "nur OaTkpCoreMedia; native_ad verboten",
+        "items[].inventory_code": "muss in inventories existieren",
+        "items[].list_tkp": "positiv, Dezimal Punkt, max 4 NK, kein Float",
+        "items[].minimum_tkp": "positiv, <= list_tkp, gleiches Dezimalformat",
+        "active_per_year": "max. eine active Revision pro year"
+    },
+    "year": 2026,
+    "name": "",
+    "version": "2026.1",
+    "revision_number": 1,
+    "status": "draft",
+    "valid_from": null,
+    "items": []
+}
