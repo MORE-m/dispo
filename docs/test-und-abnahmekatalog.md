@@ -117,6 +117,11 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Persistenz testseitig über `CalculationWriter`; HTTP Store bleibt 422.
   Abdeckt: Handoff, Snapshot, Ops-Flight Adopt/Save, disposed-Gate,
   Material ohne Statuswechsel, Mixed, Rechte/409. Kein D4-Release.
+- **D4b-1:** Save-UI an Registry-Release-Signal
+  (`oa_tkp_http_mutation_allowed` = `allowsHttpMutation()`). Capability allein
+  öffnet Speichern nicht. Produktive Registry bleibt planned; HTTP Store 422.
+  Tests: `PoCalcTkp1d4b1SaveReleaseGateTest`, Vitest `isOaTkpSaveBlocked`.
+  D4b-2/D4d offen. Dok: `docs/readiness/PO-CALC-TKP-1D4b1-auftrag-2026-10-27.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

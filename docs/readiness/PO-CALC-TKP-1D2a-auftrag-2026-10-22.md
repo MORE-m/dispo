@@ -61,3 +61,6 @@ oa_tkp / tkp: pair_status=planned, current_released_version=null, v1=implemented
 - D2b: React TKP Editor
 - D3: OA Dispo Snapshot
 - D4: Registry Release + HTTP Store/Update Nutzerfreigabe
+- **D4b-1 (nachgezogen):** Save-UI-Prop `oa_tkp_http_mutation_allowed` an
+  `allowsHttpMutation()`; produktive Speicherung bleibt planned/gesperrt
+  (`docs/readiness/PO-CALC-TKP-1D4b1-auftrag-2026-10-27.md`)

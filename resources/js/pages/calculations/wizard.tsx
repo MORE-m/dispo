@@ -108,6 +108,7 @@ import {
     buildOaTkpPositionPayload,
     draftBlocksOaTkpPreview,
     draftHasTkpPositions,
+    isOaTkpSaveBlocked,
     emptyOaTkpDraftFields,
     formatImpressions,
     formatTkpDisplay,
@@ -1051,6 +1052,7 @@ export default function CalculationWizard({
     linkedDispoOrders = null,
     standardOffer = null,
     oa_tkp_wizard_capability = false,
+    oa_tkp_http_mutation_allowed = false,
 }: {
     catalog: Catalog;
     component_profiles: ComponentProfilesProp;
@@ -1068,6 +1070,8 @@ export default function CalculationWizard({
     dispoOrderRevision?: DispoOrderRevisionContext | null;
     linkedDispoOrders?: LinkedDispoOrdersProp | null;
     oa_tkp_wizard_capability?: boolean;
+    /** Registry-Release-Signal für OA-TKP HTTP Store/Update + UI-Save (nicht Capability). */
+    oa_tkp_http_mutation_allowed?: boolean;
     standardOffer?: {
         mode: 'create' | 'edit';
         offer_id: number | null;
@@ -2161,7 +2165,11 @@ export default function CalculationWizard({
             (!isBudgetSetup && draftBlocksOaTkpPreview(positions)),
     });
     const hasTkpPositions = draftHasTkpPositions(positions);
-    const tkpSaveBlocked = hasTkpPositions && !isStandardOffer;
+    const tkpSaveBlocked = isOaTkpSaveBlocked({
+        hasTkpPositions,
+        httpMutationAllowed: oa_tkp_http_mutation_allowed === true,
+        isStandardOffer,
+    });
     const schemaStillLoading = Object.keys(schemaLoadingClientKeys).length > 0;
     const schemaFingerprintMissing =
         !isBudgetSetup && positions.some(positionNeedsFieldSchema);

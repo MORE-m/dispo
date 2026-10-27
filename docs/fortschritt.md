@@ -1,6 +1,16 @@
 # Fortschritt V1
 
-Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D3d-4** auf Feature-Branch (Draft-PR):
+Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-1** auf Feature-Branch (Draft-PR):
+OA-TKP Save-UI an dasselbe Registry-Release-Signal wie HTTP Mutation gekoppelt
+(`oa_tkp_http_mutation_allowed` ← `OaTkpWizardCapability::allowsHttpMutation()`).
+**Die UI ist für einen zukünftigen Registry-Release vorbereitet; die produktive
+OA-Speicherung bleibt gesperrt.** Registry `oa_tkp`/`tkp` bleibt **planned**,
+`current_released_version=null`, `v1=implemented`. Kein Preislistenimport, kein
+HTTP-Bypass, kein LiveBookability-Change. Budget/SO-TKP geschlossen. D4b-2 und
+D4d offen. Dok: `docs/readiness/PO-CALC-TKP-1D4b1-auftrag-2026-10-27.md`.
+
+Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D3d-4** auf `main` (PR #190,
+Merge `96de1c035301c910bc6b2e37f79a4df4f4f6ce1b`):
 dauerhaft eingecheckter OA-TKP Playwright-Smoke (isoliert Port **8073**,
 `playwright.po-calc-tkp-d3d4.config.ts`, Seeder `E2EOaTkpDispoSeeder`).
 Handoff, Snapshot/Show, Ops-Flight (Adopt ohne Auto-Save), disposed-Gate,
