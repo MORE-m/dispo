@@ -55,6 +55,7 @@ export default defineConfig({
         '**/po-allonge-1-*.spec.ts',
         '**/po-spot-surcharge-1-*.spec.ts',
         '**/po-spot-single-1-*.spec.ts',
+        '**/po-calc-tkp-d3d4-*.spec.ts',
         '**/po-swf-promo-1-*.spec.ts',
         '**/po-swf-contest-1-*.spec.ts',
         '**/po-swf-calendar-1-*.spec.ts',

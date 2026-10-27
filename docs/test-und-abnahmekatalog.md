@@ -111,6 +111,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - **D3d-3a:** OA nutzt bestehenden auftragsbezogenen Materialworkflow; keine
   Spotproduktion; kein Material-Completion-Gate. Tests:
   `PoCalcTkp1d3d3aMaterialCompletionContractTest`
+- **D3d-4:** isolierter OA Playwright-Smoke
+  (`npm run test:e2e:po-calc-tkp-d3d4`, Port **8073**,
+  `playwright.po-calc-tkp-d3d4.config.ts`, Seeder `E2EOaTkpDispoSeeder`).
+  Persistenz testseitig über `CalculationWriter`; HTTP Store bleibt 422.
+  Abdeckt: Handoff, Snapshot, Ops-Flight Adopt/Save, disposed-Gate,
+  Material ohne Statuswechsel, Mixed, Rechte/409. Kein D4-Release.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

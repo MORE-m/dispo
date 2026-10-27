@@ -1,6 +1,7 @@
 # PO-CALC-TKP-1D3d-3a – OA Material & Completion Contract
 
-Stand: 26. Oktober 2026 (Feature-Branch / Draft-PR)  
+Stand: 26. Oktober 2026 (auf `main`, PR #189,
+Merge `23e9f0c775bb52f46e4ded343987b64e9c3b9a07`)  
 Base: `7b0951fd20a02abd55f80dd468ad6220056f2082` (D3d-2b-2 auf `main`, PR #188)
 
 ## Ziel
