@@ -1,0 +1,11 @@
+{
+  "_readme": "Array von Plattform-Objekten für OaPlatformImporter. Leeres Array = noch keine Fachlieferung. Keine Demo-Werte.",
+  "_validation": {
+    "code": "Pflicht, unique",
+    "name": "Pflicht",
+    "is_active": "optional bool, default true",
+    "sort": "optional int, default 0",
+    "is_adserver_relevant": "optional bool, default false"
+  },
+  "platforms": []
+}
