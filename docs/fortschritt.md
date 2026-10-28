@@ -1,10 +1,23 @@
 # Fortschritt V1
 
-Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-2** auf Feature-Branch (Draft-PR):
+Stand: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4a** auf Feature-Branch (Draft-PR):
+`oa_targeting_definitions.minimum_tkp_surcharge` (decimal 16,4, Default 0) +
+Importvertrag (`tkp_surcharge` = Listen, `minimum_tkp_surcharge` = Mindest;
+fehlend → 0). Engine/Under-Min/Sonderfreigabe **unverändert** (Folge D4c-4b).
+Selection-Snapshot bewusst OUT. Registry planned; kein Fachimport, kein Deploy.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4a-auftrag-2026-10-28.md`,
+`docs/readiness/PO-CALC-TKP-1D4c4-discovery-2026-10-28.md`.
+
+Stand davor: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-3** auf `main` (PR #195,
+Merge `14de0f218a7842b46e658942bd0c384a989eb360`):
+fachliche OA-TKP-Datenanalyse + 82-Zeilen-Abnahmematrix; 0 belegte Preise;
+Import-Readiness fachlich NOT READY. Kein Import/Registry.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c3-auftrag-2026-10-28.md`.
+
+Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-2** auf `main` (PR #194):
 Sichere OA-TKP-Stammdaten-Import-CLI (`oa:import-platforms|targetings|price-list`,
 `oa:activate-price-list`) über bestehende Domain-Importer; Draft-only-Guard;
-atomare Activate/Archive mit MySQL-Jahres-`GET_LOCK`. Kein produktiver Import,
-kein Registry-Flip, kein Deploy, kein D4d. STOP vor Merge ohne PO-Abnahme.
+atomare Activate/Archive mit MySQL-Jahres-`GET_LOCK`.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`.
 
 Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-1** auf `main` (PR #193,

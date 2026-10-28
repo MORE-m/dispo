@@ -34,8 +34,10 @@ Analyse D4c-3 (28.10.2026): noch **keine** belegten Listen-/Mindest-TKPs im Repo
 - Keine Demo-/E2E-Codes
 
 ### Targetings (optional)
-- Pflicht: `code`, `name`, `category` (`technisch`\|`dmp`), `tkp_surcharge` (≥ 0, Punkt, max. 4 NK)
+- Pflicht: `code`, `name`, `category` (`technisch`\|`dmp`), `tkp_surcharge` (Listen-Aufschlag ≥ 0, Punkt, max. 4 NK)
+- `minimum_tkp_surcharge`: Mindest-Aufschlag ≥ 0, max. 4 NK, `≤ tkp_surcharge`; **fehlend → `0.0000`** (D4c-4a)
 - Optional: `revision_number`, `is_active`, `valid_from`, `valid_to`
+- **Hinweis:** Mindestaufschläge werden erst ab **D4c-4b** in Engine/Under-Min verwendet; Import speichert sie bereits.
 
 ## Arbeitsablauf Fachbereich
 

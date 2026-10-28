@@ -339,7 +339,9 @@ Unterobjekte werden typbezogen normalisiert:
   422. Pinning/Expected-Token/Lock/Method-Switch unverändert.
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
-  keine Plattformdimension), `oa_targeting_definitions` (absoluter `tkp_surcharge`),
+  keine Plattformdimension),   `oa_targeting_definitions` (Listen-Aufschlag `tkp_surcharge` + Mindest-Aufschlag
+  `minimum_tkp_surcharge`, Default 0; D4c-4a – Engine/Under-Min nutzen Mindest erst
+  ab D4c-4b; Selection-Snapshot-Erweiterung ebenfalls D4c-4b),
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
   Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
   `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),

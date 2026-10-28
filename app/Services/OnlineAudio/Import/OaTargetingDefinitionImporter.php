@@ -7,7 +7,10 @@ use App\Models\OaTargetingDefinition;
 use Illuminate\Support\Facades\DB;
 
 /**
- * PO-CALC-TKP-1A: Import-Grundlage für Targeting-Stammdaten (absolute TKP-Aufschläge).
+ * PO-CALC-TKP-1A / 1D4c-4a: Import für Targeting-Stammdaten.
+ *
+ * `tkp_surcharge` = Listen-Aufschlag; `minimum_tkp_surcharge` = Mindest-Aufschlag (Default 0).
+ * Engine/Under-Min nutzen den Mindestaufschlag erst ab D4c-4b.
  */
 final class OaTargetingDefinitionImporter
 {
@@ -19,6 +22,8 @@ final class OaTargetingDefinitionImporter
     {
         $errors = [];
         $seen = [];
+        /** @var list<array{line: int, list: string, minimum: string}> $normalizedSurcharges */
+        $normalizedSurcharges = [];
 
         foreach ($rows as $index => $row) {
             $line = $index + 1;
@@ -26,7 +31,12 @@ final class OaTargetingDefinitionImporter
             $name = trim((string) ($row['name'] ?? ''));
             $category = trim((string) ($row['category'] ?? ''));
             $revision = (int) ($row['revision_number'] ?? 1);
-            $surcharge = OaTkpImportDecimal::normalizeNonNegative($row['tkp_surcharge'] ?? null);
+            $listSurcharge = OaTkpImportDecimal::normalizeNonNegative($row['tkp_surcharge'] ?? null);
+            $minimumRaw = $row['minimum_tkp_surcharge'] ?? null;
+            $minimumMissing = $minimumRaw === null || $minimumRaw === '';
+            $minimumSurcharge = $minimumMissing
+                ? '0.0000'
+                : OaTkpImportDecimal::normalizeNonNegative($minimumRaw);
 
             if ($code === '') {
                 $errors[] = "Zeile {$line}: code fehlt.";
@@ -51,8 +61,25 @@ final class OaTargetingDefinitionImporter
                 $errors[] = "Zeile {$line}: revision_number muss ≥ 1 sein.";
             }
 
-            if ($surcharge === null) {
+            if ($listSurcharge === null) {
                 $errors[] = "Zeile {$line}: tkp_surcharge ungültig.";
+            }
+
+            if ($minimumSurcharge === null) {
+                $errors[] = "Zeile {$line}: minimum_tkp_surcharge ungültig.";
+            }
+
+            if ($listSurcharge !== null && $minimumSurcharge !== null
+                && OaTkpImportDecimal::compare($minimumSurcharge, $listSurcharge) > 0) {
+                $errors[] = "Zeile {$line}: minimum_tkp_surcharge darf tkp_surcharge nicht überschreiten.";
+            }
+
+            if ($listSurcharge !== null && $minimumSurcharge !== null) {
+                $normalizedSurcharges[$index] = [
+                    'line' => $line,
+                    'list' => $listSurcharge,
+                    'minimum' => $minimumSurcharge,
+                ];
             }
         }
 
@@ -67,14 +94,16 @@ final class OaTargetingDefinitionImporter
         $created = 0;
         $updated = 0;
 
-        DB::transaction(function () use ($rows, &$created, &$updated): void {
-            foreach ($rows as $row) {
+        DB::transaction(function () use ($rows, $normalizedSurcharges, &$created, &$updated): void {
+            foreach ($rows as $index => $row) {
                 $code = trim((string) $row['code']);
                 $revision = (int) ($row['revision_number'] ?? 1);
+                $surcharges = $normalizedSurcharges[$index];
                 $payload = [
                     'name' => trim((string) $row['name']),
                     'category' => OaTargetingCategory::from(trim((string) $row['category'])),
-                    'tkp_surcharge' => OaTkpImportDecimal::normalizeNonNegative($row['tkp_surcharge']),
+                    'tkp_surcharge' => $surcharges['list'],
+                    'minimum_tkp_surcharge' => $surcharges['minimum'],
                     'is_active' => (bool) ($row['is_active'] ?? true),
                     'valid_from' => $row['valid_from'] ?? null,
                     'valid_to' => $row['valid_to'] ?? null,

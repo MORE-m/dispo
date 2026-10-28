@@ -8,13 +8,17 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * PO-CALC-TKP-1A: Targeting-Stammdatum mit absolutem TKP-Aufschlag (EUR je 1000).
+ * PO-CALC-TKP-1A / 1D4c-4a: Targeting-Stammdatum mit Listen- und Mindest-TKP-Aufschlag.
+ *
+ * `tkp_surcharge` = Listen-Aufschlag (Final-TKP). `minimum_tkp_surcharge` = Mindest-Aufschlag
+ * (noch nicht in Engine/Under-Min; D4c-4b).
  *
  * @property int $id
  * @property string $code
  * @property string $name
  * @property OaTargetingCategory $category
  * @property string $tkp_surcharge
+ * @property string $minimum_tkp_surcharge
  * @property int $revision_number
  * @property bool $is_active
  * @property Carbon|null $valid_from
@@ -27,6 +31,7 @@ class OaTargetingDefinition extends Model
         'name',
         'category',
         'tkp_surcharge',
+        'minimum_tkp_surcharge',
         'revision_number',
         'is_active',
         'valid_from',
