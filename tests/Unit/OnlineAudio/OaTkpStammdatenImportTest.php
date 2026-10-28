@@ -95,6 +95,7 @@ class OaTkpStammdatenImportTest extends TestCase
         $this->assertSame(1, $result['created']);
         $row = OaTargetingDefinition::query()->firstOrFail();
         $this->assertSame(0, OaTkpImportDecimal::compare((string) $row->tkp_surcharge, '1.2500'));
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $row->minimum_tkp_surcharge, '0.0000'));
         $this->assertSame(OaTargetingCategory::Technisch, $row->category);
     }
 

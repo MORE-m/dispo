@@ -89,10 +89,9 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
 
         $this->assertSame(0, Artisan::call('oa:import-targetings', ['path' => $path]));
         $this->assertSame(1, OaTargetingDefinition::query()->count());
-        $this->assertSame(0, OaTkpImportDecimal::compare(
-            (string) OaTargetingDefinition::query()->firstOrFail()->tkp_surcharge,
-            '1.5000',
-        ));
+        $imported = OaTargetingDefinition::query()->firstOrFail();
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $imported->tkp_surcharge, '1.5000'));
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $imported->minimum_tkp_surcharge, '0.0000'));
     }
 
     #[Test]

@@ -1,2 +1,2 @@
-code;name;category;tkp_surcharge;revision_number;is_active;valid_from;valid_to;notes
-;;;;1;;;;# OPTIONAL für ersten Release. category nur technisch|dmp. tkp_surcharge absolut ≥0 max 4 NK Punkt. Keine fiktiven Aufschläge.
+code;name;category;tkp_surcharge;minimum_tkp_surcharge;revision_number;is_active;valid_from;valid_to;notes
+;;;;;1;;;;# OPTIONAL. category technisch|dmp. tkp_surcharge=Listen ≥0; minimum_tkp_surcharge=Mindest ≥0 und ≤ Listen; max 4 NK Punkt; fehlend → 0. Keine fiktiven Aufschläge. Engine-Under-Min nutzt Mindest erst ab D4c-4b.

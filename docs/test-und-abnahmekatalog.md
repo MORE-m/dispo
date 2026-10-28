@@ -140,6 +140,15 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   kein produktiver Import, kein Registry-Flip. Tests:
   `PoCalcTkp1d4c2ImportCliTest`, `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest`.
   Dok: `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`.
+- **D4c-3:** Fachliche Abnahmematrix 41×2026/2027; 0 belegte Listen-/Mindest-TKPs;
+  Plattformen/Targetings offen. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4c3-auftrag-2026-10-28.md` (PR #195).
+- **D4c-4a:** Targeting-Stammdatum `minimum_tkp_surcharge` (Default 0) + Import;
+  Listen-Aufschlag unverändert. **Engine/Under-Min nutzen Mindest noch nicht**
+  (D4c-4b). Selection-Snapshot OUT. Tests:
+  `PoCalcTkp1d4c4aTargetingMinimumImportTest`,
+  `PoCalcTkp1d4c4aMysqlSchemaTest`. Registry planned.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4c4a-auftrag-2026-10-28.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
