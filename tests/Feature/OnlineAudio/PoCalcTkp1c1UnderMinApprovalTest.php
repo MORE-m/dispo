@@ -74,6 +74,10 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
         $this->assertFalse($aAbove->requiresSpecialApproval);
     }
 
+    /**
+     * Legacy-Snapshot ohne price_list_minimum_tkp_snapshot:
+     * Assessor vergleicht weiter Basis vs. minimum_tkp_snapshot (1C1).
+     */
     #[Test]
     public function targeting_does_not_heal_under_min(): void
     {
@@ -85,6 +89,7 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
             finalTkp: '12.0000',
             targetingTotal: '3.0000',
         );
+        $this->assertNull($position->price_list_minimum_tkp_snapshot);
         $calc = $this->wrapPositions($ctx['user'], [$position]);
 
         $assessment = app(SpecialApprovalAssessor::class)
@@ -95,6 +100,50 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
             SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
             $assessment->reasons[0]['code'],
         );
+    }
+
+    /** FD-D4c-4b: neuer Vertrag → Final vs. effektives Minimum. */
+    #[Test]
+    public function effective_minimum_contract_list_surcharge_can_clear_under_min(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            basis: '9.0000',
+            minimum: '10.0000',
+            finalTkp: '12.0000',
+            targetingTotal: '3.0000',
+            priceListMinimum: '10.0000',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position]);
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $this->assertFalse($assessment->requiresSpecialApproval);
+    }
+
+    #[Test]
+    public function effective_minimum_contract_final_below_triggers_special_approval(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            basis: '9.0000',
+            minimum: '19.0000',
+            finalTkp: '12.0000',
+            targetingTotal: '3.0000',
+            priceListMinimum: '14.0000',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position]);
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $this->assertTrue($assessment->requiresSpecialApproval);
+        $this->assertSame('12.0000', $assessment->reasons[0]['final_tkp']);
+        $this->assertSame('19.0000', $assessment->reasons[0]['minimum_tkp']);
+        $this->assertSame('14.0000', $assessment->reasons[0]['price_list_minimum_tkp']);
     }
 
     #[Test]
@@ -485,11 +534,16 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
         string $finalTkp = '',
         string $targetingTotal = '0.0000',
         ?bool $belowMinimumMarker = null,
+        ?string $priceListMinimum = null,
     ): CalculationPosition {
         if ($finalTkp === '') {
             $finalTkp = $basis;
         }
-        $below = $belowMinimumMarker ?? (Decimal::cmp($basis, $minimum, 4) < 0);
+        $below = $belowMinimumMarker ?? (
+            $priceListMinimum !== null
+                ? Decimal::cmp($finalTkp, $minimum, 4) < 0
+                : Decimal::cmp($basis, $minimum, 4) < 0
+        );
 
         $position = new CalculationPosition;
         $position->forceFill([
@@ -517,6 +571,7 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
             'basis_tkp' => $basis,
             'list_tkp_snapshot' => '12.0000',
             'minimum_tkp_snapshot' => $minimum,
+            'price_list_minimum_tkp_snapshot' => $priceListMinimum,
             'final_tkp' => $finalTkp,
             'targeting_surcharge_total' => $targetingTotal,
             'below_minimum_tkp' => $below,

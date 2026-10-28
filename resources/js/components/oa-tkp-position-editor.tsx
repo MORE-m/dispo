@@ -414,8 +414,8 @@ export function OaTkpPositionEditor({
             {belowMin ? (
                 <div data-test={`oa-tkp-under-min-${positionIndex}`}>
                     <StatusBanner tone="warning">
-                        Basis-TKP unterschreitet Mindest-TKP. Für diese Position
-                        ist eine Sonderfreigabe erforderlich.
+                        Finaler TKP unterschreitet Mindest-TKP. Für diese
+                        Position ist eine Sonderfreigabe erforderlich.
                     </StatusBanner>
                 </div>
             ) : null}

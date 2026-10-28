@@ -272,7 +272,12 @@ final class OaTkpWriterPositionResolver
 
         if ($pin) {
             $listTkp = (string) $existing->list_tkp_snapshot;
-            $minimumTkp = (string) $existing->minimum_tkp_snapshot;
+            // D4c-4b: Engine-Input ist Preislisten-Grundminimum.
+            // Neu: price_list_minimum_tkp_snapshot. Legacy-Pin: minimum_tkp_snapshot war Grundminimum.
+            $minimumTkp = $existing->price_list_minimum_tkp_snapshot !== null
+                && $existing->price_list_minimum_tkp_snapshot !== ''
+                ? (string) $existing->price_list_minimum_tkp_snapshot
+                : (string) $existing->minimum_tkp_snapshot;
             $priceListId = (int) $existing->oa_tkp_price_list_id;
             $priceListVersion = (string) $existing->oa_tkp_price_list_version;
             $priceListYear = (int) $existing->oa_tkp_price_list_year;
@@ -747,6 +752,11 @@ final class OaTkpWriterPositionResolver
 
     private function targetingInputFromStored(CalculationPositionOaTargetingSelection $keep, int $sort): OaTkpTargetingSelectionInput
     {
+        $minimumRaw = $keep->minimum_tkp_surcharge_snapshot;
+        $minimumSurcharge = ($minimumRaw === null || $minimumRaw === '')
+            ? '0.0000'
+            : (string) $minimumRaw;
+
         return new OaTkpTargetingSelectionInput(
             code: (string) $keep->targeting_code,
             name: (string) $keep->targeting_name,
@@ -755,6 +765,7 @@ final class OaTkpWriterPositionResolver
             revisionNumber: (int) $keep->targeting_revision_number,
             oaTargetingDefinitionId: (int) $keep->oa_targeting_definition_id,
             sort: $sort,
+            minimumTkpSurcharge: $minimumSurcharge,
         );
     }
 
@@ -768,6 +779,7 @@ final class OaTkpWriterPositionResolver
             revisionNumber: (int) $definition->revision_number,
             oaTargetingDefinitionId: (int) $definition->id,
             sort: $sort,
+            minimumTkpSurcharge: (string) ($definition->minimum_tkp_surcharge ?? '0.0000'),
         );
     }
 

@@ -181,6 +181,7 @@ final class OaTkpCalculationPersister
             'basis_tkp' => $result->basisTkp,
             'list_tkp_snapshot' => $result->listTkp,
             'minimum_tkp_snapshot' => $result->minimumTkp,
+            'price_list_minimum_tkp_snapshot' => $result->priceListMinimumTkp,
             'final_tkp' => $result->finalTkp,
             'targeting_surcharge_total' => $result->targetingSurchargeTotal,
             'below_minimum_tkp' => $result->belowMinimumTkp,
@@ -220,6 +221,7 @@ final class OaTkpCalculationPersister
                 'targeting_name' => $targeting->name,
                 'targeting_category' => $targeting->category,
                 'tkp_surcharge_snapshot' => $targeting->tkpSurcharge,
+                'minimum_tkp_surcharge_snapshot' => $targeting->minimumTkpSurcharge,
                 'targeting_revision_number' => $targeting->revisionNumber,
                 'sort' => $targeting->sort > 0 ? $targeting->sort : (($index + 1) * 10),
             ]);

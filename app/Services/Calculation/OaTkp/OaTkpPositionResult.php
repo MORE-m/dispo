@@ -5,7 +5,10 @@ namespace App\Services\Calculation\OaTkp;
 use App\Services\Calculation\DiscountInput;
 
 /**
- * PO-CALC-TKP-1B: Ergebnis einer Normal-TKP-Position inkl. Commercial.
+ * PO-CALC-TKP-1B / 1D4c-4b: Ergebnis einer Normal-TKP-Position inkl. Commercial.
+ *
+ * `minimumTkp` = effektive Mindestschwelle (Grundminimum + Σ Mindest-Aufschläge).
+ * `priceListMinimumTkp` = Preislisten-Grundminimum.
  *
  * @param  list<OaTkpPlatformAllocationInput>  $platformAllocations
  * @param  list<OaTkpTargetingSelectionInput>  $targetings
@@ -60,5 +63,7 @@ final readonly class OaTkpPositionResult
         public ?string $advertisingCategoryKey = null,
         public ?string $advertisingCategoryName = null,
         public ?string $positionKey = null,
+        public string $priceListMinimumTkp = '0.0000',
+        public string $targetingMinimumSurchargeTotal = '0.0000',
     ) {}
 }

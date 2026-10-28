@@ -138,6 +138,9 @@ describe('OaTkpPositionEditor', () => {
         );
 
         expect(screen.getByTestId('oa-tkp-under-min-0').textContent).toContain(
+            'Finaler TKP unterschreitet Mindest-TKP',
+        );
+        expect(screen.getByTestId('oa-tkp-under-min-0').textContent).toContain(
             'Sonderfreigabe',
         );
     });

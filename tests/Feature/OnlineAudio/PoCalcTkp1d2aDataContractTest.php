@@ -90,15 +90,38 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
     {
         $this->enableCapability();
         $ctx = $this->seedContext();
+        // FD-D4c-4b: final = basis + Listenaufschlag (2) muss unter effektivem Min (8) liegen.
+        $payload = $this->previewPayload($ctx, ['basis_tkp' => '5.0000']);
+
+        $response = $this->actingAs($ctx['user'])->postJson(route('calculations.preview'), $payload);
+
+        $response->assertOk();
+        $tkp = $response->json('totals.positions.0.method_result.tkp');
+        $this->assertSame('7.0000', $tkp['final_tkp']);
+        $this->assertSame('8.0000', $tkp['minimum_tkp']);
+        $this->assertSame('8.0000', $tkp['price_list_minimum_tkp']);
+        $this->assertTrue($tkp['below_minimum_tkp']);
+        $this->assertTrue($response->json('totals.requires_special_approval'));
+        $codes = collect($response->json('totals.special_approval_reasons'))->pluck('code')->all();
+        $this->assertContains('oa_tkp_basis_below_minimum', $codes);
+    }
+
+    /** FD-D4c-4b Fall 8: Basis < Grundmin, Final ≥ effektiv → keine Sonderfreigabe. */
+    #[Test]
+    public function basis_below_list_min_but_final_above_effective_needs_no_special_approval(): void
+    {
+        $this->enableCapability();
+        $ctx = $this->seedContext();
+        // basis 7 < list-min 8, final 9 ≥ effective 8
         $payload = $this->previewPayload($ctx, ['basis_tkp' => '7.0000']);
 
         $response = $this->actingAs($ctx['user'])->postJson(route('calculations.preview'), $payload);
 
         $response->assertOk();
-        $this->assertTrue($response->json('totals.positions.0.method_result.tkp.below_minimum_tkp'));
-        $this->assertTrue($response->json('totals.requires_special_approval'));
-        $codes = collect($response->json('totals.special_approval_reasons'))->pluck('code')->all();
-        $this->assertContains('oa_tkp_basis_below_minimum', $codes);
+        $tkp = $response->json('totals.positions.0.method_result.tkp');
+        $this->assertSame('9.0000', $tkp['final_tkp']);
+        $this->assertFalse($tkp['below_minimum_tkp']);
+        $this->assertFalse($response->json('totals.requires_special_approval'));
     }
 
     #[Test]

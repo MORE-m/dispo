@@ -681,13 +681,14 @@ class CalculationController extends Controller
                     ->orderBy('category')
                     ->orderBy('name')
                     ->orderBy('code')
-                    ->get(['id', 'code', 'name', 'category', 'tkp_surcharge', 'revision_number'])
+                    ->get(['id', 'code', 'name', 'category', 'tkp_surcharge', 'minimum_tkp_surcharge', 'revision_number'])
                     ->map(fn (OaTargetingDefinition $targeting): array => [
                         'id' => (int) $targeting->id,
                         'code' => (string) $targeting->code,
                         'name' => (string) $targeting->name,
                         'category' => $targeting->category->value,
                         'tkp_surcharge' => Decimal::roundPrice((string) $targeting->tkp_surcharge),
+                        'minimum_tkp_surcharge' => Decimal::roundPrice((string) ($targeting->minimum_tkp_surcharge ?? '0.0000')),
                         'revision_number' => (int) $targeting->revision_number,
                     ])
                     ->values()
@@ -843,6 +844,7 @@ class CalculationController extends Controller
                         'basis_tkp' => $oaReload['basis_tkp'] ?? null,
                         'list_tkp_snapshot' => $oaReload['list_tkp_snapshot'] ?? null,
                         'minimum_tkp_snapshot' => $oaReload['minimum_tkp_snapshot'] ?? null,
+                        'price_list_minimum_tkp_snapshot' => $oaReload['price_list_minimum_tkp_snapshot'] ?? null,
                         'final_tkp' => $oaReload['final_tkp'] ?? null,
                         'targeting_surcharge_total' => $oaReload['targeting_surcharge_total'] ?? null,
                         'below_minimum_tkp' => $oaReload['below_minimum_tkp'] ?? (bool) $position->below_minimum_tkp,
