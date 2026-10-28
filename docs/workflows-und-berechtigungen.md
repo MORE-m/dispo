@@ -188,7 +188,9 @@ Mindestens folgende Fälle lösen eine kaufmännische Sonderfreigabe aus:
 - Positionsrabatt überschreitet persönliche Rabattgrenze,
 - Auftragsrabatt überschreitet persönliche Rabattgrenze,
 - effektiver (kombinierter) Rabatt überschreitet persönliche Rabattgrenze,
-- Basis-TKP liegt unter Mindest-TKP (noch nicht implementiert),
+- OA-TKP: finaler TKP liegt unter effektivem Mindest-TKP
+  (`basis + Σ Listenaufschläge` &lt; `Preislisten-Min + Σ Mindestaufschläge`;
+  Gleichheit zulässig; FD-D4c-4b / Reason `oa_tkp_basis_below_minimum`),
 - Online-Audio-Festpreis (noch nicht implementiert),
 - überschreibender regulärer Produktionspreis (**BL-P5-02a:** Überschreibung
   serverseitig ausgeschlossen; Sonderfreigabe-Auslöser bleibt Folgeslice),

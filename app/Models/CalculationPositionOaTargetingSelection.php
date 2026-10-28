@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $targeting_name
  * @property string $targeting_category
  * @property string $tkp_surcharge_snapshot
+ * @property string|null $minimum_tkp_surcharge_snapshot
  * @property int $targeting_revision_number
  * @property int $sort
  */
@@ -29,6 +30,7 @@ class CalculationPositionOaTargetingSelection extends Model
         'targeting_name',
         'targeting_category',
         'tkp_surcharge_snapshot',
+        'minimum_tkp_surcharge_snapshot',
         'targeting_revision_number',
         'sort',
     ];

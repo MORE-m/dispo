@@ -1,10 +1,13 @@
 # PO-CALC-TKP-1D4c-4 – Discovery: Admin-Preisverwaltung und Mindest-TKP
 
-Stand: 28. Oktober 2026 (**Discovery / Architektur – keine Implementierung**)  
-Base: `14de0f218a7842b46e658942bd0c384a989eb360` (`origin/main`, PR #195 gemergt)  
-Worktree: `dispo-wt-po-calc-tkp-1d4c4` / Branch `docs/po-calc-tkp-1d4c4-admin-min-discovery`
+Stand: 28. Oktober 2026 (**Discovery / Architektur**)  
+Base damals: `14de0f218a7842b46e658942bd0c384a989eb360` (`origin/main`, PR #195)  
+Worktree damals: `dispo-wt-po-calc-tkp-1d4c4` / Branch `docs/po-calc-tkp-1d4c4-admin-min-discovery`
 
-**STOP:** Kein Code, kein PR, kein Import, kein Deploy, keine Registry-Freigabe, kein D4d.
+**Nachzug:** FD-D4c-4b (Gesamtpreisprüfung) ist in **D4c-4b** implementiert –
+siehe `docs/readiness/PO-CALC-TKP-1D4c4b-auftrag-2026-10-28.md`. Admin-UI bleibt OUT.
+
+**STOP Discovery-Original:** Kein Import, kein Deploy, keine Registry-Freigabe, kein D4d.
 
 ---
 

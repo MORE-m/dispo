@@ -1,10 +1,19 @@
 # Fortschritt V1
 
-Stand: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4a** auf Feature-Branch (Draft-PR):
+Stand: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4b** auf Feature-Branch (Draft-PR):
+FD-D4c-4b Gesamtpreisprüfung –
+`final_tkp = basis + Σ Listenaufschläge`,
+`effective_minimum = price_list.minimum + Σ Mindestaufschläge`,
+Sonderfreigabe iff `final < effective` (Gleichheit ok). Snapshots:
+`price_list_minimum_tkp_snapshot` + `minimum_tkp_surcharge_snapshot`;
+`minimum_tkp_snapshot` = effektive Schwelle. Reason-Code unverändert
+(`oa_tkp_basis_below_minimum`). Legacy-Zeilen ohne List-Min-Snapshot behalten
+1C1-Vergleich. Registry planned; keine Admin-UI, kein Fachimport, kein Deploy.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4b-auftrag-2026-10-28.md`.
+
+Stand davor: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4a** auf `main` (PR #196):
 `oa_targeting_definitions.minimum_tkp_surcharge` (decimal 16,4, Default 0) +
-Importvertrag (`tkp_surcharge` = Listen, `minimum_tkp_surcharge` = Mindest;
-fehlend → 0). Engine/Under-Min/Sonderfreigabe **unverändert** (Folge D4c-4b).
-Selection-Snapshot bewusst OUT. Registry planned; kein Fachimport, kein Deploy.
+Importvertrag. Engine/Under-Min damals noch unverändert.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4a-auftrag-2026-10-28.md`,
 `docs/readiness/PO-CALC-TKP-1D4c4-discovery-2026-10-28.md`.
 

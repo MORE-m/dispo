@@ -49,8 +49,11 @@ export type OaTargetingSelectionDraft = {
 export type OaTkpMethodResult = {
     basis_tkp: string;
     list_tkp: string;
+    /** Effektive Mindestschwelle (Grundminimum + Σ Mindest-Aufschläge). */
     minimum_tkp: string;
+    price_list_minimum_tkp?: string;
     targeting_surcharge_total: string;
+    targeting_minimum_surcharge_total?: string;
     final_tkp: string;
     below_minimum_tkp: boolean;
     impressions?: number;

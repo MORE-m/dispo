@@ -530,6 +530,7 @@ final class CalculationWriter
             'basis_tkp' => $oa->basisTkp,
             'list_tkp_snapshot' => $oa->listTkp,
             'minimum_tkp_snapshot' => $oa->minimumTkp,
+            'price_list_minimum_tkp_snapshot' => $oa->priceListMinimumTkp,
             'final_tkp' => $oa->finalTkp,
             'targeting_surcharge_total' => $oa->targetingSurchargeTotal,
             'below_minimum_tkp' => $oa->belowMinimumTkp,
@@ -597,6 +598,7 @@ final class CalculationWriter
                 'targeting_name' => $targeting->name,
                 'targeting_category' => $targeting->category,
                 'tkp_surcharge_snapshot' => $targeting->tkpSurcharge,
+                'minimum_tkp_surcharge_snapshot' => $targeting->minimumTkpSurcharge,
                 'targeting_revision_number' => $targeting->revisionNumber,
                 'sort' => $targeting->sort > 0 ? $targeting->sort : (($index + 1) * 10),
             ]);
@@ -1098,8 +1100,8 @@ final class CalculationWriter
                 ),
             );
 
-            // PO-CALC-TKP-1C1: Under-Min aus Decimals (Vorschau); nach Persist bewertet der Assessor kanonisch neu.
-            if (Decimal::cmp($oa->basisTkp, $oa->minimumTkp, Decimal::PRICE_SCALE) < 0) {
+            // PO-CALC-TKP-1D4c-4b: Under-Min = final_tkp < effektives Mindest-TKP (Gleichheit ok).
+            if (Decimal::cmp($oa->finalTkp, $oa->minimumTkp, Decimal::PRICE_SCALE) < 0) {
                 $reasons[] = [
                     'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
                     'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
@@ -1107,6 +1109,8 @@ final class CalculationWriter
                     'position_key' => $positionKey,
                     'position_label' => $oa->inventoryName,
                     'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
+                    'final_tkp' => Decimal::roundPrice($oa->finalTkp),
+                    'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
                     'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
                 ];
             }
@@ -1160,7 +1164,9 @@ final class CalculationWriter
                     'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
                     'list_tkp' => Decimal::roundPrice($oa->listTkp),
                     'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
+                    'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
                     'targeting_surcharge_total' => Decimal::roundPrice($oa->targetingSurchargeTotal),
+                    'targeting_minimum_surcharge_total' => Decimal::roundPrice($oa->targetingMinimumSurchargeTotal),
                     'final_tkp' => Decimal::roundPrice($oa->finalTkp),
                     'below_minimum_tkp' => $oa->belowMinimumTkp,
                     'impressions' => $oa->impressions,
@@ -1997,6 +2003,7 @@ final class CalculationWriter
             'basis_tkp' => $this->tkpDisplay($position->basis_tkp),
             'list_tkp_snapshot' => $this->tkpDisplay($position->list_tkp_snapshot),
             'minimum_tkp_snapshot' => $this->tkpDisplay($position->minimum_tkp_snapshot),
+            'price_list_minimum_tkp_snapshot' => $this->tkpDisplay($position->price_list_minimum_tkp_snapshot),
             'final_tkp' => $this->tkpDisplay($position->final_tkp),
             'targeting_surcharge_total' => $this->tkpDisplay($position->targeting_surcharge_total),
             'below_minimum_tkp' => (bool) $position->below_minimum_tkp,
@@ -2017,6 +2024,7 @@ final class CalculationWriter
                     'targeting_name' => $selection->targeting_name,
                     'targeting_category' => $selection->targeting_category,
                     'tkp_surcharge_snapshot' => $this->tkpDisplay($selection->tkp_surcharge_snapshot),
+                    'minimum_tkp_surcharge_snapshot' => $this->tkpDisplay($selection->minimum_tkp_surcharge_snapshot),
                     'targeting_revision_number' => (int) $selection->targeting_revision_number,
                     'sort' => (int) $selection->sort,
                 ],

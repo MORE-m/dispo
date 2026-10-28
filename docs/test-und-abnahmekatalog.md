@@ -144,11 +144,18 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Plattformen/Targetings offen. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c3-auftrag-2026-10-28.md` (PR #195).
 - **D4c-4a:** Targeting-Stammdatum `minimum_tkp_surcharge` (Default 0) + Import;
-  Listen-Aufschlag unverändert. **Engine/Under-Min nutzen Mindest noch nicht**
-  (D4c-4b). Selection-Snapshot OUT. Tests:
+  Listen-Aufschlag unverändert. Selection-Snapshot damals OUT. Tests:
   `PoCalcTkp1d4c4aTargetingMinimumImportTest`,
   `PoCalcTkp1d4c4aMysqlSchemaTest`. Registry planned.
   Dok: `docs/readiness/PO-CALC-TKP-1D4c4a-auftrag-2026-10-28.md`.
+- **D4c-4b (FD-D4c-4b):** Gesamt-Mindest-TKP –
+  `final < effective_minimum` → Sonderfreigabe (Gleichheit ok);
+  Basis unter Grundminimum allein nicht. Snapshots getrennt
+  (`price_list_minimum_tkp_snapshot`, `minimum_tkp_surcharge_snapshot`).
+  Tests: `OaTkpNormalEngineTest` (D4c4b-*), `PoCalcTkp1d4c4bEffectiveMinimumTest`,
+  Assessor-Legacy vs. Neu in `PoCalcTkp1c1UnderMinApprovalTest`,
+  Preview-Fall-8 in `PoCalcTkp1d2aDataContractTest`. Registry planned.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4c4b-auftrag-2026-10-28.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

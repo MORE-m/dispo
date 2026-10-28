@@ -9,11 +9,15 @@ use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
 use Illuminate\Validation\ValidationException;
 
 /**
- * PO-CALC-TKP-1B: generische Normal-TKP-Engine (Profil oa_tkp × Method tkp).
+ * PO-CALC-TKP-1B / 1D4c-4b: generische Normal-TKP-Engine (Profil oa_tkp × Method tkp).
  *
- * Formel:
- *   final_tkp = basis_tkp + Σ targeting_surcharges
- *   media_gross = impressions / 1000 × final_tkp
+ * Formel (FD-D4c-4b):
+ *   final_tkp = basis_tkp + Σ listen_targeting_surcharges
+ *   effective_minimum_tkp = price_list_minimum_tkp + Σ minimum_targeting_surcharges
+ *   below_minimum = final_tkp < effective_minimum_tkp   (Gleichheit zulässig)
+ *
+ * Input `minimumTkp` ist das Preislisten-Grundminimum (nicht die effektive Schwelle).
+ * Result `minimumTkp` ist die effektive Schwelle; `priceListMinimumTkp` das Grundminimum.
  *
  * Kein Adserver (FD-OA-ADSERVER). Keine Plattform-Preiswirkung (FD-OA-PLAT).
  * Kein Festpreis. Commercial: Position-/Order-Rabatt → AE → N/N → OA-Payfaktor.
@@ -39,27 +43,44 @@ final class OaTkpNormalEngine
 
         $basis = $this->requirePositiveTkp($input->basisTkp, 'basis_tkp');
         $list = $this->requirePositiveTkp($input->listTkp, 'list_tkp');
-        $minimum = $this->requirePositiveTkp($input->minimumTkp, 'minimum_tkp');
+        $priceListMinimum = $this->requirePositiveTkp($input->minimumTkp, 'minimum_tkp');
 
-        if (OaTkpImportDecimal::compare($minimum, $list) > 0) {
+        if (OaTkpImportDecimal::compare($priceListMinimum, $list) > 0) {
             throw ValidationException::withMessages([
                 'positions' => 'Mindest-TKP darf Listen-TKP nicht überschreiten.',
             ]);
         }
 
-        $targetingTotal = '0.0000';
+        $listSurchargeTotal = '0.0000';
+        $minimumSurchargeTotal = '0.0000';
         foreach ($input->targetings as $targeting) {
-            $surcharge = OaTkpImportDecimal::normalizeNonNegative($targeting->tkpSurcharge);
-            if ($surcharge === null) {
+            $listSurcharge = OaTkpImportDecimal::normalizeNonNegative($targeting->tkpSurcharge);
+            if ($listSurcharge === null) {
                 throw ValidationException::withMessages([
                     'positions' => "Targeting „{$targeting->code}“: tkp_surcharge ungültig.",
                 ]);
             }
-            $targetingTotal = Decimal::roundPrice(Decimal::add($targetingTotal, $surcharge, Decimal::PRICE_SCALE));
+
+            $minimumSurcharge = OaTkpImportDecimal::normalizeNonNegative($targeting->minimumTkpSurcharge);
+            if ($minimumSurcharge === null) {
+                throw ValidationException::withMessages([
+                    'positions' => "Targeting „{$targeting->code}“: minimum_tkp_surcharge ungültig.",
+                ]);
+            }
+
+            if (OaTkpImportDecimal::compare($minimumSurcharge, $listSurcharge) > 0) {
+                throw ValidationException::withMessages([
+                    'positions' => "Targeting „{$targeting->code}“: Mindest-Aufschlag darf Listen-Aufschlag nicht überschreiten.",
+                ]);
+            }
+
+            $listSurchargeTotal = Decimal::roundPrice(Decimal::add($listSurchargeTotal, $listSurcharge, Decimal::PRICE_SCALE));
+            $minimumSurchargeTotal = Decimal::roundPrice(Decimal::add($minimumSurchargeTotal, $minimumSurcharge, Decimal::PRICE_SCALE));
         }
 
-        $finalTkp = Decimal::roundPrice(Decimal::add($basis, $targetingTotal, Decimal::PRICE_SCALE));
-        $belowMinimum = OaTkpImportDecimal::compare($basis, $minimum) < 0;
+        $finalTkp = Decimal::roundPrice(Decimal::add($basis, $listSurchargeTotal, Decimal::PRICE_SCALE));
+        $effectiveMinimum = Decimal::roundPrice(Decimal::add($priceListMinimum, $minimumSurchargeTotal, Decimal::PRICE_SCALE));
+        $belowMinimum = OaTkpImportDecimal::compare($finalTkp, $effectiveMinimum) < 0;
 
         $mediaGrossInternal = Decimal::mul(
             Decimal::div((string) $input->impressions, '1000', Decimal::INTERNAL_SCALE),
@@ -83,8 +104,8 @@ final class OaTkpNormalEngine
             impressions: $input->impressions,
             basisTkp: $basis,
             listTkp: $list,
-            minimumTkp: $minimum,
-            targetingSurchargeTotal: $targetingTotal,
+            minimumTkp: $effectiveMinimum,
+            targetingSurchargeTotal: $listSurchargeTotal,
             finalTkp: $finalTkp,
             belowMinimumTkp: $belowMinimum,
             mediaGross: $commercial['media_gross'],
@@ -119,6 +140,8 @@ final class OaTkpNormalEngine
             advertisingCategoryKey: $input->advertisingCategoryKey,
             advertisingCategoryName: $input->advertisingCategoryName,
             positionKey: $input->positionKey,
+            priceListMinimumTkp: $priceListMinimum,
+            targetingMinimumSurchargeTotal: $minimumSurchargeTotal,
         );
     }
 

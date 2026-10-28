@@ -200,7 +200,12 @@ final class SpecialApprovalAssessor
     }
 
     /**
-     * PO-CALC-TKP-1C1: Under-Min aus Positions-Snapshot-Decimals (OA-001/002).
+     * OA-TKP Under-Min aus Positions-Snapshot-Decimals.
+     *
+     * D4c-4b (neu, price_list_minimum_tkp_snapshot gesetzt):
+     *   final_tkp < minimum_tkp_snapshot (effektive Schwelle); Gleichheit ok.
+     * Legacy (Feld fehlt): basis_tkp < minimum_tkp_snapshot (1C1-Vertrag).
+     *
      * Boolean below_minimum_tkp ist nur Marker, nicht kanonisch.
      *
      * @return list<array<string, mixed>>
@@ -221,9 +226,28 @@ final class SpecialApprovalAssessor
 
         $basis = Decimal::roundPrice((string) $basisRaw);
         $minimum = Decimal::roundPrice((string) $minimumRaw);
+        $usesEffectiveMinimumContract = $position->price_list_minimum_tkp_snapshot !== null
+            && $position->price_list_minimum_tkp_snapshot !== '';
 
-        if (Decimal::cmp($basis, $minimum, Decimal::PRICE_SCALE) >= 0) {
-            return [];
+        if ($usesEffectiveMinimumContract) {
+            $finalRaw = $position->final_tkp;
+            if ($finalRaw === null || $finalRaw === '') {
+                throw ValidationException::withMessages([
+                    'positions' => 'OA-TKP-Position ohne gültigen Final-TKP-Snapshot ist nicht bewertbar.',
+                ]);
+            }
+            $final = Decimal::roundPrice((string) $finalRaw);
+            if (Decimal::cmp($final, $minimum, Decimal::PRICE_SCALE) >= 0) {
+                return [];
+            }
+            $compared = $final;
+            $comparedKey = 'final_tkp';
+        } else {
+            if (Decimal::cmp($basis, $minimum, Decimal::PRICE_SCALE) >= 0) {
+                return [];
+            }
+            $compared = $basis;
+            $comparedKey = 'basis_tkp';
         }
 
         $inventoryName = $position->inventory !== null ? $position->inventory->name : null;
@@ -232,7 +256,7 @@ final class SpecialApprovalAssessor
                 ? $position->inventory_name
                 : null);
 
-        return [[
+        $reason = [
             'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
             'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
             'position_id' => (int) $position->id,
@@ -240,7 +264,17 @@ final class SpecialApprovalAssessor
             'position_label' => $label,
             'basis_tkp' => $basis,
             'minimum_tkp' => $minimum,
-        ]];
+            $comparedKey => $compared,
+        ];
+
+        if ($usesEffectiveMinimumContract) {
+            $reason['price_list_minimum_tkp'] = Decimal::roundPrice(
+                (string) $position->price_list_minimum_tkp_snapshot,
+            );
+            $reason['final_tkp'] = $compared;
+        }
+
+        return [$reason];
     }
 
     private function isStoredOaTkpPosition(CalculationPosition $position): bool

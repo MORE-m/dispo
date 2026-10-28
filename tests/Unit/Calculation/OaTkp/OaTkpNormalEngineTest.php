@@ -8,6 +8,7 @@ use App\Services\Calculation\OaTkp\OaTkpNormalEngine;
 use App\Services\Calculation\OaTkp\OaTkpPlatformAllocationInput;
 use App\Services\Calculation\OaTkp\OaTkpPositionInput;
 use App\Services\Calculation\OaTkp\OaTkpTargetingSelectionInput;
+use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -229,7 +230,183 @@ class OaTkpNormalEngineTest extends TestCase
 
         $this->assertTrue($result->belowMinimumTkp);
         $this->assertSame('7.0000', $result->basisTkp);
+        $this->assertSame('8.0000', $result->minimumTkp);
+        $this->assertSame('8.0000', $result->priceListMinimumTkp);
         $this->assertSame('70.00', $result->mediaGross);
+    }
+
+    /** PO-CALC-TKP-1D4c-4b FD: ohne Targeting → final = basis, effective = Grundminimum. */
+    #[Test]
+    public function d4c4b_without_targeting_compares_final_to_list_minimum(): void
+    {
+        $above = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '15.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            isAeEligible: false,
+        ));
+        $this->assertSame('15.0000', $above->finalTkp);
+        $this->assertSame('14.0000', $above->minimumTkp);
+        $this->assertFalse($above->belowMinimumTkp);
+
+        $equal = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '14.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            isAeEligible: false,
+        ));
+        $this->assertFalse($equal->belowMinimumTkp);
+
+        $under = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '13.9999',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            isAeEligible: false,
+        ));
+        $this->assertTrue($under->belowMinimumTkp);
+    }
+
+    /** Pre-Stream 56/14 + DMP 25/5. */
+    #[Test]
+    public function d4c4b_dmp_only_builds_effective_minimum(): void
+    {
+        $result = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '20.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '25.0000', minimumTkpSurcharge: '5.0000'),
+            ],
+            isAeEligible: false,
+        ));
+
+        $this->assertSame('45.0000', $result->finalTkp);
+        $this->assertSame('25.0000', $result->targetingSurchargeTotal);
+        $this->assertSame('5.0000', $result->targetingMinimumSurchargeTotal);
+        $this->assertSame('19.0000', $result->minimumTkp);
+        $this->assertSame('14.0000', $result->priceListMinimumTkp);
+        $this->assertFalse($result->belowMinimumTkp);
+    }
+
+    /** Pre-Stream 56/14 + Geo 15/3. */
+    #[Test]
+    public function d4c4b_geo_only_builds_effective_minimum(): void
+    {
+        $result = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '12.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('geo', 'Geo', 'technisch', '15.0000', minimumTkpSurcharge: '3.0000'),
+            ],
+            isAeEligible: false,
+        ));
+
+        $this->assertSame('27.0000', $result->finalTkp);
+        $this->assertSame('17.0000', $result->minimumTkp);
+        $this->assertFalse($result->belowMinimumTkp);
+    }
+
+    /** Pre-Stream 56/14 + DMP + Geo; Aufschläge je genau einmal. */
+    #[Test]
+    public function d4c4b_dmp_and_geo_sum_list_and_minimum_once(): void
+    {
+        $result = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '10.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '25.0000', minimumTkpSurcharge: '5.0000'),
+                new OaTkpTargetingSelectionInput('geo', 'Geo', 'technisch', '15.0000', minimumTkpSurcharge: '3.0000'),
+            ],
+            isAeEligible: false,
+        ));
+
+        $this->assertSame('50.0000', $result->finalTkp);
+        $this->assertSame('40.0000', $result->targetingSurchargeTotal);
+        $this->assertSame('8.0000', $result->targetingMinimumSurchargeTotal);
+        $this->assertSame('22.0000', $result->minimumTkp);
+        $this->assertFalse($result->belowMinimumTkp);
+
+        // final exakt auf effective: basis 0 nicht erlaubt → basis so dass final = 22
+        $onMin = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '1.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '10.5000', minimumTkpSurcharge: '4.0000'),
+                new OaTkpTargetingSelectionInput('geo', 'Geo', 'technisch', '10.5000', minimumTkpSurcharge: '4.0000'),
+            ],
+            isAeEligible: false,
+        ));
+        $this->assertSame('22.0000', $onMin->finalTkp);
+        $this->assertSame('22.0000', $onMin->minimumTkp);
+        $this->assertFalse($onMin->belowMinimumTkp);
+
+        $trulyUnder = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '1.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '10.0000', minimumTkpSurcharge: '5.0000'),
+            ],
+            isAeEligible: false,
+        ));
+        $this->assertSame('11.0000', $trulyUnder->finalTkp);
+        $this->assertSame('19.0000', $trulyUnder->minimumTkp);
+        $this->assertTrue($trulyUnder->belowMinimumTkp);
+    }
+
+    /**
+     * FD-D4c-4b Fall 8: Basis unter Grundminimum, Final aber ≥ effektives Minimum
+     * → keine Sonderfreigabe-Markierung.
+     */
+    #[Test]
+    public function d4c4b_basis_below_list_min_but_final_above_effective_is_not_under_min(): void
+    {
+        $result = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '12.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '25.0000', minimumTkpSurcharge: '5.0000'),
+            ],
+            isAeEligible: false,
+        ));
+
+        $this->assertTrue(OaTkpImportDecimal::compare($result->basisTkp, $result->priceListMinimumTkp) < 0);
+        $this->assertSame('37.0000', $result->finalTkp);
+        $this->assertSame('19.0000', $result->minimumTkp);
+        $this->assertFalse($result->belowMinimumTkp);
+    }
+
+    #[Test]
+    public function d4c4b_missing_minimum_surcharge_defaults_to_zero(): void
+    {
+        $result = $this->engine->calculatePosition($this->baseInput(
+            impressions: 10_000,
+            basisTkp: '10.0000',
+            listTkp: '56.0000',
+            minimumTkp: '14.0000',
+            targetings: [
+                new OaTkpTargetingSelectionInput('dmp', 'DMP', 'dmp', '25.0000'),
+            ],
+            isAeEligible: false,
+        ));
+
+        $this->assertSame('0.0000', $result->targetingMinimumSurchargeTotal);
+        $this->assertSame('14.0000', $result->minimumTkp);
+        $this->assertSame('35.0000', $result->finalTkp);
+        $this->assertFalse($result->belowMinimumTkp);
     }
 
     #[Test]

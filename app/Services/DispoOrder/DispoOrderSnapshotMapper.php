@@ -278,6 +278,10 @@ final class DispoOrderSnapshotMapper
                 'targeting_name' => $row->targeting_name,
                 'targeting_category' => $row->targeting_category,
                 'tkp_surcharge_snapshot' => Decimal::roundPrice((string) $row->tkp_surcharge_snapshot),
+                'minimum_tkp_surcharge_snapshot' => $row->minimum_tkp_surcharge_snapshot === null
+                    || $row->minimum_tkp_surcharge_snapshot === ''
+                    ? null
+                    : Decimal::roundPrice((string) $row->minimum_tkp_surcharge_snapshot),
                 'targeting_revision_number' => (int) $row->targeting_revision_number,
                 'sort' => (int) $row->sort,
             ])
@@ -311,6 +315,8 @@ final class DispoOrderSnapshotMapper
             'impressions' => (int) $position->impressions,
             'basis_tkp' => Decimal::roundPrice((string) $position->basis_tkp),
             'list_tkp_snapshot' => Decimal::roundPrice((string) $position->list_tkp_snapshot),
+            // Effektive Mindestschwelle (FD-D4c-4b). Grundminimum bleibt nur in Calc
+            // (price_list_minimum_tkp_snapshot) – kein Dispo-Schema-Risiko in 4b.
             'minimum_tkp_snapshot' => Decimal::roundPrice((string) $position->minimum_tkp_snapshot),
             'final_tkp' => Decimal::roundPrice((string) $position->final_tkp),
             'targeting_surcharge_total' => Decimal::roundPrice((string) $position->targeting_surcharge_total),

@@ -309,13 +309,21 @@ Unterobjekte werden typbezogen normalisiert:
   (ohne Kalenderdatum; Erklärungs-/Legacy-Pfad Durchschnitt),
 - **PO-CALC-TKP-1B Persistenz:** `calculation_position_oa_platform_allocations`
   (platform_code/name + impressions; Summe = Positions-Impressions) und
-  `calculation_position_oa_targeting_selections` (code/name/category + surcharge-Snapshot);
+  `calculation_position_oa_targeting_selections` (code/name/category + Listen-Aufschlag-
+  Snapshot `tkp_surcharge_snapshot` + Mindest-Aufschlag-Snapshot
+  `minimum_tkp_surcharge_snapshot`, D4c-4b; fehlend historisch → 0 beim Rebind);
   Positionsfelder u. a. `impressions`, `basis_tkp`, `list_tkp_snapshot`,
-  `minimum_tkp_snapshot`, `final_tkp`, `below_minimum_tkp` (Marker, nicht
-  Approval-SoT), Price-List-Identity. **PO-CALC-TKP-1C1:** Under-Min-Sonderfreigabe
-  über `SpecialApprovalAssessor` (`oa_tkp_basis_below_minimum`); SoT =
-  Decimal-Vergleich `basis_tkp` &lt; `minimum_tkp_snapshot` (kein Live-Lookup;
-  Targeting heilt nicht; Partial Selection positionsbezogen),
+  `minimum_tkp_snapshot` (= **effektive** Mindestschwelle ab D4c-4b),
+  `price_list_minimum_tkp_snapshot` (= Preislisten-Grundminimum; null = Legacy),
+  `final_tkp`, `below_minimum_tkp` (Marker, nicht Approval-SoT), Price-List-Identity.
+  **PO-CALC-TKP-1D4c-4b / FD-D4c-4b:** Under-Min-Sonderfreigabe über bestehenden
+  Reason-Code `oa_tkp_basis_below_minimum`; SoT neu =
+  `final_tkp` &lt; `minimum_tkp_snapshot` (effektiv =
+  `price_list_minimum_tkp_snapshot` + Σ Mindest-Aufschläge). Gleichheit zulässig.
+  Basis unter Grundminimum allein löst keine Freigabe aus, wenn Final ≥ effektiv.
+  Legacy-Zeilen ohne `price_list_minimum_tkp_snapshot`: weiter
+  `basis_tkp` &lt; `minimum_tkp_snapshot` (1C1). Kein Live-Lookup; Partial Selection
+  positionsbezogen,
 - **PO-CALC-TKP-1D1 Writer-Integration:** `CalculationWriter` verarbeitet Positionen mit
   Freeze `oa_tkp`/`tkp` über `OaTkpWriterPositionResolver` + `OaTkpNormalEngine`
   (Spot/SWF weiter über `CalculationEngine`; kein Medium-Code-Branching, Berechtigung
@@ -340,8 +348,7 @@ Unterobjekte werden typbezogen normalisiert:
 - **PO-CALC-TKP-1A Stammdaten:** `oa_platforms`, `oa_tkp_price_lists` /
   `oa_tkp_price_list_items` (Jahr/Revision × Medium × Inventar; Listen-/Mindest-TKP;
   keine Plattformdimension),   `oa_targeting_definitions` (Listen-Aufschlag `tkp_surcharge` + Mindest-Aufschlag
-  `minimum_tkp_surcharge`, Default 0; D4c-4a – Engine/Under-Min nutzen Mindest erst
-  ab D4c-4b; Selection-Snapshot-Erweiterung ebenfalls D4c-4b),
+  `minimum_tkp_surcharge`, Default 0; D4c-4a Schema/Import, D4c-4b Engine/Snapshots),
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
   Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
   `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
@@ -372,7 +379,11 @@ Ab **PO-CALC-TKP-1D3a** additiv OA-TKP-Snapshot-Felder auf `dispo_order_position
 `targeting_surcharge_total`, `below_minimum_tkp`, `oa_tkp_price_list_id` /
 `version` / `year` / `revision`, JSON `oa_platform_allocations_snapshot` und
 `oa_targeting_selections_snapshot` (historische Werte aus der Calc, keine Live-
-Auflösung). Spot-Spalten unverändert; OA nutzt `length_seconds=0` /
+Auflösung). Ab **D4c-4b:** Dispo behält `minimum_tkp_snapshot` als **effektive** Schwelle
+(keine neue Dispo-Spalte für Grundminimum – kleinste kompatible Lösung);
+Targeting-JSON additiv `minimum_tkp_surcharge_snapshot` (null bei Legacy).
+Grundminimum nur in Calc (`price_list_minimum_tkp_snapshot`). Spot-Spalten
+unverändert; OA nutzt `length_seconds=0` /
 `total_spot_count=0` ohne Spotproduktion. Adoption-API/Create-Dialog (D3b) und
 Dispo-Show (D3c) nutzen die eingefrorenen Snapshot-Felder (`impressions`, TKP,
 Platform-/Targeting-JSON, OA-Preislistenidentität).

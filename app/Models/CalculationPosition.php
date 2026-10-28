@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $basis_tkp
  * @property string|null $list_tkp_snapshot
  * @property string|null $minimum_tkp_snapshot
+ * @property string|null $price_list_minimum_tkp_snapshot
  * @property string|null $final_tkp
  * @property string|null $targeting_surcharge_total
  * @property bool|null $below_minimum_tkp
@@ -104,6 +105,7 @@ class CalculationPosition extends Model
         'basis_tkp',
         'list_tkp_snapshot',
         'minimum_tkp_snapshot',
+        'price_list_minimum_tkp_snapshot',
         'final_tkp',
         'targeting_surcharge_total',
         'below_minimum_tkp',
