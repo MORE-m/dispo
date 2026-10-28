@@ -1,12 +1,16 @@
-# OA-TKP Import-Vorlagen (PO-CALC-TKP-1D4c-1)
+# OA-TKP Import-Vorlagen (PO-CALC-TKP-1D4c-1 / D4c-3)
 
-Nur Felddefinitionen und leere Matrizen. **Keine erfundenen Fachwerte.**
+Nur Felddefinitionen und leere Matrizen bzw. Abnahmestatus. **Keine erfundenen Fachwerte.**
+
+Analyse D4c-3 (28.10.2026): noch **keine** belegten Listen-/Mindest-TKPs im Repo – siehe  
+`docs/readiness/PO-CALC-TKP-1D4c3-auftrag-2026-10-28.md`.
 
 ## Dateien
 
 | Datei | Format für Importer | Zweck |
 |---|---|---|
 | `oa-tkp-price-matrix-2026-2027.csv` | Fachlieferung (Excel) | 82 Zeilen: 41 Paare × 2026/2027; `list_tkp`/`minimum_tkp` leer |
+| `oa-tkp-abnahmematrix-d4c3-2026-2027.csv` | Fach-Abnahme | dieselbe Matrix + Quelle/Freigabestatus/fehlende Angaben (D4c-3) |
 | `oa-tkp-price-list.import.skeleton.json` | **Objekt** → `OaTkpPriceListImporter::import($payload)` | JSON-Import; `items` aus Matrix befüllen; `status` zuerst `draft` |
 | `oa-platforms.template.csv` | Fachlieferung | Plattformzeilen |
 | `oa-platforms.import.skeleton.json` | **JSON-Array** → `OaPlatformImporter::import($rows)` | leeres Array `[]` |
