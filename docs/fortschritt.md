@@ -1,11 +1,18 @@
 # Fortschritt V1
 
-Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-1** auf Feature-Branch (Draft-PR, nur Doku):
+Stand: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-2** auf Feature-Branch (Draft-PR):
+Sichere OA-TKP-Stammdaten-Import-CLI (`oa:import-platforms|targetings|price-list`,
+`oa:activate-price-list`) über bestehende Domain-Importer; Draft-only-Guard;
+atomare Activate/Archive mit MySQL-Jahres-`GET_LOCK`. Kein produktiver Import,
+kein Registry-Flip, kein Deploy, kein D4d. STOP vor Merge ohne PO-Abnahme.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`.
+
+Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4c-1** auf `main` (PR #193,
+Merge `2d5591469994ba8de9a9e148caa9bfd618241611`):
 Go-live-Stammdaten-Analyse + leere Importvorlagen (41 Paare × 2026/2027, keine
 erfundenen TKPs). Live: Zuordnungen ok, Preislisten/Plattformen/Targetings = 0.
 Registry planned; kein Import, kein D4d. Folge-Slice spezifiziert: D4c-2 Import-CLI.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c1-auftrag-2026-10-27.md`,
-`docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`,
 `docs/readiness/import-templates/`.
 
 Stand davor: 27. Oktober 2026 – **PO-CALC-TKP-1D4b-2** auf `main` (PR #192,

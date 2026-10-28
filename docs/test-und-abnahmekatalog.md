@@ -133,8 +133,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   2026/2027, keine erfundenen TKPs). Domain-Importer vorhanden; CLI fehlt → D4c-2.
   Dok: `docs/readiness/PO-CALC-TKP-1D4c1-auftrag-2026-10-27.md`,
   `docs/readiness/import-templates/`.
-- **D4c-2 (Spezifikation):** Sichere Artisan-Import-CLI über bestehende Importer +
-  atomare Activate/Archive. Noch nicht implementiert.
+- **D4c-2:** Sichere Artisan-Import-CLI über bestehende Importer + atomare
+  Activate/Archive (`OaTkpPriceListActivationService`, MySQL-`GET_LOCK`).
+  Draft-only Preislisten-Import; keine Überschreibung von active/archived;
+  Activate nur explizit (`--archive-previous` für Vorgänger). Kein HTTP,
+  kein produktiver Import, kein Registry-Flip. Tests:
+  `PoCalcTkp1d4c2ImportCliTest`, `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest`.
   Dok: `docs/readiness/PO-CALC-TKP-1D4c2-auftrag-2026-10-27.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
