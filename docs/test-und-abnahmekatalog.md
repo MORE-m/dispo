@@ -156,6 +156,13 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Assessor-Legacy vs. Neu in `PoCalcTkp1c1UnderMinApprovalTest`,
   Preview-Fall-8 in `PoCalcTkp1d2aDataContractTest`. Registry planned.
   Dok: `docs/readiness/PO-CALC-TKP-1D4c4b-auftrag-2026-10-28.md`.
+- **D4c-4c:** OA Admin-Backend (JSON) Preislisten/Targetings/Plattformen;
+  Rechte `access-administration`; Draft→Validate→Activate/Archive; Audit;
+  Active/Archived unveränderlich; Admin-Activate erfordert vollständige 41er-Matrix.
+  Tests: `PoCalcTkp1d4c4cAdminBackendTest`,
+  `OaTkpPriceListYearLockReentrantTest`; Concurrency weiter
+  `PoCalcTkp1d4c2ActivateConcurrencyMysqlTest`. Keine UI. Registry planned.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4c4c-auftrag-2026-10-29.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

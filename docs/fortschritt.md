@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 29. Oktober 2026 – **SEC-COMPOSER-01** auf Feature-Branch (Draft-PR):
+Stand: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4c** auf Feature-Branch (Draft-PR):
+OA-TKP Admin-Backend (JSON-API) für Preislisten-/Revisionen, Targetings und
+Plattformen; Draft nur über `DraftImportGuard`, Activate nur über
+`ActivationService` + YearLock; AuditLogger; Vollständigkeitsprüfung 41 Paare
+beim Admin-Activate. Keine Admin-UI, kein Fachimport, Registry planned.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4c-auftrag-2026-10-29.md`.
+
+Stand davor: 29. Oktober 2026 – **SEC-COMPOSER-01** auf `main` (PR #198):
 `symfony/mime` v7.4.19 → v7.4.22 (CVE-2026-45070 / PKSA-wtxr-p26d-nn42);
 Composer-Audit nach PR #197 wieder grün. Keine OA-TKP-Fachänderung.
 Dok: `docs/readiness/SEC-COMPOSER-01-auftrag-2026-10-29.md`.

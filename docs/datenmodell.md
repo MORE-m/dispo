@@ -352,6 +352,11 @@ Unterobjekte werden typbezogen normalisiert:
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
   Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
   `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
+- **PO-CALC-TKP-1D4c-4c Admin-Backend:** HTTP-JSON unter
+  `administration/online-audio/{preislisten|targetings|plattformen}`; Schreiben
+  über bestehende Importer/`DraftImportGuard`/`ActivationService` (kein zweites
+  Preissystem). AuditEvents `oa_tkp_price_list.*` / `oa_targeting_definition.*` /
+  `oa_platform.*`. Kein Schema-Change in 4c; kein Hard-Delete.
 - `SocialElement` und `InfluencerItem`,
 - `PriceComponent` für Produktion, Sonstiges, Fremdkosten und Booster.
 

@@ -3,11 +3,13 @@
 use App\Exceptions\CatalogAdminConflictException;
 use App\Exceptions\FieldDefinitionConflictException;
 use App\Exceptions\FieldSetAssignmentConflictException;
+use App\Exceptions\OaTkpAdminConflictException;
 use App\Exceptions\PriceListAdminConflictException;
 use App\Exceptions\PriceListSelectionConflictException;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Services\OnlineAudio\Import\OaTkpStammdatenImportException;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -61,11 +63,26 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json(['message' => $exception->getMessage()], 409);
         });
 
+        $exceptions->render(function (OaTkpAdminConflictException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 409);
+        });
+
         $exceptions->render(function (PriceListSelectionConflictException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
         });
 
         $exceptions->render(function (FieldDefinitionConflictException $exception) {
             return response()->json(['message' => $exception->getMessage()], 409);
+        });
+
+        $exceptions->render(function (OaTkpStammdatenImportException $exception, Request $request) {
+            if (! $request->expectsJson() && ! $request->is('administration/online-audio/*')) {
+                return null;
+            }
+
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'errors' => $exception->errors,
+            ], 422);
         });
     })->create();
