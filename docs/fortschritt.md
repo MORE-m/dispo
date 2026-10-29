@@ -1,6 +1,11 @@
 # Fortschritt V1
 
-Stand: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4b** auf Feature-Branch (Draft-PR):
+Stand: 29. Oktober 2026 – **SEC-COMPOSER-01** auf Feature-Branch (Draft-PR):
+`symfony/mime` v7.4.19 → v7.4.22 (CVE-2026-45070 / PKSA-wtxr-p26d-nn42);
+Composer-Audit nach PR #197 wieder grün. Keine OA-TKP-Fachänderung.
+Dok: `docs/readiness/SEC-COMPOSER-01-auftrag-2026-10-29.md`.
+
+Stand davor: 28. Oktober 2026 – **PO-CALC-TKP-1D4c-4b** auf `main` (PR #197):
 FD-D4c-4b Gesamtpreisprüfung –
 `final_tkp = basis + Σ Listenaufschläge`,
 `effective_minimum = price_list.minimum + Σ Mindestaufschläge`,
