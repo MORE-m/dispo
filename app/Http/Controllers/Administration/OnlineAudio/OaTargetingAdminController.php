@@ -162,6 +162,7 @@ class OaTargetingAdminController extends Controller
             'code' => (string) $definition->code,
             'name' => (string) $definition->name,
             'category' => $definition->category->value,
+            'category_label' => $definition->category->label(),
             'tkp_surcharge' => (string) $definition->tkp_surcharge,
             'minimum_tkp_surcharge' => (string) $definition->minimum_tkp_surcharge,
             'revision_number' => (int) $definition->revision_number,

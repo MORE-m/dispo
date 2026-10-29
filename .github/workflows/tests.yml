@@ -261,6 +261,20 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+      - name: Browser PO-CALC-TKP-1D4c-4d OA admin UI smoke
+        run: npx playwright test -c playwright.po-calc-tkp-d4c4d.config.ts --retries=0
+
+      - name: Upload PO-CALC-TKP-1D4c-4d failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: po-calc-tkp-d4c4d-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            test-results/po-calc-tkp-d4c4d/
+            docs/readiness/artifacts/po-calc-tkp-1d4c4d/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Browser PO-SWF-PROMO-1 isolated tests
         run: npx playwright test -c playwright.po-swf-promo-1.config.ts --retries=0
 

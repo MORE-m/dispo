@@ -12,6 +12,7 @@ type TargetingRow = {
     code: string;
     name: string;
     category: string;
+    category_label?: string;
     tkp_surcharge: string;
     minimum_tkp_surcharge: string;
     revision_number: number;
@@ -19,6 +20,20 @@ type TargetingRow = {
     valid_from?: string | null;
     valid_to?: string | null;
 };
+
+function categoryLabel(
+    row: TargetingRow,
+    categories: CategoryOption[],
+): string {
+    if (row.category_label) {
+        return row.category_label;
+    }
+
+    return (
+        categories.find((option) => option.value === row.category)?.label ??
+        row.category
+    );
+}
 
 type CategoryOption = {
     value: string;
@@ -298,13 +313,13 @@ export default function OaTargetingsIndex({
                                     </td>
                                     <td className="px-3 py-2">{row.name}</td>
                                     <td className="px-3 py-2">
-                                        {row.category}
+                                        {categoryLabel(row, categories)}
                                     </td>
                                     <td className="px-3 py-2 font-mono">
-                                        {row.tkp_surcharge}
+                                        {row.tkp_surcharge} €
                                     </td>
                                     <td className="px-3 py-2 font-mono">
-                                        {row.minimum_tkp_surcharge}
+                                        {row.minimum_tkp_surcharge} €
                                     </td>
                                     <td className="px-3 py-2">
                                         {row.is_active ? 'Ja' : 'Nein'}

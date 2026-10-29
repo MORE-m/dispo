@@ -310,9 +310,6 @@ class OaTkpPriceListAdminController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @return list<array{
      *     medium_code: string,
      *     inventory_code: string,
@@ -348,6 +345,9 @@ class OaTkpPriceListAdminController extends Controller
         }, $pairs);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function serializeList(OaTkpPriceList $list, bool $withItems = false): array
     {
         $payload = [

@@ -524,12 +524,12 @@ export default function OaPriceListShow({
                     </p>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border">
+                <div className="max-h-[70vh] overflow-auto rounded-xl border">
                     <table
                         className="w-full text-left text-sm"
                         data-test="oa-price-list-matrix"
                     >
-                        <thead className="bg-muted/40">
+                        <thead className="bg-muted/40 sticky top-0 z-10 shadow-sm">
                             <tr>
                                 <th className="px-3 py-2 font-medium">
                                     Werbeform
@@ -538,10 +538,10 @@ export default function OaPriceListShow({
                                     Inventar
                                 </th>
                                 <th className="px-3 py-2 font-medium">
-                                    Listen-TKP
+                                    Listen-TKP (€)
                                 </th>
                                 <th className="px-3 py-2 font-medium">
-                                    Mindest-TKP
+                                    Mindest-TKP (€)
                                 </th>
                             </tr>
                         </thead>
@@ -708,7 +708,10 @@ export default function OaPriceListShow({
                 ) : null}
 
                 {activatePreview ? (
-                    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm">
+                    <div
+                        className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm"
+                        data-test="oa-activate-confirm"
+                    >
                         <p className="font-medium">Aktivierung bestätigen</p>
                         {activatePreview.archived_previous_ids.length > 0 ? (
                             <p className="mt-1">
@@ -727,6 +730,7 @@ export default function OaPriceListShow({
                             <Button
                                 type="button"
                                 disabled={busy || dirty}
+                                data-test="oa-activate-confirm-submit"
                                 onClick={onActivateConfirm}
                             >
                                 Jetzt aktivieren
@@ -735,6 +739,7 @@ export default function OaPriceListShow({
                                 type="button"
                                 variant="outline"
                                 disabled={busy}
+                                data-test="oa-activate-confirm-cancel"
                                 onClick={() => setActivatePreview(null)}
                             >
                                 Abbrechen

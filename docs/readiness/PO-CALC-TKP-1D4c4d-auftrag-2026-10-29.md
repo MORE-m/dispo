@@ -58,10 +58,16 @@ JSON-Vertrag (4c-Tests unverändert). Mutationen im UI per `fetch` + CSRF.
 - Vitest: `resources/js/lib/oa-tkp-admin.test.ts`
 - Regression: `PoCalcTkp1d4c4cAdminBackendTest`
 
+## Browser-Abnahme / E2E
+
+- Isoliert: `playwright.po-calc-tkp-d4c4d.config.ts`, Port **8077**, Seeder `E2EOaTkpAdminUiSeeder`
+- Screenshots: `docs/readiness/artifacts/po-calc-tkp-1d4c4d/`
+- CI-Job: „Browser PO-CALC-TKP-1D4c-4d OA admin UI smoke“
+
 ## Bewusst nicht
 
 - Kein Merge/Deploy, kein produktiver Import, keine Registry-Freigabe (`planned`)
-- Keine automatische 2027-Aktivierung
+- Keine automatische 2027-Aktivierung in Produktion
 - Keine neue Backend-Preislogik
 - Kein Hard-Delete
 
@@ -69,4 +75,4 @@ JSON-Vertrag (4c-Tests unverändert). Mutationen im UI per `fetch` + CSRF.
 
 - Ohne operative `inventory_medium_rules` bleibt Aktivierung fail-closed (wie 4c).
 - Create erfordert ≥1 Item (API); leere Drafts ohne Preiszeile sind nicht vorgesehen.
-- Browser-E2E für Admin-UI optional nachgezogen (Vitest + Feature abdecken Kernpfade).
+- SQLite zeigt Dezimalwerte teils ohne 4 NK (Anzeige `25` statt `25.0000`); MySQL-Produktion mit decimal bleibt maßgeblich.

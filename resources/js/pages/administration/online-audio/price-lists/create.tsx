@@ -240,17 +240,17 @@ export default function OaPriceListCreate({
                                 }
                                 data-test="oa-fill-test-prices"
                             />
-                            Testpreise für alle Pflichtpaare eintragen
-                            (OA_TEST_* je Medium, Listen + Mindest)
+                            Abnahme-Testpreise je Werbeform für alle Zeilen
+                            eintragen (nur Testdaten, nicht produktiv)
                         </label>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border">
+                    <div className="max-h-[70vh] overflow-auto rounded-xl border">
                         <table
                             className="w-full text-left text-sm"
                             data-test="oa-price-list-matrix"
                         >
-                            <thead className="bg-muted/40">
+                            <thead className="bg-muted/40 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th className="px-3 py-2 font-medium">
                                         Werbeform
@@ -259,10 +259,10 @@ export default function OaPriceListCreate({
                                         Inventar
                                     </th>
                                     <th className="px-3 py-2 font-medium">
-                                        Listen-TKP
+                                        Listen-TKP (€)
                                     </th>
                                     <th className="px-3 py-2 font-medium">
-                                        Mindest-TKP
+                                        Mindest-TKP (€)
                                     </th>
                                 </tr>
                             </thead>
