@@ -212,7 +212,7 @@ class OaTkpPriceListAdminController extends Controller
                 'old_values' => $event->old_values,
                 'new_values' => $event->new_values,
                 'correlation_id' => $event->correlation_id,
-                'created_at' => $event->created_at?->toIso8601String(),
+                'created_at' => $event->created_at->toIso8601String(),
             ])
             ->values()
             ->all();
@@ -244,9 +244,7 @@ class OaTkpPriceListAdminController extends Controller
             'version' => (string) $list->version,
             'revision_number' => (int) $list->revision_number,
             'lock_version' => (int) $list->lock_version,
-            'status' => $list->status instanceof PriceListStatus
-                ? $list->status->value
-                : (string) $list->status,
+            'status' => $list->status->value,
             'valid_from' => $list->valid_from?->toDateString(),
             'published_at' => $list->published_at?->toIso8601String(),
             'archived_at' => $list->archived_at?->toIso8601String(),
@@ -260,10 +258,10 @@ class OaTkpPriceListAdminController extends Controller
             $payload['items'] = $list->items->map(static function (OaTkpPriceListItem $item): array {
                 return [
                     'id' => (int) $item->id,
-                    'medium_code' => (string) ($item->advertisingMedium?->code ?? ''),
-                    'medium_name' => (string) ($item->advertisingMedium?->name ?? ''),
-                    'inventory_code' => (string) ($item->inventory?->code ?? ''),
-                    'inventory_name' => (string) ($item->inventory?->name ?? ''),
+                    'medium_code' => (string) $item->advertisingMedium->code,
+                    'medium_name' => (string) $item->advertisingMedium->name,
+                    'inventory_code' => (string) $item->inventory->code,
+                    'inventory_name' => (string) $item->inventory->name,
                     'list_tkp' => (string) $item->list_tkp,
                     'minimum_tkp' => (string) $item->minimum_tkp,
                 ];

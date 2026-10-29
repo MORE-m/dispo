@@ -120,9 +120,7 @@ final class OaTargetingAdminWriter
             'id' => (int) $definition->id,
             'code' => (string) $definition->code,
             'name' => (string) $definition->name,
-            'category' => $definition->category instanceof OaTargetingCategory
-                ? $definition->category->value
-                : (string) $definition->category,
+            'category' => $definition->category->value,
             'tkp_surcharge' => (string) $definition->tkp_surcharge,
             'minimum_tkp_surcharge' => (string) $definition->minimum_tkp_surcharge,
             'revision_number' => (int) $definition->revision_number,

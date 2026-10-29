@@ -315,17 +315,15 @@ final class OaTkpPriceListAdminWriter
             'revision_number' => (int) $list->revision_number,
             'name' => (string) $list->name,
             'version' => (string) $list->version,
-            'status' => $list->status instanceof PriceListStatus
-                ? $list->status->value
-                : (string) $list->status,
+            'status' => $list->status->value,
             'lock_version' => (int) $list->lock_version,
             'valid_from' => $list->valid_from?->toDateString(),
             'published_at' => $list->published_at?->toIso8601String(),
             'archived_at' => $list->archived_at?->toIso8601String(),
             'items' => $list->items->map(static function (OaTkpPriceListItem $item): array {
                 return [
-                    'medium_code' => (string) ($item->advertisingMedium?->code ?? ''),
-                    'inventory_code' => (string) ($item->inventory?->code ?? ''),
+                    'medium_code' => (string) $item->advertisingMedium->code,
+                    'inventory_code' => (string) $item->inventory->code,
                     'list_tkp' => (string) $item->list_tkp,
                     'minimum_tkp' => (string) $item->minimum_tkp,
                 ];
@@ -411,8 +409,8 @@ final class OaTkpPriceListAdminWriter
         $items = [];
         foreach ($list->items as $item) {
             $items[] = [
-                'medium_code' => (string) ($item->advertisingMedium?->code ?? ''),
-                'inventory_code' => (string) ($item->inventory?->code ?? ''),
+                'medium_code' => (string) $item->advertisingMedium->code,
+                'inventory_code' => (string) $item->inventory->code,
                 'list_tkp' => (string) $item->list_tkp,
                 'minimum_tkp' => (string) $item->minimum_tkp,
             ];

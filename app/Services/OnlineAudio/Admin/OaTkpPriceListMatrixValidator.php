@@ -113,7 +113,7 @@ final class OaTkpPriceListMatrixValidator
             'errors' => array_values($unique),
             'items_count' => count($itemsRaw),
             'required_pairs' => count($required),
-            'missing_pairs' => array_values($missing),
+            'missing_pairs' => $missing,
             'unexpected_pairs' => array_values(array_unique($unexpected)),
             'complete' => $complete,
         ];
@@ -138,8 +138,8 @@ final class OaTkpPriceListMatrixValidator
         foreach ($list->items as $item) {
             /** @var OaTkpPriceListItem $item */
             $items[] = [
-                'medium_code' => (string) ($item->advertisingMedium?->code ?? ''),
-                'inventory_code' => (string) ($item->inventory?->code ?? ''),
+                'medium_code' => (string) $item->advertisingMedium->code,
+                'inventory_code' => (string) $item->inventory->code,
                 'list_tkp' => (string) $item->list_tkp,
                 'minimum_tkp' => (string) $item->minimum_tkp,
             ];

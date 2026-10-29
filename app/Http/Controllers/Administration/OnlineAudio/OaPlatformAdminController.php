@@ -149,7 +149,7 @@ class OaPlatformAdminController extends Controller
                 'old_values' => $event->old_values,
                 'new_values' => $event->new_values,
                 'correlation_id' => $event->correlation_id,
-                'created_at' => $event->created_at?->toIso8601String(),
+                'created_at' => $event->created_at->toIso8601String(),
             ])
             ->values()
             ->all();
