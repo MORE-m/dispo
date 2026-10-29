@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Administration\OnlineAudio;
 
 use App\Enums\PriceListStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AdvertisingMedium;
 use App\Models\AuditEvent;
+use App\Models\Inventory;
 use App\Models\OaTkpPriceList;
 use App\Models\OaTkpPriceListItem;
 use App\Models\User;
@@ -14,13 +16,15 @@ use App\Support\OnlineAudio\OaTkpActiveMediumInventoryPairs;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * PO-CALC-TKP-1D4c-4c: JSON-Admin-API für OA-TKP-Preislisten (ohne UI).
+ * PO-CALC-TKP-1D4c-4d: OA-TKP-Preislisten Admin (Inertia-UI + JSON-API aus 4c).
  */
 class OaTkpPriceListAdminController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|Response
     {
         $this->authorize('manage-oa-tkp-master-data');
 
@@ -44,24 +48,97 @@ class OaTkpPriceListAdminController extends Controller
             $query->where('year', (int) $year);
         }
 
-        return response()->json([
-            'price_lists' => $query->get()->map(fn (OaTkpPriceList $list): array => $this->serializeList($list))->values()->all(),
-            'required_pairs' => OaTkpActiveMediumInventoryPairs::all(),
-            'filters' => [
-                'status' => $status,
-                'year' => is_numeric($year) ? (int) $year : null,
-            ],
+        $lists = $query->get();
+        $serialized = $lists->map(fn (OaTkpPriceList $list): array => $this->serializeList($list))->values()->all();
+        $requiredPairs = OaTkpActiveMediumInventoryPairs::all();
+        $filters = [
+            'status' => $status,
+            'year' => is_numeric($year) ? (int) $year : null,
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'price_lists' => $serialized,
+                'required_pairs' => $requiredPairs,
+                'filters' => $filters,
+            ]);
+        }
+
+        $years = OaTkpPriceList::query()
+            ->select('year')
+            ->distinct()
+            ->orderByDesc('year')
+            ->pluck('year')
+            ->map(static fn ($y): int => (int) $y)
+            ->values()
+            ->all();
+
+        return Inertia::render('administration/online-audio/price-lists/index', [
+            'priceLists' => $serialized,
+            'filters' => $filters,
+            'years' => $years,
+            'requiredPairsCount' => count($requiredPairs),
+            'currentYear' => (int) date('Y'),
         ]);
     }
 
-    public function show(OaTkpPriceList $oaTkpPriceList): JsonResponse
+    public function create(Request $request): Response
+    {
+        $this->authorize('manage-oa-tkp-master-data');
+
+        $currentYear = (int) date('Y');
+
+        return Inertia::render('administration/online-audio/price-lists/create', [
+            'requiredPairs' => $this->requiredPairsForUi(),
+            'currentYear' => $currentYear,
+            'suggestedYear' => max($currentYear + 1, 2027),
+        ]);
+    }
+
+    public function show(Request $request, OaTkpPriceList $oaTkpPriceList): JsonResponse|Response
     {
         $this->authorize('manage-oa-tkp-master-data');
         $oaTkpPriceList->load(['items.advertisingMedium:id,code,name', 'items.inventory:id,code,name']);
 
-        return response()->json([
-            'price_list' => $this->serializeList($oaTkpPriceList, withItems: true),
-            'required_pairs' => OaTkpActiveMediumInventoryPairs::all(),
+        $serialized = $this->serializeList($oaTkpPriceList, withItems: true);
+        $requiredPairs = OaTkpActiveMediumInventoryPairs::all();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'price_list' => $serialized,
+                'required_pairs' => $requiredPairs,
+            ]);
+        }
+
+        $requiredPairsUi = $this->requiredPairsForUi();
+
+        $siblings = OaTkpPriceList::query()
+            ->where('year', $oaTkpPriceList->year)
+            ->orderByDesc('revision_number')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OaTkpPriceList $list): array => [
+                'id' => (int) $list->id,
+                'revision_number' => (int) $list->revision_number,
+                'status' => $list->status->value,
+                'status_label' => $list->status->label(),
+                'name' => (string) $list->name,
+            ])
+            ->values()
+            ->all();
+
+        return Inertia::render('administration/online-audio/price-lists/show', [
+            'priceList' => $serialized,
+            'requiredPairs' => $requiredPairsUi,
+            'siblingRevisions' => $siblings,
+            'routes' => [
+                'index' => route('administration.oa-tkp.price-lists.index'),
+                'update' => route('administration.oa-tkp.price-lists.update', $oaTkpPriceList),
+                'validate' => route('administration.oa-tkp.price-lists.validate', $oaTkpPriceList),
+                'activate' => route('administration.oa-tkp.price-lists.activate', $oaTkpPriceList),
+                'archive' => route('administration.oa-tkp.price-lists.archive', $oaTkpPriceList),
+                'history' => route('administration.oa-tkp.price-lists.history', $oaTkpPriceList),
+            ],
         ]);
     }
 
@@ -233,6 +310,42 @@ class OaTkpPriceListAdminController extends Controller
     }
 
     /**
+     * @return list<array{
+     *     medium_code: string,
+     *     inventory_code: string,
+     *     advertising_medium_id: int,
+     *     inventory_id: int,
+     *     medium_name: string,
+     *     inventory_name: string
+     * }>
+     */
+    private function requiredPairsForUi(): array
+    {
+        $pairs = OaTkpActiveMediumInventoryPairs::all();
+        if ($pairs === []) {
+            return [];
+        }
+
+        $mediumIds = array_values(array_unique(array_column($pairs, 'advertising_medium_id')));
+        $inventoryIds = array_values(array_unique(array_column($pairs, 'inventory_id')));
+
+        $mediumNames = AdvertisingMedium::query()
+            ->whereIn('id', $mediumIds)
+            ->pluck('name', 'id');
+        $inventoryNames = Inventory::query()
+            ->whereIn('id', $inventoryIds)
+            ->pluck('name', 'id');
+
+        return array_map(static function (array $pair) use ($mediumNames, $inventoryNames): array {
+            return [
+                ...$pair,
+                'medium_name' => (string) ($mediumNames[$pair['advertising_medium_id']] ?? $pair['medium_code']),
+                'inventory_name' => (string) ($inventoryNames[$pair['inventory_id']] ?? $pair['inventory_code']),
+            ];
+        }, $pairs);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function serializeList(OaTkpPriceList $list, bool $withItems = false): array
@@ -245,6 +358,8 @@ class OaTkpPriceListAdminController extends Controller
             'revision_number' => (int) $list->revision_number,
             'lock_version' => (int) $list->lock_version,
             'status' => $list->status->value,
+            'status_label' => $list->status->label(),
+            'editable' => $list->status === PriceListStatus::Draft,
             'valid_from' => $list->valid_from?->toDateString(),
             'published_at' => $list->published_at?->toIso8601String(),
             'archived_at' => $list->archived_at?->toIso8601String(),

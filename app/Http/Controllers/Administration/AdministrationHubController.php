@@ -22,6 +22,7 @@ class AdministrationHubController extends Controller
         $canManageSpecialApprove = $request->user()?->can('manage-special-approve-rights') ?? false;
         $canManageUsers = $request->user()?->can('manage-users') ?? false;
         $canViewNotificationOutbox = $request->user()?->can('view-notification-outbox') ?? false;
+        $canManageOaTkp = $request->user()?->can('manage-oa-tkp-master-data') ?? false;
 
         return Inertia::render('administration/index', [
             'modules' => [
@@ -66,6 +67,13 @@ class AdministrationHubController extends Controller
                     'description' => 'Inventarspezifische Spotproduktionspreise je Jahr anlegen, aktivieren und archivieren.',
                     'href' => '/administration/produktionspreise',
                     'available' => true,
+                ],
+                [
+                    'key' => 'online-audio',
+                    'title' => 'Online Audio',
+                    'description' => 'OA-TKP-Preislisten, Targetings und Plattformen pflegen und Revisionen aktivieren (nur Admin).',
+                    'href' => $canManageOaTkp ? '/administration/online-audio' : null,
+                    'available' => $canManageOaTkp,
                 ],
                 [
                     'key' => 'crm-import',

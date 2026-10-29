@@ -12,13 +12,15 @@ use App\Services\OnlineAudio\Import\OaTkpStammdatenImportException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * PO-CALC-TKP-1D4c-4c: JSON-Admin-API für OA-Targetings (ohne UI).
+ * PO-CALC-TKP-1D4c-4d: OA-Targeting-Admin (Inertia-UI + JSON-API aus 4c).
  */
 class OaTargetingAdminController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|Response
     {
         $this->authorize('manage-oa-tkp-master-data');
 
@@ -36,7 +38,7 @@ class OaTargetingAdminController extends Controller
             $query->where('is_active', filter_var($active, FILTER_VALIDATE_BOOLEAN));
         }
 
-        return response()->json([
+        $payload = [
             'targetings' => $query->get()->map(fn (OaTargetingDefinition $row): array => $this->serialize($row))->values()->all(),
             'categories' => array_map(
                 static fn (OaTargetingCategory $c): array => ['value' => $c->value, 'label' => $c->label()],
@@ -46,7 +48,13 @@ class OaTargetingAdminController extends Controller
                 'geo_category' => 'Geo wird zunächst unter category=technisch geführt (keine neue Kategorie).',
                 'revision_identity' => 'Identity = code + revision_number; Preiserhöhungen bevorzugt als neue Revision.',
             ],
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return Inertia::render('administration/online-audio/targetings/index', $payload);
     }
 
     public function show(OaTargetingDefinition $oaTargetingDefinition): JsonResponse
@@ -154,6 +162,7 @@ class OaTargetingAdminController extends Controller
             'code' => (string) $definition->code,
             'name' => (string) $definition->name,
             'category' => $definition->category->value,
+            'category_label' => $definition->category->label(),
             'tkp_surcharge' => (string) $definition->tkp_surcharge,
             'minimum_tkp_surcharge' => (string) $definition->minimum_tkp_surcharge,
             'revision_number' => (int) $definition->revision_number,

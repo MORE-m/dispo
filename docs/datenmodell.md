@@ -360,6 +360,9 @@ Unterobjekte werden typbezogen normalisiert:
   OA-`inventory_medium_rules` (kein CSV-Fallback). AuditEvents
   `oa_tkp_price_list.*` / `oa_targeting_definition.*` / `oa_platform.*`.
   Kein Schema-Change in 4c; kein Hard-Delete.
+- **PO-CALC-TKP-1D4c-4d Admin-UI:** dieselben Routes liefern Browser-GETs als
+  Inertia-Seiten (`administration/online-audio/*`); Mutationen weiter JSON.
+  Hub-Modul „Online Audio“ im Administrationsbereich nur für Admins.
 - `SocialElement` und `InfluencerItem`,
 - `PriceComponent` für Produktion, Sonstiges, Fremdkosten und Booster.
 

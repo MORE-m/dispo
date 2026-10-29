@@ -56,6 +56,7 @@ export default defineConfig({
         '**/po-spot-surcharge-1-*.spec.ts',
         '**/po-spot-single-1-*.spec.ts',
         '**/po-calc-tkp-d3d4-*.spec.ts',
+        '**/po-calc-tkp-d4c4d-*.spec.ts',
         '**/po-swf-promo-1-*.spec.ts',
         '**/po-swf-contest-1-*.spec.ts',
         '**/po-swf-calendar-1-*.spec.ts',
@@ -88,7 +89,7 @@ export default defineConfig({
     // BL-P4-03h / SPT-008 / DSP-DCP-001 / BL-P8-02a / BL-P8-02b / BL-P8-02c /
     // BL-P8-02d / BL-P8-02e / BL-P9-01a / BL-P9-01b / BL-P9-01c / BL-P9-02a /
     // wizard-inventory-collapse / PO-AUTH-SPECIAL-APPROVE-1 / PO-NOT002-ADMIN-1 /
-    // PO-USER-ADMIN-1 /
+    // PO-USER-ADMIN-1 / PO-CALC-TKP-1D3d-4 / PO-CALC-TKP-1D4c-4d /
     // CRM Wizard Picker / Calc-Dispo-Banner / CRM Masterdata Search /
     // PO-ALLONGE-1 laufen separat mit eigener DB/Port.
     // BL-P2-01a darf nicht in der Hauptsuite laufen: der Freeze-Test benennt
