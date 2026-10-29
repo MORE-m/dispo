@@ -456,6 +456,26 @@ Bewusst **nicht** in 02e: Submit-/Invalidierungsmails, In-App, Empfängerwahl,
 allgemeine Audit-Explorer-UI, Worker/Dispatch. `NOT-002` erst nach Merge auf `main`
 als abgeschlossen führen.
 
+## Online-Audio-TKP-Stammdaten (PO-CALC-TKP-1D4c-4d)
+
+Administrations-Hub → **Online Audio** (nur Rolle Admin, Gate
+`manage-oa-tkp-master-data`; Management/Vertrieb/Dispo/PM: kein Menüzugriff,
+direkte Routes 403).
+
+Unterbereiche:
+
+1. **TKP-Preislisten** – Jahr/Revision wählen; Draft-Matrix (Werbeform × Inventar)
+   mit Listen-/Mindest-TKP; Speichern; Vollständigkeit prüfen; Aktivieren mit
+   Dry-Run und Bestätigung der Vorgänger-Archivierung; Historie/Audit.
+   Active/Archived schreibgeschützt.
+2. **Targetings** – Code/Name/Kategorie/Aufschläge revisionssicher anlegen;
+   Preisanpassungen als neue Revision; Geo unter Kategorie `technisch`.
+3. **Plattformen** – Anlegen/Bearbeiten/Aktivieren/Deaktivieren; keine Preise;
+   kein Auto-Anlegen von Spotify/YouTube/Deezer.
+
+Schreiben läuft ausschließlich über den D4c-4c-Backend-Vertrag (keine parallele
+Client-Validierung als Freigabe). Registry `oa_tkp`/`tkp` bleibt `planned`.
+
 ## Abschlussbedingungen
 
 Ein Abschluss ist nur zulässig, wenn:

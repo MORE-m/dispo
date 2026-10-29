@@ -11,13 +11,15 @@ use App\Services\OnlineAudio\Import\OaTkpStammdatenImportException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * PO-CALC-TKP-1D4c-4c: JSON-Admin-API für OA-Plattformen (ohne UI, ohne Preise).
+ * PO-CALC-TKP-1D4c-4d: OA-Plattform-Admin (Inertia-UI + JSON-API aus 4c).
  */
 class OaPlatformAdminController extends Controller
 {
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|Response
     {
         $this->authorize('manage-oa-tkp-master-data');
 
@@ -27,13 +29,19 @@ class OaPlatformAdminController extends Controller
             $query->where('is_active', filter_var($active, FILTER_VALIDATE_BOOLEAN));
         }
 
-        return response()->json([
+        $payload = [
             'platforms' => $query->get()->map(fn (OaPlatform $row): array => $this->serialize($row))->values()->all(),
             'notes' => [
                 'no_pricing' => 'Plattformen tragen keine TKP-Preise.',
                 'no_auto_seed' => 'Spotify/YouTube/Deezer werden durch diesen Endpoint nicht automatisch angelegt.',
             ],
-        ]);
+        ];
+
+        if ($request->expectsJson()) {
+            return response()->json($payload);
+        }
+
+        return Inertia::render('administration/online-audio/platforms/index', $payload);
     }
 
     public function show(OaPlatform $oaPlatform): JsonResponse

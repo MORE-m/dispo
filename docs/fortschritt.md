@@ -1,10 +1,18 @@
 # Fortschritt V1
 
-Stand: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4c** Review-Nachzug auf Feature-Branch
-(Draft-PR #199): Admin-only Gate `manage-oa-tkp-master-data` (auch Lesen;
+Stand: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4d** Feature-Branch
+`feat/po-calc-tkp-1d4c4d-admin-ui` (Base `db470f2` / PR #199):
+OA-TKP-Adminoberfläche (Inertia) für Preislisten, Targetings, Plattformen;
+Hub-Modul **Online Audio** nur Admin (`manage-oa-tkp-master-data`);
+Mutationen über bestehenden 4c-JSON-Vertrag (Validate/Activate/Archive,
+Dry-Run-Bestätigung). Keine neue Preislogik, kein Fachimport, Registry planned.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4d-auftrag-2026-10-29.md`.
+
+Stand davor: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4c** auf `main` (PR #199,
+Merge `db470f2…`): Admin-only Gate `manage-oa-tkp-master-data` (auch Lesen;
 Management 403); Activate-Vollständigkeit gemeinsam in `ActivationService`
 (Admin=CLI); SoT = aktive InventoryMediumRules, kein CSV-Fallback.
-Keine Admin-UI, kein Fachimport, Registry planned.
+Keine Admin-UI (bis 4d), kein Fachimport, Registry planned.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4c-auftrag-2026-10-29.md`.
 
 Stand davor: 29. Oktober 2026 – **SEC-COMPOSER-01** auf `main` (PR #198):

@@ -13,6 +13,7 @@ use App\Http\Controllers\Administration\FieldSetAssignmentAdminController;
 use App\Http\Controllers\Administration\InventoryAdminController;
 use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
 use App\Http\Controllers\Administration\NotificationOutboxAdminController;
+use App\Http\Controllers\Administration\OnlineAudio\OaAdminHubController;
 use App\Http\Controllers\Administration\OnlineAudio\OaPlatformAdminController;
 use App\Http\Controllers\Administration\OnlineAudio\OaTargetingAdminController;
 use App\Http\Controllers\Administration\OnlineAudio\OaTkpPriceListAdminController;
@@ -315,10 +316,15 @@ Route::middleware(['auth'])->group(function () {
         Route::post('administration/produktionspreise/{productionPriceList}/kopieren', [ProductionPriceListAdminController::class, 'copy'])
             ->name('administration.production-prices.copy');
 
-        // PO-CALC-TKP-1D4c-4c: OA-TKP Admin-Backend (JSON, ohne UI) – Admin-only
+        // PO-CALC-TKP-1D4c-4d: OA-TKP Admin-UI (Inertia) + JSON-API aus 4c – Admin-only
         Route::middleware(['can:manage-oa-tkp-master-data'])->group(function () {
+            Route::get('administration/online-audio', OaAdminHubController::class)
+                ->name('administration.oa-tkp.hub');
+
             Route::get('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'index'])
                 ->name('administration.oa-tkp.price-lists.index');
+            Route::get('administration/online-audio/preislisten/neu', [OaTkpPriceListAdminController::class, 'create'])
+                ->name('administration.oa-tkp.price-lists.create');
             Route::post('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'store'])
                 ->name('administration.oa-tkp.price-lists.store');
             Route::get('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'show'])
