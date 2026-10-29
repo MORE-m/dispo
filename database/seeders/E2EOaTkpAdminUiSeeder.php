@@ -67,7 +67,7 @@ class E2EOaTkpAdminUiSeeder extends Seeder
 
         try {
             $header = fgetcsv($handle, 0, ';');
-            if (! is_array($header)) {
+            if ($header === false) {
                 throw new RuntimeException('OA-Matrix-CSV ohne Header.');
             }
             $header = array_map(static fn ($h): string => (string) $h, $header);
@@ -80,7 +80,8 @@ class E2EOaTkpAdminUiSeeder extends Seeder
 
             $pairs = [];
             while (($row = fgetcsv($handle, 0, ';')) !== false) {
-                if (! is_array($row) || ($row[$yearIdx] ?? '') !== '2026') {
+                // fgetcsv liefert hier bereits list<string|null> (nicht false).
+                if (($row[$yearIdx] ?? '') !== '2026') {
                     continue;
                 }
                 $medium = (string) ($row[$mediumIdx] ?? '');
