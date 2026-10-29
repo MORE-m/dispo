@@ -19,7 +19,7 @@ class OaPlatformAdminController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $active = $request->query('is_active');
         $query = OaPlatform::query()->orderBy('sort')->orderBy('code');
@@ -38,7 +38,7 @@ class OaPlatformAdminController extends Controller
 
     public function show(OaPlatform $oaPlatform): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         return response()->json([
             'platform' => $this->serialize($oaPlatform),
@@ -47,7 +47,7 @@ class OaPlatformAdminController extends Controller
 
     public function store(Request $request, OaPlatformAdminWriter $writer): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:64'],
@@ -74,7 +74,7 @@ class OaPlatformAdminController extends Controller
         OaPlatform $oaPlatform,
         OaPlatformAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -107,7 +107,7 @@ class OaPlatformAdminController extends Controller
         OaPlatform $oaPlatform,
         OaPlatformAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $platform = $writer->setActive($oaPlatform, true, $request->all(), $this->actor($request));
 
@@ -122,7 +122,7 @@ class OaPlatformAdminController extends Controller
         OaPlatform $oaPlatform,
         OaPlatformAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $platform = $writer->setActive($oaPlatform, false, $request->all(), $this->actor($request));
 
@@ -134,7 +134,7 @@ class OaPlatformAdminController extends Controller
 
     public function history(OaPlatform $oaPlatform): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $events = AuditEvent::query()
             ->where('auditable_type', OaPlatform::class)
@@ -162,7 +162,7 @@ class OaPlatformAdminController extends Controller
 
     public function destroy(): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         return response()->json([
             'message' => 'Hard-Delete ist für OA-Plattformen nicht erlaubt.',

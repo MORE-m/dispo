@@ -20,7 +20,7 @@ class OaTargetingAdminController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $code = $request->query('code');
         $active = $request->query('is_active');
@@ -51,7 +51,7 @@ class OaTargetingAdminController extends Controller
 
     public function show(OaTargetingDefinition $oaTargetingDefinition): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         return response()->json([
             'targeting' => $this->serialize($oaTargetingDefinition),
@@ -60,7 +60,7 @@ class OaTargetingAdminController extends Controller
 
     public function store(Request $request, OaTargetingAdminWriter $writer): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'code' => ['required', 'string', 'max:64'],
@@ -91,7 +91,7 @@ class OaTargetingAdminController extends Controller
         string $code,
         OaTargetingAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -118,7 +118,7 @@ class OaTargetingAdminController extends Controller
 
     public function history(OaTargetingDefinition $oaTargetingDefinition): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $events = AuditEvent::query()
             ->where('auditable_type', OaTargetingDefinition::class)

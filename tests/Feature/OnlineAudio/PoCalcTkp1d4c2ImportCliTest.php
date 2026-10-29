@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\EnsuresOaTkpInventoryMediumRules;
 use Tests\TestCase;
 
 /**
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 class PoCalcTkp1d4c2ImportCliTest extends TestCase
 {
+    use EnsuresOaTkpInventoryMediumRules;
     use RefreshDatabase;
 
     private string $tmpDir;
@@ -154,9 +156,42 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
     }
 
     #[Test]
+    public function activate_without_operative_oa_rules_fails_closed(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->assertSame(0, Artisan::call('oa:import-price-list', [
+            'path' => $this->writeJson('r1.json', $this->priceListPayload(2026, 1, PriceListStatus::Draft->value)),
+        ]));
+        $this->assertSame(1, Artisan::call('oa:activate-price-list', [
+            '--year' => 2026,
+            '--revision' => 1,
+        ]));
+        $this->assertSame(PriceListStatus::Draft, OaTkpPriceList::query()->firstOrFail()->status);
+    }
+
+    #[Test]
+    public function activate_incomplete_matrix_fails_when_extra_rules_exist(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureOaInventoryMediumRules([
+            ['pre_stream', 'inv_more_kombi_online_audio'],
+            ['in_stream', 'inv_more_kombi_online_audio'],
+        ]);
+        $this->assertSame(0, Artisan::call('oa:import-price-list', [
+            'path' => $this->writeJson('r1.json', $this->priceListPayload(2026, 1, PriceListStatus::Draft->value)),
+        ]));
+        $this->assertSame(1, Artisan::call('oa:activate-price-list', [
+            '--year' => 2026,
+            '--revision' => 1,
+        ]));
+        $this->assertSame(PriceListStatus::Draft, OaTkpPriceList::query()->firstOrFail()->status);
+    }
+
+    #[Test]
     public function activate_without_and_with_archive_previous(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         $this->assertSame(0, Artisan::call('oa:import-price-list', [
             'path' => $this->writeJson('r1.json', $this->priceListPayload(2026, 1, PriceListStatus::Draft->value)),
         ]));
@@ -192,6 +227,7 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
     public function activate_dry_run_and_idempotent_and_rollback_on_empty_items(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         $this->assertSame(0, Artisan::call('oa:import-price-list', [
             'path' => $this->writeJson('r1.json', $this->priceListPayload(2026, 1, PriceListStatus::Draft->value)),
         ]));
@@ -237,6 +273,7 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
     public function different_years_are_independent_and_pins_survive_activation(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         $this->assertSame(0, Artisan::call('oa:import-price-list', [
             'path' => $this->writeJson('y2026.json', $this->priceListPayload(2026, 1, PriceListStatus::Draft->value)),
         ]));

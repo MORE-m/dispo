@@ -1,6 +1,6 @@
 # PO-CALC-TKP-1D4c-4c – OA-Preisverwaltung Admin-Backend
 
-**Status:** Feature-Branch / Draft-PR – **STOP vor Merge ohne PO-Abnahme.**  
+**Status:** Feature-Branch / Draft-PR #199 – **STOP vor Merge ohne PO-Abnahme.**  
 Keine Admin-UI, kein produktiver Preisimport, kein Deploy, keine Registry-Freigabe.
 
 Base: `6761f47e6519d5ebf385f7e5cf033eff96884ae5` (`origin/main`, PR #198)  
@@ -15,15 +15,31 @@ Worktree: `dispo-wt-po-calc-tkp-1d4c4c`
 | Targeting-Admin über `OaTargetingDefinitionImporter` + neue Revision | ja |
 | Plattform-Admin über `OaPlatformImporter` (kein Auto-Seed Spotify/YT/Deezer) | ja |
 | `DraftImportGuard` + `ActivationService` + YearLock (singleton, reentrant) | ja |
-| Matrix-Validator (zulässige Paare + Vollständigkeit 41) | ja |
+| **Gemeinsame** Activate-Vollständigkeit (Admin + CLI) im `ActivationService` | ja (Review-Nachzug) |
+| Matrix-SoT = aktive `InventoryMediumRules` (kein CSV-Fallback) | ja (Review-Nachzug) |
 | AuditLogger (`oa_tkp_price_list.*`, `oa_targeting_definition.*`, `oa_platform.*`) | ja |
-| Gate `access-administration` (Admin + Management, Spot-Konvention) | ja |
-| Feature-/Unit-Tests | ja |
+| Gate `manage-oa-tkp-master-data` (**Admin-only**, auch Lesen) | ja (Review-Nachzug) |
+| Feature-/Unit-Tests inkl. Management-403 | ja |
 | Admin-UI / Fachbefüllung / Registry | **OUT → D4c-4d / D4d** |
+
+## Rechtevertrag (verbindlich)
+
+| Rolle | OA Lesen | OA Schreiben / Validate / Activate / Archive |
+|---|---|---|
+| **Admin** | ja | ja |
+| **Management** | **nein** (restriktive Variante) | **nein** |
+| Sales / Dispo / ProductManagement | nein | nein |
+| Gast | nein | nein |
+
+- Gate: `manage-oa-tkp-master-data` → `User::canManageOaTkpMasterData()` → nur `Role::Admin`
+- Middleware zusätzlich auf der OA-Routengruppe; Controller `authorize` identisch
+- Spot-/Produktionspreis-Admin unverändert über `access-administration` (Admin+Management)
+- Keine separate Activate-Capability in v1
 
 ## API-Vertrag (D4c-4d)
 
-Alle Routen unter `can:access-administration`, JSON, Prefix `administration/online-audio/`.
+Routen unter `can:access-administration` **und** `can:manage-oa-tkp-master-data`, JSON,
+Prefix `administration/online-audio/`.
 
 ### Preislisten
 
@@ -39,7 +55,7 @@ Alle Routen unter `can:access-administration`, JSON, Prefix `administration/onli
 | GET | `…/{id}/historie` | `…history` |
 | DELETE | `…/{id}` | 405 |
 
-Fehler: **422** mit `message`, `errors[]`, ggf. `field_errors[{line,field,message}]`; Optimistic Lock **409**.
+Fehler: **422** mit `message`, `errors[]`, ggf. `field_errors[{line,field,message}]`; Optimistic Lock **409**; Rechte **403**.
 
 ### Targetings / Plattformen
 
@@ -51,24 +67,25 @@ Fehler: **422** mit `message`, `errors[]`, ggf. `field_errors[{line,field,messag
 
 1. Draft anlegen (nächste `revision_number` / Jahr)  
 2. Draft bearbeiten (nur `status=draft`; Active/Archived fail-closed)  
-3. Prüfen (`require_complete=true` für Activate)  
-4. Aktivieren → `OaTkpPriceListActivationService` mit `archivePrevious=true` + YearLock  
+3. Prüfen (Admin-Endpoint; gleiche Paar-SoT wie Activate)  
+4. Aktivieren → **nur** `OaTkpPriceListActivationService` (+ YearLock; Admin mit `archivePrevious=true`)  
 5. Optional: aktive Revision ohne Nachfolger archivieren  
 6. Kein Hard-Delete
 
-Draft-Schreiben läuft ausschließlich über `OaTkpPriceListDraftImportGuard` (nicht am ActivationService vorbei).
+## Aktivierungsvalidierung (Admin = CLI)
 
-## Validierung Preismatrix
+Gemeinsam in `OaTkpPriceListActivationService::assertActivatable`:
 
-- Importer-Regeln: `list_tkp`/`minimum_tkp` > 0, max. 4 NK, `min ≤ list`, keine Duplikate, nur OA-Kernmedien  
-- Admin zusätzlich: Paare ∈ aktive InventoryMediumRules **oder** Fallback D4c-1-CSV (41 Paare)  
-- Activate Admin: **Vollständigkeit Pflicht** (CLI Activate bleibt ohne Matrix-Vollständigkeit – siehe offene Punkte)
+1. Es müssen **aktive** OA-`InventoryMediumRule`-Paare existieren (Kernmedien).  
+   Fehlen sie → **fail-closed** (kein CSV-/Dateifallback).
+2. Jedes Item: zulässiges Kernmedium, aktive Zuordnung, keine Duplikate,
+   `list_tkp`/`minimum_tkp` > 0, max. 4 NK, `min ≤ list`.
+3. Jedes erforderliche Paar muss in der Revision vorkommen (Vollständigkeit).
+4. Fehler → TX-Rollback; YearLock freigegeben; Historie/Active unverändert.
 
-## Rechte
-
-- Gate: `access-administration` → Rollen **Admin** und **Management** (wie Spot-Preislisten)  
-- **Offen:** Auftragstext „Nur Admins“ vs. Spot-Konvention inkl. Management  
-- Aktivierung derzeit dieselbe Gate-Stufe (keine separate Activate-Capability)
+Herkunft der „41er“-Matrix: operative Stammdaten (`inventory_medium_rules` ×
+`OaTkpCoreMedia`). Typisch 41 Paare nach Katalog/Matrix-Import – Anzahl folgt
+den aktiven Rules, nicht einer Readiness-CSV.
 
 ## Targeting revisionssicher
 
@@ -84,19 +101,19 @@ Draft-Schreiben läuft ausschließlich über `OaTkpPriceListDraftImportGuard` (n
 | Midroll | 80 | 20 |
 | DMP / Geo Aufschläge | 25/15 | 5/3 |
 
-Preisjahr **2027** priorisiert; keine Auto-Befüllung 2026/41 Inventare.
+Preisjahr **2027** priorisiert; keine Auto-Befüllung 2026/Inventare.
 
-## Offene Produktentscheidungen
+## Offene Produktentscheidungen (verbleibend)
 
-1. Admin-Rechte nur `Admin` oder weiterhin Admin+Management?  
-2. CLI-Activate ebenfalls auf 41er-Vollständigkeit vereinheitlichen?  
-3. Geo-Kategorie dauerhaft `technisch` oder Enum erweitern?  
-4. Inventar-Befüllung gleicher Medium-Grundpreis auf alle Stream-Inventare?  
-5. Separate Activate-Capability?
+1. Geo-Kategorie dauerhaft `technisch` oder Enum erweitern?  
+2. Inventar-Befüllung gleicher Medium-Grundpreis auf alle Stream-Inventare?  
+3. Management später lesend freigeben? (aktuell nein)
+
+Erledigt durch Review-Nachzug: Admin-only; CLI/Admin Activate-Konsistenz; kein CSV-Fallback.
 
 ## OUT
 
 - Admin-UI (D4c-4d)  
 - Produktiver Import / Activate auf Staging/Prod  
 - Registry `oa_tkp`/`tkp` → bleibt `planned`  
-- Engine-/Spot-/SWF-Änderungen (Regression erwartet grün)
+- Engine-/Spot-/SWF-Änderungen (Spot-Rechte unverändert)

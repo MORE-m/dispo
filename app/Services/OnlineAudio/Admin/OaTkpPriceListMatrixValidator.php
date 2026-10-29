@@ -11,10 +11,10 @@ use App\Support\OnlineAudio\OaTkpActiveMediumInventoryPairs;
 use App\Support\OnlineAudio\OaTkpCoreMedia;
 
 /**
- * PO-CALC-TKP-1D4c-4c: fachliche Matrix-Validierung für Admin (Zulässigkeit + Vollständigkeit).
+ * PO-CALC-TKP-1D4c-4c: fachliche Matrix-Validierung für Admin-Prüf-Endpoint.
  *
- * CLI-Importer bleibt unverändert; Admin Activate erzwingt zusätzlich Abdeckung
- * aller aktiven OA-Kern-Medium×Inventar-Paare.
+ * SoT der erforderlichen Paare = aktive InventoryMediumRules (wie ActivationService).
+ * Aktivierung selbst prüft erneut ausschließlich im ActivationService.
  */
 final class OaTkpPriceListMatrixValidator
 {
@@ -86,6 +86,13 @@ final class OaTkpPriceListMatrixValidator
         }
 
         $complete = $required !== [] && $missing === [] && $unexpected === [];
+        if ($requireComplete && $required === []) {
+            $errors[] = [
+                'line' => null,
+                'field' => 'items',
+                'message' => 'Keine aktiven OA-Medium×Inventar-Zuordnungen vorhanden; Aktivierung nicht zulässig.',
+            ];
+        }
         if ($requireComplete && ! $complete) {
             foreach ($missing as $pair) {
                 $errors[] = [

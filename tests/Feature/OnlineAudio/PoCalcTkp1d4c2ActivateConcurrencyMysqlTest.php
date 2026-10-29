@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Process\Process;
+use Tests\Concerns\EnsuresOaTkpInventoryMediumRules;
 use Tests\Support\MysqlTestDatabaseGuard;
 use Tests\TestCase;
 
@@ -32,6 +33,7 @@ use Tests\TestCase;
  */
 class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
 {
+    use EnsuresOaTkpInventoryMediumRules;
     use RefreshDatabase;
 
     private bool $skipBecauseNotMysql = false;
@@ -91,6 +93,7 @@ class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
     public function concurrent_activate_same_year_leaves_exactly_one_active(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         $guard = app(OaTkpPriceListDraftImportGuard::class);
         $guard->importDraftOnly([
             'year' => 2026,
@@ -143,6 +146,7 @@ class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
     public function concurrent_activate_same_revision_is_safe(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         app(OaTkpPriceListDraftImportGuard::class)->importDraftOnly([
             'year' => 2026,
             'revision_number' => 1,
@@ -170,6 +174,7 @@ class PoCalcTkp1d4c2ActivateConcurrencyMysqlTest extends TestCase
     public function concurrent_draft_import_and_activate_cannot_overwrite_active(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->ensureDefaultOaPriceListPairRule();
         app(OaTkpPriceListDraftImportGuard::class)->importDraftOnly([
             'year' => 2026,
             'revision_number' => 1,

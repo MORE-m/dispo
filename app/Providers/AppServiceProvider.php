@@ -82,6 +82,10 @@ class AppServiceProvider extends ServiceProvider
             return $user->canViewNotificationOutbox();
         });
 
+        Gate::define('manage-oa-tkp-master-data', function (User $user): bool {
+            return $user->canManageOaTkpMasterData();
+        });
+
         Gate::define('import-crm-accounts', function (User $user): bool {
             return $user->canImportCrmAccounts();
         });

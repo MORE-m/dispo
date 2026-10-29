@@ -22,7 +22,7 @@ class OaTkpPriceListAdminController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $status = (string) $request->query('status', 'all');
         $year = $request->query('year');
@@ -56,7 +56,7 @@ class OaTkpPriceListAdminController extends Controller
 
     public function show(OaTkpPriceList $oaTkpPriceList): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
         $oaTkpPriceList->load(['items.advertisingMedium:id,code,name', 'items.inventory:id,code,name']);
 
         return response()->json([
@@ -67,7 +67,7 @@ class OaTkpPriceListAdminController extends Controller
 
     public function store(Request $request, OaTkpPriceListAdminWriter $writer): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
         $this->rejectServerOwnedFields($request, forCreate: true);
 
         $validated = $request->validate([
@@ -100,7 +100,7 @@ class OaTkpPriceListAdminController extends Controller
         OaTkpPriceList $oaTkpPriceList,
         OaTkpPriceListAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
         $this->rejectServerOwnedFields($request, forCreate: false);
 
         $validated = $request->validate([
@@ -133,7 +133,7 @@ class OaTkpPriceListAdminController extends Controller
         OaTkpPriceList $oaTkpPriceList,
         OaTkpPriceListAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
         $requireComplete = $request->boolean('require_complete', true);
 
         return response()->json($writer->validate($oaTkpPriceList, $requireComplete));
@@ -144,7 +144,7 @@ class OaTkpPriceListAdminController extends Controller
         OaTkpPriceList $oaTkpPriceList,
         OaTkpPriceListAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'lock_version' => ['required', 'integer', 'min:1'],
@@ -180,7 +180,7 @@ class OaTkpPriceListAdminController extends Controller
         OaTkpPriceList $oaTkpPriceList,
         OaTkpPriceListAdminWriter $writer,
     ): JsonResponse {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $validated = $request->validate([
             'lock_version' => ['required', 'integer', 'min:1'],
@@ -197,7 +197,7 @@ class OaTkpPriceListAdminController extends Controller
 
     public function history(OaTkpPriceList $oaTkpPriceList): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         $events = AuditEvent::query()
             ->where('auditable_type', OaTkpPriceList::class)
@@ -225,7 +225,7 @@ class OaTkpPriceListAdminController extends Controller
 
     public function destroy(): JsonResponse
     {
-        $this->authorize('access-administration');
+        $this->authorize('manage-oa-tkp-master-data');
 
         return response()->json([
             'message' => 'Hard-Delete ist für OA-TKP-Preislisten nicht erlaubt.',

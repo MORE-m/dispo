@@ -214,14 +214,8 @@ final class OaTkpPriceListAdminWriter
             );
         }
 
-        $report = $this->matrix->validateStoredList($fresh, requireComplete: true);
-        if (! $report['valid']) {
-            throw new OaTkpStammdatenImportException(
-                'Aktivierung ungültig: Preismatrix unvollständig oder fehlerhaft.',
-                array_map(static fn (array $e): string => $e['message'], $report['errors']),
-            );
-        }
-
+        // Vollständigkeit/Zulässigkeit ausschließlich im ActivationService
+        // (identisch zu CLI); kein zweiter Aktivierungspfad.
         $before = $this->auditPayload($fresh);
         $result = $this->activation->activate(
             (int) $fresh->year,

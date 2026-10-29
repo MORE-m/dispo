@@ -315,53 +315,55 @@ Route::middleware(['auth'])->group(function () {
         Route::post('administration/produktionspreise/{productionPriceList}/kopieren', [ProductionPriceListAdminController::class, 'copy'])
             ->name('administration.production-prices.copy');
 
-        // PO-CALC-TKP-1D4c-4c: OA-TKP Admin-Backend (JSON, ohne UI)
-        Route::get('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'index'])
-            ->name('administration.oa-tkp.price-lists.index');
-        Route::post('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'store'])
-            ->name('administration.oa-tkp.price-lists.store');
-        Route::get('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'show'])
-            ->name('administration.oa-tkp.price-lists.show');
-        Route::put('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'update'])
-            ->name('administration.oa-tkp.price-lists.update');
-        Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/pruefen', [OaTkpPriceListAdminController::class, 'validateMatrix'])
-            ->name('administration.oa-tkp.price-lists.validate');
-        Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/aktivieren', [OaTkpPriceListAdminController::class, 'activate'])
-            ->name('administration.oa-tkp.price-lists.activate');
-        Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/archivieren', [OaTkpPriceListAdminController::class, 'archive'])
-            ->name('administration.oa-tkp.price-lists.archive');
-        Route::get('administration/online-audio/preislisten/{oaTkpPriceList}/historie', [OaTkpPriceListAdminController::class, 'history'])
-            ->name('administration.oa-tkp.price-lists.history');
-        Route::delete('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'destroy'])
-            ->name('administration.oa-tkp.price-lists.destroy');
+        // PO-CALC-TKP-1D4c-4c: OA-TKP Admin-Backend (JSON, ohne UI) – Admin-only
+        Route::middleware(['can:manage-oa-tkp-master-data'])->group(function () {
+            Route::get('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'index'])
+                ->name('administration.oa-tkp.price-lists.index');
+            Route::post('administration/online-audio/preislisten', [OaTkpPriceListAdminController::class, 'store'])
+                ->name('administration.oa-tkp.price-lists.store');
+            Route::get('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'show'])
+                ->name('administration.oa-tkp.price-lists.show');
+            Route::put('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'update'])
+                ->name('administration.oa-tkp.price-lists.update');
+            Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/pruefen', [OaTkpPriceListAdminController::class, 'validateMatrix'])
+                ->name('administration.oa-tkp.price-lists.validate');
+            Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/aktivieren', [OaTkpPriceListAdminController::class, 'activate'])
+                ->name('administration.oa-tkp.price-lists.activate');
+            Route::post('administration/online-audio/preislisten/{oaTkpPriceList}/archivieren', [OaTkpPriceListAdminController::class, 'archive'])
+                ->name('administration.oa-tkp.price-lists.archive');
+            Route::get('administration/online-audio/preislisten/{oaTkpPriceList}/historie', [OaTkpPriceListAdminController::class, 'history'])
+                ->name('administration.oa-tkp.price-lists.history');
+            Route::delete('administration/online-audio/preislisten/{oaTkpPriceList}', [OaTkpPriceListAdminController::class, 'destroy'])
+                ->name('administration.oa-tkp.price-lists.destroy');
 
-        Route::get('administration/online-audio/targetings', [OaTargetingAdminController::class, 'index'])
-            ->name('administration.oa-tkp.targetings.index');
-        Route::post('administration/online-audio/targetings', [OaTargetingAdminController::class, 'store'])
-            ->name('administration.oa-tkp.targetings.store');
-        Route::get('administration/online-audio/targetings/{oaTargetingDefinition}', [OaTargetingAdminController::class, 'show'])
-            ->name('administration.oa-tkp.targetings.show');
-        Route::post('administration/online-audio/targetings/{code}/revisionen', [OaTargetingAdminController::class, 'storeRevision'])
-            ->name('administration.oa-tkp.targetings.revisions.store');
-        Route::get('administration/online-audio/targetings/{oaTargetingDefinition}/historie', [OaTargetingAdminController::class, 'history'])
-            ->name('administration.oa-tkp.targetings.history');
+            Route::get('administration/online-audio/targetings', [OaTargetingAdminController::class, 'index'])
+                ->name('administration.oa-tkp.targetings.index');
+            Route::post('administration/online-audio/targetings', [OaTargetingAdminController::class, 'store'])
+                ->name('administration.oa-tkp.targetings.store');
+            Route::get('administration/online-audio/targetings/{oaTargetingDefinition}', [OaTargetingAdminController::class, 'show'])
+                ->name('administration.oa-tkp.targetings.show');
+            Route::post('administration/online-audio/targetings/{code}/revisionen', [OaTargetingAdminController::class, 'storeRevision'])
+                ->name('administration.oa-tkp.targetings.revisions.store');
+            Route::get('administration/online-audio/targetings/{oaTargetingDefinition}/historie', [OaTargetingAdminController::class, 'history'])
+                ->name('administration.oa-tkp.targetings.history');
 
-        Route::get('administration/online-audio/plattformen', [OaPlatformAdminController::class, 'index'])
-            ->name('administration.oa-tkp.platforms.index');
-        Route::post('administration/online-audio/plattformen', [OaPlatformAdminController::class, 'store'])
-            ->name('administration.oa-tkp.platforms.store');
-        Route::get('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'show'])
-            ->name('administration.oa-tkp.platforms.show');
-        Route::put('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'update'])
-            ->name('administration.oa-tkp.platforms.update');
-        Route::post('administration/online-audio/plattformen/{oaPlatform}/aktivieren', [OaPlatformAdminController::class, 'activate'])
-            ->name('administration.oa-tkp.platforms.activate');
-        Route::post('administration/online-audio/plattformen/{oaPlatform}/deaktivieren', [OaPlatformAdminController::class, 'deactivate'])
-            ->name('administration.oa-tkp.platforms.deactivate');
-        Route::get('administration/online-audio/plattformen/{oaPlatform}/historie', [OaPlatformAdminController::class, 'history'])
-            ->name('administration.oa-tkp.platforms.history');
-        Route::delete('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'destroy'])
-            ->name('administration.oa-tkp.platforms.destroy');
+            Route::get('administration/online-audio/plattformen', [OaPlatformAdminController::class, 'index'])
+                ->name('administration.oa-tkp.platforms.index');
+            Route::post('administration/online-audio/plattformen', [OaPlatformAdminController::class, 'store'])
+                ->name('administration.oa-tkp.platforms.store');
+            Route::get('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'show'])
+                ->name('administration.oa-tkp.platforms.show');
+            Route::put('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'update'])
+                ->name('administration.oa-tkp.platforms.update');
+            Route::post('administration/online-audio/plattformen/{oaPlatform}/aktivieren', [OaPlatformAdminController::class, 'activate'])
+                ->name('administration.oa-tkp.platforms.activate');
+            Route::post('administration/online-audio/plattformen/{oaPlatform}/deaktivieren', [OaPlatformAdminController::class, 'deactivate'])
+                ->name('administration.oa-tkp.platforms.deactivate');
+            Route::get('administration/online-audio/plattformen/{oaPlatform}/historie', [OaPlatformAdminController::class, 'history'])
+                ->name('administration.oa-tkp.platforms.history');
+            Route::delete('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'destroy'])
+                ->name('administration.oa-tkp.platforms.destroy');
+        });
 
         // PO-AUTH-SPECIAL-APPROVE-1: Sonderfreigaberecht (nur Admin, Gate im Controller)
         Route::get('administration/benutzer', [UserAdminController::class, 'index'])
