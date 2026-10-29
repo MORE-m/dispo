@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Policies\CalculationPolicy;
 use App\Policies\DispoOrderPolicy;
 use App\Policies\StandardOfferPolicy;
+use App\Services\OnlineAudio\Import\OaTkpPriceListYearLock;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // PO-CALC-TKP-1D4c-4c: eine Lock-Instanz pro Request, damit AdminWriter →
+        // DraftImportGuard / Activation denselben reentrant-Zustand teilen.
+        $this->app->singleton(OaTkpPriceListYearLock::class);
     }
 
     /**
@@ -77,6 +80,10 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('view-notification-outbox', function (User $user): bool {
             return $user->canViewNotificationOutbox();
+        });
+
+        Gate::define('manage-oa-tkp-master-data', function (User $user): bool {
+            return $user->canManageOaTkpMasterData();
         });
 
         Gate::define('import-crm-accounts', function (User $user): bool {

@@ -5,16 +5,19 @@ namespace App\Services\OnlineAudio\Import;
 use App\Enums\PriceListStatus;
 use App\Models\OaTkpPriceList;
 use App\Models\OaTkpPriceListItem;
+use App\Support\OnlineAudio\OaTkpActiveMediumInventoryPairs;
 use App\Support\OnlineAudio\OaTkpCoreMedia;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * PO-CALC-TKP-1D4c-2: Atomare Aktivierung einer OA-TKP-Draft-Revision.
+ * PO-CALC-TKP-1D4c-2 / 1D4c-4c: Atomare Aktivierung einer OA-TKP-Draft-Revision.
  *
  * Archivierung eines Vorgängers nur mit archivePrevious=true.
  * Keine Item-Änderungen, kein Löschen historischer Listen.
+ * Vollständigkeit: alle aktiven OA-InventoryMediumRules müssen abgedeckt sein
+ * (gemeinsam für CLI und Admin-API; kein CSV-Fallback).
  */
 final class OaTkpPriceListActivationService
 {
@@ -189,6 +192,8 @@ final class OaTkpPriceListActivationService
 
     private function assertActivatable(OaTkpPriceList $list): int
     {
+        $required = OaTkpActiveMediumInventoryPairs::requiredPairKeySetForActivation();
+
         $items = OaTkpPriceListItem::query()
             ->where('oa_tkp_price_list_id', $list->id)
             ->with(['advertisingMedium:id,code', 'inventory:id,code'])
@@ -225,6 +230,10 @@ final class OaTkpPriceListActivationService
             }
             $seen[$pair] = true;
 
+            if (! isset($required[$pair])) {
+                $errors[] = "Item {$line}: Medium×Inventar „{$pair}“ ist keine aktive OA-Zuordnung.";
+            }
+
             $listTkp = OaTkpImportDecimal::normalizePositive($item->list_tkp);
             $minimumTkp = OaTkpImportDecimal::normalizePositive($item->minimum_tkp);
             if ($listTkp === null) {
@@ -239,6 +248,12 @@ final class OaTkpPriceListActivationService
                 && OaTkpImportDecimal::compare($minimumTkp, $listTkp) > 0
             ) {
                 $errors[] = "Item {$line}: minimum_tkp darf list_tkp nicht überschreiten.";
+            }
+        }
+
+        foreach (array_keys($required) as $pair) {
+            if (! isset($seen[$pair])) {
+                $errors[] = "Preismatrix unvollständig: fehlendes Paar „{$pair}“.";
             }
         }
 

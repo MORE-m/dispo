@@ -291,16 +291,17 @@ Begründung: ohne duale Targeting-Felder kann Slice 2 den Fachvertrag nicht korr
 
 ---
 
-## 12. Slice-Status (nach D4c-4a)
+## 12. Slice-Status (nach D4c-4c)
 
 | Slice | Status |
 |---|---|
-| **1** Datenmodell + Importvertrag Mindest-Aufschlag | **umgesetzt** (Feature `feat/po-calc-tkp-1d4c4a-targeting-minimum-schema`, Dok `PO-CALC-TKP-1D4c4a-auftrag-2026-10-28.md`) – Engine/Under-Min/Snapshots noch OUT |
-| 2 Engine + effektives Min + Freigabe | offen |
-| 3–6 Admin / Befüllung / Registry | offen |
-
-**Wichtig:** Nach 4a speichert der Import `minimum_tkp_surcharge`, aber Engine und Sonderfreigabe nutzen ihn **noch nicht**.
+| **1** Datenmodell + Importvertrag Mindest-Aufschlag | **umgesetzt** (PR #196 / D4c-4a) |
+| **2** Engine + effektives Min + Freigabe | **umgesetzt** (PR #197 / D4c-4b, FD-D4c-4b) |
+| **3** Admin-Backend HTTP + Rechte + Audit | **umgesetzt** (Feature `feat/po-calc-tkp-1d4c4c-admin-backend`, Dok `PO-CALC-TKP-1D4c4c-auftrag-2026-10-29.md`) – UI OUT |
+| 4 Admin-UI | offen (D4c-4d) |
+| 5–6 Fachbefüllung / Registry | offen |
 
 ## 13. Statuszeile
 
-> D4c-4 Discovery: Ist-Engine kennt nur einen Targeting-Aufschlag und prüft Under-Min gegen Preislisten-Min ohne Targeting-Mins. Soll braucht Listen- + Mindest-Aufschlag und effektive Mindest-TKP. Admin-OA fehlt; Spot-Admin + Import/Activate wiederverwendbar. Slice 1 (4a) = Stammdaten/Import; Engine folgt in 4b.
+> D4c-4: Datenmodell (4a) + Engine/Gesamtmin (4b) + Admin-Backend JSON (4c) umgesetzt.
+> Admin-UI (4d), Fachbefüllung und Registry-Freigabe bleiben STOP.

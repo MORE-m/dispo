@@ -188,6 +188,15 @@ class User extends Authenticatable
         return $this->hasRole(Role::Admin);
     }
 
+    /**
+     * PO-CALC-TKP-1D4c-4c: OA-TKP-Stammdaten und Preisrevisionen ausschließlich Admin
+     * (Lesen und Schreiben; Management nicht, restriktive Variante).
+     */
+    public function canManageOaTkpMasterData(): bool
+    {
+        return $this->hasRole(Role::Admin);
+    }
+
     /** PO-BLP203-1 C1: CSV-Import anwenden. */
     public function canImportCrmAccounts(): bool
     {
