@@ -352,6 +352,11 @@ Unterobjekte werden typbezogen normalisiert:
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
   Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
   `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
+- **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
+  (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
+  `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit
+  nur fünf OA-Kernmedien). **Noch kein** operatives Enforcement im Writer/Wizard
+  (Folgeslices 4j-2ff.). Kein Backfill, keine Auto-Plattformen.
 - **PO-CALC-TKP-1D4c-4c Admin-Backend:** HTTP-JSON unter
   `administration/online-audio/{preislisten|targetings|plattformen}`; Schreiben
   über bestehende Importer/`DraftImportGuard`/`ActivationService` (kein zweites
