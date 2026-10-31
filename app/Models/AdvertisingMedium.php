@@ -81,4 +81,14 @@ class AdvertisingMedium extends Model
     {
         return $this->hasMany(AdvertisingMediumCalculationMethod::class);
     }
+
+    /**
+     * PO-CALC-TKP-1D4c-4j-1: OA-Plattform-Zuordnungen (noch ohne Writer-Enforce).
+     *
+     * @return HasMany<OaPlatformMediumRule, $this>
+     */
+    public function oaPlatformMediumRules(): HasMany
+    {
+        return $this->hasMany(OaPlatformMediumRule::class);
+    }
 }

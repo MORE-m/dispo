@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * PO-CALC-TKP-1A: Online-Audio-Plattform-Stammdatum (Mengenverteilung, nicht Preis-Key).
+ *
+ * Ab D4c-4j-1: Medium-Zuordnungen über {@see OaPlatformMediumRule} (noch ohne Writer-Enforce).
  *
  * @property int $id
  * @property string $code
@@ -35,6 +38,14 @@ class OaPlatform extends Model
             'sort' => 'integer',
             'is_adserver_relevant' => 'boolean',
         ];
+    }
+
+    /**
+     * @return HasMany<OaPlatformMediumRule, $this>
+     */
+    public function mediumRules(): HasMany
+    {
+        return $this->hasMany(OaPlatformMediumRule::class);
     }
 
     /**

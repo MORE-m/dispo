@@ -1,7 +1,15 @@
 # Fortschritt V1
 
-Stand: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4d** Feature-Branch
-`feat/po-calc-tkp-1d4c4d-admin-ui` (Base `db470f2` / PR #199):
+Stand: 31. Oktober 2026 – **PO-CALC-TKP-1D4c-4j-1** Feature-Branch
+`feat/po-calc-tkp-1d4c4j1-platform-medium-rules` (Base `391eaf4` / PR #200):
+Tabelle `oa_platform_medium_rules` (Platform × OA-Kernmedium, Soft-Deactivate),
+Model/Beziehungen, Helper `OaPlatformMediumRules` – **noch ohne** Writer-/Wizard-Enforce.
+Keine Plattformbefüllung, keine Admin-Matrix, Registry planned.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`,
+`docs/readiness/PO-CALC-TKP-1D4c4j-discovery-2026-10-30.md`.
+
+Stand davor: 29. Oktober 2026 – **PO-CALC-TKP-1D4c-4d** auf `main` (PR #200,
+Merge `391eaf4…`):
 OA-TKP-Adminoberfläche (Inertia) für Preislisten, Targetings, Plattformen;
 Hub-Modul **Online Audio** nur Admin (`manage-oa-tkp-master-data`);
 Mutationen über bestehenden 4c-JSON-Vertrag (Validate/Activate/Archive,
