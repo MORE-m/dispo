@@ -71,7 +71,7 @@ class AdministrationHubController extends Controller
                 [
                     'key' => 'online-audio',
                     'title' => 'Online Audio',
-                    'description' => 'OA-TKP-Preislisten, Targetings und Plattformen pflegen und Revisionen aktivieren (nur Admin).',
+                    'description' => 'OA-TKP-Preislisten, Targetings, Plattformen und Medienzuordnungen pflegen (nur Admin).',
                     'href' => $canManageOaTkp ? '/administration/online-audio' : null,
                     'available' => $canManageOaTkp,
                 ],

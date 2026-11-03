@@ -15,6 +15,7 @@ use App\Http\Controllers\Administration\InventoryMediumRuleAdminController;
 use App\Http\Controllers\Administration\NotificationOutboxAdminController;
 use App\Http\Controllers\Administration\OnlineAudio\OaAdminHubController;
 use App\Http\Controllers\Administration\OnlineAudio\OaPlatformAdminController;
+use App\Http\Controllers\Administration\OnlineAudio\OaPlatformMediumRuleAdminController;
 use App\Http\Controllers\Administration\OnlineAudio\OaTargetingAdminController;
 use App\Http\Controllers\Administration\OnlineAudio\OaTkpPriceListAdminController;
 use App\Http\Controllers\Administration\PriceListAdminController;
@@ -369,6 +370,15 @@ Route::middleware(['auth'])->group(function () {
                 ->name('administration.oa-tkp.platforms.history');
             Route::delete('administration/online-audio/plattformen/{oaPlatform}', [OaPlatformAdminController::class, 'destroy'])
                 ->name('administration.oa-tkp.platforms.destroy');
+
+            Route::get('administration/online-audio/plattform-medien', [OaPlatformMediumRuleAdminController::class, 'index'])
+                ->name('administration.oa-tkp.platform-medium-rules.index');
+            Route::put('administration/online-audio/plattform-medien', [OaPlatformMediumRuleAdminController::class, 'update'])
+                ->name('administration.oa-tkp.platform-medium-rules.update');
+            Route::get('administration/online-audio/plattform-medien/historie', [OaPlatformMediumRuleAdminController::class, 'history'])
+                ->name('administration.oa-tkp.platform-medium-rules.history');
+            Route::delete('administration/online-audio/plattform-medien', [OaPlatformMediumRuleAdminController::class, 'destroy'])
+                ->name('administration.oa-tkp.platform-medium-rules.destroy');
         });
 
         // PO-AUTH-SPECIAL-APPROVE-1: Sonderfreigaberecht (nur Admin, Gate im Controller)

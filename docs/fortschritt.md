@@ -1,6 +1,15 @@
 # Fortschritt V1
 
-Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-1** auf `main` (PR **#204**,
+Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-2/3** Feature-Branch
+`feat/po-calc-tkp-1d4c4j23-platform-medium-admin` (Base `607fd60`, PR #205):
+Admin-only Matrix Plattform × fünf OA-Kernmedien (GET/PUT, `revision_token`,
+409 bei Drift, Soft-Deactivate, Audit, Historie, DELETE 405, Inertia + Hub-Karte).
+**Kein** Resolver-Enforcement, **keine** Fachdaten, **kein** Wizard-Filter,
+Registry `oa_tkp`/`tkp` bleibt `planned`, `dispo_mat_core` nicht migriert.
+Kanonisch weiter: **4j-4** Fachdaten → **4j-5** Enforcement → **4j-6** Wizard/E2E.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`.
+
+Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-1** auf `main` (PR **#204**,
 Merge-Commit `495499a7a409ddc3bfd8ea7f6c31473d402be899`; Feature-HEAD
 `2e6db748a3a57f801d189514aa13e919c7420760`; Post-Merge-CI
 [`41199774870`](https://github.com/MORE-m/dispo/actions/runs/41199774870) success):

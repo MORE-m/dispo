@@ -84,7 +84,12 @@ class PoCalcTkp1d4c4dAdminUiTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('administration/online-audio/index')
-                ->has('sections', 3));
+                ->has('sections', 4)
+                ->where('sections.0.key', 'price-lists')
+                ->where('sections.1.key', 'targetings')
+                ->where('sections.2.key', 'platforms')
+                ->where('sections.3.key', 'platform-medium-rules')
+                ->where('sections.3.title', 'Plattform × Medium'));
 
         $this->actingAs($management)
             ->get(route('administration.oa-tkp.hub'))
@@ -95,6 +100,8 @@ class PoCalcTkp1d4c4dAdminUiTest extends TestCase
             'administration.oa-tkp.price-lists.create',
             'administration.oa-tkp.targetings.index',
             'administration.oa-tkp.platforms.index',
+            'administration.oa-tkp.platform-medium-rules.index',
+            'administration.oa-tkp.platform-medium-rules.history',
         ] as $routeName) {
             $this->actingAs($admin)
                 ->get(route($routeName))
