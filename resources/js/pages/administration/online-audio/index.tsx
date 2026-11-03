@@ -23,7 +23,7 @@ export default function OnlineAudioAdminHub({
             >
                 <PageHeader
                     title="Online Audio"
-                    description="TKP-Stammdaten: Preislisten, Targetings und Plattformen (Admin-only)."
+                    description="TKP-Stammdaten: Preislisten, Targetings, Plattformen und Medienzuordnungen (Admin-only)."
                     actions={
                         <Button variant="outline" asChild>
                             <Link href="/administration">Administration</Link>

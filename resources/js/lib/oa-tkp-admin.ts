@@ -184,3 +184,81 @@ export function firstApiError(
 
     return result.message ?? fallback;
 }
+
+export type OaPlatformMediumCell = {
+    medium_code: string;
+    advertising_medium_id: number;
+    is_active: boolean;
+    rule_id: number | null;
+};
+
+export type OaPlatformMediumRow = {
+    id: number;
+    code: string;
+    name: string;
+    is_active: boolean;
+    sort: number;
+    cells: OaPlatformMediumCell[];
+};
+
+export type OaPlatformMediumSaveCell = {
+    oa_platform_id: number;
+    medium_code: string;
+    is_active: boolean;
+};
+
+export function platformMediumSnapshot(
+    platforms: OaPlatformMediumRow[],
+): string {
+    return JSON.stringify(
+        platforms.map((platform) => ({
+            id: platform.id,
+            cells: platform.cells.map((cell) => ({
+                medium_code: cell.medium_code,
+                is_active: cell.is_active,
+            })),
+        })),
+    );
+}
+
+export function isPlatformMediumMatrixDirty(
+    loaded: OaPlatformMediumRow[],
+    edited: OaPlatformMediumRow[],
+): boolean {
+    return platformMediumSnapshot(loaded) !== platformMediumSnapshot(edited);
+}
+
+export function isPlatformMediumMatrixEmpty(
+    platforms: OaPlatformMediumRow[],
+): boolean {
+    return platforms.length === 0;
+}
+
+export function platformMediumHeaders(
+    media: Array<{ code: string; name: string }>,
+): string[] {
+    return media.map((medium) => medium.name);
+}
+
+export function platformMediumAriaLabel(
+    platformName: string,
+    mediumName: string,
+): string {
+    return `${platformName}, ${mediumName}`;
+}
+
+export function buildPlatformMediumSavePayload(
+    revisionToken: string,
+    platforms: OaPlatformMediumRow[],
+): { revision_token: string; cells: OaPlatformMediumSaveCell[] } {
+    return {
+        revision_token: revisionToken,
+        cells: platforms.flatMap((platform) =>
+            platform.cells.map((cell) => ({
+                oa_platform_id: platform.id,
+                medium_code: cell.medium_code,
+                is_active: cell.is_active,
+            })),
+        ),
+    };
+}

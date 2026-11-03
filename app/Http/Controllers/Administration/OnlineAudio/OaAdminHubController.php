@@ -36,6 +36,12 @@ class OaAdminHubController extends Controller
                     'description' => 'Plattformen anlegen, bearbeiten und aktivieren/deaktivieren.',
                     'href' => route('administration.oa-tkp.platforms.index'),
                 ],
+                [
+                    'key' => 'platform-medium-rules',
+                    'title' => 'Plattform × Medium',
+                    'description' => 'Zulässige OA-Kernmedien je Plattform pflegen.',
+                    'href' => route('administration.oa-tkp.platform-medium-rules.index'),
+                ],
             ],
         ]);
     }
