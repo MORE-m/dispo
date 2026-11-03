@@ -431,11 +431,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   1D-/D3-/D4c-Slices (Stammdaten, Engine/Writer hinter Registry-Gate, Dispo-Pfad,
   Import-CLI, Effective-Minimum, Admin für Preislisten/Targetings/Plattformen)
   sowie **4j-1** Platform×Medium-Regelmodell (PR **#204**, Merge
-  `495499a7…`). **4j-2/3** Admin-Matrix (Backend + Inertia) auf Feature-Branch
-  `feat/po-calc-tkp-1d4c4j23-platform-medium-admin`, noch nicht gemergt.
+  `495499a7…`) und **4j-2/3** Admin-Matrix (PR **#206**, Merge `ad5161c…`).
+  **4j-4** fachlich freigegeben (PO 03.11.2026: Midroll-Trio inaktiv → Midroll-Rules
+  → aktivieren); Umsetzung erst nach grüner Post-Merge-CI #206.
   Registry `oa_tkp`/`tkp` bleibt `planned`.
-- **Weiter offen:** **4j-4** fachliche Plattform-/Rule-Daten, **4j-5** Enforcement,
-  **4j-6** Wizard-Filter/Cleanup/E2E; produktive Rule-Basis; Registry-Release;
+- **Weiter offen:** **4j-4a/4j-4b** Umsetzung, Stream-/Influencer-Plattformen,
+  **4j-5** Enforcement, **4j-6** Wizard-Filter/Cleanup/E2E; Registry-Release;
   produktive OA-TKP-Freigabe. Kanonische Reihenfolge ab 03.11.2026:
   `4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`.
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Mengenverteilung, Targeting produktiv

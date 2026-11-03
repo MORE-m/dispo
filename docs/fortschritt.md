@@ -1,12 +1,21 @@
 # Fortschritt V1
 
-Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-2/3** Feature-Branch
-`feat/po-calc-tkp-1d4c4j23-platform-medium-admin` (Base `607fd60`, PR #205):
+Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-4** fachlich freigegeben
+(Midroll-Plattformen Spotify/YouTube/Deezer; Codes `spotify`/`youtube`/`deezer`;
+4j-4a inaktiv importieren; 4j-4b nur Midroll-Rules, danach aktivieren).
+Umsetzung **gesperrt**, bis Post-Merge-CI PR #206
+[`41666294818`](https://github.com/MORE-m/dispo/actions/runs/41666294818)
+vollständig grün ist. **Kein** Enforcement (4j-5), kein Wizard, Registry `planned`,
+keine Datenmutation in diesem Docs-Stand.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`.
+
+Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-2/3** auf `main`
+(PR **#206**, Merge-Commit `ad5161c0d6ff0958c6833aebbcc038d5557e2ca9`;
+Feature-HEAD `b79601f83cba3210878210212cd0beb6a4a2f4ec`):
 Admin-only Matrix Plattform × fünf OA-Kernmedien (GET/PUT, `revision_token`,
 409 bei Drift, Soft-Deactivate, Audit, Historie, DELETE 405, Inertia + Hub-Karte).
-**Kein** Resolver-Enforcement, **keine** Fachdaten, **kein** Wizard-Filter,
+**Kein** Resolver-Enforcement, **keine** Fachdaten (bis 4j-4), **kein** Wizard-Filter,
 Registry `oa_tkp`/`tkp` bleibt `planned`, `dispo_mat_core` nicht migriert.
-Kanonisch weiter: **4j-4** Fachdaten → **4j-5** Enforcement → **4j-6** Wizard/E2E.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`.
 
 Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-1** auf `main` (PR **#204**,
