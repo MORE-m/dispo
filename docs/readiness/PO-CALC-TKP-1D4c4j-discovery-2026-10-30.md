@@ -6,6 +6,14 @@ siehe `PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`.
 Git (Discovery-Basis): `391eaf440a0ae4b0c7ae2fcc088b890d629cd067` (`origin/main`)  
 DB: `dispo_mat_core` – Preisliste 2027.1 Draft (41), Targetings dmp/geo, Plattformen **0**, Registry **`planned`**
 
+**Nachtrag 03.11.2026 – Nummerierung:** 4j-1 ist auf `main` (PR **#204**,
+Merge `495499a7a409ddc3bfd8ea7f6c31473d402be899`). Die Slice-Nummern in §9 sind
+der Discovery-Stand vom 30.10. und **historisch überholt**. Ab 03.11.2026 gilt
+verbindlich die Nummerierung aus dem 4j-1-Auftrag: **4j-2** Admin-Backend,
+**4j-3** Admin-UI, **4j-4** fachliche Befüllung, **4j-5** Enforcement,
+**4j-6** Wizard/E2E. Die fachliche Empfehlung bleibt: Admin und ausreichend
+befüllte Rule-Basis vor fail-closed Enforcement (`4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`).
+
 **FD-D4c-4j (verbindlich):** Plattformen sind werbeformabhängig. Auswahl und Persistenz nur bei aktiver, fachlich gültiger Zuordnung Platform × OA-Kernmedium.
 
 **STOP (Discovery):** keine Plattformanlage, keine Aktivierung, kein Deploy, kein Registry-Flip.
@@ -230,7 +238,11 @@ Keine Ableitung aus E2E-Seeder (`spotify`/`youtube`/`deezer` nur Test).
 
 ---
 
-## 9. Priorisierter Implementierungsplan (Slices)
+## 9. Priorisierter Implementierungsplan (Slices) — Discovery-Stand 30.10.
+
+Die Tabelle und die Reihenfolge darunter sind der ursprüngliche Discovery-Vorschlag.
+Sie sind **nicht** der aktuelle Auftragsplan. Kanonisch ab 03.11.2026: siehe Nachtrag
+am Dokumentanfang und `PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`.
 
 | Slice | Inhalt | Abhängigkeit | Migration | Risiko |
 |---|---|---|---|---|

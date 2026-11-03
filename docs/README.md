@@ -37,7 +37,9 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`entscheidungen/`](entscheidungen/) | Architecture Decision Records (ADR) |
 | [`entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md`](entscheidungen/PO-GOLIVE-CUT-1-DEC-operative-v1.md) | Operative V1 Medien-/Stufenpriorisierung (akzeptiert für Projektpriorisierung) |
 | [`readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md`](readiness/PO-SPOT-SURCHARGE-1-auftrag-2026-10-18.md) | Erst-/Letztplatzierung (auf `main`, PR #160) |
-| [`readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md`](readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md) | Single-Spot +50 % (Draft-PR PO-SPOT-SINGLE-1) |
+| [`readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md`](readiness/PO-SPOT-SINGLE-1-auftrag-2026-10-18.md) | Single-Spot +50 % (auf `main`, PR #161) |
+| [`readiness/PO-CALC-TKP-1D4c4j-discovery-2026-10-30.md`](readiness/PO-CALC-TKP-1D4c4j-discovery-2026-10-30.md) | OA Platform×Medium Discovery; §9-Nummern historisch (PO 03.11.2026) |
+| [`readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`](readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md) | 4j-1 Datenmodell auf `main` (PR #204); kanonische Folgeslices |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |

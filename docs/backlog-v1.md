@@ -138,8 +138,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Akzeptanz:** keine erfundenen Default-Grenzen; `null` bedeutet keine persönliche Grenze
 - **Tests:** Pest Lesen der Markierung berechtigt vs. Grenze überschritten; Flag-Policy siehe PO-AUTH-SPECIAL-APPROVE-1
 - **Hinweis PO-GOLIVE-CUT-1-DEC Stufe 2 / PO-USER-ADMIN-1:** Minimale Benutzer-Admin-UI
-  (Anlegen/Rolle/Rabattgrenze/Aktivstatus/Sonderflag) als Feature-Branch/Draft-PR;
-  Sonderfreigabe weiterhin über bestehenden Writer. Kein AUTH-005-Ausbau. Dok
+  (Anlegen/Rolle/Rabattgrenze/Aktivstatus/Sonderflag) auf `main` (PR **#164**);
+  Sonderfreigabe weiterhin über bestehenden Writer. Kein AUTH-005-Ausbau, kein Deploy. Dok
   `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`.
 
 ### BL-P1-04 – Append-only-Audit
@@ -309,7 +309,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 4
 - **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; **Inventarauswahl einklappbar** PR **#112**; Rest offen: Abbinder/SPT-013, operative Blockplanung; REP-007 Dispo-PDF = Phase 10)
-- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** **PO-SPOT-SURCHARGE-1** auf `main` (PR #160, Erst/Letzt +30 %); **PO-SPOT-SINGLE-1** Draft-PR (Single +50 %, MAT-003 5/3). Promo nicht still in denselben Slice ziehen.
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** **PO-SPOT-SURCHARGE-1** auf `main` (PR #160, Erst/Letzt +30 %); **PO-SPOT-SINGLE-1** auf `main` (PR **#161**, Single +50 %, MAT-003 5/3). Promo nicht still in denselben Slice ziehen.
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
 - **Ergebnis 02a (`main`, PR #56):** Methodenwechsel bei unverändertem Inventar/Preisjahr behält historischen Preislisten-Pin; AT-01/03/23/24 gezielt gehärtet
@@ -319,7 +319,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 02e (`main`, PR #61, manuell abgenommen):** `component_profile` am Werbemittel + Positions-Freeze; Tandem/Tridem mit Reminder-Rollen; verbindlich `shared_total_length` (kein `individual`); Rechenweg ohne ×2/×3; Einheiten vs. abgeleitete Ausstrahlungen; Average+Calendar+02d; **SPT-012 erledigt**; SPT-013 teilweise (Abbinder bewusst zurückgestellt)
 - **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
 - **Ergebnis Inventar-UI (PR #112, `012e125…`; Post-Merge-CI `36924662513` grün inkl. Inventar-Smoke):** nach erfolgreicher Inventarwahl klappen übrige Kacheln ein; „Anderes Inventar wählen“ klappt auf; Inventare ohne kalkulierbares Medium nicht wählbar; a11y/`motion-reduce`
-- **Ergebnis PO-SPOT-SINGLE-1 (Draft-PR):** `spot_single` × `spot_classic` +50 %; MAT-003 (5 erlaubt / 3 ausgeschlossen); Average/Calendar; fail-closed; Snapshots; Produktion OUT; SPT-010 Hinweis nur für Single
+- **Ergebnis PO-SPOT-SINGLE-1 (`main`, PR #161):** `spot_single` × `spot_classic` +50 %; MAT-003 (5 erlaubt / 3 ausgeschlossen); Average/Calendar; fail-closed; Snapshots; Produktion OUT; SPT-010 Hinweis nur für Single
 - **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10 (Interim-Nachweis laut CUT-1-DEC: Dispo-Detail + SPT-008); MAT-003-Hinweistexte/Vollabnahme separat
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
@@ -369,7 +369,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **PO-ALLONGE-1** auf `main` PR #142 + lokal eingerichtet;
   **PO-SWF-PROMO-1** auf `main` PR #163 (Promo × Average); Paket nicht erledigt; Deploy offen)
 - **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Promo gemergt; weitere SWF → Stufe 3 / separate Readiness;
-  nächster operativer Slice Stufe 2: **PO-USER-ADMIN-1** (Draft-PR)
+  **PO-USER-ADMIN-1** auf `main` (PR **#164**); Stufe-2-Rest weiter offen
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
 - **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
@@ -391,8 +391,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **PO-SWF-PROMO-1 (`main` PR #163):** Promo/Moderation × Average, Profil `swf_promo`,
   Initial 20 s / +50 %, vier Matrix-Inventare, kein Confirm-Feld, Calendar/Settlement/Produktion OUT;
   `BL-P5-01` bleibt teilweise; Dok `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`
-- **PO-USER-ADMIN-1 (Feature-Branch / Draft-PR):** minimale Benutzer-Admin-UI; siehe Readiness
-  `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`
+- **PO-USER-ADMIN-1 (`main`, PR #164):** minimale Benutzer-Admin-UI; siehe Readiness
+  `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`. Kein Deploy.
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
 - **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
 
@@ -424,12 +424,23 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P6-01 – Online Audio TKP
 
 - **Phase:** 6
-- **Status:** offen
+- **Status:** teilweise (Unterbau auf `main`; produktiv nicht freigegeben)
 - **Anforderungen:** `OA-001` bis `OA-009`
 - **Abhängigkeiten:** BL-P4-01
-- **Ergebnis:** TKP, Mengenverteilung, Targeting
+- **Umgesetzt (nicht „Online Audio fertig“):** OA-TKP-Unterbau der gemergten
+  1D-/D3-/D4c-Slices (Stammdaten, Engine/Writer hinter Registry-Gate, Dispo-Pfad,
+  Import-CLI, Effective-Minimum, Admin für Preislisten/Targetings/Plattformen)
+  sowie **4j-1** Platform×Medium-Regelmodell (PR **#204**, Merge
+  `495499a7…`). Registry `oa_tkp`/`tkp` bleibt `planned`.
+- **Weiter offen:** **4j-2** Admin-Backend Rules, **4j-3** Admin-UI-Matrix,
+  **4j-4** fachliche Plattform-/Rule-Daten, **4j-5** Enforcement,
+  **4j-6** Wizard-Filter/Cleanup/E2E; produktive Rule-Basis; Registry-Release;
+  produktive OA-TKP-Freigabe. Kanonische Reihenfolge ab 03.11.2026:
+  `4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`.
+- **Ergebnis (Ziel, noch nicht erreicht):** TKP, Mengenverteilung, Targeting produktiv
 - **Akzeptanz:** `AT-08`, `AT-09` (Speichern vs. Übergabe)
-- **Tests:** Pest Mindest-TKP gegen Basis-TKP
+- **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
+  `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
 
 ### BL-P6-02 – Social Media und Events
 

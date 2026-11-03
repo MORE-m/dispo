@@ -1,6 +1,8 @@
 # PO-USER-ADMIN-1 – Minimale Benutzer-Admin-UI
 
-Stand: 19. Oktober 2026 · Feature-Branch · Draft-PR · **kein** Merge · **kein** Deploy
+Stand zum Auftrag: 19. Oktober 2026 · Feature-Branch · damals Draft-PR · **kein** Deploy
+
+**Nachzug:** gemergt als PR **#164** (19.10.2026). Kein Deploy. Der übrige Auftragstext bleibt der damalige Scope.
 
 ## Ziel
 
