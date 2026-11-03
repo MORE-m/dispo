@@ -177,6 +177,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   (ohne Writer-Enforce). Tests: `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
   (SQLite + MySQL). Registry planned. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`.
+- **D4c-4j-2/3:** Admin-Matrix Plattform × Kernmedium (GET/PUT, `revision_token`,
+  409, Soft-Deactivate, Audit, DELETE 405, Inertia/Hub). Tests:
+  `PoCalcTkp1d4c4j2PlatformMediumRuleAdminTest` (SQLite + MySQL),
+  Regression `PoCalcTkp1d4c4dAdminUiTest`, Vitest `oa-tkp-admin.test.ts`.
+  Kein Resolver-Enforce, Registry planned. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

@@ -472,9 +472,14 @@ Unterbereiche:
    Preisanpassungen als neue Revision; Geo unter Kategorie `technisch`.
 3. **Plattformen** – Anlegen/Bearbeiten/Aktivieren/Deaktivieren; keine Preise;
    kein Auto-Anlegen von Spotify/YouTube/Deezer.
+4. **Plattform × Medium** (4j-2/3) – volle Matrix je Plattform und fünf
+   OA-Kernmedien; Speichern ersetzt den gewünschten Aktivstatus (Soft-Deactivate,
+   kein Hard-Delete); `revision_token` mit 409 bei paralleler Änderung.
+   Wirkt nicht auf Kalkulation, Wizard oder Preise.
 
-Schreiben läuft ausschließlich über den D4c-4c-Backend-Vertrag (keine parallele
-Client-Validierung als Freigabe). Registry `oa_tkp`/`tkp` bleibt `planned`.
+Schreiben von Preislisten, Targetings und Plattformen läuft über den
+D4c-4c-Backend-Vertrag. Die Medienmatrix hat einen eigenen Admin-PUT und ändert
+weder Preise noch die Registry. Registry `oa_tkp`/`tkp` bleibt `planned`.
 
 ## Abschlussbedingungen
 

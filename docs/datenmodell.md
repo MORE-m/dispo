@@ -355,8 +355,9 @@ Unterobjekte werden typbezogen normalisiert:
 - **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
   (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
   `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit
-  nur fünf OA-Kernmedien). **Noch kein** operatives Enforcement im Writer/Wizard
-  (Folgeslices 4j-2ff.). Kein Backfill, keine Auto-Plattformen.
+  nur fünf OA-Kernmedien). **4j-2/3:** Admin-Matrix (Full-PUT, `revision_token`,
+  Soft-Deactivate, Audit) ohne Schemaänderung. **Noch kein** operatives Enforcement
+  im Writer/Wizard (4j-5). Kein Backfill, keine Auto-Plattformen.
 - **PO-CALC-TKP-1D4c-4c Admin-Backend:** HTTP-JSON unter
   `administration/online-audio/{preislisten|targetings|plattformen}`; Schreiben
   über bestehende Importer/`DraftImportGuard`/`ActivationService` (kein zweites
