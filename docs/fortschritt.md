@@ -1,10 +1,16 @@
 # Fortschritt V1
 
-Stand: 31. Oktober 2026 – **PO-CALC-TKP-1D4c-4j-1** Feature-Branch
-`feat/po-calc-tkp-1d4c4j1-platform-medium-rules` (Base `391eaf4` / PR #200):
+Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-1** auf `main` (PR **#204**,
+Merge-Commit `495499a7a409ddc3bfd8ea7f6c31473d402be899`; Feature-HEAD
+`2e6db748a3a57f801d189514aa13e919c7420760`; Post-Merge-CI
+[`41199774870`](https://github.com/MORE-m/dispo/actions/runs/41199774870) success):
 Tabelle `oa_platform_medium_rules` (Platform × OA-Kernmedium, Soft-Deactivate),
-Model/Beziehungen, Helper `OaPlatformMediumRules` – **noch ohne** Writer-/Wizard-Enforce.
-Keine Plattformbefüllung, keine Admin-Matrix, Registry planned.
+Model/Beziehungen, Helper `OaPlatformMediumRules`. **Kein** Writer-/Wizard-Enforce,
+**keine** Plattform-/Rule-Fachdaten, **keine** Platform×Medium-Admin-Matrix.
+Registry `oa_tkp`/`tkp` bleibt `planned`. `dispo_mat_core` für 4j-1 nicht migriert.
+Kanonische Folgeslices (PO 03.11.2026): **4j-2** Admin-Backend → **4j-3** Admin-UI →
+**4j-4** Fachdaten → **4j-5** Enforcement → **4j-6** Wizard/E2E. PR #200 ist der
+Merge von **4d**, nicht von 4j-1.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`,
 `docs/readiness/PO-CALC-TKP-1D4c4j-discovery-2026-10-30.md`.
 
@@ -271,7 +277,7 @@ Folgeslice. Phase 4/5 auf `main` (Deploy offen).
 
 ## Aktuelle Aufgabe
 
-**PO-USER-ADMIN-1 (19. Oktober 2026):** minimale Benutzer-Admin-UI – Draft-PR, kein Merge/Deploy.
+**PO-USER-ADMIN-1 (19. Oktober 2026):** minimale Benutzer-Admin-UI auf `main` (PR #164). Kein Deploy.
 Stufe 2 bleibt darüber hinaus offen (Preis-/Katalogvalidierung, Betrieb/E2E-Vorbereitung).
 
 **PO-SWF-PROMO-1 (19. Oktober 2026):** Promo auf `main` (PR #163). Contest/Event-Tipp/weitere SWF nicht begonnen. `BL-P5-01` bleibt teilweise.

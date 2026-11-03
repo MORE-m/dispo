@@ -26,3 +26,5 @@ mit Fachaufschlag **+50 %**. Keine neue Engine.
 ## Out
 
 Promo, Contest, Event-Tipp, Abbinder, Showsponsoring-Single, Produktionsfreigabe Single, Deploy, Merge
+
+**Nachzug:** gemergt als PR **#161** (18.10.2026). „Merge“ in der Out-Zeile ist der damalige Auftrag, nicht der aktuelle Status. Kein Deploy.
