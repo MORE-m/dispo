@@ -185,8 +185,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `docs/readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`.
 - **D4c-4j-4a:** Lieferdatei auf `main` (PR #208); lokal auf `dispo_mat_core`
   Schema 4j-1 + drei inaktive Plattformen (`spotify`/`youtube`/`deezer`).
-  Rules weiterhin 0; keine Aktivierung; 4j-5 gesperrt. Dok:
+  Rules damals 0; keine Aktivierung. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`.
+- **D4c-4j-4b:** lokal auf `dispo_mat_core` nach PR #209: drei aktive Midroll-Rules
+  + Aktivierung Spotify/YouTube/Deezer via Admin-HTTP; Stream-/Influencer 0;
+  4j-5 gesperrt; Registry planned. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

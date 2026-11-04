@@ -1,6 +1,18 @@
 # Fortschritt V1
 
-Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** lokal auf `dispo_mat_core`
+Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4b** lokal auf `dispo_mat_core`
+(nach PR **#209**, Merge `5dfa646…`; Post-Merge-CI
+[`41831598822`](https://github.com/MORE-m/dispo/actions/runs/41831598822) success):
+drei Midroll-Rules aktiv (Spotify/YouTube/Deezer × `midroll_music_environment`);
+drei Plattformen aktiv (`is_adserver_relevant=false`); Audit vorhanden;
+Admin-Matrix bestätigt. Backup
+`local-backups/po-calc-tkp-1d4c4j4b-20261104-144510/` (nicht in Git).
+**Kein** Deploy, **kein** 4j-5, Stream-/Influencer-Rules offen, Registry `planned`.
+Nächster fachlicher Schritt: **PO-Entscheidung** zu den vier offenen
+Stream-/Influencer-Medien (nicht 4j-5).
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
+
+Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** lokal auf `dispo_mat_core`
 eingerichtet (nach PR **#208**, Merge `6e0688d…`; Post-Merge-CI
 [`41815398103`](https://github.com/MORE-m/dispo/actions/runs/41815398103) success):
 4j-1-Schema `oa_platform_medium_rules` migriert; drei inaktive Plattformen
@@ -8,7 +20,7 @@ eingerichtet (nach PR **#208**, Merge `6e0688d…`; Post-Merge-CI
 Rules = 0; Admin-Matrix zeigt drei Inaktiv-Zeilen ohne Cells. Backup
 `local-backups/po-calc-tkp-1d4c4j4a-20261104-124313/` (nicht in Git).
 **Kein** Deploy, **keine** Midroll-Rules, **keine** Aktivierung, **kein** 4j-5,
-Registry `planned`. Nächster Slice: **4j-4b**.
+Registry `planned`. Nächster Slice war damals **4j-4b**.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`.
 
 Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** Repo-Vertrag auf `main`
