@@ -432,13 +432,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Import-CLI, Effective-Minimum, Admin für Preislisten/Targetings/Plattformen)
   sowie **4j-1** Platform×Medium-Regelmodell (PR **#204**, Merge
   `495499a7…`) und **4j-2/3** Admin-Matrix (PR **#206**, Merge `ad5161c…`).
-  **4j-4** fachlich freigegeben (PO 03.11.2026 / PR **#207**). **4j-4a** Repo-Vertrag
-  (Lieferdatei inaktiv Spotify/YouTube/Deezer) auf Feature-Branch; Datenmutation
-  und Schema-Migrate auf `dispo_mat_core` noch **nicht** erfolgt.
+  **4j-4** fachlich freigegeben (PO 03.11.2026 / PR **#207**). **4j-4a** Repo auf
+  `main` (PR **#208**) und lokal auf `dispo_mat_core`: Schema 4j-1 + drei inaktive
+  Plattformen (`spotify`/`youtube`/`deezer`); Rules weiterhin 0.
   Registry `oa_tkp`/`tkp` bleibt `planned`.
-- **Weiter offen:** **4j-4a** operativer Datenlauf, **4j-4b** Midroll-Rules + Aktivierung,
-  Stream-/Influencer-Plattformen, **4j-5** Enforcement, **4j-6** Wizard-Filter/Cleanup/E2E;
-  Registry-Release; produktive OA-TKP-Freigabe. Kanonische Reihenfolge ab 03.11.2026:
+- **Weiter offen:** **4j-4b** Midroll-Rules + Aktivierung, Stream-/Influencer-Plattformen,
+  **4j-5** Enforcement, **4j-6** Wizard-Filter/Cleanup/E2E; Registry-Release;
+  produktive OA-TKP-Freigabe. Kanonische Reihenfolge ab 03.11.2026:
   `4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`.
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Mengenverteilung, Targeting produktiv
 - **Akzeptanz:** `AT-08`, `AT-09` (Speichern vs. Übergabe)

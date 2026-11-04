@@ -1,12 +1,20 @@
 # Fortschritt V1
 
-Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** Repo-Vertrag auf Feature-Branch
-`feat/po-calc-tkp-1d4c4j4a-platform-base-data` (Base `3ab7b41…`, PR #207):
-versionierte Lieferdatei für Spotify/YouTube/Deezer
-(`spotify`/`youtube`/`deezer`, Sort 10/20/30, `is_active=false`,
-`is_adserver_relevant=false`). **Keine** Migration, **kein** echter Import,
-`dispo_mat_core` unverändert (`oa_platforms` = 0; Rules-Tabelle dort noch nicht
-migriert). 4j-4b und 4j-5 weiterhin offen bzw. gesperrt. Registry `planned`.
+Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** lokal auf `dispo_mat_core`
+eingerichtet (nach PR **#208**, Merge `6e0688d…`; Post-Merge-CI
+[`41815398103`](https://github.com/MORE-m/dispo/actions/runs/41815398103) success):
+4j-1-Schema `oa_platform_medium_rules` migriert; drei inaktive Plattformen
+`spotify` / `youtube` / `deezer` importiert (`is_adserver_relevant=false`);
+Rules = 0; Admin-Matrix zeigt drei Inaktiv-Zeilen ohne Cells. Backup
+`local-backups/po-calc-tkp-1d4c4j4a-20261104-124313/` (nicht in Git).
+**Kein** Deploy, **keine** Midroll-Rules, **keine** Aktivierung, **kein** 4j-5,
+Registry `planned`. Nächster Slice: **4j-4b**.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`.
+
+Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** Repo-Vertrag auf `main`
+(PR **#208**, Merge `6e0688dbba14b761260758ac852da12b3db7b05d`; Feature-HEAD
+`9c8b225256608ab6f0b53ff6e029f109d6fabea5`): Lieferdatei Spotify/YouTube/Deezer
+inaktiv. Damals noch keine lokale Datenmutation.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`,
 `docs/readiness/import-templates/oa-platforms.4j4a-midroll-grundbestand.import.json`.
 
@@ -15,8 +23,7 @@ Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-4** fachlich freigegeben
 4j-4a inaktiv importieren; 4j-4b nur Midroll-Rules, danach aktivieren).
 PO-Entscheidung auf `main` (PR **#207**, Merge `3ab7b41…`). Post-Merge-CI #206
 [`41666294818`](https://github.com/MORE-m/dispo/actions/runs/41666294818) success.
-**Kein** Enforcement (4j-5), kein Wizard, Registry `planned`; Datenmutation
-erst nach 4j-4a-Repo-PR und getrenntem Datenlauf.
+**Kein** Enforcement (4j-5), kein Wizard, Registry `planned`.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`.
 
 Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-2/3** auf `main`
