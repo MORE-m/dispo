@@ -1,12 +1,22 @@
 # Fortschritt V1
 
-Stand: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-4** fachlich freigegeben
+Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** Repo-Vertrag auf Feature-Branch
+`feat/po-calc-tkp-1d4c4j4a-platform-base-data` (Base `3ab7b41…`, PR #207):
+versionierte Lieferdatei für Spotify/YouTube/Deezer
+(`spotify`/`youtube`/`deezer`, Sort 10/20/30, `is_active=false`,
+`is_adserver_relevant=false`). **Keine** Migration, **kein** echter Import,
+`dispo_mat_core` unverändert (`oa_platforms` = 0; Rules-Tabelle dort noch nicht
+migriert). 4j-4b und 4j-5 weiterhin offen bzw. gesperrt. Registry `planned`.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`,
+`docs/readiness/import-templates/oa-platforms.4j4a-midroll-grundbestand.import.json`.
+
+Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-4** fachlich freigegeben
 (Midroll-Plattformen Spotify/YouTube/Deezer; Codes `spotify`/`youtube`/`deezer`;
 4j-4a inaktiv importieren; 4j-4b nur Midroll-Rules, danach aktivieren).
-Umsetzung **gesperrt**, bis Post-Merge-CI PR #206
-[`41666294818`](https://github.com/MORE-m/dispo/actions/runs/41666294818)
-vollständig grün ist. **Kein** Enforcement (4j-5), kein Wizard, Registry `planned`,
-keine Datenmutation in diesem Docs-Stand.
+PO-Entscheidung auf `main` (PR **#207**, Merge `3ab7b41…`). Post-Merge-CI #206
+[`41666294818`](https://github.com/MORE-m/dispo/actions/runs/41666294818) success.
+**Kein** Enforcement (4j-5), kein Wizard, Registry `planned`; Datenmutation
+erst nach 4j-4a-Repo-PR und getrenntem Datenlauf.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`.
 
 Stand davor: 3. November 2026 – **PO-CALC-TKP-1D4c-4j-2/3** auf `main`
