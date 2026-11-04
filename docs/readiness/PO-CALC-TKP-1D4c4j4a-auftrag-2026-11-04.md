@@ -43,10 +43,14 @@ SHA-256 `1f2d34c3f288034c83c6574265aa5bb7ccf429517ca3878512703f4c6b47efbe`).
 | Rules nach Import | **0** |
 | Admin-Matrix (read-only) | 3 Inaktiv-Zeilen × 5 Medien; alle Cells false / `rule_id=null` |
 
-## Noch nicht
+## Nachzug
 
-- Rules / Midroll-Matrix (**4j-4b**)
-- Aktivierung der drei Plattformen (Teil 4j-4b nach Rule-Prüfung)
+**4j-4b** lokal erledigt (04.11.2026): Midroll-Rules + Aktivierung – siehe
+`PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
+
+## Noch nicht (über 4j-4a hinaus)
+
+- Stream-/Influencer-Rules (PO-Entscheidung)
 - 4j-5 Resolver-Enforcement
 - Wizard-Filter / Mediumwechsel-Cleanup
 - Registry-Release
@@ -61,4 +65,4 @@ SHA-256 `1f2d34c3f288034c83c6574265aa5bb7ccf429517ca3878512703f4c6b47efbe`).
 
 ## STOP
 
-4j-4a lokal abgeschlossen. Kein 4j-4b, kein 4j-5 in diesem Auftrag.
+4j-4a lokal abgeschlossen. 4j-4b war eigener Folgeauftrag; kein 4j-5 hier.
