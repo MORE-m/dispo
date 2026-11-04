@@ -1,15 +1,24 @@
 # Fortschritt V1
 
-Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4b** lokal auf `dispo_mat_core`
+Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4c** fachlich freigegeben
+(Struktur Stream-/Influencer): Pre = In gemeinsame Plattformmenge; Influencer =
+Modell A; keine dauerhaften Leerzustände der vier Medien; Midroll-Dreiheit
+unverändert und **nicht** als Stream-Ableitung. Konkrete Stream-Plattformnamen
+**noch offen** → keine neuen Plattformen, keine zusätzlichen Rules, **4j-5
+gesperrt**. Registry `planned`; OA-004 separat.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md`.
+Nächster fachlicher Schritt: **Stream-Plattformliste** (Namen) liefern.
+
+Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4b** lokal auf `dispo_mat_core`
 (nach PR **#209**, Merge `5dfa646…`; Post-Merge-CI
-[`41831598822`](https://github.com/MORE-m/dispo/actions/runs/41831598822) success):
+[`41831598822`](https://github.com/MORE-m/dispo/actions/runs/41831598822) success;
+Docs auf `main` PR **#210**, Merge `f58127b…`; Post-Merge-CI
+[`41851776148`](https://github.com/MORE-m/dispo/actions/runs/41851776148) success):
 drei Midroll-Rules aktiv (Spotify/YouTube/Deezer × `midroll_music_environment`);
 drei Plattformen aktiv (`is_adserver_relevant=false`); Audit vorhanden;
 Admin-Matrix bestätigt. Backup
 `local-backups/po-calc-tkp-1d4c4j4b-20261104-144510/` (nicht in Git).
-**Kein** Deploy, **kein** 4j-5, Stream-/Influencer-Rules offen, Registry `planned`.
-Nächster fachlicher Schritt: **PO-Entscheidung** zu den vier offenen
-Stream-/Influencer-Medien (nicht 4j-5).
+**Kein** Deploy, **kein** 4j-5, Registry `planned`.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
 
 Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4a** lokal auf `dispo_mat_core`
