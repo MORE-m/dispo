@@ -42,7 +42,7 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md`](readiness/PO-CALC-TKP-1D4c4j1-auftrag-2026-10-31.md) | 4j-1 Datenmodell auf `main` (PR #204); kanonische Folgeslices |
 | [`readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`](readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md) | 4j-2/3 Admin-Matrix Plattform × Medium (auf `main`, PR #206) |
 | [`readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`](readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md) | 4j-4 PO-Freigabe Midroll-Plattformen (auf `main`, PR #207) |
-| [`readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md) | 4j-4a Repo-Vertrag Lieferdatei; Datenlauf separat |
+| [`readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md) | 4j-4a Repo + lokaler Datenlauf (3 inaktive Plattformen; Rules offen) |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |
