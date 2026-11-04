@@ -1,13 +1,14 @@
 # PO-CALC-TKP-1D4c-4j-2/3 – Admin-Matrix Plattform × Medium
 
-Stand: 3. November 2026 (Feature-Branch, noch nicht gemergt)
+Stand: 3. November 2026 – auf `main` (PR **#206**, Merge
+`ad5161c0d6ff0958c6833aebbcc038d5557e2ca9`; Feature-HEAD
+`b79601f83cba3210878210212cd0beb6a4a2f4ec`).
 
-Base: `607fd6096c8f26549d8aca36e58f931c44196b99` (PR #205)
-Pre-Rebase-Feature: `d6feefd4143afef96beee22a5c02775d86152ba0`
+Base war: `607fd6096c8f26549d8aca36e58f931c44196b99` (PR #205)
 Branch: `feat/po-calc-tkp-1d4c4j23-platform-medium-admin`
-Worktree: `dispo-wt-po-calc-tkp-1d4c4j23`
 
-Kanonische Folge bleibt: **4j-4** Fachdaten → **4j-5** Enforcement → **4j-6** Wizard/E2E.
+Kanonische Folge: **4j-4** Fachdaten (PO freigegeben; Umsetzung nach CI-Gate) →
+**4j-5** Enforcement → **4j-6** Wizard/E2E.
 
 ## Ziel
 
@@ -53,7 +54,9 @@ operativ zählen sie erst bei aktiver Plattform und späterem Enforcement.
 - Vitest `resources/js/lib/oa-tkp-admin.test.ts`: 8/8
 - `npm run check`, `tsc --noEmit`, Pint, PHPStan (Repo-Pfade) grün
 
-## STOP
+## Nachzug Merge / 4j-4
 
-Kein Merge ohne PO-Abnahme. Kein Enforcement, keine Fachdaten, kein Deploy,
-keine Registry-Freigabe, kein `dispo_mat_core`-Migrate.
+Merge und Admin-Matrix sind erledigt. **4j-4** ist fachlich freigegeben
+(`PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`); Umsetzung erst nach
+grüner Post-Merge-CI #206. Weiterhin: kein Enforcement, kein Deploy, keine
+Registry-Freigabe; `dispo_mat_core`-Migrate nur im freigegebenen 4j-4a-Schritt.
