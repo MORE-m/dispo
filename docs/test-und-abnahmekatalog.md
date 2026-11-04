@@ -183,6 +183,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Regression `PoCalcTkp1d4c4dAdminUiTest`, Vitest `oa-tkp-admin.test.ts`.
   Kein Resolver-Enforce, Registry planned. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j23-auftrag-2026-11-03.md`.
+- **D4c-4j-4a (Repo):** versionierte Lieferdatei
+  `oa-platforms.4j4a-midroll-grundbestand.import.json` (Spotify/YouTube/Deezer,
+  inaktiv, `is_adserver_relevant=false`). Schema-Migrate und echter Import auf
+  `dispo_mat_core` sind **separater Datenlauf** nach Merge; in diesem Slice keine
+  DB-Mutation. Keine Rules, keine Aktivierung, 4j-5 gesperrt. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

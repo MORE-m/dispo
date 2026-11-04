@@ -14,6 +14,7 @@ Analyse D4c-3 (28.10.2026): noch **keine** belegten Listen-/Mindest-TKPs im Repo
 | `oa-tkp-price-list.import.skeleton.json` | **Objekt** → `OaTkpPriceListImporter::import($payload)` | JSON-Import; `items` aus Matrix befüllen; `status` zuerst `draft` |
 | `oa-platforms.template.csv` | Fachlieferung | Plattformzeilen |
 | `oa-platforms.import.skeleton.json` | **JSON-Array** → `OaPlatformImporter::import($rows)` | leeres Array `[]` |
+| `oa-platforms.4j4a-midroll-grundbestand.import.json` | **JSON-Array** → `oa:import-platforms` | PO-freigegebener Midroll-Grundbestand (4j-4a; zunächst inaktiv; Import separat) |
 | `oa-targetings.template.csv` | Fachlieferung | optionale Targetings |
 | `oa-targetings.import.skeleton.json` | **JSON-Array** → `OaTargetingDefinitionImporter::import($rows)` | leeres Array `[]` |
 
