@@ -1,23 +1,23 @@
 [
-  {
-    "code": "spotify",
-    "name": "Spotify",
-    "is_active": false,
-    "sort": 10,
-    "is_adserver_relevant": false
-  },
-  {
-    "code": "youtube",
-    "name": "YouTube",
-    "is_active": false,
-    "sort": 20,
-    "is_adserver_relevant": false
-  },
-  {
-    "code": "deezer",
-    "name": "Deezer",
-    "is_active": false,
-    "sort": 30,
-    "is_adserver_relevant": false
-  }
+    {
+        "code": "spotify",
+        "name": "Spotify",
+        "is_active": false,
+        "sort": 10,
+        "is_adserver_relevant": false
+    },
+    {
+        "code": "youtube",
+        "name": "YouTube",
+        "is_active": false,
+        "sort": 20,
+        "is_adserver_relevant": false
+    },
+    {
+        "code": "deezer",
+        "name": "Deezer",
+        "is_active": false,
+        "sort": 30,
+        "is_adserver_relevant": false
+    }
 ]
