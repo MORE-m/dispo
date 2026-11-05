@@ -7,8 +7,11 @@ Stand: 3. November 2026 – auf `main` (PR **#206**, Merge
 Base war: `607fd6096c8f26549d8aca36e58f931c44196b99` (PR #205)
 Branch: `feat/po-calc-tkp-1d4c4j23-platform-medium-admin`
 
-Kanonische Folge: **4j-4** Fachdaten (PO freigegeben; Umsetzung nach CI-Gate) →
-**4j-5** Enforcement → **4j-6** Wizard/E2E.
+Kanonische Folge war: **4j-4** Fachdaten → **4j-5** Enforcement → **4j-6**
+Wizard/E2E. **Nachtrag 05.11.2026 (4j-KORR):** 4j-5/4j-6 alter Zuschnitt für V1
+**gestoppt**; Admin-Matrix bleibt historisch vorhanden, ist aber **nicht**
+V1-Buchungsvoraussetzung. Weiter mit **KORR-2…4**. Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
 
 ## Ziel
 

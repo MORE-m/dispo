@@ -189,8 +189,11 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `docs/readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`.
 - **D4c-4j-4b:** lokal auf `dispo_mat_core` nach PR #209: drei aktive Midroll-Rules
   + Aktivierung Spotify/YouTube/Deezer via Admin-HTTP; Stream-/Influencer 0;
-  4j-5 gesperrt; Registry planned. Dok:
+  4j-5 damals gesperrt; Registry planned. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
+- **D4c-4j-KORR:** V1 ohne Endnutzer-Plattformauswahl; Midroll = Bundle; OA-005/006
+  Future; 4j-5 alter Zuschnitt verworfen; Pfad KORR-2…4. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
@@ -382,7 +385,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-05 | SWF-001–SWF-005 | Trailer 20 s, +30 %, Zeitfenster | Sekundenpreis × 20 × 1,30; kein Spotlängenindex |
 | AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
-| AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt |
+| AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt (**V1 / 4j-KORR:** Plattformteil = Future; Abnahme ohne Plattformauswahl nach KORR-3/4) |
 | AT-09 | OA-001–OA-003 | Basis-TKP unter Minimum | Speichern möglich; Übergabe ohne Begründung/Sonderfreigabe blockiert |
 | AT-10 | SOC-001–SOC-006 | Paket aus Story, Reel und Booster | Unterpositionen und Medien-/Boostertrennung; initial kein Rabatt/AE |
 | AT-11 | PRO-001–PRO-007 | Produktion mit Menge 0, regulär und Sonstiges | Preislistenbezug; reguläre Überschreibung nur mit Begründung/Freigabe |

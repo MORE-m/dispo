@@ -283,8 +283,11 @@ Regeln:
 - Bei Festpreis: `effektiver TKP = Festpreis ÷ Impressions × 1.000`.
 - Bei null Impressions ist der effektive TKP nicht berechenbar; Übergabe ist zu blockieren.
 - Die Summe aller Plattform-/Pre-Stream-/In-Stream-Mengen muss der Gesamtmenge entsprechen.
+  (**V1 / 4j-KORR 05.11.2026:** keine Endnutzer-Plattformverteilung; Pre-/In über
+  getrennte Medien. OA-005/006 = Future.)
 - Targeting-Aufschläge sind additiv, nicht multiplikativ.
-- Der zusätzliche Adserver-TKP für Spotify/Deezer/YouTube ist ein Verkaufsbestandteil.
+- Der zusätzliche Adserver-TKP für Spotify/Deezer/YouTube ist ein Verkaufsbestandteil
+  (OA-004; Midroll-Bundle-Kontext, keine Einzelplattform-Wahl).
 
 ## Social Media und Influencer
 

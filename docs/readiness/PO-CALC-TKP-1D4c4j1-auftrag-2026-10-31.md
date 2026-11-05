@@ -19,6 +19,13 @@ Discovery: `PO-CALC-TKP-1D4c4j-discovery-2026-10-30.md`.
 | Enforcement / Fachdaten / Admin-Matrix | weiterhin **nein** |
 | Registry | bleibt `planned` |
 
+## Nachtrag 05.11.2026 (4j-KORR)
+
+Schema und Helper bleiben historisch umgesetzt. Für operative V1 sind
+Platform×Medium-Rules **kein** Buchungs-/Speichervertrag. 4j-5
+fail-closed Enforcement **verworfen**. Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
 ## Ziel
 
 Additives Datenmodell für werbeformabhängige OA-Plattformzuordnungen inkl.
