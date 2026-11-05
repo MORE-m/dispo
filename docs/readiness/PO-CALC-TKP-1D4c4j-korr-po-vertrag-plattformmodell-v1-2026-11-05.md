@@ -1,7 +1,7 @@
 # PO-CALC-TKP-1D4c-4j-KORR – PO-Vertrag Plattformmodell V1
 
-Stand: 5. November 2026  
-Status: **fachlich freigegeben (PO 05.11.2026) – Docs-/Vertragskorrektur**  
+Stand: 5. November 2026
+Status: **fachlich freigegeben (PO 05.11.2026) – Docs-/Vertragskorrektur**
 Base: `main` @ `fc6bcdad981ec09ee505fbd576c617820caf6b75` (nach PR #211)
 
 **Keine** Runtime-, DB-, Rule-, Plattform-, Wizard-, Resolver- oder Registry-Änderung
@@ -56,7 +56,7 @@ Spotify / YouTube / Deezer sind in V1 **keine** einzeln auswählbaren Buchungspl
 
 ### Neue PO-Bewertung
 
-Diese technische Plattformstruktur ist **nicht buchungsrelevant für V1**.  
+Diese technische Plattformstruktur ist **nicht buchungsrelevant für V1**.
 Sie ist **kein** Vertrag für Endnutzer-Plattformauswahl und **kein** Speicher-Gate
 über Platform×Medium-Rules.
 
