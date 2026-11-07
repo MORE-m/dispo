@@ -197,6 +197,38 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
         const messages = JSON.stringify(body);
         expect(messages).toContain('noch nicht freigegeben');
         expect(calculationCount()).toBe(calcsBefore);
+
+        // KORR-4: leere Allocations ändern den Registry-Fail-Closed nicht (kein Plattform-Pflichtfehler).
+        const emptyPlatforms = await request.post('/kalkulationen', {
+            headers,
+            data: {
+                planning_mode: 'manual',
+                customer_name: 'E2E D3d4 Empty Platforms Probe',
+                order_discount_percent: '0',
+                ae_enabled: false,
+                schema_fingerprint: probe.schema_fingerprint,
+                dynamic_field_values: { campaign_period: null },
+                positions: [
+                    {
+                        inventory_id: probe.inventory_id,
+                        advertising_medium_id: probe.advertising_medium_id,
+                        schema_fingerprint: probe.position_schema_fingerprint,
+                        calculation_method_key: 'tkp',
+                        impressions: 100_000,
+                        basis_tkp: '10.0000',
+                        oa_platform_allocations: [],
+                        oa_targeting_selections: [],
+                        position_discount_percent: '0',
+                        ae_percent: '15',
+                    },
+                ],
+            },
+        });
+        expect(emptyPlatforms.status()).toBe(422);
+        const emptyBody = JSON.stringify(await emptyPlatforms.json());
+        expect(emptyBody).toContain('noch nicht freigegeben');
+        expect(emptyBody.toLowerCase()).not.toContain('plattformverteilung ist pflicht');
+        expect(calculationCount()).toBe(calcsBefore);
     });
 
     test('Handoff: gespeicherte OA-Position → Dispoauftrag ohne Spotproduktion', async ({

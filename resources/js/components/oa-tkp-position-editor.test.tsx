@@ -251,10 +251,16 @@ describe('OaTkpPositionEditor', () => {
             />,
         );
 
+        // Midroll ist das Spotify/YouTube/Deezer-Bundle – keine Einzelplattform-UX.
+        expect(screen.queryByRole('checkbox', { name: /spotify/i })).toBeNull();
+        expect(screen.queryByRole('checkbox', { name: /youtube/i })).toBeNull();
+        expect(screen.queryByRole('checkbox', { name: /deezer/i })).toBeNull();
+        expect(screen.queryByLabelText(/platform/i)).toBeNull();
         expect(screen.queryByText(/Spotify/i)).toBeNull();
         expect(screen.queryByText(/YouTube/i)).toBeNull();
         expect(screen.queryByText(/Deezer/i)).toBeNull();
         expect(screen.queryByText('Platform hinzufügen')).toBeNull();
         expect(screen.queryByText('Platform-Verteilung')).toBeNull();
+        expect(screen.queryByText(/mindestens eine Plattform/i)).toBeNull();
     });
 });
