@@ -171,6 +171,32 @@ class PoCalcTkp1d3aDispoSnapshotTest extends TestCase
     }
 
     #[Test]
+    public function oa_handoff_accepts_empty_platform_allocations_and_snapshots_empty_array(): void
+    {
+        $ctx = $this->seedContext();
+        $calc = app(CalculationWriter::class)->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_platform_allocations' => [],
+            ]),
+        ]), $ctx['user']);
+
+        $oa = $calc->positions->firstOrFail();
+        $this->assertSame(0, $oa->oaPlatformAllocations()->count());
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calc, [(int) $oa->id], $ctx['user'])
+            ->order;
+
+        $snap = $order->positions()
+            ->where('line_role', DispoOrderPosition::LINE_ROLE_MEDIA)
+            ->firstOrFail();
+
+        $this->assertSame(100_000, (int) $snap->impressions);
+        $this->assertSame('10.0000', (string) $snap->basis_tkp);
+        $this->assertSame([], $snap->oa_platform_allocations_snapshot);
+    }
+
+    #[Test]
     public function oa_snapshot_stays_frozen_after_calc_and_master_data_changes(): void
     {
         $ctx = $this->seedContext();

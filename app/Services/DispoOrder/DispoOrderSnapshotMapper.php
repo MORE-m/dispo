@@ -510,22 +510,21 @@ final class DispoOrderSnapshotMapper
             throw ValidationException::withMessages(['position_ids' => $message]);
         }
 
+        // V1: leere Platform-Allocations sind zulässig. Nicht-leer: bisheriger Summenvertrag.
         $allocations = $position->oaPlatformAllocations;
-        if ($allocations->isEmpty()) {
-            throw ValidationException::withMessages(['position_ids' => $message]);
-        }
+        if (! $allocations->isEmpty()) {
+            $sum = 0;
+            foreach ($allocations as $row) {
+                $impressions = (int) $row->impressions;
+                if ($impressions < 1 || trim((string) $row->platform_code) === '') {
+                    throw ValidationException::withMessages(['position_ids' => $message]);
+                }
+                $sum += $impressions;
+            }
 
-        $sum = 0;
-        foreach ($allocations as $row) {
-            $impressions = (int) $row->impressions;
-            if ($impressions < 1 || trim((string) $row->platform_code) === '') {
+            if ($sum !== (int) $position->impressions) {
                 throw ValidationException::withMessages(['position_ids' => $message]);
             }
-            $sum += $impressions;
-        }
-
-        if ($sum !== (int) $position->impressions) {
-            throw ValidationException::withMessages(['position_ids' => $message]);
         }
 
         foreach ($position->oaTargetingSelections as $row) {

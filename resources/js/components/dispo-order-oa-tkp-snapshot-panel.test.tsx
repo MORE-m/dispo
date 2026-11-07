@@ -105,4 +105,27 @@ describe('DispoOrderOaTkpSnapshotPanel', () => {
             screen.queryByTestId('dispo-order-oa-targetings-1'),
         ).not.toBeInTheDocument();
     });
+
+    it('hides platform block for explicit empty V1 snapshot', () => {
+        render(
+            <DispoOrderOaTkpSnapshotPanel
+                index={2}
+                position={{
+                    calculation_method_key: 'tkp',
+                    engine_profile_key: 'oa_tkp',
+                    impressions: 100_000,
+                    final_tkp: '10.0000',
+                    oa_platform_allocations_snapshot: [],
+                    oa_targeting_selections_snapshot: [],
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByTestId('dispo-order-oa-tkp-snapshot-2'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByTestId('dispo-order-oa-platforms-2'),
+        ).not.toBeInTheDocument();
+    });
 });

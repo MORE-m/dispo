@@ -98,6 +98,31 @@ class PoCalcTkp1d3bDispoAdoptionTest extends TestCase
     }
 
     #[Test]
+    public function oa_without_platforms_can_be_adopted_into_dispo_order(): void
+    {
+        $ctx = $this->seedContext();
+        $calc = app(CalculationWriter::class)->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_platform_allocations' => [],
+            ]),
+        ]), $ctx['user']);
+        $oaId = (int) $calc->positions->firstOrFail()->id;
+
+        $this->actingAs($ctx['user'])
+            ->getJson(route('dispo-orders.positions', $calc))
+            ->assertOk()
+            ->assertJsonPath('positions.0.impressions', 100_000)
+            ->assertJsonPath('positions.0.already_adopted', false);
+
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calc, [$oaId], $ctx['user'])
+            ->order;
+
+        $this->assertSame(1, DispoOrder::query()->count());
+        $this->assertSame([], $order->positions()->firstOrFail()->oa_platform_allocations_snapshot);
+    }
+
+    #[Test]
     public function mixed_positions_response_lists_spot_and_oa(): void
     {
         $ctx = $this->seedContext();

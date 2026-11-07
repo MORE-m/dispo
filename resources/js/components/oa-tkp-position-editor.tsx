@@ -8,10 +8,7 @@ import {
     isActiveTargetingBlockedByHistorical,
     isOaTkpTripleUnchanged,
     needsOaTkpRebind,
-    platformDistributionStatus,
     restoreOriginalOaTkpPin,
-    type OaPlatformAllocationDraft,
-    type OaPlatformCatalogRow,
     type OaTargetingCatalogRow,
     type OaTkpMethodResult,
     type OaTkpPositionFields,
@@ -25,7 +22,6 @@ import { useEffect, useMemo } from 'react';
 type Props = {
     positionIndex: number;
     position: OaTkpPositionFields & { client_key: string };
-    platforms: OaPlatformCatalogRow[];
     targetings: OaTargetingCatalogRow[];
     currentPriceYear: number;
     nextPriceYear: number;
@@ -41,7 +37,6 @@ type Props = {
 export function OaTkpPositionEditor({
     positionIndex,
     position,
-    platforms,
     targetings,
     currentPriceYear,
     nextPriceYear,
@@ -172,11 +167,6 @@ export function OaTkpPositionEditor({
         currentPriceYear,
     ]);
 
-    const distribution = platformDistributionStatus(
-        position.impressions_input,
-        position.oa_platform_allocations,
-    );
-
     const listTkp = methodResult?.list_tkp ?? position.list_tkp_snapshot;
     const minTkp = methodResult?.minimum_tkp ?? position.minimum_tkp_snapshot;
     const surcharge =
@@ -185,47 +175,6 @@ export function OaTkpPositionEditor({
     const finalTkp = methodResult?.final_tkp ?? position.final_tkp;
     const belowMin =
         methodResult?.below_minimum_tkp ?? position.below_minimum_tkp;
-
-    const activePlatformOptions = platforms.filter(
-        (platform) =>
-            !position.oa_platform_allocations.some(
-                (row) => row.oa_platform_id === platform.id && !row.historical,
-            ),
-    );
-
-    function updateAllocation(
-        rowIndex: number,
-        patch: Partial<OaPlatformAllocationDraft>,
-    ) {
-        const next = position.oa_platform_allocations.map((row, index) =>
-            index === rowIndex ? { ...row, ...patch } : row,
-        );
-        onChange({ oa_platform_allocations: next });
-    }
-
-    function addPlatformRow() {
-        const first = activePlatformOptions[0];
-        onChange({
-            oa_platform_allocations: [
-                ...position.oa_platform_allocations,
-                {
-                    oa_platform_id: first?.id ?? null,
-                    platform_code: first?.code ?? null,
-                    platform_name: first?.name ?? null,
-                    impressions_input: '',
-                    historical: false,
-                },
-            ],
-        });
-    }
-
-    function removePlatformRow(rowIndex: number) {
-        onChange({
-            oa_platform_allocations: position.oa_platform_allocations.filter(
-                (_, index) => index !== rowIndex,
-            ),
-        });
-    }
 
     function toggleTargeting(targeting: OaTargetingCatalogRow) {
         if (
@@ -419,137 +368,6 @@ export function OaTkpPositionEditor({
                     </StatusBanner>
                 </div>
             ) : null}
-
-            <fieldset className="space-y-3">
-                <legend className="text-sm font-medium">
-                    Platform-Verteilung
-                </legend>
-                <p
-                    className="text-muted-foreground text-sm"
-                    data-test={`oa-tkp-platform-summary-${positionIndex}`}
-                >
-                    {distribution.message}
-                </p>
-                {fieldErrors[
-                    `positions.${positionIndex}.oa_platform_allocations`
-                ]?.[0] ? (
-                    <p className="text-destructive text-sm" role="alert">
-                        {
-                            fieldErrors[
-                                `positions.${positionIndex}.oa_platform_allocations`
-                            ][0]
-                        }
-                    </p>
-                ) : null}
-
-                <ul className="space-y-3">
-                    {position.oa_platform_allocations.map((row, rowIndex) => (
-                        <li
-                            key={`${row.oa_platform_id ?? 'new'}-${rowIndex}`}
-                            className="border-border/70 grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_8rem_auto]"
-                            data-test={`oa-tkp-platform-${positionIndex}-${rowIndex}`}
-                        >
-                            <FormField
-                                label={
-                                    row.historical
-                                        ? 'Platform (historisch)'
-                                        : 'Platform'
-                                }
-                                htmlFor={`oa-tkp-platform-select-${positionIndex}-${rowIndex}`}
-                            >
-                                {row.historical ? (
-                                    <p className="text-sm">
-                                        {row.platform_name ??
-                                            row.platform_code ??
-                                            'Historische Platform'}
-                                        <span className="text-muted-foreground ml-2 text-xs">
-                                            (nicht mehr aktiv)
-                                        </span>
-                                    </p>
-                                ) : (
-                                    <select
-                                        id={`oa-tkp-platform-select-${positionIndex}-${rowIndex}`}
-                                        className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
-                                        disabled={!canEdit}
-                                        value={row.oa_platform_id ?? ''}
-                                        onChange={(event) => {
-                                            const id = Number(
-                                                event.target.value,
-                                            );
-                                            const platform = platforms.find(
-                                                (item) => item.id === id,
-                                            );
-                                            updateAllocation(rowIndex, {
-                                                oa_platform_id:
-                                                    platform?.id ?? null,
-                                                platform_code:
-                                                    platform?.code ?? null,
-                                                platform_name:
-                                                    platform?.name ?? null,
-                                            });
-                                        }}
-                                    >
-                                        <option value="">Bitte wählen</option>
-                                        {platforms.map((platform) => (
-                                            <option
-                                                key={platform.id}
-                                                value={platform.id}
-                                            >
-                                                {platform.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                )}
-                            </FormField>
-                            <FormField
-                                label="Impressions"
-                                htmlFor={`oa-tkp-platform-imp-${positionIndex}-${rowIndex}`}
-                            >
-                                <Input
-                                    id={`oa-tkp-platform-imp-${positionIndex}-${rowIndex}`}
-                                    inputMode="numeric"
-                                    disabled={!canEdit}
-                                    value={row.impressions_input}
-                                    onChange={(event) =>
-                                        updateAllocation(rowIndex, {
-                                            impressions_input:
-                                                event.target.value.replace(
-                                                    /[^\d]/g,
-                                                    '',
-                                                ),
-                                        })
-                                    }
-                                />
-                            </FormField>
-                            {canEdit ? (
-                                <div className="flex items-end">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() =>
-                                            removePlatformRow(rowIndex)
-                                        }
-                                    >
-                                        Entfernen
-                                    </Button>
-                                </div>
-                            ) : null}
-                        </li>
-                    ))}
-                </ul>
-
-                {canEdit && showActivePickers ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        data-test={`oa-tkp-platform-add-${positionIndex}`}
-                        onClick={addPlatformRow}
-                        disabled={platforms.length === 0}
-                    >
-                        Platform hinzufügen
-                    </Button>
-                ) : null}
-            </fieldset>
 
             <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Targetings</legend>

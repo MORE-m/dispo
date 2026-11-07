@@ -148,6 +148,32 @@ class PoCalcTkp1d3cDispoShowTest extends TestCase
     }
 
     #[Test]
+    public function oa_show_without_platforms_exposes_empty_platform_snapshot(): void
+    {
+        $ctx = $this->seedContext();
+        $calc = app(CalculationWriter::class)->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_platform_allocations' => [],
+            ]),
+        ]), $ctx['user']);
+        $oa = $calc->positions->firstOrFail();
+        $order = app(DispoOrderWriter::class)
+            ->createFromCalculation($calc, [(int) $oa->id], $ctx['user'])
+            ->order;
+
+        $this->actingAs($ctx['user'])
+            ->get(route('dispo-orders.show', $order))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('dispo-orders/show')
+                ->has('order.positions', 1)
+                ->where('order.positions.0.calculation_method_key', 'tkp')
+                ->where('order.positions.0.impressions', 100_000)
+                ->where('order.positions.0.final_tkp', '10.0000')
+                ->where('order.positions.0.oa_platform_allocations_snapshot', []));
+    }
+
+    #[Test]
     public function show_authorization_unchanged_for_oa_orders(): void
     {
         $ctx = $this->seedContext();

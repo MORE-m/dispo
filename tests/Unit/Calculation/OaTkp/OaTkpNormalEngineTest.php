@@ -80,14 +80,24 @@ class OaTkpNormalEngineTest extends TestCase
     }
 
     #[Test]
-    public function empty_platform_allocations_are_rejected(): void
+    public function empty_platform_allocations_are_accepted_without_price_effect(): void
     {
-        $this->expectException(ValidationException::class);
-        $this->engine->calculatePosition($this->baseInput(
+        $withPlatform = $this->engine->calculatePosition($this->baseInput(
+            impressions: 100_000,
+            basisTkp: '10.0000',
+            allocations: [
+                new OaTkpPlatformAllocationInput('fixture_a', 'A', 100_000),
+            ],
+        ));
+        $withoutPlatform = $this->engine->calculatePosition($this->baseInput(
             impressions: 100_000,
             basisTkp: '10.0000',
             allocations: [],
         ));
+
+        $this->assertSame($withPlatform->finalTkp, $withoutPlatform->finalTkp);
+        $this->assertSame($withPlatform->mediaGross, $withoutPlatform->mediaGross);
+        $this->assertSame([], $withoutPlatform->platformAllocations);
     }
 
     #[Test]

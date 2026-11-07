@@ -491,16 +491,17 @@ class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
     }
 
     #[Test]
-    public function missing_platform_and_invalid_allocation_and_native_ad_are_rejected(): void
+    public function empty_platforms_are_accepted_while_invalid_allocation_and_native_ad_remain_rejected(): void
     {
         $ctx = $this->seedContext();
         $this->simulateRelease();
 
         $noPlatform = $this->oaStorePayload($ctx);
         $noPlatform['positions'][0]['oa_platform_allocations'] = [];
-        $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $noPlatform)
-            ->assertStatus(422);
-        $this->assertSame(0, Calculation::query()->count());
+        $this->actingAs($ctx['user'])->post(route('calculations.store'), $noPlatform)
+            ->assertRedirect();
+        $this->assertSame(1, Calculation::query()->count());
+        $this->assertSame(0, CalculationPositionOaPlatformAllocation::query()->count());
 
         $badSum = $this->oaStorePayload($ctx);
         $badSum['positions'][0]['oa_platform_allocations'] = [
@@ -508,7 +509,7 @@ class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
         ];
         $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $badSum)
             ->assertStatus(422);
-        $this->assertSame(0, Calculation::query()->count());
+        $this->assertSame(1, Calculation::query()->count());
 
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
         $nativePayload = $this->oaStorePayload($ctx);
@@ -516,7 +517,7 @@ class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
         $nativePayload = $this->withLiveSchemaFingerprint($nativePayload);
         $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $nativePayload)
             ->assertStatus(422);
-        $this->assertSame(0, Calculation::query()->count());
+        $this->assertSame(1, Calculation::query()->count());
     }
 
     #[Test]

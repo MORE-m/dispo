@@ -289,10 +289,27 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
     }
 
     #[Test]
-    public function invalid_allocations_do_not_create_calculation(): void
+    public function empty_allocations_persist_zero_rows_while_sum_mismatch_still_rolls_back(): void
     {
         $ctx = $this->seedContext();
         $before = Calculation::query()->count();
+
+        $created = app(OaTkpCalculationPersister::class)->create(
+            $ctx['user'],
+            $this->positionInput(
+                $ctx,
+                impressions: 100_000,
+                basisTkp: '10.0000',
+                listTkp: '12.0000',
+                minimumTkp: '8.0000',
+                allocations: [],
+                isAeEligible: false,
+            ),
+            aeEnabled: false,
+        );
+
+        $this->assertSame($before + 1, Calculation::query()->count());
+        $this->assertSame(0, $created->positions->firstOrFail()->oaPlatformAllocations()->count());
 
         try {
             app(OaTkpCalculationPersister::class)->create(
@@ -303,7 +320,9 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
                     basisTkp: '10.0000',
                     listTkp: '12.0000',
                     minimumTkp: '8.0000',
-                    allocations: [],
+                    allocations: [
+                        new OaTkpPlatformAllocationInput('fixture_a', 'A', 50_000),
+                    ],
                     isAeEligible: false,
                 ),
                 aeEnabled: false,
@@ -313,7 +332,7 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
             // expected
         }
 
-        $this->assertSame($before, Calculation::query()->count());
+        $this->assertSame($before + 1, Calculation::query()->count());
     }
 
     #[Test]

@@ -28,7 +28,7 @@ vi.mock('@/hooks/use-oa-tkp-pricing-metadata', () => ({
 }));
 
 describe('OaTkpPositionEditor', () => {
-    it('renders impressions, basis and readonly price metrics', () => {
+    it('renders impressions, basis and readonly price metrics without platform UX', () => {
         const position = {
             ...emptyOaTkpDraftFields(2026),
             client_key: 'c1',
@@ -44,21 +44,13 @@ describe('OaTkpPositionEditor', () => {
             list_tkp_snapshot: '12.0000',
             minimum_tkp_snapshot: '8.0000',
             expected_oa_tkp_price_list_id: 10,
-            oa_platform_allocations: [
-                {
-                    oa_platform_id: 1,
-                    platform_code: 'a',
-                    platform_name: 'Platform A',
-                    impressions_input: '100000',
-                },
-            ],
+            oa_platform_allocations: [],
         };
 
         render(
             <OaTkpPositionEditor
                 positionIndex={0}
                 position={position}
-                platforms={[{ id: 1, code: 'a', name: 'Platform A', sort: 1 }]}
                 targetings={[
                     {
                         id: 5,
@@ -96,6 +88,13 @@ describe('OaTkpPositionEditor', () => {
             '12,0000',
         );
         expect(screen.queryByText('Spotlänge')).toBeNull();
+        expect(screen.queryByText('Platform-Verteilung')).toBeNull();
+        expect(screen.queryByText('Platform hinzufügen')).toBeNull();
+        expect(screen.queryByTestId('oa-tkp-platform-add-0')).toBeNull();
+        expect(screen.queryByTestId('oa-tkp-platform-summary-0')).toBeNull();
+        expect(screen.queryByText('Spotify')).toBeNull();
+        expect(screen.queryByText('YouTube')).toBeNull();
+        expect(screen.queryByText('Deezer')).toBeNull();
     });
 
     it('shows under-min warning', () => {
@@ -117,7 +116,6 @@ describe('OaTkpPositionEditor', () => {
             <OaTkpPositionEditor
                 positionIndex={0}
                 position={position}
-                platforms={[]}
                 targetings={[]}
                 currentPriceYear={2026}
                 nextPriceYear={2027}
@@ -145,7 +143,7 @@ describe('OaTkpPositionEditor', () => {
         );
     });
 
-    it('keeps inactive historical platform and targeting visible and blocks same-code active', () => {
+    it('keeps historical targeting visible and blocks same-code active without platform UX', () => {
         const position = {
             ...emptyOaTkpDraftFields(2026),
             client_key: 'c1',
@@ -165,15 +163,7 @@ describe('OaTkpPositionEditor', () => {
             original_oa_price_year: 2026,
             list_tkp_snapshot: '12.0000',
             minimum_tkp_snapshot: '8.0000',
-            oa_platform_allocations: [
-                {
-                    oa_platform_id: 99,
-                    platform_code: 'legacy',
-                    platform_name: 'Legacy Platform',
-                    impressions_input: '100000',
-                    historical: true,
-                },
-            ],
+            oa_platform_allocations: [],
             oa_targeting_selections: [
                 {
                     oa_targeting_definition_id: 7,
@@ -191,9 +181,6 @@ describe('OaTkpPositionEditor', () => {
             <OaTkpPositionEditor
                 positionIndex={0}
                 position={position}
-                platforms={[
-                    { id: 1, code: 'spotify', name: 'Spotify', sort: 1 },
-                ]}
                 targetings={[
                     {
                         id: 8,
@@ -215,8 +202,8 @@ describe('OaTkpPositionEditor', () => {
             />,
         );
 
-        expect(screen.getByText('Legacy Platform')).toBeTruthy();
-        expect(screen.getByText(/nicht mehr aktiv/)).toBeTruthy();
+        expect(screen.queryByText('Legacy Platform')).toBeNull();
+        expect(screen.queryByText('Platform-Verteilung')).toBeNull();
         expect(
             screen.getByTestId('oa-tkp-targeting-historical-0-geo').textContent,
         ).toContain('historisch');
@@ -229,5 +216,45 @@ describe('OaTkpPositionEditor', () => {
         expect(activeGeoLabel.textContent).toMatch(
             /historische Auswahl entfernen/i,
         );
+    });
+
+    it('midroll music environment shows no Spotify/YouTube/Deezer single-select', () => {
+        const position = {
+            ...emptyOaTkpDraftFields(2026),
+            client_key: 'c1',
+            calculation_method_key: 'tkp',
+            inventory_id: 1,
+            advertising_medium_id: 9,
+            price_year: 2026,
+            saved_inventory_id: null,
+            saved_advertising_medium_id: null,
+            saved_price_year: null,
+            impressions_input: '50000',
+            basis_tkp: '15.0000',
+            expected_oa_tkp_price_list_id: 10,
+            oa_platform_allocations: [],
+        };
+
+        render(
+            <OaTkpPositionEditor
+                positionIndex={0}
+                position={position}
+                targetings={[]}
+                currentPriceYear={2026}
+                nextPriceYear={2027}
+                methodResult={null}
+                mediaGross={null}
+                fieldErrors={{}}
+                canEdit
+                showActivePickers
+                onChange={vi.fn()}
+            />,
+        );
+
+        expect(screen.queryByText(/Spotify/i)).toBeNull();
+        expect(screen.queryByText(/YouTube/i)).toBeNull();
+        expect(screen.queryByText(/Deezer/i)).toBeNull();
+        expect(screen.queryByText('Platform hinzufügen')).toBeNull();
+        expect(screen.queryByText('Platform-Verteilung')).toBeNull();
     });
 });
