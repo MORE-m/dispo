@@ -4416,10 +4416,6 @@ export default function CalculationWizard({
                                                                 position={
                                                                     position
                                                                 }
-                                                                platforms={
-                                                                    catalog.oa_platforms ??
-                                                                    []
-                                                                }
                                                                 targetings={
                                                                     catalog.oa_targetings ??
                                                                     []

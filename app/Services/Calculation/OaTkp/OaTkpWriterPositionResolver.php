@@ -523,9 +523,13 @@ final class OaTkpWriterPositionResolver
     private function resolvePlatformAllocations(array $position, ?CalculationPosition $existing, string $prefix): array
     {
         $rows = $position['oa_platform_allocations'] ?? null;
-        if (! is_array($rows) || $rows === []) {
+        // V1: leere Allocations sind zulässig (keine Plattformpflicht). Nicht-leer: bisheriger Vertrag.
+        if ($rows === null || $rows === []) {
+            return [];
+        }
+        if (! is_array($rows)) {
             throw ValidationException::withMessages([
-                "{$prefix}.oa_platform_allocations" => 'Plattformverteilung ist Pflicht: mindestens eine Allocation.',
+                "{$prefix}.oa_platform_allocations" => 'Ungültige Plattformverteilung.',
             ]);
         }
 

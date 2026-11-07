@@ -283,8 +283,8 @@ describe('oa-tkp-wizard helpers', () => {
         );
     });
 
-    it('preview readiness requires complete allocation', () => {
-        const incomplete = {
+    it('preview readiness allows empty allocations and still validates non-empty ones', () => {
+        const withoutPlatforms = {
             ...emptyOaTkpDraftFields(2026),
             calculation_method_key: 'tkp',
             inventory_id: 1,
@@ -296,6 +296,13 @@ describe('oa-tkp-wizard helpers', () => {
             expected_oa_tkp_price_list_id: 11,
             impressions_input: '100000',
             basis_tkp: '10.0000',
+            oa_platform_allocations: [],
+        };
+        expect(isOaTkpPreviewReady(withoutPlatforms)).toBe(true);
+        expect(draftBlocksOaTkpPreview([withoutPlatforms])).toBe(false);
+
+        const incomplete = {
+            ...withoutPlatforms,
             oa_platform_allocations: [
                 {
                     oa_platform_id: 3,
@@ -311,6 +318,13 @@ describe('oa-tkp-wizard helpers', () => {
         incomplete.oa_platform_allocations[0]!.impressions_input = '100000';
         expect(isOaTkpPreviewReady(incomplete)).toBe(true);
         expect(draftBlocksOaTkpPreview([incomplete])).toBe(false);
+
+        const missingBasis = {
+            ...withoutPlatforms,
+            basis_tkp: '',
+        };
+        expect(isOaTkpPreviewReady(missingBasis)).toBe(false);
+
         expect(
             draftBlocksOaTkpPreview([
                 {

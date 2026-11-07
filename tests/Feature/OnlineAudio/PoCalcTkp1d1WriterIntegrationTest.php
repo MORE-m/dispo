@@ -433,7 +433,6 @@ class PoCalcTkp1d1WriterIntegrationTest extends TestCase
             'unknown targeting' => ['oa_targeting_selections' => [['targeting_code' => 'does_not_exist']]],
             'unknown platform' => ['oa_platform_allocations' => [['platform_code' => 'nope', 'impressions' => 100_000]]],
             'platform sum mismatch' => ['oa_platform_allocations' => [['oa_platform_id' => $ctx['platform']->id, 'impressions' => 99_999]]],
-            'missing platforms' => ['oa_platform_allocations' => []],
             'zero impressions' => ['impressions' => 0],
             'bad basis' => ['basis_tkp' => '1,5'],
         ];
@@ -451,6 +450,28 @@ class PoCalcTkp1d1WriterIntegrationTest extends TestCase
         $this->assertSame(0, CalculationPosition::query()->count());
         $this->assertSame(0, CalculationPositionOaPlatformAllocation::query()->count());
         $this->assertSame(0, CalculationPositionOaTargetingSelection::query()->count());
+    }
+
+    #[Test]
+    public function empty_platform_allocations_are_accepted_and_persist_zero_rows(): void
+    {
+        $ctx = $this->seedContext();
+        $writer = app(CalculationWriter::class);
+
+        $calculation = $writer->create($this->payload([
+            $this->oaPosition($ctx, [
+                'oa_platform_allocations' => [],
+                'oa_targeting_selections' => [],
+            ]),
+        ]), $ctx['user']);
+
+        $position = $calculation->positions->firstOrFail();
+        $this->assertSame(0, $position->oaPlatformAllocations()->count());
+        $this->assertSame(100_000, (int) $position->impressions);
+        $this->assertSame(0, OaTkpImportDecimal::compare((string) $position->basis_tkp, '10.0000'));
+
+        $reloaded = $writer->payloadFromCalculation(Calculation::query()->findOrFail($calculation->id));
+        $this->assertSame([], $reloaded['positions'][0]['oa_platform_allocations']);
     }
 
     #[Test]

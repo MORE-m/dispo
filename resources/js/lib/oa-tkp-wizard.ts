@@ -387,32 +387,37 @@ export function isOaTkpPreviewReady(position: OaTkpPositionFields): boolean {
         return false;
     }
 
-    if (position.oa_platform_allocations.length < 1) {
-        return false;
-    }
-
-    if (
-        position.oa_platform_allocations.some(
-            (row) =>
-                row.oa_platform_id == null ||
-                parsePositiveIntegerInput(row.impressions_input) === null,
-        )
-    ) {
-        return false;
-    }
-
-    if (hasDuplicatePlatformIds(position.oa_platform_allocations)) {
-        return false;
-    }
-
     if (hasDuplicateTargetingCodes(position.oa_targeting_selections)) {
         return false;
     }
 
-    const total = parsePositiveIntegerInput(position.impressions_input);
-    const allocated = platformAllocationSum(position.oa_platform_allocations);
-    if (total === null || !Number.isFinite(allocated) || allocated !== total) {
-        return false;
+    // V1: leere Allocations sind preview-ready. Nicht-leer: bisherige Konsistenzprüfung.
+    if (position.oa_platform_allocations.length > 0) {
+        if (
+            position.oa_platform_allocations.some(
+                (row) =>
+                    row.oa_platform_id == null ||
+                    parsePositiveIntegerInput(row.impressions_input) === null,
+            )
+        ) {
+            return false;
+        }
+
+        if (hasDuplicatePlatformIds(position.oa_platform_allocations)) {
+            return false;
+        }
+
+        const total = parsePositiveIntegerInput(position.impressions_input);
+        const allocated = platformAllocationSum(
+            position.oa_platform_allocations,
+        );
+        if (
+            total === null ||
+            !Number.isFinite(allocated) ||
+            allocated !== total
+        ) {
+            return false;
+        }
     }
 
     return true;

@@ -290,10 +290,9 @@ final class OaTkpNormalEngine
      */
     private function assertPlatformAllocations(int $impressions, array $allocations): void
     {
+        // V1: leere Allocations sind zulässig. Nicht-leer: bisheriger Mengen-/Summenvertrag.
         if ($allocations === []) {
-            throw ValidationException::withMessages([
-                'positions' => 'Plattformverteilung ist Pflicht (OA-006): mindestens eine Allocation.',
-            ]);
+            return;
         }
 
         $seenCodes = [];
