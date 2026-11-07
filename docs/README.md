@@ -44,7 +44,8 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`](readiness/PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md) | 4j-4 PO-Freigabe Midroll-Plattformen (auf `main`, PR #207) |
 | [`readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4a-auftrag-2026-11-04.md) | 4j-4a Repo + lokaler Datenlauf (3 inaktive Plattformen; Rules offen) |
 | [`readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md) | 4j-4b lokaler Datenlauf (3 Midroll-Rules + 3 aktive Plattformen; 4j-5 gesperrt) |
-| [`readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md) | 4j-4c PO-Freigabe Stream-/Influencer-Struktur (Namen offen; 4j-5 gesperrt) |
+| [`readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md) | 4j-4c Stream-/Influencer-Struktur (historisch; V1 durch 4j-KORR überholt) |
+| [`readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`](readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md) | 4j-KORR PO-Vertrag: V1 ohne Plattformauswahl; 4j-5 verworfen |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |

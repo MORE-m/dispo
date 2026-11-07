@@ -436,15 +436,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `main` (PR **#208**) und lokal auf `dispo_mat_core`: Schema 4j-1 + drei Plattformen.
   **4j-4b** lokal und Docs auf `main` (PR **#210**): drei aktive Midroll-Rules + drei
   aktive Plattformen (`spotify`/`youtube`/`deezer`, `is_adserver_relevant=false`).
-  **4j-4c** Struktur freigegeben (PO 04.11.2026): Pre = In; Influencer = Modell A;
-  keine dauerhaften Leerzustände; Midroll nicht als Stream-Ableitung; konkrete
-  Stream-Namen offen. Registry `oa_tkp`/`tkp` bleibt `planned`.
-- **Weiter offen:** **konkrete Stream-Plattformnamen** (nach 4j-4c);
-  **4j-5** Enforcement (gesperrt), **4j-6** Wizard-Filter/Cleanup/E2E;
-  Registry-Release; produktive OA-TKP-Freigabe; OA-004. Kanonische Reihenfolge
-  ab 03.11.2026: `4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`.
-- **Ergebnis (Ziel, noch nicht erreicht):** TKP, Mengenverteilung, Targeting produktiv
-- **Akzeptanz:** `AT-08`, `AT-09` (Speichern vs. Übergabe)
+  **4j-4c** Struktur (PO 04.11.2026) historisch; für V1-Buchung überholt durch
+  **4j-KORR** (PO 05.11.2026): keine Endnutzer-Plattformauswahl; Midroll =
+  Spotify/YouTube/Deezer-Bundle; OA-005/006 = Future; bestehende Plattformen/Rules
+  nicht V1-buchungsrelevant. Registry `oa_tkp`/`tkp` bleibt `planned`.
+- **Weiter offen:** **KORR-2** Wizard/Resolver-Readiness ohne Plattformpflicht;
+  **KORR-3** Runtime-Minimalslice; **KORR-4** E2E; Registry-Release; produktive
+  OA-TKP-Freigabe; OA-004. **4j-5** alter Zuschnitt **gestoppt/verworfen**;
+  **4j-6** neu zu schneiden. Pfad: `KORR-1 → KORR-2 → KORR-3 → KORR-4`.
+- **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
+  V1-Plattformauswahl; Future OA-005/006 separat
+- **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
   `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
 

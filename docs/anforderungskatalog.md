@@ -545,11 +545,20 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 
 ## 11.2 Plattformen, Mengen und Targeting
 
+> **V1-Hinweis (PO-CALC-TKP-1D4c-4j-KORR, 05.11.2026):** Für die operative OA-TKP-V1
+> gibt es **keine** Endnutzer-Plattformauswahl. Fünf Werbemittel
+> (`pre_stream` … `midroll_music_environment`); Midroll = Spotify/YouTube/Deezer
+> als **gemeinsames** Bundle-Werbemittel. **OA-005** und **OA-006** gelten als
+> **Future / fachlich noch nicht für operative V1 freigegeben** und dürfen nicht
+> so interpretiert werden, dass Spotify/YouTube/Deezer einzeln wählbar sind oder
+> jedes Medium Platform×Medium-Rules braucht. Details:
+> `docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
 **OA-005** Eine Online-Audio-Position darf mehrere Plattformen enthalten.
 
 **OA-006** Die Mengenverteilung je Plattform sowie auf Pre-Stream und In-Stream ist Pflicht. Eine reine Gesamtmenge mit Freitext genügt nicht.
 
-**OA-007** Bei Pre-Stream sind Pre-Stream-AIs Pflicht; bei In-Stream sind In-Stream-AIs Pflicht. Summe der Detailmengen muss der Positionsgesamtmenge entsprechen.
+**OA-007** Bei Pre-Stream sind Pre-Stream-AIs Pflicht; bei In-Stream sind In-Stream-AIs Pflicht. Summe der Detailmengen muss der Positionsgesamtmenge entsprechen. (V1: Pre-/In-Zuordnung über getrennte Advertising-Media-Codes.)
 
 **OA-008** Targetings werden als unbegrenzt wiederholbare Datensätze mit Kategorie (technisch/DMP), Spezifikation, Aufschlag und optionaler UND-/ODER-Verknüpfung gespeichert.
 
@@ -557,7 +566,8 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 
 ## 11.3 Pflicht-/Dispofelder
 
-- Inventar, Plattform(en), Werbemittel und HR-Kampagne ja/nein
+- Inventar, Plattform(en) (**V1 / 4j-KORR:** Plattformauswahl nicht operativ;
+  Future OA-005/006), Werbemittel und HR-Kampagne ja/nein
 
 - tatsächliche Länge in Sekunden
 

@@ -1,13 +1,18 @@
 # Fortschritt V1
 
-Stand: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4c** fachlich freigegeben
-(Struktur Stream-/Influencer): Pre = In gemeinsame Plattformmenge; Influencer =
-Modell A; keine dauerhaften Leerzustände der vier Medien; Midroll-Dreiheit
-unverändert und **nicht** als Stream-Ableitung. Konkrete Stream-Plattformnamen
-**noch offen** → keine neuen Plattformen, keine zusätzlichen Rules, **4j-5
-gesperrt**. Registry `planned`; OA-004 separat.
+Stand: 5. November 2026 – **PO-CALC-TKP-1D4c-4j-KORR** PO-Vertrag Plattformmodell V1
+korrigiert (Docs-only): fünf Werbemittel ohne Endnutzer-Plattformauswahl; Midroll
+= Spotify/YouTube/Deezer-**Bundle**; OA-005/006 = Future; **4j-5** alter Zuschnitt
+**verworfen**; 4j-6 neu zu schneiden; bestehende drei Plattformen + Midroll-Rules
+technisch belassen, aber **nicht** V1-buchungsrelevant. Registry `planned`.
+Pfad: **KORR-1** (dieser Docs-Slice) → **KORR-2** Wizard/Resolver-Readiness.
+Dok: `docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
+Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4c** fachlich freigegeben
+(Struktur Stream-/Influencer; später durch 4j-KORR für V1 überholt): Pre = In;
+Influencer = Modell A; Stream-Namen damals offen; 4j-5 gesperrt. Docs auf `main`
+PR **#211**, Merge `fc6bcda…`.
 Dok: `docs/readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md`.
-Nächster fachlicher Schritt: **Stream-Plattformliste** (Namen) liefern.
 
 Stand davor: 4. November 2026 – **PO-CALC-TKP-1D4c-4j-4b** lokal auf `dispo_mat_core`
 (nach PR **#209**, Merge `5dfa646…`; Post-Merge-CI

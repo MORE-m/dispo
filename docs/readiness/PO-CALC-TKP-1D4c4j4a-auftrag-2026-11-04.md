@@ -50,9 +50,9 @@ SHA-256 `1f2d34c3f288034c83c6574265aa5bb7ccf429517ca3878512703f4c6b47efbe`).
 
 ## Noch nicht (über 4j-4a hinaus)
 
-- Stream-/Influencer-Rules (PO-Entscheidung)
-- 4j-5 Resolver-Enforcement
-- Wizard-Filter / Mediumwechsel-Cleanup
+- Stream-/Influencer-Rules – **V1 laut 4j-KORR nicht vorgesehen**
+- 4j-5 Resolver-Enforcement – **V1-Zuschnitt verworfen (4j-KORR)**
+- Wizard-Filter / Mediumwechsel-Cleanup – durch **KORR-2…4** ersetzen
 - Registry-Release
 - OA-004 / Adserver-Aufschlag
 - Preiswirkung / `FD-OA-PLAT`
@@ -66,3 +66,6 @@ SHA-256 `1f2d34c3f288034c83c6574265aa5bb7ccf429517ca3878512703f4c6b47efbe`).
 ## STOP
 
 4j-4a lokal abgeschlossen. 4j-4b war eigener Folgeauftrag; kein 4j-5 hier.
+
+**Nachtrag 05.11.2026:** Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.

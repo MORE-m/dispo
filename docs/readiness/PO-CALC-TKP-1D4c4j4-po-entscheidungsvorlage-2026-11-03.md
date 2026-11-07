@@ -9,6 +9,13 @@ Umsetzung von **4j-4a** erst nach vollständig grüner Post-Merge-CI
 (`ci` / `mysql` / `e2e-spt008`). Bis dahin: Doku nur; keine Migration,
 keine Datenänderung, kein Import.
 
+**Nachtrag 05.11.2026 (4j-KORR):** Die drei `oa_platforms` Spotify/YouTube/Deezer
+und Midroll-Rules bleiben **historisch umgesetzt**, sind aber für operative
+V1-Buchung **nicht** als einzeln wählbare Plattformen freigegeben. Midroll =
+gemeinsames Werbemittel `midroll_music_environment`. 4j-5 alter Zuschnitt
+**verworfen**. Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
 Kernmedien unverändert: `pre_stream`, `in_stream`, `pre_stream_influencer`,
 `in_stream_influencer`, `midroll_music_environment`. `native_ad` OUT.
 

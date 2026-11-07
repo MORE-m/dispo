@@ -5,16 +5,20 @@ Bezug: Entscheidungsvorlage 4j-4c (Readiness-Analyse); Midroll-Freigabe 4j-4 /
 `PO-CALC-TKP-1D4c4j4-po-entscheidungsvorlage-2026-11-03.md`
 
 **Status: fachlich freigegeben (PO 04.11.2026) – Strukturentscheidung.**
-Konkrete Stream-Plattformnamen bleiben offen. Bis zu deren Freigabe:
-**keine** neuen Plattformen, **keine** zusätzlichen Rules, **kein** 4j-5.
+**Überholt für V1 durch PO-CALC-TKP-1D4c-4j-KORR (05.11.2026):** Keine
+Stream-Plattformliste und keine Platform×Medium-Befüllung für V1-Buchung.
+Dokument bleibt als historische Entscheidung erhalten.
 
 Kernmedien unverändert: `pre_stream`, `in_stream`, `pre_stream_influencer`,
 `in_stream_influencer`, `midroll_music_environment`. `native_ad` OUT.
 Registry `oa_tkp` / `tkp` bleibt `planned`. OA-004 eigener Vertrag.
 
+Kanonisch ab 05.11.2026:
+`docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
 ---
 
-## Freigegebene Struktur
+## Freigegebene Struktur (historisch 04.11.2026; V1-Buchung: siehe KORR)
 
 ### 1. Pre-/In-Stream
 

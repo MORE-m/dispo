@@ -49,5 +49,11 @@ SHA-256 `a178cd155c0087fc62a12ef0cd1e1a46b006430ee2adf87a64941b119d137420`).
 
 ## STOP
 
-4j-4b lokal abgeschlossen. **Kein** 4j-5. Nächster fachlicher Schritt:
-PO-Entscheidung für Plattformzuordnungen der vier offenen Stream-/Influencer-Medien.
+4j-4b lokal abgeschlossen. **Kein** 4j-5.
+
+**Nachtrag 05.11.2026 (4j-KORR):** Die drei aktiven Midroll-Rules/Plattformen
+bleiben technisch bestehen, sind für V1-Buchung **nicht maßgeblich** (Midroll =
+Bundle-Werbemittel; keine Endnutzer-Plattformwahl). Keine Stream-Plattformliste
+mehr nötig. Nächster Slice: **KORR-2** (Wizard/Resolver-Readiness ohne
+Plattformpflicht). Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.

@@ -8,13 +8,21 @@ DB: `dispo_mat_core` – Preisliste 2027.1 Draft (41), Targetings dmp/geo, Platt
 
 **Nachtrag 03.11.2026 – Nummerierung:** 4j-1 ist auf `main` (PR **#204**,
 Merge `495499a7a409ddc3bfd8ea7f6c31473d402be899`). Die Slice-Nummern in §9 sind
-der Discovery-Stand vom 30.10. und **historisch überholt**. Ab 03.11.2026 gilt
-verbindlich die Nummerierung aus dem 4j-1-Auftrag: **4j-2** Admin-Backend,
-**4j-3** Admin-UI, **4j-4** fachliche Befüllung, **4j-5** Enforcement,
-**4j-6** Wizard/E2E. Die fachliche Empfehlung bleibt: Admin und ausreichend
-befüllte Rule-Basis vor fail-closed Enforcement (`4j-2 → 4j-3 → 4j-4 → 4j-5 → 4j-6`).
+der Discovery-Stand vom 30.10. und **historisch überholt**. Ab 03.11.2026 galt
+die Nummerierung: **4j-2** Admin-Backend, **4j-3** Admin-UI, **4j-4** fachliche
+Befüllung, **4j-5** Enforcement, **4j-6** Wizard/E2E.
 
-**FD-D4c-4j (verbindlich):** Plattformen sind werbeformabhängig. Auswahl und Persistenz nur bei aktiver, fachlich gültiger Zuordnung Platform × OA-Kernmedium.
+**Nachtrag 05.11.2026 – PO-CALC-TKP-1D4c-4j-KORR:** Für operative OA-TKP-V1 gibt
+es **keine** Endnutzer-Plattformauswahl (fünf Werbemittel; Midroll =
+Spotify/YouTube/Deezer-Bundle). **FD-D4c-4j** und fail-closed 4j-5 gelten **nicht**
+als V1-Buchungsvertrag. Technisches Schema/Admin (4j-1…4j-4b) bleibt historisch
+umgesetzt, aber nicht buchungsrelevant. Kanonischer Pfad: **KORR-1…4**; alter
+4j-5/4j-6-Zuschnitt gestoppt/neu zu schneiden. Siehe
+`PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+
+**FD-D4c-4j (historisch Discovery 30.10. / bis KORR):** Plattformen werbeformabhängig;
+Auswahl nur bei aktiver Platform×Medium-Rule. **V1-Status ab 05.11.2026:** nicht
+maßgeblich für Buchung; siehe KORR.
 
 **STOP (Discovery):** keine Plattformanlage, keine Aktivierung, kein Deploy, kein Registry-Flip.
 
