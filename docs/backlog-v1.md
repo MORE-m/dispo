@@ -449,15 +449,20 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
   **PRE-1** reduziert die Fachdatenblocker: 2026 wird benötigt und nutzt
   dieselben Preise wie 2027; `2027.1` ist fachlich freigegeben und technisch
-  weiter Draft; `dmp`/`geo` sind der V1-Katalog. OA-004 bleibt offen,
-  Midroll-Listen-TKP bleibt 80.0000. Dok:
+  weiter Draft; `dmp`/`geo` sind der V1-Katalog. Midroll-Listen-TKP bleibt
+  80.0000. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
   **PRE-2** (09.11.2026): Draft `2026.1` lokal angelegt (41 Items, Parität
   41/41 zu `2027.1`); Active weiter 0; keine Aktivierung. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`.
-- **Weiter offen:** Aktivierung 2026/2027, OA-004, D4d-WIRE,
-  Registry-Release, Release-E2E. OA-003 bleibt außerhalb des ersten
-  Normal-TKP-Releases. Nächster Slice: Aktivierung (separates GO).
+  **OA004-DEC** (09.11.2026): 15 EUR Adserver = interne Einkaufskosten /
+  harte Kosten, kein Verkaufsaufschlag; Midroll 80.0000/20.0000; OA-004
+  kein Release-Blocker für Normal-TKP-V1; kein Runtime-Slice vor D4d-REL.
+  Dok: `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
+- **Weiter offen:** Aktivierung 2026/2027 (PRE-3), D4d-WIRE, Registry-Release,
+  Release-E2E. OA-003 bleibt außerhalb des ersten Normal-TKP-Releases.
+  OA-004-Code ist **nicht** Voraussetzung für D4d-REL. Nächster Slice:
+  Aktivierung (separates GO).
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
   V1-Plattformauswahl; Future OA-005/006 separat
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)

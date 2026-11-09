@@ -197,9 +197,12 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 - **KORR-1…4 erledigt** (Stand 09.11.2026): Vertrag, Readiness, Runtime ohne
   Plattformpflicht (PR #216), E2E fünf Medien (PR #217, CI `42394888095`
   success). Registry bleibt `planned`.
-- **D4d Go/No-Go: NO-GO.** Keine active Preisliste, OA-004 offen, Wizard-Flip
-  würde die Methodenoption schließen. Dok:
-  `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
+- **D4d Go/No-Go: NO-GO.** Keine active Preisliste, Wizard-Flip würde die
+  Methodenoption schließen. **Nachtrag OA004-DEC:** 15 EUR Adserver =
+  interne Kosten, kein Verkaufsaufschlag; Midroll 80/20; OA-004 kein
+  Verkaufs-Release-Blocker. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`,
+  `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis

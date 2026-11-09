@@ -168,7 +168,8 @@ Keys kanonisch: `customer_confirmation`, `audio_motif`, `briefing`,
 - Produktionsmenge: optional, Standardwert 0.
 - Social Media initial vollständig nicht rabattierbar und nicht AE-fähig.
 - Boosterbudget separat, nicht rabattierbar und nicht AE-fähig.
-- Adserver-TKP Spotify/Deezer/YouTube: 15 EUR als Verkaufsbestandteil.
+- Adserver-Kosten Spotify/Deezer/YouTube: 15 EUR TKP als interner Einkaufspreis /
+  harte Kosten; keine zusätzliche Preiswirkung im Verkauf (OA-004, PO 09.11.2026).
 
 ### RHH-Referenzen SWF
 

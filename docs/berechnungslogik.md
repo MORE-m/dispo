@@ -286,8 +286,10 @@ Regeln:
   (**V1 / 4j-KORR 05.11.2026:** keine Endnutzer-Plattformverteilung; Pre-/In über
   getrennte Medien. OA-005/006 = Future.)
 - Targeting-Aufschläge sind additiv, nicht multiplikativ.
-- Der zusätzliche Adserver-TKP für Spotify/Deezer/YouTube ist ein Verkaufsbestandteil
-  (OA-004; Midroll-Bundle-Kontext, keine Einzelplattform-Wahl).
+- OA-004 (15 EUR Adserver-/Einkaufskosten Spotify/Deezer/YouTube im Midroll-Bundle)
+  ist **kein** Verkaufsbestandteil: nicht additiv auf Final-TKP, Listen-TKP oder
+  Mindest-TKP; keine Änderung an OA-001/OA-002. Midroll-Listenpreis bleibt
+  `80.0000` / `20.0000` (kein `80 + 15`). Interne Kostenbetrachtung = Future.
 
 ## Social Media und Influencer
 
