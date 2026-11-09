@@ -1,6 +1,33 @@
 # Fortschritt V1
 
-Stand: 5. November 2026 – **PO-CALC-TKP-1D4c-4j-KORR** PO-Vertrag Plattformmodell V1
+Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-1** PO-Fachentscheidung.
+D4d bleibt **NO-GO**. Registry `oa_tkp`/`tkp` bleibt **planned**.
+Freigegeben: eigene Preisliste **2026** mit denselben Werten wie 2027;
+Draft **`2027.1`** (41 Items) ist die fachliche Preisbasis, weiter Draft;
+V1-Targeting nur `dmp` (25.0000/5.0000) und `geo` (15.0000/3.0000).
+OA-004 bleibt **offen / fachlich zu klären**; Midroll-Listen-TKP bleibt
+**80.0000**, keine Annahme 80+15. Fachdatenblocker reduziert auf: Aufbau
+der 2026-Liste, Aktivierung beider Jahre, OA-004, D4d-WIRE, Registry-Release,
+Release-E2E. OA-003 bleibt außerhalb des ersten Normal-TKP-Releases.
+Nächster Slice: **D4d-PRE-2** (2026-Liste vorbereiten, nicht aktivieren).
+Dok: `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
+
+Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d** Go/No-Go: **NO-GO**.
+KORR-1…4 sind abgeschlossen (KORR-1 PR **#212** `b4c8231`; KORR-2 ohne
+eigenen Merge, Folge in KORR-3; KORR-3 PR **#216** `b87213f`; KORR-4 PR
+**#217** `8366b82`, Post-Merge-CI `42394888095` success). V1-Vertrag bleibt:
+fünf OA-Werbemittel, keine Endnutzer-Plattformauswahl, Midroll =
+Spotify/YouTube/Deezer-Bundle, OA-005/006 Future, Platform×Medium-Rules
+nicht buchungsrelevant, 4j-5 verworfen. Registry `oa_tkp`/`tkp` bleibt
+**planned**. Nicht produktiv freigegeben. Blocker vor jedem Flip: keine
+active OA-Preisliste (nur Draft `2027.1`, Jahr 2026 ohne Liste), OA-004
+nicht belegt, Targeting nur `dmp`/`geo` ohne Freigabebeleg, Registry-Flip
+würde die Wizard-Methodenoption schließen. OA-003 bleibt späterer Slice
+(empfohlene spätere Teilfreigabe nur Normal-TKP). Nächster Slice:
+**D4d-PRE-1** (PO-Fachentscheidung, keine Aktivierung).
+Dok: `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
+
+Stand davor: 5. November 2026 – **PO-CALC-TKP-1D4c-4j-KORR** PO-Vertrag Plattformmodell V1
 korrigiert (Docs-only): fünf Werbemittel ohne Endnutzer-Plattformauswahl; Midroll
 = Spotify/YouTube/Deezer-**Bundle**; OA-005/006 = Future; **4j-5** alter Zuschnitt
 **verworfen**; 4j-6 neu zu schneiden; bestehende drei Plattformen + Midroll-Rules
