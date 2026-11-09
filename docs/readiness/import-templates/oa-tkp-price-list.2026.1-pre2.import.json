@@ -1,0 +1,274 @@
+{
+    "_meta": {
+        "slice": "PO-CALC-TKP-1D4d-PRE-2",
+        "purpose": "Draft-Preisliste 2026.1 mit exakt denselben 41 Preiswerten wie freigegebene 2027.1 (kein Activate)",
+        "source": "dispo_mat_core oa_tkp_price_lists.id=1 version=2027.1 revision=1 draft",
+        "generated_at": "2026-11-09",
+        "pair_count": 41,
+        "price_year": 2026,
+        "native_ad": "excluded",
+        "parity_with": "2027.1",
+        "pairs_by_medium": {
+            "in_stream": 10,
+            "in_stream_influencer": 10,
+            "midroll_music_environment": 1,
+            "pre_stream": 10,
+            "pre_stream_influencer": 10
+        },
+        "import_contract": "D4c-2 oa:import-price-list status=draft only"
+    },
+    "year": 2026,
+    "name": "OA-TKP 2026 (PRE-2 Parität zu 2027.1)",
+    "version": "2026.1",
+    "revision_number": 1,
+    "status": "draft",
+    "valid_from": "2026-01-01",
+    "items": [
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_80er_90er_oldie_antenne_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_caravan_fm",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_ffn_hamburg_plus",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_more_hamburg_kombi",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_more_hamburg_kombi_plus",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_more_kombi_podcast",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_radio_bollerwagen_dab_plus_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_radio_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream",
+            "inventory_code": "inv_rock_antenne_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_80er_90er_oldie_antenne_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_caravan_fm",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_ffn_hamburg_plus",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_more_hamburg_kombi",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_more_hamburg_kombi_plus",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_more_kombi_podcast",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_radio_bollerwagen_dab_plus_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_radio_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "in_stream_influencer",
+            "inventory_code": "inv_rock_antenne_hamburg",
+            "list_tkp": "44.0000",
+            "minimum_tkp": "8.0000"
+        },
+        {
+            "medium_code": "midroll_music_environment",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "80.0000",
+            "minimum_tkp": "20.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_80er_90er_oldie_antenne_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_caravan_fm",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_ffn_hamburg_plus",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_more_hamburg_kombi",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_more_hamburg_kombi_plus",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_more_kombi_podcast",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_radio_bollerwagen_dab_plus_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_radio_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream",
+            "inventory_code": "inv_rock_antenne_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_80er_90er_oldie_antenne_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_caravan_fm",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_ffn_hamburg_plus",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_more_hamburg_kombi",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_more_hamburg_kombi_plus",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_more_kombi_online_audio",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_more_kombi_podcast",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_radio_bollerwagen_dab_plus_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_radio_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        },
+        {
+            "medium_code": "pre_stream_influencer",
+            "inventory_code": "inv_rock_antenne_hamburg",
+            "list_tkp": "56.0000",
+            "minimum_tkp": "14.0000"
+        }
+    ]
+}

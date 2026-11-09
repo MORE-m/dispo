@@ -1,6 +1,19 @@
 # Fortschritt V1
 
-Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-1** PO-Fachentscheidung.
+Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-2** Datenbereitstellung.
+D4d bleibt **NO-GO**. Registry `oa_tkp`/`tkp` bleibt **planned**.
+Lokal in `dispo_mat_core`: Draft **`2026.1`** (id=2, 41 Items) aus
+fachlich freigegebener Draft-`2027.1` (id=1) angelegt; Parität **41/41**;
+Active weiterhin **0** für beide Jahre; Targetings `dmp`/`geo` unverändert;
+OA-004 offen, Midroll 80.0000/20.0000. Aktivierung nur Dry-Run analysiert,
+nicht geschrieben. Backup
+`local-backups/po-calc-tkp-1d4d-pre2-20261109-173428/` (nicht in Git).
+Lieferdatei:
+`docs/readiness/import-templates/oa-tkp-price-list.2026.1-pre2.import.json`.
+Nächster Slice: Aktivierung 2026/2027 (separates GO) – hier nicht gestartet.
+Dok: `docs/readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`.
+
+Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-1** PO-Fachentscheidung.
 D4d bleibt **NO-GO**. Registry `oa_tkp`/`tkp` bleibt **planned**.
 Freigegeben: eigene Preisliste **2026** mit denselben Werten wie 2027;
 Draft **`2027.1`** (41 Items) ist die fachliche Preisbasis, weiter Draft;
@@ -9,7 +22,7 @@ OA-004 bleibt **offen / fachlich zu klären**; Midroll-Listen-TKP bleibt
 **80.0000**, keine Annahme 80+15. Fachdatenblocker reduziert auf: Aufbau
 der 2026-Liste, Aktivierung beider Jahre, OA-004, D4d-WIRE, Registry-Release,
 Release-E2E. OA-003 bleibt außerhalb des ersten Normal-TKP-Releases.
-Nächster Slice: **D4d-PRE-2** (2026-Liste vorbereiten, nicht aktivieren).
+Nächster Slice war damals **D4d-PRE-2**.
 Dok: `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
 
 Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d** Go/No-Go: **NO-GO**.

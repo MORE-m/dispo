@@ -452,9 +452,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   weiter Draft; `dmp`/`geo` sind der V1-Katalog. OA-004 bleibt offen,
   Midroll-Listen-TKP bleibt 80.0000. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
-- **Weiter offen:** Aufbau der 2026-Preisliste, Aktivierung 2026/2027,
-  OA-004, D4d-WIRE, Registry-Release, Release-E2E. OA-003 bleibt außerhalb
-  des ersten Normal-TKP-Releases. Nächster Slice **D4d-PRE-2**.
+  **PRE-2** (09.11.2026): Draft `2026.1` lokal angelegt (41 Items, Parität
+  41/41 zu `2027.1`); Active weiter 0; keine Aktivierung. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`.
+- **Weiter offen:** Aktivierung 2026/2027, OA-004, D4d-WIRE,
+  Registry-Release, Release-E2E. OA-003 bleibt außerhalb des ersten
+  Normal-TKP-Releases. Nächster Slice: Aktivierung (separates GO).
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
   V1-Plattformauswahl; Future OA-005/006 separat
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)

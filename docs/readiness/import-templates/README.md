@@ -12,6 +12,7 @@ Analyse D4c-3 (28.10.2026): noch **keine** belegten Listen-/Mindest-TKPs im Repo
 | `oa-tkp-price-matrix-2026-2027.csv` | Fachlieferung (Excel) | 82 Zeilen: 41 Paare × 2026/2027; `list_tkp`/`minimum_tkp` leer |
 | `oa-tkp-abnahmematrix-d4c3-2026-2027.csv` | Fach-Abnahme | dieselbe Matrix + Quelle/Freigabestatus/fehlende Angaben (D4c-3) |
 | `oa-tkp-price-list.import.skeleton.json` | **Objekt** → `OaTkpPriceListImporter::import($payload)` | JSON-Import; `items` aus Matrix befüllen; `status` zuerst `draft` |
+| `oa-tkp-price-list.2026.1-pre2.import.json` | **Objekt** → `oa:import-price-list` | PRE-2: Draft `2026.1` mit 41 Werten = Parität zu freigegebener `2027.1` (kein Activate) |
 | `oa-platforms.template.csv` | Fachlieferung | Plattformzeilen |
 | `oa-platforms.import.skeleton.json` | **JSON-Array** → `OaPlatformImporter::import($rows)` | leeres Array `[]` |
 | `oa-platforms.4j4a-midroll-grundbestand.import.json` | **JSON-Array** → `oa:import-platforms` | PO-freigegebener Midroll-Grundbestand (4j-4a; zunächst inaktiv; Import separat) |
