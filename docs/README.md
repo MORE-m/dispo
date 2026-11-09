@@ -50,6 +50,7 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md) | D4d-PRE-1: 2026/2027.1 und `dmp`/`geo` freigegeben; OA-004 damals offen (Nachtrag OA004-DEC); D4d weiter **NO-GO** |
 | [`readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md) | D4d-PRE-2: Draft `2026.1` aus `2027.1` (41/41); Active=0; keine Aktivierung; D4d weiter **NO-GO** |
 | [`readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md) | OA004-DEC: 15 EUR Adserver = interne Kosten; Midroll 80/20; kein Verkaufs-Blocker |
+| [`readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md) | D4d-PRE-3: `2026.1`/`2027.1` active; Registry `planned`; D4d weiter **NO-GO** |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |

@@ -459,10 +459,12 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   harte Kosten, kein Verkaufsaufschlag; Midroll 80.0000/20.0000; OA-004
   kein Release-Blocker für Normal-TKP-V1; kein Runtime-Slice vor D4d-REL.
   Dok: `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
-- **Weiter offen:** Aktivierung 2026/2027 (PRE-3), D4d-WIRE, Registry-Release,
-  Release-E2E. OA-003 bleibt außerhalb des ersten Normal-TKP-Releases.
-  OA-004-Code ist **nicht** Voraussetzung für D4d-REL. Nächster Slice:
-  Aktivierung (separates GO).
+  **PRE-3** (09.11.2026): `2026.1` und `2027.1` lokal **active** (je 41,
+  1 Active/Jahr); Registry `planned`. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`.
+- **Weiter offen:** D4d-WIRE, Registry-Release, Release-E2E. OA-003 bleibt
+  außerhalb des ersten Normal-TKP-Releases. OA-004-Code ist **nicht**
+  Voraussetzung für D4d-REL. Nächster Slice: **D4d-WIRE**.
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
   V1-Plattformauswahl; Future OA-005/006 separat
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
