@@ -541,7 +541,7 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 
 **OA-003** Bei Festpreis wird der effektive TKP automatisch berechnet und ebenfalls gegen den Mindest-TKP geprüft. Online-Audio-Festpreis erfordert immer eine Sonderfreigabe.
 
-**OA-004** Der zusätzliche Adserver-TKP von 15 EUR bei Spotify/Deezer/YouTube wird als Verkaufs-TKP/Preisbestandteil geführt.
+**OA-004** Für das Midroll-Musikumfeld (Spotify / YouTube / Deezer als gemeinsames Bundle-Werbemittel) entstehen interne Adserver-/Einkaufskosten von 15 EUR TKP. Diese Kosten dienen ausschließlich der internen kaufmännischen Betrachtung und werden nicht auf den Listen-TKP oder den finalen Verkaufspreis aufgeschlagen. Keine Einzelplattform-Auswahl daraus; keine Preiswirkung im V1-Kalkulationspfad.
 
 ## 11.2 Plattformen, Mengen und Targeting
 

@@ -18,6 +18,14 @@ freigegeben. OA-004 bleibt offen, Midroll-Listen-TKP bleibt 80.0000.
 D4d bleibt NO-GO. Dok:
 `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
 
+Nachtrag OA004-DEC, 9. November 2026: OA-004 fachlich geklärt –
+15 EUR Adserver-TKP = interne Einkaufskosten / harte Kosten, **kein**
+Verkaufsaufschlag. Midroll bleibt `80.0000` / `20.0000` (kein `80 + 15`).
+OA-004 ist **kein Release-Blocker** mehr für den Normal-TKP-V1-Verkauf;
+kein Runtime-Slice vor D4d-REL. D4d bleibt NO-GO wegen Preislisten /
+WIRE / Registry. Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
+
 Fachdaten gelesen aus der lokalen DB `dispo_mat_core` (nur SELECT,
 9. November 2026). Testfixtures sind keine Fachdaten.
 
@@ -45,9 +53,9 @@ Fachdaten gelesen aus der lokalen DB `dispo_mat_core` (nur SELECT,
 ### Weiterhin offen
 
 - D4d Registry- und Produktivfreigabe (**dieser Bericht: NO-GO**)
-- OA-004
+- OA-004 → **Nachtrag OA004-DEC:** fachlich geklärt, kein Verkaufs-Preisblocker
 - OA-003 / OA-Festpreis (empfohlene spätere Teilfreigabe, siehe F)
-- reale Fachdaten- und Preislistenfreigabe
+- reale Fachdaten- und Preislistenfreigabe (PRE-2/PRE-3, WIRE, REL)
 
 ---
 
@@ -302,6 +310,16 @@ OA-004 ist nicht umgesetzt. Midroll darf produktiv nicht freigegeben werden,
 solange nicht fachlich belegt ist, dass der Listenpreis die 15 EUR bereits
 enthält. Das ist ein D4d-NO-GO.
 
+**Nachtrag OA004-DEC, 9. November 2026:** Die 15 EUR sind **interne
+Einkaufskosten / harte Kosten**, kein Verkaufsbestandteil. Sie werden im
+V1-Verkaufspreis **nicht** addiert. Midroll-Listenpreis bleibt `80.0000` /
+`20.0000`. Ist-Zustand (0 Zeilen `oa_adserver_surcharges`, Engine addiert
+nichts) ist für den Verkaufspfad **korrekt**. OA-004 ist fachlich geklärt
+und **kein Release-Blocker** mehr für Normal-TKP-V1. Kein Runtime-Slice
+vor D4d-REL. D4d bleibt NO-GO aus anderen Gates (Preislisten, WIRE,
+Registry). Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
+
 ### Midroll-Preisbeispiel (Draft, nicht produktiv)
 
 Quelle: `oa_tkp_price_list_items` der Draft-Liste `2027.1`, Medium
@@ -424,8 +442,8 @@ darf SO-Options und Budget nicht mitöffnen. Der Materializer-Reject und
 | OA-001 | Effective-Minimum umgesetzt | `OaTkpNormalEngine`, Assessor | nein |
 | OA-002 | Speichern ja; Sonderfreigabe vor Disposition; Freitext offen seit 1C1 | Assessor, ApprovalService, Policy | nein für D4d; Freitext bleibt Follow-up |
 | OA-003 | nicht implementiert | Writer erzwingt `normal` / `fixed_price_nn=null` | nein für eine **ausdrückliche** Normal-TKP-Teilfreigabe (Empfehlung B); ja für einen vollständigen BL-P6-01-Release (Variante A) |
-| OA-004 | nicht umgesetzt, nicht im Listenpreis belegt | Engine, 0 Adserver-Zeilen, Midroll-Draft 80.0000 | **ja** |
-| OA-008/009 Targeting | Mechanik da; nur `dmp`/`geo` ohne Freigabebeleg | 2 Zeilen | **ja** (Fachdaten) |
+| OA-004 | historisch: nicht als Verkaufsaufschlag umgesetzt; **Nachtrag OA004-DEC:** interne Kosten, keine Verkaufs-Preiswirkung nötig | Engine, 0 Adserver-Zeilen, Midroll-Draft 80.0000 | **nein** (Nachtrag OA004-DEC) |
+| OA-008/009 Targeting | Mechanik da; `dmp`/`geo` freigegeben (PRE-1) | 2 Zeilen | **nein** (Nachtrag PRE-1) |
 | Wizard | Soft-Open nur vor Release; nach Release derzeit ohne Option | Capability + Options-Resolver | **ja** |
 | HTTP Store/Update | testseitig mit Fake; produktiv zu | D4b-2, Guard | nein als Code, solange der Wizard-Pfad vor dem Flip korrigiert wird |
 | Dispo | Codepfad unter Fake belegt; 0 Realvorgänge | KORR-4, D3* | nein als Code |
@@ -441,16 +459,17 @@ darf SO-Options und Budget nicht mitöffnen. Der Materializer-Reject und
 
 **NO-GO.**
 
-GO wäre nur zulässig, wenn Preisdaten, OA-004, Targeting-Freigabe und ein
+GO wäre nur zulässig, wenn Preisdaten, Targeting-Freigabe und ein
 Wizard-Pfad, der nach dem Flip sichtbar bleibt, vorhanden wären.
 Das ist nicht der Fall.
 
 CONDITIONAL GO (Normal-TKP ja, Festpreis OUT) ist fachlich die richtige
 spätere Form (Variante B), sobald die NO-GO-Gates geschlossen sind.
 Heute ist sie nicht vertretbar: es gibt keine active Preisliste, das
-Wizard-Jahr 2026 hat keine Liste, und der Midroll-Preis wäre ohne
-belegten OA-004-Bestandteil nicht freigabefähig. Der Registry-Flip hätte
-zusätzlich die Wizard-Auswahl geschlossen.
+Wizard-Jahr 2026 hat keine Liste. **Nachtrag OA004-DEC:** der
+Midroll-Verkaufspreis braucht keinen +15-Aufschlag; OA-004 ist kein
+Verkaufs-Gate mehr. Der Registry-Flip hätte zusätzlich die
+Wizard-Auswahl geschlossen.
 
 Registry bleibt `planned`. Nichts aktiviert.
 
@@ -466,15 +485,14 @@ Nur das, was dieser Befund erzwingt.
    kaufmännisch freigeben ja/nein; enthält Midroll `80.0000` die
    15 EUR Adserver bereits ja/nein; sind `dmp`/`geo` der freigegebene
    Zielgruppenkatalog ja/nein.
-2. **OA-004** – nur wenn die PO-Antwort zu Midroll „nein, 15 EUR sind
-   nicht im Listenpreis“ ist. Sonst dokumentierte Teilfeststellung
-   „im Listenpreis enthalten“, ohne neue Preislogik.
+2. **OA-004** – **Nachtrag OA004-DEC:** geklärt als interne Kosten;
+   kein Verkaufs-Runtime-Slice vor D4d-REL.
 3. **D4d-WIRE** – Released-Pfad zeigt die fünf Medien im Kalkulationswizard
    und lässt Standardangebote sowie Budget zu. Registry bleibt in diesem
    Slice `planned`. `kind=NULL` wird dabei berücksichtigt.
-4. **D4d-REL** – erst nach active Liste für jedes freigegebene Preisjahr,
-   nach OA-004-Klärung, nach Targeting-Freigabe und nach D4d-WIRE.
-   Dann erst Katalog-Flip.
+4. **D4d-REL** – erst nach active Liste für jedes freigegebene Preisjahr
+   (PRE-2/PRE-3), nach Targeting-Freigabe (PRE-1 erledigt) und nach
+   D4d-WIRE. OA-004-Code ist **nicht** Voraussetzung. Dann erst Katalog-Flip.
 5. **D4d-E2E** – Smoke ohne Test-Fake gegen die echte Registry.
 
 OA-003 nicht in dieser Reihe. Erst nach der Teilfreigabe Normal-TKP,

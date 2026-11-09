@@ -1,16 +1,26 @@
 # Fortschritt V1
 
-Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-2** Datenbereitstellung.
+Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-OA004-DEC** Adserver-TKP
+als interne Kosten. 15 EUR = Einkaufskosten / harte Kosten, **kein**
+Verkaufsaufschlag; Midroll bleibt **80.0000 / 20.0000** (kein `80 + 15`).
+OA-004 fachlich geklärt, **kein Release-Blocker** für Normal-TKP-V1;
+kein Runtime-Slice vor D4d-REL. `oa_adserver_surcharges` nicht als
+Verkaufsaufschlag befüllen. D4d bleibt **NO-GO**. Registry `planned`.
+PRE-2 erledigt (Draft `2026.1`). Verbleibende Blocker: PRE-3 (Aktivierung),
+D4d-WIRE, D4d-REL, D4d-E2E. OA-003 außerhalb des ersten Normal-TKP-Releases.
+Docs-only. Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
+
+Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-2** Datenbereitstellung.
 D4d bleibt **NO-GO**. Registry `oa_tkp`/`tkp` bleibt **planned**.
 Lokal in `dispo_mat_core`: Draft **`2026.1`** (id=2, 41 Items) aus
 fachlich freigegebener Draft-`2027.1` (id=1) angelegt; Parität **41/41**;
 Active weiterhin **0** für beide Jahre; Targetings `dmp`/`geo` unverändert;
-OA-004 offen, Midroll 80.0000/20.0000. Aktivierung nur Dry-Run analysiert,
-nicht geschrieben. Backup
-`local-backups/po-calc-tkp-1d4d-pre2-20261109-173428/` (nicht in Git).
+Midroll 80.0000/20.0000. Aktivierung nur Dry-Run analysiert, nicht geschrieben.
+Backup `local-backups/po-calc-tkp-1d4d-pre2-20261109-173428/` (nicht in Git).
 Lieferdatei:
 `docs/readiness/import-templates/oa-tkp-price-list.2026.1-pre2.import.json`.
-Nächster Slice: Aktivierung 2026/2027 (separates GO) – hier nicht gestartet.
+Nächster Slice damals: Aktivierung 2026/2027 (separates GO).
 Dok: `docs/readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`.
 
 Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-1** PO-Fachentscheidung.
@@ -18,8 +28,8 @@ D4d bleibt **NO-GO**. Registry `oa_tkp`/`tkp` bleibt **planned**.
 Freigegeben: eigene Preisliste **2026** mit denselben Werten wie 2027;
 Draft **`2027.1`** (41 Items) ist die fachliche Preisbasis, weiter Draft;
 V1-Targeting nur `dmp` (25.0000/5.0000) und `geo` (15.0000/3.0000).
-OA-004 bleibt **offen / fachlich zu klären**; Midroll-Listen-TKP bleibt
-**80.0000**, keine Annahme 80+15. Fachdatenblocker reduziert auf: Aufbau
+OA-004 war damals **offen / fachlich zu klären**; Midroll-Listen-TKP bleibt
+**80.0000**, keine Annahme 80+15. Fachdatenblocker damals: Aufbau
 der 2026-Liste, Aktivierung beider Jahre, OA-004, D4d-WIRE, Registry-Release,
 Release-E2E. OA-003 bleibt außerhalb des ersten Normal-TKP-Releases.
 Nächster Slice war damals **D4d-PRE-2**.

@@ -62,27 +62,20 @@ Keine weiteren Targetings.
 
 ## 4. OA-004 / 15 EUR Adserver
 
-**Nicht entschieden.** Status: `offen / fachlich zu klären`.
+**Zum Zeitpunkt PRE-1:** `Nicht entschieden.` Status war
+`offen / fachlich zu klären`.
 
-Die Anforderung steht im Repository:
+Die damalige Anforderungsformulierung im Repository lautete sinngemäß
+„Verkaufs-TKP / Preisbestandteil“. Offen waren Herkunft, Geltung und
+ob die 15 EUR im Midroll-Listen-TKP **80.0000** enthalten oder zusätzlich
+gelten. Keine Annahme „80 + 15“.
 
-- `docs/anforderungskatalog.md`, OA-004: zusätzlicher Adserver-TKP von
-  15 EUR bei Spotify/Deezer/YouTube als Verkaufs-TKP/Preisbestandteil
-- `docs/initialdaten.md`: Adserver-TKP Spotify/Deezer/YouTube 15 EUR
-  als Verkaufsbestandteil
-
-Eine belastbare separate Fachquelle fehlt dafür:
-
-- woher die 15 EUR stammen
-- ob sie weiterhin gelten
-- ob sie im Midroll-Listen-TKP bereits enthalten sind
-- ob sie zusätzlich auf den Listen-TKP zu rechnen sind
-
-Der fachlich bestätigte Midroll-Listen-TKP der aktuellen Preislieferung
-bleibt **80.0000**. Dieser Slice ändert ihn nicht auf 95.0000.
-Keine Annahme „80 + 15“.
-
-OA-004 bleibt bis zur Klärung ein D4d-Releasepunkt für Midroll.
+**Nachtrag OA004-DEC, 9. November 2026:** fachlich geklärt.
+15 EUR = interne Einkaufskosten / harte Kosten; **kein** Verkaufsaufschlag;
+keine Preiswirkung auf Listen-/Final-/Mindest-TKP. Midroll bleibt
+`80.0000` / `20.0000`. OA-004 ist **kein Release-Blocker** mehr für den
+Normal-TKP-V1-Verkauf; kein Runtime-Slice vor D4d-REL.
+Dok: `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
 
 ## 5. Konsequenz für D4d
 
@@ -97,7 +90,7 @@ Weiter offen, deshalb weiterhin NO-GO:
 
 - Aufbau der 2026-Preisliste
 - Aktivierung 2026 und 2027
-- OA-004
+- OA-004 → **Nachtrag OA004-DEC:** geklärt, kein Verkaufs-Preisblocker
 - D4d-WIRE (Wizard bleibt nach einem reinen Registry-Flip ohne Methodenoption)
 - Registry-Release
 - Release-E2E
