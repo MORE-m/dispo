@@ -440,10 +440,21 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **4j-KORR** (PO 05.11.2026): keine Endnutzer-Plattformauswahl; Midroll =
   Spotify/YouTube/Deezer-Bundle; OA-005/006 = Future; bestehende Plattformen/Rules
   nicht V1-buchungsrelevant. Registry `oa_tkp`/`tkp` bleibt `planned`.
-- **Weiter offen:** **KORR-2** Wizard/Resolver-Readiness ohne Plattformpflicht;
-  **KORR-3** Runtime-Minimalslice; **KORR-4** E2E; Registry-Release; produktive
-  OA-TKP-Freigabe; OA-004. **4j-5** alter Zuschnitt **gestoppt/verworfen**;
-  **4j-6** neu zu schneiden. Pfad: `KORR-1 → KORR-2 → KORR-3 → KORR-4`.
+  **KORR-1…4 erledigt** (09.11.2026): KORR-1 Vertrag (PR **#212**);
+  KORR-2 Readiness (kein eigener Merge, Folge in KORR-3); KORR-3 Runtime
+  ohne Plattformpflicht (PR **#216**); KORR-4 E2E (PR **#217**, CI
+  `42394888095` success). **4j-5** alter Zuschnitt **verworfen**.
+- **D4d (09.11.2026): weiterhin NO-GO.** OA-TKP ist nicht produktiv
+  freigegeben. Go/No-Go:
+  `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
+  **PRE-1** reduziert die Fachdatenblocker: 2026 wird benötigt und nutzt
+  dieselben Preise wie 2027; `2027.1` ist fachlich freigegeben und technisch
+  weiter Draft; `dmp`/`geo` sind der V1-Katalog. OA-004 bleibt offen,
+  Midroll-Listen-TKP bleibt 80.0000. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
+- **Weiter offen:** Aufbau der 2026-Preisliste, Aktivierung 2026/2027,
+  OA-004, D4d-WIRE, Registry-Release, Release-E2E. OA-003 bleibt außerhalb
+  des ersten Normal-TKP-Releases. Nächster Slice **D4d-PRE-2**.
 - **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
   V1-Plattformauswahl; Future OA-005/006 separat
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)

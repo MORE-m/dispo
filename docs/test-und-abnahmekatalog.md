@@ -192,8 +192,14 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   4j-5 damals gesperrt; Registry planned. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`.
 - **D4c-4j-KORR:** V1 ohne Endnutzer-Plattformauswahl; Midroll = Bundle; OA-005/006
-  Future; 4j-5 alter Zuschnitt verworfen; Pfad KORR-2…4. Dok:
+  Future; 4j-5 alter Zuschnitt verworfen. Dok:
   `docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
+- **KORR-1…4 erledigt** (Stand 09.11.2026): Vertrag, Readiness, Runtime ohne
+  Plattformpflicht (PR #216), E2E fünf Medien (PR #217, CI `42394888095`
+  success). Registry bleibt `planned`.
+- **D4d Go/No-Go: NO-GO.** Keine active Preisliste, OA-004 offen, Wizard-Flip
+  würde die Methodenoption schließen. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
 - Freeze in Create/Revision-TX nach Positions-Snapshots + Dyn-Feld-Capture; keine Live-Neuberechnung
 - Konflikt Calc↔Derived: Create erlaubt; UI-Hinweis
@@ -386,7 +392,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
 | AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt (**V1 / 4j-KORR:** Plattformteil = Future; Abnahme ohne Plattformauswahl nach KORR-3/4) |
-| AT-09 | OA-001–OA-003 | Basis-TKP unter Minimum | Speichern möglich; Übergabe ohne Begründung/Sonderfreigabe blockiert |
+| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge) | Speichern möglich; Sonderfreigabe vor Disposition. OA-003 Festpreis nicht implementiert. D4d NO-GO |
 | AT-10 | SOC-001–SOC-006 | Paket aus Story, Reel und Booster | Unterpositionen und Medien-/Boostertrennung; initial kein Rabatt/AE |
 | AT-11 | PRO-001–PRO-007 | Produktion mit Menge 0, regulär und Sonstiges | Preislistenbezug; reguläre Überschreibung nur mit Begründung/Freigabe |
 | AT-12 | AUTH-004, AUTH-005 | Ersteller versucht eigene Freigabe | Server blockiert; andere berechtigte Person kann freigeben |
