@@ -47,6 +47,7 @@ use App\Support\Calculation\OaTkpHttpReleaseGuard;
 use App\Support\Calculation\OaTkpWizardCapability;
 use App\Support\DynamicField\ChoiceFieldValueContract;
 use App\Support\Inventory\InventoryIdentity;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use App\Support\PriceList\PriceListCalendar;
 use App\Support\PriceList\PriceListYearSelection;
 use Illuminate\Http\JsonResponse;
@@ -504,11 +505,36 @@ class CalculationController extends Controller
             ->get(['id', 'name', 'code', 'kind', 'category_id', 'default_length_seconds', 'is_discountable', 'is_ae_eligible', 'is_active', 'calculation_method_mode', 'default_calculation_method_id', 'component_profile']);
 
         $media = $activeMedia->concat($historicalMedia)->values()->map(
-            function (AdvertisingMedium $medium) use ($includeWizardPlannedTkp): array {
+            function (AdvertisingMedium $medium) use ($includeWizardPlannedTkp, $forCalculationWizard): array {
                 $bookability = $this->liveBookability->payloadForMedium($medium);
                 $methodOptions = $this->methodOptionsResolver
                     ->resolve($medium, includeWizardPlannedTkp: $includeWizardPlannedTkp)
                     ->toPayload();
+
+                // PO-CALC-TKP-1D4d-WIRE: Standardangebote dürfen OA-TKP nicht über
+                // LiveBookability-is_bookable miterhalten (Defense-in-depth).
+                if (! $forCalculationWizard && OaTkpCoreMedia::contains((string) $medium->code)) {
+                    $bookability = [
+                        'is_bookable_for_new_positions' => false,
+                        'unbookable_reason' => 'TKP-Positionen sind in Standardangeboten nicht verfügbar.',
+                    ];
+                    $methods = array_values(array_filter(
+                        $methodOptions['methods'],
+                        static fn (array $row): bool => $row['key'] !== OaTkpWriterPositionResolver::METHOD_KEY,
+                    ));
+                    $methodOptions['methods'] = $methods;
+                    $defaultKey = $methodOptions['default_calculation_method_key'];
+                    $defaultStillPresent = false;
+                    foreach ($methods as $row) {
+                        if ($row['key'] === $defaultKey) {
+                            $defaultStillPresent = true;
+                            break;
+                        }
+                    }
+                    if ($defaultKey === OaTkpWriterPositionResolver::METHOD_KEY || ! $defaultStillPresent) {
+                        $methodOptions['default_calculation_method_key'] = null;
+                    }
+                }
 
                 return [
                     'id' => $medium->id,

@@ -12,6 +12,7 @@ use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\CalculationMethod;
 use App\Support\Calculation\CalculationMethodFreezeResolver;
 use App\Support\Calculation\EngineProfileRegistry;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
 use InvalidArgumentException;
 use ValueError;
 
@@ -50,20 +51,28 @@ final class AdvertisingMediumLiveBookability
 
         $kindRaw = $medium->getAttributes()['kind'] ?? null;
         if ($kindRaw === null || trim((string) $kindRaw) === '') {
-            return $this->blocked('Keine freigegebene Berechnungsmethode vorhanden.');
-        }
-
-        $kind = CalculationKind::tryFrom(trim((string) $kindRaw));
-        $expectedProfile = match ($kind) {
-            CalculationKind::SpotClassic => EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
-            CalculationKind::SwfTrailer => EngineProfileRegistry::PROFILE_SWF_TRAILER,
-            CalculationKind::SwfAllonge => EngineProfileRegistry::PROFILE_SWF_ALLONGE,
-            CalculationKind::SwfPromo => EngineProfileRegistry::PROFILE_SWF_PROMO,
-            CalculationKind::SwfContest => EngineProfileRegistry::PROFILE_SWF_CONTEST,
-            default => null,
-        };
-        if ($expectedProfile === null) {
-            return $this->blocked('Nur Spot Classic, Trailer, Allonge, Promo/Moderation und Gewinnspiel/Pay-Off sind derzeit für neue Kalkulationen freigegeben.');
+            // PO-CALC-TKP-1D4d-WIRE: OA-V1-Core darf kind=null behalten; Bookability
+            // läuft über Assignment oa_tkp×tkp + Registry-Release (kein Soft-Open).
+            // Alle anderen kind=NULL-Medien bleiben fail-closed.
+            $code = trim((string) $medium->code);
+            if (! OaTkpCoreMedia::contains($code)) {
+                return $this->blocked('Keine freigegebene Berechnungsmethode vorhanden.');
+            }
+            $expectedProfile = EngineProfileRegistry::PROFILE_OA_TKP;
+        } else {
+            $kind = CalculationKind::tryFrom(trim((string) $kindRaw));
+            $expectedProfile = match ($kind) {
+                CalculationKind::SpotClassic => EngineProfileRegistry::PROFILE_SPOT_CLASSIC,
+                CalculationKind::SwfTrailer => EngineProfileRegistry::PROFILE_SWF_TRAILER,
+                CalculationKind::SwfAllonge => EngineProfileRegistry::PROFILE_SWF_ALLONGE,
+                CalculationKind::SwfPromo => EngineProfileRegistry::PROFILE_SWF_PROMO,
+                CalculationKind::SwfContest => EngineProfileRegistry::PROFILE_SWF_CONTEST,
+                CalculationKind::OaTkp => EngineProfileRegistry::PROFILE_OA_TKP,
+                default => null,
+            };
+            if ($expectedProfile === null) {
+                return $this->blocked('Nur Spot Classic, Trailer, Allonge, Promo/Moderation und Gewinnspiel/Pay-Off sind derzeit für neue Kalkulationen freigegeben.');
+            }
         }
 
         $medium->loadMissing([

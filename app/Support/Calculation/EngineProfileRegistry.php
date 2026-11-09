@@ -49,6 +49,18 @@ final class EngineProfileRegistry
     public const PROFILE_OA_TKP = 'oa_tkp';
 
     /**
+     * Test-only: simuliert Domain-Release für oa_tkp×tkp ohne produktiven CATALOG-Flip.
+     * null = Katalog; gesetztes Array = Override nur für dieses Paar.
+     *
+     * @var array{
+     *     pair_status: EngineCapabilityStatus,
+     *     current_released_version: string|null,
+     *     versions: array<string, EngineCapabilityStatus>
+     * }|null
+     */
+    private static ?array $oaTkpPairOverrideForTests = null;
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -234,6 +246,35 @@ final class EngineProfileRegistry
     }
 
     /**
+     * Test-only: oa_tkp×tkp als released/v1 simulieren (WIRE/REL-Tests).
+     * Wirft außerhalb von Unit-/Feature-Tests – kein produktiver Schalter.
+     */
+    public static function fakeOaTkpPairReleasedForTests(): void
+    {
+        if (! app()->runningUnitTests()) {
+            throw new \LogicException(
+                'OA-TKP Registry-Pair-Fake ist nur in Unit-/Feature-Tests erlaubt.',
+            );
+        }
+
+        self::$oaTkpPairOverrideForTests = [
+            'pair_status' => EngineCapabilityStatus::Released,
+            'current_released_version' => 'v1',
+            'versions' => [
+                'v1' => EngineCapabilityStatus::Released,
+            ],
+        ];
+    }
+
+    /**
+     * Test-only: Pair-Override zurücksetzen (tearDown).
+     */
+    public static function clearOaTkpPairFakeForTests(): void
+    {
+        self::$oaTkpPairOverrideForTests = null;
+    }
+
+    /**
      * Fachlicher Pair-Status für neue Vorgänge.
      */
     public static function pairStatus(string $engineProfileKey, string $calculationMethodKey): EngineCapabilityStatus
@@ -404,6 +445,14 @@ final class EngineProfileRegistry
     {
         self::assertKnownProfile($engineProfileKey);
         self::assertKnownMethodForProfile($engineProfileKey, $calculationMethodKey);
+
+        if (
+            self::$oaTkpPairOverrideForTests !== null
+            && $engineProfileKey === self::PROFILE_OA_TKP
+            && $calculationMethodKey === 'tkp'
+        ) {
+            return self::$oaTkpPairOverrideForTests;
+        }
 
         return self::catalog()[$engineProfileKey][$calculationMethodKey];
     }
