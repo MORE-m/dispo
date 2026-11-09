@@ -62,7 +62,7 @@ OA-TKP-Preisliste Activate Dry-Run OK: year=2026 revision=1 id=2 archived_previo
 OA-TKP-Preisliste Activate OK: year=2026 revision=1 id=2 archived_previous=0 items=41 dry_run=no
 ```
 
-### Readback
+### Readback (final, nach Wiederherstellung)
 
 | Feld | Wert |
 |---|---|
@@ -70,14 +70,13 @@ OA-TKP-Preisliste Activate OK: year=2026 revision=1 id=2 archived_previous=0 ite
 | revision | 1 |
 | status | **active** |
 | items | 41 (unverändert) |
-| published_at | `2026-11-09 21:25:18` |
+| published_at | `2026-11-09 21:28:31` |
 | lock_version | 2 |
 | active count Jahr 2026 | **1** |
 | Midroll | 80.0000 / 20.0000 |
 | Targetings | unverändert |
 | Registry | weiterhin `planned` |
 | Resolver 2026 | → `2026.1` |
-| 2027 | weiter `draft` |
 
 ---
 
@@ -103,10 +102,29 @@ OA-TKP-Preisliste Activate OK: year=2027 revision=1 id=1 archived_previous=0 ite
 | revision | 1 |
 | status | **active** |
 | items | 41 |
-| published_at | `2026-11-09 21:25:29` |
+| published_at | `2026-11-09 21:28:32` |
 | lock_version | 2 |
 | active count Jahr 2027 | **1** |
 | Resolver 2027 | → `2027.1` |
+
+---
+
+## Zwischenfall / Wiederherstellung
+
+Nach dem ersten erfolgreichen Activate-Lauf (published_at 21:25:18 / 21:25:29)
+waren `oa_tkp_price_lists` und `oa_tkp_price_list_items` kurzzeitig **leer**
+(0 Zeilen). Ursache: versehentlicher Pest-Lauf ohne `DB_DATABASE=dispo_test`
+gegen die `.env`-DB `dispo_mat_core` (Guard hat abgebrochen; dennoch Datenverlust
+an den Preislisten-Tabellen). Platforms/Targetings/Media blieben erhalten.
+
+Maßnahme:
+
+1. Verifiziertes PRE-3-Backup `…-214406/` → `oa-tkp-relevant-tables.sql` restored
+   (beide Jahre wieder Draft, 41+41 Items)
+2. Activate 2026 + 2027 erneut (Dry-Run → Write)
+3. Tests ausschließlich mit `DB_DATABASE=dispo_test` (49/49)
+
+Finaler Endzustand = zweite Activate-Runde (published_at 21:28:31 / 21:28:32).
 
 ---
 
