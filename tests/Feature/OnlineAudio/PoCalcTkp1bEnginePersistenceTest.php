@@ -38,17 +38,18 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function registry_stays_planned_while_v1_is_implemented(): void
+    public function registry_is_released_with_v1(): void
     {
         $this->assertSame(
-            'planned',
+            'released',
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp')->value,
         );
-        $this->assertNull(
+        $this->assertSame(
+            'v1',
             EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
         $this->assertSame(
-            'implemented',
+            'released',
             EngineProfileRegistry::statusForVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp', 'v1')->value,
         );
     }
@@ -69,7 +70,7 @@ class PoCalcTkp1bEnginePersistenceTest extends TestCase
 
         $pre = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
         $preBook = app(AdvertisingMediumLiveBookability::class)->evaluate($pre, 'tkp');
-        $this->assertFalse($preBook->isBookableForNewPositions);
+        $this->assertTrue($preBook->isBookableForNewPositions);
     }
 
     #[Test]

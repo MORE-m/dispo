@@ -14,9 +14,11 @@ Lokale Vorgänger-Readiness (nicht auf `main`): PRE-3 Activation,
 WIRE-Readiness. Branch dieses Dokuments (lokal, kein Push):
 `docs/po-calc-tkp-1d4d-rel-readiness`.
 
-**Dieser Slice ist Analyse / Docs only.** Kein Registry-Flip. Keine
-DB-Mutation. Keine Preislistenaktivierung. Kein Runtime-Commit.
-Kein Push / PR / Merge.
+**Nachtrag (lokal, 9.11.2026):** D4d-REL ist lokal auf WIRE-HEAD
+`1ebee331…` implementiert (`feat/po-calc-tkp-1d4d-rel-release-v1`,
+Worktree `dispo-wt-po-calc-tkp-1d4d-rel`): CATALOG `oa_tkp×tkp` =
+`released` / `current_released_version=v1` / `v1=Released`. Noch
+**kein** Push / PR / Merge / Deploy. Kein E2E-Release-Smoke.
 
 ---
 

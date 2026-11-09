@@ -38,20 +38,21 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * PO-CALC-TKP-1D1: Normal-TKP im CalculationWriter (Registry bleibt planned, HTTP fail-closed).
+ * PO-CALC-TKP-1D1: Normal-TKP im CalculationWriter (nach D4d-REL HTTP freigegeben).
  */
 class PoCalcTkp1d1WriterIntegrationTest extends TestCase
 {
     use RefreshDatabase;
 
     #[Test]
-    public function registry_stays_planned_after_writer_integration(): void
+    public function registry_is_released_after_writer_integration(): void
     {
         $this->assertSame(
-            'planned',
+            'released',
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp')->value,
         );
-        $this->assertNull(
+        $this->assertSame(
+            'v1',
             EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
     }
@@ -507,49 +508,44 @@ class PoCalcTkp1d1WriterIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function http_preview_store_and_update_with_tkp_remain_fail_closed(): void
+    public function http_preview_store_and_update_with_tkp_are_allowed_when_released(): void
     {
         $ctx = $this->seedContext();
+        $payload = $this->withLiveSchemaFingerprint($this->payload([$this->oaPosition($ctx)]));
 
-        $httpPosition = [
-            'inventory_id' => $ctx['inventory']->id,
-            'advertising_medium_id' => $ctx['medium']->id,
-            'calculation_method_key' => 'tkp',
-            'length_seconds' => 30,
-            'total_spot_count' => 1,
-            'position_discount_percent' => '0',
-            'ae_percent' => '0',
-            'plan_rows' => [['hour' => 8, 'day_group' => 'mo_fr']],
-        ];
+        $preview = $this->actingAs($ctx['user'])->postJson(route('calculations.preview'), $payload);
+        $preview->assertOk();
 
-        $preview = $this->actingAs($ctx['user'])->postJson(route('calculations.preview'), [
-            'planning_mode' => 'manual',
-            'order_discount_percent' => '0',
-            'positions' => [$httpPosition],
-        ]);
-        $preview->assertStatus(422);
-        $this->assertStringContainsString('noch nicht freigegeben', (string) json_encode($preview->json('errors')));
+        $store = $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $payload);
+        $store->assertRedirect();
+        $this->assertSame(1, Calculation::query()->count());
 
-        $store = $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $this->withLiveSchemaFingerprint([
-            'planning_mode' => 'manual',
-            'order_discount_percent' => '0',
-            'positions' => [$httpPosition],
-        ]));
-        $store->assertStatus(422);
-        $this->assertStringContainsString('noch nicht freigegeben', (string) json_encode($store->json('errors')));
-        $this->assertSame(0, Calculation::query()->count());
-
-        // Update einer intern angelegten OA-Kalkulation über HTTP bleibt gesperrt.
-        $calculation = app(CalculationWriter::class)->create($this->payload([$this->oaPosition($ctx)]), $ctx['user']);
-        $before = (string) $calculation->nn_invest;
-        $payload = app(CalculationWriter::class)->payloadFromCalculation($calculation->fresh());
-        unset($payload['positions'][0]['engine_profile_key']);
-        $payload['positions'][0]['length_seconds'] = 30;
-        $payload['lock_version'] = $calculation->lock_version;
-        $update = $this->actingAs($ctx['user'])->putJson(route('calculations.update', $calculation), $payload);
-        $update->assertStatus(422);
-        $this->assertSame($before, (string) $calculation->fresh()->nn_invest);
-        $this->assertSame(1, (int) $calculation->fresh()->lock_version);
+        $calculation = Calculation::query()->firstOrFail();
+        $updatePayload = app(CalculationWriter::class)->payloadFromCalculation($calculation->fresh());
+        $updatePayload['lock_version'] = $calculation->lock_version;
+        $newImpressions = (int) $updatePayload['positions'][0]['impressions'] + 1000;
+        $updatePayload['positions'][0]['impressions'] = $newImpressions;
+        if (! empty($updatePayload['positions'][0]['oa_platform_allocations'][0])) {
+            $updatePayload['positions'][0]['oa_platform_allocations'][0]['impressions'] = $newImpressions;
+        }
+        foreach ($updatePayload['positions'] as $index => $position) {
+            unset(
+                $updatePayload['positions'][$index]['engine_profile_key'],
+                $updatePayload['positions'][$index]['list_tkp_snapshot'],
+                $updatePayload['positions'][$index]['minimum_tkp_snapshot'],
+                $updatePayload['positions'][$index]['final_tkp'],
+                $updatePayload['positions'][$index]['targeting_surcharge_total'],
+                $updatePayload['positions'][$index]['below_minimum_tkp'],
+                $updatePayload['positions'][$index]['length_seconds'],
+                $updatePayload['positions'][$index]['total_spot_count'],
+                $updatePayload['positions'][$index]['plan_rows'],
+                $updatePayload['positions'][$index]['time_ranges'],
+                $updatePayload['positions'][$index]['planner_entries'],
+            );
+        }
+        $update = $this->actingAs($ctx['user'])->putJson(route('calculations.update', $calculation), $updatePayload);
+        $update->assertRedirect();
+        $this->assertSame('v1', $calculation->fresh()->positions->firstOrFail()->algorithm_version);
     }
 
     #[Test]

@@ -8,6 +8,7 @@ use App\Enums\OaTargetingCategory;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\OaPlatform;
@@ -37,30 +38,30 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function registry_stays_planned_after_capability_on(): void
+    public function registry_is_released_after_capability_on(): void
     {
         $this->enableCapability();
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
         $this->assertSame(
-            EngineCapabilityStatus::Implemented,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::statusForVersion('oa_tkp', 'tkp', 'v1'),
         );
     }
 
     #[Test]
-    public function preview_blocked_when_capability_off(): void
+    public function preview_allowed_when_capability_off_because_catalog_released(): void
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
 
         $response = $this->actingAs($ctx['user'])->postJson(route('calculations.preview'), $this->previewPayload($ctx));
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors(['positions']);
+        $response->assertOk();
+        $this->assertSame('tkp', $response->json('totals.positions.0.method_result.method'));
     }
 
     #[Test]
@@ -150,18 +151,17 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
     }
 
     #[Test]
-    public function store_and_update_remain_blocked_with_capability_on(): void
+    public function store_and_update_succeed_when_catalog_released(): void
     {
-        $this->enableCapability();
+        config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
         $payload = $this->previewPayload($ctx);
 
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.store'), $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
+            ->assertRedirect();
 
-        $calc = app(CalculationWriter::class)->create($payload, $ctx['user']);
+        $calc = Calculation::query()->firstOrFail();
         $updatePayload = app(CalculationWriter::class)->payloadFromCalculation($calc);
         $updatePayload['lock_version'] = $calc->lock_version;
         foreach ($updatePayload['positions'] as $index => $position) {
@@ -175,19 +175,14 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
                 $updatePayload['positions'][$index]['length_seconds'],
                 $updatePayload['positions'][$index]['total_spot_count'],
                 $updatePayload['positions'][$index]['plan_rows'],
-                $updatePayload['positions'][$index]['time_ranges'],
                 $updatePayload['positions'][$index]['planner_entries'],
+                $updatePayload['positions'][$index]['time_ranges'],
             );
         }
 
-        $response = $this->actingAs($ctx['user'])
-            ->putJson(route('calculations.update', $calc), $updatePayload);
-        $response->assertStatus(422);
-        $this->assertSame(
-            'Kalkulationsart TKP ist noch nicht freigegeben.',
-            $response->json('errors.positions.0')
-            ?? $response->json('message'),
-        );
+        $this->actingAs($ctx['user'])
+            ->putJson(route('calculations.update', $calc), $updatePayload)
+            ->assertRedirect();
     }
 
     #[Test]
@@ -196,13 +191,6 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
 
-        $denied = $this->actingAs($ctx['user'])->getJson(route('calculations.oa-tkp.pricing-metadata', [
-            'advertising_medium_id' => $ctx['medium']->id,
-            'inventory_id' => $ctx['inventory']->id,
-        ]));
-        $denied->assertStatus(422);
-
-        $this->enableCapability();
         $ok = $this->actingAs($ctx['user'])->getJson(route('calculations.oa-tkp.pricing-metadata', [
             'advertising_medium_id' => $ctx['medium']->id,
             'inventory_id' => $ctx['inventory']->id,
@@ -261,7 +249,7 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
                 ->where('oa_tkp_preview_surface_allowed', true)
-                ->where('oa_tkp_http_mutation_allowed', false)
+                ->where('oa_tkp_http_mutation_allowed', true)
                 ->has('catalog.oa_platforms', 1)
                 ->has('catalog.oa_targetings', 1)
                 ->where('catalog.oa_platforms.0.code', 'fixture_plat_a')
@@ -275,7 +263,7 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
     }
 
     #[Test]
-    public function wizard_props_hide_tkp_options_when_capability_off(): void
+    public function wizard_props_expose_tkp_via_livebookability_when_released_without_capability(): void
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
@@ -286,15 +274,16 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', false)
-                ->where('oa_tkp_preview_surface_allowed', false)
-                ->where('oa_tkp_http_mutation_allowed', false)
-                ->where('catalog.oa_platforms', [])
-                ->where('catalog.oa_targetings', [])
+                ->where('oa_tkp_preview_surface_allowed', true)
+                ->where('oa_tkp_http_mutation_allowed', true)
+                ->has('catalog.oa_platforms')
+                ->has('catalog.oa_targetings')
                 ->where('catalog.media', function ($media) {
                     $preStream = collect($media)->firstWhere('code', 'pre_stream');
                     $keys = collect($preStream['calculation_method_options']['methods'] ?? [])->pluck('key')->all();
 
-                    return ! in_array('tkp', $keys, true);
+                    return in_array('tkp', $keys, true)
+                        && ($preStream['is_bookable_for_new_positions'] ?? false) === true;
                 })
             );
     }

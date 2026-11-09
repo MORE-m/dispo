@@ -1,6 +1,16 @@
 # Fortschritt V1
 
-Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-3** Aktivierung.
+Stand: 10. November 2026 – **PO-CALC-TKP-1D4d-REL** Feature-Branch:
+Registry-CATALOG `oa_tkp×tkp` = **released/v1** nur im Branch
+`feat/po-calc-tkp-1d4d-rel-release-v1`. **`main` bleibt planned** bis REL
+gemergt ist. Voraussetzungen auf `main`: #221 WIRE + #223 PRE-3-Doku.
+Lokal `dispo_mat_core`: `2026.1`/`2027.1` active (PRE-3). Fünf Core-Medien
+Normal-TKP ohne Soft-Open; Fake bleibt. OUT: OA-003, Native-Ad,
+Standardangebote, Budget, Plattformauswahl. Keine DB-Mutation im REL-Slice.
+Verbleibend: REL Draft-PR + volle CI; D4d-E2E erst nach REL-Merge. Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md`.
+
+Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-3** Aktivierung.
 Lokal `dispo_mat_core`: **`2026.1`** und **`2027.1`** jeweils **active**,
 41 Items, genau 1 Active/Jahr; Parität 41/41; Midroll 80/20; Targetings
 unverändert; Adserver 0. Backup

@@ -58,7 +58,7 @@ class PoCalcTkp1aFoundationTest extends TestCase
     }
 
     #[Test]
-    public function core_media_have_tkp_oa_tkp_override_while_registry_stays_planned(): void
+    public function core_media_have_tkp_oa_tkp_override_while_registry_is_released(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
 
@@ -96,17 +96,18 @@ class PoCalcTkp1aFoundationTest extends TestCase
 
         $this->assertTrue(EngineProfileRegistry::hasProfile(EngineProfileRegistry::PROFILE_OA_TKP));
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
-        $this->assertNull(
+        $this->assertSame(
+            'v1',
             EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
         $pairs = EngineProfileRegistry::pairsForMethodKey('tkp');
         $this->assertCount(1, $pairs);
         $this->assertSame('oa_tkp', $pairs[0]['engine_profile_key']);
-        $this->assertSame('planned', $pairs[0]['pair_status']);
-        $this->assertNull($pairs[0]['current_released_version']);
+        $this->assertSame('released', $pairs[0]['pair_status']);
+        $this->assertSame('v1', $pairs[0]['current_released_version']);
     }
 
     #[Test]
@@ -142,7 +143,7 @@ class PoCalcTkp1aFoundationTest extends TestCase
     }
 
     #[Test]
-    public function oa_medium_tkp_is_not_bookable_while_planned(): void
+    public function oa_medium_tkp_is_bookable_when_released_native_stays_out(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
 
@@ -151,14 +152,9 @@ class PoCalcTkp1aFoundationTest extends TestCase
 
         $result = app(AdvertisingMediumLiveBookability::class)->evaluate($medium, 'tkp');
 
-        $this->assertFalse($result->isBookableForNewPositions);
-        $reason = (string) $result->unbookableReason;
-        $this->assertTrue(
-            str_contains($reason, 'Keine freigegebene Berechnungsmethode')
-            || str_contains($reason, 'noch nicht freigegeben')
-            || str_contains($reason, 'nicht für neue Kalkulationen freigegeben'),
-            $reason,
-        );
+        $this->assertTrue($result->isBookableForNewPositions);
+        $this->assertSame('oa_tkp', $result->engineProfileKey);
+        $this->assertSame('v1', $result->algorithmVersion);
 
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
         $nativeResult = app(AdvertisingMediumLiveBookability::class)->evaluate($native, 'tkp');
@@ -221,7 +217,7 @@ class PoCalcTkp1aFoundationTest extends TestCase
             $this->fail('Expected ValidationException');
         } catch (ValidationException $e) {
             $messages = collect($e->errors())->flatten()->implode(' ');
-            // PO-CALC-TKP-1D1: Writer verarbeitet TKP intern (Registry bleibt planned); ohne
+            // PO-CALC-TKP-1D1/REL: Writer verarbeitet TKP intern (Registry released/v1); ohne
             // OA-Preisliste/Impressions bleibt der Pfad fail-closed mit ValidationException.
             $this->assertTrue(
                 str_contains($messages, 'Keine aktive OA-TKP-Preislistenrevision')

@@ -197,10 +197,10 @@ class PoCalcTkp1d3cDispoShowTest extends TestCase
     public function registry_remains_planned(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
         $this->assertSame(0, DispoOrderPosition::query()->count());
     }
 

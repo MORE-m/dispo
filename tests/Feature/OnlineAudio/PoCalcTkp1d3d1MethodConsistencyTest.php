@@ -230,13 +230,13 @@ class PoCalcTkp1d3d1MethodConsistencyTest extends TestCase
     }
 
     #[Test]
-    public function registry_and_http_gates_remain_closed(): void
+    public function registry_released_allows_http_store_gate(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
 
         config([OaTkpWizardCapability::CONFIG_KEY => true]);
         $ctx = $this->seedContext();
@@ -244,7 +244,7 @@ class PoCalcTkp1d3d1MethodConsistencyTest extends TestCase
 
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.store'), $payload)
-            ->assertStatus(422);
+            ->assertRedirect();
     }
 
     /**

@@ -186,7 +186,7 @@ class PoCalcTkp1d4c4j1PlatformMediumRulesTest extends TestCase
 
         $this->assertSame($allocBefore, CalculationPositionOaPlatformAllocation::query()->count());
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
     }

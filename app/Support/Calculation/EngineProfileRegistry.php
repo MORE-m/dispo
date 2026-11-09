@@ -44,7 +44,7 @@ final class EngineProfileRegistry
     public const PROFILE_SWF_CONTEST = 'swf_contest';
 
     /**
-     * PO-CALC-TKP-1A: Online-Audio-TKP-Kern (Stammdaten vorbereitet; Pair bleibt planned bis Engine-Freigabe).
+     * PO-CALC-TKP-1A/1D4d-REL: Online-Audio-TKP-Kern; Pair Normal-TKP v1 freigegeben.
      */
     public const PROFILE_OA_TKP = 'oa_tkp';
 
@@ -71,12 +71,12 @@ final class EngineProfileRegistry
      */
     private const CATALOG = [
         self::PROFILE_OA_TKP => [
-            // PO-CALC-TKP-1B: Engine v1 implementiert; Pair bleibt planned (kein Bookability-Release).
+            // PO-CALC-TKP-1D4d-REL: Normal-TKP v1 freigegeben (OA-003 Festpreis bleibt OUT).
             'tkp' => [
-                'pair_status' => EngineCapabilityStatus::Planned,
-                'current_released_version' => null,
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
                 'versions' => [
-                    'v1' => EngineCapabilityStatus::Implemented,
+                    'v1' => EngineCapabilityStatus::Released,
                 ],
             ],
         ],

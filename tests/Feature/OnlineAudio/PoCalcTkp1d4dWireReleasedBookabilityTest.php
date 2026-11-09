@@ -35,7 +35,7 @@ use Tests\TestCase;
 /**
  * PO-CALC-TKP-1D4d-WIRE: nach Registry-Release bleiben die fünf V1-Medien bookable.
  *
- * Produktiver CATALOG bleibt planned; Release nur per Test-Fake.
+ * Nach D4d-REL ist der produktive CATALOG released; Fake bleibt optional/idempotent.
  */
 class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
 {
@@ -49,13 +49,17 @@ class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
     }
 
     #[Test]
-    public function registry_catalog_stays_planned_without_fake(): void
+    public function registry_catalog_is_released_without_fake(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame(
+            EngineCapabilityStatus::Released,
+            EngineProfileRegistry::statusForVersion('oa_tkp', 'tkp', 'v1'),
+        );
     }
 
     #[Test]
@@ -177,14 +181,14 @@ class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
     }
 
     #[Test]
-    public function planned_without_capability_keeps_core_media_unbookable(): void
+    public function released_without_capability_keeps_core_media_bookable(): void
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $this->seed(InitialCatalogMatCoreSeeder::class);
         $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
         $result = app(AdvertisingMediumLiveBookability::class)->evaluate($medium, 'tkp');
-        $this->assertFalse($result->isBookableForNewPositions);
-        $this->assertStringContainsString('noch nicht freigegeben', (string) $result->unbookableReason);
+        $this->assertTrue($result->isBookableForNewPositions);
+        $this->assertSame('v1', $result->algorithmVersion);
     }
 
     #[Test]

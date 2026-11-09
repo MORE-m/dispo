@@ -315,10 +315,10 @@ class PoCalcTkp1d3d3aMaterialCompletionContractTest extends TestCase
     public function release_protection_remains_planned(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
     }
 
     private function mp3File(string $name = 'oa-motif.mp3'): UploadedFile

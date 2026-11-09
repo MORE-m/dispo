@@ -217,8 +217,8 @@ class E2EOaTkpDispoSeeder extends Seeder
             'release' => [
                 'engine_profile_key' => 'oa_tkp',
                 'calculation_method_key' => 'tkp',
-                'pair_status' => 'planned',
-                'current_released_version' => null,
+                'pair_status' => 'released',
+                'current_released_version' => 'v1',
             ],
         ];
 

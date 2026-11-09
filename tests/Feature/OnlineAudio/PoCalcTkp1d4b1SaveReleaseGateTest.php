@@ -7,6 +7,7 @@ use App\Enums\OaTargetingCategory;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\OaPlatform;
@@ -29,7 +30,7 @@ use Tests\TestCase;
 /**
  * PO-CALC-TKP-1D4b-1: UI-Save folgt demselben Registry-Release-Signal wie HTTP Mutation.
  *
- * Produktive Registry bleibt planned. Release nur isoliert per Test-Fake.
+ * Nach D4d-REL ist der CATALOG released; Capability bleibt kein Persistenz-Schalter.
  */
 class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
 {
@@ -42,22 +43,22 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
     }
 
     #[Test]
-    public function registry_remains_planned_and_v1_implemented(): void
+    public function registry_is_released_and_v1_released(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
         $this->assertSame(
-            EngineCapabilityStatus::Implemented,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::statusForVersion('oa_tkp', 'tkp', 'v1'),
         );
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
     }
 
     #[Test]
-    public function create_and_edit_expose_mutation_prop_false_when_planned(): void
+    public function create_and_edit_expose_mutation_prop_true_when_released(): void
     {
         $this->enableCapability();
         $ctx = $this->seedContext();
@@ -69,7 +70,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
                 ->where('oa_tkp_preview_surface_allowed', true)
-                ->where('oa_tkp_http_mutation_allowed', false)
+                ->where('oa_tkp_http_mutation_allowed', true)
             );
 
         $calc = app(CalculationWriter::class)->create($this->previewPayload($ctx), $ctx['user']);
@@ -81,46 +82,41 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
                 ->where('oa_tkp_preview_surface_allowed', true)
-                ->where('oa_tkp_http_mutation_allowed', false)
+                ->where('oa_tkp_http_mutation_allowed', true)
             );
     }
 
     #[Test]
-    public function wizard_capability_on_does_not_open_mutation_prop_or_http_store(): void
+    public function wizard_capability_off_still_allows_mutation_when_released(): void
     {
-        $this->enableCapability();
+        config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
         $payload = $this->previewPayload($ctx);
 
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
 
         $this->actingAs($ctx['user'])
             ->get(route('calculations.create'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('oa_tkp_http_mutation_allowed', false)
+                ->where('oa_tkp_http_mutation_allowed', true)
             );
 
-        $response = $this->actingAs($ctx['user'])
-            ->postJson(route('calculations.store'), $payload);
-        $response->assertStatus(422);
-        $this->assertSame(
-            OaTkpHttpReleaseGuard::MESSAGE,
-            $response->json('errors.positions.0')
-            ?? $response->json('message'),
-        );
+        $this->actingAs($ctx['user'])
+            ->postJson(route('calculations.store'), $payload)
+            ->assertRedirect();
+        $this->assertSame(1, Calculation::query()->count());
     }
 
     #[Test]
-    public function simulated_release_opens_mutation_prop_on_create_and_edit(): void
+    public function released_catalog_opens_mutation_prop_on_create_and_edit(): void
     {
         $this->enableCapability();
         $ctx = $this->seedContext();
-        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(true);
 
         $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
 
@@ -149,9 +145,12 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
         $ctx = $this->seedContext();
         $payload = $this->previewPayload($ctx);
 
+        OaTkpHttpReleaseGuard::assertMutationAllowed($payload);
+
+        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(false);
         try {
             OaTkpHttpReleaseGuard::assertMutationAllowed($payload);
-            $this->fail('Expected ValidationException while planned');
+            $this->fail('Expected ValidationException while fake blocks mutation');
         } catch (ValidationException $e) {
             $this->assertSame(
                 OaTkpHttpReleaseGuard::MESSAGE,
@@ -159,7 +158,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
             );
         }
 
-        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(true);
+        OaTkpWizardCapability::clearHttpMutationFakeForTests();
         OaTkpHttpReleaseGuard::assertMutationAllowed($payload);
 
         $this->actingAs($ctx['user'])
@@ -198,10 +197,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
         $this->enableCapability();
         $ctx = $this->seedContext();
 
-        $this->assertSame(
-            OaTkpWizardCapability::allowsHttpMutation(),
-            false,
-        );
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
 
         $this->actingAs($ctx['user'])
             ->get(route('calculations.create'))
@@ -210,7 +206,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
                 ->where('oa_tkp_http_mutation_allowed', OaTkpWizardCapability::allowsHttpMutation())
             );
 
-        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(true);
+        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(false);
 
         $this->actingAs($ctx['user'])
             ->get(route('calculations.create'))
@@ -221,15 +217,15 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
     }
 
     #[Test]
-    public function clearing_fake_restores_planned_block(): void
+    public function clearing_fake_restores_released_mutation_signal(): void
     {
-        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(true);
-        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
+        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(false);
+        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
 
         OaTkpWizardCapability::clearHttpMutationFakeForTests();
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
     }

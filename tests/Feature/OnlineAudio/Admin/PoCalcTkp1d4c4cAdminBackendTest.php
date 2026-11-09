@@ -351,8 +351,8 @@ class PoCalcTkp1d4c4cAdminBackendTest extends TestCase
 
         $this->assertTrue(AuditEvent::query()->where('action', 'oa_targeting_definition.created')->exists());
         $this->assertTrue(AuditEvent::query()->where('action', 'oa_platform.created')->exists());
-        $this->assertSame(EngineCapabilityStatus::Planned, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertSame(EngineCapabilityStatus::Released, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
     }
 
     /**

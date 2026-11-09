@@ -82,11 +82,11 @@ class CatalogAdminAdv001c3b1Test extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('method.key', 'tkp')
-                // PO-CALC-TKP-1A: planned Pair oa_tkp (kein Release).
+                // PO-CALC-TKP-1D4d-REL: released Pair oa_tkp/v1.
                 ->where('method.registry_pairs.0.engine_profile_key', 'oa_tkp')
-                ->where('method.registry_pairs.0.pair_status', 'planned')
-                ->where('method.registry_pairs.0.current_released_version', null)
-                ->where('method.registry_summary', 'oa_tkp: planned'));
+                ->where('method.registry_pairs.0.pair_status', 'released')
+                ->where('method.registry_pairs.0.current_released_version', 'v1')
+                ->where('method.registry_summary', 'oa_tkp: released / v1'));
     }
 
     public function test_registry_pairs_are_sorted_deterministically_for_multi_profile(): void
@@ -104,12 +104,12 @@ class CatalogAdminAdv001c3b1Test extends TestCase
         $this->assertSame('planned', $planned[0]['pair_status']);
         $this->assertNull($planned[0]['current_released_version']);
 
-        // PO-CALC-TKP-1A: Pair existiert als planned (kein Release).
+        // PO-CALC-TKP-1D4d-REL: Normal-TKP Pair ist released/v1.
         $tkpPairs = EngineProfileRegistry::pairsForMethodKey('tkp');
         $this->assertCount(1, $tkpPairs);
         $this->assertSame('oa_tkp', $tkpPairs[0]['engine_profile_key']);
-        $this->assertSame('planned', $tkpPairs[0]['pair_status']);
-        $this->assertNull($tkpPairs[0]['current_released_version']);
+        $this->assertSame('released', $tkpPairs[0]['pair_status']);
+        $this->assertSame('v1', $tkpPairs[0]['current_released_version']);
     }
 
     public function test_metadata_update_allows_name_help_sort_and_audits(): void
