@@ -4,7 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
+
   pull_request:
+    paths-ignore:
+      - '*.md'
+      - '**/*.md'
 
 permissions:
   contents: read
