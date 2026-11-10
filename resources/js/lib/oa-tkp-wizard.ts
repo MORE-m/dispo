@@ -446,6 +446,18 @@ export function isOaTkpSaveBlocked(options: {
     return !options.httpMutationAllowed;
 }
 
+/**
+ * PO-CALC-TKP-1D4d-UI-WIRE: aktive OA-Picker folgen der Preview-Surface
+ * (Soft-Open oder released Pair), nie der Soft-Open-Capability allein.
+ * Standardangebote bleiben OUT.
+ */
+export function oaTkpActivePickersAllowed(
+    previewSurfaceAllowed: boolean,
+    isStandardOffer = false,
+): boolean {
+    return previewSurfaceAllowed === true && !isStandardOffer;
+}
+
 /** True, wenn mindestens eine TKP-Position noch nicht preview-ready ist. */
 export function draftBlocksOaTkpPreview(
     positions: OaTkpPositionFields[],

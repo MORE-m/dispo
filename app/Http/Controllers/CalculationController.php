@@ -741,6 +741,8 @@ class CalculationController extends Controller
                 'oa_targetings' => $oaCatalog['oa_targetings'],
             ],
             'oa_tkp_wizard_capability' => OaTkpWizardCapability::isEnabled(),
+            // PO-CALC-TKP-1D4d-UI-WIRE: Preview/Metadata/Picker-Surface (Soft-Open oder released Pair).
+            'oa_tkp_preview_surface_allowed' => OaTkpWizardCapability::allowsWizardPreviewSurface(),
             // PO-CALC-TKP-1D4b-1: Save-UI folgt demselben Registry-Release-Signal wie HTTP Mutation.
             'oa_tkp_http_mutation_allowed' => OaTkpWizardCapability::allowsHttpMutation(),
             'component_profiles' => $this->componentProfilesProp(),
