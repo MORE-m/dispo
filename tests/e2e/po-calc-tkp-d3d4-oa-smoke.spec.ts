@@ -101,10 +101,6 @@ function positionFinalTkp(positionId: number): string {
     );
 }
 
-function calculationCount(): number {
-    return Number(sqliteScalar('select count(*) from calculations', []));
-}
-
 async function login(page: Page, email: string) {
     await page.goto('/login');
     await page.locator('#email').fill(email);
