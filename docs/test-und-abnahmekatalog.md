@@ -196,11 +196,16 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `docs/readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`.
 - **KORR-1…4 erledigt** (Stand 09.11.2026): Vertrag, Readiness, Runtime ohne
   Plattformpflicht (PR #216), E2E fünf Medien (PR #217, CI `42394888095`
-  success). Registry bleibt `planned`.
-- **D4d Go/No-Go: NO-GO.** Keine active Preisliste, Wizard-Flip würde die
-  Methodenoption schließen. **Nachtrag OA004-DEC:** 15 EUR Adserver =
-  interne Kosten, kein Verkaufsaufschlag; Midroll 80/20; OA-004 kein
-  Verkaufs-Release-Blocker. Dok:
+  success).
+- **D4d ABGESCHLOSSEN** (10.11.2026): Registry `oa_tkp×tkp` = released/v1;
+  PRE-3 Listen active; WIRE/UI-WIRE/REL/E2E auf `main` (#224/#225/#226);
+  Post-Merge-CI #226 `42895484827` success inkl. isoliertem Step
+  `Browser PO-CALC-TKP-1D4d-E2E release smoke` (Port **8075**, eigene SQLite,
+  Guard gegen `dispo_mat_core`). Signale Capability=false /
+  Preview+Mutation true; Midroll 80/20, DMP→105, Freeze `oa_tkp/tkp/v1`;
+  kein +15. OA-003 Festpreis weiter OUT. Historische Go/No-Go/OA004-DEC
+  bleiben Beleg. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
 - Status: `complete|partial|open|legacy`; Legacy = Bestand ohne Backfill
