@@ -1,7 +1,7 @@
 # PO-CALC-TKP-1D4d-REL – Registry-Release Readiness
 
-Stand: 9. November 2026  
-Analysebasis: `origin/main` `c511834b898b1e4accf06dc8cfdbe3642b8d01b4`  
+Stand: 9. November 2026
+Analysebasis: `origin/main` `c511834b898b1e4accf06dc8cfdbe3642b8d01b4`
 Parallel (nicht mergen in diesem Auftrag):
 
 | PR | Slice | HEAD (Analyse) |
@@ -28,9 +28,9 @@ Worktree `dispo-wt-po-calc-tkp-1d4d-rel`): CATALOG `oa_tkp×tkp` =
 
 Voraussetzungen (noch nicht erfüllt auf `main` / `dispo_mat_core`):
 
-1. PRE-2 gemergt und 2026.1 als Fachdaten dokumentiert  
-2. PRE-3 Activate-Write: 2026.1 + 2027.1 jeweils active, 41 Items, genau 1 active/Jahr  
-3. D4d-WIRE auf `main`  
+1. PRE-2 gemergt und 2026.1 als Fachdaten dokumentiert
+2. PRE-3 Activate-Write: 2026.1 + 2027.1 jeweils active, 41 Items, genau 1 active/Jahr
+3. D4d-WIRE auf `main`
 4. OA004-DEC dokumentiert (15 EUR = interne Kosten, kein Verkaufsaufschlag)
 
 Unter diesen Annahmen ist der REL-Scope **minimal** (Registry-CATALOG +
@@ -86,7 +86,7 @@ Keine historischen Blocker ungeprüft übernehmen: OA-004 ist nach OA004-DEC
 
 ## 2. Exakter Registry-Diff
 
-Datei: `app/Support/Calculation/EngineProfileRegistry.php`  
+Datei: `app/Support/Calculation/EngineProfileRegistry.php`
 Paar: `oa_tkp` × `tkp` in `CATALOG`.
 
 ### Ist
@@ -191,9 +191,9 @@ Unverändert im REL-Slice (keine Engine-/Assessor-Änderung):
 
 Konkrete Gates, die Festpreis weiter blocken:
 
-1. Registry: nur Methode `tkp` unter `oa_tkp` – kein released `fixed_price`-Paar  
-2. `OaTkpWriterPositionResolver` / Persister: `pricing_settlement_mode=normal`, `fixed_price_nn=null`  
-3. Payload: Settlement `fixed_price` für TKP → Validation („nicht verfügbar“)  
+1. Registry: nur Methode `tkp` unter `oa_tkp` – kein released `fixed_price`-Paar
+2. `OaTkpWriterPositionResolver` / Persister: `pricing_settlement_mode=normal`, `fixed_price_nn=null`
+3. Payload: Settlement `fixed_price` für TKP → Validation („nicht verfügbar“)
 4. Keine OA-Festpreis-Sonderfreigabelogik im Scope
 
 Release von `oa_tkp`×`tkp` öffnet **nicht** OA-Festpreis.
@@ -204,11 +204,11 @@ Release von `oa_tkp`×`tkp` öffnet **nicht** OA-Festpreis.
 
 PO 09.11.2026 (OA004-DEC / PR #222):
 
-- 15 EUR = interne Einkaufskosten / harte Kosten  
-- kein Verkaufsaufschlag, kein Bestandteil von `final_tkp` / `minimum_tkp`  
-- Midroll bleibt 80/20; kein `80+15`  
-- `oa_adserver_surcharges` nicht als Verkaufsaufschlag befüllen  
-- **kein** Runtime-Slice vor/in D4d-REL  
+- 15 EUR = interne Einkaufskosten / harte Kosten
+- kein Verkaufsaufschlag, kein Bestandteil von `final_tkp` / `minimum_tkp`
+- Midroll bleibt 80/20; kein `80+15`
+- `oa_adserver_surcharges` nicht als Verkaufsaufschlag befüllen
+- **kein** Runtime-Slice vor/in D4d-REL
 
 REL darf und soll OA-004-Code **nicht** nachziehen.
 
@@ -236,10 +236,10 @@ REL öffnet Budget nicht.
 
 V1-Vertrag (4j-KORR) unverändert durch Registry-Flip:
 
-- keine Endnutzer-Plattformauswahl  
-- Midroll = Bundle Spotify/YouTube/Deezer  
-- technische `oa_platforms` / Midroll-Rules dürfen bestehen, sind nicht buchungsrelevant  
-- Plattformmatrix ist **kein** REL-Gate  
+- keine Endnutzer-Plattformauswahl
+- Midroll = Bundle Spotify/YouTube/Deezer
+- technische `oa_platforms` / Midroll-Rules dürfen bestehen, sind nicht buchungsrelevant
+- Plattformmatrix ist **kein** REL-Gate
 
 KORR-3/4 Runtime ohne Plattformpflicht bleibt Voraussetzung (bereits auf `main`).
 
@@ -274,11 +274,11 @@ Geprüft in PR #221:
 
 Begründung:
 
-- Nach echtem CATALOG-Release ist `fakeReleased` idempotent/redundant für Happy-Path, aber harmlos  
-- Entfernen (Variante B) vermischt Cleanup mit Release und riskiert Test-Churn ohne Nutzen  
-- REL-Tests müssen den **echten** CATALOG prüfen (`pair_status=released` ohne Fake)  
-- Soft-Open-/planned-Regressionen, die heute „ohne Fake = planned“ assertieren, müssen im REL-Slice auf released umgestellt werden  
-- Optional Future (nicht REL): `fakeOaTkpPairPlannedForTests()` falls historische Soft-Open-Regression gegen released Catalog nötig wird  
+- Nach echtem CATALOG-Release ist `fakeReleased` idempotent/redundant für Happy-Path, aber harmlos
+- Entfernen (Variante B) vermischt Cleanup mit Release und riskiert Test-Churn ohne Nutzen
+- REL-Tests müssen den **echten** CATALOG prüfen (`pair_status=released` ohne Fake)
+- Soft-Open-/planned-Regressionen, die heute „ohne Fake = planned“ assertieren, müssen im REL-Slice auf released umgestellt werden
+- Optional Future (nicht REL): `fakeOaTkpPairPlannedForTests()` falls historische Soft-Open-Regression gegen released Catalog nötig wird
 
 REL soll den Fake **nicht** als alleinige Freigabe-Evidenz nutzen.
 
@@ -326,8 +326,8 @@ REL soll den Fake **nicht** als alleinige Freigabe-Evidenz nutzen.
 
 ### Real Catalog vs Fake
 
-- Happy-Path-REL-Tests **ohne** `fakeOaTkpPairReleasedForTests`  
-- Fake höchstens in gezielten Isolationstests; TearDown clear beibehalten  
+- Happy-Path-REL-Tests **ohne** `fakeOaTkpPairReleasedForTests`
+- Fake höchstens in gezielten Isolationstests; TearDown clear beibehalten
 
 ---
 
@@ -343,10 +343,10 @@ Registry ist **codebasiert** (kein DB-Statusfeld für Pair-Release).
 
 ### Historische Reads nach Rollback auf `planned`
 
-- Gespeicherte Snapshots mit `algorithm_version=v1` bleiben **lesbar**  
-- FreezeResolver Execution erlaubt `Implemented` **oder** `Released` → `v1` nach Rollback auf `Implemented` bleibt ausführbar  
-- OA-Writer Freeze-Pfad prüft gegen `OaTkpNormalEngine::ALGORITHM_VERSION` (`v1`), nicht gegen Pair-Released  
-- **Neue** Positionen / LiveBookability / HTTP-Mutation sind nach Rollback wieder geschlossen  
+- Gespeicherte Snapshots mit `algorithm_version=v1` bleiben **lesbar**
+- FreezeResolver Execution erlaubt `Implemented` **oder** `Released` → `v1` nach Rollback auf `Implemented` bleibt ausführbar
+- OA-Writer Freeze-Pfad prüft gegen `OaTkpNormalEngine::ALGORITHM_VERSION` (`v1`), nicht gegen Pair-Released
+- **Neue** Positionen / LiveBookability / HTTP-Mutation sind nach Rollback wieder geschlossen
 
 Voraussetzung: `v1` bleibt im `versions`-Array (Altversionen nicht entfernen – Registry-Kommentar).
 
@@ -356,17 +356,17 @@ Voraussetzung: `v1` bleibt im `versions`-Array (Altversionen nicht entfernen –
 
 Mindest-Smoke gegen **echten** released Catalog + active Listen:
 
-1. Kalkulation öffnen  
-2. OA-Core-Medium wählen  
-3. Methode TKP  
-4. aktive Jahrespreisliste (2026 bzw. 2027)  
-5. Menge / Impressions  
-6. Targeting optional  
-7. Preview  
-8. Speichern  
-9. Wieder öffnen  
-10. Snapshot/Freeze (`oa_tkp` / `tkp` / `v1`)  
-11. Mindest-TKP- / Sonderfreigabe-Fall (OA-001/002)  
+1. Kalkulation öffnen
+2. OA-Core-Medium wählen
+3. Methode TKP
+4. aktive Jahrespreisliste (2026 bzw. 2027)
+5. Menge / Impressions
+6. Targeting optional
+7. Preview
+8. Speichern
+9. Wieder öffnen
+10. Snapshot/Freeze (`oa_tkp` / `tkp` / `v1`)
+11. Mindest-TKP- / Sonderfreigabe-Fall (OA-001/002)
 
 Zusätzlich negativ-smoke: Budget, Standardangebot, `native_ad`, fehlende Jahresliste.
 
@@ -384,13 +384,13 @@ docs/**                                             # Fortschritt, Blocker, Read
 
 **Nicht** im REL-Slice:
 
-- Migrationen / Seeder  
-- Preislisten-Activate  
-- Plattform-/Targetingdaten  
-- Engineformel / OA-004-Runtime  
-- Capability-Config / Env  
-- Controllerlogik (sofern WIRE korrekt auf `main`)  
-- Fake entfernen  
+- Migrationen / Seeder
+- Preislisten-Activate
+- Plattform-/Targetingdaten
+- Engineformel / OA-004-Runtime
+- Capability-Config / Env
+- Controllerlogik (sofern WIRE korrekt auf `main`)
+- Fake entfernen
 
 Weitere Runtime-Dateien nur, wenn nach Merge von WIRE ein Regressionstest zeigt,
 dass planned-Asserts außerhalb der Registry hart brechen – dann Test-Anpassung,
