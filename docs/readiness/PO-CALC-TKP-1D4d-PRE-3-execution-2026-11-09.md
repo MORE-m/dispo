@@ -1,10 +1,10 @@
 # PO-CALC-TKP-1D4d-PRE-3 – Aktivierungs-Ausführung 2026/2027
 
-Stand: 9. November 2026  
-Basis `main`: `582ad587f442d01550ace0e52df86d4e9bb78931` (#222 Merge)  
+Stand: 9. November 2026
+Basis `main`: `582ad587f442d01550ace0e52df86d4e9bb78931` (#222 Merge)
 Gate: Post-Merge-CI #220 Run [`42695376594`](https://github.com/MORE-m/dispo/actions/runs/42695376594)
-(`ci` / `mysql` / `e2e-spt008` success)  
-Vorgänger-Readiness: `docs/readiness/PO-CALC-TKP-1D4d-PRE-3-activation-readiness-2026-11-09.md`  
+(`ci` / `mysql` / `e2e-spt008` success)
+Vorgänger-Readiness: `docs/readiness/PO-CALC-TKP-1D4d-PRE-3-activation-readiness-2026-11-09.md`
 OA004-DEC: 15 EUR = interne Kosten; Midroll 80/20; kein Verkaufsaufschlag.
 
 **Lokal auf `dispo_mat_core` ausgeführt.** Kein Registry-Flip. Kein D4d-REL.
