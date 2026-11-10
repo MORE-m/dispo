@@ -1,6 +1,22 @@
 # Fortschritt V1
 
-Stand: 10. November 2026 – **PO-CALC-TKP-1D4d-REL** Feature-Branch:
+Stand: 10. November 2026 – **PO-CALC-TKP-1D4d ABGESCHLOSSEN.**
+Normal-TKP V1 für Online Audio auf `main` freigegeben. Registry
+`oa_tkp×tkp` = **released / v1 / Released**. Fünf Core-Medien
+(`pre_stream`, `in_stream`, `pre_stream_influencer`,
+`in_stream_influencer`, `midroll_music_environment`) bookable; Midroll
+als Spotify/YouTube/Deezer-Bundle ohne Einzelplattformwahl. Listen
+`2026.1`/`2027.1` active (je 41 Items, 1 Active/Jahr); Midroll **80/20**;
+DMP +25 → Final 105; **kein +15**-Verkaufsaufschlag (15 EUR = interne
+Einkaufskosten, OA004-DEC). Signale: Capability=false, Preview-Surface=true,
+HTTP Mutation=true. Browser-Smoke #226 (Merge `c6578b0…`, Post-Merge-CI
+`42895484827` success inkl. isoliertem D4d-E2E-Step). Kein Deploy.
+**Weiter OUT / offen:** OA-003 Festpreis, Native-Ad, Budget, Standardangebote,
+OA-005/006 Allocation, interne Kosten-/Margenabbildung der 15 EUR (optional
+Future). Dok: `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
+`docs/readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md`.
+
+Stand davor: 10. November 2026 – **PO-CALC-TKP-1D4d-REL** Feature-Branch:
 Registry-CATALOG `oa_tkp×tkp` = **released/v1** nur im Branch
 `feat/po-calc-tkp-1d4d-rel-release-v1`. **`main` bleibt planned** bis REL
 gemergt ist. Voraussetzungen auf `main`: #221 WIRE + #223 PRE-3-Doku.

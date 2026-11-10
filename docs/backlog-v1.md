@@ -424,7 +424,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P6-01 – Online Audio TKP
 
 - **Phase:** 6
-- **Status:** teilweise (Unterbau auf `main`; produktiv nicht freigegeben)
+- **Status:** teilweise (Normal-TKP V1 released; OA-003/Festpreis und weitere
+  OA-Themen offen – Online Audio nicht „fertig“)
 - **Anforderungen:** `OA-001` bis `OA-009`
 - **Abhängigkeiten:** BL-P4-01
 - **Umgesetzt (nicht „Online Audio fertig“):** OA-TKP-Unterbau der gemergten
@@ -439,34 +440,24 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   **4j-4c** Struktur (PO 04.11.2026) historisch; für V1-Buchung überholt durch
   **4j-KORR** (PO 05.11.2026): keine Endnutzer-Plattformauswahl; Midroll =
   Spotify/YouTube/Deezer-Bundle; OA-005/006 = Future; bestehende Plattformen/Rules
-  nicht V1-buchungsrelevant. Registry `oa_tkp`/`tkp` bleibt `planned`.
+  nicht V1-buchungsrelevant.
   **KORR-1…4 erledigt** (09.11.2026): KORR-1 Vertrag (PR **#212**);
   KORR-2 Readiness (kein eigener Merge, Folge in KORR-3); KORR-3 Runtime
   ohne Plattformpflicht (PR **#216**); KORR-4 E2E (PR **#217**, CI
   `42394888095` success). **4j-5** alter Zuschnitt **verworfen**.
-- **D4d (09.11.2026): weiterhin NO-GO.** OA-TKP ist nicht produktiv
-  freigegeben. Go/No-Go:
-  `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`.
-  **PRE-1** reduziert die Fachdatenblocker: 2026 wird benötigt und nutzt
-  dieselben Preise wie 2027; `2027.1` ist fachlich freigegeben und technisch
-  weiter Draft; `dmp`/`geo` sind der V1-Katalog. Midroll-Listen-TKP bleibt
-  80.0000. Dok:
-  `docs/readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`.
-  **PRE-2** (09.11.2026): Draft `2026.1` lokal angelegt (41 Items, Parität
-  41/41 zu `2027.1`); Active weiter 0; keine Aktivierung. Dok:
-  `docs/readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`.
-  **OA004-DEC** (09.11.2026): 15 EUR Adserver = interne Einkaufskosten /
-  harte Kosten, kein Verkaufsaufschlag; Midroll 80.0000/20.0000; OA-004
-  kein Release-Blocker für Normal-TKP-V1; kein Runtime-Slice vor D4d-REL.
-  Dok: `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
-  **PRE-3** (09.11.2026): `2026.1` und `2027.1` lokal **active** (je 41,
-  1 Active/Jahr); Registry `planned`. Dok:
-  `docs/readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`.
-- **Weiter offen:** D4d-WIRE, Registry-Release, Release-E2E. OA-003 bleibt
-  außerhalb des ersten Normal-TKP-Releases. OA-004-Code ist **nicht**
-  Voraussetzung für D4d-REL. Nächster Slice: **D4d-WIRE**.
-- **Ergebnis (Ziel, noch nicht erreicht):** TKP, Targeting; Mengen ohne
-  V1-Plattformauswahl; Future OA-005/006 separat
+- **D4d (10.11.2026): ABGESCHLOSSEN.** Normal-TKP V1 released auf `main`
+  (Registry `oa_tkp×tkp` = released/v1). Kette: PRE-1…PRE-3, OA004-DEC,
+  WIRE, UI-WIRE (#225), REL (#224), E2E (#226, Merge `c6578b0…`, Post-Merge-CI
+  `42895484827` success). Listen `2026.1`/`2027.1` active; Midroll 80/20;
+  kein +15; Capability=false / Preview+Mutation true. Fünf Core-Medien;
+  OA-001 Mindest-TKP und OA-002 Sonderfreigabe aktiv. Historische Go/No-Go-
+  und PRE-Dokus bleiben als Beleg. Dok:
+  `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`.
+- **Weiter offen:** OA-003 Festpreis (eigener späterer Slice); Native-Ad;
+  Budget; Standardangebote; OA-005/006 Allocation; optionale interne
+  Kosten-/Margenabbildung der 15 EUR. Kein D4d-Release-Gate mehr offen.
+- **Ergebnis (Normal-TKP V1 erreicht; Rest offen):** TKP, Targeting; Mengen ohne
+  V1-Plattformauswahl; Future OA-005/006 separat; Festpreis OUT
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
   `PoCalcTkp1d4c4j1PlatformMediumRulesTest`

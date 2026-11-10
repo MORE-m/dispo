@@ -46,11 +46,13 @@ Ein untergeordnetes Dokument darf einer höherrangigen Quelle nicht widerspreche
 | [`readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4b-auftrag-2026-11-04.md) | 4j-4b lokaler Datenlauf (3 Midroll-Rules + 3 aktive Plattformen; 4j-5 gesperrt) |
 | [`readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md`](readiness/PO-CALC-TKP-1D4c4j4c-po-entscheidung-2026-11-04.md) | 4j-4c Stream-/Influencer-Struktur (historisch; V1 durch 4j-KORR überholt) |
 | [`readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md`](readiness/PO-CALC-TKP-1D4c4j-korr-po-vertrag-plattformmodell-v1-2026-11-05.md) | 4j-KORR PO-Vertrag: V1 ohne Plattformauswahl; 4j-5 verworfen |
-| [`readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md) | D4d Go/No-Go: **NO-GO**; KORR-1…4 erledigt; Registry bleibt `planned`; Nachtrag OA004-DEC |
-| [`readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md) | D4d-PRE-1: 2026/2027.1 und `dmp`/`geo` freigegeben; OA-004 damals offen (Nachtrag OA004-DEC); D4d weiter **NO-GO** |
-| [`readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md) | D4d-PRE-2: Draft `2026.1` aus `2027.1` (41/41); Active=0; keine Aktivierung; D4d weiter **NO-GO** |
+| [`readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md) | D4d Go/No-Go (historisch **NO-GO**); Nachtrag: D4d inzwischen **ABGESCHLOSSEN** |
+| [`readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-1-po-entscheidung-2026-11-09.md) | D4d-PRE-1: 2026/2027.1 und `dmp`/`geo` freigegeben; OA-004 damals offen (Nachtrag OA004-DEC) |
+| [`readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-2-auftrag-2026-11-09.md) | D4d-PRE-2: Draft `2026.1` aus `2027.1` (41/41); Active=0; keine Aktivierung |
 | [`readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md) | OA004-DEC: 15 EUR Adserver = interne Kosten; Midroll 80/20; kein Verkaufs-Blocker |
-| [`readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md) | D4d-PRE-3: `2026.1`/`2027.1` active; Registry `planned`; D4d weiter **NO-GO** |
+| [`readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md) | D4d-PRE-3: `2026.1`/`2027.1` active |
+| [`readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md`](readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md) | D4d-REL: Registry-Release Readiness; auf `main` via #224 |
+| [`readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`](readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md) | D4d-E2E: released/v1 Browser-Smoke; #226; D4d **ABGESCHLOSSEN** |
 | [`reviews/calendar-festpreis-readiness/`](reviews/calendar-festpreis-readiness/) | Bericht Calendar × Festpreis (PO-BLP403I-1 A1, auf `main` PR #126) |
 | [`readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md`](readiness/BL-P4-03i-calendar-festpreis-2026-10-06.md) | Readiness Calendar × Festpreis (READY / `main`) |
 | [`entscheidungen/PO-BLP403I-1-calendar-festpreis.md`](entscheidungen/PO-BLP403I-1-calendar-festpreis.md) | PO Calendar × Festpreis (Akzeptiert A1) |
