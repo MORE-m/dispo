@@ -226,20 +226,20 @@ class AdvertisingMediumLiveBookabilityTest extends TestCase
         $this->assertNotSame('', $payload['unbookable_reason']);
     }
 
-    public function test_oa_core_media_bookable_only_when_pair_released(): void
+    public function test_oa_core_media_bookable_when_pair_released(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
         $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
         $this->assertNull($medium->getAttributes()['kind'] ?? null);
 
-        $planned = $this->bookability->evaluate($medium, 'tkp');
-        $this->assertFalse($planned->isBookableForNewPositions);
-
-        EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
+        // D4d-REL: produktiver CATALOG ist released – ohne Fake bookable.
         $released = $this->bookability->evaluate($medium, 'tkp');
         $this->assertTrue($released->isBookableForNewPositions);
         $this->assertSame('oa_tkp', $released->engineProfileKey);
         $this->assertSame('tkp', $released->calculationMethodKey);
+
+        EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
+        $this->assertTrue($this->bookability->evaluate($medium, 'tkp')->isBookableForNewPositions);
 
         foreach (OaTkpCoreMedia::codes() as $code) {
             $core = AdvertisingMedium::query()->where('code', $code)->firstOrFail();

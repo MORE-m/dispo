@@ -14,9 +14,10 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * PO-CALC-TKP-1D4d-UI-WIRE: Inertia trennt Soft-Open, Preview-Surface und HTTP-Mutation.
+ * PO-CALC-TKP-1D4d-UI-WIRE + REL: Inertia trennt Soft-Open, Preview-Surface und HTTP-Mutation.
  *
- * Produktiver CATALOG bleibt planned; Release nur per Test-Fake.
+ * Nach Registry-Release ist der produktive CATALOG released.
+ * Planned-Fälle werden isoliert per Test-Override simuliert.
  */
 class PoCalcTkp1d4dUiWirePreviewSurfacePropTest extends TestCase
 {
@@ -34,6 +35,7 @@ class PoCalcTkp1d4dUiWirePreviewSurfacePropTest extends TestCase
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->simulatePlannedPair();
         $user = User::factory()->create(['role' => Role::Admin]);
 
         $this->assertSame(
@@ -60,6 +62,7 @@ class PoCalcTkp1d4dUiWirePreviewSurfacePropTest extends TestCase
     {
         config([OaTkpWizardCapability::CONFIG_KEY => true]);
         $this->seed(InitialCatalogMatCoreSeeder::class);
+        $this->simulatePlannedPair();
         $user = User::factory()->create(['role' => Role::Admin]);
 
         $this->assertSame(
@@ -82,12 +85,11 @@ class PoCalcTkp1d4dUiWirePreviewSurfacePropTest extends TestCase
     }
 
     #[Test]
-    public function simulated_release_opens_preview_surface_and_mutation_without_capability(): void
+    public function released_catalog_opens_preview_surface_and_mutation_without_capability(): void
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $this->seed(InitialCatalogMatCoreSeeder::class);
         $user = User::factory()->create(['role' => Role::Admin]);
-        EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
 
         $this->assertFalse(OaTkpWizardCapability::isEnabled());
         $this->assertTrue(OaTkpWizardCapability::allowsWizardPreviewSurface());
@@ -109,15 +111,28 @@ class PoCalcTkp1d4dUiWirePreviewSurfacePropTest extends TestCase
     }
 
     #[Test]
-    public function productive_catalog_stays_planned_after_fake_clear(): void
+    public function productive_catalog_stays_released_after_fake_clear(): void
     {
         EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
         EngineProfileRegistry::clearOaTkpPairFakeForTests();
 
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+    }
+
+    private function simulatePlannedPair(): void
+    {
+        $override = new \ReflectionProperty(EngineProfileRegistry::class, 'oaTkpPairOverrideForTests');
+        $override->setAccessible(true);
+        $override->setValue(null, [
+            'pair_status' => EngineCapabilityStatus::Planned,
+            'current_released_version' => null,
+            'versions' => [
+                'v1' => EngineCapabilityStatus::Implemented,
+            ],
+        ]);
     }
 }

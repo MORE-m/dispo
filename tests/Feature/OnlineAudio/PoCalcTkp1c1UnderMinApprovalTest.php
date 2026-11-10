@@ -459,17 +459,18 @@ class PoCalcTkp1c1UnderMinApprovalTest extends TestCase
     }
 
     #[Test]
-    public function registry_remains_planned(): void
+    public function registry_remains_released(): void
     {
         $this->assertSame(
-            'planned',
+            'released',
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp')->value,
         );
-        $this->assertNull(
+        $this->assertSame(
+            'v1',
             EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp'),
         );
         $this->assertSame(
-            'implemented',
+            'released',
             EngineProfileRegistry::statusForVersion(EngineProfileRegistry::PROFILE_OA_TKP, 'tkp', 'v1')->value,
         );
     }

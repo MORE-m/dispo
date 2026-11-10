@@ -372,8 +372,8 @@ class PoCalcTkp1d4c4dAdminUiTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['price_lists', 'required_pairs', 'filters']);
 
-        $this->assertSame(EngineCapabilityStatus::Planned, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertSame(EngineCapabilityStatus::Released, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
     }
 
     /**

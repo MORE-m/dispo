@@ -355,10 +355,10 @@ class PoCalcTkp1d3d2aFlightContractTest extends TestCase
     public function release_protection_remains_planned_closed(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
     }
 
     /**

@@ -382,9 +382,9 @@ class PoCalcTkp1d4c2ImportCliTest extends TestCase
     #[Test]
     public function release_protection_unchanged(): void
     {
-        $this->assertSame(EngineCapabilityStatus::Planned, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertSame(EngineCapabilityStatus::Released, EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
     }
 
     /**

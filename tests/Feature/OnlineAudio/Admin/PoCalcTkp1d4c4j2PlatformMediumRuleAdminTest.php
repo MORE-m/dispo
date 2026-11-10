@@ -460,7 +460,7 @@ class PoCalcTkp1d4c4j2PlatformMediumRuleAdminTest extends TestCase
         $this->assertSame($priceLists, OaTkpPriceList::query()->count());
         $this->assertSame($allocations, CalculationPositionOaPlatformAllocation::query()->count());
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
     }

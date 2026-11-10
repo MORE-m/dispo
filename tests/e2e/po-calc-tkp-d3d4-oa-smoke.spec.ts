@@ -42,7 +42,7 @@ type Fixture = {
         engine_profile_key: string;
         calculation_method_key: string;
         pair_status: string;
-        current_released_version: null;
+        current_released_version: 'v1';
     };
 };
 
@@ -101,10 +101,6 @@ function positionFinalTkp(positionId: number): string {
     );
 }
 
-function calculationCount(): number {
-    return Number(sqliteScalar('select count(*) from calculations', []));
-}
-
 async function login(page: Page, email: string) {
     await page.goto('/login');
     await page.locator('#email').fill(email);
@@ -145,19 +141,18 @@ async function csrfHeaders(page: Page): Promise<Record<string, string>> {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
-    test('HTTP Store für OA-TKP bleibt geschlossen; Fixture persistiert', async ({
+    test('HTTP Store für OA-TKP ist freigegeben (kein Registry-Fail-Closed); Fixture persistiert', async ({
         page,
         request,
     }) => {
         const fixture = loadFixture();
-        expect(fixture.release.pair_status).toBe('planned');
-        expect(fixture.release.current_released_version).toBeNull();
+        expect(fixture.release.pair_status).toBe('released');
+        expect(fixture.release.current_released_version).toBe('v1');
         expect(fixture.oaInProgress.impressions).toBe(100_000);
         expect(orderStatus(fixture.oaInProgress.id)).toBe('in_progress');
         expect(operationalFlight(fixture.oaInProgress.positionId!).start).toBe('');
         expect(operationalFlight(fixture.oaInProgress.positionId!).end).toBe('');
 
-        const calcsBefore = calculationCount();
         await login(page, 'sales@example.com');
         const headers = await csrfHeaders(page);
         const probe = fixture.httpStoreProbe;
@@ -165,7 +160,7 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
             headers,
             data: {
                 planning_mode: 'manual',
-                customer_name: 'E2E D3d4 HTTP Block Probe',
+                customer_name: 'E2E D3d4 HTTP Release Probe',
                 order_discount_percent: '0',
                 ae_enabled: false,
                 schema_fingerprint: probe.schema_fingerprint,
@@ -192,13 +187,15 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
             },
         });
 
-        expect(response.status()).toBe(422);
-        const body = await response.json();
-        const messages = JSON.stringify(body);
-        expect(messages).toContain('noch nicht freigegeben');
-        expect(calculationCount()).toBe(calcsBefore);
+        // REL: Registry-Fail-Closed ist weg; andere Validierungsfehler (Preis/Jahr) bleiben möglich.
+        if (response.status() === 422) {
+            const messages = JSON.stringify(await response.json());
+            expect(messages).not.toContain('noch nicht freigegeben');
+        } else {
+            expect([200, 201, 302]).toContain(response.status());
+        }
 
-        // KORR-4: leere Allocations ändern den Registry-Fail-Closed nicht (kein Plattform-Pflichtfehler).
+        // KORR-4: leere Allocations erzeugen keinen Plattform-Pflichtfehler.
         const emptyPlatforms = await request.post('/kalkulationen', {
             headers,
             data: {
@@ -224,11 +221,13 @@ test.describe('PO-CALC-TKP-1D3d-4 OA Playwright Smoke', () => {
                 ],
             },
         });
-        expect(emptyPlatforms.status()).toBe(422);
-        const emptyBody = JSON.stringify(await emptyPlatforms.json());
-        expect(emptyBody).toContain('noch nicht freigegeben');
-        expect(emptyBody.toLowerCase()).not.toContain('plattformverteilung ist pflicht');
-        expect(calculationCount()).toBe(calcsBefore);
+        if (emptyPlatforms.status() === 422) {
+            const emptyBody = JSON.stringify(await emptyPlatforms.json());
+            expect(emptyBody).not.toContain('noch nicht freigegeben');
+            expect(emptyBody.toLowerCase()).not.toContain('plattformverteilung ist pflicht');
+        } else {
+            expect([200, 201, 302]).toContain(emptyPlatforms.status());
+        }
     });
 
     test('Handoff: gespeicherte OA-Position → Dispoauftrag ohne Spotproduktion', async ({

@@ -8,6 +8,7 @@ use App\Enums\OaTargetingCategory;
 use App\Enums\PriceListStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingMedium;
+use App\Models\Calculation;
 use App\Models\DispoOrder;
 use App\Models\DispoOrderPosition;
 use App\Models\Inventory;
@@ -274,13 +275,13 @@ class PoCalcTkp1d3aDispoSnapshotTest extends TestCase
     }
 
     #[Test]
-    public function registry_and_http_store_update_remain_closed(): void
+    public function registry_released_allows_http_store_and_update(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
 
         config([OaTkpWizardCapability::CONFIG_KEY => true]);
         $ctx = $this->seedContext();
@@ -288,9 +289,9 @@ class PoCalcTkp1d3aDispoSnapshotTest extends TestCase
 
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.store'), $payload)
-            ->assertStatus(422);
+            ->assertRedirect();
 
-        $calc = app(CalculationWriter::class)->create($payload, $ctx['user']);
+        $calc = Calculation::query()->firstOrFail();
         $update = app(CalculationWriter::class)->payloadFromCalculation($calc);
         $update['lock_version'] = $calc->lock_version;
         foreach ($update['positions'] as $index => $position) {
@@ -311,7 +312,7 @@ class PoCalcTkp1d3aDispoSnapshotTest extends TestCase
 
         $this->actingAs($ctx['user'])
             ->putJson(route('calculations.update', $calc), $update)
-            ->assertStatus(422);
+            ->assertRedirect();
     }
 
     /**

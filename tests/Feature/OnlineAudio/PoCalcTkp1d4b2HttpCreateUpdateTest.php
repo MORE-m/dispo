@@ -25,7 +25,6 @@ use App\Services\Calculation\Decimal;
 use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
 use App\Services\StandardOffer\StandardOfferSpotClassicBoundary;
 use App\Support\Calculation\EngineProfileRegistry;
-use App\Support\Calculation\OaTkpHttpReleaseGuard;
 use App\Support\Calculation\OaTkpWizardCapability;
 use App\Support\DispoOrder\DispoPositionMethodClassifier;
 use App\Support\PriceList\PriceListCalendar;
@@ -38,7 +37,7 @@ use Tests\TestCase;
 /**
  * PO-CALC-TKP-1D4b-2: Positive HTTP Create/Update für OA-TKP über reguläre Controller.
  *
- * Release nur isoliert per D4b-1-Fake. Produktive Registry bleibt planned.
+ * Nach D4d-REL ist der CATALOG released; HTTP-Fake nur noch für Negativ-Isolation.
  */
 class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
 {
@@ -51,30 +50,26 @@ class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
     }
 
     #[Test]
-    public function registry_remains_planned_and_http_store_stays_closed_without_fake(): void
+    public function registry_is_released_and_http_store_opens_without_fake(): void
     {
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion('oa_tkp', 'tkp'));
         $this->assertSame(
-            EngineCapabilityStatus::Implemented,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::statusForVersion('oa_tkp', 'tkp', 'v1'),
         );
-        $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
 
         $ctx = $this->seedContext();
         $response = $this->actingAs($ctx['user'])->postJson(
             route('calculations.store'),
             $this->oaStorePayload($ctx),
         );
-        $response->assertStatus(422);
-        $this->assertSame(
-            OaTkpHttpReleaseGuard::MESSAGE,
-            $response->json('errors.positions.0') ?? $response->json('message'),
-        );
-        $this->assertSame(0, Calculation::query()->count());
+        $response->assertRedirect();
+        $this->assertSame(1, Calculation::query()->count());
     }
 
     #[Test]
@@ -547,21 +542,22 @@ class PoCalcTkp1d4b2HttpCreateUpdateTest extends TestCase
     }
 
     #[Test]
-    public function fake_reset_restores_planned_http_block_and_does_not_leak(): void
+    public function fake_false_blocks_http_and_clear_restores_released_open(): void
     {
         $ctx = $this->seedContext();
-        $this->simulateRelease();
         $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
 
-        OaTkpWizardCapability::clearHttpMutationFakeForTests();
+        OaTkpWizardCapability::fakeHttpMutationAllowedForTests(false);
         $this->assertFalse(OaTkpWizardCapability::allowsHttpMutation());
-
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.store'), $this->oaStorePayload($ctx))
             ->assertStatus(422);
         $this->assertSame(0, Calculation::query()->count());
+
+        OaTkpWizardCapability::clearHttpMutationFakeForTests();
+        $this->assertTrue(OaTkpWizardCapability::allowsHttpMutation());
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus('oa_tkp', 'tkp'),
         );
     }
