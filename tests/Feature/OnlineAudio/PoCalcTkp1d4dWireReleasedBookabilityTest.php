@@ -94,6 +94,7 @@ class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', false)
+                ->where('oa_tkp_preview_surface_allowed', true)
                 ->where('oa_tkp_http_mutation_allowed', true)
                 ->where('catalog.media', function ($media) {
                     $byCode = collect($media)->keyBy('code');

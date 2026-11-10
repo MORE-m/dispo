@@ -10,6 +10,7 @@ import {
     isActiveTargetingBlockedByHistorical,
     isOaTkpPreviewReady,
     isOaTkpSaveBlocked,
+    oaTkpActivePickersAllowed,
     isSelectableForCalculationWizardPosition,
     isTkpPosition,
     isValidBasisTkpInput,
@@ -64,6 +65,34 @@ describe('oa-tkp-wizard helpers', () => {
                 isStandardOffer: true,
             }),
         ).toBe(false);
+    });
+
+    it('separates preview-surface pickers from soft-open capability and save gate', () => {
+        // released + Capability=false: Pickers offen, Save nicht capability-blocked
+        expect(oaTkpActivePickersAllowed(true, false)).toBe(true);
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: true,
+                httpMutationAllowed: true,
+                isStandardOffer: false,
+            }),
+        ).toBe(false);
+
+        // planned Soft-Open: Pickers offen, Save gesperrt
+        expect(oaTkpActivePickersAllowed(true, false)).toBe(true);
+        expect(
+            isOaTkpSaveBlocked({
+                hasTkpPositions: true,
+                httpMutationAllowed: false,
+                isStandardOffer: false,
+            }),
+        ).toBe(true);
+
+        // planned + Capability=false: Pickers zu
+        expect(oaTkpActivePickersAllowed(false, false)).toBe(false);
+
+        // Standardangebote: keine aktiven OA-Picker
+        expect(oaTkpActivePickersAllowed(true, true)).toBe(false);
     });
 
     it('soft-opens selection under capability when methods include tkp', () => {

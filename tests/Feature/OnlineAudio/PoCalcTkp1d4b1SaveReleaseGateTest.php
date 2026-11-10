@@ -68,6 +68,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
+                ->where('oa_tkp_preview_surface_allowed', true)
                 ->where('oa_tkp_http_mutation_allowed', false)
             );
 
@@ -79,6 +80,7 @@ class PoCalcTkp1d4b1SaveReleaseGateTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
+                ->where('oa_tkp_preview_surface_allowed', true)
                 ->where('oa_tkp_http_mutation_allowed', false)
             );
     }

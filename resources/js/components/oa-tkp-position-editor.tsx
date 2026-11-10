@@ -29,7 +29,7 @@ type Props = {
     mediaGross: string | null | undefined;
     fieldErrors: Record<string, string[]>;
     canEdit: boolean;
-    /** Capability OFF + historical: nur Anzeige. */
+    /** Aktive Picker nur bei freigegebener Preview-Surface; historische Anzeige bleibt unabhängig lesbar. */
     showActivePickers: boolean;
     onChange: (patch: Partial<OaTkpPositionFields>) => void;
 };

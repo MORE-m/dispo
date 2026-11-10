@@ -260,6 +260,7 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', true)
+                ->where('oa_tkp_preview_surface_allowed', true)
                 ->where('oa_tkp_http_mutation_allowed', false)
                 ->has('catalog.oa_platforms', 1)
                 ->has('catalog.oa_targetings', 1)
@@ -285,6 +286,7 @@ class PoCalcTkp1d2aDataContractTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('calculations/wizard')
                 ->where('oa_tkp_wizard_capability', false)
+                ->where('oa_tkp_preview_surface_allowed', false)
                 ->where('oa_tkp_http_mutation_allowed', false)
                 ->where('catalog.oa_platforms', [])
                 ->where('catalog.oa_targetings', [])

@@ -109,6 +109,7 @@ import {
     draftBlocksOaTkpPreview,
     draftHasTkpPositions,
     isOaTkpSaveBlocked,
+    oaTkpActivePickersAllowed,
     emptyOaTkpDraftFields,
     formatImpressions,
     formatTkpDisplay,
@@ -1052,6 +1053,7 @@ export default function CalculationWizard({
     linkedDispoOrders = null,
     standardOffer = null,
     oa_tkp_wizard_capability = false,
+    oa_tkp_preview_surface_allowed = false,
     oa_tkp_http_mutation_allowed = false,
 }: {
     catalog: Catalog;
@@ -1070,6 +1072,8 @@ export default function CalculationWizard({
     dispoOrderRevision?: DispoOrderRevisionContext | null;
     linkedDispoOrders?: LinkedDispoOrdersProp | null;
     oa_tkp_wizard_capability?: boolean;
+    /** Preview-/Metadata-Signal; true bei Soft-Open oder released Pair. */
+    oa_tkp_preview_surface_allowed?: boolean;
     /** Registry-Release-Signal für OA-TKP HTTP Store/Update + UI-Save (nicht Capability). */
     oa_tkp_http_mutation_allowed?: boolean;
     standardOffer?: {
@@ -1095,6 +1099,11 @@ export default function CalculationWizard({
     /** Soft-Open nur Kalkulationswizard – nie Standard Offers. */
     const oaTkpCapabilityEnabled =
         oa_tkp_wizard_capability === true && !isStandardOffer;
+    /** Aktive OA-Picker/Metadata: Preview-Surface, nicht Soft-Open-Capability. */
+    const oaTkpPreviewSurfaceAllowed = oaTkpActivePickersAllowed(
+        oa_tkp_preview_surface_allowed === true,
+        isStandardOffer,
+    );
     const [templateTitle, setTemplateTitle] = useState(
         standardOffer?.title ?? 'Standardangebot',
     );
@@ -4449,7 +4458,7 @@ export default function CalculationWizard({
                                                                     canEdit
                                                                 }
                                                                 showActivePickers={
-                                                                    oaTkpCapabilityEnabled
+                                                                    oaTkpPreviewSurfaceAllowed
                                                                 }
                                                                 onChange={(
                                                                     patch,
