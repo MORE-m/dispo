@@ -1,12 +1,22 @@
 # Fortschritt V1
 
-Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-OA004-DEC** Adserver-TKP
+Stand: 9. November 2026 – **PO-CALC-TKP-1D4d-PRE-3** Aktivierung.
+Lokal `dispo_mat_core`: **`2026.1`** und **`2027.1`** jeweils **active**,
+41 Items, genau 1 Active/Jahr; Parität 41/41; Midroll 80/20; Targetings
+unverändert; Adserver 0. Backup
+`local-backups/po-calc-tkp-1d4d-pre3-20261109-214406/`. Resolver
+2026→`2026.1`, 2027→`2027.1`. Registry weiterhin **planned**. D4d bleibt
+**NO-GO** (WIRE/REL/E2E). OA-003 OUT. Gate: Post-Merge-CI #220
+`42695376594` success. Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-PRE-3-execution-2026-11-09.md`.
+
+Stand davor: 9. November 2026 – **PO-CALC-TKP-1D4d-OA004-DEC** Adserver-TKP
 als interne Kosten. 15 EUR = Einkaufskosten / harte Kosten, **kein**
 Verkaufsaufschlag; Midroll bleibt **80.0000 / 20.0000** (kein `80 + 15`).
 OA-004 fachlich geklärt, **kein Release-Blocker** für Normal-TKP-V1;
 kein Runtime-Slice vor D4d-REL. `oa_adserver_surcharges` nicht als
 Verkaufsaufschlag befüllen. D4d bleibt **NO-GO**. Registry `planned`.
-PRE-2 erledigt (Draft `2026.1`). Verbleibende Blocker: PRE-3 (Aktivierung),
+PRE-2 erledigt (Draft `2026.1`). Verbleibende Blocker damals: PRE-3,
 D4d-WIRE, D4d-REL, D4d-E2E. OA-003 außerhalb des ersten Normal-TKP-Releases.
 Docs-only. Dok:
 `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`.
