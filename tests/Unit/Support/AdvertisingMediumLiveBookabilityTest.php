@@ -10,6 +10,9 @@ use App\Models\AdvertisingMedium;
 use App\Models\CalculationMethod;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
+use App\Support\Calculation\EngineProfileRegistry;
+use App\Support\OnlineAudio\OaTkpCoreMedia;
+use Database\Seeders\InitialCatalogMatCoreSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -26,6 +29,12 @@ class AdvertisingMediumLiveBookabilityTest extends TestCase
     {
         parent::setUp();
         $this->bookability = new AdvertisingMediumLiveBookability;
+    }
+
+    protected function tearDown(): void
+    {
+        EngineProfileRegistry::clearOaTkpPairFakeForTests();
+        parent::tearDown();
     }
 
     public function test_null_kind_medium_is_not_bookable_with_german_reason(): void
@@ -215,6 +224,40 @@ class AdvertisingMediumLiveBookabilityTest extends TestCase
         $this->assertFalse($payload['is_bookable_for_new_positions']);
         $this->assertIsString($payload['unbookable_reason']);
         $this->assertNotSame('', $payload['unbookable_reason']);
+    }
+
+    public function test_oa_core_media_bookable_only_when_pair_released(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
+        $this->assertNull($medium->getAttributes()['kind'] ?? null);
+
+        $planned = $this->bookability->evaluate($medium, 'tkp');
+        $this->assertFalse($planned->isBookableForNewPositions);
+
+        EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
+        $released = $this->bookability->evaluate($medium, 'tkp');
+        $this->assertTrue($released->isBookableForNewPositions);
+        $this->assertSame('oa_tkp', $released->engineProfileKey);
+        $this->assertSame('tkp', $released->calculationMethodKey);
+
+        foreach (OaTkpCoreMedia::codes() as $code) {
+            $core = AdvertisingMedium::query()->where('code', $code)->firstOrFail();
+            $this->assertTrue(
+                $this->bookability->evaluate($core, 'tkp')->isBookableForNewPositions,
+                $code,
+            );
+        }
+    }
+
+    public function test_wrong_method_on_oa_core_stays_unbookable_after_release(): void
+    {
+        $this->seed(InitialCatalogMatCoreSeeder::class);
+        EngineProfileRegistry::fakeOaTkpPairReleasedForTests();
+        $medium = AdvertisingMedium::query()->where('code', 'pre_stream')->firstOrFail();
+
+        $result = $this->bookability->evaluate($medium, 'average');
+        $this->assertFalse($result->isBookableForNewPositions);
     }
 
     private function spots(): AdvertisingCategory
