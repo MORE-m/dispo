@@ -1,8 +1,15 @@
 # Fortschritt V1
 
-Stand: 11. November 2026 – **PO-CALC-TKP-OA003-PO** Festpreis-Vertrag
-**verbindlich** (Docs-only). Settlement auf `oa_tkp×tkp`/`v1`; kein neues
-Pair/v2; Runtime weiter OUT bis OA003-1…4. Dok:
+Stand: 11. November 2026 – **PO-CALC-TKP-OA003-1** Settlement + Approval
+(isoliert). Rechenkern `OaTkpFixedPriceSettlement`, Reason
+`oa_tkp_fixed_price`, Assessor für gespeicherte Festpreispositionen.
+**Nicht produktiv verdrahtet** (Writer/Preview/UI/Dispo weiter OUT; HTTP
+lehnt Festpreis weiter ab). Registry `oa_tkp×tkp`/`v1` unverändert.
+Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`.
+
+Stand davor: 11. November 2026 – **PO-CALC-TKP-OA003-PO** Festpreis-Vertrag
+**verbindlich** (Docs-only, PR #229). Settlement auf `oa_tkp×tkp`/`v1`; kein
+neues Pair/v2. Dok:
 `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
 `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
 

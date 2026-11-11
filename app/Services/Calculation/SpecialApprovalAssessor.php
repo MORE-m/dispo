@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpecialApprovalReasonCode;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
@@ -173,30 +174,64 @@ final class SpecialApprovalAssessor
         string $orderDiscountPercent,
         ?string $limit,
     ): array {
-        $discountable = (bool) $position->is_discountable;
-        $positionPercent = $discountable ? (string) $position->position_discount_percent : '0';
-        $orderPercent = $discountable ? $orderDiscountPercent : '0';
-        $effective = $this->effectivePercentFromAmounts(
-            (string) $position->media_gross,
-            (string) $position->position_discount_amount,
-            (string) $position->order_discount_amount,
-        );
+        // OA-Festpreis: Forward-Rabatte wirken nicht – keine Rabattgrenzen-Reasons aus der Medienposition.
+        $rateReasons = [];
+        if (! $this->isStoredOaTkpFixedPricePosition($position)) {
+            $discountable = (bool) $position->is_discountable;
+            $positionPercent = $discountable ? (string) $position->position_discount_percent : '0';
+            $orderPercent = $discountable ? $orderDiscountPercent : '0';
+            $effective = $this->effectivePercentFromAmounts(
+                (string) $position->media_gross,
+                (string) $position->position_discount_amount,
+                (string) $position->order_discount_amount,
+            );
 
-        $reasons = $this->reasonsForRates(
-            $positionPercent,
-            $orderPercent,
-            $effective,
-            $limit,
-            (int) $position->id,
-            'id:'.$position->id,
-            $position->inventory?->name,
-        );
+            $rateReasons = $this->reasonsForRates(
+                $positionPercent,
+                $orderPercent,
+                $effective,
+                $limit,
+                (int) $position->id,
+                'id:'.$position->id,
+                $position->inventory?->name,
+            );
+        }
 
         return array_merge(
-            $reasons,
+            $rateReasons,
             $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
+            $this->oaTkpFixedPriceReasonsFromStoredPosition($position),
             $this->oaTkpBelowMinimumReasonsFromStoredPosition($position),
         );
+    }
+
+    /**
+     * OA-003: Festpreispositionen erfordern immer Sonderfreigabe.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function oaTkpFixedPriceReasonsFromStoredPosition(CalculationPosition $position): array
+    {
+        if (! $this->isStoredOaTkpFixedPricePosition($position)) {
+            return [];
+        }
+
+        $inventoryName = $position->inventory !== null ? $position->inventory->name : null;
+        $label = $inventoryName
+            ?? (is_string($position->inventory_name) && $position->inventory_name !== ''
+                ? $position->inventory_name
+                : null);
+
+        return [[
+            'code' => SpecialApprovalReasonCode::OaTkpFixedPrice->value,
+            'label' => SpecialApprovalReasonCode::OaTkpFixedPrice->label(),
+            'position_id' => (int) $position->id,
+            'position_key' => 'id:'.$position->id,
+            'position_label' => $label,
+            'fixed_price_nn' => $position->fixed_price_nn === null
+                ? null
+                : (string) $position->fixed_price_nn,
+        ]];
     }
 
     /**
@@ -281,6 +316,12 @@ final class SpecialApprovalAssessor
     {
         return (string) ($position->engine_profile_key ?? '') === EngineProfileRegistry::PROFILE_OA_TKP
             && (string) ($position->calculation_method_key ?? '') === 'tkp';
+    }
+
+    private function isStoredOaTkpFixedPricePosition(CalculationPosition $position): bool
+    {
+        return $this->isStoredOaTkpPosition($position)
+            && $position->pricing_settlement_mode === PricingSettlementMode::FixedPrice;
     }
 
     /**
@@ -371,6 +412,7 @@ final class SpecialApprovalAssessor
             SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+            SpecialApprovalReasonCode::OaTkpFixedPrice->value,
         ];
 
         $inherited = [];

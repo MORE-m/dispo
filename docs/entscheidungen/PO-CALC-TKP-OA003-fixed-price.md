@@ -7,8 +7,17 @@ Basis: `origin/main` @ `4f6149576884a29fdfb28a06029129a0fb5c02ae`
 IDs: `PO-CALC-TKP-OA003-PO`, `OA-003`  
 Vorgänger: `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`
 
-Dieser Slice ist **Docs/Vertrag**. Keine Runtime, keine Registry-Änderung, keine
-Migration, keine DB-Mutation, kein Deploy.
+### Umsetzungsstand (Nachzug OA003-1)
+
+- **OA003-1 umgesetzt (isoliert):** Settlement-Kern
+  `OaTkpFixedPriceSettlement` + Reason `oa_tkp_fixed_price` + Assessor-Logik
+  für gespeicherte Festpreispositionen inkl. Unit-/Feature-Tests.
+- **Noch nicht produktiv verdrahtet:** Writer, Preview, HTTP, Wizard, Dispo-Mapper.
+- HTTP/Wizard lehnen OA-Festpreis weiterhin ab.
+- `supportsFixedPriceSettlement('oa_tkp')` bleibt **false** (kein halb offener Pfad).
+- Registry `oa_tkp×tkp`/`v1` unverändert; kein v2; keine Migration.
+
+PO-Docs-Slice war **Docs/Vertrag**. Runtime folgt in OA003-1…4.
 
 ---
 
