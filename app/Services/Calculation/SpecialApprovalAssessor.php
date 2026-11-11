@@ -174,27 +174,31 @@ final class SpecialApprovalAssessor
         string $orderDiscountPercent,
         ?string $limit,
     ): array {
-        $discountable = (bool) $position->is_discountable;
-        $positionPercent = $discountable ? (string) $position->position_discount_percent : '0';
-        $orderPercent = $discountable ? $orderDiscountPercent : '0';
-        $effective = $this->effectivePercentFromAmounts(
-            (string) $position->media_gross,
-            (string) $position->position_discount_amount,
-            (string) $position->order_discount_amount,
-        );
+        // OA-Festpreis: Forward-Rabatte wirken nicht – keine Rabattgrenzen-Reasons aus der Medienposition.
+        $rateReasons = [];
+        if (! $this->isStoredOaTkpFixedPricePosition($position)) {
+            $discountable = (bool) $position->is_discountable;
+            $positionPercent = $discountable ? (string) $position->position_discount_percent : '0';
+            $orderPercent = $discountable ? $orderDiscountPercent : '0';
+            $effective = $this->effectivePercentFromAmounts(
+                (string) $position->media_gross,
+                (string) $position->position_discount_amount,
+                (string) $position->order_discount_amount,
+            );
 
-        $reasons = $this->reasonsForRates(
-            $positionPercent,
-            $orderPercent,
-            $effective,
-            $limit,
-            (int) $position->id,
-            'id:'.$position->id,
-            $position->inventory?->name,
-        );
+            $rateReasons = $this->reasonsForRates(
+                $positionPercent,
+                $orderPercent,
+                $effective,
+                $limit,
+                (int) $position->id,
+                'id:'.$position->id,
+                $position->inventory?->name,
+            );
+        }
 
         return array_merge(
-            $reasons,
+            $rateReasons,
             $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
             $this->oaTkpFixedPriceReasonsFromStoredPosition($position),
             $this->oaTkpBelowMinimumReasonsFromStoredPosition($position),
@@ -208,11 +212,7 @@ final class SpecialApprovalAssessor
      */
     private function oaTkpFixedPriceReasonsFromStoredPosition(CalculationPosition $position): array
     {
-        if (! $this->isStoredOaTkpPosition($position)) {
-            return [];
-        }
-
-        if ($position->pricing_settlement_mode !== PricingSettlementMode::FixedPrice) {
+        if (! $this->isStoredOaTkpFixedPricePosition($position)) {
             return [];
         }
 
@@ -316,6 +316,12 @@ final class SpecialApprovalAssessor
     {
         return (string) ($position->engine_profile_key ?? '') === EngineProfileRegistry::PROFILE_OA_TKP
             && (string) ($position->calculation_method_key ?? '') === 'tkp';
+    }
+
+    private function isStoredOaTkpFixedPricePosition(CalculationPosition $position): bool
+    {
+        return $this->isStoredOaTkpPosition($position)
+            && $position->pricing_settlement_mode === PricingSettlementMode::FixedPrice;
     }
 
     /**

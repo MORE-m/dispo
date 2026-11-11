@@ -210,6 +210,120 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
         $this->assertNotContains(SpecialApprovalReasonCode::Unattributable->value, $codes);
     }
 
+    #[Test]
+    public function fixed_oa_ignores_global_order_discount_limit_reasons(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            settlement: PricingSettlementMode::FixedPrice,
+            basis: '50.0000',
+            minimum: '20.0000',
+            finalTkp: '50.0000',
+            priceListMinimum: '20.0000',
+            fixedPriceNn: '5000.00',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position], orderDiscountPercent: '20');
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $codes = array_column($assessment->reasons, 'code');
+        $this->assertSame(
+            [SpecialApprovalReasonCode::OaTkpFixedPrice->value],
+            $codes,
+        );
+        $this->assertNotContains(SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::PositionDiscountExceedsLimit->value, $codes);
+    }
+
+    #[Test]
+    public function fixed_oa_ignores_stored_position_discount_limit_reasons(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            settlement: PricingSettlementMode::FixedPrice,
+            basis: '50.0000',
+            minimum: '20.0000',
+            finalTkp: '50.0000',
+            priceListMinimum: '20.0000',
+            fixedPriceNn: '5000.00',
+            positionDiscountPercent: '25',
+            positionDiscountAmount: '2000.00',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position]);
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $codes = array_column($assessment->reasons, 'code');
+        $this->assertSame(
+            [SpecialApprovalReasonCode::OaTkpFixedPrice->value],
+            $codes,
+        );
+        $this->assertNotContains(SpecialApprovalReasonCode::PositionDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value, $codes);
+    }
+
+    #[Test]
+    public function fixed_oa_under_min_with_high_order_discount_keeps_only_oa_reasons(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            settlement: PricingSettlementMode::FixedPrice,
+            basis: '15.0000',
+            minimum: '20.0000',
+            finalTkp: '15.0000',
+            priceListMinimum: '20.0000',
+            fixedPriceNn: '1500.00',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position], orderDiscountPercent: '20');
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $codes = array_column($assessment->reasons, 'code');
+        $this->assertSame(
+            [
+                SpecialApprovalReasonCode::OaTkpFixedPrice->value,
+                SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+            ],
+            $codes,
+        );
+        $this->assertNotContains(SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value, $codes);
+        $this->assertNotContains(SpecialApprovalReasonCode::PositionDiscountExceedsLimit->value, $codes);
+    }
+
+    #[Test]
+    public function normal_oa_still_emits_order_discount_limit_reason(): void
+    {
+        $ctx = $this->seedContext();
+        $position = $this->makeOaPosition(
+            $ctx,
+            settlement: PricingSettlementMode::Normal,
+            basis: '50.0000',
+            minimum: '20.0000',
+            finalTkp: '50.0000',
+            priceListMinimum: '20.0000',
+        );
+        $calc = $this->wrapPositions($ctx['user'], [$position], orderDiscountPercent: '20');
+
+        $assessment = app(SpecialApprovalAssessor::class)
+            ->assessFromCalculation($calc, $calc->positions);
+
+        $codes = array_column($assessment->reasons, 'code');
+        $this->assertSame(
+            [SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value],
+            $codes,
+        );
+        $this->assertNotContains(SpecialApprovalReasonCode::OaTkpFixedPrice->value, $codes);
+    }
+
     /**
      * @return array{user: User, medium: AdvertisingMedium, inventory: Inventory, list: OaTkpPriceList}
      */
@@ -252,6 +366,9 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
         string $finalTkp,
         string $priceListMinimum,
         ?string $fixedPriceNn = null,
+        string $positionDiscountPercent = '0',
+        string $positionDiscountAmount = '0.00',
+        string $orderDiscountAmount = '0.00',
     ): CalculationPosition {
         $below = Decimal::cmp($finalTkp, $minimum, 4) < 0;
         $position = new CalculationPosition;
@@ -271,7 +388,7 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
             'length_seconds' => 0,
             'total_spot_count' => 0,
             'surcharge_percent' => '0',
-            'position_discount_percent' => '0',
+            'position_discount_percent' => $positionDiscountPercent,
             'ae_percent' => '0',
             'is_discountable' => true,
             'is_ae_eligible' => false,
@@ -290,8 +407,8 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
             'oa_tkp_price_list_year' => $ctx['list']->year,
             'oa_tkp_price_list_revision' => $ctx['list']->revision_number,
             'media_gross' => '8000.00',
-            'position_discount_amount' => '0.00',
-            'order_discount_amount' => '0.00',
+            'position_discount_amount' => $positionDiscountAmount,
+            'order_discount_amount' => $orderDiscountAmount,
             'ae_amount' => '0.00',
             'nn_invest' => $fixedPriceNn ?? '5000.00',
             'effective_pay_factor_percent' => '100.0000',
@@ -305,8 +422,11 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
     /**
      * @param  list<CalculationPosition>  $positions
      */
-    private function wrapPositions(User $user, array $positions): Calculation
-    {
+    private function wrapPositions(
+        User $user,
+        array $positions,
+        string $orderDiscountPercent = '0',
+    ): Calculation {
         $calculation = Calculation::query()->create([
             'number' => 'OA0031-'.uniqid(),
             'number_year' => 2026,
@@ -315,7 +435,7 @@ class PoCalcTkpOa0031ApprovalTest extends TestCase
             'planning_mode' => PlanningMode::Manual,
             'advisor_id' => $user->id,
             'customer_name' => 'Fixture Kunde OA003-1',
-            'order_discount_percent' => '0',
+            'order_discount_percent' => $orderDiscountPercent,
             'ae_enabled' => false,
             'media_gross' => '0',
             'position_discount_total' => '0',
