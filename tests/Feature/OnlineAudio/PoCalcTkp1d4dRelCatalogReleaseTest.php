@@ -152,7 +152,7 @@ class PoCalcTkp1d4dRelCatalogReleaseTest extends TestCase
     }
 
     #[Test]
-    public function negatives_native_standard_offer_budget_fixed_price_remain_out(): void
+    public function negatives_native_standard_offer_budget_remain_out(): void
     {
         config([OaTkpWizardCapability::CONFIG_KEY => false]);
         $ctx = $this->seedContext();
@@ -182,10 +182,8 @@ class PoCalcTkp1d4dRelCatalogReleaseTest extends TestCase
             $this->assertStringContainsString('Budgetvorschläge', collect($e->errors())->flatten()->implode(' '));
         }
 
-        $fixed = $this->oaStorePayload($ctx);
-        $fixed['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
-        $fixed['positions'][0]['fixed_price_nn'] = '100.00';
-        $this->actingAs($ctx['user'])->postJson(route('calculations.store'), $fixed)->assertStatus(422);
+        // Hinweis: fixed_price ist seit PO-CALC-TKP-OA003-2 IN (siehe
+        // PoCalcTkpOa0032WriterTest / PoCalcTkp1d4dWireReleasedBookabilityTest) und daher kein Negativ mehr.
         $this->assertSame(0, Calculation::query()->count());
     }
 

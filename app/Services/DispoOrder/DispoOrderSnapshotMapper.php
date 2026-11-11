@@ -343,7 +343,9 @@ final class DispoOrderSnapshotMapper
             // OA ohne Spotproduktion: nn_invest der Position ist medienrein.
             'nn_invest' => (string) $position->nn_invest,
             'pricing_settlement_mode' => $position->pricing_settlement_mode->value,
-            'fixed_price_nn' => null,
+            'fixed_price_nn' => $position->fixed_price_nn === null
+                ? null
+                : (string) $position->fixed_price_nn,
             'effective_pay_factor_percent' => $position->effective_pay_factor_percent === null
                 ? null
                 : (string) $position->effective_pay_factor_percent,

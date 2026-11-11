@@ -240,18 +240,25 @@ class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
     }
 
     #[Test]
-    public function oa_fixed_price_settlement_stays_out_after_release(): void
+    public function oa_fixed_price_settlement_is_accepted_after_release(): void
     {
+        // PO-CALC-TKP-OA003-2: OA-Festpreis ist IN (vorher OUT/422).
         $ctx = $this->seedContext();
         $this->simulateRegistryRelease();
         $payload = $this->oaStorePayload($ctx);
+        unset($payload['positions'][0]['basis_tkp']);
         $payload['positions'][0]['pricing_settlement_mode'] = 'fixed_price';
         $payload['positions'][0]['fixed_price_nn'] = '100.00';
 
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.store'), $payload)
-            ->assertStatus(422);
-        $this->assertSame(0, Calculation::query()->count());
+            ->assertRedirect();
+
+        $this->assertSame(1, Calculation::query()->count());
+        $position = Calculation::query()->firstOrFail()->positions->firstOrFail();
+        $this->assertSame('fixed_price', $position->pricing_settlement_mode->value);
+        $this->assertSame('100.00', (string) $position->fixed_price_nn);
+        $this->assertSame('100.00', (string) $position->nn_invest);
     }
 
     private function simulateRegistryRelease(): void

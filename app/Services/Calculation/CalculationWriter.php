@@ -30,8 +30,12 @@ use App\Models\Inventory;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlement;
+use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlementInput;
+use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlementResult;
 use App\Services\Calculation\OaTkp\OaTkpNormalEngine;
 use App\Services\Calculation\OaTkp\OaTkpPlatformAllocationInput;
+use App\Services\Calculation\OaTkp\OaTkpPositionInput;
 use App\Services\Calculation\OaTkp\OaTkpPositionResult;
 use App\Services\Calculation\OaTkp\OaTkpTargetingSelectionInput;
 use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
@@ -66,6 +70,7 @@ final class CalculationWriter
         private readonly CrmOrderHeaderBinder $crmHeaders,
         private readonly OaTkpWriterPositionResolver $oaTkpPositions = new OaTkpWriterPositionResolver,
         private readonly OaTkpNormalEngine $oaTkpEngine = new OaTkpNormalEngine,
+        private readonly OaTkpFixedPriceSettlement $oaTkpFixedPrice = new OaTkpFixedPriceSettlement,
         private readonly SpecialApprovalAssessor $specialApproval = new SpecialApprovalAssessor,
     ) {}
 
@@ -411,6 +416,7 @@ final class CalculationWriter
                 $this->deleteSpotChildren($position);
                 $this->syncOaPlatformAllocations($position, $oaResults[$index]->platformAllocations);
                 $this->syncOaTargetingSelections($position, $oaResults[$index]->targetings);
+                // OA003-2: Fixed normalisiert position_discounts auf [] (keine stale Kinder).
                 $this->syncPositionDiscounts($position, $item['position_discounts']);
 
                 continue;
@@ -545,8 +551,8 @@ final class CalculationWriter
             'order_discount_amount' => $oa->orderDiscountAmount,
             'ae_amount' => $oa->aeAmount,
             'nn_invest' => $oa->nnInvest,
-            'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
-            'fixed_price_nn' => null,
+            'pricing_settlement_mode' => $oa->pricingSettlementMode->value,
+            'fixed_price_nn' => $oa->fixedPriceNn,
             'effective_pay_factor_percent' => $oa->effectivePayFactorPercent,
             'effective_total_discount_percent' => $oa->effectiveDiscountPercent,
             'sort' => $index,
@@ -1058,6 +1064,9 @@ final class CalculationWriter
         $afterOrderTotal = $spotTotals->afterOrderDiscountTotal;
         $aeEligibleBase = $spotTotals->aeEligibleBase;
 
+        // OA Fixed trägt kein Forward-Order-Discount – Breakdown-Basis ohne Fixed-Referenzbrutto.
+        $orderDiscountBreakdownBase = $spotTotals->afterPositionDiscountTotal;
+
         $spotCursor = 0;
         foreach ($resolved as $index => $item) {
             if (($item['is_oa_tkp'] ?? false) !== true) {
@@ -1067,7 +1076,7 @@ final class CalculationWriter
                 continue;
             }
 
-            $oa = $this->oaTkpEngine->calculatePosition($item['oa_input'], $orderDiscounts, $orderPercent, $aeEnabled);
+            $oa = $this->calculateOaPositionResult($item, $orderDiscounts, $orderPercent, $aeEnabled);
             $oaResults[(int) $index] = $oa;
             $positions[] = $this->positionResultFromOa($oa);
 
@@ -1078,6 +1087,11 @@ final class CalculationWriter
             $nnInvest = Decimal::roundMoney(Decimal::add($nnInvest, $oa->nnInvest));
             $afterPositionTotal = Decimal::roundMoney(Decimal::add($afterPositionTotal, $oa->afterPositionDiscount));
             $afterOrderTotal = Decimal::roundMoney(Decimal::add($afterOrderTotal, $oa->afterOrderDiscount));
+            if ($oa->pricingSettlementMode !== PricingSettlementMode::FixedPrice) {
+                $orderDiscountBreakdownBase = Decimal::roundMoney(
+                    Decimal::add($orderDiscountBreakdownBase, $oa->afterPositionDiscount),
+                );
+            }
             if ($oa->isAeEligible) {
                 $aeEligibleBase = Decimal::roundMoney(Decimal::add($aeEligibleBase, $oa->afterOrderDiscount));
             }
@@ -1089,31 +1103,8 @@ final class CalculationWriter
 
             $reasons = array_merge(
                 $reasons,
-                $this->specialApproval->reasonsForRates(
-                    $oa->effectivePositionDiscountPercent,
-                    $oa->effectiveOrderDiscountPercent,
-                    $oa->effectiveDiscountPercent,
-                    $limit,
-                    null,
-                    $positionKey,
-                    $oa->inventoryName,
-                ),
+                $this->oaPreviewSpecialApprovalReasons($oa, $limit, $positionKey, $payloadPosition),
             );
-
-            // PO-CALC-TKP-1D4c-4b: Under-Min = final_tkp < effektives Mindest-TKP (Gleichheit ok).
-            if (Decimal::cmp($oa->finalTkp, $oa->minimumTkp, Decimal::PRICE_SCALE) < 0) {
-                $reasons[] = [
-                    'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
-                    'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
-                    'position_id' => isset($payloadPosition['id']) ? (int) $payloadPosition['id'] : null,
-                    'position_key' => $positionKey,
-                    'position_label' => $oa->inventoryName,
-                    'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
-                    'final_tkp' => Decimal::roundPrice($oa->finalTkp),
-                    'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
-                    'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
-                ];
-            }
         }
 
         $assessment = SpecialApprovalAssessment::fromReasons($reasons);
@@ -1131,7 +1122,7 @@ final class CalculationWriter
             requiresSpecialApproval: $assessment->requiresSpecialApproval,
             positions: $positions,
             aeEnabled: $aeEnabled,
-            orderDiscounts: $this->orderDiscountBreakdown($afterPositionTotal, $orderDiscounts),
+            orderDiscounts: $this->orderDiscountBreakdown($orderDiscountBreakdownBase, $orderDiscounts),
             afterPositionDiscountTotal: $afterPositionTotal,
             afterOrderDiscountTotal: $afterOrderTotal,
             aeEligibleBase: $aeEligibleBase,
@@ -1140,10 +1131,170 @@ final class CalculationWriter
     }
 
     /**
+     * @param  array<string, mixed>  $item
+     * @param  list<DiscountInput>  $orderDiscounts
+     */
+    private function calculateOaPositionResult(
+        array $item,
+        array $orderDiscounts,
+        string $orderPercent,
+        bool $aeEnabled,
+    ): OaTkpPositionResult {
+        /** @var OaTkpPositionInput $oaInput */
+        $oaInput = $item['oa_input'];
+        $mode = $item['pricing_settlement_mode'] ?? PricingSettlementMode::Normal;
+
+        if ($mode === PricingSettlementMode::FixedPrice) {
+            // Resolver liefert Decimal::of() (interne Skala); Settlement erwartet Geldformat (max. 2 NK).
+            $fixedNn = Decimal::roundMoney((string) ($item['fixed_price_nn'] ?? '0'));
+            $settled = $this->oaTkpFixedPrice->calculate(new OaTkpFixedPriceSettlementInput(
+                impressions: $oaInput->impressions,
+                fixedPriceNn: $fixedNn,
+                listTkp: $oaInput->listTkp,
+                priceListMinimumTkp: $oaInput->minimumTkp,
+                targetings: $oaInput->targetings,
+                aePercent: $oaInput->aePercent,
+                aeEnabled: $aeEnabled,
+                isAeEligible: $oaInput->isAeEligible,
+            ));
+
+            return $this->oaResultFromFixedSettlement($oaInput, $settled);
+        }
+
+        return $this->oaTkpEngine->calculatePosition($oaInput, $orderDiscounts, $orderPercent, $aeEnabled);
+    }
+
+    private function oaResultFromFixedSettlement(
+        OaTkpPositionInput $oaInput,
+        OaTkpFixedPriceSettlementResult $settled,
+    ): OaTkpPositionResult {
+        return new OaTkpPositionResult(
+            impressions: $settled->impressions,
+            basisTkp: $settled->basisTkp,
+            listTkp: $settled->listTkp,
+            minimumTkp: $settled->effectiveMinimumTkp,
+            targetingSurchargeTotal: $settled->targetingSurchargeTotal,
+            finalTkp: $settled->finalTkp,
+            belowMinimumTkp: $settled->belowMinimumTkp,
+            mediaGross: $settled->mediaGross,
+            positionDiscountAmount: $settled->positionDiscountAmount,
+            afterPositionDiscount: $settled->afterPositionDiscount,
+            orderDiscountAmount: $settled->orderDiscountAmount,
+            afterOrderDiscount: $settled->afterOrderDiscount,
+            aeAmount: $settled->aeAmount,
+            nnInvest: $settled->nnInvest,
+            effectiveDiscountPercent: $settled->effectiveTotalDiscountPercent,
+            effectivePayFactorPercent: $settled->effectivePayFactorPercent,
+            oaTkpPriceListId: $oaInput->oaTkpPriceListId,
+            oaTkpPriceListVersion: $oaInput->oaTkpPriceListVersion,
+            oaTkpPriceListYear: $oaInput->oaTkpPriceListYear,
+            oaTkpPriceListRevision: $oaInput->oaTkpPriceListRevision,
+            platformAllocations: $oaInput->platformAllocations,
+            targetings: $oaInput->targetings,
+            inventoryId: $oaInput->inventoryId,
+            inventoryCode: $oaInput->inventoryCode,
+            inventoryName: $oaInput->inventoryName,
+            advertisingMediumId: $oaInput->advertisingMediumId,
+            advertisingMediumCode: $oaInput->advertisingMediumCode,
+            advertisingMediumName: $oaInput->advertisingMediumName,
+            aePercent: $settled->aePercent,
+            isDiscountable: $oaInput->isDiscountable,
+            isAeEligible: $oaInput->isAeEligible,
+            appliedPositionDiscounts: [],
+            appliedOrderDiscounts: [],
+            effectivePositionDiscountPercent: '0',
+            effectiveOrderDiscountPercent: '0',
+            advertisingCategoryId: $oaInput->advertisingCategoryId,
+            advertisingCategoryKey: $oaInput->advertisingCategoryKey,
+            advertisingCategoryName: $oaInput->advertisingCategoryName,
+            positionKey: $oaInput->positionKey,
+            priceListMinimumTkp: $settled->priceListMinimumTkp,
+            targetingMinimumSurchargeTotal: $settled->targetingMinimumSurchargeTotal,
+            pricingSettlementMode: PricingSettlementMode::FixedPrice,
+            fixedPriceNn: $settled->fixedPriceNn,
+            effectiveDiscountBeforeAePercent: $settled->effectiveDiscountBeforeAePercent,
+            referenceTkp: $settled->referenceTkp,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payloadPosition
+     * @return list<array<string, mixed>>
+     */
+    private function oaPreviewSpecialApprovalReasons(
+        OaTkpPositionResult $oa,
+        ?string $limit,
+        string $positionKey,
+        array $payloadPosition,
+    ): array {
+        $reasons = [];
+        $positionId = isset($payloadPosition['id']) ? (int) $payloadPosition['id'] : null;
+
+        if ($oa->pricingSettlementMode === PricingSettlementMode::FixedPrice) {
+            $reasons[] = [
+                'code' => SpecialApprovalReasonCode::OaTkpFixedPrice->value,
+                'label' => SpecialApprovalReasonCode::OaTkpFixedPrice->label(),
+                'position_id' => $positionId,
+                'position_key' => $positionKey,
+                'position_label' => $oa->inventoryName,
+                'fixed_price_nn' => $oa->fixedPriceNn,
+            ];
+        } else {
+            $reasons = array_merge(
+                $reasons,
+                $this->specialApproval->reasonsForRates(
+                    $oa->effectivePositionDiscountPercent,
+                    $oa->effectiveOrderDiscountPercent,
+                    $oa->effectiveDiscountPercent,
+                    $limit,
+                    null,
+                    $positionKey,
+                    $oa->inventoryName,
+                ),
+            );
+        }
+
+        // PO-CALC-TKP-1D4c-4b: Under-Min = final_tkp < effektives Mindest-TKP (Gleichheit ok).
+        if (Decimal::cmp($oa->finalTkp, $oa->minimumTkp, Decimal::PRICE_SCALE) < 0) {
+            $reasons[] = [
+                'code' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+                'label' => SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->label(),
+                'position_id' => $positionId,
+                'position_key' => $positionKey,
+                'position_label' => $oa->inventoryName,
+                'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
+                'final_tkp' => Decimal::roundPrice($oa->finalTkp),
+                'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
+                'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
+            ];
+        }
+
+        return $reasons;
+    }
+
+    /**
      * Adapter: OA-Ergebnis → PositionResult (Commercial generisch + additive method_result).
      */
     private function positionResultFromOa(OaTkpPositionResult $oa): PositionResult
     {
+        $tkp = [
+            'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
+            'list_tkp' => Decimal::roundPrice($oa->listTkp),
+            'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
+            'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
+            'targeting_surcharge_total' => Decimal::roundPrice($oa->targetingSurchargeTotal),
+            'targeting_minimum_surcharge_total' => Decimal::roundPrice($oa->targetingMinimumSurchargeTotal),
+            'final_tkp' => Decimal::roundPrice($oa->finalTkp),
+            'below_minimum_tkp' => $oa->belowMinimumTkp,
+            'impressions' => $oa->impressions,
+            'price_year' => $oa->oaTkpPriceListYear,
+            'pricing_settlement_mode' => $oa->pricingSettlementMode->value,
+            'fixed_price_nn' => $oa->fixedPriceNn,
+        ];
+        if ($oa->referenceTkp !== null) {
+            $tkp['reference_tkp'] = Decimal::roundPrice($oa->referenceTkp);
+        }
+
         return new PositionResult(
             mediaGross: $oa->mediaGross,
             positionDiscountAmount: $oa->positionDiscountAmount,
@@ -1156,22 +1307,12 @@ final class CalculationWriter
             spotCount: 0,
             lengthIndex: 100,
             rows: [],
-            pricingSettlementMode: PricingSettlementMode::Normal,
+            pricingSettlementMode: $oa->pricingSettlementMode,
+            fixedPriceNn: $oa->fixedPriceNn,
             effectivePayFactorPercent: $oa->effectivePayFactorPercent,
             methodResult: [
                 'method' => OaTkpWriterPositionResolver::METHOD_KEY,
-                'tkp' => [
-                    'basis_tkp' => Decimal::roundPrice($oa->basisTkp),
-                    'list_tkp' => Decimal::roundPrice($oa->listTkp),
-                    'minimum_tkp' => Decimal::roundPrice($oa->minimumTkp),
-                    'price_list_minimum_tkp' => Decimal::roundPrice($oa->priceListMinimumTkp),
-                    'targeting_surcharge_total' => Decimal::roundPrice($oa->targetingSurchargeTotal),
-                    'targeting_minimum_surcharge_total' => Decimal::roundPrice($oa->targetingMinimumSurchargeTotal),
-                    'final_tkp' => Decimal::roundPrice($oa->finalTkp),
-                    'below_minimum_tkp' => $oa->belowMinimumTkp,
-                    'impressions' => $oa->impressions,
-                    'price_year' => $oa->oaTkpPriceListYear,
-                ],
+                'tkp' => $tkp,
             ],
         );
     }
