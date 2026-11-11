@@ -280,16 +280,44 @@ Regeln:
 
 - Die Mindestpreisprüfung verwendet ausschließlich den Basis-TKP (`OA-001`).
 - Unter Mindest-TKP darf gespeichert, aber ohne Begründung und Sonderfreigabe nicht übergeben werden.
-- Bei Festpreis: `effektiver TKP = Festpreis ÷ Impressions × 1.000`.
+- **Normal-TKP (D4c-4b):** effective minimum =
+  Preislisten-Grundminimum + Σ Targeting-Mindestaufschläge; Vergleich über `final_tkp`.
 - Bei null Impressions ist der effektive TKP nicht berechenbar; Übergabe ist zu blockieren.
 - Die Summe aller Plattform-/Pre-Stream-/In-Stream-Mengen muss der Gesamtmenge entsprechen.
   (**V1 / 4j-KORR 05.11.2026:** keine Endnutzer-Plattformverteilung; Pre-/In über
   getrennte Medien. OA-005/006 = Future.)
-- Targeting-Aufschläge sind additiv, nicht multiplikativ.
+- Targeting-Aufschläge sind additiv, nicht multiplikativ (Normal-TKP).
 - OA-004 (15 EUR Adserver-/Einkaufskosten Spotify/Deezer/YouTube im Midroll-Bundle)
-  ist **kein** Verkaufsbestandteil: nicht additiv auf Final-TKP, Listen-TKP oder
-  Mindest-TKP; keine Änderung an OA-001/OA-002. Midroll-Listenpreis bleibt
-  `80.0000` / `20.0000` (kein `80 + 15`). Interne Kostenbetrachtung = Future.
+  ist **kein** Verkaufsbestandteil: nicht additiv auf Final-TKP, Listen-TKP,
+  Mindest-TKP oder Festpreis-N/N; keine Änderung an OA-001/OA-002/OA-003.
+  Midroll-Listenpreis bleibt `80.0000` / `20.0000` (kein `80 + 15`).
+  Interne Kostenbetrachtung = Future.
+
+### Online-Audio-Festpreis (OA-003 / PO-CALC-TKP-OA003-PO)
+
+Preisabschluss analog Spot (`pricing_settlement_mode`), **nicht** eigener Method-Key:
+
+```text
+engine_profile_key = oa_tkp
+calculation_method_key = tkp
+algorithm_version = v1
+pricing_settlement_mode = fixed_price
+fixed_price_nn = vereinbarter N/N-Endbetrag
+```
+
+```text
+final_tkp = basis_tkp = fixed_price_nn ÷ Impressions × 1.000
+reference_tkp = list_tkp + Σ Targeting-Listenaufschläge
+media_gross = Impressions ÷ 1.000 × reference_tkp
+nn_invest = fixed_price_nn
+targeting_surcharge_total = 0   # bei fixed_price; Einzel-Snapshots bleiben
+```
+
+- Keine Forward-Rabatte auf Fest-N/N; AE rückwärts wie Spot-Festpreis.
+- Prüfung gegen effective minimum; Sonderfreigabe immer (`oa_tkp_fixed_price`).
+- Under-Min zusätzlich: `oa_tkp_basis_below_minimum`.
+- Aktive Jahrespreisliste Pflicht. Registry `fixed_price` bleibt planned.
+- Verbindlich: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`.
 
 ## Social Media und Influencer
 
@@ -394,8 +422,9 @@ Rabatt-/AE-Pipeline gilt wieder.
 Nicht rabattierbare Zusatzzeilen bleiben separat. Bei Mediabrutto null ist die
 Rückrechnung nicht zulässig und erfordert kaufmännische Prüfung.
 
-**Abgrenzung Phase 7:** SWF-/Online-Audio-Festpreis und Registry-Freigabe
-`fixed_price` als Methodenwechsel sind **nicht** Teil von BL-P4-02d.
+**Abgrenzung Phase 7 / OA-003:** Registry-Freigabe `fixed_price` als
+Methodenwechsel bleibt OUT. Online-Audio-Festpreis ist separat als Settlement auf
+`oa_tkp×tkp`/`v1` beschlossen (`PO-CALC-TKP-OA003-PO`); nicht Teil von BL-P4-02d.
 
 ## Payfaktor
 

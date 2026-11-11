@@ -453,7 +453,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   OA-001 Mindest-TKP und OA-002 Sonderfreigabe aktiv. Historische Go/No-Go-
   und PRE-Dokus bleiben als Beleg. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`.
-- **Weiter offen:** OA-003 Festpreis (eigener späterer Slice); Native-Ad;
+- **OA-003 Festpreis:** PO-Vertrag **verbindlich**
+  (`docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`; Readiness
+  `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`).
+  Settlement auf `oa_tkp×tkp`/`v1`, kein neues Pair/v2. Runtime **noch offen** in
+  Slices OA003-1 (Settlement+Approval) → OA003-2 (Writer/Preview/Dispo) →
+  OA003-3 (UI) → OA003-4 (E2E/Release).
+- **Weiter offen:** Native-Ad;
   Budget; Standardangebote; OA-005/006 Allocation; optionale interne
   Kosten-/Margenabbildung der 15 EUR. Kein D4d-Release-Gate mehr offen.
 - **Ergebnis (Normal-TKP V1 erreicht; Rest offen):** TKP, Targeting; Mengen ohne
