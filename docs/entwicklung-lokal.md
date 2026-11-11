@@ -15,7 +15,7 @@ dieser lokalen Einrichtung** (Details: [`entwicklung-lokal-umgebung.md`](entwick
 | Entwicklungs-DB | MySQL **`dispo_mat_core`** (vollständiger MAT-/Katalog-/Preislistenbestand) |
 | Storage | `dispo-main/storage/app` (u. a. `private/price-list-imports`) |
 | Start | `./scripts/start-dev.sh` (existiert; liest `DB_DATABASE` aus `.env`), `Dispo starten.command` oder `php artisan serve --host=127.0.0.1 --port=8000` |
-| Test-MySQL | ausschließlich **`dispo_test`** (`phpunit.mysql.xml` + `MysqlTestDatabaseGuard`) |
+| Test-MySQL | ausschließlich **`dispo_test`** (`phpunit.mysql.xml` + Bootstrap-Guard + `MysqlTestDatabaseGuard`) |
 | Pest/PHPUnit Standard | SQLite `:memory:` (`phpunit.xml`) |
 | Playwright/E2E | eigene SQLite-Dateien und Ports – niemals die Dev-DB |
 
@@ -136,12 +136,23 @@ npm audit --omit=dev
 Pest nutzt standardmäßig SQLite in Memory (`phpunit.xml`).
 MySQL-Integrationssuite: `vendor/bin/pest --configuration=phpunit.mysql.xml`
 (benötigt eine Datenbank `dispo_test` und die Zugangsdaten aus `phpunit.mysql.xml`).
-`phpunit.mysql.xml` erzwingt `DB_DATABASE=dispo_test` per `force="true"` – äußere
-Shell-Variablen wie `DB_DATABASE=dispo` oder `DB_DATABASE=dispo_mat_core` dürfen die
-Entwicklungsdatenbank nicht treffen.
-Zusätzlich bricht `Tests\Support\MysqlTestDatabaseGuard` vor `RefreshDatabase` /
-`DatabaseMigrations` und in MySQL-Parallelworkern ab, wenn nicht exakt `dispo_test`
-aktiv ist. **Tests dürfen `dispo_mat_core` weder lesen noch zurücksetzen.**
+
+Automatisierte Pest/PHPUnit-Läufe haben drei Schutzebenen gegen versehentliche
+Dev-DB-Treffer (`dispo_mat_core` / stillgelegtes `dispo`):
+
+1. **PHPUnit-Konfiguration** – `phpunit.xml` erzwingt SQLite `:memory:`;
+   `phpunit.mysql.xml` erzwingt MySQL `dispo_test` (jeweils inkl. leerer `DB_URL`,
+   `force="true"`). Äußere Shell-Variablen dürfen die Dev-DB nicht wählen.
+2. **Bootstrap-Guard** – `Tests\Support\TestDatabaseBootstrapGuard` in
+   `tests/bootstrap.php` **vor** Composer-/Laravel-Autoload (reines PHP, fail-closed
+   bei unsicherer `DB_*`/`APP_ENV`/`DB_URL`-Matrix).
+3. **Laravel-aware Guard** – `Tests\Support\MysqlTestDatabaseGuard` vor
+   `RefreshDatabase` / `DatabaseMigrations` und in MySQL-Parallelworkern
+   (prüft konfigurierte und per `select database()` aktive MySQL-DB).
+
+E2E bleibt zusätzlich über `E2EIsolatedEnvironmentGuard` und isolierte
+Playwright-Konfigurationen getrennt. **Tests dürfen `dispo_mat_core` weder lesen
+noch zurücksetzen.**
 
 ## DF-3.3a2β – historische Dispo-Origin-Retention
 
