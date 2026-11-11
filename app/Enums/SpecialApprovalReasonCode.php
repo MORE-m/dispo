@@ -13,6 +13,11 @@ enum SpecialApprovalReasonCode: string
      * Legacy-Snapshots ohne price_list_minimum_tkp_snapshot: Basis vs. Mindest-Snapshot.
      */
     case OaTkpBasisBelowMinimum = 'oa_tkp_basis_below_minimum';
+    /**
+     * OA-003: Online-Audio-Festpreis erfordert immer Sonderfreigabe
+     * (unabhängig vom effektiven TKP / Under-Min).
+     */
+    case OaTkpFixedPrice = 'oa_tkp_fixed_price';
     case Unattributable = 'unattributable';
 
     public function label(): string
@@ -22,6 +27,7 @@ enum SpecialApprovalReasonCode: string
             self::OrderDiscountExceedsLimit => 'Auftragsrabatt überschreitet persönliche Grenze',
             self::EffectiveDiscountExceedsLimit => 'Effektiver Rabatt überschreitet persönliche Grenze',
             self::OaTkpBasisBelowMinimum => 'Finaler TKP unterschreitet Mindest-TKP',
+            self::OaTkpFixedPrice => 'Online-Audio-Festpreis',
             self::Unattributable => 'Sonderfreigabegrund nicht eindeutig den ausgewählten Positionen zuordenbar',
         };
     }

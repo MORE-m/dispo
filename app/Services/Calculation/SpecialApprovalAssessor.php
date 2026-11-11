@@ -2,6 +2,7 @@
 
 namespace App\Services\Calculation;
 
+use App\Enums\PricingSettlementMode;
 use App\Enums\SpecialApprovalReasonCode;
 use App\Models\Calculation;
 use App\Models\CalculationPosition;
@@ -195,8 +196,42 @@ final class SpecialApprovalAssessor
         return array_merge(
             $reasons,
             $this->productionReasonsFromStoredPosition($position, $orderDiscountPercent, $limit),
+            $this->oaTkpFixedPriceReasonsFromStoredPosition($position),
             $this->oaTkpBelowMinimumReasonsFromStoredPosition($position),
         );
+    }
+
+    /**
+     * OA-003: Festpreispositionen erfordern immer Sonderfreigabe.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function oaTkpFixedPriceReasonsFromStoredPosition(CalculationPosition $position): array
+    {
+        if (! $this->isStoredOaTkpPosition($position)) {
+            return [];
+        }
+
+        if ($position->pricing_settlement_mode !== PricingSettlementMode::FixedPrice) {
+            return [];
+        }
+
+        $inventoryName = $position->inventory !== null ? $position->inventory->name : null;
+        $label = $inventoryName
+            ?? (is_string($position->inventory_name) && $position->inventory_name !== ''
+                ? $position->inventory_name
+                : null);
+
+        return [[
+            'code' => SpecialApprovalReasonCode::OaTkpFixedPrice->value,
+            'label' => SpecialApprovalReasonCode::OaTkpFixedPrice->label(),
+            'position_id' => (int) $position->id,
+            'position_key' => 'id:'.$position->id,
+            'position_label' => $label,
+            'fixed_price_nn' => $position->fixed_price_nn === null
+                ? null
+                : (string) $position->fixed_price_nn,
+        ]];
     }
 
     /**
@@ -371,6 +406,7 @@ final class SpecialApprovalAssessor
             SpecialApprovalReasonCode::OrderDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::EffectiveDiscountExceedsLimit->value,
             SpecialApprovalReasonCode::OaTkpBasisBelowMinimum->value,
+            SpecialApprovalReasonCode::OaTkpFixedPrice->value,
         ];
 
         $inherited = [];
