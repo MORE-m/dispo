@@ -9,6 +9,8 @@ import {
     hydrateOaTkpFromSaved,
     isActiveTargetingBlockedByHistorical,
     isOaTkpPreviewReady,
+    isValidFixedPriceNnInput,
+    oaTkpSettlementModeChangePatch,
     isOaTkpSaveBlocked,
     oaTkpActivePickersAllowed,
     isSelectableForCalculationWizardPosition,
@@ -393,5 +395,159 @@ describe('oa-tkp-wizard helpers', () => {
             oaTkpDraftPatchOnMethodSelect('tkp', 2026).impressions_input,
         ).toBe('');
         expect(oaTkpDraftPatchOnMethodSelect('average', 2026)).toEqual({});
+    });
+
+    it('does not touch spot settlement when leaving a non-TKP method', () => {
+        const spot = { calculation_method_key: 'average' as string | null };
+        const patch = oaTkpDraftPatchAfterResolvedMethod(
+            spot,
+            'calendar',
+            2026,
+        );
+        expect(patch).not.toHaveProperty('pricing_settlement_mode');
+        expect(patch).not.toHaveProperty('fixed_price_nn_input');
+
+        const fromTkp = oaTkpDraftPatchAfterResolvedMethod(
+            { calculation_method_key: 'tkp' },
+            'average',
+            2026,
+        );
+        expect(fromTkp.pricing_settlement_mode).toBe('normal');
+        expect(fromTkp.fixed_price_nn_input).toBe('');
+    });
+});
+
+describe('oa-tkp-wizard fixed price settlement (OA003-3)', () => {
+    const base = {
+        ...emptyOaTkpDraftFields(2026),
+        calculation_method_key: 'tkp',
+        inventory_id: 1,
+        advertising_medium_id: 2,
+        price_year: 2026,
+        saved_inventory_id: null,
+        saved_advertising_medium_id: null,
+        saved_price_year: null,
+        expected_oa_tkp_price_list_id: 11,
+        impressions_input: '100000',
+        basis_tkp: '10.0000',
+    };
+
+    const payloadExtras = {
+        client_key: 'c1',
+        position_discounts: [
+            { type: 'agency', custom_label: null, percent: '5' },
+        ],
+        dynamic_field_values: { period_open: true },
+    };
+
+    it('UI-01 default draft is normal', () => {
+        const draft = emptyOaTkpDraftFields(2026);
+        expect(draft.pricing_settlement_mode).toBe('normal');
+        expect(draft.fixed_price_nn_input).toBe('');
+    });
+
+    it('UI-02 normal needs basis TKP', () => {
+        expect(isOaTkpPreviewReady(base)).toBe(true);
+        expect(isOaTkpPreviewReady({ ...base, basis_tkp: '' })).toBe(false);
+    });
+
+    it('UI-03 fixed is ready without basis TKP', () => {
+        expect(
+            isOaTkpPreviewReady({
+                ...base,
+                basis_tkp: '',
+                pricing_settlement_mode: 'fixed_price',
+                fixed_price_nn_input: '1.500,00',
+            }),
+        ).toBe(true);
+    });
+
+    it('UI-04 fixed without N/N is not ready', () => {
+        expect(
+            isOaTkpPreviewReady({
+                ...base,
+                pricing_settlement_mode: 'fixed_price',
+                fixed_price_nn_input: '',
+            }),
+        ).toBe(false);
+    });
+
+    it('UI-05 fixed with valid N/N is ready', () => {
+        expect(
+            isOaTkpPreviewReady({
+                ...base,
+                pricing_settlement_mode: 'fixed_price',
+                fixed_price_nn_input: '2500,50',
+            }),
+        ).toBe(true);
+    });
+
+    it('UI-06 fixed with more than 2 decimals is invalid', () => {
+        expect(isValidFixedPriceNnInput('100,555')).toBe(false);
+        expect(isValidFixedPriceNnInput('')).toBe(false);
+        expect(isValidFixedPriceNnInput('0')).toBe(false);
+        expect(isValidFixedPriceNnInput('abc')).toBe(false);
+        expect(isValidFixedPriceNnInput('1.500,00')).toBe(true);
+        expect(isValidFixedPriceNnInput('100.5')).toBe(true);
+        expect(
+            isOaTkpPreviewReady({
+                ...base,
+                pricing_settlement_mode: 'fixed_price',
+                fixed_price_nn_input: '100,555',
+            }),
+        ).toBe(false);
+    });
+
+    it('UI-07 normal payload keeps basis and discounts', () => {
+        const payload = buildOaTkpPositionPayload({
+            ...base,
+            ...payloadExtras,
+        });
+        expect(payload.pricing_settlement_mode).toBe('normal');
+        expect(payload.fixed_price_nn).toBeNull();
+        expect(payload.basis_tkp).toBe('10.0000');
+        expect(payload.position_discounts).toHaveLength(1);
+    });
+
+    it('UI-08 fixed payload sends N/N and no basis authority', () => {
+        const payload = buildOaTkpPositionPayload({
+            ...base,
+            ...payloadExtras,
+            pricing_settlement_mode: 'fixed_price',
+            fixed_price_nn_input: '1.500,5',
+        });
+        expect(payload.pricing_settlement_mode).toBe('fixed_price');
+        expect(payload.fixed_price_nn).toBe('1500.50');
+        expect(payload).not.toHaveProperty('basis_tkp');
+        expect(payload.position_discounts).toEqual([]);
+        expect(payload.position_discount_percent).toBe('0');
+    });
+
+    it('UI-09 hydrate keeps fixed mode and N/N', () => {
+        const hydrated = hydrateOaTkpFromSaved({
+            expected_oa_tkp_price_list_id: 10,
+            impressions: 50_000,
+            price_year: 2026,
+            pricing_settlement_mode: 'fixed_price',
+            fixed_price_nn: '1500.50',
+        });
+        expect(hydrated.pricing_settlement_mode).toBe('fixed_price');
+        expect(hydrated.fixed_price_nn_input).toBe('1.500,5');
+
+        const normal = hydrateOaTkpFromSaved({ price_year: 2026 });
+        expect(normal.pricing_settlement_mode).toBe('normal');
+        expect(normal.fixed_price_nn_input).toBe('');
+    });
+
+    it('UI-10 mode change clears the opposite side', () => {
+        expect(oaTkpSettlementModeChangePatch('fixed_price')).toEqual({
+            pricing_settlement_mode: 'fixed_price',
+            fixed_price_nn_input: '',
+        });
+        expect(oaTkpSettlementModeChangePatch('normal')).toEqual({
+            pricing_settlement_mode: 'normal',
+            fixed_price_nn_input: '',
+            basis_tkp: '',
+        });
     });
 });

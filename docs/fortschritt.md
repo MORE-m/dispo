@@ -1,6 +1,13 @@
 # Fortschritt V1
 
-Stand: 11. November 2026 – **PO-CALC-TKP-OA003-2** Backend-Wiring.
+Stand: 11. November 2026 – **PO-CALC-TKP-OA003-3** Wizard-UI.
+`OaTkpPositionEditor`: Preisabschluss Normal/Festpreis, Festpreis-N/N-Eingabe,
+permanenter Sonderfreigabe-Hinweis, Server-Metriken (kein Client-Recompute),
+Targeting-Referenzhinweis; Helper/Payload/Hydrate in `oa-tkp-wizard.ts`.
+Vitest grün. **OA003-4 Browser-E2E / Release-Closure offen**; OA-003 nicht
+vollständig freigegeben. Registry unverändert; kein +15.
+
+Stand davor: 11. November 2026 – **PO-CALC-TKP-OA003-2** Backend-Wiring.
 Resolver/Preview/Writer/Persistenz/Reload/Dispo-Snapshot für OA-Festpreis
 verdrahtet (`OaTkpFixedPriceSettlement`, Mode `fixed_price` auf
 `oa_tkp×tkp`/`v1`). Special Approval Preview + Stored. **UI / Browser-E2E /

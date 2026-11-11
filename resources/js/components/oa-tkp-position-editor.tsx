@@ -8,6 +8,7 @@ import {
     isActiveTargetingBlockedByHistorical,
     isOaTkpTripleUnchanged,
     needsOaTkpRebind,
+    oaTkpSettlementModeChangePatch,
     restoreOriginalOaTkpPin,
     type OaTargetingCatalogRow,
     type OaTkpMethodResult,
@@ -17,6 +18,8 @@ import {
     useOaTkpAvailablePriceYears,
     useOaTkpPricingMetadata,
 } from '@/hooks/use-oa-tkp-pricing-metadata';
+import { formatFixedPriceNnInput } from '@/lib/pricing-settlement';
+import { cn } from '@/lib/utils';
 import { useEffect, useMemo } from 'react';
 
 type Props = {
@@ -173,6 +176,25 @@ export function OaTkpPositionEditor({
         methodResult?.targeting_surcharge_total ??
         position.targeting_surcharge_total;
     const finalTkp = methodResult?.final_tkp ?? position.final_tkp;
+    const isFixed = position.pricing_settlement_mode === 'fixed_price';
+    const fixedPriceNnDisplay =
+        methodResult?.fixed_price_nn != null
+            ? formatFixedPriceNnInput(methodResult.fixed_price_nn)
+            : position.fixed_price_nn_input.trim();
+    const referenceTkp = methodResult?.reference_tkp;
+    const settlementOptions = [
+        {
+            key: 'normal' as const,
+            title: 'Normal',
+            description: 'Basis-TKP, Targeting-Aufschläge und Rabatte.',
+        },
+        {
+            key: 'fixed_price' as const,
+            title: 'Festpreis',
+            description:
+                'Vereinbarter N/N-Endbetrag; Preisbasis ist der Listen-TKP.',
+        },
+    ];
     const belowMin =
         methodResult?.below_minimum_tkp ?? position.below_minimum_tkp;
 
@@ -240,6 +262,82 @@ export function OaTkpPositionEditor({
 
     return (
         <div className="space-y-6" data-test={`oa-tkp-editor-${positionIndex}`}>
+            <fieldset
+                className="space-y-3"
+                data-test={`oa-tkp-settlement-${positionIndex}`}
+            >
+                <legend className="text-sm font-medium">Preisabschluss</legend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {settlementOptions.map((option) => {
+                        const selected =
+                            position.pricing_settlement_mode === option.key;
+                        const inputId = `oa-tkp-settlement-${positionIndex}-${option.key}`;
+
+                        return (
+                            <label
+                                key={option.key}
+                                htmlFor={inputId}
+                                className={cn(
+                                    'relative flex cursor-pointer flex-col gap-1 rounded-xl border-2 p-4 transition-all outline-none',
+                                    'focus-within:ring-primary/25 focus-within:ring-[3px]',
+                                    selected
+                                        ? 'border-primary bg-accent/70 ring-primary/15 shadow-xs ring-1'
+                                        : 'border-border/80 bg-card hover:border-primary/45 hover:bg-muted/25',
+                                    !canEdit && 'cursor-not-allowed opacity-50',
+                                )}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <input
+                                        id={inputId}
+                                        type="radio"
+                                        name={`oa-tkp-settlement-${positionIndex}`}
+                                        value={option.key}
+                                        checked={selected}
+                                        disabled={!canEdit}
+                                        onChange={() =>
+                                            onChange(
+                                                oaTkpSettlementModeChangePatch(
+                                                    option.key,
+                                                ),
+                                            )
+                                        }
+                                        className="border-primary text-primary focus-visible:ring-primary/40 mt-0.5 size-4 shrink-0 accent-[var(--primary)] focus-visible:ring-[3px] focus-visible:outline-none"
+                                        data-test={`oa-tkp-settlement-${option.key === 'fixed_price' ? 'fixed' : 'normal'}-${positionIndex}`}
+                                    />
+                                    <span className="min-w-0 flex-1">
+                                        <span className="text-foreground block text-sm font-semibold">
+                                            {option.title}
+                                        </span>
+                                        <span className="text-muted-foreground mt-1 block text-sm">
+                                            {option.description}
+                                        </span>
+                                    </span>
+                                </div>
+                            </label>
+                        );
+                    })}
+                </div>
+                {fieldErrors[
+                    `positions.${positionIndex}.pricing_settlement_mode`
+                ]?.[0] ? (
+                    <p className="text-destructive text-sm" role="alert">
+                        {
+                            fieldErrors[
+                                `positions.${positionIndex}.pricing_settlement_mode`
+                            ][0]
+                        }
+                    </p>
+                ) : null}
+            </fieldset>
+
+            {isFixed ? (
+                <div data-test={`oa-tkp-fixed-approval-${positionIndex}`}>
+                    <StatusBanner tone="warning">
+                        Online-Audio-Festpreis erfordert eine Sonderfreigabe.
+                    </StatusBanner>
+                </div>
+            ) : null}
+
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <FormField
                     label="Impressions"
@@ -267,24 +365,52 @@ export function OaTkpPositionEditor({
                     />
                 </FormField>
 
-                <FormField
-                    label="Basis-TKP"
-                    htmlFor={`oa-tkp-basis-${positionIndex}`}
-                    error={
-                        fieldErrors[`positions.${positionIndex}.basis_tkp`]?.[0]
-                    }
-                >
-                    <Input
-                        id={`oa-tkp-basis-${positionIndex}`}
-                        data-test={`oa-tkp-basis-${positionIndex}`}
-                        inputMode="decimal"
-                        value={position.basis_tkp}
-                        disabled={!canEdit}
-                        onChange={(event) =>
-                            onChange({ basis_tkp: event.target.value })
+                {isFixed ? (
+                    <FormField
+                        label="Festpreis N/N"
+                        htmlFor={`oa-tkp-fixed-price-${positionIndex}`}
+                        hint="Vereinbarter N/N-Endbetrag in Euro (max. 2 Nachkommastellen)."
+                        error={
+                            fieldErrors[
+                                `positions.${positionIndex}.fixed_price_nn`
+                            ]?.[0]
                         }
-                    />
-                </FormField>
+                    >
+                        <Input
+                            id={`oa-tkp-fixed-price-${positionIndex}`}
+                            data-test={`oa-tkp-fixed-price-${positionIndex}`}
+                            inputMode="decimal"
+                            value={position.fixed_price_nn_input}
+                            disabled={!canEdit}
+                            onChange={(event) =>
+                                onChange({
+                                    fixed_price_nn_input: event.target.value,
+                                })
+                            }
+                        />
+                    </FormField>
+                ) : (
+                    <FormField
+                        label="Basis-TKP"
+                        htmlFor={`oa-tkp-basis-${positionIndex}`}
+                        error={
+                            fieldErrors[
+                                `positions.${positionIndex}.basis_tkp`
+                            ]?.[0]
+                        }
+                    >
+                        <Input
+                            id={`oa-tkp-basis-${positionIndex}`}
+                            data-test={`oa-tkp-basis-${positionIndex}`}
+                            inputMode="decimal"
+                            value={position.basis_tkp}
+                            disabled={!canEdit}
+                            onChange={(event) =>
+                                onChange({ basis_tkp: event.target.value })
+                            }
+                        />
+                    </FormField>
+                )}
 
                 <FormField
                     label="Preislistenjahr"
@@ -342,22 +468,56 @@ export function OaTkpPositionEditor({
                     value={formatTkpDisplay(listTkp)}
                 />
                 <ReadonlyMetric
-                    label="Mindest-TKP"
+                    label="Effektiver Mindest-TKP"
                     value={formatTkpDisplay(minTkp)}
                 />
-                <ReadonlyMetric
-                    label="Targeting-Aufschlag"
-                    value={formatTkpDisplay(surcharge)}
-                />
-                <ReadonlyMetric
-                    label="Final-TKP"
-                    value={formatTkpDisplay(finalTkp)}
-                    testId={`oa-tkp-final-${positionIndex}`}
-                />
-                <ReadonlyMetric
-                    label="Media-Brutto"
-                    value={mediaGross ? money(mediaGross) : '–'}
-                />
+                {isFixed ? (
+                    <>
+                        {referenceTkp != null ? (
+                            <ReadonlyMetric
+                                label="Referenz-TKP"
+                                value={formatTkpDisplay(referenceTkp)}
+                                testId={`oa-tkp-reference-tkp-${positionIndex}`}
+                            />
+                        ) : null}
+                        <ReadonlyMetric
+                            label="Effektiver TKP"
+                            value={formatTkpDisplay(finalTkp)}
+                            testId={`oa-tkp-final-${positionIndex}`}
+                        />
+                        <ReadonlyMetric
+                            label="Festpreis N/N"
+                            value={
+                                fixedPriceNnDisplay !== ''
+                                    ? `${fixedPriceNnDisplay} €`
+                                    : '–'
+                            }
+                            testId={`oa-tkp-fixed-nn-${positionIndex}`}
+                        />
+                        <ReadonlyMetric
+                            label="Referenz-Mediabrutto"
+                            value={mediaGross ? money(mediaGross) : '–'}
+                            testId={`oa-tkp-media-gross-${positionIndex}`}
+                        />
+                    </>
+                ) : (
+                    <>
+                        <ReadonlyMetric
+                            label="Targeting-Aufschlag"
+                            value={formatTkpDisplay(surcharge)}
+                        />
+                        <ReadonlyMetric
+                            label="Final-TKP"
+                            value={formatTkpDisplay(finalTkp)}
+                            testId={`oa-tkp-final-${positionIndex}`}
+                        />
+                        <ReadonlyMetric
+                            label="Media-Brutto"
+                            value={mediaGross ? money(mediaGross) : '–'}
+                            testId={`oa-tkp-media-gross-${positionIndex}`}
+                        />
+                    </>
+                )}
             </dl>
 
             {belowMin ? (
@@ -371,6 +531,18 @@ export function OaTkpPositionEditor({
 
             <fieldset className="space-y-3">
                 <legend className="text-sm font-medium">Targetings</legend>
+                {isFixed ? (
+                    <div
+                        data-test={`oa-tkp-fixed-targeting-hint-${positionIndex}`}
+                    >
+                        <StatusBanner tone="info">
+                            Targeting-Aufschläge dienen beim Festpreis als
+                            Preis-/Mindest-TKP-Referenz und werden nicht
+                            zusätzlich auf den vereinbarten Festpreis
+                            aufgeschlagen.
+                        </StatusBanner>
+                    </div>
+                ) : null}
                 {fieldErrors[
                     `positions.${positionIndex}.oa_targeting_selections`
                 ]?.[0] ? (

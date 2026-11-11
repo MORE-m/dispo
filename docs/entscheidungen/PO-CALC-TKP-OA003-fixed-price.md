@@ -7,14 +7,18 @@ Basis: `origin/main` @ `4f6149576884a29fdfb28a06029129a0fb5c02ae`
 IDs: `PO-CALC-TKP-OA003-PO`, `OA-003`  
 Vorgänger: `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`
 
-### Umsetzungsstand (Nachzug OA003-1 / OA003-2)
+### Umsetzungsstand (Nachzug OA003-1 / OA003-2 / OA003-3)
 
 - **OA003-1 umgesetzt:** Settlement-Kern `OaTkpFixedPriceSettlement` + Reason
   `oa_tkp_fixed_price` + Assessor für gespeicherte Festpreispositionen (PR #230).
 - **OA003-2 umgesetzt:** Backend-Wiring Resolver/Preview/Writer/Persistenz/
   Reload/Normal↔Fixed/Dispo-Snapshot; Preview-Approval-Parity.
-- **Weiter OUT:** Wizard-UI (`OaTkpPositionEditor`), Browser-E2E, Release-Closure
-  (OA003-3/4). Standardangebote/Budget/Native-Ad/Plattformwahl unverändert OUT.
+- **OA003-3 umgesetzt:** Wizard-UI in `OaTkpPositionEditor` (Preisabschluss
+  Normal/Festpreis, Festpreis-N/N, Sonderfreigabe-Hinweis, Server-Metriken,
+  Targeting-Referenzhinweis); Payload/Hydrate/Moduswechsel in
+  `oa-tkp-wizard.ts`; Vitest. Server bleibt autoritativ (kein Client-Recompute).
+- **Weiter OUT / offen:** Browser-E2E, Release-Closure (OA003-4); OA-003 ist
+  **nicht** vollständig freigegeben. Standardangebote/Budget/Native-Ad/Plattformwahl unverändert OUT.
 - `supportsFixedPriceSettlement('oa_tkp')` bleibt **false** (OA-eigener Resolver).
 - Registry `oa_tkp×tkp`/`v1` unverändert; kein v2; keine Migration; kein +15.
 

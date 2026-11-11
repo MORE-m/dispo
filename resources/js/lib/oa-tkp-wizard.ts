@@ -8,6 +8,12 @@
 import type { CalculationMethodOptions } from '@/lib/calculation-method-draft';
 import type { WizardSelectableMedium } from '@/lib/wizard-medium-selection';
 import { isSelectableForNewWizardPositions } from '@/lib/wizard-medium-selection';
+import {
+    parseFixedPriceNnInput,
+    pricingSettlementDraftFromSaved,
+    settlementPayloadFields,
+    type PricingSettlementMode,
+} from '@/lib/pricing-settlement';
 
 export const OA_TKP_METHOD_KEY = 'tkp';
 
@@ -58,6 +64,11 @@ export type OaTkpMethodResult = {
     below_minimum_tkp: boolean;
     impressions?: number;
     price_year?: number;
+    /** OA003-2: vom Server zurückgespiegelter Preisabschluss. */
+    pricing_settlement_mode?: 'normal' | 'fixed_price';
+    fixed_price_nn?: string | null;
+    /** Referenz-TKP (Festpreis: Preis-/Mindest-TKP-Referenz, server-authoritativ). */
+    reference_tkp?: string;
 };
 
 export type OaTkpPricingMetadata = {
@@ -85,6 +96,8 @@ export type OaTkpPositionFields = {
     expected_oa_tkp_price_list_id: number | null;
     impressions_input: string;
     basis_tkp: string;
+    pricing_settlement_mode: PricingSettlementMode;
+    fixed_price_nn_input: string;
     list_tkp_snapshot: string | null;
     minimum_tkp_snapshot: string | null;
     final_tkp: string | null;
@@ -133,10 +146,7 @@ export function isSelectableForCalculationWizardPosition(
     );
 }
 
-export function emptyOaTkpDraftFields(
-    priceYear: number,
-): Pick<
-    OaTkpPositionFields,
+type OaTkpDraftFieldKeys =
     | 'expected_oa_tkp_price_list_id'
     | 'impressions_input'
     | 'basis_tkp'
@@ -150,8 +160,20 @@ export function emptyOaTkpDraftFields(
     | 'original_oa_tkp_price_list_id'
     | 'original_oa_list_tkp'
     | 'original_oa_minimum_tkp'
-    | 'original_oa_price_year'
-> {
+    | 'original_oa_price_year';
+
+type OaTkpDraftFieldsWithoutSettlement = Pick<
+    OaTkpPositionFields,
+    OaTkpDraftFieldKeys
+>;
+
+/**
+ * OA-Felder ohne Preisabschluss. Für Nicht-TKP-Positionen (Spot): Settlement
+ * gehört dem Spot-Pfad und darf hier nicht überschrieben werden.
+ */
+export function emptyOaTkpDraftFieldsWithoutSettlement(
+    priceYear: number,
+): OaTkpDraftFieldsWithoutSettlement {
     return {
         expected_oa_tkp_price_list_id: null,
         impressions_input: '',
@@ -170,6 +192,20 @@ export function emptyOaTkpDraftFields(
     };
 }
 
+export function emptyOaTkpDraftFields(
+    priceYear: number,
+): OaTkpDraftFieldsWithoutSettlement &
+    Pick<
+        OaTkpPositionFields,
+        'pricing_settlement_mode' | 'fixed_price_nn_input'
+    > {
+    return {
+        ...emptyOaTkpDraftFieldsWithoutSettlement(priceYear),
+        pricing_settlement_mode: 'normal',
+        fixed_price_nn_input: '',
+    };
+}
+
 /**
  * Medium-/Inventory-Resolve: Zielmethode TKP → OA-Draft nur neu, wenn vorher nicht TKP.
  * Verlassen von TKP → OA-Felder leeren (kein Restzustand an Spot-Position).
@@ -183,7 +219,11 @@ export function oaTkpDraftPatchAfterResolvedMethod(
         return isTkpPosition(previous) ? {} : emptyOaTkpDraftFields(priceYear);
     }
 
-    return emptyOaTkpDraftFields(priceYear);
+    // Verlassen von TKP: OA-Draft inkl. Settlement leeren. Spot→Spot: Settlement
+    // der Spot-Position nicht anfassen.
+    return isTkpPosition(previous)
+        ? emptyOaTkpDraftFields(priceYear)
+        : emptyOaTkpDraftFieldsWithoutSettlement(priceYear);
 }
 
 /**
@@ -197,6 +237,30 @@ export function oaTkpDraftPatchOnMethodSelect(
     return nextMethodKey === OA_TKP_METHOD_KEY
         ? emptyOaTkpDraftFields(priceYear)
         : {};
+}
+
+/** Festpreis N/N: positiv, max. 2 NK (Client-Spiegel; Server bleibt autoritativ). */
+export function isValidFixedPriceNnInput(raw: string): boolean {
+    return parseFixedPriceNnInput(raw) !== null;
+}
+
+/** Moduswechsel Normal ↔ Festpreis: Gegenseite wird bewusst geleert. */
+export function oaTkpSettlementModeChangePatch(
+    nextMode: PricingSettlementMode,
+): Partial<OaTkpPositionFields> {
+    if (nextMode === 'fixed_price') {
+        // basis_tkp bleibt im Draft, wird bei Festpreis aber nicht gesendet.
+        return {
+            pricing_settlement_mode: 'fixed_price',
+            fixed_price_nn_input: '',
+        };
+    }
+
+    return {
+        pricing_settlement_mode: 'normal',
+        fixed_price_nn_input: '',
+        basis_tkp: '',
+    };
 }
 
 export function parsePositiveIntegerInput(raw: string): number | null {
@@ -383,7 +447,11 @@ export function isOaTkpPreviewReady(position: OaTkpPositionFields): boolean {
         return false;
     }
 
-    if (!isValidBasisTkpInput(position.basis_tkp)) {
+    if (position.pricing_settlement_mode === 'fixed_price') {
+        if (!isValidFixedPriceNnInput(position.fixed_price_nn_input)) {
+            return false;
+        }
+    } else if (!isValidBasisTkpInput(position.basis_tkp)) {
         return false;
     }
 
@@ -475,7 +543,10 @@ export type OaTkpPreviewPayloadPosition = {
     price_year: number;
     expected_oa_tkp_price_list_id: number;
     impressions: number;
-    basis_tkp: string;
+    pricing_settlement_mode: PricingSettlementMode;
+    fixed_price_nn?: string | null;
+    /** Nur im Modus normal; bei Festpreis nicht gesendet. */
+    basis_tkp?: string;
     oa_platform_allocations: Array<{
         oa_platform_id: number;
         platform_code?: string | null;
@@ -517,6 +588,9 @@ export function buildOaTkpPositionPayload(
     const impressions =
         parsePositiveIntegerInput(position.impressions_input) ?? 0;
 
+    const settlement = settlementPayloadFields(position);
+    const isFixed = settlement.pricing_settlement_mode === 'fixed_price';
+
     return {
         id: position.id ?? null,
         client_key: position.client_key,
@@ -528,7 +602,8 @@ export function buildOaTkpPositionPayload(
         expected_oa_tkp_price_list_id:
             position.expected_oa_tkp_price_list_id ?? 0,
         impressions,
-        basis_tkp: position.basis_tkp.trim(),
+        ...settlement,
+        ...(isFixed ? {} : { basis_tkp: position.basis_tkp.trim() }),
         oa_platform_allocations: position.oa_platform_allocations
             .filter((row) => row.oa_platform_id != null)
             .map((row) => ({
@@ -545,7 +620,7 @@ export function buildOaTkpPositionPayload(
             })),
         position_discount_percent: '0',
         ae_percent: '0',
-        position_discounts: position.position_discounts,
+        position_discounts: isFixed ? [] : position.position_discounts,
         dynamic_field_values: position.dynamic_field_values,
     };
 }
@@ -647,6 +722,8 @@ export function hydrateOaTkpFromSaved(position: {
     expected_oa_tkp_price_list_id?: number | null;
     impressions?: number | null;
     basis_tkp?: string | null;
+    pricing_settlement_mode?: string | null;
+    fixed_price_nn?: string | null;
     list_tkp_snapshot?: string | null;
     minimum_tkp_snapshot?: string | null;
     final_tkp?: string | null;
@@ -678,6 +755,7 @@ export function hydrateOaTkpFromSaved(position: {
                 ? String(position.impressions)
                 : '',
         basis_tkp: position.basis_tkp ?? '',
+        ...pricingSettlementDraftFromSaved(position),
         list_tkp_snapshot: position.list_tkp_snapshot ?? null,
         minimum_tkp_snapshot: position.minimum_tkp_snapshot ?? null,
         final_tkp: position.final_tkp ?? null,
