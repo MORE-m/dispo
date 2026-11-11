@@ -2,13 +2,16 @@
 
 namespace App\Services\Calculation\OaTkp;
 
+use App\Enums\PricingSettlementMode;
 use App\Services\Calculation\DiscountInput;
 
 /**
- * PO-CALC-TKP-1B / 1D4c-4b: Ergebnis einer Normal-TKP-Position inkl. Commercial.
+ * PO-CALC-TKP-1B / 1D4c-4b / OA003-2: Ergebnis einer OA-TKP-Position inkl. Commercial.
  *
  * `minimumTkp` = effektive Mindestschwelle (Grundminimum + Σ Mindest-Aufschläge).
  * `priceListMinimumTkp` = Preislisten-Grundminimum.
+ *
+ * Settlement-Defaults bleiben `normal` / `null`, damit die Normal-Engine unverändert bleibt.
  *
  * @param  list<OaTkpPlatformAllocationInput>  $platformAllocations
  * @param  list<OaTkpTargetingSelectionInput>  $targetings
@@ -65,5 +68,9 @@ final readonly class OaTkpPositionResult
         public ?string $positionKey = null,
         public string $priceListMinimumTkp = '0.0000',
         public string $targetingMinimumSurchargeTotal = '0.0000',
+        public PricingSettlementMode $pricingSettlementMode = PricingSettlementMode::Normal,
+        public ?string $fixedPriceNn = null,
+        public ?string $effectiveDiscountBeforeAePercent = null,
+        public ?string $referenceTkp = null,
     ) {}
 }

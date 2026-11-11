@@ -308,20 +308,30 @@ final class OaTkpWriterPositionResolver
             $priceListRevision = $active['revision_number'];
         }
 
+        $settlement = $this->parseSettlement($position, $index);
         $this->assertNoUnsupportedFields($position, $prefix);
 
         $impressions = $this->parseImpressions($position['impressions'] ?? null, "{$prefix}.impressions");
-        $basisTkp = OaTkpImportDecimal::normalizePositive($position['basis_tkp'] ?? null);
-        if ($basisTkp === null) {
-            throw ValidationException::withMessages([
-                "{$prefix}.basis_tkp" => 'Basis-TKP ist ungültig (muss > 0 sein, max. 4 Nachkommastellen, Punkt als Trenner).',
-            ]);
+        $isFixed = $settlement['mode'] === PricingSettlementMode::FixedPrice;
+
+        // Fixed: basis_tkp ist kein Client-Eingang – Placeholder nur für den OA-Input-Träger.
+        // Der kanonische Wert kommt aus OaTkpFixedPriceSettlement.
+        if ($isFixed) {
+            $basisTkp = $listTkp;
+            $positionDiscounts = [];
+        } else {
+            $basisTkp = OaTkpImportDecimal::normalizePositive($position['basis_tkp'] ?? null);
+            if ($basisTkp === null) {
+                throw ValidationException::withMessages([
+                    "{$prefix}.basis_tkp" => 'Basis-TKP ist ungültig (muss > 0 sein, max. 4 Nachkommastellen, Punkt als Trenner).',
+                ]);
+            }
+            $positionDiscounts = $this->positionDiscountInputs($position);
         }
 
         $allocations = $this->resolvePlatformAllocations($position, $existing, $prefix);
         $targetings = $this->resolveTargetings($position, $existing, $prefix);
 
-        $positionDiscounts = $this->positionDiscountInputs($position);
         $aePercent = $this->resolveAePercent($payload, $position, $isAeEligible, $existing);
 
         $oaInput = new OaTkpPositionInput(
@@ -381,8 +391,8 @@ final class OaTkpWriterPositionResolver
             'production_lines' => [],
             'production_ae_percent' => '0',
             'needs_spot_redistribution' => false,
-            'pricing_settlement_mode' => PricingSettlementMode::Normal,
-            'fixed_price_nn' => null,
+            'pricing_settlement_mode' => $settlement['mode'],
+            'fixed_price_nn' => $settlement['fixed_price_nn'],
             'surcharge_percent' => '0',
             'rule' => $rule,
         ];
@@ -474,6 +484,69 @@ final class OaTkpWriterPositionResolver
 
     /**
      * @param  array<string, mixed>  $position
+     * @return array{mode: PricingSettlementMode, fixed_price_nn: ?string}
+     */
+    private function parseSettlement(array $position, int $index): array
+    {
+        $modeRaw = $position['pricing_settlement_mode'] ?? PricingSettlementMode::Normal->value;
+        // tryFrom fail-closed für unbekannte Werte (Enum: normal | fixed_price).
+        $mode = PricingSettlementMode::tryFrom(is_scalar($modeRaw) ? (string) $modeRaw : '');
+        if ($mode === null) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.pricing_settlement_mode" => 'Der Preisabschluss ist ungültig.',
+            ]);
+        }
+
+        $fixedNn = null;
+        if (array_key_exists('fixed_price_nn', $position)
+            && $position['fixed_price_nn'] !== null
+            && $position['fixed_price_nn'] !== ''
+        ) {
+            $fixedNn = $this->parseFixedPriceNn((string) $position['fixed_price_nn'], $index);
+        }
+
+        if ($mode === PricingSettlementMode::FixedPrice) {
+            if ($fixedNn === null || Decimal::cmp($fixedNn, '0') <= 0) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}.fixed_price_nn" => 'Festpreis erfordert einen N/N-Endbetrag größer 0.',
+                ]);
+            }
+
+            return ['mode' => $mode, 'fixed_price_nn' => $fixedNn];
+        }
+
+        return ['mode' => PricingSettlementMode::Normal, 'fixed_price_nn' => null];
+    }
+
+    private function parseFixedPriceNn(string $raw, int $index): string
+    {
+        $normalized = str_replace(',', '.', trim($raw));
+
+        if (preg_match('/^(-?)(\d+)(?:\.(\d+))?$/', $normalized, $matches) !== 1) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N ist ungültig.',
+            ]);
+        }
+
+        $fraction = $matches[3] ?? '';
+        if (strlen($fraction) > 2) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N darf höchstens zwei Nachkommastellen haben.',
+            ]);
+        }
+
+        try {
+            // Money-Skala (2 NK) – Settlement validiert fail-closed auf max. 2 Nachkommastellen.
+            return Decimal::roundMoney(Decimal::of($normalized));
+        } catch (\InvalidArgumentException) {
+            throw ValidationException::withMessages([
+                "positions.{$index}.fixed_price_nn" => 'Festpreis-N/N ist ungültig.',
+            ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
      */
     private function assertNoUnsupportedFields(array $position, string $prefix): void
     {
@@ -485,14 +558,7 @@ final class OaTkpWriterPositionResolver
             }
         }
 
-        $settlement = is_scalar($position['pricing_settlement_mode'] ?? null)
-            ? (string) $position['pricing_settlement_mode']
-            : '';
-        if ($settlement !== '' && $settlement !== PricingSettlementMode::Normal->value) {
-            throw ValidationException::withMessages([
-                "{$prefix}.pricing_settlement_mode" => 'Festpreis-Abschluss ist für TKP nicht verfügbar.',
-            ]);
-        }
+        // OA003-2: Settlement-Modi normal/fixed_price werden in parseSettlement geprüft.
     }
 
     private function parseImpressions(mixed $raw, string $key): int
