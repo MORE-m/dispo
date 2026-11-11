@@ -1,6 +1,12 @@
 # Fortschritt V1
 
-Stand: 10. November 2026 – **PO-CALC-TKP-1D4d ABGESCHLOSSEN.**
+Stand: 11. November 2026 – **PO-CALC-TKP-OA003-PO** Festpreis-Vertrag
+**verbindlich** (Docs-only). Settlement auf `oa_tkp×tkp`/`v1`; kein neues
+Pair/v2; Runtime weiter OUT bis OA003-1…4. Dok:
+`docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
+`docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
+
+Stand davor: 10. November 2026 – **PO-CALC-TKP-1D4d ABGESCHLOSSEN.**
 Normal-TKP V1 für Online Audio auf `main` freigegeben. Registry
 `oa_tkp×tkp` = **released / v1 / Released**. Fünf Core-Medien
 (`pre_stream`, `in_stream`, `pre_stream_influencer`,
@@ -11,9 +17,10 @@ DMP +25 → Final 105; **kein +15**-Verkaufsaufschlag (15 EUR = interne
 Einkaufskosten, OA004-DEC). Signale: Capability=false, Preview-Surface=true,
 HTTP Mutation=true. Browser-Smoke #226 (Merge `c6578b0…`, Post-Merge-CI
 `42895484827` success inkl. isoliertem D4d-E2E-Step). Kein Deploy.
-**Weiter OUT / offen:** OA-003 Festpreis, Native-Ad, Budget, Standardangebote,
-OA-005/006 Allocation, interne Kosten-/Margenabbildung der 15 EUR (optional
-Future). Dok: `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
+**Weiter OUT / offen:** OA-003 Festpreis-**Runtime** (PO-Vertrag 11.11.2026),
+Native-Ad, Budget, Standardangebote, OA-005/006 Allocation, interne
+Kosten-/Margenabbildung der 15 EUR (optional Future). Dok:
+`docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
 `docs/readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md`.
 
 Stand davor: 10. November 2026 – **PO-CALC-TKP-1D4d-REL** Feature-Branch:

@@ -185,7 +185,7 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 
 ## 4.2 Kaufmännische Sonderfreigabe
 
-Eine Sonderfreigabe ist ein eigener Freigabetyp und nicht mit der allgemeinen Vier-Augen-Prüfung gleichzusetzen. Auslöser sind insbesondere Rabattüberschreitung, Online-Audio-Basis-TKP unter Mindest-TKP, Online-Audio-Festpreis sowie begründungspflichtige Produktionspreisüberschreibungen.
+Eine Sonderfreigabe ist ein eigener Freigabetyp und nicht mit der allgemeinen Vier-Augen-Prüfung gleichzusetzen. Auslöser sind insbesondere Rabattüberschreitung, Online-Audio-TKP unter effektivem Mindest-TKP (`oa_tkp_basis_below_minimum`), Online-Audio-Festpreis immer (`oa_tkp_fixed_price`, OA-003) sowie begründungspflichtige Produktionspreisüberschreibungen.
 
 - Geschäftsführung ist immer berechtigt.
 
@@ -539,7 +539,7 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 
 **OA-002** Ein Basis-TKP unter Mindest-TKP ist speicherbar, blockiert aber die Übergabe an die Disposition, bis Begründung und kaufmännische Sonderfreigabe vorliegen.
 
-**OA-003** Bei Festpreis wird der effektive TKP automatisch berechnet und ebenfalls gegen den Mindest-TKP geprüft. Online-Audio-Festpreis erfordert immer eine Sonderfreigabe.
+**OA-003** Online-Audio-Festpreis ist ein Preisabschluss (`pricing_settlement_mode=fixed_price`) auf dem Pair `oa_tkp×tkp` / `algorithm_version=v1` – kein eigenes Registry-Pair und kein Method-Key `fixed_price`. `fixed_price_nn` ist der vereinbarte N/N-Endbetrag. Effektiver TKP = `fixed_price_nn / Impressions × 1.000` (kanonisch `final_tkp`; bei Festpreis auch `basis_tkp = final_tkp`). Prüfung gegen **effective minimum** (Preislisten-Grundminimum + Targeting-Mindestaufschläge). Targeting-Listenaufschläge erhöhen den Festpreis-N/N nicht (`targeting_surcharge_total=0` bei Festpreis; Einzel-Snapshots bleiben). Keine Forward-Rabatte; AE rückwärts analog Spot-Festpreis. Sonderfreigabe **immer** (`oa_tkp_fixed_price`); bei Under-Min zusätzlich `oa_tkp_basis_below_minimum`. Aktive Jahrespreisliste bleibt Pflicht. Gilt für alle fünf Core-Medien; `native_ad` OUT. Verbindlich: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`. Runtime-Umsetzung folgt in Slices OA003-1…4.
 
 **OA-004** Für das Midroll-Musikumfeld (Spotify / YouTube / Deezer als gemeinsames Bundle-Werbemittel) entstehen interne Adserver-/Einkaufskosten von 15 EUR TKP. Diese Kosten dienen ausschließlich der internen kaufmännischen Betrachtung und werden nicht auf den Listen-TKP oder den finalen Verkaufspreis aufgeschlagen. Keine Einzelplattform-Auswahl daraus; keine Preiswirkung im V1-Kalkulationspfad.
 
