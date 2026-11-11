@@ -17,7 +17,7 @@ in den übrigen Docs.
 | Entwicklungs-DB | MySQL **`dispo_mat_core`** |
 | Storage | `dispo-main/storage/app` (u. a. `private/price-list-imports`) |
 | Start | `./scripts/start-dev.sh` bzw. `Dispo starten.command` (Wrapper) oder `php artisan serve --host=127.0.0.1 --port=8000` |
-| Test-MySQL | ausschließlich **`dispo_test`** |
+| Test-MySQL | ausschließlich **`dispo_test`** (PHPUnit-Force + Bootstrap-Guard + `MysqlTestDatabaseGuard`) |
 | Pest/PHPUnit | SQLite `:memory:` (`phpunit.xml`) |
 | Playwright/E2E | eigene SQLite-Dateien und Ports – niemals die Dev-DB |
 
@@ -108,7 +108,7 @@ bleibt eine gesonderte, manuelle Entscheidung.
 |---|---|
 | `.env.example` | setzt weiterhin `DB_DATABASE=dispo` (Greenfield-Vorlage) |
 | `scripts/start-dev.sh` | Fallback-Name `dispo`, wenn Env-Key fehlt |
-| `phpunit.mysql.xml` / Guard | erzwingen `dispo_test`; erwähnen `dispo` nur als Beispiel „nicht treffen“ |
+| `phpunit.mysql.xml` / Guards | erzwingen `dispo_test` (PHPUnit-Force, Bootstrap-Guard vor Autoload, Laravel-aware Guard); `dispo` nur als Beispiel „nicht treffen“ |
 | Queue / Scheduler | zum Prüfzeitpunkt **keine** laufenden `queue:work`-/`schedule:*`-Prozesse; keine abweichende Prozesskonfiguration festgestellt |
 
 Diese Stellen wurden in diesem Slice **nicht** umgebaut.
@@ -189,8 +189,12 @@ Restore-Rezept.
 ## Testisolation (unverändert maßgeblich)
 
 - Pest Standard: SQLite `:memory:`
-- MySQL: nur `dispo_test` (`phpunit.mysql.xml` `force="true"` + `MysqlTestDatabaseGuard`)
-- Playwright: eigene SQLite-Dateien und Ports (nie `dispo_mat_core` / `dispo`)
+- MySQL: nur `dispo_test` über drei Ebenen:
+  1. `phpunit.mysql.xml` `force="true"`
+  2. `TestDatabaseBootstrapGuard` in `tests/bootstrap.php` (vor Composer/Laravel)
+  3. `MysqlTestDatabaseGuard` (Laravel-aware, vor destruktiven Traits/Workern)
+- Playwright/E2E: eigene SQLite-Dateien und Ports + `E2EIsolatedEnvironmentGuard`
+  (nie `dispo_mat_core` / `dispo`)
 - Automatisierte Tests dürfen die maßgebliche Dev-DB weder zurücksetzen noch verändern
 
 ## Bewusst nicht gemacht
