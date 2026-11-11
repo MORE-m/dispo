@@ -420,10 +420,17 @@ test.describe('PO-CALC-TKP-1D4d Release Browser Smoke', () => {
         await expect(page.locator('[data-test="oa-tkp-under-min-0"]')).toContainText(
             /Sonderfreigabe erforderlich/i,
         );
+        // Method-Key fixed_price bleibt OUT; Settlement-Toggle (OA003-3) ist IN.
         await expect(
             page.locator('[data-test="calculation-method-radio-0-fixed_price"]'),
         ).toHaveCount(0);
-        await expect(page.getByLabel(/Festpreis/i)).toHaveCount(0);
+        await expect(
+            page.locator('[data-test="oa-tkp-settlement-fixed-0"]'),
+        ).toBeVisible();
+        // Normal-Modus: kein permanenter Festpreis-Approval-Banner.
+        await expect(
+            page.locator('[data-test="oa-tkp-fixed-approval-0"]'),
+        ).toHaveCount(0);
     });
 
     test('Fehlende Preisliste: kein Cross-Year (servernah)', async () => {
