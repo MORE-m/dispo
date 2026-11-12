@@ -161,7 +161,28 @@ async function startMidrollFixed(
 async function saveCalculation(page: Page): Promise<number> {
     await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
     await waitForPreview(page);
+    // Create (POST /kalkulationen) und Update (PUT /kalkulationen/{id}) warten
+    // auf die echte Save-Response. Nach dem ersten Save ist die URL bereits
+    // /kalkulationen/{id}; ein reines toHaveURL würde beim Update sofort
+    // durchlaufen, bevor die DB geschrieben ist.
+    const saveResponse = page.waitForResponse(
+        (response) => {
+            const request = response.request();
+            const path = new URL(request.url()).pathname;
+            const isCreate =
+                request.method() === 'POST' && /\/kalkulationen\/?$/.test(path);
+            const isUpdate =
+                request.method() === 'PUT' && /\/kalkulationen\/\d+$/.test(path);
+
+            return (isCreate || isUpdate) && response.status() < 400;
+        },
+        { timeout: 60_000 },
+    );
     await page.locator('[data-test="wizard-save"]').click();
+    await saveResponse;
+    await expect(page.getByText('Kalkulation gespeichert').first()).toBeVisible({
+        timeout: 30_000,
+    });
     await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 60_000 });
     const calcId = Number(page.url().match(/\/kalkulationen\/(\d+)/)?.[1] ?? '0');
     expect(calcId).toBeGreaterThan(0);
