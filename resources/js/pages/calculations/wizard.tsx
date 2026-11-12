@@ -111,6 +111,7 @@ import {
     isOaTkpSaveBlocked,
     oaTkpActivePickersAllowed,
     emptyOaTkpDraftFields,
+    emptyOaTkpDraftFieldsWithoutSettlement,
     formatImpressions,
     formatTkpDisplay,
     hydrateOaTkpFromSaved,
@@ -1529,7 +1530,7 @@ export default function CalculationWizard({
                             methodState.calculation_method_key,
                     })
                         ? hydrateOaTkpFromSaved(position)
-                        : emptyOaTkpDraftFields(pinnedYear)),
+                        : emptyOaTkpDraftFieldsWithoutSettlement(pinnedYear)),
                 };
             });
         }
@@ -2316,7 +2317,10 @@ export default function CalculationWizard({
             currentItem !== undefined
                 ? resolveTargetMediumIdAfterPatch(currentItem, patch)
                 : null;
+        // OA-TKP hat eigenen Festpreis-Pfad: Spot/Trailer-Settlement-Clear nicht anwenden.
+        const isOaTkp = currentItem !== undefined && isTkpPosition(currentItem);
         const clearTrailerSettlement =
+            !isOaTkp &&
             shouldClearTrailerSettlementForTargetMedium(
                 catalog,
                 targetMediumId,
@@ -2328,7 +2332,9 @@ export default function CalculationWizard({
             patch.fixed_price_nn_input !== undefined &&
             String(patch.fixed_price_nn_input).trim() !== ''
         ) {
-            // Settlement bleibt (z. B. Spot→SWF): N/N-Eingabe räumt Festpreis-Banner.
+            // Settlement bleibt (Spot→SWF oder OA-Festpreis-Eingabe): N/N räumt Banner.
+            clearTrailerSettlementValidationForIndex(index);
+        } else if (isOaTkp && patch.pricing_settlement_mode !== undefined) {
             clearTrailerSettlementValidationForIndex(index);
         }
 
