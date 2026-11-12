@@ -1,6 +1,17 @@
 # Fortschritt V1
 
-Stand: 11. November 2026 – **PO-CALC-TKP-OA003-3** Wizard-UI.
+Stand: 12. November 2026 – **PO-CALC-TKP-OA003-4** Fixed-Price-Release-Browser-Smoke.
+Isoliertes Playwright-Setup (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`,
+Port **8078**, SQLite `database/e2e-po-calc-tkp-oa003-release-smoke.sqlite`,
+`OA_TKP_WIZARD_CAPABILITY=false`, Guard gegen `dispo_mat_core`), 6 Tests:
+Release-Signale, Midroll Fixed→DMP→Save→Reload, Under-Min, Fixed→Normal,
+5-Core-Medien-Toggle, Negativfälle. CI-Step nach D4d. **OA003-1..3 gemergt;
+OA003-4 E2E implementiert; OA-003 erst nach Merge des OA003-4-PR und grüner
+Post-Merge-CI final geschlossen.** Registry/v1 unverändert; keine Migration;
+kein +15; keine Plattformwahl. Dok:
+`docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`.
+
+Stand davor: 11. November 2026 – **PO-CALC-TKP-OA003-3** Wizard-UI.
 `OaTkpPositionEditor`: Preisabschluss Normal/Festpreis, Festpreis-N/N-Eingabe,
 permanenter Sonderfreigabe-Hinweis, Server-Metriken (kein Client-Recompute),
 Targeting-Referenzhinweis; Helper/Payload/Hydrate in `oa-tkp-wizard.ts`.
