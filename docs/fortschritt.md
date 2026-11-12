@@ -1,6 +1,21 @@
 # Fortschritt V1
 
-Stand: 12. November 2026 – **PO-CALC-TKP-OA003 ABGESCHLOSSEN.** OA-003
+Stand: 12. November 2026 – **PO-STD-V2.** Standardangebote sind global für alle
+Medienarten (**Spot, SWF, Online Audio, Social, Events, weitere**) vollständig
+nach **V2** verschoben. Kein verpflichtender V1-Produktumfang; keine weitere
+fachliche Fertigstellung / Produktisierung in V1. Bereits vorhandenes technisches
+Fundament (Modelle, Tabellen, Services, Guards, Tests, historische
+Implementierung) bleibt im Repository erhalten; keine Löschung, keine
+Rückmigration, keine Datenlöschung. Bestehende fail-closed-Grenzen bleiben
+(u. a. Online Audio / OA-TKP in Standardangeboten = OUT). Standardangebote sind
+kein V1-Blocker mehr und erscheinen nicht mehr in V1-Priorisierungen.
+**OA-V1-Rest danach:** Native-Ad, Budgetplanung; Future: interne Kosten/Marge,
+Plattform OA-005/006; V2: Standardangebote. Docs-only; keine Runtime-/DB-
+Mutation. Dok: `docs/anforderungskatalog.md` (§3, §8.5), `docs/backlog-v1.md`,
+`docs/blocker-und-entscheidungslog.md`, `docs/test-und-abnahmekatalog.md`,
+`docs/ux-ui-gate.md`.
+
+Stand davor: 12. November 2026 – **PO-CALC-TKP-OA003 ABGESCHLOSSEN.** OA-003
 Festpreis ist im bestehenden OA-TKP-v1-Vertrag **released**. Kette gemergt:
 OA003-PO #229 → OA003-1 #230 (Settlement+Approval) → OA003-2 #231 (Backend) →
 OA003-3 #232 (UI) → OA003-4 #233 (E2E; Feature-HEAD `9600cef`, Merge-Commit
@@ -24,8 +39,9 @@ Deploy.** E2E-Isolation: `APP_ENV=testing`, SQLite, `DB_URL=''`,
 `dispo_mat_core` unberührt. Dev-DB read-only Sanity: `2026.1` active 41 Items
 (genau 1 active 2026), `2027.1` active 41 Items (genau 1 active 2027), Midroll
 80/20, keine unerwartete OA-Preismutation.
-**Weiter OUT / offen:** `native_ad`, Budget, Standardangebote, Plattform-UI /
-Plattformwahl, OA-005/006 Allocation, interne 15-EUR-Kosten-/Margenabbildung.
+**Weiter (nach PO-STD-V2 korrigiert):** V1 offen: `native_ad`, Budget.
+Future: Plattform-UI/-wahl, OA-005/006 Allocation, interne 15-EUR-Kosten-/
+Margenabbildung. **V2:** Standardangebote (kein V1-OUT/Blocker mehr).
 Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
 `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`,
 `docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`.

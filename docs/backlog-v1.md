@@ -80,8 +80,8 @@ Der Umsetzungsplan bleibt die Phasenübersicht; dieses Dokument steuert die Arbe
 ### UX-GATE-D – Dispo, Freigaben, Standardangebote, Administration
 
 - **Phase:** Gate
-- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (PR #122 `main`)** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App; weitere Invalidierungsauslöser)
-- **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, `STD-*` (Fachoberflächen), Admin-Kataloge
+- **Status:** teilweise freigegeben (Dispoentwurf + Vier-Augen-Freigabe + Dyn-Feld-Admin + Katalog + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl + **operativer Statuskern BL-P8-02a / PO-BLP802A-1** + **Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1** + **Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1** + **Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1** + **Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1** + **Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1** + **Materialuploads + Audio BL-P9-01b / PO-BLP901B-1** + **Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1** + **allgemeine Kommentare BL-P9-02a / PO-BLP902A-1** + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **Admin-Outbox-Sicht BL-P9-02e / PO-NOT002-ADMIN-1 (PR #122 `main`)** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1**); Rest blockiert (u. a. Submit-/Invalidierungsmails / In-App; weitere Invalidierungsauslöser). **Standardangebote: PO-Entscheidung 12.11.2026 → vollständig V2** (kein offener V1-Restumfang; vorhandenes Fundament bleibt)
+- **Anforderungen:** `DSP-*`, `APR-*`, `AUTH-004`, Admin-Kataloge; `STD-*` = **V2** (PO-STD-V2, kein V1-Rest)
 - **Abhängigkeiten:** UX-GATE-B
 - **Blocker:** Product-Owner-Freigabe für Restumfang (BLK-006); Kombi-Mitgliedschaften sind kein Restumfang (PO-BL-P2-01-KOMBI)
 
@@ -331,8 +331,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und operative Blockplanung teilweise offen.
 ### BL-P4-03 – Standardangebote
 
-- **Phase:** 4
-- **Status:** teilweise (`BL-P4-03a`–`03k` auf `main`; Budget/Abbinder offen)
+- **Phase:** 4 / **V2** (PO-STD-V2, 12.11.2026)
+- **Status:** technisches Fundament vorhanden (`BL-P4-03a`–`03k` auf `main`); **keine weitere fachliche Fertigstellung in V1**. Vollständiger Produktumfang = **V2**. Budget/Abbinder-auf-Vorlage und medienübergreifende Freigabe = V2; fail-closed Grenzen (u. a. OA-TKP) bleiben.
 - **Anforderungen:** `STD-001` bis `STD-009`, `AUTH-006`, `AUTH-007`, `VER-004`, `SPT-014` (03c/03h); 03b schmales Vorschlagsrecht; 03e `COM-009`; 03f `SPT-012` + **PO-BLP403F-1**; 03g `SPT-005`–`007` + **PO-BLP403G-1**; 03h **PO-BLP403H-1**
 - **Abhängigkeiten:** BL-P4-02 (Average + Calendar 02b + Komponenten 02c + Festpreis 02d + Tandem/Tridem 02e; Abbinder nicht blockierend), UX-GATE-D Teilfreigaben **PO-BLP403A-1**, **PO-BLP403C-1**, **PO-BLP403B-1**, **PO-BLP403F-1**, **PO-BLP403G-1**, **PO-BLP403H-1**, **PO-BLP403I-1**, **PO-BLP403J-1**, **PO-BLP403K-1**; 03d ohne neue Oberfläche
 - **Ergebnis 03a:** versionierte Vorlagen ohne Kundenbindung; nur Spot Classic Average; Navigation; Publish/Archiv inkl. paralleler Draft; Übernahme als isolierte Kundenkalkulation (Frozen Materialization, kein Live-`create()`); Historie/Audit; Dispo nur aus Calc
@@ -346,7 +346,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis 03i (`main`, PR #126, `4a9dd4e…`; Post-Merge-CI `37483249060` SUCCESS; kein Deploy; PO-BLP403I-1 A1 + B1+C1):** Calendar × Festpreis Einzelspot; explizite **v4-Vertragserweiterung**; 03h Allonge×`normal` bleibt; Calendar×Festpreis×Komponenten weiter abgewiesen; isolierter Smoke Port **8052**; ADR `docs/entscheidungen/PO-BLP403I-1-calendar-festpreis.md`
 - **Ergebnis 03j (`main`, PR #127, `e44c1cf…`; Post-Merge-CI `37527679296` SUCCESS; kein Deploy; PO-BLP403J-1 A1 + B1+C1):** Calendar × Festpreis × optional Hauptspot+Allonge; Strategien laut Inventarregel; explizite **v4-Vertragserweiterung**; Shared 600/500 / Individual 640/520; Smoke Port **8053**; Dok `docs/entscheidungen/PO-BLP403J-1-calendar-festpreis-hauptspot-allonge.md`
 - **Ergebnis 03k (`main`, PR #128, `0ff11aa…`; Post-Merge-CI `37611870573` SUCCESS; kein Deploy; PO-BLP403K-1 A1 + B1+C1):** Calendar × Tandem/Tridem × normal/Festpreis; explizite **v4-Vertragserweiterung**; Fixture 600/888.50 und 760/1200; Smoke Port **8054**; Dok `docs/entscheidungen/PO-BLP403K-1-calendar-tandem-tridem.md`
-- **Grenzen:** kein Budget-auf-Vorlage/Abbinder; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
+- **Grenzen / PO-STD-V2:** kein weiterer V1-Ausbau; kein Budget-auf-Vorlage/Abbinder in V1; vorhandenes Fundament bleibt; fail-closed (u. a. OA-TKP) bleibt; PM ohne Übernahme/Calc/Dispo; Kunde bei Übernahme Freitext (CRM-001 später); keine Auto-Übernahme weiterer Methoden
 - **Akzeptanz:** `AT-28` bis `AT-31` (03a); 03c/03b/03d/03e/03f/03g/03h/03i/03j/03k Feature-Tests; 03f/03g/03h/03i/03j/03k Smoke
 - **Tests 03a:** `tests/Feature/StandardOffer/StandardOfferBlP403aTest.php`
 - **Tests 03c:** `tests/Feature/StandardOffer/StandardOfferBlP403cTest.php`
@@ -425,8 +425,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 
 - **Phase:** 6
 - **Status:** teilweise (Normal-TKP V1 released; **OA-003 Festpreis
-  ABGESCHLOSSEN** 12.11.2026; weitere OA-Themen offen: Native-Ad, Budget,
-  Standardangebote, Plattform, OA-005/006 – Online Audio nicht „fertig“)
+  ABGESCHLOSSEN** 12.11.2026; Online Audio nicht „fertig“)
 - **Anforderungen:** `OA-001` bis `OA-009`
 - **Abhängigkeiten:** BL-P4-01
 - **Umgesetzt (nicht „Online Audio fertig“):** OA-TKP-Unterbau der gemergten
@@ -463,12 +462,19 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Migration, kein Deploy. Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
   `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`; Readiness
   `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
-- **Weiter offen:** Native-Ad;
-  Budget; Standardangebote; Plattform-UI/-wahl; OA-005/006 Allocation; optionale interne
-  Kosten-/Margenabbildung der 15 EUR. Kein D4d-Release-Gate mehr offen.
-- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis erreicht; Rest offen):** TKP,
+- **V1 offen:**
+  - Native-Ad
+  - Budget
+- **Future:**
+  - Plattform / OA-005/006
+  - optionale interne Kosten-/Margenabbildung der 15 EUR
+- **V2:**
+  - Standardangebote (PO-STD-V2, 12.11.2026; kein OA-V1-Blocker)
+- Kein D4d-Release-Gate mehr offen.
+- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis erreicht; Rest priorisiert):** TKP,
   Targeting; Mengen ohne V1-Plattformauswahl; Future OA-005/006 separat;
-  Festpreis (OA-003) erledigt; Native-Ad/Budget/Standardangebote/Plattform OUT
+  Festpreis (OA-003) erledigt; Native-Ad/Budget = V1 offen; Plattform Future;
+  Standardangebote = V2
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
   `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
