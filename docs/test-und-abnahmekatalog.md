@@ -203,12 +203,14 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `Browser PO-CALC-TKP-1D4d-E2E release smoke` (Port **8075**, eigene SQLite,
   Guard gegen `dispo_mat_core`). Signale Capability=false /
   Preview+Mutation true; Midroll 80/20, DMP→105, Freeze `oa_tkp/tkp/v1`;
-  kein +15. OA-003 Festpreis: PO-Vertrag verbindlich
-  (`docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`); OA003-1+2
-  Settlement/Approval/Backend verdrahtet; OA003-3 Wizard-UI (Vitest);
-  OA003-4 Fixed-Price-Browser-Smoke implementiert
-  (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`, Port 8078, 6 Tests; OA-003
-  final erst nach Merge + Post-Merge-CI grün). Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
+  kein +15. **OA-003 Festpreis: ABGESCHLOSSEN (12.11.2026)** – PO-Vertrag
+  (`docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`); OA003-1 #230
+  Settlement/Approval, OA003-2 #231 Backend, OA003-3 #232 Wizard-UI (Vitest),
+  OA003-4 #233 Fixed-Price-Browser-Smoke
+  (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`, Port 8078, 6 Tests; Merge
+  `573c1c330abc0ebeba4a38747cc6d90ee67d685f`); Post-Merge-CI `43220059401`
+  success inkl. OA003-4-Browser-Step. Native-Ad/Budget/Standardangebote/Plattform/
+  OA-005/006 weiter OUT. Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`,
@@ -405,7 +407,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
 | AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt (**V1 / 4j-KORR:** Plattformteil = Future; Abnahme ohne Plattformauswahl nach KORR-3/4) |
-| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). OA-003: PO-Vertrag verbindlich; OA003-1 Settlement/Approval; OA003-2 Backend Preview/Save/Reload/Dispo; OA003-3 Wizard-UI + Vitest (Preisabschluss, Festpreis-N/N, Sonderfreigabe-Hinweis); OA003-4 Browser-Smoke (Festpreis 5.000 → final 50, DMP-Referenz 10.500 ohne +25/+15, Under-Min mit beiden Reasons, Fixed→Normal) implementiert; OA-003 final erst nach Merge + Post-Merge-CI |
+| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). **OA-003 ABGESCHLOSSEN (12.11.2026):** PO-Vertrag; OA003-1 Settlement/Approval (#230); OA003-2 Backend Preview/Save/Reload/Dispo (#231); OA003-3 Wizard-UI + Vitest (#232; Preisabschluss, Festpreis-N/N, Sonderfreigabe-Hinweis); OA003-4 Browser-Smoke (#233; Festpreis 5.000 → final 50, DMP-Referenz 10.500 ohne +25/+15, Under-Min mit beiden Reasons, Fixed→Normal) gemergt, Post-Merge-CI `43220059401` success. E2E isoliert (`APP_ENV=testing`, SQLite, Port 8078, Guard; `dispo_mat_core` unberührt). Native-Ad/Budget/Standardangebote/Plattform/OA-005/006 weiter OUT |
 | AT-10 | SOC-001–SOC-006 | Paket aus Story, Reel und Booster | Unterpositionen und Medien-/Boostertrennung; initial kein Rabatt/AE |
 | AT-11 | PRO-001–PRO-007 | Produktion mit Menge 0, regulär und Sonstiges | Preislistenbezug; reguläre Überschreibung nur mit Begründung/Freigabe |
 | AT-12 | AUTH-004, AUTH-005 | Ersteller versucht eigene Freigabe | Server blockiert; andere berechtigte Person kann freigeben |

@@ -1,11 +1,42 @@
 # Fortschritt V1
 
-Stand: 12. November 2026 – **PO-CALC-TKP-OA003-4** Fixed-Price-Release-Browser-Smoke.
+Stand: 12. November 2026 – **PO-CALC-TKP-OA003 ABGESCHLOSSEN.** OA-003
+Festpreis ist im bestehenden OA-TKP-v1-Vertrag **released**. Kette gemergt:
+OA003-PO #229 → OA003-1 #230 (Settlement+Approval) → OA003-2 #231 (Backend) →
+OA003-3 #232 (UI) → OA003-4 #233 (E2E; Feature-HEAD `9600cef`, Merge-Commit
+`573c1c330abc0ebeba4a38747cc6d90ee67d685f`). Post-Merge-CI `43220059401`
+success: ci / mysql / e2e-spt008; D4d-Browser-Step success; OA003-4-Browser-Step
+success. Registry (Code auf `main`): `oa_tkp×tkp` = released, `v1` = released;
+**kein** `oa_tkp×fixed_price`, **kein** v2; Spot-Methode `fixed_price` bleibt
+planned; `supportsFixedPriceSettlement(oa_tkp)` bleibt false (OA-eigener
+Resolver). Vertrag: Settlement `pricing_settlement_mode=fixed_price`,
+`fixed_price_nn` = N/N-Endbetrag; `effective_tkp = fixed_price_nn / impressions
+× 1000`; `basis_tkp = final_tkp = effective_tkp`; Freeze `oa_tkp/tkp/v1`;
+Mindest-TKP gegen effective minimum (Preislisten-Min + Σ Targeting-Mindest-
+aufschläge); Targetings nicht N/N-additiv (`targeting_surcharge_total=0`,
+Listenaufschläge → Referenz-`media_gross`; Midroll+DMP: ref 105 / media_gross
+10.500 / Festpreis 5.000 → final 50 / N/N 5.000); kein +15; keine
+Forward-Rabatte, AE rückwärts, `nn_invest = fixed_price_nn`; Sonderfreigabe
+immer `oa_tkp_fixed_price`, bei Under-Min zusätzlich
+`oa_tkp_basis_below_minimum`; fünf Core-Medien. **Keine Migration, kein
+Deploy.** E2E-Isolation: `APP_ENV=testing`, SQLite, `DB_URL=''`,
+`database/e2e-po-calc-tkp-oa003-release-smoke.sqlite`, Port 8078, Guard;
+`dispo_mat_core` unberührt. Dev-DB read-only Sanity: `2026.1` active 41 Items
+(genau 1 active 2026), `2027.1` active 41 Items (genau 1 active 2027), Midroll
+80/20, keine unerwartete OA-Preismutation.
+**Weiter OUT / offen:** `native_ad`, Budget, Standardangebote, Plattform-UI /
+Plattformwahl, OA-005/006 Allocation, interne 15-EUR-Kosten-/Margenabbildung.
+Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
+`docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`,
+`docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`.
+
+Stand davor: 12. November 2026 – **PO-CALC-TKP-OA003-4** Fixed-Price-Release-Browser-Smoke.
 Isoliertes Playwright-Setup (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`,
 Port **8078**, SQLite `database/e2e-po-calc-tkp-oa003-release-smoke.sqlite`,
 `OA_TKP_WIZARD_CAPABILITY=false`, Guard gegen `dispo_mat_core`), 6 Tests:
 Release-Signale, Midroll Fixed→DMP→Save→Reload, Under-Min, Fixed→Normal,
-5-Core-Medien-Toggle, Negativfälle. CI-Step nach D4d. **OA003-1..3 gemergt;
+5-Core-Medien-Toggle, Negativfälle. CI-Step nach D4d. *(Historischer
+Zwischenstand, überholt durch Abschluss oben:)* **OA003-1..3 gemergt;
 OA003-4 E2E implementiert; OA-003 erst nach Merge des OA003-4-PR und grüner
 Post-Merge-CI final geschlossen.** Registry/v1 unverändert; keine Migration;
 kein +15; keine Plattformwahl. Dok:
@@ -48,9 +79,10 @@ DMP +25 → Final 105; **kein +15**-Verkaufsaufschlag (15 EUR = interne
 Einkaufskosten, OA004-DEC). Signale: Capability=false, Preview-Surface=true,
 HTTP Mutation=true. Browser-Smoke #226 (Merge `c6578b0…`, Post-Merge-CI
 `42895484827` success inkl. isoliertem D4d-E2E-Step). Kein Deploy.
-**Weiter OUT / offen:** OA-003 Festpreis-**Runtime** (PO-Vertrag 11.11.2026),
-Native-Ad, Budget, Standardangebote, OA-005/006 Allocation, interne
-Kosten-/Margenabbildung der 15 EUR (optional Future). Dok:
+**Weiter OUT / offen (Stand 10.11.2026, historisch):** OA-003 Festpreis-**Runtime**
+(PO-Vertrag 11.11.2026) – *seit 12.11.2026 erledigt: OA-003 ABGESCHLOSSEN, siehe
+oben*; weiter OUT: Native-Ad, Budget, Standardangebote, OA-005/006 Allocation,
+interne Kosten-/Margenabbildung der 15 EUR (optional Future). Dok:
 `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
 `docs/readiness/PO-CALC-TKP-1D4d-REL-readiness-2026-11-09.md`.
 
