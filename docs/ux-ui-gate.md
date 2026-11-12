@@ -1,6 +1,8 @@
 # UX/UI-Gates (gestuft)
 
-- **Stand:** 9. Oktober 2026
+- **Stand:** 12. November 2026
+- **PO-STD-V2 (12.11.2026):** Standardangebote vollständig **V2**; kein offener
+  V1-Gate-Restumfang. Vorhandenes Fundament bleibt; keine weitere V1-Produktisierung.
 - **Product-Owner-Entscheidung:** UX-GATE-A und UX-GATE-B freigegeben;
   UX-GATE-C blockiert; UX-GATE-D teilweise freigegeben (Entwurf + Vier-Augen-Freigabe
   + Dyn-Feld-Admin + Katalog Kat/Medien + Inventar-Admin-Lifecycle BL-P2-01a
@@ -107,7 +109,7 @@ dürfen.
 | `UX-GATE-A` | Designsystem, App-Shell, linke Navigation, Seitenlayout, gemeinsame UI-Komponenten | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-B` | Kalkulations-Wizard, Mehrsenderplanung, Spot Classic (Durchschnitt) | **fachlich freigegeben** · **technisch abgenommen** (29.08.2026) |
 | `UX-GATE-C` | Trailer/SWF, Influencer, Social Media und weitere Werbeelemente | **teilweise freigegeben** (Trailer × Durchschnitt, PO-BLP501A-1 **A1**; Allonge × Durchschnitt, PO-ALLONGE-1, vier Sender, dieser Branch, nicht gemergt, operativ nicht eingerichtet); Rest blockiert |
-| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1 + **Produktionspreise Admin + Spotproduktion-Zusatzzeilen Calc/Dispo BL-P5-02a / PO-BLP502-1 A1**) · übrige Teile blockiert |
+| `UX-GATE-D` | Dispoauftrag, Freigaben, Standardangebots-Fachoberflächen, Administration, abschließende Fachoberflächen | **teilweise freigegeben** (Entwurf + Vier-Augen-Freigabe + Inventar-Admin-Lifecycle + Preislisten-Admin-Lifecycle + Excel-Import ohne Auto-Aktivierung + Wizard-Jahreswahl PO-PRI-YEAR-1 + operativer Statuskern BL-P8-02a / PO-BLP802A-1 + Rückfrage Vertrieb BL-P8-02b / PO-BLP802B-1 + Kundenbestätigung Ausnahmeweg BL-P8-02c / PO-BLP802C-1 + Rechnung per Ende + Completion BL-P8-02d / PO-BLP802D-1 + Completed-Reopen + Storno BL-P8-02e / PO-BLP802E-1 + Upload-Fundament Kundenbestätigung BL-P9-01a / PO-BLP901A-1 + Materialuploads + Audio BL-P9-01b / PO-BLP901B-1 + Dyn-Feld-Dateien BL-P9-01c / PO-BLP901C-1 + **Ask/Answer→Outbox BL-P9-02b / PO-BLP902B-1** + **Ask/Answer-SMTP BL-P9-02c / PO-BLP902C-1** + **Freigabe erteilt/abgelehnt BL-P9-02d / PO-APPROVAL-NOTIFY-1** + **CC-Archiv-Invalidierung BL-P7-02a / PO-AT13-CC-1** + **Standardangebote BL-P4-03a / PO-BLP403A-1** + **Hauptspot+Allonge in Vorlagen BL-P4-03c / PO-BLP403C-1** + **Calc→Standardangebot BL-P4-03b / PO-BLP403B-1 + **Produktionspreise Admin + Spotproduktion-Zusatzzeilen Calc/Dispo BL-P5-02a / PO-BLP502-1 A1**) · **Standardangebote: PO-STD-V2 → vollständig V2** (kein V1-Rest); übrige Gate-D-Teile blockiert |
 
 Gesperrte Gates erzeugen **keine** vorgetäuschten fertigen Fachseiten. Menüpunkte
 dürfen abhängig von Berechtigungen sichtbar sein und auf einen klaren Leer- bzw.
@@ -538,8 +540,11 @@ manuell abgenommen; Post-Merge-CI Run `36249359170` SUCCESS):
   (allgemeine Kommentare: PO-BLP902A-1 erledigt)
 - Freigabeinvalidierung **außer** PO-AT13-CC-1 (CC-Archiv bei `at_disposition`)
 - Überschreiben oder Rücksetzen desselben abgelehnten Snapshots auf `Entwurf`
-- Standardangebots-Fachoberflächen **außerhalb** BL-P4-03a–03f (Calendar,
-  Budget-auf-Vorlage, Abbinder-auf-Vorlage, erweiterte REP-Listen)
+- Standardangebote: **PO-STD-V2 (12.11.2026) → vollständig V2**; kein offener
+  V1-Gate-Restumfang. Vorhandenes Fundament (inkl. bisheriger Teilfreigaben
+  BL-P4-03a–03k) bleibt; keine weitere V1-Produktisierung. Fail-closed Grenzen
+  bleiben. V2 später eigener Readiness-/PO-Slice (Budget-auf-Vorlage,
+  Abbinder-auf-Vorlage, medienübergreifende Freigabe, erweiterte REP-Listen)
 - Administration der übrigen Initialkataloge – Kombinationstabellen-Admin
   (**BL-P2-02a / PO-BLP202A-1** auf `main`, PR #108); Matrix Desired-State
   (**BL-P2-02b**, PR #109) und Initialkatalog (**BL-P2-02c**, PR #110) auf `main`;

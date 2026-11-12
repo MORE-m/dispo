@@ -30,8 +30,10 @@ Menüpunkte sind rollenabhängig sichtbar (`AUTH-001`, `STD-003`, `AUTH-006`,
 nicht freigegeben sind (Details: [`ux-ui-gate.md`](ux-ui-gate.md)), führen die
 betroffenen Punkte auf einen Sperr-/Leerzustand, nicht auf eine Schein-Fachseite.
 
-**Standardangebote** bleibt ein eigener linker Navigationspunkt (`STD-003`). Die
-Fachoberfläche gehört zu `UX-GATE-D`.
+**Standardangebote** bleibt ein eigener linker Navigationspunkt (`STD-003`).
+**PO-STD-V2 (12.11.2026):** vollständiger Produktumfang = **V2**; vorhandenes
+technisches Fundament bleibt; keine weitere V1-Produktisierung. Historische
+Teilfreigaben unter `UX-GATE-D` bleiben Beleg, nicht offener V1-Rest.
 
 Profil und Abmeldung liegen in der linken Leiste.
 
@@ -153,7 +155,10 @@ gruppierte Zeitschienen und Standardlängen als Vorbelegung nutzen (`SWF-008`).
 
 ## Standardangebote
 
-Flow (verbindliches Interaktionsmuster, nicht implementiert):
+**V2** (PO-STD-V2, 12.11.2026): vollständiger Produktumfang Standardangebote ist
+nicht Bestandteil von V1. Vorhandener technischer Stand bleibt erhalten.
+
+Flow (verbindliches Interaktionsmuster für V2; kein neuer V1-Ausbau):
 
 1. Liste nach Status, Sender/Kombi, Version und Aktualität filtern.
 2. Entwurf bearbeiten; veröffentlichen setzt Autor und Zeitpunkt.

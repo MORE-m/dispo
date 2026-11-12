@@ -3,6 +3,9 @@
 ## Strategie
 
 Die fachliche Mindestabnahme besteht aus den Szenarien `AT-01` bis `AT-31`.
+**PO-STD-V2 (12.11.2026):** `AT-28`–`AT-31` bleiben als **Regression** für die
+bereits vorhandene Standardoffer-Funktionalität erhalten; der vollständige
+Produktumfang Standardangebote ist **V2** und keine V1-Abnahmevoraussetzung.
 Zusätzlich benötigt jede Umsetzung:
 
 - Unit-Tests für Formeln, Regelauswertung und Statusentscheidungen,
@@ -209,8 +212,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   OA003-4 #233 Fixed-Price-Browser-Smoke
   (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`, Port 8078, 6 Tests; Merge
   `573c1c330abc0ebeba4a38747cc6d90ee67d685f`); Post-Merge-CI `43220059401`
-  success inkl. OA003-4-Browser-Step. Native-Ad/Budget/Standardangebote/Plattform/
-  OA-005/006 weiter OUT. Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
+  success inkl. OA003-4-Browser-Step. **V1 offen:** Native-Ad, Budget.
+  **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2).
+  Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`,
@@ -407,7 +411,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
 | AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt (**V1 / 4j-KORR:** Plattformteil = Future; Abnahme ohne Plattformauswahl nach KORR-3/4) |
-| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). **OA-003 ABGESCHLOSSEN (12.11.2026):** PO-Vertrag; OA003-1 Settlement/Approval (#230); OA003-2 Backend Preview/Save/Reload/Dispo (#231); OA003-3 Wizard-UI + Vitest (#232; Preisabschluss, Festpreis-N/N, Sonderfreigabe-Hinweis); OA003-4 Browser-Smoke (#233; Festpreis 5.000 → final 50, DMP-Referenz 10.500 ohne +25/+15, Under-Min mit beiden Reasons, Fixed→Normal) gemergt, Post-Merge-CI `43220059401` success. E2E isoliert (`APP_ENV=testing`, SQLite, Port 8078, Guard; `dispo_mat_core` unberührt). Native-Ad/Budget/Standardangebote/Plattform/OA-005/006 weiter OUT |
+| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). **OA-003 ABGESCHLOSSEN (12.11.2026):** PO-Vertrag; OA003-1 Settlement/Approval (#230); OA003-2 Backend Preview/Save/Reload/Dispo (#231); OA003-3 Wizard-UI + Vitest (#232; Preisabschluss, Festpreis-N/N, Sonderfreigabe-Hinweis); OA003-4 Browser-Smoke (#233; Festpreis 5.000 → final 50, DMP-Referenz 10.500 ohne +25/+15, Under-Min mit beiden Reasons, Fixed→Normal) gemergt, Post-Merge-CI `43220059401` success. E2E isoliert (`APP_ENV=testing`, SQLite, Port 8078, Guard; `dispo_mat_core` unberührt). **V1 offen:** Native-Ad, Budget. **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2); fail-closed OA-TKP in Standardangeboten bleibt |
 | AT-10 | SOC-001–SOC-006 | Paket aus Story, Reel und Booster | Unterpositionen und Medien-/Boostertrennung; initial kein Rabatt/AE |
 | AT-11 | PRO-001–PRO-007 | Produktion mit Menge 0, regulär und Sonstiges | Preislistenbezug; reguläre Überschreibung nur mit Begründung/Freigabe |
 | AT-12 | AUTH-004, AUTH-005 | Ersteller versucht eigene Freigabe | Server blockiert; andere berechtigte Person kann freigeben |
@@ -426,10 +430,10 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-25 | BUD-003–BUD-006 | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Mehrsender-Vorschlag ohne bestehendes Senderverhältnis; editierbar |
 | AT-26 | BUD-007 | Zielbudget, das sich nicht ganzzahlig teilt | Ganzzahlige Mengen; Rest oder Überschreitung transparent |
 | AT-27 | BUD-008 | Vorschlag anzeigen, verwerfen, dann explizit übernehmen | Ohne Übernahme unverändert; nach Übernahme Mengen gesetzt und weiter editierbar |
-| AT-28 | STD-004, STD-005 | Veröffentlichung, Vertrieb übernimmt und ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert |
-| AT-29 | STD-007, DSP-007 | Dispoauftrag direkt am Standardangebot | Serverseitig unzulässig; nur aus Kundenkalkulation |
-| AT-30 | AUTH-006, AUTH-007 | Nutzer nur Produktmanagement | Standardangebote erlaubt; Kundenkalkulationen/Dispo ohne Extra-Recht verweigert |
-| AT-31 | STD-002, STD-008 | Entwurf veröffentlichen, archivieren | Status, Autor, Veröffentlichungszeitpunkt und Audit vollständig |
+| AT-28 | STD-004, STD-005 | Veröffentlichung, Vertrieb übernimmt und ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert. **Regression** vorhandener Stand; vollständiger Produktumfang = **V2** (PO-STD-V2) |
+| AT-29 | STD-007, DSP-007 | Dispoauftrag direkt am Standardangebot | Serverseitig unzulässig; nur aus Kundenkalkulation. **Regression**; vollständiger Produktumfang = **V2** |
+| AT-30 | AUTH-006, AUTH-007 | Nutzer nur Produktmanagement | Standardangebote erlaubt; Kundenkalkulationen/Dispo ohne Extra-Recht verweigert. **Regression**; vollständiger Produktumfang = **V2** |
+| AT-31 | STD-002, STD-008 | Entwurf veröffentlichen, archivieren | Status, Autor, Veröffentlichungszeitpunkt und Audit vollständig. **Regression**; vollständiger Produktumfang = **V2** |
 
 ## Pflichtklassen für Negativtests
 
@@ -466,8 +470,11 @@ test_VER_005_new_fieldset_version_does_not_mutate_existing_snapshot
 
 V1 ist fachlich abnahmefähig, wenn:
 
-- alle 31 Mindestfälle erfolgreich sind,
-- alle MUSS-Anforderungen tracebar abgedeckt sind,
+- die V1-relevanten Mindestfälle erfolgreich sind (`AT-01`–`AT-27` sowie übrige
+  nicht-STD-Fälle); `AT-28`–`AT-31` sind **Regression** für vorhandene
+  Standardoffer-Funktionalität, nicht Voraussetzung für einen vollständigen
+  V1-Produktumfang Standardangebote (**V2**, PO-STD-V2),
+- alle V1-MUSS-Anforderungen tracebar abgedeckt sind (`STD-*` = V2),
 - keine offenen Fehler der Schwere kritisch/hoch bestehen,
 - Preislisten- und Kombinationsinitialdaten abgenommen wurden,
 - PDF-/Excel-/CSV-Exporte anhand freigegebener Muster geprüft sind,

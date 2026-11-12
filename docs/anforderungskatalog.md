@@ -126,7 +126,7 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 
 ## 2.3 End-to-End-Prozess
 
-1.  Vertrieb legt eine Kalkulation mit Kunde, optionaler Agentur und mindestens einer Werbemittelposition an. Optional entsteht die Kalkulation durch Übernahme eines veröffentlichten Standardangebots (`STD-004`, `STD-005`).
+1.  Vertrieb legt eine Kalkulation mit Kunde, optionaler Agentur und mindestens einer Werbemittelposition an. Die optionale Übernahme aus einem veröffentlichten Standardangebot (`STD-004`, `STD-005`) ist **V2** (PO-STD-V2, 12.11.2026); sie ist kein verpflichtender V1-Bestandteil.
 
 2.  Das System berechnet Listenpreise, Aufschläge, Rabatte, AE, N/N-Invest und Payfaktoren; Sonderfreigaben werden erkannt. Optional erzeugt der Pfad „Mit Budget planen“ Mengenvorschläge, die erst nach expliziter Übernahme gelten (`BUD-008`).
 
@@ -155,7 +155,7 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 | Rechnung per Ende   | Monate mehrfach wählbar, keine Betragsaufteilung                  | Betragsaufteilung nach Monaten                               |
 | Vertretung          | Keine Abwesenheits-/Vertreterregel                                | Delegation und Abwesenheitslogik                             |
 | Budgetplanung       | Deterministische Mengenvorschläge ohne Reichweite/KI (`BUD-009`)  | Reichweiten- oder KI-Optimierung                             |
-| Standardangebote    | Interne Vorlagen ohne Kundenbindung; Übernahme in Kundenkalkulation | Kein Kundenangebot; bleibt durch `SCP-001` ausgeschlossen    |
+| Standardangebote    | **Kein verpflichtender V1-Produktumfang** (PO-STD-V2, 12.11.2026). Bereits vorhandenes technisches Fundament bleibt im Repository; keine weitere fachliche Fertigstellung in V1. | Vollständiger, medienübergreifend freigegebener Produktumfang (`STD-001`–`STD-009`); kein Kundenangebot (`SCP-001`) |
 | Audio               | Abspielen/Download, Länge manuell prüfen                          | Automatische Audiolängenprüfung                              |
 | Weitere Teams       | Disposition/Projektmanagement koordiniert zentral                 | Direkte Zugänge für OAP, PDM, Redaktion, Moderatoren, Events |
 
@@ -407,25 +407,32 @@ Der Budget-Assistent ist eine optionale Hilfe in der Kundenkalkulation. Er erzeu
 
 ## 8.5 Standardangebote
 
+> **PO-STD-V2 (12.11.2026):** Alle Anforderungen `STD-001`–`STD-009` gehören zu **V2**.
+> Standardangebote sind global für alle Medienarten kein verpflichtender V1-Produktumfang.
+> Bereits vorhandenes technisches Fundament (Modelle, Tabellen, Services, Guards, Tests,
+> historische Implementierung) bleibt erhalten und wird in V1 nicht weiter produktisiert.
+> Bestehende fail-closed-Grenzen (u. a. OA-TKP in Standardangeboten) bleiben geschlossen.
+> Kein Kundenangebot im Sinne von `SCP-001`.
+
 Ein Standardangebot ist eine versionierte, sender- bzw. kombibezogene Kalkulationsvorlage ohne Kundenbindung. Es besitzt einen eigenen Navigationspunkt und ist kein Kundenangebot im Sinne von `SCP-001`.
 
-**STD-001** Ein Standardangebot ist an Sender und/oder Kombis gebunden, besitzt keine Kunden- oder Agenturzuordnung und dient als Vorlage für spätere Kundenkalkulationen.
+**STD-001** (**V2**) Ein Standardangebot ist an Sender und/oder Kombis gebunden, besitzt keine Kunden- oder Agenturzuordnung und dient als Vorlage für spätere Kundenkalkulationen.
 
-**STD-002** Zulässige Status sind Entwurf, veröffentlicht und archiviert. Nur veröffentlichte Versionen sind für Vertrieb zur Übernahme sichtbar.
+**STD-002** (**V2**) Zulässige Status sind Entwurf, veröffentlicht und archiviert. Nur veröffentlichte Versionen sind für Vertrieb zur Übernahme sichtbar.
 
-**STD-003** Die linke Navigation enthält den eigenen Punkt Standardangebote. Sichtbarkeit richtet sich nach Rolle (`AUTH-006`, `AUTH-007`).
+**STD-003** (**V2**) Die linke Navigation enthält den eigenen Punkt Standardangebote. Sichtbarkeit richtet sich nach Rolle (`AUTH-006`, `AUTH-007`).
 
-**STD-004** Vertrieb darf veröffentlichte Standardangebote ansehen und die Aktion Übernehmen ausführen.
+**STD-004** (**V2**) Vertrieb darf veröffentlichte Standardangebote ansehen und die Aktion Übernehmen ausführen.
 
-**STD-005** Übernehmen erzeugt eine eigenständige Kundenkalkulation als Snapshot der veröffentlichten Version. Änderungen an der Kundenkalkulation verändern niemals das Standardangebot; Änderungen am Standardangebot verändern niemals bereits übernommene Kalkulationen.
+**STD-005** (**V2**) Übernehmen erzeugt eine eigenständige Kundenkalkulation als Snapshot der veröffentlichten Version. Änderungen an der Kundenkalkulation verändern niemals das Standardangebot; Änderungen am Standardangebot verändern niemals bereits übernommene Kalkulationen.
 
-**STD-006** Vertrieb darf die übernommene Kundenkalkulation anpassen, Senderpositionen ändern, Spotmengen skalieren und den Budget-Assistenten verwenden.
+**STD-006** (**V2**) Vertrieb darf die übernommene Kundenkalkulation anpassen, Senderpositionen ändern, Spotmengen skalieren und den Budget-Assistenten verwenden.
 
-**STD-007** Ein Dispoauftrag darf nur aus der übernommenen regulären Kundenkalkulation entstehen, niemals direkt aus dem Standardangebot (`DSP-007`).
+**STD-007** (**V2**) Ein Dispoauftrag darf nur aus der übernommenen regulären Kundenkalkulation entstehen, niemals direkt aus dem Standardangebot (`DSP-007`).
 
-**STD-008** Jede Version speichert Autor, Veröffentlichungszeitpunkt sofern veröffentlicht, vollständige Versionshistorie und ist auditierbar (`AUD-001`, `AUD-002`).
+**STD-008** (**V2**) Jede Version speichert Autor, Veröffentlichungszeitpunkt sofern veröffentlicht, vollständige Versionshistorie und ist auditierbar (`AUD-001`, `AUD-002`).
 
-**STD-009** Produktmanagement, Admin und Geschäftsführung dürfen Standardangebote anlegen, bearbeiten, versionieren, veröffentlichen und archivieren und dafür Preis-/Produkt-Snapshots verwenden.
+**STD-009** (**V2**) Produktmanagement, Admin und Geschäftsführung dürfen Standardangebote anlegen, bearbeiten, versionieren, veröffentlichen und archivieren und dafür Preis-/Produkt-Snapshots verwenden.
 
 # 9. Spotkalkulation
 
@@ -927,7 +934,7 @@ Kernobjekte und fachkritische Berechnungen bleiben fest im System. Ergänzende F
 | Dynamische Felder      | Felder, Gruppen, Feldsets, Regeln, Validierung, Vorschau, Versionen               |
 | Benutzer/Rollen        | Konten, Rollen (inkl. Produktmanagement), Rabattgrenzen, Sonderfreigaberechte, Aktivstatus |
 | Stammdaten             | Kunden, Agenturen, Kontakte, Meridian-Nummern                                     |
-| Standardangebote       | Vorlagen ohne Kundenbindung; Versionen, Veröffentlichung, Archiv; Übernahme nur in Kundenkalkulation |
+| Standardangebote       | **V2** (PO-STD-V2): vollständiger Produktumfang Vorlagen/Versionen/Übernahme. Vorhandenes Fundament bleibt; keine weitere V1-Produktisierung |
 
 **ADM-001** Jede Adminänderung ist mit altem Wert, neuem Wert, Benutzer, Zeit und betroffener Version zu protokollieren.
 
@@ -1080,10 +1087,10 @@ Die folgenden Szenarien bilden die Mindestabnahme. Zusätzlich sind Unit-, Integ
 | AT-25  | Budget Mehrsender     | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Vorschlag ohne bestehendes Senderverhältnis; editierbar (`BUD-003`–`BUD-006`) |
 | AT-26  | Budgetrest            | Zielbudget, das sich nicht ganzzahlig aufteilen lässt | Ganzzahlige Mengen; Rest oder Überschreitung transparent ausgewiesen (`BUD-007`) |
 | AT-27  | Budget-Übernahme      | Vorschlag anzeigen, nicht übernehmen, dann explizit übernehmen | Ohne Übernahme unveränderte Positionen; nach Übernahme Mengen übernommen und weiter editierbar (`BUD-008`) |
-| AT-28  | Standardangebot übernehmen | Veröffentlichung, Vertrieb übernimmt, ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert (`STD-004`, `STD-005`) |
-| AT-29  | Dispo aus Vorlage     | Dispoauftrag direkt am Standardangebot          | Aktion unzulässig; Dispo nur aus Kundenkalkulation (`STD-007`, `DSP-007`) |
-| AT-30  | Rolle Produktmanagement | Nutzer nur Produktmanagement                    | Standardangebote erlaubt; Kundenkalkulationen und Dispoaufträge ohne Extra-Recht verweigert (`AUTH-006`, `AUTH-007`) |
-| AT-31  | Standardangebot Version | Entwurf veröffentlichen, archivieren, Historie  | Statuswechsel, Autor, Veröffentlichungszeitpunkt und Audit vollständig (`STD-002`, `STD-008`) |
+| AT-28  | Standardangebot übernehmen | Veröffentlichung, Vertrieb übernimmt, ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert (`STD-004`, `STD-005`). **Regression** für vorhandene Funktionalität; vollständiger Produktumfang = **V2** (PO-STD-V2) |
+| AT-29  | Dispo aus Vorlage     | Dispoauftrag direkt am Standardangebot          | Aktion unzulässig; Dispo nur aus Kundenkalkulation (`STD-007`, `DSP-007`). **Regression**; vollständiger Produktumfang = **V2** |
+| AT-30  | Rolle Produktmanagement | Nutzer nur Produktmanagement                    | Standardangebote erlaubt; Kundenkalkulationen und Dispoaufträge ohne Extra-Recht verweigert (`AUTH-006`, `AUTH-007`). **Regression**; vollständiger Produktumfang = **V2** |
+| AT-31  | Standardangebot Version | Entwurf veröffentlichen, archivieren, Historie  | Statuswechsel, Autor, Veröffentlichungszeitpunkt und Audit vollständig (`STD-002`, `STD-008`). **Regression**; vollständiger Produktumfang = **V2** |
 
 # 26. Initialkataloge
 
