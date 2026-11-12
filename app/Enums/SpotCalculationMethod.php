@@ -14,6 +14,9 @@ enum SpotCalculationMethod: string
     /** PO-CALC-TKP-1B: Normal-TKP (Legacy-Spiegel; Registry bleibt planned). */
     case Tkp = 'tkp';
 
+    /** PO-OA-NATIVE-1: Freie Preisposition (Legacy-Spiegel; Registry planned). */
+    case FreePosition = 'free_position';
+
     public function label(): string
     {
         return match ($this) {
@@ -21,6 +24,7 @@ enum SpotCalculationMethod: string
             self::Calendar => 'Kalenderplaner',
             self::FixedPrice => 'Festpreis',
             self::Tkp => 'TKP',
+            self::FreePosition => 'Freie Preisposition',
         };
     }
 

@@ -2,7 +2,7 @@
 
 namespace App\Services\Calculation\OaTkp;
 
-use App\Enums\DiscountType;
+use App\Services\Calculation\CommercialPricingCalculator;
 use App\Services\Calculation\Decimal;
 use App\Services\Calculation\DiscountInput;
 use App\Services\OnlineAudio\Import\OaTkpImportDecimal;
@@ -20,13 +20,18 @@ use Illuminate\Validation\ValidationException;
  * Result `minimumTkp` ist die effektive Schwelle; `priceListMinimumTkp` das Grundminimum.
  *
  * Kein Adserver (FD-OA-ADSERVER). Keine Plattform-Preiswirkung (FD-OA-PLAT).
- * Kein Festpreis. Commercial: Position-/Order-Rabatt → AE → N/N → OA-Payfaktor.
+ * Kein Festpreis. Commercial: Position-/Order-Rabatt → AE → N/N → OA-Payfaktor
+ * über {@see CommercialPricingCalculator} (NATIVE-1-Extraktion).
  *
  * AE nur wenn calculation.ae_enabled ∧ position.is_ae_eligible (Spot-Semantik).
  */
 final class OaTkpNormalEngine
 {
     public const ALGORITHM_VERSION = 'v1';
+
+    public function __construct(
+        private readonly CommercialPricingCalculator $commercial = new CommercialPricingCalculator,
+    ) {}
 
     /**
      * @param  list<DiscountInput>  $orderDiscounts
@@ -88,12 +93,16 @@ final class OaTkpNormalEngine
             Decimal::INTERNAL_SCALE,
         );
 
-        $commercial = $this->finalizeCommercial(
-            $mediaGrossInternal,
-            $input,
-            $orderDiscounts,
-            $orderDiscountPercent,
-            $aeEnabled,
+        $commercial = $this->commercial->calculate(
+            mediaGross: $mediaGrossInternal,
+            positionDiscounts: $input->positionDiscounts,
+            legacyPositionDiscountPercent: $input->positionDiscountPercent,
+            orderDiscounts: $orderDiscounts,
+            legacyOrderDiscountPercent: $orderDiscountPercent,
+            isDiscountable: $input->isDiscountable,
+            aePercent: $input->aePercent,
+            isAeEligible: $input->isAeEligible,
+            aeEnabled: $aeEnabled,
         );
 
         $persistedAePercent = ($aeEnabled && $input->isAeEligible)
@@ -108,15 +117,15 @@ final class OaTkpNormalEngine
             targetingSurchargeTotal: $listSurchargeTotal,
             finalTkp: $finalTkp,
             belowMinimumTkp: $belowMinimum,
-            mediaGross: $commercial['media_gross'],
-            positionDiscountAmount: $commercial['position_discount_amount'],
-            afterPositionDiscount: $commercial['after_position_discount'],
-            orderDiscountAmount: $commercial['order_discount_amount'],
-            afterOrderDiscount: $commercial['after_order_discount'],
-            aeAmount: $commercial['ae_amount'],
-            nnInvest: $commercial['nn_invest'],
-            effectiveDiscountPercent: $commercial['effective_discount_percent'],
-            effectivePayFactorPercent: $commercial['effective_pay_factor_percent'],
+            mediaGross: $commercial->mediaGross,
+            positionDiscountAmount: $commercial->positionDiscountAmount,
+            afterPositionDiscount: $commercial->afterPositionDiscount,
+            orderDiscountAmount: $commercial->orderDiscountAmount,
+            afterOrderDiscount: $commercial->afterOrderDiscount,
+            aeAmount: $commercial->aeAmount,
+            nnInvest: $commercial->nnInvest,
+            effectiveDiscountPercent: $commercial->effectiveDiscountPercent,
+            effectivePayFactorPercent: $commercial->effectivePayFactorPercent,
             oaTkpPriceListId: $input->oaTkpPriceListId,
             oaTkpPriceListVersion: $input->oaTkpPriceListVersion,
             oaTkpPriceListYear: $input->oaTkpPriceListYear,
@@ -132,10 +141,10 @@ final class OaTkpNormalEngine
             aePercent: $persistedAePercent,
             isDiscountable: $input->isDiscountable,
             isAeEligible: $input->isAeEligible,
-            appliedPositionDiscounts: $commercial['applied_position_discounts'],
-            appliedOrderDiscounts: $commercial['applied_order_discounts'],
-            effectivePositionDiscountPercent: $commercial['effective_position_discount_percent'],
-            effectiveOrderDiscountPercent: $commercial['effective_order_discount_percent'],
+            appliedPositionDiscounts: $commercial->appliedPositionDiscounts,
+            appliedOrderDiscounts: $commercial->appliedOrderDiscounts,
+            effectivePositionDiscountPercent: $commercial->effectivePositionDiscountPercent,
+            effectiveOrderDiscountPercent: $commercial->effectiveOrderDiscountPercent,
             advertisingCategoryId: $input->advertisingCategoryId,
             advertisingCategoryKey: $input->advertisingCategoryKey,
             advertisingCategoryName: $input->advertisingCategoryName,
@@ -143,137 +152,6 @@ final class OaTkpNormalEngine
             priceListMinimumTkp: $priceListMinimum,
             targetingMinimumSurchargeTotal: $minimumSurchargeTotal,
         );
-    }
-
-    /**
-     * @param  list<DiscountInput>  $orderDiscounts
-     * @return array{
-     *     media_gross: string,
-     *     position_discount_amount: string,
-     *     after_position_discount: string,
-     *     order_discount_amount: string,
-     *     after_order_discount: string,
-     *     ae_amount: string,
-     *     nn_invest: string,
-     *     effective_discount_percent: string,
-     *     effective_pay_factor_percent: string|null,
-     *     applied_position_discounts: list<DiscountInput>,
-     *     applied_order_discounts: list<DiscountInput>,
-     *     effective_position_discount_percent: string,
-     *     effective_order_discount_percent: string
-     * }
-     */
-    private function finalizeCommercial(
-        string $mediaGrossInternal,
-        OaTkpPositionInput $input,
-        array $orderDiscounts,
-        string $orderDiscountPercent,
-        bool $aeEnabled,
-    ): array {
-        $positionDiscounts = $input->isDiscountable
-            ? $this->resolveDiscountList($input->positionDiscounts, $input->positionDiscountPercent)
-            : [];
-        $appliedOrder = $input->isDiscountable
-            ? $this->resolveDiscountList($orderDiscounts, $orderDiscountPercent)
-            : [];
-
-        $positionSequence = $this->applyDiscountSequence($mediaGrossInternal, $positionDiscounts);
-        $afterPosition = $positionSequence === []
-            ? $mediaGrossInternal
-            : $positionSequence[array_key_last($positionSequence)]['remaining'];
-
-        $orderSequence = $this->applyDiscountSequence($afterPosition, $appliedOrder);
-        $afterOrder = $orderSequence === []
-            ? $afterPosition
-            : $orderSequence[array_key_last($orderSequence)]['remaining'];
-
-        $aeAmountInternal = ($aeEnabled && $input->isAeEligible)
-            ? Decimal::mul($afterOrder, Decimal::percentFactor($input->aePercent))
-            : '0';
-        $nnInternal = Decimal::sub($afterOrder, $aeAmountInternal);
-
-        $effectiveDiscount = '0';
-        if (Decimal::cmp($mediaGrossInternal, '0') !== 0) {
-            $effectiveDiscount = Decimal::mul(
-                Decimal::sub('1', Decimal::div($afterOrder, $mediaGrossInternal)),
-                '100',
-            );
-        }
-
-        $payFactor = null;
-        if (Decimal::cmp($mediaGrossInternal, '0') !== 0) {
-            $payFactor = Decimal::roundPrice(
-                Decimal::mul(Decimal::div($nnInternal, $mediaGrossInternal), '100'),
-            );
-        }
-
-        return [
-            'media_gross' => Decimal::roundMoney($mediaGrossInternal),
-            'position_discount_amount' => Decimal::roundMoney(Decimal::sub($mediaGrossInternal, $afterPosition)),
-            'after_position_discount' => Decimal::roundMoney($afterPosition),
-            'order_discount_amount' => Decimal::roundMoney(Decimal::sub($afterPosition, $afterOrder)),
-            'after_order_discount' => Decimal::roundMoney($afterOrder),
-            'ae_amount' => Decimal::roundMoney($aeAmountInternal),
-            'nn_invest' => Decimal::roundMoney($nnInternal),
-            'effective_discount_percent' => Decimal::roundPrice($effectiveDiscount),
-            'effective_pay_factor_percent' => $payFactor,
-            'applied_position_discounts' => $positionDiscounts,
-            'applied_order_discounts' => $appliedOrder,
-            'effective_position_discount_percent' => $this->effectivePercentFromDiscounts($positionDiscounts),
-            'effective_order_discount_percent' => $this->effectivePercentFromDiscounts($appliedOrder),
-        ];
-    }
-
-    /**
-     * @param  list<DiscountInput>  $discounts
-     */
-    private function effectivePercentFromDiscounts(array $discounts): string
-    {
-        if ($discounts === []) {
-            return '0';
-        }
-
-        $factor = '1';
-        foreach ($discounts as $discount) {
-            $factor = Decimal::mul($factor, Decimal::oneMinusPercent($discount->percent));
-        }
-
-        return Decimal::roundPrice(Decimal::mul(Decimal::sub('1', $factor), '100'));
-    }
-
-    /**
-     * @param  list<DiscountInput>  $discounts
-     * @return list<DiscountInput>
-     */
-    private function resolveDiscountList(array $discounts, string $legacyPercent): array
-    {
-        if ($discounts !== []) {
-            return $discounts;
-        }
-
-        if (Decimal::cmp($legacyPercent, '0') === 0) {
-            return [];
-        }
-
-        return [new DiscountInput(type: DiscountType::Quantity, percent: $legacyPercent)];
-    }
-
-    /**
-     * @param  list<DiscountInput>  $discounts
-     * @return list<array{remaining: string}>
-     */
-    private function applyDiscountSequence(string $startAmount, array $discounts): array
-    {
-        $remaining = $startAmount;
-        $steps = [];
-
-        foreach ($discounts as $discount) {
-            $factor = Decimal::oneMinusPercent($discount->percent);
-            $remaining = Decimal::mul($remaining, $factor);
-            $steps[] = ['remaining' => $remaining];
-        }
-
-        return $steps;
     }
 
     private function assertImpressions(int $impressions): void
