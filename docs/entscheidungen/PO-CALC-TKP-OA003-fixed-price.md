@@ -1,30 +1,46 @@
 # PO-CALC-TKP-OA003-PO – Online-Audio-Festpreis Vertrag
 
-Status: **Akzeptiert / verbindlich für nachfolgende Implementierungsslices**  
-Stand: 11. November 2026  
-Basis: `origin/main` @ `4f6149576884a29fdfb28a06029129a0fb5c02ae`  
+Status: **ABGESCHLOSSEN / released** (12. November 2026) – OA-003 Festpreis
+released im bestehenden OA-TKP-v1-Vertrag. Der Vertrag selbst bleibt unverändert
+verbindlich.  
+Stand: 12. November 2026 (Closure) – historischer Vertragsstand: 11. November 2026  
+Basis Vertrag: `origin/main` @ `4f6149576884a29fdfb28a06029129a0fb5c02ae`  
 (nach PR #228 / Post-Merge-CI `42996888406` success)  
+Closure-Basis: `main` @ `573c1c330abc0ebeba4a38747cc6d90ee67d685f` (Merge #233)  
 IDs: `PO-CALC-TKP-OA003-PO`, `OA-003`  
-Vorgänger: `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`
+Vorgänger: `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`  
+Closure-Notiz: `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`
 
-### Umsetzungsstand (Nachzug OA003-1 / OA003-2 / OA003-3)
+### Umsetzungsstand (ABGESCHLOSSEN, 12.11.2026)
 
-- **OA003-1 umgesetzt:** Settlement-Kern `OaTkpFixedPriceSettlement` + Reason
-  `oa_tkp_fixed_price` + Assessor für gespeicherte Festpreispositionen (PR #230).
-- **OA003-2 umgesetzt:** Backend-Wiring Resolver/Preview/Writer/Persistenz/
-  Reload/Normal↔Fixed/Dispo-Snapshot; Preview-Approval-Parity.
-- **OA003-3 umgesetzt:** Wizard-UI in `OaTkpPositionEditor` (Preisabschluss
-  Normal/Festpreis, Festpreis-N/N, Sonderfreigabe-Hinweis, Server-Metriken,
-  Targeting-Referenzhinweis); Payload/Hydrate/Moduswechsel in
-  `oa-tkp-wizard.ts`; Vitest. Server bleibt autoritativ (kein Client-Recompute).
-- **OA003-4 E2E implementiert (12.11.2026):** isolierter Browser-Smoke
-  (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`, Port 8078; siehe
-  `docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`). OA003-1..3 gemergt;
-  OA-003 ist **erst final geschlossen**, wenn der OA003-4-PR gemergt und die
-  Post-Merge-CI grün ist.
-- **Weiter OUT / offen:** Release-Closure-Docs-Merge, Deploy; Standardangebote/Budget/Native-Ad/Plattformwahl unverändert OUT.
-- `supportsFixedPriceSettlement('oa_tkp')` bleibt **false** (OA-eigener Resolver).
-- Registry `oa_tkp×tkp`/`v1` unverändert; kein v2; keine Migration; kein +15.
+**PO-CALC-TKP-OA003 – ABGESCHLOSSEN.** OA-003 Festpreis ist im bestehenden
+OA-TKP-v1-Vertrag released. Gemergte Kette:
+
+| Slice | PR | Inhalt |
+|---|---|---|
+| OA003-PO | #229 | Vertrag (Docs-only) |
+| OA003-1 | #230 | Settlement-Kern `OaTkpFixedPriceSettlement` + Reason `oa_tkp_fixed_price` + Assessor (Settlement+Approval) |
+| OA003-2 | #231 | Backend-Wiring Resolver/Preview/Writer/Persistenz/Reload/Normal↔Fixed/Dispo-Snapshot (inkl. `fixed_price_nn` im Dispo-Mapper); Preview-Approval-Parität |
+| OA003-3 | #232 | Wizard-UI `OaTkpPositionEditor` (Preisabschluss Normal/Festpreis, Festpreis-N/N, Sonderfreigabe-Hinweis, Server-Metriken, Targeting-Referenzhinweis); Server bleibt autoritativ |
+| OA003-4 | #233 | Isolierter Browser-E2E (Feature-HEAD `9600cef`, Merge-Commit `573c1c330abc0ebeba4a38747cc6d90ee67d685f`) |
+
+- **Post-Merge-CI** `43220059401` **success**: `ci`, `mysql`, `e2e-spt008`;
+  D4d-Browser-Step success; OA003-4-Browser-Step success.
+- **Registry (Code auf `main`):** `oa_tkp × tkp`, `pair_status = released`,
+  `current_released_version = v1`, `versions.v1 = released`. **Kein**
+  `oa_tkp × fixed_price`, **kein** v2. Spot-Methode `fixed_price` bleibt
+  `planned`. `supportsFixedPriceSettlement('oa_tkp')` bleibt **false**
+  (OA-eigener Resolver).
+- **E2E-Isolation:** `APP_ENV=testing`, SQLite, `DB_URL=''`,
+  `database/e2e-po-calc-tkp-oa003-release-smoke.sqlite`, Port 8078, Guard;
+  `dispo_mat_core` unberührt. Dok: `docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`.
+- **Keine Migration, kein Deploy**, kein +15-Verkaufseffekt.
+- **Weiter OUT / offen (unverändert):** `native_ad`, Budget, Standardangebote,
+  Plattform-UI/Plattformwahl, OA-005/006, interne 15-EUR-Kostenabbildung.
+
+*Historischer Zwischenstand (vor Closure):* OA003-1..3 waren gemergt, OA003-4
+E2E implementiert; Closure stand bis zu Merge #233 + grüner Post-Merge-CI aus.
+Dieser Zwischenstand ist durch den obigen Abschluss überholt.
 
 ---
 
@@ -302,8 +318,9 @@ Normal-TKP-v1: `pricing_settlement_mode = normal`.
 
 ### Dispo
 
-`DispoOrderSnapshotMapper` muss `fixed_price_nn` bei OA durchreichen (heute hart
-`null` – Korrektur im Writer/Dispo-Slice). Enthalten: Impressions, Festpreis,
+`DispoOrderSnapshotMapper` muss `fixed_price_nn` bei OA durchreichen. *(Zum
+Zeitpunkt des PO-Vertrags am 11.11.2026 war dies hart `null`; mit OA003-2 (#231)
+behoben – `fixed_price_nn` wird bei OA-Festpreis durchgereicht.)* Enthalten: Impressions, Festpreis,
 final/effektiver TKP, Listen-TKP, effective minimum, Targeting-Snapshots,
 Preislistenreferenz, Sonderfreigabegründe. Keine Live-Neuberechnung.
 
@@ -364,21 +381,26 @@ Festpreis 5.000 → net_before_ae 5.882,35 / AE 882,35 / N/N 5.000
 
 ---
 
-## 16. Implementierungsslices (nach diesem PO)
+## 16. Implementierungsslices (nach diesem PO) – alle erledigt
 
-| Slice | Inhalt |
-|---|---|
-| **OA003-1** | Settlement + Approval (Rechenkern, effective TKP/Min, Targetings, AE reverse, Reason, Unit/Feature) |
-| **OA003-2** | Writer / Preview / Persistenz / Dispo (Resolver, Save/Update, Snapshot, Mapper `fixed_price_nn`, Reload) |
-| **OA003-3** | UI (`OaTkpPositionEditor`, Toggle, Anzeigen, Hinweis, Wechsel) |
-| **OA003-4** | E2E / Release (Browser, fünf Medien, Special Approval, Freeze/Dispo, Negativfälle) |
+| Slice | Inhalt | Status |
+|---|---|---|
+| **OA003-1** | Settlement + Approval (Rechenkern, effective TKP/Min, Targetings, AE reverse, Reason, Unit/Feature) | erledigt, #230 |
+| **OA003-2** | Writer / Preview / Persistenz / Dispo (Resolver, Save/Update, Snapshot, Mapper `fixed_price_nn`, Reload) | erledigt, #231 |
+| **OA003-3** | UI (`OaTkpPositionEditor`, Toggle, Anzeigen, Hinweis, Wechsel) | erledigt, #232 |
+| **OA003-4** | E2E / Release (Browser, fünf Medien, Special Approval, Freeze/Dispo, Negativfälle) | erledigt, #233 (Merge `573c1c3`) |
 
-OA003-1 startet **erst nach Merge** dieses Docs-Vertrags und ausdrücklichem
-Implementierungsauftrag. Kein automatischer Runtime-Start.
+*Historisch:* OA003-1 startete erst nach Merge dieses Docs-Vertrags und
+ausdrücklichem Implementierungsauftrag; kein automatischer Runtime-Start.
 
 ---
 
-## 17. Bewusst nicht in diesem Slice
+## 17. Bewusst nicht in diesem Slice (historisch, PO-Slice #229)
+
+*Der PO-Slice war Docs-only; die folgenden Punkte waren damals bewusst nicht
+Teil von #229. Implementierung OA003-1…4 ist inzwischen erfolgt (siehe oben).
+Registry-Änderung, Migration, DB-Mutation und Deploy fanden auch in OA003-1…4
+nicht statt.*
 
 - Runtime / Registry / Migration / DB / Deploy
 - Implementierung OA003-1…4

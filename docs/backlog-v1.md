@@ -424,8 +424,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P6-01 – Online Audio TKP
 
 - **Phase:** 6
-- **Status:** teilweise (Normal-TKP V1 released; OA-003/Festpreis und weitere
-  OA-Themen offen – Online Audio nicht „fertig“)
+- **Status:** teilweise (Normal-TKP V1 released; **OA-003 Festpreis
+  ABGESCHLOSSEN** 12.11.2026; weitere OA-Themen offen: Native-Ad, Budget,
+  Standardangebote, Plattform, OA-005/006 – Online Audio nicht „fertig“)
 - **Anforderungen:** `OA-001` bis `OA-009`
 - **Abhängigkeiten:** BL-P4-01
 - **Umgesetzt (nicht „Online Audio fertig“):** OA-TKP-Unterbau der gemergten
@@ -453,17 +454,21 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   OA-001 Mindest-TKP und OA-002 Sonderfreigabe aktiv. Historische Go/No-Go-
   und PRE-Dokus bleiben als Beleg. Dok:
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`.
-- **OA-003 Festpreis:** PO-Vertrag **verbindlich**
-  (`docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`; Readiness
-  `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`).
-  Settlement auf `oa_tkp×tkp`/`v1`, kein neues Pair/v2. Runtime **noch offen** in
-  Slices OA003-1 (Settlement+Approval) → OA003-2 (Writer/Preview/Dispo) →
-  OA003-3 (UI) → OA003-4 (E2E/Release).
+- **OA-003 Festpreis: ABGESCHLOSSEN (12.11.2026).** Released im bestehenden
+  OA-TKP-v1-Vertrag (`oa_tkp×tkp`/`v1`; kein `oa_tkp×fixed_price`, kein v2).
+  Kette: OA003-PO #229 → OA003-1 #230 (Settlement+Approval) → OA003-2 #231
+  (Backend) → OA003-3 #232 (UI) → OA003-4 #233 (E2E, Merge-Commit
+  `573c1c330abc0ebeba4a38747cc6d90ee67d685f`). Post-Merge-CI `43220059401`
+  success (ci/mysql/e2e-spt008; D4d- und OA003-4-Browser-Step success). Keine
+  Migration, kein Deploy. Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
+  `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`; Readiness
+  `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
 - **Weiter offen:** Native-Ad;
-  Budget; Standardangebote; OA-005/006 Allocation; optionale interne
+  Budget; Standardangebote; Plattform-UI/-wahl; OA-005/006 Allocation; optionale interne
   Kosten-/Margenabbildung der 15 EUR. Kein D4d-Release-Gate mehr offen.
-- **Ergebnis (Normal-TKP V1 erreicht; Rest offen):** TKP, Targeting; Mengen ohne
-  V1-Plattformauswahl; Future OA-005/006 separat; Festpreis OUT
+- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis erreicht; Rest offen):** TKP,
+  Targeting; Mengen ohne V1-Plattformauswahl; Future OA-005/006 separat;
+  Festpreis (OA-003) erledigt; Native-Ad/Budget/Standardangebote/Plattform OUT
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
   `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
