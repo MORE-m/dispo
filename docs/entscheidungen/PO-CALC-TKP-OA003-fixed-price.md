@@ -17,8 +17,12 @@ Vorgänger: `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.m
   Normal/Festpreis, Festpreis-N/N, Sonderfreigabe-Hinweis, Server-Metriken,
   Targeting-Referenzhinweis); Payload/Hydrate/Moduswechsel in
   `oa-tkp-wizard.ts`; Vitest. Server bleibt autoritativ (kein Client-Recompute).
-- **Weiter OUT / offen:** Browser-E2E, Release-Closure (OA003-4); OA-003 ist
-  **nicht** vollständig freigegeben. Standardangebote/Budget/Native-Ad/Plattformwahl unverändert OUT.
+- **OA003-4 E2E implementiert (12.11.2026):** isolierter Browser-Smoke
+  (`playwright.po-calc-tkp-oa003-4-e2e.config.ts`, Port 8078; siehe
+  `docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`). OA003-1..3 gemergt;
+  OA-003 ist **erst final geschlossen**, wenn der OA003-4-PR gemergt und die
+  Post-Merge-CI grün ist.
+- **Weiter OUT / offen:** Release-Closure-Docs-Merge, Deploy; Standardangebote/Budget/Native-Ad/Plattformwahl unverändert OUT.
 - `supportsFixedPriceSettlement('oa_tkp')` bleibt **false** (OA-eigener Resolver).
 - Registry `oa_tkp×tkp`/`v1` unverändert; kein v2; keine Migration; kein +15.
 
