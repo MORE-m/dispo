@@ -216,8 +216,16 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   generisches `free_position`-Fundament (Kind, Registry planned,
   `FreePositionEngine`, `CommercialPricingCalculator`); Unit-/Foundation-
   Tests A–G + OA-/Spot-Regression. **Native-Ad weiterhin nicht buchbar**;
-  Pair nicht released; Podcast-Rule OUT. **V1 offen:** Native-Ad (Wiring/
-  Bookability/UI/Release), Budget. **Future:** Plattform / OA-005/006.
+  Pair nicht released; Podcast-Rule OUT. **NATIVE-2 Writer/HTTP (13.11.2026):**
+  Feature-Tests `tests/Feature/Calculation/FreePosition/` (Writer: Hauptfall
+  5000/4500/3600/540/3060, Flags/AE aus, Rate-Approval, Mixed Spot+Free /
+  OA Normal+Free / OA Fixed+Free / Spot+OA+Free mit Reihenfolge,
+  Header-only, 5000→7000, Methodenwechsel, Budget negativ; HTTP: Preview/
+  Create/Update/Reload mit Registry-Fake, ohne Fake blockiert, `free_price`
+  Pflicht/ungültig/Fremdfeld, native_ad→free_position→persist;
+  StandardOffer negativ) + Unit `FreePositionWriterPositionResolverTest`.
+  Registry-CATALOG bleibt planned. **V1 offen:** Native-Ad (UI/Dispo/
+  Release), Budget. **Future:** Plattform / OA-005/006.
   **V2:** Standardangebote (PO-STD-V2). Historische Go/No-Go/OA004-DEC bleiben
   Beleg. Dok: `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,

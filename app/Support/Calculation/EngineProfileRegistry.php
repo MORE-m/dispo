@@ -67,6 +67,18 @@ final class EngineProfileRegistry
     private static ?array $oaTkpPairOverrideForTests = null;
 
     /**
+     * Test-only (NATIVE-2): simuliert Domain-Release für free_position×free_position ohne
+     * produktiven CATALOG-Flip. null = Katalog; gesetztes Array = Override nur für dieses Paar.
+     *
+     * @var array{
+     *     pair_status: EngineCapabilityStatus,
+     *     current_released_version: string|null,
+     *     versions: array<string, EngineCapabilityStatus>
+     * }|null
+     */
+    private static ?array $freePositionPairOverrideForTests = null;
+
+    /**
      * Kanonischer Katalog. Altversionen dürfen später nicht entfernt werden.
      *
      * @var array<string, array<string, array{
@@ -291,6 +303,35 @@ final class EngineProfileRegistry
     }
 
     /**
+     * Test-only (NATIVE-2): free_position×free_position als released/v1 simulieren.
+     * Wirft außerhalb von Unit-/Feature-Tests – kein produktiver Schalter.
+     */
+    public static function fakeFreePositionPairReleasedForTests(): void
+    {
+        if (! app()->runningUnitTests()) {
+            throw new \LogicException(
+                'Free-Position Registry-Pair-Fake ist nur in Unit-/Feature-Tests erlaubt.',
+            );
+        }
+
+        self::$freePositionPairOverrideForTests = [
+            'pair_status' => EngineCapabilityStatus::Released,
+            'current_released_version' => 'v1',
+            'versions' => [
+                'v1' => EngineCapabilityStatus::Released,
+            ],
+        ];
+    }
+
+    /**
+     * Test-only: Free-Position-Pair-Override zurücksetzen (tearDown).
+     */
+    public static function clearFreePositionPairFakeForTests(): void
+    {
+        self::$freePositionPairOverrideForTests = null;
+    }
+
+    /**
      * Fachlicher Pair-Status für neue Vorgänge.
      */
     public static function pairStatus(string $engineProfileKey, string $calculationMethodKey): EngineCapabilityStatus
@@ -468,6 +509,14 @@ final class EngineProfileRegistry
             && $calculationMethodKey === 'tkp'
         ) {
             return self::$oaTkpPairOverrideForTests;
+        }
+
+        if (
+            self::$freePositionPairOverrideForTests !== null
+            && $engineProfileKey === self::PROFILE_FREE_POSITION
+            && $calculationMethodKey === 'free_position'
+        ) {
+            return self::$freePositionPairOverrideForTests;
         }
 
         return self::catalog()[$engineProfileKey][$calculationMethodKey];

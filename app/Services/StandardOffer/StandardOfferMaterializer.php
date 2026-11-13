@@ -55,6 +55,12 @@ final class StandardOfferMaterializer
                     "positions.{$index}" => 'TKP-Positionen sind in Standardangeboten nicht verfügbar.',
                 ]);
             }
+            // NATIVE-2: Freie Preispositionen bleiben aus Standardangeboten (V2) ausgeschlossen.
+            if (($item['is_free_position'] ?? false) === true) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}" => 'Freie Preispositionen sind in Standardangeboten nicht verfügbar.',
+                ]);
+            }
         }
         $totals = $this->calculations->totalsFromPayload($payload, $user);
 

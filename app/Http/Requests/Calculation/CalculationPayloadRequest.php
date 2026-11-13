@@ -21,6 +21,8 @@ use App\Models\ConfigurationSnapshot;
 use App\Models\SnapshotFieldDefinition;
 use App\Services\Calculation\ComponentValidator;
 use App\Services\Calculation\DiscountValidator;
+use App\Services\Calculation\FreePosition\FreePositionEngine;
+use App\Services\Calculation\FreePosition\FreePositionWriterPositionResolver;
 use App\Services\Calculation\PlannerEntryValidator;
 use App\Services\Calculation\TimeRangeValidator;
 use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
@@ -263,6 +265,9 @@ class CalculationPayloadRequest extends FormRequest
             'positions.*.expected_oa_tkp_price_list_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'positions.*.impressions' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'positions.*.basis_tkp' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            // NATIVE-2: Free-Position-Ausgangspreis; methodensensitiv in withValidator geprüft
+            // (Pflicht/Format nur für free_position, Ablehnung auf allen anderen Methoden).
+            'positions.*.free_price' => ['sometimes', 'nullable'],
             'positions.*.oa_platform_allocations' => ['sometimes', 'nullable', 'array'],
             'positions.*.oa_platform_allocations.*.oa_platform_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'positions.*.oa_platform_allocations.*.platform_code' => ['sometimes', 'nullable', 'string', 'max:64'],
@@ -359,6 +364,7 @@ class CalculationPayloadRequest extends FormRequest
             $this->validateDynamicPeriods($validator);
             $this->validateDynamicFieldKeys($validator);
             $this->validatePositionMethodKeys($validator);
+            $this->validateFreePrice($validator);
             $this->validateLengthSecondsForNonTkp($validator);
             // PO-32b-1: leere Custom-Pflichtfelder blockieren Calc Create/Update
             // nicht allein deshalb; Snapshot-Regeln/Typvalidierung bleiben aktiv.
@@ -443,6 +449,27 @@ class CalculationPayloadRequest extends FormRequest
                 }
 
                 $method = SpotCalculationMethod::tryFrom($methodKey) ?? SpotCalculationMethod::Average;
+                if (! $normalized['present'] && $this->isStoredFreePosition($position)) {
+                    $method = SpotCalculationMethod::FreePosition;
+                }
+
+                // NATIVE-2: Freie Preisposition ohne Spot-Timing/Komponenten/Settlement/Länge.
+                if ($method === SpotCalculationMethod::FreePosition) {
+                    try {
+                        $discountValidator->validated(
+                            $position['position_discounts'] ?? [],
+                            "positions.{$index}.position_discounts",
+                        );
+                    } catch (ValidationException $exception) {
+                        foreach ($exception->errors() as $key => $messages) {
+                            foreach ($messages as $message) {
+                                $validator->errors()->add($key, $message);
+                            }
+                        }
+                    }
+
+                    continue;
+                }
 
                 // PO-CALC-TKP-1D2a: TKP ohne Spot-Timing/Komponenten/Settlement-Pflicht.
                 if ($method === SpotCalculationMethod::Tkp) {
@@ -658,6 +685,108 @@ class CalculationPayloadRequest extends FormRequest
     }
 
     /**
+     * NATIVE-2: free_price methodensensitiv.
+     * - free_position: Pflicht bei neuer Position, Format via FreePositionEngine, keine Spot-/OA-Felder.
+     * - alle anderen Methoden: free_price (nicht leer) wird abgewiesen.
+     */
+    private function validateFreePrice(Validator $validator): void
+    {
+        $normalizer = app(CalculationPositionMethodKeyNormalizer::class);
+        $engine = new FreePositionEngine;
+
+        foreach ($this->input('positions', []) as $index => $position) {
+            if (! is_array($position)) {
+                continue;
+            }
+
+            try {
+                $normalized = $normalizer->normalize($position);
+            } catch (ValidationException) {
+                continue;
+            }
+
+            $hasFreePrice = array_key_exists('free_price', $position);
+
+            if (! $this->isFreePositionPayload($position, $normalized)) {
+                $raw = $position['free_price'] ?? null;
+                if ($hasFreePrice && $raw !== null && (! is_string($raw) || trim($raw) !== '')) {
+                    $validator->errors()->add(
+                        "positions.{$index}.free_price",
+                        'Der freie Ausgangspreis ist nur für die Freie Preisposition zulässig.',
+                    );
+                }
+
+                continue;
+            }
+
+            foreach (FreePositionWriterPositionResolver::foreignFieldViolations($position) as $field => $message) {
+                $validator->errors()->add("positions.{$index}.{$field}", $message);
+            }
+
+            $hasIdentity = isset($position['id']) && (int) $position['id'] > 0;
+            if (! $hasFreePrice) {
+                if (! $hasIdentity) {
+                    $validator->errors()->add(
+                        "positions.{$index}.free_price",
+                        'Freier Ausgangspreis ist erforderlich.',
+                    );
+                }
+
+                continue;
+            }
+
+            $raw = $position['free_price'];
+            if (! is_scalar($raw) || is_bool($raw) || trim((string) $raw) === '') {
+                $validator->errors()->add(
+                    "positions.{$index}.free_price",
+                    'Freier Ausgangspreis ist erforderlich.',
+                );
+
+                continue;
+            }
+
+            try {
+                $engine->assertFreePrice((string) $raw);
+            } catch (ValidationException $exception) {
+                $messages = $exception->errors()['free_price'] ?? ['Freier Ausgangspreis ist ungültig.'];
+                $validator->errors()->add("positions.{$index}.free_price", (string) $messages[0]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $position
+     * @param  array{present: bool, key: string|null}  $normalized
+     */
+    private function isFreePositionPayload(array $position, array $normalized): bool
+    {
+        if ($normalized['present']) {
+            return $normalized['key'] === FreePositionWriterPositionResolver::METHOD_KEY;
+        }
+
+        return $this->isStoredFreePosition($position);
+    }
+
+    /**
+     * Update ohne Methodenschlüssel: gespeicherter Freeze der Position (per id) entscheidet.
+     *
+     * @param  array<string, mixed>  $position
+     */
+    private function isStoredFreePosition(array $position): bool
+    {
+        $calculation = $this->route('calculation');
+        if (! $calculation instanceof Calculation || ! isset($position['id'])) {
+            return false;
+        }
+
+        $calculation->loadMissing('positions');
+
+        return FreePositionWriterPositionResolver::isStored(
+            $calculation->positions->firstWhere('id', (int) $position['id']),
+        );
+    }
+
+    /**
      * PO-CALC-TKP-1D2a: Spotlänge bleibt Pflicht für Spot/SWF; TKP-Positionen ohne length_seconds.
      */
     private function validateLengthSecondsForNonTkp(Validator $validator): void
@@ -677,6 +806,11 @@ class CalculationPayloadRequest extends FormRequest
 
             $methodKey = (string) ($normalized['key'] ?? '');
             if ($methodKey === SpotCalculationMethod::Tkp->value) {
+                continue;
+            }
+
+            // NATIVE-2: Freie Preisposition hat keine Spotlänge.
+            if ($this->isFreePositionPayload($position, $normalized)) {
                 continue;
             }
 

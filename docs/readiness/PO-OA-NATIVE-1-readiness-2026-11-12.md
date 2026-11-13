@@ -2,13 +2,15 @@
 
 | Feld | Wert |
 |---|---|
-| Status | **NATIVE-1 Foundation implementiert** – Native-Ad weiterhin **nicht** operativ buchbar; Pair **nicht** released |
-| Stand | 12. November 2026 (NATIVE-1 Foundation) |
+| Status | **NATIVE-1 Foundation + NATIVE-2 Writer/HTTP/Persistenz implementiert** – Native-Ad weiterhin **nicht** operativ buchbar; Pair **nicht** released (CATALOG `planned`) |
+| Stand | 13. November 2026 (NATIVE-2 Writer/HTTP/Persistenz; Base NATIVE-1 `4a2ba72`) |
 | Slice | `PO-OA-NATIVE-1` / `NATIVE-1` |
 | Branch | `feat/free-position-native-1-foundation` |
 | Base | `8005d2f670b909084d526f1e81471e936bd277bd` (`main` nach #235 PO-STD-V2) |
 | Worktree | `dispo-wt-free-position-native-1` |
-| Explizit nicht | Bookability, Wizard UI, HTTP Writer, Podcast-Rule, Registry-Release, Migration, Deploy, `dispo_mat_core`-Write |
+| Explizit nicht | Bookability, Wizard UI, Podcast-Rule, Registry-Release, Migration, Deploy, `dispo_mat_core`-Write |
+| NATIVE-2 Branch | `feat/free-position-native-2-writer` (Worktree `dispo-wt-free-position-native-2`) |
+| NATIVE-2 Umfang | `FreePositionWriterPositionResolver`, `FreePositionHttpReleaseGuard`, `CalculationWriter`-Dispatch/Totals/Persistenz/Reload, Request-Validierung `free_price`, Registry-Test-Fake, Budget-Guard; **kein** CATALOG-Flip, **kein** StandardOffer-Öffnen, **kein** Budget-Free, **keine** Migration/UI/Podcast-Rule |
 
 ---
 
@@ -272,7 +274,7 @@ ungefragt öffnen.
 |---|---|
 | **NATIVE-PO** (Docs, dieser Stand) | Fachvertrag geschlossen; technische Readiness |
 | **NATIVE-1** | Registry Pair `free_position×free_position` v1 + `CalculationKind` + Bookability/Freeze-Mapping + Medium-Assignment Native |
-| **NATIVE-2** | Writer/Preview/Engine: Userpreis → `media_gross` + Forward-Rabatt/AE + Approval-Reuse; `length_seconds=0` |
+| **NATIVE-2** | Writer/Preview/Engine: Userpreis → `media_gross` + Forward-Rabatt/AE + Approval-Reuse; `length_seconds=0` — **umgesetzt 13.11.2026** (Pair weiter planned; Tests via Registry-Fake) |
 | **NATIVE-3** | Wizard-UI Minimal (Preis + Rabatte/AE) |
 | **NATIVE-4** | Dispo-Classifier/Snapshot + Reload/Copy-Regression |
 | **NATIVE-5** | Stammdaten: Podcast-Rule; E2E; OA-TKP-Regression (5 Core unverändert) |

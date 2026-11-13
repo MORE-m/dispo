@@ -30,6 +30,10 @@ use App\Models\Inventory;
 use App\Models\SpotClassicPlanRow;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use App\Services\Calculation\FreePosition\FreePositionEngine;
+use App\Services\Calculation\FreePosition\FreePositionInput;
+use App\Services\Calculation\FreePosition\FreePositionResult;
+use App\Services\Calculation\FreePosition\FreePositionWriterPositionResolver;
 use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlement;
 use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlementInput;
 use App\Services\Calculation\OaTkp\OaTkpFixedPriceSettlementResult;
@@ -72,6 +76,8 @@ final class CalculationWriter
         private readonly OaTkpNormalEngine $oaTkpEngine = new OaTkpNormalEngine,
         private readonly OaTkpFixedPriceSettlement $oaTkpFixedPrice = new OaTkpFixedPriceSettlement,
         private readonly SpecialApprovalAssessor $specialApproval = new SpecialApprovalAssessor,
+        private readonly FreePositionWriterPositionResolver $freePositions = new FreePositionWriterPositionResolver,
+        private readonly FreePositionEngine $freeEngine = new FreePositionEngine,
     ) {}
 
     /**
@@ -205,6 +211,15 @@ final class CalculationWriter
                     ]);
                 }
 
+                // NATIVE-2: Budgetvorschlag ist Spot-only; Freie Preispositionen fail-closed.
+                if ($lockedCalculation->positions->contains(
+                    fn (CalculationPosition $position): bool => FreePositionWriterPositionResolver::isStored($position),
+                )) {
+                    throw ValidationException::withMessages([
+                        'positions' => 'Budgetvorschläge sind für Kalkulationen mit Freien Preispositionen nicht verfügbar.',
+                    ]);
+                }
+
                 if ($lockedProposal->lock_version !== null && $lockedProposal->lock_version !== $lockedCalculation->lock_version) {
                     throw ValidationException::withMessages([
                         'lock_version' => 'Der Vorschlag basiert auf einer älteren Version der Kalkulation. Bitte neuen Vorschlag erzeugen.',
@@ -290,10 +305,16 @@ final class CalculationWriter
         $resolved = $this->resolvedPositions($payload, $isCreate ? null : $calculation);
         /** @var array<int, OaTkpPositionResult> $oaResults */
         $oaResults = [];
-        $totals = $this->totalsFromResolved($resolved, $payload, $user, $isCreate ? null : $calculation, $oaResults);
+        /** @var array<int, FreePositionResult> $freeResults */
+        $freeResults = [];
+        $totals = $this->totalsFromResolved($resolved, $payload, $user, $isCreate ? null : $calculation, $oaResults, $freeResults);
 
         foreach ($resolved as $index => $item) {
-            if (($item['is_oa_tkp'] ?? false) !== true && $item['needs_spot_redistribution'] && $item['time_ranges'] !== []) {
+            if (($item['is_oa_tkp'] ?? false) !== true
+                && ($item['is_free_position'] ?? false) !== true
+                && $item['needs_spot_redistribution']
+                && $item['time_ranges'] !== []
+            ) {
                 throw ValidationException::withMessages([
                     "positions.{$index}.time_ranges" => 'Bitte verteile die bisherige Gesamtspotzahl auf die Preiszeiträume.',
                 ]);
@@ -327,9 +348,12 @@ final class CalculationWriter
             $previousInventoryCode = $existing === null ? '' : trim((string) ($existing->inventory_code ?? ''));
 
             $isOa = ($item['is_oa_tkp'] ?? false) === true;
+            $isFree = ($item['is_free_position'] ?? false) === true;
             $position = $existing ?? new CalculationPosition;
             if ($isOa) {
                 $this->fillOaTkpPosition($position, $item, $oaResults[$index], $clientKey, $index);
+            } elseif ($isFree) {
+                $this->fillFreePositionPosition($position, $item, $freeResults[$index], $clientKey, $index);
             } else {
                 $position->fill([
                     'client_key' => $clientKey,
@@ -422,6 +446,18 @@ final class CalculationWriter
                 continue;
             }
 
+            if ($isFree) {
+                // NATIVE-2: kein Plan-/Komponenten-/Produktionspfad; Spot- und OA-Reste entfernen.
+                $this->deleteSpotChildren($position);
+                $position->oaPlatformAllocations()->delete();
+                $position->oaTargetingSelections()->delete();
+                $position->unsetRelation('oaPlatformAllocations');
+                $position->unsetRelation('oaTargetingSelections');
+                $this->syncPositionDiscounts($position, $item['position_discounts']);
+
+                continue;
+            }
+
             if ($item['spot_method'] === SpotCalculationMethod::Calendar) {
                 $position->timeRanges()->delete();
                 $this->syncPlannerEntries($position, $result);
@@ -468,7 +504,8 @@ final class CalculationWriter
         $this->dynamicFields->syncFromPayload($calculation, $payload);
 
         if ($calculation->positions->contains(
-            fn (CalculationPosition $position): bool => $this->isOaTkpStoredPosition($position),
+            fn (CalculationPosition $position): bool => $this->isOaTkpStoredPosition($position)
+                || FreePositionWriterPositionResolver::isStored($position),
         )) {
             $this->reassessSpecialApprovalFromStoredPositions($calculation);
         }
@@ -555,6 +592,59 @@ final class CalculationWriter
             'fixed_price_nn' => $oa->fixedPriceNn,
             'effective_pay_factor_percent' => $oa->effectivePayFactorPercent,
             'effective_total_discount_percent' => $oa->effectiveDiscountPercent,
+            'sort' => $index,
+        ]);
+    }
+
+    /**
+     * NATIVE-2: Free-Position-Felder; media_gross = free_price (keine neue Spalte).
+     * Kein Spot-/OA-/Settlement-Feld; Freeze/kind/Methoden-Keys serverseitig aus dem Resolver.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function fillFreePositionPosition(
+        CalculationPosition $position,
+        array $item,
+        FreePositionResult $free,
+        string $clientKey,
+        int $index,
+    ): void {
+        $position->forceFill([
+            'client_key' => $clientKey,
+            'inventory_id' => $item['inventory']->id,
+            'advertising_medium_id' => $item['medium']->id,
+            'inventory_medium_rule_id' => $item['inventory_medium_rule_id'],
+            'booking_code' => $item['booking_code'] ?? null,
+            'planning_responsibility_key' => $item['planning_responsibility_key'] ?? null,
+            'planning_responsibility_label' => $item['planning_responsibility_label'] ?? null,
+            'combination_hint_text' => $item['combination_hint_text'] ?? null,
+            'price_list_id' => null,
+            'price_list_version' => null,
+            'kind' => $item['freeze']->legacyKind(),
+            'spot_method' => $item['freeze']->legacySpotMethod(),
+            'length_seconds' => 0,
+            'total_spot_count' => 0,
+            'needs_spot_redistribution' => false,
+            'component_calculation_strategy' => null,
+            'component_profile' => null,
+            'average_second_price' => null,
+            'length_index' => null,
+            'surcharge_percent' => '0',
+            'position_discount_percent' => $free->effectivePositionDiscountPercent,
+            'ae_percent' => $free->aePercent,
+            'is_discountable' => $free->isDiscountable,
+            'is_ae_eligible' => $free->isAeEligible,
+            'media_gross' => $free->mediaGross,
+            'production_gross' => '0.00',
+            'production_nn_invest' => '0.00',
+            'position_discount_amount' => $free->positionDiscountAmount,
+            'order_discount_amount' => $free->orderDiscountAmount,
+            'ae_amount' => $free->aeAmount,
+            'nn_invest' => $free->nnInvest,
+            'pricing_settlement_mode' => PricingSettlementMode::Normal->value,
+            'fixed_price_nn' => null,
+            'effective_pay_factor_percent' => $free->effectivePayFactorPercent,
+            'effective_total_discount_percent' => $free->effectiveDiscountPercent,
             'sort' => $index,
         ]);
     }
@@ -941,7 +1031,7 @@ final class CalculationWriter
         $inputs = [];
 
         foreach ($resolved as $index => $item) {
-            if (($item['is_oa_tkp'] ?? false) === true) {
+            if (($item['is_oa_tkp'] ?? false) === true || ($item['is_free_position'] ?? false) === true) {
                 continue;
             }
             $inputs[] = $this->positionInputFromResolved($payload, (int) $index, $item, $existing);
@@ -1009,8 +1099,9 @@ final class CalculationWriter
     {
         $resolved = $this->resolvedPositions($payload, $existing);
         $oaResults = [];
+        $freeResults = [];
 
-        return $this->totalsFromResolved($resolved, $payload, $user, $existing, $oaResults);
+        return $this->totalsFromResolved($resolved, $payload, $user, $existing, $oaResults, $freeResults);
     }
 
     /**
@@ -1019,6 +1110,7 @@ final class CalculationWriter
      * @param  list<array<string, mixed>>  $resolved
      * @param  array<string, mixed>  $payload
      * @param  array<int, OaTkpPositionResult>  $oaResults  Index → OA-Ergebnis (Out-Parameter für fillAndPersist)
+     * @param  array<int, FreePositionResult>  $freeResults  Index → Free-Ergebnis (Out-Parameter für fillAndPersist)
      */
     private function totalsFromResolved(
         array $resolved,
@@ -1026,8 +1118,10 @@ final class CalculationWriter
         User $user,
         ?Calculation $existing,
         array &$oaResults,
+        array &$freeResults = [],
     ): CalculationTotals {
         $oaResults = [];
+        $freeResults = [];
         $target = $payload['target_budget_nn'] ?? null;
         $targetString = $target === null || $target === '' ? null : (string) $target;
         $limit = $user->discount_limit_percent === null ? null : (string) $user->discount_limit_percent;
@@ -1037,20 +1131,26 @@ final class CalculationWriter
 
         $spotInputs = [];
         $hasOa = false;
+        $hasFree = false;
         foreach ($resolved as $index => $item) {
             if (($item['is_oa_tkp'] ?? false) === true) {
                 $hasOa = true;
 
                 continue;
             }
+            if (($item['is_free_position'] ?? false) === true) {
+                $hasFree = true;
+
+                continue;
+            }
             $spotInputs[] = $this->positionInputFromResolved($payload, (int) $index, $item, $existing);
         }
 
-        if (! $hasOa) {
+        if (! $hasOa && ! $hasFree) {
             return $this->engine->calculate($spotInputs, $orderPercent, $targetString, $limit, $orderDiscounts, $aeEnabled);
         }
 
-        // Zielbudget wird erst über alle Positionen (Spot + OA) gebildet.
+        // Zielbudget wird erst über alle Positionen (Spot + OA + Free) gebildet.
         $spotTotals = $this->engine->calculate($spotInputs, $orderPercent, null, $limit, $orderDiscounts, $aeEnabled);
 
         $positions = [];
@@ -1069,6 +1169,46 @@ final class CalculationWriter
 
         $spotCursor = 0;
         foreach ($resolved as $index => $item) {
+            if (($item['is_free_position'] ?? false) === true) {
+                // NATIVE-2: Free nutzt FreePositionEngine mit denselben Auftragsrabatten (je Position einmal).
+                /** @var FreePositionInput $freeInput */
+                $freeInput = $item['free_input'];
+                $free = $this->freeEngine->calculatePosition($freeInput, $orderDiscounts, $orderPercent, $aeEnabled);
+                $freeResults[(int) $index] = $free;
+                $positions[] = $this->positionResultFromFree($free);
+
+                $mediaGross = Decimal::roundMoney(Decimal::add($mediaGross, $free->mediaGross));
+                $positionDiscountTotal = Decimal::roundMoney(Decimal::add($positionDiscountTotal, $free->positionDiscountAmount));
+                $orderDiscountTotal = Decimal::roundMoney(Decimal::add($orderDiscountTotal, $free->orderDiscountAmount));
+                $aeTotal = Decimal::roundMoney(Decimal::add($aeTotal, $free->aeAmount));
+                $nnInvest = Decimal::roundMoney(Decimal::add($nnInvest, $free->nnInvest));
+                $afterPositionTotal = Decimal::roundMoney(Decimal::add($afterPositionTotal, $free->afterPositionDiscount));
+                $afterOrderTotal = Decimal::roundMoney(Decimal::add($afterOrderTotal, $free->afterOrderDiscount));
+                $orderDiscountBreakdownBase = Decimal::roundMoney(
+                    Decimal::add($orderDiscountBreakdownBase, $free->afterPositionDiscount),
+                );
+                if ($free->isAeEligible) {
+                    $aeEligibleBase = Decimal::roundMoney(Decimal::add($aeEligibleBase, $free->afterOrderDiscount));
+                }
+
+                $freePayloadPosition = $payload['positions'][$index] ?? [];
+                $freePositionKey = isset($freePayloadPosition['id'])
+                    ? 'id:'.((int) $freePayloadPosition['id'])
+                    : (string) ($freePayloadPosition['client_key'] ?? 'new:'.$index);
+
+                $reasons = array_merge($reasons, $this->specialApproval->reasonsForRates(
+                    $free->effectivePositionDiscountPercent,
+                    $free->effectiveOrderDiscountPercent,
+                    $free->effectiveDiscountPercent,
+                    $limit,
+                    null,
+                    $freePositionKey,
+                    $freeInput->inventoryName,
+                ));
+
+                continue;
+            }
+
             if (($item['is_oa_tkp'] ?? false) !== true) {
                 $positions[] = $spotTotals->positions[$spotCursor];
                 $spotCursor++;
@@ -1318,6 +1458,39 @@ final class CalculationWriter
     }
 
     /**
+     * Adapter: Free-Ergebnis → PositionResult (Commercial generisch + additive method_result).
+     */
+    private function positionResultFromFree(FreePositionResult $free): PositionResult
+    {
+        return new PositionResult(
+            mediaGross: $free->mediaGross,
+            positionDiscountAmount: $free->positionDiscountAmount,
+            afterPositionDiscount: $free->afterPositionDiscount,
+            orderDiscountAmount: $free->orderDiscountAmount,
+            afterOrderDiscount: $free->afterOrderDiscount,
+            aeAmount: $free->aeAmount,
+            nnInvest: $free->nnInvest,
+            effectiveDiscountPercent: $free->effectiveDiscountPercent,
+            spotCount: 0,
+            lengthIndex: 100,
+            rows: [],
+            positionDiscounts: $free->appliedPositionDiscountSteps,
+            orderDiscounts: $free->appliedOrderDiscountSteps,
+            pricingSettlementMode: PricingSettlementMode::Normal,
+            fixedPriceNn: null,
+            effectivePayFactorPercent: $free->effectivePayFactorPercent,
+            methodResult: [
+                'method' => FreePositionWriterPositionResolver::METHOD_KEY,
+                'free_position' => [
+                    'free_price' => Decimal::roundMoney($free->freePrice),
+                    'is_discountable' => $free->isDiscountable,
+                    'is_ae_eligible' => $free->isAeEligible,
+                ],
+            ],
+        );
+    }
+
+    /**
      * @param  list<DiscountInput>  $discounts
      * @return list<array{type: string, label: string, percent: string, amount: string, remaining: string}>
      */
@@ -1367,9 +1540,22 @@ final class CalculationWriter
                 continue;
             }
 
+            // NATIVE-2: Freie Preisposition (nach OA, vor Spot); kein Medium-Code-Branching.
+            if (FreePositionWriterPositionResolver::isFreePositionRequest($position, $existingPosition)) {
+                $resolved[] = $this->freePositions->resolve($position, $existingPosition, (int) $index, $payload);
+
+                continue;
+            }
+
             if (OaTkpWriterPositionResolver::isStoredOaTkp($existingPosition)) {
                 throw ValidationException::withMessages([
                     "positions.{$index}" => 'Eine TKP-Position kann nicht auf eine andere Berechnungsmethode umgestellt werden.',
+                ]);
+            }
+
+            if (FreePositionWriterPositionResolver::isStored($existingPosition)) {
+                throw ValidationException::withMessages([
+                    "positions.{$index}" => 'Eine Freie Preisposition kann nicht auf eine andere Berechnungsmethode umgestellt werden.',
                 ]);
             }
 
@@ -1865,6 +2051,40 @@ final class CalculationWriter
         ];
     }
 
+    /**
+     * NATIVE-2: free_price gehört zum Header-only-Vergleich (sonst würde eine Preisänderung
+     * still verworfen). Nur für Methode free_position; sonst null.
+     *
+     * @param  array<string, mixed>  $position
+     */
+    private function normalizeFreePriceForCompare(array $position): ?string
+    {
+        $isFree = (string) ($position['calculation_method_key'] ?? $position['spot_method'] ?? '')
+            === FreePositionWriterPositionResolver::METHOD_KEY;
+        if (! $isFree) {
+            return null;
+        }
+
+        if (! array_key_exists('free_price', $position)) {
+            return '__absent__';
+        }
+
+        $raw = $position['free_price'];
+        if ($raw === null || $raw === '') {
+            return '__blank__';
+        }
+        if (! is_scalar($raw)) {
+            return '__invalid__';
+        }
+
+        $normalized = str_replace(',', '.', trim((string) $raw));
+        try {
+            return Decimal::roundMoney($normalized);
+        } catch (\InvalidArgumentException) {
+            return '__invalid__'.$normalized;
+        }
+    }
+
     private function normalizeQuantityForCompare(mixed $quantity): string
     {
         if ($quantity === null || $quantity === '') {
@@ -1977,6 +2197,7 @@ final class CalculationWriter
 
             $normalized[] = [
                 'oa_tkp' => $this->normalizeOaTkpForCompare($position),
+                'free_price' => $this->normalizeFreePriceForCompare($position),
                 'id' => isset($position['id']) ? (int) $position['id'] : null,
                 'production_lines' => $productionLines,
                 'client_key' => $position['client_key'] ?? null,
@@ -2046,6 +2267,7 @@ final class CalculationWriter
 
             $positions[] = [
                 ...$this->oaTkpPayloadFields($position),
+                ...$this->freePositionPayloadFields($position),
                 'id' => $position->id,
                 'client_key' => $position->client_key,
                 'inventory_id' => $position->inventory_id,
@@ -2170,6 +2392,24 @@ final class CalculationWriter
                     'sort' => (int) $selection->sort,
                 ],
             )->values()->all(),
+        ];
+    }
+
+    /**
+     * NATIVE-2: Reload-Felder für Freie Preisposition (`free_price` = gespeichertes `media_gross`).
+     *
+     * @return array<string, mixed>
+     */
+    private function freePositionPayloadFields(CalculationPosition $position): array
+    {
+        if (! FreePositionWriterPositionResolver::isStored($position)) {
+            return [];
+        }
+
+        return [
+            'calculation_method_key' => $position->calculation_method_key,
+            'engine_profile_key' => $position->engine_profile_key,
+            'free_price' => Decimal::roundMoney((string) $position->media_gross),
         ];
     }
 

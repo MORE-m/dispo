@@ -43,6 +43,7 @@ use App\Services\DynamicField\ConfigurationSnapshotFreezeService;
 use App\Support\Advertising\AdvertisingMediumCalculationMethodOptionsResolver;
 use App\Support\Advertising\AdvertisingMediumLiveBookability;
 use App\Support\Advertising\SpotComponentProfileContract;
+use App\Support\Calculation\FreePositionHttpReleaseGuard;
 use App\Support\Calculation\OaTkpHttpReleaseGuard;
 use App\Support\Calculation\OaTkpWizardCapability;
 use App\Support\DynamicField\ChoiceFieldValueContract;
@@ -105,6 +106,7 @@ class CalculationController extends Controller
         $user = $request->user();
         $payload = $request->payload();
         OaTkpHttpReleaseGuard::assertMutationAllowed($payload);
+        FreePositionHttpReleaseGuard::assertMutationAllowed($payload);
         $calculation = $this->writer->create($payload, $user);
 
         return redirect()
@@ -158,6 +160,7 @@ class CalculationController extends Controller
         $user = $request->user();
         $payload = $request->payload();
         OaTkpHttpReleaseGuard::assertMutationAllowed($payload, $calculation);
+        FreePositionHttpReleaseGuard::assertMutationAllowed($payload, $calculation);
         $this->writer->update($calculation, $payload, $user);
 
         return redirect()
@@ -182,6 +185,7 @@ class CalculationController extends Controller
 
         $payload = $request->payload();
         OaTkpHttpReleaseGuard::assertPreviewAllowed($payload, $existing);
+        FreePositionHttpReleaseGuard::assertPreviewAllowed($payload, $existing);
 
         return response()->json([
             'totals' => $this->writer->preview($payload, $user, $existing)->toArray(),
