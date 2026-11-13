@@ -1,6 +1,25 @@
 # Fortschritt V1
 
-Stand: 12. November 2026 – **PO-OA-NATIVE-1 / NATIVE-1 Foundation.** Generisches
+Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-2 Writer/HTTP/Persistenz
+(Backend, Pair weiter planned).** `free_position` ist im `CalculationWriter`
+verdrahtet: `FreePositionWriterPositionResolver` (Dispatch nach OA, vor Spot;
+Zuordnung `free_position×free_position` + `kind=free_position`; Flags
+Medium ∧ Regel; `free_price` aus Payload oder gespeichertem `media_gross`),
+`FreePositionEngine` mit denselben Auftragsrabatten, gemischte Totals
+(Spot/OA/Free in Payload-Reihenfolge), Persistenz `media_gross = free_price`
+(keine neue Spalte), Reload `free_price = media_gross`, Header-only-Vergleich,
+Methodenwechsel von/zu Free gesperrt, bestehende Rate-Approval-Gründe.
+`FreePositionHttpReleaseGuard` sperrt Preview/Create/Update und Budget; Request
+validiert `free_price` methodensensitiv. **Registry-CATALOG bleibt `planned`**
+(kein produktives Release); Tests simulieren Release nur über
+`fakeFreePositionPairReleasedForTests()` (nur `runningUnitTests()`). Budget und
+Standardangebote bleiben fail-closed. Keine Migration, keine UI, keine
+Podcast-Rule, kein `dispo_mat_core`-Write, kein Deploy. Tests:
+`tests/Feature/Calculation/FreePosition/*`,
+`tests/Unit/Calculation/FreePosition/FreePositionWriterPositionResolverTest.php`.
+Dok: `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`.
+
+Stand davor: 12. November 2026 – **PO-OA-NATIVE-1 / NATIVE-1 Foundation.** Generisches
 `free_position`-Fundament implementiert: `CalculationKind::FreePosition`, Registry
 `free_position×free_position` = **planned** (`versions.v1=implemented`,
 `current_released_version=null`), `FreePositionEngine` (`free_price` →

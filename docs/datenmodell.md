@@ -360,6 +360,17 @@ Unterobjekte werden typbezogen normalisiert:
   `fixed_price_nn=null`; technische Defaults später `length_seconds=0`,
   `total_spot_count=0`, `impressions=null`, keine Preisliste/TKP. Native-Ad
   operativ weiterhin OUT (kein Assignment/Bookability/Writer). Keine Migration.
+- **PO-OA-NATIVE-1 / NATIVE-2 (Writer/Persistenz):** Position mit Freeze
+  `free_position`/`free_position`/`v1`, `kind=free_position`,
+  `spot_method=free_position`. Persistenz ohne neue Spalte: `media_gross` =
+  User-`free_price` (Reload `free_price` = gespeichertes `media_gross`);
+  `pricing_settlement_mode=normal`, `fixed_price_nn=null`, `length_seconds=0`,
+  `total_spot_count=0`, `price_list_id=null`, keine OA-/Spot-Kinder;
+  Positionsrabatte über bestehende `calculation_position_discounts`;
+  `is_discountable`/`is_ae_eligible` serverseitig (Medium ∧ Regel) eingefroren.
+  Registry-CATALOG weiter `planned`; Writer/HTTP nur bei Registry-Release
+  (Produktiv gesperrt, Tests via Fake). Budget/Standardangebote OUT. Keine
+  Migration.
 - **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
   (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
   `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit
