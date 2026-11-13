@@ -47,3 +47,4 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/database/e2e-free-position-native-3.json

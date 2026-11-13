@@ -1,6 +1,21 @@
 # Fortschritt V1
 
-Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-2 Writer/HTTP/Persistenz
+Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-3 Wizard-UI
+implementiert (Pair weiter planned/unreleased).** Freie Preisposition im
+Kalkulationswizard: `free-position-wizard.ts` (Detection nur über
+`calculation_method_key === 'free_position'`, Draft-Hygiene, `free_price`-
+Payload ohne `media_gross`/Spot-/OA-Felder, Hydration aus `free_price`/
+`media_gross`), `FreePositionEditor` (Feld „Preis“, Platzhalter `0,00 €`,
+Server-Fehler `positions.{i}.free_price`, read-only Vorschau-Brutto), Wizard-
+Wiring (Länge/Preisjahr/Planer/Settlement/OA-Editor für Free ausgeblendet,
+Rabatte nur wenn Medium ∧ Regel discountable, AE über Header-Toggle, Preview-
+Sperre bei ungültigem Preis), Edit-Props liefern `free_price`. Frontend rechnet
+keine Kommerzformel. Isolierter Browser-Smoke
+`playwright.po-free-position-native-3.config.ts` (Port 8079, SQLite, Registry-
+Test-Fake nur im E2E-Server) mit CI-Step. **Kein Pair-Release, keine
+Podcast-Rule, kein Deploy, kein `dispo_mat_core`-Write, kein StandardOffer/
+Budget.** Offen: NATIVE-4 (Dispo-Classifier/Snapshot), NATIVE-5 (Podcast-Rule/
+Release). Zuvor: **PO-OA-NATIVE-1 / NATIVE-2 Writer/HTTP/Persistenz
 (Backend, Pair weiter planned).** `free_position` ist im `CalculationWriter`
 verdrahtet: `FreePositionWriterPositionResolver` (Dispatch nach OA, vor Spot;
 Zuordnung `free_position×free_position` + `kind=free_position`; Flags

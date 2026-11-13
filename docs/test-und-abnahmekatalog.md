@@ -216,7 +216,16 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   generisches `free_position`-Fundament (Kind, Registry planned,
   `FreePositionEngine`, `CommercialPricingCalculator`); Unit-/Foundation-
   Tests A–G + OA-/Spot-Regression. **Native-Ad weiterhin nicht buchbar**;
-  Pair nicht released; Podcast-Rule OUT. **NATIVE-2 Writer/HTTP (13.11.2026):**
+  Pair nicht released; Podcast-Rule OUT. **NATIVE-3 Wizard-UI (13.11.2026):**
+  Vitest `free-position-wizard.test.ts` (Detection, `free_price`-Payload ohne
+  `media_gross`/Spot-/OA-Felder, Rabatte erhalten, Hydration `free_price`/
+  `media_gross`, Free↔Spot/TKP-Cleanup, Preview-Sperre) und
+  `free-position-editor.test.tsx`; Feature `FreePositionWizardPropsTest`
+  (`free_price` in Edit-Props, Pair ohne Fake planned); Browser-Smoke
+  `po-free-position-native-3.spec.ts` (isoliert Port 8079: Editor ohne
+  Spot/OA-Felder, 5000 + 10 % → N/N 4500, Save/Reload, Update 7000 + AE,
+  ungültiger Preis); CI-Step in `tests.yml`. Pair weiter planned.
+  **NATIVE-2 Writer/HTTP (13.11.2026):**
   Feature-Tests `tests/Feature/Calculation/FreePosition/` (Writer: Hauptfall
   5000/4500/3600/540/3060, Flags/AE aus, Rate-Approval, Mixed Spot+Free /
   OA Normal+Free / OA Fixed+Free / Spot+OA+Free mit Reihenfolge,

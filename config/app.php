@@ -125,4 +125,10 @@ return [
 
     'e2e_server' => (bool) env('E2E_SERVER', false),
 
+    /*
+     * NATIVE-3 Browser-Smoke: simuliert free_position×free_position als released – nur in
+     * isolierten E2E-Servern (testing + E2E_SERVER=1). Flippt nie den Registry-CATALOG.
+     */
+    'e2e_free_position_pair_released' => (bool) env('E2E_FREE_POSITION_PAIR_RELEASED', false),
+
 ];
