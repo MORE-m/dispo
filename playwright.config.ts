@@ -60,6 +60,7 @@ export default defineConfig({
         '**/po-calc-tkp-1d4d-release-smoke.spec.ts',
         '**/po-calc-tkp-oa003-fixed-price-release-smoke.spec.ts',
         '**/po-free-position-native-3.spec.ts',
+        '**/po-free-position-native-4.spec.ts',
         '**/po-swf-promo-1-*.spec.ts',
         '**/po-swf-contest-1-*.spec.ts',
         '**/po-swf-calendar-1-*.spec.ts',

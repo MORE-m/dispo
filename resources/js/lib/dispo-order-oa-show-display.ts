@@ -1,5 +1,10 @@
 import { formatImpressions, formatTkpDisplay } from '@/lib/oa-tkp-wizard';
 import {
+    FREE_POSITION_DISPLAY_LABEL,
+    formatFreePositionMoney,
+} from '@/lib/dispo-order-adoption-display';
+import {
+    isFreePositionMethodPair,
     isInconsistentMethodPair,
     isOaTkpMethodPair,
     METHOD_INCONSISTENCY_MESSAGE,
@@ -69,6 +74,17 @@ export function isInconsistentDispoShowPosition(
     return isInconsistentMethodPair(position);
 }
 
+export function isFreePositionDispoShowPosition(
+    position: Pick<
+        DispoShowOaPosition,
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
+    >,
+): boolean {
+    return isFreePositionMethodPair(position);
+}
+
 /** Kompakte Meta-Zeile unter Inventory/Medium. */
 export function formatDispoShowPositionMeta(
     position: DispoShowOaPosition,
@@ -94,6 +110,14 @@ export function formatDispoShowPositionMeta(
         }
 
         return parts.join(' · ');
+    }
+
+    if (isFreePositionDispoShowPosition(position)) {
+        const gross = formatFreePositionMoney(position.media_gross);
+
+        return gross === null
+            ? FREE_POSITION_DISPLAY_LABEL
+            : `${FREE_POSITION_DISPLAY_LABEL} · ${gross}`;
     }
 
     const parts = [

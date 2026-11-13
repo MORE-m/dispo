@@ -371,6 +371,15 @@ Unterobjekte werden typbezogen normalisiert:
   Registry-CATALOG weiter `planned`; Writer/HTTP nur bei Registry-Release
   (Produktiv gesperrt, Tests via Fake). Budget/Standardangebote OUT. Keine
   Migration.
+- **PO-OA-NATIVE-1 / NATIVE-4 (Dispo-Freeze):** `dispo_order_positions` friert
+  Free Position ohne Schemaänderung ein: Freeze `free_position`/`free_position`/
+  `v1`, `kind=spot_method=free_position`, `media_gross` = `free_price`, Rabatte/
+  AE/N/N aus der Calc, `length_seconds=0`, `total_spot_count=0`, `impressions`/
+  TKP-/Preislisten-Felder `null`, `pricing_settlement_mode=normal`,
+  `fixed_price_nn=null`, leere Plan-/Zeitraum-/Planner-/Komponenten-Snapshots,
+  OA-Snapshots `null`, `position_discounts_snapshot` kopiert. Klassifikation
+  `free_position` nur über das Paar (AND-only); Pair im CATALOG weiter planned.
+  Keine Migration.
 - **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
   (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
   `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit

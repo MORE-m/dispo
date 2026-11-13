@@ -2,6 +2,7 @@ import { formatImpressions, formatTkpDisplay } from '@/lib/oa-tkp-wizard';
 import { formatPlannerEntriesSummary } from '@/lib/dispo-planner-display';
 import { formatHour, formatInclusiveEnd } from '@/lib/pricing-time';
 import {
+    isFreePositionMethodPair,
     isInconsistentMethodPair,
     isOaTkpMethodPair,
     METHOD_INCONSISTENCY_MESSAGE,
@@ -17,6 +18,7 @@ export type DispoAdoptionPositionDisplay = {
     adoptable?: boolean;
     impressions?: number | null;
     final_tkp?: string | null;
+    media_gross?: string | null;
     length_seconds: number;
     total_spot_count: number;
     time_ranges: {
@@ -59,6 +61,37 @@ export function isInconsistentAdoptionPosition(
     }
 
     return isInconsistentMethodPair(position);
+}
+
+/** NATIVE-4: Free Position ohne Spot-/Längen-Scheinwerte. */
+export const FREE_POSITION_DISPLAY_LABEL = 'Freie Preisposition';
+
+export function isFreePositionAdoptionPosition(
+    position: Pick<
+        DispoAdoptionPositionDisplay,
+        | 'calculation_method_key'
+        | 'engine_profile_key'
+        | 'method_classification'
+    >,
+): boolean {
+    return isFreePositionMethodPair(position);
+}
+
+export function formatFreePositionMoney(
+    value: string | null | undefined,
+): string | null {
+    if (value == null || value.trim() === '') {
+        return null;
+    }
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+        return null;
+    }
+
+    return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+    }).format(amount);
 }
 
 function formatTimeRanges(
@@ -114,6 +147,14 @@ export function formatDispoAdoptionPositionDetail(
         }
 
         return parts.join(' · ');
+    }
+
+    if (isFreePositionAdoptionPosition(position)) {
+        const gross = formatFreePositionMoney(position.media_gross);
+
+        return gross === null
+            ? FREE_POSITION_DISPLAY_LABEL
+            : `${FREE_POSITION_DISPLAY_LABEL} · ${gross}`;
     }
 
     return `${position.total_spot_count} Spots · ${position.length_seconds}s · ${formatPositionTiming(position)}`;

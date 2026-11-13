@@ -225,6 +225,20 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   `po-free-position-native-3.spec.ts` (isoliert Port 8079: Editor ohne
   Spot/OA-Felder, 5000 + 10 % → N/N 4500, Save/Reload, Update 7000 + AE,
   ungültiger Preis); CI-Step in `tests.yml`. Pair weiter planned.
+  **NATIVE-4 Dispo/Freeze (13.11.2026):** Unit `DispoPositionMethodClassifierTest`
+  (Free AND-only; free×average/spot×free/free×tkp/oa×free inkonsistent;
+  neutrale Meldung); Feature `FreePositionDispoIntegrationTest` (Hauptfall
+  5000/10 %/20 %/15 % AE → 500/900/540/3060 eingefroren; Mixed Spot+Free,
+  OA Normal+Free, OA Fixed+Free, Spot+OA+Free mit Reihenfolge; Teilübernahme
+  nur Free; historische Stabilität nach Live-Änderung inkl. Show-Props;
+  `planning_responsibility_key=redaktion`; Partial-Freeze und Wrong-Pair
+  fail-closed ohne Dispo; Adoption-Liste; Produktionszeile für Free
+  abgelehnt); Vitest `dispo-position-method-classification`,
+  `dispo-order-adoption-display`, `dispo-order-oa-show-display` („Freie
+  Preisposition“ ohne Spots/Länge); Browser-Smoke
+  `po-free-position-native-4.spec.ts` (isoliert Port 8080: Free speichern →
+  Dispo-Create-Detail → Übernahme → Show-Meta + DB-Freeze); CI-Step in
+  `tests.yml`. Pair weiter planned.
   **NATIVE-2 Writer/HTTP (13.11.2026):**
   Feature-Tests `tests/Feature/Calculation/FreePosition/` (Writer: Hauptfall
   5000/4500/3600/540/3060, Flags/AE aus, Rate-Approval, Mixed Spot+Free /

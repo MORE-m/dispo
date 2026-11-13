@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     formatDispoShowPositionMeta,
     formatOaPriceListIdentity,
+    isFreePositionDispoShowPosition,
     isInconsistentDispoShowPosition,
     isOaTkpDispoShowPosition,
 } from '@/lib/dispo-order-oa-show-display';
@@ -88,5 +89,43 @@ describe('dispo-order-oa-show-display', () => {
                 oa_tkp_price_list_id: 9,
             }),
         ).toBe('Jahr 2026 · Version 2026.1 · Revision 2 · ID 9');
+    });
+
+    it('formats Free Position meta without spots, length or OA values', () => {
+        const free = {
+            calculation_method_key: 'free_position',
+            engine_profile_key: 'free_position',
+            spot_method_label: 'Freie Preisposition',
+            total_spot_count: 0,
+            length_seconds: 0,
+        };
+
+        expect(isFreePositionDispoShowPosition(free)).toBe(true);
+        expect(isOaTkpDispoShowPosition(free)).toBe(false);
+        expect(isInconsistentDispoShowPosition(free)).toBe(false);
+
+        expect(formatDispoShowPositionMeta(free)).toBe('Freie Preisposition');
+
+        const meta = formatDispoShowPositionMeta({
+            ...free,
+            media_gross: '5000.00',
+            price_list_version: '2026.1',
+        });
+        expect(meta).toContain('Freie Preisposition · ');
+        expect(meta).toContain('5.000,00');
+        expect(meta).not.toContain('Spots');
+        expect(meta).not.toMatch(/\b0s\b/);
+        expect(meta).not.toContain('Preisliste');
+        expect(meta).not.toContain('Impressions');
+        expect(meta).not.toContain('TKP');
+    });
+
+    it('treats wrong Free Position pairs as inconsistent in show', () => {
+        expect(
+            isInconsistentDispoShowPosition({
+                calculation_method_key: 'free_position',
+                engine_profile_key: 'oa_tkp',
+            }),
+        ).toBe(true);
     });
 });
