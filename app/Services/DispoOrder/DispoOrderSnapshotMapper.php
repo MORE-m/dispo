@@ -112,9 +112,14 @@ final class DispoOrderSnapshotMapper
         // PO-CALC-TKP-1D3d-1: inkonsistente Paare nicht still in den Spot-Pfad leiten.
         DispoPositionMethodClassifier::assertAdoptable($position);
 
+        // NATIVE-4: explizite Pfade je Klassifikation; kein Default, der Free still verschluckt.
         return match (DispoPositionMethodClassifier::classifyPosition($position)) {
             DispoPositionMethodClassifier::KIND_OA_TKP => $this->oaTkpPositionFromCalculationPosition($position, $sort),
-            default => $this->spotPositionFromCalculationPosition($position, $sort),
+            DispoPositionMethodClassifier::KIND_FREE_POSITION => $this->freePositionFromCalculationPosition($position, $sort),
+            DispoPositionMethodClassifier::KIND_SPOT_FAMILY => $this->spotPositionFromCalculationPosition($position, $sort),
+            default => throw ValidationException::withMessages([
+                'position_ids' => DispoPositionMethodClassifier::inconsistencyMessage(),
+            ]),
         };
     }
 
@@ -234,6 +239,89 @@ final class DispoOrderSnapshotMapper
                     'media_gross' => $component->media_gross === null ? null : (string) $component->media_gross,
                 ]
             )->values()->all(),
+            'position_discounts_snapshot' => $position->discounts->map(
+                fn (CalculationPositionDiscount $discount): array => [
+                    'type' => $discount->type->value,
+                    'custom_label' => $discount->custom_label,
+                    'percent' => (string) $discount->percent,
+                ]
+            )->all(),
+            'oa_platform_allocations_snapshot' => null,
+            'oa_targeting_selections_snapshot' => null,
+        ];
+    }
+
+    /**
+     * NATIVE-4: Free-Position-Mediazeile aus gespeicherten Calc-Werten (keine Neuberechnung).
+     * Freeze, Geldwerte, Flags und Rabatte werden kopiert; keine Spot-/OA-/TKP-Felder.
+     *
+     * @return array<string, mixed>
+     */
+    private function freePositionFromCalculationPosition(CalculationPosition $position, int $sort): array
+    {
+        $freeze = $this->freezeResolver->resolveStoredPosition($position, forExecution: true);
+
+        return [
+            'line_role' => DispoOrderPosition::LINE_ROLE_MEDIA,
+            'calculation_position_id' => $position->id,
+            'sort' => $sort,
+            'inventory_id' => $position->inventory_id,
+            'inventory_name' => InventoryIdentity::displayName($position),
+            'inventory_code' => InventoryIdentity::displayCode($position),
+            'advertising_medium_id' => $position->advertising_medium_id,
+            'advertising_medium_name' => $position->advertisingMedium->name ?? 'Unbekannt',
+            'advertising_medium_code' => $position->advertisingMedium->code ?? null,
+            'booking_code' => $position->booking_code,
+            'planning_responsibility_key' => $position->planning_responsibility_key,
+            'planning_responsibility_label' => $position->planning_responsibility_label,
+            'combination_hint_text' => $position->combination_hint_text,
+            'kind' => $freeze->legacyKind()->value,
+            'spot_method' => $freeze->legacySpotMethod()->value,
+            'engine_profile_key' => $freeze->engineProfileKey,
+            'calculation_method_key' => $freeze->calculationMethodKey,
+            'calculation_method_name' => $freeze->calculationMethodName,
+            'algorithm_version' => $freeze->algorithmVersion,
+            'length_seconds' => 0,
+            'component_calculation_strategy' => null,
+            'component_profile' => null,
+            'derived_component_airings' => null,
+            'total_spot_count' => 0,
+            'impressions' => null,
+            'basis_tkp' => null,
+            'list_tkp_snapshot' => null,
+            'minimum_tkp_snapshot' => null,
+            'final_tkp' => null,
+            'targeting_surcharge_total' => null,
+            'below_minimum_tkp' => null,
+            'needs_spot_redistribution' => false,
+            'price_list_id' => null,
+            'oa_tkp_price_list_id' => null,
+            'oa_tkp_price_list_version' => null,
+            'oa_tkp_price_list_year' => null,
+            'oa_tkp_price_list_revision' => null,
+            'price_list_version' => null,
+            'price_list_name' => null,
+            'average_second_price' => null,
+            'length_index' => null,
+            'surcharge_percent' => '0',
+            'position_discount_percent' => (string) $position->position_discount_percent,
+            'ae_percent' => (string) $position->ae_percent,
+            'is_discountable' => $position->is_discountable,
+            'is_ae_eligible' => $position->is_ae_eligible,
+            'media_gross' => (string) $position->media_gross,
+            'position_discount_amount' => (string) $position->position_discount_amount,
+            'order_discount_amount' => (string) $position->order_discount_amount,
+            'ae_amount' => (string) $position->ae_amount,
+            // Free Position hat keine Spotproduktion: nn_invest der Position ist medienrein.
+            'nn_invest' => (string) $position->nn_invest,
+            'pricing_settlement_mode' => 'normal',
+            'fixed_price_nn' => null,
+            'effective_pay_factor_percent' => null,
+            'effective_total_discount_percent' => null,
+            'plan_rows_snapshot' => [],
+            'time_ranges_snapshot' => [],
+            'planner_entries_snapshot' => [],
+            'components_snapshot' => [],
             'position_discounts_snapshot' => $position->discounts->map(
                 fn (CalculationPositionDiscount $discount): array => [
                     'type' => $discount->type->value,
@@ -381,6 +469,11 @@ final class DispoOrderSnapshotMapper
         if ($carrierKind === DispoPositionMethodClassifier::KIND_OA_TKP) {
             throw ValidationException::withMessages([
                 'position_ids' => 'TKP-Positionen besitzen keine Spotproduktion und können nicht als Produktionszeile übernommen werden.',
+            ]);
+        }
+        if ($carrierKind === DispoPositionMethodClassifier::KIND_FREE_POSITION) {
+            throw ValidationException::withMessages([
+                'position_ids' => 'Freie Preispositionen besitzen keine Spotproduktion und können nicht als Produktionszeile übernommen werden.',
             ]);
         }
         DispoPositionMethodClassifier::assertAdoptable($carrier);

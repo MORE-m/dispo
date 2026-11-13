@@ -1,7 +1,27 @@
 # Fortschritt V1
 
-Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-3 Wizard-UI
-implementiert (Pair weiter planned/unreleased).** Freie Preisposition im
+Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-4 Dispo/Freeze
+implementiert (Free Position weiter planned/unreleased, Podcast OUT).**
+`DispoPositionMethodClassifier` kennt `KIND_FREE_POSITION` (AND-only:
+`engine_profile_key=free_position` ∧ `calculation_method_key=free_position` ∧
+Registry-Paar; Halb-/Fremdpaare wie free×average, spot×free, free×tkp, oa×free
+sind inkonsistent), `assertAdoptable` akzeptiert Free, neutrale
+Inkonsistenz-Meldung. `DispoOrderSnapshotMapper` mappt explizit
+OA/Free/Spot (kein Default, der Free verschluckt):
+`freePositionFromCalculationPosition()` friert Freeze, Geldwerte, Flags und
+Rabatte ein (`length_seconds=0`, `total_spot_count=0`, keine Spot-/OA-/TKP-
+Felder, Settlement `normal`, leere Kind-Snapshots), `productionFromLine` lehnt
+Free ab. Frontend: `Freie Preisposition` (optional · Brutto) in Dispo-Create-
+Dialog und Dispo-Show statt „0 Spots · 0s“. Adoption-Service liefert zusätzlich
+`media_gross`. Das Pair bleibt im Registry-CATALOG **planned**; kein Release,
+keine Migration, keine Podcast-Rule, kein Deploy, kein `dispo_mat_core`-Write,
+kein Medium-Code-Branching. Tests:
+`tests/Feature/Calculation/FreePosition/FreePositionDispoIntegrationTest.php`,
+Classifier-Unit, Vitest, Browser-Smoke
+`playwright.po-free-position-native-4.config.ts` (Port 8080, CI-Step).
+Offen: NATIVE-5 (Podcast-Rule/Release; Spot-Export/Kampagnenzeitraum-
+Ableitung für Free nicht gesondert geprüft). Zuvor: **PO-OA-NATIVE-1 /
+NATIVE-3 Wizard-UI implementiert (Pair weiter planned/unreleased).** Freie Preisposition im
 Kalkulationswizard: `free-position-wizard.ts` (Detection nur über
 `calculation_method_key === 'free_position'`, Draft-Hygiene, `free_price`-
 Payload ohne `media_gross`/Spot-/OA-Felder, Hydration aus `free_price`/

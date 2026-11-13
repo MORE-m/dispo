@@ -39,6 +39,7 @@ type SelectablePosition = {
     adoptable?: boolean;
     impressions?: number | null;
     final_tkp?: string | null;
+    media_gross?: string | null;
     length_seconds: number;
     total_spot_count: number;
     nn_invest: string;

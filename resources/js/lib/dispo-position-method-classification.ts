@@ -1,17 +1,20 @@
+import { FREE_POSITION_METHOD_KEY } from '@/lib/free-position-wizard';
 import { OA_TKP_METHOD_KEY } from '@/lib/oa-tkp-wizard';
 
 /** Spiegelt App\Support\DispoOrder\DispoPositionMethodClassifier (ohne volle Registry). */
 export const METHOD_KIND_OA_TKP = 'oa_tkp' as const;
+export const METHOD_KIND_FREE_POSITION = 'free_position' as const;
 export const METHOD_KIND_SPOT_FAMILY = 'spot_family' as const;
 export const METHOD_KIND_INCONSISTENT = 'inconsistent' as const;
 
 export type DispoMethodClassification =
     | typeof METHOD_KIND_OA_TKP
+    | typeof METHOD_KIND_FREE_POSITION
     | typeof METHOD_KIND_SPOT_FAMILY
     | typeof METHOD_KIND_INCONSISTENT;
 
 export const METHOD_INCONSISTENCY_MESSAGE =
-    'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann weder als Spot noch als Online-Audio übernommen werden.';
+    'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann nicht an die Disposition übergeben werden.';
 
 /** Bekannte Nicht-OA-Registry-Paare (Spiegel EngineProfileRegistry, Stand D3d-1). */
 const SPOT_FAMILY_PAIRS: ReadonlyArray<readonly [string, string]> = [
@@ -69,6 +72,16 @@ export function classifyDispoMethodPair(
         return METHOD_KIND_INCONSISTENT;
     }
 
+    // NATIVE-4: Free Position nur als AND-Paar; Halb-/Fremdpaare sind inkonsistent.
+    const isFreeProfile = profile === 'free_position';
+    const isFreeMethod = method === FREE_POSITION_METHOD_KEY;
+
+    if (isFreeProfile || isFreeMethod) {
+        return isFreeProfile && isFreeMethod
+            ? METHOD_KIND_FREE_POSITION
+            : METHOD_KIND_INCONSISTENT;
+    }
+
     if (isKnownSpotFamilyPair(profile, method)) {
         return METHOD_KIND_SPOT_FAMILY;
     }
@@ -83,6 +96,7 @@ export function resolveDispoMethodClassification(position: {
 }): DispoMethodClassification {
     if (
         position.method_classification === METHOD_KIND_OA_TKP ||
+        position.method_classification === METHOD_KIND_FREE_POSITION ||
         position.method_classification === METHOD_KIND_SPOT_FAMILY ||
         position.method_classification === METHOD_KIND_INCONSISTENT
     ) {
@@ -101,6 +115,16 @@ export function isOaTkpMethodPair(position: {
     calculation_method_key?: string | null;
 }): boolean {
     return resolveDispoMethodClassification(position) === METHOD_KIND_OA_TKP;
+}
+
+export function isFreePositionMethodPair(position: {
+    method_classification?: DispoMethodClassification | null;
+    engine_profile_key?: string | null;
+    calculation_method_key?: string | null;
+}): boolean {
+    return (
+        resolveDispoMethodClassification(position) === METHOD_KIND_FREE_POSITION
+    );
 }
 
 export function isInconsistentMethodPair(position: {

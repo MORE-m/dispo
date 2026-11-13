@@ -11,6 +11,8 @@
 | Explizit nicht | Bookability, Wizard UI, Podcast-Rule, Registry-Release, Migration, Deploy, `dispo_mat_core`-Write |
 | NATIVE-2 Branch | `feat/free-position-native-2-writer` (Worktree `dispo-wt-free-position-native-2`) |
 | NATIVE-3 Branch | `feat/free-position-native-3-ui` (Worktree `dispo-wt-free-position-native-3`, Base `5a1358f`) |
+| NATIVE-4 Branch | `feat/free-position-native-4-dispo` (Worktree `dispo-wt-free-position-native-4`, Base `6fe81e3`) |
+| NATIVE-4 Status | **Dispo-Classifier/Snapshot (Freeze) implementiert**; Free AND-only klassifiziert, explizites Mapper-`match`, Anzeige „Freie Preisposition“; Pair weiter **planned/unreleased**; Browser-Smoke Port 8080; **kein** Release/Podcast-Rule/Deploy/`dispo_mat_core`-Write/Migration |
 | NATIVE-3 Status | **Wizard-UI implementiert** (Preis, Rabatte, AE-Header-Toggle); Pair weiter **planned/unreleased**; isolierter Browser-Smoke (Port 8079) mit Registry-Test-Fake nur im E2E-Server; **kein** Release/Podcast-Rule/Deploy/`dispo_mat_core`-Write/StandardOffer/Budget |
 | NATIVE-2 Umfang | `FreePositionWriterPositionResolver`, `FreePositionHttpReleaseGuard`, `CalculationWriter`-Dispatch/Totals/Persistenz/Reload, Request-Validierung `free_price`, Registry-Test-Fake, Budget-Guard; **kein** CATALOG-Flip, **kein** StandardOffer-Öffnen, **kein** Budget-Free, **keine** Migration/UI/Podcast-Rule |
 
@@ -278,7 +280,7 @@ ungefragt öffnen.
 | **NATIVE-1** | Registry Pair `free_position×free_position` v1 + `CalculationKind` + Bookability/Freeze-Mapping + Medium-Assignment Native |
 | **NATIVE-2** | Writer/Preview/Engine: Userpreis → `media_gross` + Forward-Rabatt/AE + Approval-Reuse; `length_seconds=0` — **umgesetzt 13.11.2026** (Pair weiter planned; Tests via Registry-Fake) |
 | **NATIVE-3** | Wizard-UI Minimal (Preis + Rabatte/AE) — **umgesetzt 13.11.2026** (Pair weiter planned; Browser-Smoke via E2E-Fake) |
-| **NATIVE-4** | Dispo-Classifier/Snapshot + Reload/Copy-Regression |
+| **NATIVE-4** | Dispo-Classifier/Snapshot + Reload/Copy-Regression — **Dispo-Freeze umgesetzt 13.11.2026** (Pair weiter planned; Podcast OUT; Revisions-/Copy-Pfad nutzt denselben Writer, nicht gesondert getestet) |
 | **NATIVE-5** | Stammdaten: Podcast-Rule; E2E; OA-TKP-Regression (5 Core unverändert) |
 
 OA-Budget und Standardangebote bleiben OUT/V2.

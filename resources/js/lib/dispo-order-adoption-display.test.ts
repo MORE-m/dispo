@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     formatDispoAdoptionPositionDetail,
+    isFreePositionAdoptionPosition,
     isInconsistentAdoptionPosition,
     isOaTkpAdoptionPosition,
 } from '@/lib/dispo-order-adoption-display';
@@ -105,5 +106,45 @@ describe('dispo-order-adoption-display', () => {
         expect(detail).toBe(METHOD_INCONSISTENCY_MESSAGE);
         expect(detail).not.toMatch(/\b0\s*Spots\b/);
         expect(detail).not.toContain('0s');
+    });
+
+    it('formats Free Position as Freie Preisposition without spot/length values', () => {
+        const free = {
+            calculation_method_key: 'free_position',
+            engine_profile_key: 'free_position',
+            length_seconds: 0,
+            total_spot_count: 0,
+            time_ranges: [],
+        };
+
+        expect(isFreePositionAdoptionPosition(free)).toBe(true);
+        expect(isOaTkpAdoptionPosition(free)).toBe(false);
+        expect(isInconsistentAdoptionPosition(free)).toBe(false);
+
+        const plain = formatDispoAdoptionPositionDetail(free);
+        expect(plain).toBe('Freie Preisposition');
+        expect(plain).not.toContain('Spots');
+        expect(plain).not.toContain('0s');
+
+        const withGross = formatDispoAdoptionPositionDetail({
+            ...free,
+            media_gross: '5000.00',
+        });
+        expect(withGross).toContain('Freie Preisposition');
+        expect(withGross).toContain('5.000,00');
+        expect(withGross).not.toContain('Spots');
+        expect(withGross).not.toMatch(/\b0s\b/);
+    });
+
+    it('treats wrong Free Position pairs as inconsistent', () => {
+        const detail = formatDispoAdoptionPositionDetail({
+            calculation_method_key: 'free_position',
+            engine_profile_key: 'spot_classic',
+            length_seconds: 0,
+            total_spot_count: 0,
+            time_ranges: [],
+        });
+
+        expect(detail).toBe(METHOD_INCONSISTENCY_MESSAGE);
     });
 });

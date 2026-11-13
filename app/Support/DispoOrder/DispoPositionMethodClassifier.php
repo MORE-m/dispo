@@ -4,6 +4,7 @@ namespace App\Support\DispoOrder;
 
 use App\Models\CalculationPosition;
 use App\Models\DispoOrderPosition;
+use App\Services\Calculation\FreePosition\FreePositionWriterPositionResolver;
 use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Support\Calculation\EngineProfileRegistry;
 use Illuminate\Validation\ValidationException;
@@ -12,6 +13,7 @@ use Illuminate\Validation\ValidationException;
  * PO-CALC-TKP-1D3d-1: einheitliche Klassifikation Method × Engine für Dispo.
  *
  * Gültig OA: oa_tkp × tkp (Registry-Paar).
+ * Gültig Free Position (NATIVE-4): free_position × free_position (AND-only, Registry-Paar).
  * Gültig Spot-Familie: bekanntes Nicht-OA-Registry-Paar oder Legacy-NULL/NULL.
  * Sonst inkonsistent – weder Spot- noch OA-Pfad.
  */
@@ -19,11 +21,13 @@ final class DispoPositionMethodClassifier
 {
     public const string KIND_OA_TKP = 'oa_tkp';
 
+    public const string KIND_FREE_POSITION = 'free_position';
+
     public const string KIND_SPOT_FAMILY = 'spot_family';
 
     public const string KIND_INCONSISTENT = 'inconsistent';
 
-    public const string MESSAGE_INCONSISTENT = 'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann weder als Spot noch als Online-Audio übernommen werden.';
+    public const string MESSAGE_INCONSISTENT = 'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann nicht an die Disposition übergeben werden.';
 
     public static function classify(?string $engineProfileKey, ?string $calculationMethodKey): string
     {
@@ -54,6 +58,22 @@ final class DispoPositionMethodClassifier
             return self::KIND_INCONSISTENT;
         }
 
+        $isFreeProfile = $profile === EngineProfileRegistry::PROFILE_FREE_POSITION;
+        $isFreeMethod = $method === FreePositionWriterPositionResolver::METHOD_KEY;
+
+        if ($isFreeProfile || $isFreeMethod) {
+            // NATIVE-4: AND-only – halbe/falsche Paare (free×average, spot×free, free×tkp, oa×free) inkonsistent.
+            if (
+                $isFreeProfile
+                && $isFreeMethod
+                && EngineProfileRegistry::hasMethodForProfile($profile, $method)
+            ) {
+                return self::KIND_FREE_POSITION;
+            }
+
+            return self::KIND_INCONSISTENT;
+        }
+
         if (EngineProfileRegistry::hasMethodForProfile($profile, $method)) {
             return self::KIND_SPOT_FAMILY;
         }
@@ -72,6 +92,11 @@ final class DispoPositionMethodClassifier
     public static function isOaTkp(?string $engineProfileKey, ?string $calculationMethodKey): bool
     {
         return self::classify($engineProfileKey, $calculationMethodKey) === self::KIND_OA_TKP;
+    }
+
+    public static function isFreePosition(?string $engineProfileKey, ?string $calculationMethodKey): bool
+    {
+        return self::classify($engineProfileKey, $calculationMethodKey) === self::KIND_FREE_POSITION;
     }
 
     public static function isSpotFamily(?string $engineProfileKey, ?string $calculationMethodKey): bool

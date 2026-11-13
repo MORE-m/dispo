@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
     classifyDispoMethodPair,
+    isFreePositionMethodPair,
     isInconsistentMethodPair,
     isOaTkpMethodPair,
+    METHOD_INCONSISTENCY_MESSAGE,
+    METHOD_KIND_FREE_POSITION,
     METHOD_KIND_INCONSISTENT,
     METHOD_KIND_OA_TKP,
     METHOD_KIND_SPOT_FAMILY,
@@ -65,6 +68,56 @@ describe('dispo-position-method-classification', () => {
                 method_classification: METHOD_KIND_INCONSISTENT,
                 calculation_method_key: 'tkp',
                 engine_profile_key: 'oa_tkp',
+            }),
+        ).toBe(true);
+    });
+
+    it('classifies Free Position as AND pair only', () => {
+        expect(classifyDispoMethodPair('free_position', 'free_position')).toBe(
+            METHOD_KIND_FREE_POSITION,
+        );
+        expect(
+            isFreePositionMethodPair({
+                engine_profile_key: 'free_position',
+                calculation_method_key: 'free_position',
+            }),
+        ).toBe(true);
+        expect(
+            isOaTkpMethodPair({
+                engine_profile_key: 'free_position',
+                calculation_method_key: 'free_position',
+            }),
+        ).toBe(false);
+    });
+
+    it('rejects half and wrong Free Position pairs as inconsistent', () => {
+        const wrong: Array<[string | null, string | null]> = [
+            ['free_position', 'average'],
+            ['spot_classic', 'free_position'],
+            ['free_position', 'tkp'],
+            ['oa_tkp', 'free_position'],
+            ['free_position', null],
+            [null, 'free_position'],
+        ];
+        for (const [profile, method] of wrong) {
+            expect(classifyDispoMethodPair(profile, method)).toBe(
+                METHOD_KIND_INCONSISTENT,
+            );
+        }
+    });
+
+    it('uses neutral inconsistency wording', () => {
+        expect(METHOD_INCONSISTENCY_MESSAGE).toBe(
+            'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann nicht an die Disposition übergeben werden.',
+        );
+    });
+
+    it('prefers server free_position classification', () => {
+        expect(
+            isFreePositionMethodPair({
+                method_classification: METHOD_KIND_FREE_POSITION,
+                engine_profile_key: null,
+                calculation_method_key: null,
             }),
         ).toBe(true);
     });

@@ -84,6 +84,8 @@ final class DispoOrderPositionAdoptionService
                 'final_tkp' => $position->final_tkp === null || trim((string) $position->final_tkp) === ''
                     ? null
                     : Decimal::roundPrice((string) $position->final_tkp),
+                // NATIVE-4: Free Position zeigt Brutto statt Spots/Länge.
+                'media_gross' => (string) $position->media_gross,
                 'length_seconds' => $position->length_seconds,
                 'total_spot_count' => $position->total_spot_count,
                 'nn_invest' => (string) $position->nn_invest,

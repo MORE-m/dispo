@@ -34,6 +34,28 @@ class DispoPositionMethodClassifierTest extends TestCase
     }
 
     #[Test]
+    public function classifies_valid_free_position_and_only_and(): void
+    {
+        $this->assertSame(
+            DispoPositionMethodClassifier::KIND_FREE_POSITION,
+            DispoPositionMethodClassifier::classify('free_position', 'free_position'),
+        );
+        $this->assertTrue(DispoPositionMethodClassifier::isFreePosition('free_position', 'free_position'));
+        $this->assertFalse(DispoPositionMethodClassifier::isSpotFamily('free_position', 'free_position'));
+        $this->assertFalse(DispoPositionMethodClassifier::isOaTkp('free_position', 'free_position'));
+        $this->assertFalse(DispoPositionMethodClassifier::isInconsistent('free_position', 'free_position'));
+    }
+
+    #[Test]
+    public function inconsistency_message_is_neutral(): void
+    {
+        $this->assertSame(
+            'Die Methoden-/Engine-Kombination dieser Position ist ungültig und kann nicht an die Disposition übergeben werden.',
+            DispoPositionMethodClassifier::inconsistencyMessage(),
+        );
+    }
+
+    #[Test]
     #[DataProvider('validSpotFamilyPairs')]
     public function classifies_valid_spot_family(?string $profile, ?string $method): void
     {
@@ -91,6 +113,17 @@ class DispoPositionMethodClassifierTest extends TestCase
             ['', 'tkp'],
             ['unknown_profile', 'average'],
             ['spot_classic', 'unknown_method'],
+            // NATIVE-4: Free Position nur als AND-Paar.
+            ['free_position', 'average'],
+            ['free_position', 'tkp'],
+            ['free_position', null],
+            [null, 'free_position'],
+            ['free_position', ''],
+            ['', 'free_position'],
+            ['spot_classic', 'free_position'],
+            ['swf_trailer', 'free_position'],
+            ['oa_tkp', 'free_position'],
+            ['tkp', 'free_position'],
         ];
     }
 }
