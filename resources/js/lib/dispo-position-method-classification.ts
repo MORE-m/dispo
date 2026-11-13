@@ -123,8 +123,7 @@ export function isFreePositionMethodPair(position: {
     calculation_method_key?: string | null;
 }): boolean {
     return (
-        resolveDispoMethodClassification(position) ===
-        METHOD_KIND_FREE_POSITION
+        resolveDispoMethodClassification(position) === METHOD_KIND_FREE_POSITION
     );
 }
 
