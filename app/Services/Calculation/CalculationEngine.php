@@ -195,6 +195,10 @@ final class CalculationEngine
             SpotCalculationMethod::Tkp => throw new \InvalidArgumentException(
                 'Kalkulationsart tkp gehört zur OA-TKP-Engine (OaTkpNormalEngine), nicht zur Spot-CalculationEngine.',
             ),
+            // NATIVE-1: eigener Rechenkern FreePositionEngine — Spot-Engine bleibt fail-closed.
+            SpotCalculationMethod::FreePosition => throw new \InvalidArgumentException(
+                'Kalkulationsart free_position gehört zur FreePositionEngine, nicht zur Spot-CalculationEngine.',
+            ),
         };
     }
 

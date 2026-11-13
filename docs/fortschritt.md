@@ -1,6 +1,16 @@
 # Fortschritt V1
 
-Stand: 12. November 2026 – **PO-STD-V2.** Standardangebote sind global für alle
+Stand: 12. November 2026 – **PO-OA-NATIVE-1 / NATIVE-1 Foundation.** Generisches
+`free_position`-Fundament implementiert: `CalculationKind::FreePosition`, Registry
+`free_position×free_position` = **planned** (`versions.v1=implemented`,
+`current_released_version=null`), `FreePositionEngine` (`free_price` →
+`media_gross` → Commercial), gemeinsame Pipeline `CommercialPricingCalculator`
+(OA-Normal refaktoriert). Unit-/Foundation-/OA-/Spot-Regression grün. **Native-Ad
+weiterhin nicht operativ buchbar**; Pair nicht released; kein Wizard/HTTP/Writer;
+keine Podcast-Rule; keine Migration; kein `dispo_mat_core`-Write; kein Deploy.
+Dok: `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`.
+
+Stand davor: 12. November 2026 – **PO-STD-V2.** Standardangebote sind global für alle
 Medienarten (**Spot, SWF, Online Audio, Social, Events, weitere**) vollständig
 nach **V2** verschoben. Kein verpflichtender V1-Produktumfang; keine weitere
 fachliche Fertigstellung / Produktisierung in V1. Bereits vorhandenes technisches

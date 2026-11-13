@@ -83,7 +83,12 @@ class EngineProfileRegistryTest extends TestCase
         $this->assertSame('oa_tkp', $tkpPairs[0]['engine_profile_key']);
         $this->assertSame('released', $tkpPairs[0]['pair_status']);
         $this->assertSame('v1', $tkpPairs[0]['current_released_version']);
-        $this->assertSame([], EngineProfileRegistry::pairsForMethodKey('free_position'));
+        // NATIVE-1: free_position×free_position planned (noch nicht released).
+        $freePairs = EngineProfileRegistry::pairsForMethodKey('free_position');
+        $this->assertCount(1, $freePairs);
+        $this->assertSame('free_position', $freePairs[0]['engine_profile_key']);
+        $this->assertSame('planned', $freePairs[0]['pair_status']);
+        $this->assertNull($freePairs[0]['current_released_version']);
 
         $average = EngineProfileRegistry::pairsForMethodKey('average');
         // alphabetisch: spot_classic, swf_allonge, swf_contest, swf_promo, swf_trailer

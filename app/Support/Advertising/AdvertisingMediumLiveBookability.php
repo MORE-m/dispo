@@ -68,6 +68,8 @@ final class AdvertisingMediumLiveBookability
                 CalculationKind::SwfPromo => EngineProfileRegistry::PROFILE_SWF_PROMO,
                 CalculationKind::SwfContest => EngineProfileRegistry::PROFILE_SWF_CONTEST,
                 CalculationKind::OaTkp => EngineProfileRegistry::PROFILE_OA_TKP,
+                // NATIVE-1: Profil-Zuordnung bekannt; Pair planned → bleibt fail-closed.
+                CalculationKind::FreePosition => EngineProfileRegistry::PROFILE_FREE_POSITION,
                 default => null,
             };
             if ($expectedProfile === null) {

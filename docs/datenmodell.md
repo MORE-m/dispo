@@ -352,6 +352,14 @@ Unterobjekte werden typbezogen normalisiert:
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
   Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
   `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
+- **PO-OA-NATIVE-1 / NATIVE-1:** `CalculationKind::FreePosition` (`free_position`);
+  Registry-Profil `free_position` × Methode `free_position` = **planned**
+  (`versions.v1=implemented`, `current_released_version=null`). Rechenkern
+  `FreePositionEngine`: User-`free_price` → `media_gross` →
+  `CommercialPricingCalculator` (Rabatte → AE → N/N). Settlement `normal`,
+  `fixed_price_nn=null`; technische Defaults später `length_seconds=0`,
+  `total_spot_count=0`, `impressions=null`, keine Preisliste/TKP. Native-Ad
+  operativ weiterhin OUT (kein Assignment/Bookability/Writer). Keine Migration.
 - **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
   (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
   `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit

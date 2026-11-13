@@ -23,4 +23,10 @@ enum CalculationKind: string
      * Medium-kind im Katalog bleibt null; Bookability bleibt planned/fail-closed.
      */
     case OaTkp = 'oa_tkp';
+
+    /**
+     * PO-OA-NATIVE-1 / NATIVE-1: generische freie Preisposition (User-Ausgangspreis).
+     * Native-Ad nutzt später dieses Kind; Pair bleibt planned/nicht released.
+     */
+    case FreePosition = 'free_position';
 }
