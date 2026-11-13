@@ -124,6 +124,16 @@ import {
     type OaTkpMethodResult,
 } from '@/lib/oa-tkp-wizard';
 import { OaTkpPositionEditor } from '@/components/oa-tkp-position-editor';
+import { FreePositionEditor } from '@/components/free-position-editor';
+import {
+    buildFreePositionPayload,
+    draftBlocksFreePositionPreview,
+    emptyFreePositionDraftFields,
+    freePositionDraftPatchAfterResolvedMethod,
+    freePositionDraftPatchOnMethodSelect,
+    hydrateFreePositionFromSaved,
+    isFreePosition,
+} from '@/lib/free-position-wizard';
 import { rebindPositionOnInventoryChange } from '@/lib/wizard-inventory-rebind';
 import { allongeConfigurationHint } from '@/lib/wizard-allonge-confirmation-hint';
 import { applySuccessfulPositionSave } from '@/lib/wizard-allonge-saved-basis';
@@ -328,6 +338,8 @@ type PositionDraft = {
     original_oa_list_tkp: string | null;
     original_oa_minimum_tkp: string | null;
     original_oa_price_year: number | null;
+    /** NATIVE-3: Freie Preisposition – Rohinput für „Preis“ (Payload: free_price). */
+    free_price_input: string;
 };
 
 type PeriodValue = { start: string | null; end: string | null } | null;
@@ -605,6 +617,8 @@ type SavedCalculation = {
             position_flight_period?: PeriodValue;
         };
         engine_profile_key?: string | null;
+        /** NATIVE-3: gespeicherter Preis einer Freien Preisposition (Server). */
+        free_price?: string | null;
         expected_oa_tkp_price_list_id?: number | null;
         impressions?: number | null;
         basis_tkp?: string | null;
@@ -945,6 +959,7 @@ function firstValidPosition(
                 ).find((option) => option.year === year)?.status ?? null,
             ...defaultPricingSettlementDraft(),
             ...emptyOaTkpDraftFields(year),
+            ...emptyFreePositionDraftFields(),
         };
     }
 
@@ -1531,6 +1546,12 @@ export default function CalculationWizard({
                     })
                         ? hydrateOaTkpFromSaved(position)
                         : emptyOaTkpDraftFieldsWithoutSettlement(pinnedYear)),
+                    ...(isFreePosition({
+                        calculation_method_key:
+                            methodState.calculation_method_key,
+                    })
+                        ? hydrateFreePositionFromSaved(position)
+                        : emptyFreePositionDraftFields()),
                 };
             });
         }
@@ -1933,6 +1954,25 @@ export default function CalculationWizard({
                           ).payload,
                       };
 
+                      // NATIVE-3: Free vor dem Spot-Builder; server-authoritativ, nur free_price.
+                      if (isFreePosition(position)) {
+                          return buildFreePositionPayload({
+                              ...position,
+                              position_discounts: payloadDiscounts(
+                                  position.position_discounts,
+                              ),
+                              dynamic_field_values:
+                                  dynamicFieldValues as Record<
+                                      string,
+                                      | string
+                                      | number
+                                      | boolean
+                                      | null
+                                      | Record<string, string | null>
+                                  >,
+                          });
+                      }
+
                       if (isTkpPosition(position)) {
                           return buildOaTkpPositionPayload({
                               ...position,
@@ -2172,7 +2212,9 @@ export default function CalculationWizard({
         blocked:
             busy ||
             proposalLoading ||
-            (!isBudgetSetup && draftBlocksOaTkpPreview(positions)),
+            (!isBudgetSetup &&
+                (draftBlocksOaTkpPreview(positions) ||
+                    draftBlocksFreePositionPreview(positions))),
     });
     const hasTkpPositions = draftHasTkpPositions(positions);
     const tkpSaveBlocked = isOaTkpSaveBlocked({
@@ -2319,8 +2361,11 @@ export default function CalculationWizard({
                 : null;
         // OA-TKP hat eigenen Festpreis-Pfad: Spot/Trailer-Settlement-Clear nicht anwenden.
         const isOaTkp = currentItem !== undefined && isTkpPosition(currentItem);
+        const isFreeCurrent =
+            currentItem !== undefined && isFreePosition(currentItem);
         const clearTrailerSettlement =
             !isOaTkp &&
+            !isFreeCurrent &&
             shouldClearTrailerSettlementForTargetMedium(
                 catalog,
                 targetMediumId,
@@ -2456,6 +2501,26 @@ export default function CalculationWizard({
                             }
                         }
                     }
+
+                    // NATIVE-3: Mediumwechsel über Inventar – Free-Reste räumen.
+                    if (
+                        next.advertising_medium_id !==
+                        item.advertising_medium_id
+                    ) {
+                        next = {
+                            ...next,
+                            ...(isFreePosition(item) && !isFreePosition(next)
+                                ? initialTimingFieldsForMethod(
+                                      next.calculation_method_key,
+                                  )
+                                : {}),
+                            ...freePositionDraftPatchAfterResolvedMethod(
+                                item,
+                                next.calculation_method_key,
+                                item.price_year,
+                            ),
+                        };
+                    }
                 } else if (patch.advertising_medium_id !== undefined) {
                     const medium = catalog.media.find(
                         (candidate) =>
@@ -2498,6 +2563,20 @@ export default function CalculationWizard({
                         schema_fingerprint: null,
                         field_schema: null,
                         ...oaTkpDraftPatchAfterResolvedMethod(
+                            item,
+                            methodState.calculation_method_key,
+                            item.price_year,
+                        ),
+                        ...(isFreePosition(item) &&
+                        !isFreePosition({
+                            calculation_method_key:
+                                methodState.calculation_method_key,
+                        })
+                            ? initialTimingFieldsForMethod(
+                                  methodState.calculation_method_key,
+                              )
+                            : {}),
+                        ...freePositionDraftPatchAfterResolvedMethod(
                             item,
                             methodState.calculation_method_key,
                             item.price_year,
@@ -3023,6 +3102,7 @@ export default function CalculationWizard({
                             budgetPriceYear ??
                             defaultPriceYear(catalog, item.inventory_id),
                     ),
+                    ...emptyFreePositionDraftFields(),
                 };
             }),
         );
@@ -3977,137 +4057,263 @@ export default function CalculationWizard({
                                                                     })()}
                                                                 </select>
                                                             </FormField>
-                                                            {position.components
-                                                                .length ===
-                                                            0 ? (
-                                                                <FormField
-                                                                    label="Länge (Sekunden)"
-                                                                    htmlFor={`length-${index}`}
-                                                                    hint={spotLengthSpt010Hint(
-                                                                        position.length_seconds,
-                                                                        catalog.media.find(
-                                                                            (
-                                                                                item,
-                                                                            ) =>
-                                                                                item.id ===
-                                                                                position.advertising_medium_id,
-                                                                        )?.code,
+                                                            {/* NATIVE-3: Länge/Allonge/Preisjahr gehören nicht zur Freien Preisposition. */}
+                                                            {!isFreePosition(
+                                                                position,
+                                                            ) ? (
+                                                                <>
+                                                                    {position
+                                                                        .components
+                                                                        .length ===
+                                                                    0 ? (
+                                                                        <FormField
+                                                                            label="Länge (Sekunden)"
+                                                                            htmlFor={`length-${index}`}
+                                                                            hint={spotLengthSpt010Hint(
+                                                                                position.length_seconds,
+                                                                                catalog.media.find(
+                                                                                    (
+                                                                                        item,
+                                                                                    ) =>
+                                                                                        item.id ===
+                                                                                        position.advertising_medium_id,
+                                                                                )
+                                                                                    ?.code,
+                                                                            )}
+                                                                        >
+                                                                            <Input
+                                                                                id={`length-${index}`}
+                                                                                data-test={`position-length-seconds-${index}`}
+                                                                                type="number"
+                                                                                min={
+                                                                                    1
+                                                                                }
+                                                                                value={
+                                                                                    position.length_seconds
+                                                                                }
+                                                                                disabled={
+                                                                                    !canEdit
+                                                                                }
+                                                                                onChange={(
+                                                                                    event,
+                                                                                ) =>
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        {
+                                                                                            length_seconds:
+                                                                                                Number(
+                                                                                                    event
+                                                                                                        .target
+                                                                                                        .value,
+                                                                                                ),
+                                                                                        },
+                                                                                    )
+                                                                                }
+                                                                            />
+                                                                        </FormField>
+                                                                    ) : (
+                                                                        <p
+                                                                            className="text-muted-foreground text-sm"
+                                                                            data-test={`position-length-from-components-${index}`}
+                                                                        >
+                                                                            Länge
+                                                                            aus
+                                                                            Komponenten:{' '}
+                                                                            {totalComponentLength(
+                                                                                position.components,
+                                                                            )}
+                                                                            s
+                                                                        </p>
                                                                     )}
-                                                                >
-                                                                    <Input
-                                                                        id={`length-${index}`}
-                                                                        data-test={`position-length-seconds-${index}`}
-                                                                        type="number"
-                                                                        min={1}
-                                                                        value={
-                                                                            position.length_seconds
-                                                                        }
-                                                                        disabled={
-                                                                            !canEdit
-                                                                        }
-                                                                        onChange={(
-                                                                            event,
-                                                                        ) =>
-                                                                            updatePosition(
-                                                                                index,
-                                                                                {
-                                                                                    length_seconds:
-                                                                                        Number(
-                                                                                            event
-                                                                                                .target
-                                                                                                .value,
-                                                                                        ),
-                                                                                },
+                                                                    {allongeConfigurationHint(
+                                                                        catalog,
+                                                                        position,
+                                                                    )?.tone ===
+                                                                    'block' ? (
+                                                                        <p
+                                                                            className="text-sm text-amber-800"
+                                                                            data-test={`allonge-unconfirmed-${index}`}
+                                                                        >
+                                                                            {
+                                                                                allongeConfigurationHint(
+                                                                                    catalog,
+                                                                                    position,
+                                                                                )
+                                                                                    ?.text
+                                                                            }
+                                                                        </p>
+                                                                    ) : null}
+                                                                    {allongeConfigurationHint(
+                                                                        catalog,
+                                                                        position,
+                                                                    )?.tone ===
+                                                                    'snapshot' ? (
+                                                                        <p
+                                                                            className="text-muted-foreground text-sm"
+                                                                            data-test={`allonge-snapshot-note-${index}`}
+                                                                        >
+                                                                            {
+                                                                                allongeConfigurationHint(
+                                                                                    catalog,
+                                                                                    position,
+                                                                                )
+                                                                                    ?.text
+                                                                            }
+                                                                        </p>
+                                                                    ) : null}
+                                                                    <FormField
+                                                                        label="Preisjahr"
+                                                                        htmlFor={`price-year-${index}`}
+                                                                        hint={
+                                                                            priceYearDirty(
+                                                                                position.original_price_year,
+                                                                                position.price_year,
                                                                             )
+                                                                                ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
+                                                                                : position.price_list_status ===
+                                                                                    'archived'
+                                                                                  ? 'Historische Preisliste (unverändert gepinnt).'
+                                                                                  : undefined
                                                                         }
-                                                                    />
-                                                                </FormField>
-                                                            ) : (
-                                                                <p
-                                                                    className="text-muted-foreground text-sm"
-                                                                    data-test={`position-length-from-components-${index}`}
-                                                                >
-                                                                    Länge aus
-                                                                    Komponenten:{' '}
-                                                                    {totalComponentLength(
-                                                                        position.components,
-                                                                    )}
-                                                                    s
-                                                                </p>
-                                                            )}
-                                                            {allongeConfigurationHint(
-                                                                catalog,
-                                                                position,
-                                                            )?.tone ===
-                                                            'block' ? (
-                                                                <p
-                                                                    className="text-sm text-amber-800"
-                                                                    data-test={`allonge-unconfirmed-${index}`}
-                                                                >
-                                                                    {
-                                                                        allongeConfigurationHint(
+                                                                    >
+                                                                        <select
+                                                                            id={`price-year-${index}`}
+                                                                            data-test={`position-price-year-${index}`}
+                                                                            className={
+                                                                                formSelectClass
+                                                                            }
+                                                                            value={
+                                                                                position.price_year
+                                                                            }
+                                                                            disabled={
+                                                                                !canEdit
+                                                                            }
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) => {
+                                                                                const year =
+                                                                                    Number(
+                                                                                        event
+                                                                                            .target
+                                                                                            .value,
+                                                                                    );
+                                                                                const originalPin: OriginalPriceListPin | null =
+                                                                                    position.original_price_year !==
+                                                                                    null
+                                                                                        ? {
+                                                                                              year: position.original_price_year,
+                                                                                              price_list_id:
+                                                                                                  position.original_price_list_id,
+                                                                                              version:
+                                                                                                  position.original_price_list_version,
+                                                                                              status: position.original_price_list_status,
+                                                                                          }
+                                                                                        : null;
+
+                                                                                if (
+                                                                                    originalPin &&
+                                                                                    year ===
+                                                                                        originalPin.year
+                                                                                ) {
+                                                                                    updatePosition(
+                                                                                        index,
+                                                                                        restoreOriginalPriceListPin(
+                                                                                            originalPin,
+                                                                                        ),
+                                                                                    );
+                                                                                    return;
+                                                                                }
+
+                                                                                const option =
+                                                                                    resolveDisplayedPriceYearOptions(
+                                                                                        catalog,
+                                                                                        position.inventory_id,
+                                                                                        year,
+                                                                                        originalPin,
+                                                                                    ).find(
+                                                                                        (
+                                                                                            row,
+                                                                                        ) =>
+                                                                                            row.year ===
+                                                                                            year,
+                                                                                    );
+
+                                                                                updatePosition(
+                                                                                    index,
+                                                                                    {
+                                                                                        price_year:
+                                                                                            year,
+                                                                                        expected_price_list_id:
+                                                                                            option?.price_list_id ??
+                                                                                            expectedPriceListIdForYear(
+                                                                                                catalog,
+                                                                                                position.inventory_id,
+                                                                                                year,
+                                                                                            ),
+                                                                                        price_list_version:
+                                                                                            option?.version ??
+                                                                                            null,
+                                                                                        price_list_status:
+                                                                                            option?.status ??
+                                                                                            null,
+                                                                                    },
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            {resolveDisplayedPriceYearOptions(
+                                                                                catalog,
+                                                                                position.inventory_id,
+                                                                                position.price_year,
+                                                                                position.original_price_year !==
+                                                                                    null
+                                                                                    ? {
+                                                                                          year: position.original_price_year,
+                                                                                          price_list_id:
+                                                                                              position.original_price_list_id,
+                                                                                          version:
+                                                                                              position.original_price_list_version,
+                                                                                          status: position.original_price_list_status,
+                                                                                      }
+                                                                                    : null,
+                                                                            ).map(
+                                                                                (
+                                                                                    option,
+                                                                                ) => (
+                                                                                    <option
+                                                                                        key={
+                                                                                            option.year
+                                                                                        }
+                                                                                        value={
+                                                                                            option.year
+                                                                                        }
+                                                                                        disabled={
+                                                                                            !option.available &&
+                                                                                            option.year !==
+                                                                                                position.original_price_year
+                                                                                        }
+                                                                                    >
+                                                                                        {
+                                                                                            option.year
+                                                                                        }
+                                                                                        {option.version
+                                                                                            ? ` · ${option.version}`
+                                                                                            : option.available
+                                                                                              ? ''
+                                                                                              : ' · keine aktive Liste'}
+                                                                                        {option.status ===
+                                                                                        'archived'
+                                                                                            ? ' · historisch'
+                                                                                            : ''}
+                                                                                    </option>
+                                                                                ),
+                                                                            )}
+                                                                        </select>
+                                                                        {!resolveDisplayedPriceYearOptions(
                                                                             catalog,
-                                                                            position,
-                                                                        )?.text
-                                                                    }
-                                                                </p>
-                                                            ) : null}
-                                                            {allongeConfigurationHint(
-                                                                catalog,
-                                                                position,
-                                                            )?.tone ===
-                                                            'snapshot' ? (
-                                                                <p
-                                                                    className="text-muted-foreground text-sm"
-                                                                    data-test={`allonge-snapshot-note-${index}`}
-                                                                >
-                                                                    {
-                                                                        allongeConfigurationHint(
-                                                                            catalog,
-                                                                            position,
-                                                                        )?.text
-                                                                    }
-                                                                </p>
-                                                            ) : null}
-                                                            <FormField
-                                                                label="Preisjahr"
-                                                                htmlFor={`price-year-${index}`}
-                                                                hint={
-                                                                    priceYearDirty(
-                                                                        position.original_price_year,
-                                                                        position.price_year,
-                                                                    )
-                                                                        ? 'Nach dem Speichern wird die Position mit der aktiven Preisliste dieses Jahres neu bepreist.'
-                                                                        : position.price_list_status ===
-                                                                            'archived'
-                                                                          ? 'Historische Preisliste (unverändert gepinnt).'
-                                                                          : undefined
-                                                                }
-                                                            >
-                                                                <select
-                                                                    id={`price-year-${index}`}
-                                                                    data-test={`position-price-year-${index}`}
-                                                                    className={
-                                                                        formSelectClass
-                                                                    }
-                                                                    value={
-                                                                        position.price_year
-                                                                    }
-                                                                    disabled={
-                                                                        !canEdit
-                                                                    }
-                                                                    onChange={(
-                                                                        event,
-                                                                    ) => {
-                                                                        const year =
-                                                                            Number(
-                                                                                event
-                                                                                    .target
-                                                                                    .value,
-                                                                            );
-                                                                        const originalPin: OriginalPriceListPin | null =
+                                                                            position.inventory_id,
+                                                                            position.price_year,
                                                                             position.original_price_year !==
-                                                                            null
+                                                                                null
                                                                                 ? {
                                                                                       year: position.original_price_year,
                                                                                       price_list_id:
@@ -4116,150 +4322,40 @@ export default function CalculationWizard({
                                                                                           position.original_price_list_version,
                                                                                       status: position.original_price_list_status,
                                                                                   }
-                                                                                : null;
-
-                                                                        if (
-                                                                            originalPin &&
-                                                                            year ===
-                                                                                originalPin.year
-                                                                        ) {
-                                                                            updatePosition(
-                                                                                index,
-                                                                                restoreOriginalPriceListPin(
-                                                                                    originalPin,
-                                                                                ),
-                                                                            );
-                                                                            return;
-                                                                        }
-
-                                                                        const option =
-                                                                            resolveDisplayedPriceYearOptions(
-                                                                                catalog,
-                                                                                position.inventory_id,
-                                                                                year,
-                                                                                originalPin,
-                                                                            ).find(
-                                                                                (
-                                                                                    row,
-                                                                                ) =>
-                                                                                    row.year ===
-                                                                                    year,
-                                                                            );
-
-                                                                        updatePosition(
-                                                                            index,
-                                                                            {
-                                                                                price_year:
-                                                                                    year,
-                                                                                expected_price_list_id:
-                                                                                    option?.price_list_id ??
-                                                                                    expectedPriceListIdForYear(
-                                                                                        catalog,
-                                                                                        position.inventory_id,
-                                                                                        year,
-                                                                                    ),
-                                                                                price_list_version:
-                                                                                    option?.version ??
-                                                                                    null,
-                                                                                price_list_status:
-                                                                                    option?.status ??
-                                                                                    null,
-                                                                            },
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    {resolveDisplayedPriceYearOptions(
-                                                                        catalog,
-                                                                        position.inventory_id,
-                                                                        position.price_year,
-                                                                        position.original_price_year !==
-                                                                            null
-                                                                            ? {
-                                                                                  year: position.original_price_year,
-                                                                                  price_list_id:
-                                                                                      position.original_price_list_id,
-                                                                                  version:
-                                                                                      position.original_price_list_version,
-                                                                                  status: position.original_price_list_status,
-                                                                              }
-                                                                            : null,
-                                                                    ).map(
-                                                                        (
-                                                                            option,
-                                                                        ) => (
-                                                                            <option
-                                                                                key={
-                                                                                    option.year
-                                                                                }
-                                                                                value={
-                                                                                    option.year
-                                                                                }
-                                                                                disabled={
-                                                                                    !option.available &&
-                                                                                    option.year !==
-                                                                                        position.original_price_year
-                                                                                }
+                                                                                : null,
+                                                                        ).find(
+                                                                            (
+                                                                                option,
+                                                                            ) =>
+                                                                                option.year ===
+                                                                                    position.price_year &&
+                                                                                option.available,
+                                                                        ) &&
+                                                                        position.price_list_status !==
+                                                                            'archived' &&
+                                                                        !(
+                                                                            position.original_price_year ===
+                                                                                position.price_year &&
+                                                                            position.original_price_list_id !==
+                                                                                null
+                                                                        ) ? (
+                                                                            <p
+                                                                                className="text-destructive mt-1 text-xs"
+                                                                                data-test={`position-price-year-missing-${index}`}
                                                                             >
-                                                                                {
-                                                                                    option.year
-                                                                                }
-                                                                                {option.version
-                                                                                    ? ` · ${option.version}`
-                                                                                    : option.available
-                                                                                      ? ''
-                                                                                      : ' · keine aktive Liste'}
-                                                                                {option.status ===
-                                                                                'archived'
-                                                                                    ? ' · historisch'
-                                                                                    : ''}
-                                                                            </option>
-                                                                        ),
-                                                                    )}
-                                                                </select>
-                                                                {!resolveDisplayedPriceYearOptions(
-                                                                    catalog,
-                                                                    position.inventory_id,
-                                                                    position.price_year,
-                                                                    position.original_price_year !==
-                                                                        null
-                                                                        ? {
-                                                                              year: position.original_price_year,
-                                                                              price_list_id:
-                                                                                  position.original_price_list_id,
-                                                                              version:
-                                                                                  position.original_price_list_version,
-                                                                              status: position.original_price_list_status,
-                                                                          }
-                                                                        : null,
-                                                                ).find(
-                                                                    (option) =>
-                                                                        option.year ===
-                                                                            position.price_year &&
-                                                                        option.available,
-                                                                ) &&
-                                                                position.price_list_status !==
-                                                                    'archived' &&
-                                                                !(
-                                                                    position.original_price_year ===
-                                                                        position.price_year &&
-                                                                    position.original_price_list_id !==
-                                                                        null
-                                                                ) ? (
-                                                                    <p
-                                                                        className="text-destructive mt-1 text-xs"
-                                                                        data-test={`position-price-year-missing-${index}`}
-                                                                    >
-                                                                        Für
-                                                                        dieses
-                                                                        Jahr
-                                                                        liegt
-                                                                        keine
-                                                                        aktive
-                                                                        Preisliste
-                                                                        vor.
-                                                                    </p>
-                                                                ) : null}
-                                                            </FormField>
+                                                                                Für
+                                                                                dieses
+                                                                                Jahr
+                                                                                liegt
+                                                                                keine
+                                                                                aktive
+                                                                                Preisliste
+                                                                                vor.
+                                                                            </p>
+                                                                        ) : null}
+                                                                    </FormField>
+                                                                </>
+                                                            ) : null}
                                                             {positionRuntime.isFieldVisible(
                                                                 'period_open',
                                                             ) ? (
@@ -4399,6 +4495,11 @@ export default function CalculationWizard({
                                                                             key,
                                                                             position.price_year,
                                                                         ),
+                                                                        ...freePositionDraftPatchOnMethodSelect(
+                                                                            position,
+                                                                            key,
+                                                                            position.price_year,
+                                                                        ),
                                                                     },
                                                                 );
                                                             }}
@@ -4477,7 +4578,44 @@ export default function CalculationWizard({
                                                             />
                                                         ) : null}
 
+                                                        {isFreePosition(
+                                                            position,
+                                                        ) ? (
+                                                            <FreePositionEditor
+                                                                positionIndex={
+                                                                    index
+                                                                }
+                                                                position={
+                                                                    position
+                                                                }
+                                                                mediaGross={
+                                                                    totals
+                                                                        ?.positions?.[
+                                                                        index
+                                                                    ]
+                                                                        ?.media_gross
+                                                                }
+                                                                fieldErrors={
+                                                                    fieldErrors
+                                                                }
+                                                                canEdit={
+                                                                    canEdit
+                                                                }
+                                                                onChange={(
+                                                                    patch,
+                                                                ) =>
+                                                                    updatePosition(
+                                                                        index,
+                                                                        patch,
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : null}
+
                                                         {!isTkpPosition(
+                                                            position,
+                                                        ) &&
+                                                        !isFreePosition(
                                                             position,
                                                         ) ? (
                                                             <>
@@ -5336,8 +5474,26 @@ export default function CalculationWizard({
                                                         types={discountTypes}
                                                         canEdit={canEdit}
                                                         disabled={
-                                                            (rule?.is_discountable ===
-                                                                false &&
+                                                            // NATIVE-3: Free – nur Regel/Medium-Flag, keine Produktionszeilen.
+                                                            (isFreePosition(
+                                                                position,
+                                                            ) &&
+                                                                (rule?.is_discountable ===
+                                                                    false ||
+                                                                    catalog.media.find(
+                                                                        (
+                                                                            item,
+                                                                        ) =>
+                                                                            item.id ===
+                                                                            position.advertising_medium_id,
+                                                                    )
+                                                                        ?.is_discountable ===
+                                                                        false)) ||
+                                                            (!isFreePosition(
+                                                                position,
+                                                            ) &&
+                                                                rule?.is_discountable ===
+                                                                    false &&
                                                                 !(
                                                                     displayTotals
                                                                         ?.positions[
@@ -5392,65 +5548,72 @@ export default function CalculationWizard({
                                                             </span>
                                                         </p>
                                                     ) : null}
-                                                    <ProductionLinesEditor
-                                                        positionIndex={index}
-                                                        lines={
-                                                            position.production_lines ??
-                                                            []
-                                                        }
-                                                        results={
-                                                            displayTotals
-                                                                ?.positions[
+                                                    {!isFreePosition(
+                                                        position,
+                                                    ) ? (
+                                                        <ProductionLinesEditor
+                                                            positionIndex={
                                                                 index
-                                                            ]?.production_lines
-                                                        }
-                                                        canEdit={canEdit}
-                                                        supported={productionSupported(
-                                                            {
-                                                                mediumKind:
-                                                                    catalog.media.find(
-                                                                        (
-                                                                            item,
-                                                                        ) =>
-                                                                            item.id ===
-                                                                            position.advertising_medium_id,
-                                                                    )?.kind,
-                                                                mediumCode:
-                                                                    catalog.media.find(
-                                                                        (
-                                                                            item,
-                                                                        ) =>
-                                                                            item.id ===
-                                                                            position.advertising_medium_id,
-                                                                    )?.code,
-                                                                methodKey:
-                                                                    position.calculation_method_key,
-                                                                settlementMode:
-                                                                    position.pricing_settlement_mode,
-                                                            },
-                                                        )}
-                                                        previewLoading={
-                                                            previewLoading
-                                                        }
-                                                        error={
-                                                            fieldErrors[
-                                                                `positions.${index}.production_lines`
-                                                            ]?.[0]
-                                                        }
-                                                        fieldErrors={
-                                                            fieldErrors
-                                                        }
-                                                        onChange={(
-                                                            production_lines,
-                                                        ) =>
-                                                            updatePosition(
-                                                                index,
+                                                            }
+                                                            lines={
+                                                                position.production_lines ??
+                                                                []
+                                                            }
+                                                            results={
+                                                                displayTotals
+                                                                    ?.positions[
+                                                                    index
+                                                                ]
+                                                                    ?.production_lines
+                                                            }
+                                                            canEdit={canEdit}
+                                                            supported={productionSupported(
                                                                 {
-                                                                    production_lines,
+                                                                    mediumKind:
+                                                                        catalog.media.find(
+                                                                            (
+                                                                                item,
+                                                                            ) =>
+                                                                                item.id ===
+                                                                                position.advertising_medium_id,
+                                                                        )?.kind,
+                                                                    mediumCode:
+                                                                        catalog.media.find(
+                                                                            (
+                                                                                item,
+                                                                            ) =>
+                                                                                item.id ===
+                                                                                position.advertising_medium_id,
+                                                                        )?.code,
+                                                                    methodKey:
+                                                                        position.calculation_method_key,
+                                                                    settlementMode:
+                                                                        position.pricing_settlement_mode,
                                                                 },
-                                                            )
-                                                        }
-                                                    />
+                                                            )}
+                                                            previewLoading={
+                                                                previewLoading
+                                                            }
+                                                            error={
+                                                                fieldErrors[
+                                                                    `positions.${index}.production_lines`
+                                                                ]?.[0]
+                                                            }
+                                                            fieldErrors={
+                                                                fieldErrors
+                                                            }
+                                                            onChange={(
+                                                                production_lines,
+                                                            ) =>
+                                                                updatePosition(
+                                                                    index,
+                                                                    {
+                                                                        production_lines,
+                                                                    },
+                                                                )
+                                                            }
+                                                        />
+                                                    ) : null}
                                                 </CardContent>
                                             </Card>
                                         );
@@ -5695,14 +5858,28 @@ export default function CalculationWizard({
                                                             </p>
                                                             <p className="text-muted-foreground mt-1">
                                                                 {position.spot_method ===
-                                                                    'tkp' ||
-                                                                (
-                                                                    position as {
-                                                                        calculation_method_key?: string;
-                                                                    }
-                                                                )
-                                                                    .calculation_method_key ===
-                                                                    'tkp' ? (
+                                                                'free_position' ? (
+                                                                    <>
+                                                                        Freie
+                                                                        Preisposition
+                                                                        · Brutto{' '}
+                                                                        {money(
+                                                                            position.media_gross,
+                                                                        )}{' '}
+                                                                        · N/N{' '}
+                                                                        {money(
+                                                                            position.nn_invest,
+                                                                        )}
+                                                                    </>
+                                                                ) : position.spot_method ===
+                                                                      'tkp' ||
+                                                                  (
+                                                                      position as {
+                                                                          calculation_method_key?: string;
+                                                                      }
+                                                                  )
+                                                                      .calculation_method_key ===
+                                                                      'tkp' ? (
                                                                     <>
                                                                         TKP-Position
                                                                         · Brutto{' '}
@@ -5738,7 +5915,9 @@ export default function CalculationWizard({
                                                             </p>
                                                             <ul className="text-muted-foreground mt-2 list-inside list-disc">
                                                                 {(position.spot_method ===
-                                                                'tkp'
+                                                                    'tkp' ||
+                                                                position.spot_method ===
+                                                                    'free_position'
                                                                     ? []
                                                                     : position
                                                                             .time_ranges
@@ -5876,9 +6055,22 @@ export default function CalculationWizard({
                                                                     )}
                                                                 </p>
                                                                 <p className="text-muted-foreground mt-1">
-                                                                    {isTkpPosition(
+                                                                    {isFreePosition(
                                                                         position,
                                                                     ) ? (
+                                                                        <>
+                                                                            Freie
+                                                                            Preisposition
+                                                                            {result?.media_gross
+                                                                                ? ` · Preis ${money(result.media_gross)}`
+                                                                                : ''}
+                                                                            {result?.nn_invest
+                                                                                ? ` · N/N ${money(result.nn_invest)}`
+                                                                                : ''}
+                                                                        </>
+                                                                    ) : isTkpPosition(
+                                                                          position,
+                                                                      ) ? (
                                                                         <>
                                                                             Methode
                                                                             TKP

@@ -35,6 +35,7 @@ use App\Services\Calculation\BudgetProposalFingerprint;
 use App\Services\Calculation\BudgetSpotProposalService;
 use App\Services\Calculation\CalculationWriter;
 use App\Services\Calculation\Decimal;
+use App\Services\Calculation\FreePosition\FreePositionWriterPositionResolver;
 use App\Services\Calculation\OaTkp\OaTkpPricingMetadataService;
 use App\Services\Calculation\OaTkp\OaTkpWriterPositionResolver;
 use App\Services\DispoOrder\DispoOrderRevisionContext;
@@ -396,17 +397,18 @@ class CalculationController extends Controller
         $oaReloadByPositionId = [];
         $hasStoredOaTkp = $calculation !== null
             && $calculation->positions->contains(
-                fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position),
+                fn (CalculationPosition $position): bool => OaTkpWriterPositionResolver::isStoredOaTkp($position)
+                    || FreePositionWriterPositionResolver::isStored($position),
             );
-        // Nur bei OA-Positionen: vermeidet unnötigen Reload-Pfad und bricht Spot/DF-3-Edit nicht.
+        // Nur bei OA-/Free-Positionen: vermeidet unnötigen Reload-Pfad und bricht Spot/DF-3-Edit nicht.
         if ($hasStoredOaTkp) {
             foreach ($this->writer->payloadFromCalculation($calculation)['positions'] ?? [] as $reloadPosition) {
                 if (! is_array($reloadPosition) || ! isset($reloadPosition['id'])) {
                     continue;
                 }
-                if (! OaTkpWriterPositionResolver::isStoredOaTkp(
-                    $calculation->positions->firstWhere('id', (int) $reloadPosition['id']),
-                )) {
+                $storedPosition = $calculation->positions->firstWhere('id', (int) $reloadPosition['id']);
+                if (! OaTkpWriterPositionResolver::isStoredOaTkp($storedPosition)
+                    && ! FreePositionWriterPositionResolver::isStored($storedPosition)) {
                     continue;
                 }
                 $oaReloadByPositionId[(int) $reloadPosition['id']] = $reloadPosition;
@@ -863,6 +865,14 @@ class CalculationController extends Controller
                             ? ['period_open' => true]
                             : $this->dynamicFields->positionValuesForPayload($position, $snapshot),
                     ];
+
+                    if (FreePositionWriterPositionResolver::isStored($position)) {
+                        // NATIVE-3: Reload-Preis aus payloadFromCalculation (free_price = media_gross).
+                        return array_merge($base, [
+                            'engine_profile_key' => $oaReload['engine_profile_key'] ?? $position->engine_profile_key,
+                            'free_price' => $oaReload['free_price'] ?? null,
+                        ]);
+                    }
 
                     if (! $isOa) {
                         return $base;

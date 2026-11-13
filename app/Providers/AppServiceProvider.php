@@ -11,6 +11,7 @@ use App\Policies\CalculationPolicy;
 use App\Policies\DispoOrderPolicy;
 use App\Policies\StandardOfferPolicy;
 use App\Services\OnlineAudio\Import\OaTkpPriceListYearLock;
+use App\Support\Calculation\EngineProfileRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -37,6 +38,21 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureAuthorization();
+        $this->configureE2EFreePositionPairFake();
+    }
+
+    /**
+     * NATIVE-3: Test-only Registry-Fake für den isolierten Browser-Smoke.
+     * Dreifach geschützt (testing + E2E_SERVER + explizites Flag); Produktion bleibt planned.
+     */
+    protected function configureE2EFreePositionPairFake(): void
+    {
+        if (app()->environment('testing')
+            && (bool) config('app.e2e_server')
+            && (bool) config('app.e2e_free_position_pair_released')
+        ) {
+            EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
+        }
     }
 
     /**
