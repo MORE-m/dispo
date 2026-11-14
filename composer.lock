@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "40f9075261a4a6cf2c4aa51b8f837e0b",
+    "content-hash": "877a1e549928b45e34e925c53dc9d3a6",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -1969,16 +1969,16 @@
         },
         {
             "name": "laravel/wayfinder",
-            "version": "v0.1.21",
+            "version": "v0.1.23",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/wayfinder.git",
-                "reference": "a85a996cea189f59cac14854f8b13319a29007f3"
+                "reference": "e7b0914d194201e54ba320ef38137b47a7daca98"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/wayfinder/zipball/a85a996cea189f59cac14854f8b13319a29007f3",
-                "reference": "a85a996cea189f59cac14854f8b13319a29007f3",
+                "url": "https://api.github.com/repos/laravel/wayfinder/zipball/e7b0914d194201e54ba320ef38137b47a7daca98",
+                "reference": "e7b0914d194201e54ba320ef38137b47a7daca98",
                 "shasum": ""
             },
             "require": {
@@ -2031,7 +2031,7 @@
                 "issues": "https://github.com/laravel/wayfinder/issues",
                 "source": "https://github.com/laravel/wayfinder"
             },
-            "time": "2026-08-04T21:55:43+00:00"
+            "time": "2026-10-16T14:24:32+00:00"
         },
         {
             "name": "league/commonmark",
@@ -3729,16 +3729,16 @@
         },
         {
             "name": "phpstan/phpdoc-parser",
-            "version": "2.3.6",
+            "version": "2.4.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpdoc-parser.git",
-                "reference": "1427af4647235b4a73b13940b1f1258d3584f36e"
+                "reference": "af8e840551031d254cfdb3a18a62c3470a309c10"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/1427af4647235b4a73b13940b1f1258d3584f36e",
-                "reference": "1427af4647235b4a73b13940b1f1258d3584f36e",
+                "url": "https://api.github.com/repos/phpstan/phpdoc-parser/zipball/af8e840551031d254cfdb3a18a62c3470a309c10",
+                "reference": "af8e840551031d254cfdb3a18a62c3470a309c10",
                 "shasum": ""
             },
             "require": {
@@ -3770,9 +3770,9 @@
             "description": "PHPDoc parser with support for nullable, intersection and generic types",
             "support": {
                 "issues": "https://github.com/phpstan/phpdoc-parser/issues",
-                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.3.6"
+                "source": "https://github.com/phpstan/phpdoc-parser/tree/2.4.1"
             },
-            "time": "2026-09-27T20:07:45+00:00"
+            "time": "2026-10-30T19:36:28+00:00"
         },
         {
             "name": "pragmarx/google2fa",
