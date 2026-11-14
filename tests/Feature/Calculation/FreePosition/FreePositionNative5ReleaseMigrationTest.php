@@ -65,7 +65,7 @@ class FreePositionNative5ReleaseMigrationTest extends TestCase
         $this->assertTrue($rule->is_active);
         $this->assertSame('redaktion', $rule->planning_responsibility_key);
         $this->assertSame('Online Audio (UA)', $rule->booking_code);
-        $this->assertSame(30, (int) $rule->default_length_seconds);
+        $this->assertNull($rule->default_length_seconds);
 
         $this->assertHistoricalRulesUnchanged($snapshots);
         $this->assertFalse($this->moreOaRuleQuery($native)->exists());

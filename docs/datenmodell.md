@@ -357,7 +357,9 @@ Unterobjekte werden typbezogen normalisiert:
   `free_position` = **released** (`versions.v1=released`,
   `current_released_version=v1`). Datenmigration (Schema = NEIN): Native-Ad
   `kind=free_position`, Override, Assignment Profil `free_position`; Podcast-
-  Rule `inv_more_kombi_podcast×native_ad`; MORE-Kombi Online Audio × Native-Ad
+  Rule `inv_more_kombi_podcast×native_ad` mit
+  `default_length_seconds=NULL` (keine fachliche/preisbildende Länge;
+  Position persistiert `length_seconds=0`); MORE-Kombi Online Audio × Native-Ad
   OUT. Native-Ad ist Free-Position-buchbar, bleibt aber OUT aus OA-TKP
   (CoreMedia/Resolver/Import/Completeness/Targeting/Platform). Operativer
   DB-Stand auf `dispo_mat_core` erst nach Merge + Migration.

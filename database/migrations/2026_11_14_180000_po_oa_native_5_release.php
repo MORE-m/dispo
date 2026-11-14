@@ -219,6 +219,7 @@ return new class extends Migration
             $row = $existing->first();
             if (! (bool) $row->is_active
                 || (string) $row->planning_responsibility_key !== self::PLANNING_KEY
+                || $row->default_length_seconds !== null
             ) {
                 throw new RuntimeException(
                     'NATIVE-5: bestehende Podcast×native_ad Rule weicht vom Release-Initialzustand ab.',
@@ -237,7 +238,7 @@ return new class extends Migration
             'planning_responsibility_key' => self::PLANNING_KEY,
             'hint_text' => null,
             'sort' => 0,
-            'default_length_seconds' => 30,
+            'default_length_seconds' => null,
             'surcharge_percent' => 0,
             'is_discountable' => true,
             'is_ae_eligible' => true,
@@ -328,7 +329,7 @@ return new class extends Migration
         $exactlyRelease = (bool) $row->is_active
             && (string) $row->planning_responsibility_key === self::PLANNING_KEY
             && (string) $row->booking_code === self::BOOKING_CODE
-            && (int) $row->default_length_seconds === 30
+            && $row->default_length_seconds === null
             && (bool) $row->is_discountable
             && (bool) $row->is_ae_eligible;
 

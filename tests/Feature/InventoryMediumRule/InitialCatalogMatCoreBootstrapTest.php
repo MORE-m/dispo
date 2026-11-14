@@ -11,6 +11,7 @@ use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\Inventory;
+use App\Models\InventoryMediumRule;
 use App\Models\Organization;
 use App\Services\InventoryMediumRule\Catalog\InitialCatalogBootstrapper;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
@@ -124,6 +125,14 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
         $this->assertSame(CalculationKind::FreePosition, $native->kind);
         $this->assertSame(CalculationMethodMode::Override, $native->calculation_method_mode);
+        $podcast = Inventory::query()->where('code', 'inv_more_kombi_podcast')->firstOrFail();
+        $podcastRule = InventoryMediumRule::query()
+            ->where('inventory_id', $podcast->id)
+            ->where('advertising_medium_id', $native->id)
+            ->firstOrFail();
+        $this->assertTrue($podcastRule->is_active);
+        $this->assertSame('redaktion', $podcastRule->planning_responsibility_key);
+        $this->assertNull($podcastRule->default_length_seconds);
         $this->assertSame(
             CalculationMethodMode::Inherit,
             AdvertisingMedium::query()->where('code', 'trailer_station_voice')->firstOrFail()->calculation_method_mode,

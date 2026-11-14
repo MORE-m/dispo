@@ -242,6 +242,14 @@ test.describe('NATIVE-5 Free-Position Release Browser Smoke', () => {
         expect(fixture.inventories.more_oa.has_native_rule).toBe(false);
         expect(fixture.inventories.more_oa.bookable).toBe(false);
 
+        // Podcast×Native-Ad längenneutral; Position später length_seconds=0.
+        expect(
+            sqliteScalar(
+                `select default_length_seconds from inventory_medium_rules where advertising_medium_id=? and inventory_id=?`,
+                [fixture.medium.id, fixture.inventories.podcast.id],
+            ),
+        ).toBe('');
+
         // DB-Gegenprobe: genau 5 aktive Native-Ad-Rules, keine MORE-OA-Rule.
         expect(
             Number(

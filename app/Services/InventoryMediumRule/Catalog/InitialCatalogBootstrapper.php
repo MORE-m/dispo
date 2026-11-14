@@ -251,7 +251,10 @@ final class InitialCatalogBootstrapper
 
         if ($podcastRules->count() === 1) {
             $rule = $podcastRules->first();
-            if (! $rule->is_active || (string) $rule->planning_responsibility_key !== 'redaktion') {
+            if (! $rule->is_active
+                || (string) $rule->planning_responsibility_key !== 'redaktion'
+                || $rule->default_length_seconds !== null
+            ) {
                 throw new RuntimeException(
                     'NATIVE-5: bestehende Podcast×native_ad Rule weicht vom Release-Initialzustand ab.',
                 );
@@ -265,7 +268,7 @@ final class InitialCatalogBootstrapper
                 'planning_responsibility_key' => 'redaktion',
                 'hint_text' => null,
                 'sort' => 0,
-                'default_length_seconds' => 30,
+                'default_length_seconds' => null,
                 'surcharge_percent' => '0.0000',
                 'is_discountable' => true,
                 'is_ae_eligible' => true,

@@ -107,6 +107,7 @@ class FreePositionNative5CatalogReleaseTest extends TestCase
             ->firstOrFail();
         $this->assertTrue($rule->is_active);
         $this->assertSame('redaktion', $rule->planning_responsibility_key);
+        $this->assertNull($rule->default_length_seconds);
 
         $this->actingAs($ctx['user'])
             ->post(route('calculations.store'), $this->payload([
@@ -119,6 +120,7 @@ class FreePositionNative5CatalogReleaseTest extends TestCase
         $this->assertSame('free_position', $position->engine_profile_key);
         $this->assertSame('v1', $position->algorithm_version);
         $this->assertSame('2500.00', (string) $position->media_gross);
+        $this->assertSame(0, (int) $position->length_seconds);
         $this->assertSame('redaktion', $position->planning_responsibility_key);
     }
 
