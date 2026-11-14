@@ -30,7 +30,7 @@ class FreePositionFoundationTest extends TestCase
     }
 
     #[Test]
-    public function registry_knows_planned_free_position_pair_with_implemented_v1(): void
+    public function registry_knows_released_free_position_pair_v1(): void
     {
         $this->assertTrue(EngineProfileRegistry::hasProfile(EngineProfileRegistry::PROFILE_FREE_POSITION));
         $this->assertTrue(EngineProfileRegistry::hasMethodForProfile(
@@ -39,18 +39,18 @@ class FreePositionFoundationTest extends TestCase
         ));
 
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus(
                 EngineProfileRegistry::PROFILE_FREE_POSITION,
                 'free_position',
             ),
         );
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion(
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion(
             EngineProfileRegistry::PROFILE_FREE_POSITION,
             'free_position',
         ));
         $this->assertSame(
-            EngineCapabilityStatus::Implemented,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::statusForVersion(
                 EngineProfileRegistry::PROFILE_FREE_POSITION,
                 'free_position',
@@ -78,13 +78,13 @@ class FreePositionFoundationTest extends TestCase
     }
 
     #[Test]
-    public function pairs_for_method_key_lists_planned_free_position_only(): void
+    public function pairs_for_method_key_lists_released_free_position_only(): void
     {
         $pairs = EngineProfileRegistry::pairsForMethodKey('free_position');
         $this->assertCount(1, $pairs);
         $this->assertSame('free_position', $pairs[0]['engine_profile_key']);
-        $this->assertSame('planned', $pairs[0]['pair_status']);
-        $this->assertNull($pairs[0]['current_released_version']);
+        $this->assertSame('released', $pairs[0]['pair_status']);
+        $this->assertSame('v1', $pairs[0]['current_released_version']);
     }
 
     #[Test]

@@ -114,16 +114,19 @@ class FreePositionWriterPositionResolverTest extends TestCase
     }
 
     #[Test]
-    public function registry_fake_is_test_only_scoped_and_leaves_catalog_planned(): void
+    public function registry_catalog_is_released_and_fake_remains_test_only_scoped(): void
     {
         $profile = EngineProfileRegistry::PROFILE_FREE_POSITION;
-        $this->assertFalse(FreePositionHttpReleaseGuard::pairIsReleased());
-        $this->assertSame(EngineCapabilityStatus::Planned, EngineProfileRegistry::pairStatus($profile, 'free_position'));
+        $this->assertTrue(FreePositionHttpReleaseGuard::pairIsReleased());
+        $this->assertSame(EngineCapabilityStatus::Released, EngineProfileRegistry::pairStatus($profile, 'free_position'));
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion($profile, 'free_position'));
 
         EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
         $this->assertTrue(FreePositionHttpReleaseGuard::pairIsReleased());
-        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion($profile, 'free_position'));
-        $this->assertSame(EngineCapabilityStatus::Released, EngineProfileRegistry::statusForVersion($profile, 'free_position', 'v1'));
+        $this->assertSame(
+            EngineCapabilityStatus::Released,
+            EngineProfileRegistry::statusForVersion($profile, 'free_position', 'v1'),
+        );
         // Andere Paare bleiben unberührt.
         $this->assertSame(
             EngineCapabilityStatus::Planned,
@@ -131,34 +134,20 @@ class FreePositionWriterPositionResolverTest extends TestCase
         );
 
         EngineProfileRegistry::clearFreePositionPairFakeForTests();
-        $this->assertFalse(FreePositionHttpReleaseGuard::pairIsReleased());
-        $this->assertNull(EngineProfileRegistry::currentReleasedVersion($profile, 'free_position'));
+        $this->assertTrue(FreePositionHttpReleaseGuard::pairIsReleased());
+        $this->assertSame('v1', EngineProfileRegistry::currentReleasedVersion($profile, 'free_position'));
     }
 
     #[Test]
-    public function http_guard_blocks_payload_signal_until_release_and_budget_guard_always_blocks(): void
+    public function http_guard_allows_released_free_payload_and_budget_guard_always_blocks(): void
     {
         $payload = ['positions' => [['calculation_method_key' => 'free_position']]];
 
-        try {
-            FreePositionHttpReleaseGuard::assertPreviewAllowed($payload);
-            $this->fail('Preview ohne Release muss blockiert sein.');
-        } catch (ValidationException $exception) {
-            $this->assertSame(FreePositionHttpReleaseGuard::MESSAGE, $exception->errors()['positions'][0]);
-        }
-        try {
-            FreePositionHttpReleaseGuard::assertMutationAllowed($payload);
-            $this->fail('Mutation ohne Release muss blockiert sein.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions', $exception->errors());
-        }
+        FreePositionHttpReleaseGuard::assertPreviewAllowed($payload);
+        FreePositionHttpReleaseGuard::assertMutationAllowed($payload);
 
         // Nicht-Free-Payload bleibt unberührt.
         FreePositionHttpReleaseGuard::assertPreviewAllowed(['positions' => [['spot_method' => 'average']]]);
-
-        EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
-        FreePositionHttpReleaseGuard::assertPreviewAllowed($payload);
-        FreePositionHttpReleaseGuard::assertMutationAllowed($payload);
 
         // Budget bleibt auch bei Release fail-closed.
         $this->expectException(ValidationException::class);

@@ -16,7 +16,7 @@ use Tests\TestCase;
 /**
  * NATIVE-2: HTTP Preview/Create/Update/Reload für Free-Position über reguläre Controller.
  *
- * Produktiv ist das Pair planned (HTTP blockiert); Release wird nur über den Registry-Test-Fake simuliert.
+ * Nach NATIVE-5 ist free_position×free_position released/v1; Fake bleibt optional.
  */
 class FreePositionHttpCreateUpdateTest extends TestCase
 {
@@ -30,63 +30,29 @@ class FreePositionHttpCreateUpdateTest extends TestCase
     }
 
     #[Test]
-    public function without_fake_preview_store_and_update_are_blocked(): void
+    public function without_fake_preview_store_and_update_are_allowed_after_release(): void
     {
         $ctx = $this->seedFreeContext();
 
-        $this->assertFalse(FreePositionHttpReleaseGuard::pairIsReleased());
+        $this->assertTrue(FreePositionHttpReleaseGuard::pairIsReleased());
 
         $this->actingAs($ctx['user'])
             ->postJson(route('calculations.preview'), $this->payload([$this->freePosition($ctx)]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
+            ->assertOk();
 
-        $this->actingAs($ctx['user'])
-            ->postJson(route('calculations.store'), $this->payload([$this->freePosition($ctx)]))
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
-        $this->assertSame(0, Calculation::query()->count());
-
-        // Bestand mit Free bleibt auch bei Update/Preview gesperrt, sobald das Pair nicht released ist.
-        EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
         $this->actingAs($ctx['user'])
             ->post(route('calculations.store'), $this->payload([$this->freePosition($ctx)]))
             ->assertRedirect();
         $calculation = Calculation::query()->firstOrFail();
-        EngineProfileRegistry::clearFreePositionPairFakeForTests();
 
         $update = $this->httpUpdatePayload($calculation);
         $update['positions'][0]['free_price'] = '7000';
         $this->actingAs($ctx['user'])
-            ->putJson(route('calculations.update', $calculation), $update)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
-
-        // Auch ein Header-only-Update (ohne positions) trifft den Bestands-Guard.
-        $this->actingAs($ctx['user'])
-            ->putJson(route('calculations.update', $calculation), [
-                'lock_version' => $calculation->lock_version,
-                'schema_fingerprint' => $this->httpUpdatePayload($calculation)['schema_fingerprint'],
-                'planning_mode' => 'manual',
-                'order_discount_percent' => '0',
-                'campaign' => 'Neu',
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
-
-        $this->actingAs($ctx['user'])
-            ->postJson(route('calculations.preview'), [
-                'calculation_id' => $calculation->id,
-                'planning_mode' => 'manual',
-                'order_discount_percent' => '0',
-                'positions' => [],
-            ])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['positions']);
+            ->put(route('calculations.update', $calculation), $update)
+            ->assertRedirect();
 
         $fresh = $calculation->fresh();
-        $this->assertSame(1, (int) $fresh->lock_version);
-        $this->assertSame('5000.00', (string) $fresh->positions->firstOrFail()->media_gross);
+        $this->assertSame('7000.00', (string) $fresh->positions->firstOrFail()->media_gross);
     }
 
     #[Test]

@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 /**
  * NATIVE-4: Freie Preisposition in Dispo-Create/-Show (isoliert, Port 8080).
- * Pair bleibt im Registry-CATALOG planned; der E2E-Server simuliert den Release nur per Test-Fake.
+ * Nach NATIVE-5 ist free_position×free_position released/v1 (kein Fake).
  * Fixture-JSON schreibt E2EFreePositionNative3Seeder (geteilt mit NATIVE-3).
  */
 const root = path.resolve(
@@ -19,7 +19,11 @@ const e2eDb = path.join(root, 'database/e2e-po-free-position-native-4.sqlite');
 type Fixture = {
     inventory: { id: number; code: string; name: string };
     medium: { id: number; code: string; name: string };
-    registry: { catalog_pair_status: string; e2e_fake_released: boolean };
+    registry: {
+        catalog_pair_status: string;
+        current_released_version: string;
+        e2e_fake_released: boolean;
+    };
 };
 
 function loadFixture(): Fixture {
@@ -158,12 +162,13 @@ function dispoCol(orderId: number, column: string): string {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('NATIVE-4 Free-Position Dispo Browser Smoke', () => {
-    test('E2E-1 Isolation und Registry-Pair bleibt planned', async () => {
+    test('E2E-1 Isolation und Registry-Pair ist released/v1', async () => {
         expect(e2eDb.includes('dispo_mat_core')).toBe(false);
         expect(process.env.DB_DATABASE ?? '').not.toBe('dispo_mat_core');
 
         const fixture = loadFixture();
-        expect(fixture.registry.catalog_pair_status).toBe('planned');
+        expect(fixture.registry.catalog_pair_status).toBe('released');
+        expect(fixture.registry.current_released_version).toBe('v1');
     });
 
     test('E2E-2 Free speichern → Dispo-Create zeigt Freie Preisposition → Übernahme → Show', async ({

@@ -23,7 +23,7 @@ use Tests\TestCase;
 /**
  * NATIVE-2: Free-Position im CalculationWriter (Preview, Persistenz, Reload, Mixed).
  *
- * Pair bleibt im CATALOG planned; Release wird nur über den Test-Fake simuliert.
+ * Nach NATIVE-5 ist free_position×free_position released/v1; Fake bleibt optional.
  */
 class FreePositionWriterIntegrationTest extends TestCase
 {
@@ -37,14 +37,8 @@ class FreePositionWriterIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function catalog_pair_stays_planned_and_fake_is_isolated(): void
+    public function catalog_pair_is_released_and_fake_is_isolated(): void
     {
-        $this->assertSame(
-            EngineCapabilityStatus::Planned,
-            EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position'),
-        );
-
-        EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
         $this->assertSame(
             EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position'),
@@ -53,6 +47,12 @@ class FreePositionWriterIntegrationTest extends TestCase
             EngineProfileRegistry::PROFILE_FREE_POSITION,
             'free_position',
         ));
+
+        EngineProfileRegistry::fakeFreePositionPairReleasedForTests();
+        $this->assertSame(
+            EngineCapabilityStatus::Released,
+            EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position'),
+        );
         // OA-Paar unverändert
         $this->assertSame(
             EngineCapabilityStatus::Released,
@@ -61,26 +61,22 @@ class FreePositionWriterIntegrationTest extends TestCase
 
         EngineProfileRegistry::clearFreePositionPairFakeForTests();
         $this->assertSame(
-            EngineCapabilityStatus::Planned,
+            EngineCapabilityStatus::Released,
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position'),
         );
     }
 
     #[Test]
-    public function writer_without_registry_release_fails_closed(): void
+    public function writer_with_catalog_release_allows_preview_and_create(): void
     {
         $ctx = $this->seedFreeContext();
         $writer = app(CalculationWriter::class);
 
-        try {
-            $writer->preview($this->payload([$this->freePosition($ctx)]), $ctx['user']);
-            $this->fail('Preview ohne Registry-Release muss fehlschlagen.');
-        } catch (ValidationException $exception) {
-            $this->assertArrayHasKey('positions.0', $exception->errors());
-        }
+        $preview = $writer->preview($this->payload([$this->freePosition($ctx)]), $ctx['user']);
+        $this->assertSame('5000.00', $preview->positions[0]->mediaGross);
 
-        $this->expectException(ValidationException::class);
-        $writer->create($this->payload([$this->freePosition($ctx)]), $ctx['user']);
+        $calculation = $writer->create($this->payload([$this->freePosition($ctx)]), $ctx['user']);
+        $this->assertSame('free_position', $calculation->positions->firstOrFail()->calculation_method_key);
     }
 
     #[Test]

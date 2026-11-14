@@ -13,7 +13,7 @@ use Tests\TestCase;
 
 /**
  * NATIVE-3: Wizard-Props (Edit) müssen für gespeicherte Free-Positionen `free_price` liefern,
- * sonst scheitert die Reload-Hydration im Frontend. Release nur über Registry-Test-Fake.
+ * sonst scheitert die Reload-Hydration im Frontend. Pair ist nach NATIVE-5 released/v1.
  */
 class FreePositionWizardPropsTest extends TestCase
 {
@@ -58,8 +58,8 @@ class FreePositionWizardPropsTest extends TestCase
     }
 
     #[Test]
-    public function pair_stays_planned_without_test_fake(): void
+    public function pair_is_released_without_test_fake(): void
     {
-        $this->assertFalse(FreePositionHttpReleaseGuard::pairIsReleased());
+        $this->assertTrue(FreePositionHttpReleaseGuard::pairIsReleased());
     }
 }

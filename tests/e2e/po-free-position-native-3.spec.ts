@@ -19,7 +19,11 @@ const e2eDb = path.join(root, 'database/e2e-po-free-position-native-3.sqlite');
 type Fixture = {
     inventory: { id: number; code: string; name: string };
     medium: { id: number; code: string; name: string };
-    registry: { catalog_pair_status: string; e2e_fake_released: boolean };
+    registry: {
+        catalog_pair_status: string;
+        current_released_version: string;
+        e2e_fake_released: boolean;
+    };
 };
 
 function loadFixture(): Fixture {
@@ -180,8 +184,9 @@ test.describe('NATIVE-3 Free-Position Wizard Browser Smoke', () => {
         expect(process.env.DB_DATABASE ?? '').not.toBe('dispo_mat_core');
 
         const fixture = loadFixture();
-        // CATALOG bleibt planned; nur der E2E-Server-Fake macht das Pair buchbar.
-        expect(fixture.registry.catalog_pair_status).toBe('planned');
+        // NATIVE-5: CATALOG free_position×free_position = released/v1 (kein Fake).
+        expect(fixture.registry.catalog_pair_status).toBe('released');
+        expect(fixture.registry.current_released_version).toBe('v1');
 
         await startFreePosition(page, 'NATIVE-3 Editor GmbH');
 

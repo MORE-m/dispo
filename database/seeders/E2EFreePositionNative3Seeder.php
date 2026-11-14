@@ -2,13 +2,9 @@
 
 namespace Database\Seeders;
 
-use App\Enums\CalculationKind;
-use App\Enums\CalculationMethodMode;
 use App\Enums\EngineCapabilityStatus;
 use App\Enums\Role;
 use App\Models\AdvertisingMedium;
-use App\Models\AdvertisingMediumCalculationMethod;
-use App\Models\CalculationMethod;
 use App\Models\Inventory;
 use App\Models\InventoryMediumRule;
 use App\Models\User;
@@ -20,11 +16,10 @@ use ReflectionClassConstant;
 use RuntimeException;
 
 /**
- * E2E-Seeder NATIVE-3 Free-Position-Smoke (isolierte SQLite, eigener Port).
+ * E2E-Seeder NATIVE-3/4 Free-Position-Smoke (isolierte SQLite, eigener Port).
  *
- * `native_ad` wird wie in CreatesFreePositionCatalog für free_position konfiguriert.
- * Das Release des Pairs simuliert ausschließlich der Test-Fake im E2E-Server
- * (E2E_FREE_POSITION_PAIR_RELEASED=1); der Registry-CATALOG bleibt planned.
+ * Nach NATIVE-5 setzt InitialCatalogMatCoreSeeder Native-Ad bereits auf free_position
+ * (released/v1). Kein Registry-Fake mehr nötig; Isolation gegen dispo_mat_core bleibt.
  */
 class E2EFreePositionNative3Seeder extends Seeder
 {
@@ -43,12 +38,18 @@ class E2EFreePositionNative3Seeder extends Seeder
             );
         }
 
-        // Produktiver Katalog muss planned bleiben (der Fake wirkt nur als Test-Override).
         $catalog = (new ReflectionClassConstant(EngineProfileRegistry::class, 'CATALOG'))->getValue();
         $catalogPair = $catalog[EngineProfileRegistry::PROFILE_FREE_POSITION]['free_position'] ?? null;
-        if ($catalogPair === null || $catalogPair['pair_status'] !== EngineCapabilityStatus::Planned) {
+        if ($catalogPair === null || $catalogPair['pair_status'] !== EngineCapabilityStatus::Released) {
             throw new RuntimeException(
-                'E2E Free-Position-Smoke Abbruch: Registry-CATALOG free_position×free_position ist nicht planned.',
+                'E2E Free-Position-Smoke Abbruch: Registry-CATALOG free_position×free_position ist nicht released.',
+            );
+        }
+        if (($catalogPair['current_released_version'] ?? null) !== 'v1'
+            || ($catalogPair['versions']['v1'] ?? null) !== EngineCapabilityStatus::Released
+        ) {
+            throw new RuntimeException(
+                'E2E Free-Position-Smoke Abbruch: Registry free_position×free_position ist nicht released/v1.',
             );
         }
 
@@ -68,31 +69,9 @@ class E2EFreePositionNative3Seeder extends Seeder
 
         $this->call(InitialCatalogMatCoreSeeder::class);
 
-        $method = CalculationMethod::query()->where('key', 'free_position')->firstOrFail();
         $medium = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
 
-        $medium->kind = CalculationKind::FreePosition;
-        $medium->calculation_method_mode = CalculationMethodMode::Override;
-        $medium->default_calculation_method_id = (int) $method->id;
-        $medium->is_discountable = true;
-        $medium->is_ae_eligible = true;
-        $medium->save();
-
-        AdvertisingMediumCalculationMethod::query()
-            ->where('advertising_medium_id', $medium->id)
-            ->delete();
-
-        $assignment = new AdvertisingMediumCalculationMethod;
-        $assignment->advertising_medium_id = $medium->id;
-        $assignment->calculation_method_id = (int) $method->id;
-        $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_FREE_POSITION;
-        $assignment->is_active = true;
-        $assignment->sort = 10;
-        $assignment->lock_version = 1;
-        $assignment->save();
-
-        // Deterministischer Start: nur das Free-Medium ist im isolierten Katalog aktiv, damit der
-        // Wizard (firstValidPosition) direkt mit Free-Sender × native_ad startet.
+        // Deterministischer Start: nur das Free-Medium ist im isolierten Katalog aktiv.
         AdvertisingMedium::query()
             ->where('id', '!=', $medium->id)
             ->update(['is_active' => false]);
@@ -124,6 +103,7 @@ class E2EFreePositionNative3Seeder extends Seeder
                 ],
                 'registry' => [
                     'catalog_pair_status' => $catalogPair['pair_status']->value,
+                    'current_released_version' => $catalogPair['current_released_version'],
                     'e2e_fake_released' => (bool) config('app.e2e_free_position_pair_released'),
                 ],
             ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR),

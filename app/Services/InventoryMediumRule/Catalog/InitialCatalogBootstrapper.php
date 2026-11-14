@@ -4,6 +4,7 @@ namespace App\Services\InventoryMediumRule\Catalog;
 
 use App\Enums\CalculationKind;
 use App\Enums\CalculationMethodMode;
+use App\Enums\ComponentCalculationStrategy;
 use App\Enums\InventoryType;
 use App\Enums\SpotComponentProfile;
 use App\Models\AdvertisingCategory;
@@ -12,6 +13,7 @@ use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\CalculationMethod;
 use App\Models\Inventory;
+use App\Models\InventoryMediumRule;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
 use App\Support\Calculation\EngineProfileRegistry;
 use App\Support\Inventory\InventoryCodeValidator;
@@ -80,6 +82,7 @@ final class InitialCatalogBootstrapper
 
             $this->ensureSwfTrailerCategoryMethod($categoryIds);
             $this->ensureOnlineAudioTkpCoreMediumOverrides();
+            $this->ensureNativeAdFreePositionRelease();
             $this->ensureAllongeMediumOverride();
             $this->ensurePromoMediumOverride();
             $this->ensureContestMediumOverride();
@@ -134,6 +137,152 @@ final class InitialCatalogBootstrapper
             if ($nativeTkp) {
                 throw new RuntimeException(
                     'PO-CALC-TKP-1A: native_ad darf keine tkp-Medium-Zuordnung haben.',
+                );
+            }
+        }
+    }
+
+    /**
+     * NATIVE-5: Native-Ad als Free Position v1 (Override free_position×free_position) + Podcast-Rule.
+     * Idempotent; fail-closed. Keine Rule für MORE-Kombi Online Audio.
+     * Vier historische Native-Ad-Rules werden hier nicht angelegt (Matrix/Operativdaten).
+     */
+    private function ensureNativeAdFreePositionRelease(): void
+    {
+        $method = CalculationMethod::query()->where('key', 'free_position')->first();
+        if ($method === null) {
+            throw new RuntimeException(
+                'NATIVE-5: Berechnungsmethode „free_position“ fehlt für den Initialkatalog-Bootstrap.',
+            );
+        }
+        $methodId = (int) $method->id;
+
+        $native = AdvertisingMedium::query()->where('code', 'native_ad')->lockForUpdate()->first();
+        if ($native === null) {
+            return;
+        }
+
+        $categoryKey = AdvertisingCategory::query()->whereKey($native->category_id)->value('key');
+        if ($categoryKey !== CanonicalAdvertisingCategories::ONLINE_AUDIO) {
+            throw new RuntimeException('NATIVE-5: native_ad muss Kategorie online_audio haben.');
+        }
+
+        $assignments = AdvertisingMediumCalculationMethod::query()
+            ->where('advertising_medium_id', $native->id)
+            ->get();
+
+        $freeRows = $assignments->filter(
+            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id === $methodId,
+        );
+
+        if ($freeRows->count() > 1) {
+            throw new RuntimeException('NATIVE-5: native_ad hat mehrdeutige free_position-Zuordnungen.');
+        }
+
+        $foreignActive = $assignments->first(
+            fn (AdvertisingMediumCalculationMethod $row): bool => (int) $row->calculation_method_id !== $methodId
+                && $row->is_active,
+        );
+        if ($foreignActive !== null) {
+            throw new RuntimeException(
+                'NATIVE-5: native_ad hat widersprüchliches aktives Assignment (nicht free_position).',
+            );
+        }
+
+        if ($freeRows->count() === 1) {
+            $row = $freeRows->first();
+            if ((string) $row->engine_profile_key !== EngineProfileRegistry::PROFILE_FREE_POSITION
+                || ! $row->is_active
+                || (int) $row->sort !== 10
+                || $native->kind !== CalculationKind::FreePosition
+                || $native->calculation_method_mode !== CalculationMethodMode::Override
+                || (int) $native->default_calculation_method_id !== $methodId
+            ) {
+                throw new RuntimeException(
+                    'NATIVE-5: native_ad Free-Position-Vertrag weicht ab und wird nicht überschrieben.',
+                );
+            }
+        } else {
+            // Fresh: kind bereits free_position aus Definitions, noch Inherit ohne Assignment
+            // (wie SWF-Promo) oder historischer Pre-State kind=null/inherit.
+            $canInstallFresh = (
+                $native->kind === CalculationKind::FreePosition || $native->kind === null
+            )
+                && $native->calculation_method_mode === CalculationMethodMode::Inherit
+                && $native->default_calculation_method_id === null
+                && $assignments->isEmpty();
+
+            if (! $canInstallFresh) {
+                throw new RuntimeException(
+                    'NATIVE-5: native_ad weicht vom erwarteten Pre-State ab und wird nicht überschrieben.',
+                );
+            }
+
+            $native->kind = CalculationKind::FreePosition;
+            $native->calculation_method_mode = CalculationMethodMode::Override;
+            $native->default_calculation_method_id = $methodId;
+            $native->is_discountable = true;
+            $native->is_ae_eligible = true;
+            $native->save();
+
+            $assignment = new AdvertisingMediumCalculationMethod;
+            $assignment->advertising_medium_id = $native->id;
+            $assignment->calculation_method_id = $methodId;
+            $assignment->engine_profile_key = EngineProfileRegistry::PROFILE_FREE_POSITION;
+            $assignment->is_active = true;
+            $assignment->sort = 10;
+            $assignment->lock_version = 1;
+            $assignment->save();
+        }
+
+        $podcast = Inventory::query()->where('code', 'inv_more_kombi_podcast')->lockForUpdate()->first();
+        if ($podcast === null) {
+            throw new RuntimeException('NATIVE-5: Inventar inv_more_kombi_podcast fehlt.');
+        }
+
+        $podcastRules = InventoryMediumRule::query()
+            ->where('inventory_id', $podcast->id)
+            ->where('advertising_medium_id', $native->id)
+            ->get();
+
+        if ($podcastRules->count() > 1) {
+            throw new RuntimeException('NATIVE-5: doppelte Podcast×native_ad Rules.');
+        }
+
+        if ($podcastRules->count() === 1) {
+            $rule = $podcastRules->first();
+            if (! $rule->is_active || (string) $rule->planning_responsibility_key !== 'redaktion') {
+                throw new RuntimeException(
+                    'NATIVE-5: bestehende Podcast×native_ad Rule weicht vom Release-Initialzustand ab.',
+                );
+            }
+        } else {
+            InventoryMediumRule::query()->create([
+                'inventory_id' => $podcast->id,
+                'advertising_medium_id' => $native->id,
+                'is_active' => true,
+                'booking_code' => 'Online Audio (UA)',
+                'planning_responsibility_key' => 'redaktion',
+                'hint_text' => null,
+                'sort' => 0,
+                'default_length_seconds' => 30,
+                'surcharge_percent' => '0.0000',
+                'is_discountable' => true,
+                'is_ae_eligible' => true,
+                'component_calculation_strategy' => ComponentCalculationStrategy::SharedTotalLength,
+                'lock_version' => 1,
+            ]);
+        }
+
+        $moreOa = Inventory::query()->where('code', 'inv_more_kombi_online_audio')->value('id');
+        if ($moreOa !== null) {
+            $exists = InventoryMediumRule::query()
+                ->where('inventory_id', (int) $moreOa)
+                ->where('advertising_medium_id', $native->id)
+                ->exists();
+            if ($exists) {
+                throw new RuntimeException(
+                    'NATIVE-5: inv_more_kombi_online_audio × native_ad darf nicht existieren.',
                 );
             }
         }
@@ -607,6 +756,14 @@ final class InitialCatalogBootstrapper
             if ((int) $existing->default_calculation_method_id !== (int) $averageId) {
                 $mismatches[] = 'default_calculation_method_id Ist='.(string) $existing->default_calculation_method_id.' Soll=average';
             }
+        } elseif ($definition['code'] === 'native_ad') {
+            $freeId = CalculationMethod::query()->where('key', 'free_position')->value('id');
+            if ($existing->calculation_method_mode !== CalculationMethodMode::Override) {
+                $mismatches[] = 'calculation_method_mode Ist='.$existing->calculation_method_mode->value.' Soll=override';
+            }
+            if ((int) $existing->default_calculation_method_id !== (int) $freeId) {
+                $mismatches[] = 'default_calculation_method_id Ist='.(string) $existing->default_calculation_method_id.' Soll=free_position';
+            }
         } elseif (OaTkpCoreMedia::contains($definition['code'])) {
             $tkpId = CalculationMethod::query()->where('key', 'tkp')->value('id');
             if ($existing->calculation_method_mode !== CalculationMethodMode::Override) {
@@ -667,6 +824,18 @@ final class InitialCatalogBootstrapper
                     'promo_moderation' => 'Promo-Override fehlt oder weicht ab',
                     default => 'Contest-Override fehlt oder weicht ab',
                 };
+            }
+        } elseif ($definition['code'] === 'native_ad') {
+            $keys = AdvertisingMediumCalculationMethod::query()
+                ->where('advertising_medium_id', $existing->id)
+                ->where('engine_profile_key', EngineProfileRegistry::PROFILE_FREE_POSITION)
+                ->where('is_active', true)
+                ->with('calculationMethod')
+                ->get()
+                ->pluck('calculationMethod.key')
+                ->all();
+            if ($methodCount !== 1 || $keys !== ['free_position']) {
+                $mismatches[] = 'Native-Ad Free-Position-Override fehlt oder weicht ab';
             }
         } elseif (OaTkpCoreMedia::contains($definition['code'])) {
             $keys = AdvertisingMediumCalculationMethod::query()

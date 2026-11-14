@@ -48,3 +48,4 @@ yarn-error.log
 /.vscode
 /.zed
 /database/e2e-free-position-native-3.json
+/database/e2e-free-position-native-5-release.json

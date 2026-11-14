@@ -1,6 +1,20 @@
 # Fortschritt V1
 
-Stand: 13. November 2026 – **PO-OA-NATIVE-1 / NATIVE-4 Dispo/Freeze
+Stand: 14. November 2026 – **PO-OA-NATIVE-1 / NATIVE-5 implementiert
+(Free Position released/v1, Native-Ad Free-Position-Zuordnung, Podcast-Rule;
+operativer Release erst nach Merge + Post-Merge-CI + kontrollierter
+`dispo_mat_core`-Datenmigration abgeschlossen).** Registry
+`free_position×free_position` = **released/v1**. Datenmigration
+`2026_11_14_180000_po_oa_native_5_release.php` (Schema-Migration = NEIN):
+Native-Ad Override `free_position`, Assignment Profil `free_position`,
+Podcast-Rule `inv_more_kombi_podcast×native_ad` (active/`redaktion`);
+vier historische Rules unberührt; MORE-Kombi Online Audio × Native-Ad OUT.
+InitialCatalog/Bootstrapper denselben Vertrag. Buchbarkeit nur über
+`InventoryMediumRule`. OA-TKP-Preislisten unverändert (41/41); Native weiter
+nicht OA-TKP-fähig. Kein Fake im NATIVE-5-Smoke
+(`playwright.po-free-position-native-5.config.ts`, Port 8080). **Kein**
+`dispo_mat_core`-Write vor Merge, kein Deploy, kein Budget, keine
+Standardangebote. Zuvor: **PO-OA-NATIVE-1 / NATIVE-4 Dispo/Freeze
 implementiert (Free Position weiter planned/unreleased, Podcast OUT).**
 `DispoPositionMethodClassifier` kennt `KIND_FREE_POSITION` (AND-only:
 `engine_profile_key=free_position` ∧ `calculation_method_key=free_position` ∧

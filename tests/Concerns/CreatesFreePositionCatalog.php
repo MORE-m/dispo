@@ -27,8 +27,9 @@ use Database\Seeders\InitialCatalogMatCoreSeeder;
  *
  * `native_ad` wird im Test-DB explizit für den free_position-Pfad konfiguriert
  * (kind=free_position + Medium-Override-Zuordnung free_position × free_position).
- * Produktiv bleibt das Pair planned; Tests simulieren Release über
- * {@see EngineProfileRegistry::fakeFreePositionPairReleasedForTests()}.
+ * NATIVE-5: Das Pair free_position×free_position ist produktiv released/v1; der Fake
+ * {@see EngineProfileRegistry::fakeFreePositionPairReleasedForTests()} ist nur noch optional
+ * (idempotent) und für Happy-Paths nicht mehr nötig.
  */
 trait CreatesFreePositionCatalog
 {

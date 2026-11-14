@@ -28,7 +28,7 @@ use Tests\TestCase;
 /**
  * NATIVE-4: Free Position wird korrekt klassifiziert und in die Disposition eingefroren.
  *
- * Das Pair bleibt im CATALOG planned/unreleased; Release wird nur über den Test-Fake simuliert.
+ * Nach NATIVE-5 ist free_position×free_position released/v1; Fake bleibt optional.
  * Kein Medium-Code-Branching: Erkennung allein über das Freeze-Paar.
  */
 class FreePositionDispoIntegrationTest extends TestCase
@@ -106,18 +106,20 @@ class FreePositionDispoIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function pair_stays_planned_in_catalog_while_dispo_works_with_test_fake(): void
+    public function pair_is_released_in_catalog_and_dispo_works_without_fake(): void
     {
         $ctx = $this->releasedFreeContext();
         $calc = $this->createCalc($ctx, [$this->freePosition($ctx)]);
 
         EngineProfileRegistry::clearFreePositionPairFakeForTests();
 
-        // Ohne Release-Fake: Katalog planned. Dispo-Freeze nutzt den eingefrorenen v1-Descriptor
-        // (implemented) und braucht kein neues Release.
         $this->assertSame(
-            'planned',
+            'released',
             EngineProfileRegistry::pairStatus(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position')->value,
+        );
+        $this->assertSame(
+            'v1',
+            EngineProfileRegistry::currentReleasedVersion(EngineProfileRegistry::PROFILE_FREE_POSITION, 'free_position'),
         );
         $order = app(DispoOrderWriter::class)
             ->createFromCalculation($calc, [(int) $calc->positions->firstOrFail()->id], $ctx['user'])

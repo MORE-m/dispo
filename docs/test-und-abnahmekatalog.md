@@ -247,10 +247,14 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Create/Update/Reload mit Registry-Fake, ohne Fake blockiert, `free_price`
   Pflicht/ungültig/Fremdfeld, native_ad→free_position→persist;
   StandardOffer negativ) + Unit `FreePositionWriterPositionResolverTest`.
-  Registry-CATALOG bleibt planned. **V1 offen:** Native-Ad (UI/Dispo/
-  Release), Budget. **Future:** Plattform / OA-005/006.
-  **V2:** Standardangebote (PO-STD-V2). Historische Go/No-Go/OA004-DEC bleiben
-  Beleg. Dok: `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`,
+  Registry-CATALOG war planned bis NATIVE-5. **NATIVE-5 Release (14.11.2026):**
+  Registry `free_position×free_position` = released/v1; Datenmigration Native-Ad
+  Free-Position + Podcast-Rule; MORE-Kombi Online Audio OUT; Browser-Smoke
+  `po-free-position-native-5.spec.ts` (Port 8080, kein Fake); operativer
+  `dispo_mat_core`-Stand erst nach Merge + Migration. **V1 offen:** Budget.
+  **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2).
+  Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
+  `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-go-no-go-2026-11-09.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-OA004-po-entscheidung-2026-11-09.md`,

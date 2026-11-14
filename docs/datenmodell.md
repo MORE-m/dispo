@@ -350,16 +350,22 @@ Unterobjekte werden typbezogen normalisiert:
   keine Plattformdimension),   `oa_targeting_definitions` (Listen-Aufschlag `tkp_surcharge` + Mindest-Aufschlag
   `minimum_tkp_surcharge`, Default 0; D4c-4a Schema/Import, D4c-4b Engine/Snapshots),
   `oa_adserver_surcharges` (konfigurierbar, Runtime OUT). Assignment: TKP-Kernmedien →
-  Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` OUT). Registry
-  `oa_tkp`/`tkp` = planned (`v1` implemented, nicht released),
+  Medium-Override `tkp`/`oa_tkp` (nicht kategorieglobal; `native_ad` nicht
+  OA-TKP-fähig). Registry `oa_tkp`/`tkp` = planned (`v1` implemented, nicht
+  released),
+- **PO-OA-NATIVE-1 / NATIVE-5:** Registry-Profil `free_position` × Methode
+  `free_position` = **released** (`versions.v1=released`,
+  `current_released_version=v1`). Datenmigration (Schema = NEIN): Native-Ad
+  `kind=free_position`, Override, Assignment Profil `free_position`; Podcast-
+  Rule `inv_more_kombi_podcast×native_ad`; MORE-Kombi Online Audio × Native-Ad
+  OUT. Native-Ad ist Free-Position-buchbar, bleibt aber OUT aus OA-TKP
+  (CoreMedia/Resolver/Import/Completeness/Targeting/Platform). Operativer
+  DB-Stand auf `dispo_mat_core` erst nach Merge + Migration.
 - **PO-OA-NATIVE-1 / NATIVE-1:** `CalculationKind::FreePosition` (`free_position`);
-  Registry-Profil `free_position` × Methode `free_position` = **planned**
-  (`versions.v1=implemented`, `current_released_version=null`). Rechenkern
-  `FreePositionEngine`: User-`free_price` → `media_gross` →
+  Rechenkern `FreePositionEngine`: User-`free_price` → `media_gross` →
   `CommercialPricingCalculator` (Rabatte → AE → N/N). Settlement `normal`,
-  `fixed_price_nn=null`; technische Defaults später `length_seconds=0`,
-  `total_spot_count=0`, `impressions=null`, keine Preisliste/TKP. Native-Ad
-  operativ weiterhin OUT (kein Assignment/Bookability/Writer). Keine Migration.
+  `fixed_price_nn=null`; Defaults `length_seconds=0`, `total_spot_count=0`,
+  `impressions=null`, keine Preisliste/TKP.
 - **PO-OA-NATIVE-1 / NATIVE-2 (Writer/Persistenz):** Position mit Freeze
   `free_position`/`free_position`/`v1`, `kind=free_position`,
   `spot_method=free_position`. Persistenz ohne neue Spalte: `media_gross` =
@@ -368,9 +374,8 @@ Unterobjekte werden typbezogen normalisiert:
   `total_spot_count=0`, `price_list_id=null`, keine OA-/Spot-Kinder;
   Positionsrabatte über bestehende `calculation_position_discounts`;
   `is_discountable`/`is_ae_eligible` serverseitig (Medium ∧ Regel) eingefroren.
-  Registry-CATALOG weiter `planned`; Writer/HTTP nur bei Registry-Release
-  (Produktiv gesperrt, Tests via Fake). Budget/Standardangebote OUT. Keine
-  Migration.
+  Writer/HTTP über `FreePositionHttpReleaseGuard` (nach NATIVE-5 released/v1).
+  Budget/Standardangebote OUT.
 - **PO-OA-NATIVE-1 / NATIVE-4 (Dispo-Freeze):** `dispo_order_positions` friert
   Free Position ohne Schemaänderung ein: Freeze `free_position`/`free_position`/
   `v1`, `kind=spot_method=free_position`, `media_gross` = `free_price`, Rabatte/
@@ -378,8 +383,7 @@ Unterobjekte werden typbezogen normalisiert:
   TKP-/Preislisten-Felder `null`, `pricing_settlement_mode=normal`,
   `fixed_price_nn=null`, leere Plan-/Zeitraum-/Planner-/Komponenten-Snapshots,
   OA-Snapshots `null`, `position_discounts_snapshot` kopiert. Klassifikation
-  `free_position` nur über das Paar (AND-only); Pair im CATALOG weiter planned.
-  Keine Migration.
+  `free_position` nur über das Paar (AND-only).
 - **PO-CALC-TKP-1D4c-4j-1 Platform×Medium-Rules:** additiv `oa_platform_medium_rules`
   (`oa_platform_id`, `advertising_medium_id`, `is_active`, Unique-Paar, FKs
   `restrictOnDelete`). Helper `OaPlatformMediumRules` (aktive Lookups, Medium-Zulässigkeit
