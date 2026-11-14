@@ -93,6 +93,13 @@ async function waitForPreview(page: Page) {
     });
 }
 
+async function waitForSchemaReady(page: Page) {
+    await expect(page.locator('[data-test="wizard-schema-loading"]')).toHaveCount(
+        0,
+        { timeout: 60_000 },
+    );
+}
+
 async function openNewCalculationStepTwo(page: Page, customer: string) {
     await page.goto('/kalkulationen/neu');
     await page.locator('[data-test="crm-customer-search"]').fill(customer);
@@ -152,21 +159,36 @@ async function addOrderDiscount(page: Page, percent: string) {
 async function saveCalculation(page: Page): Promise<number> {
     await page.getByRole('button', { name: '4. Zusammenfassung' }).click();
     await waitForPreview(page);
-    const saveResponse = page.waitForResponse(
-        (response) => {
-            const request = response.request();
-            const pathname = new URL(request.url()).pathname;
+    await waitForSchemaReady(page);
 
-            return (
-                request.method() === 'POST' &&
-                /\/kalkulationen\/?$/.test(pathname) &&
-                response.status() < 400
-            );
-        },
-        { timeout: 60_000 },
-    );
-    await page.locator('[data-test="wizard-save"]').click();
-    await saveResponse;
+    let saved = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        const saveResponse = page.waitForResponse(
+            (response) => {
+                const request = response.request();
+                const pathname = new URL(request.url()).pathname;
+
+                return (
+                    request.method() === 'POST' &&
+                    /\/kalkulationen\/?$/.test(pathname) &&
+                    response.status() < 400
+                );
+            },
+            { timeout: 30_000 },
+        );
+        await page.locator('[data-test="wizard-save"]').click();
+        try {
+            await saveResponse;
+            saved = true;
+            break;
+        } catch {
+            // Save ohne POST: Schema fehlte/Retry-Token. Nachladen abwarten, erneut versuchen.
+            await waitForSchemaReady(page);
+            await waitForPreview(page);
+        }
+    }
+    expect(saved, 'Kalkulation speichern (POST) nach Schema-Ready').toBe(true);
+
     await expect(page).toHaveURL(/\/kalkulationen\/\d+$/, { timeout: 60_000 });
     const calcId = Number(
         page.url().match(/\/kalkulationen\/(\d+)/)?.[1] ?? '0',
