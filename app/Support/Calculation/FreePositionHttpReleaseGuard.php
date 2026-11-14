@@ -13,7 +13,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Preview, Store und Update sind ausschließlich bei Registry-Release
  * (free_position × free_position) offen – kein Soft-Open / keine Wizard-Capability.
- * Produktiv bleibt das Pair `planned` → jede Free-Position im Payload oder Bestand wird abgewiesen.
+ * Nach NATIVE-5 ist das Pair `released/v1`; Guard bleibt fail-closed falls der Katalog
+ * jemals wieder unreleased wäre.
  */
 final class FreePositionHttpReleaseGuard
 {

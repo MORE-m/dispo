@@ -136,7 +136,8 @@ final class InitialCatalogDefinitions
             $row('Pre-Stream Influencer', 'pre_stream_influencer', CanonicalAdvertisingCategories::ONLINE_AUDIO, 390),
             $row('In-Stream Influencer', 'in_stream_influencer', CanonicalAdvertisingCategories::ONLINE_AUDIO, 400),
             $row('Mid-Roll Spotify / Deezer / Youtube Musikumfeld', 'midroll_music_environment', CanonicalAdvertisingCategories::ONLINE_AUDIO, 410),
-            $row('Native-Ad', 'native_ad', CanonicalAdvertisingCategories::ONLINE_AUDIO, 420),
+            // NATIVE-5: Native-Ad als Free Position v1 (Override setzt Bootstrapper).
+            $row('Native-Ad', 'native_ad', CanonicalAdvertisingCategories::ONLINE_AUDIO, 420, CalculationKind::FreePosition),
         ];
     }
 }

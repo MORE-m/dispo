@@ -49,8 +49,8 @@ final class EngineProfileRegistry
     public const PROFILE_OA_TKP = 'oa_tkp';
 
     /**
-     * PO-OA-NATIVE-1 / NATIVE-1: generische Free-Position-Engine (User-Ausgangspreis).
-     * Pair free_position×free_position bleibt planned; kein produktives Release.
+     * PO-OA-NATIVE-1 / NATIVE-5: generische Free-Position-Engine (User-Ausgangspreis).
+     * Pair free_position×free_position = released/v1 (Native-Ad V1).
      */
     public const PROFILE_FREE_POSITION = 'free_position';
 
@@ -98,13 +98,13 @@ final class EngineProfileRegistry
                 ],
             ],
         ],
-        // NATIVE-1: Algorithmus v1 implementiert, Pair nicht released (kein Bookability/Writer).
+        // NATIVE-5: Free Position v1 produktiv freigegeben (Native-Ad Initial-Medium).
         self::PROFILE_FREE_POSITION => [
             'free_position' => [
-                'pair_status' => EngineCapabilityStatus::Planned,
-                'current_released_version' => null,
+                'pair_status' => EngineCapabilityStatus::Released,
+                'current_released_version' => 'v1',
                 'versions' => [
-                    'v1' => EngineCapabilityStatus::Implemented,
+                    'v1' => EngineCapabilityStatus::Released,
                 ],
             ],
         ],

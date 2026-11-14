@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\OnlineAudio;
 
+use App\Enums\CalculationKind;
 use App\Enums\CalculationMethodMode;
 use App\Enums\EngineCapabilityStatus;
 use App\Enums\Role;
@@ -116,15 +117,20 @@ class PoCalcTkp1aFoundationTest extends TestCase
         $this->seed(InitialCatalogMatCoreSeeder::class);
 
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
-        $this->assertSame(CalculationMethodMode::Inherit, $native->calculation_method_mode);
-        $this->assertNull($native->kind);
+        // NATIVE-5: Native-Ad ist Free Position (nicht OA-TKP-fähig).
+        $this->assertSame(CalculationKind::FreePosition, $native->kind);
+        $this->assertSame(CalculationMethodMode::Override, $native->calculation_method_mode);
+        $this->assertSame(
+            EngineProfileRegistry::PROFILE_FREE_POSITION,
+            $this->effectiveEngineProfile($native, 'free_position'),
+        );
 
-        $methodId = (int) CalculationMethod::query()->where('key', 'tkp')->value('id');
+        $tkpMethodId = (int) CalculationMethod::query()->where('key', 'tkp')->value('id');
         $this->assertSame(
             0,
             AdvertisingMediumCalculationMethod::query()
                 ->where('advertising_medium_id', $native->id)
-                ->where('calculation_method_id', $methodId)
+                ->where('calculation_method_id', $tkpMethodId)
                 ->count(),
         );
 
@@ -135,7 +141,7 @@ class PoCalcTkp1aFoundationTest extends TestCase
             0,
             AdvertisingCategoryCalculationMethod::query()
                 ->where('advertising_category_id', $categoryId)
-                ->where('calculation_method_id', $methodId)
+                ->where('calculation_method_id', $tkpMethodId)
                 ->count(),
         );
 

@@ -11,6 +11,7 @@ use App\Models\AdvertisingCategoryCalculationMethod;
 use App\Models\AdvertisingMedium;
 use App\Models\AdvertisingMediumCalculationMethod;
 use App\Models\Inventory;
+use App\Models\InventoryMediumRule;
 use App\Models\Organization;
 use App\Services\InventoryMediumRule\Catalog\InitialCatalogBootstrapper;
 use App\Support\Advertising\CanonicalAdvertisingCategories;
@@ -61,7 +62,7 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $categoryKey = AdvertisingCategory::query()->whereKey($medium->category_id)->value('key');
             $this->assertSame($definition['category_key'], $categoryKey);
             $this->assertSame($definition['kind']?->value, $medium->kind?->value);
-            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)
+            if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff', 'native_ad'], true)
                 || OaTkpCoreMedia::contains($definition['code'])
             ) {
                 $this->assertSame(CalculationMethodMode::Override, $medium->calculation_method_mode);
@@ -76,7 +77,8 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             $this->assertSame($definition['component_profile']?->value, $medium->component_profile?->value);
             $this->assertTrue($medium->is_active);
             // PO-SWF-CALENDAR-1: Allonge/Promo/Contest Override → average + calendar.
-            // PO-CALC-TKP-1A: TKP-Kernmedien Override → tkp/oa_tkp; Native bleibt Inherit.
+            // PO-CALC-TKP-1A: TKP-Kernmedien Override → tkp/oa_tkp.
+            // NATIVE-5: native_ad Override → free_position.
             $methodKeys = AdvertisingMediumCalculationMethod::query()
                 ->where('advertising_medium_id', $medium->id)
                 ->with('calculationMethod')
@@ -86,6 +88,8 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
                 ->all();
             if (in_array($definition['code'], ['allonge', 'promo_moderation', 'contest_payoff'], true)) {
                 $this->assertSame(['average', 'calendar'], $methodKeys, $definition['code']);
+            } elseif ($definition['code'] === 'native_ad') {
+                $this->assertSame(['free_position'], $methodKeys, $definition['code']);
             } elseif (OaTkpCoreMedia::contains($definition['code'])) {
                 $this->assertSame(['tkp'], $methodKeys, $definition['code']);
             } else {
@@ -117,10 +121,18 @@ class InitialCatalogMatCoreBootstrapTest extends TestCase
             ->whereHas('calculationMethod', fn ($q) => $q->where('key', 'tkp'))
             ->count();
         $this->assertSame(0, $oaCategoryTkp);
-        $this->assertSame(
-            CalculationMethodMode::Inherit,
-            AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail()->calculation_method_mode,
-        );
+        // NATIVE-5: native_ad ist Free Position (Override), nicht TKP.
+        $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
+        $this->assertSame(CalculationKind::FreePosition, $native->kind);
+        $this->assertSame(CalculationMethodMode::Override, $native->calculation_method_mode);
+        $podcast = Inventory::query()->where('code', 'inv_more_kombi_podcast')->firstOrFail();
+        $podcastRule = InventoryMediumRule::query()
+            ->where('inventory_id', $podcast->id)
+            ->where('advertising_medium_id', $native->id)
+            ->firstOrFail();
+        $this->assertTrue($podcastRule->is_active);
+        $this->assertSame('redaktion', $podcastRule->planning_responsibility_key);
+        $this->assertNull($podcastRule->default_length_seconds);
         $this->assertSame(
             CalculationMethodMode::Inherit,
             AdvertisingMedium::query()->where('code', 'trailer_station_voice')->firstOrFail()->calculation_method_mode,

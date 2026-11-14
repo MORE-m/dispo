@@ -6,9 +6,8 @@ import { defineConfig, devices } from '@playwright/test';
  * NATIVE-4 Free-Position-Dispo-Smoke: Freie Preisposition in Dispo-Create/-Show.
  * Isolierte SQLite, Port 8080 (Seeder wie NATIVE-3). Kein DB_DATABASE=dispo_mat_core. retries=0.
  *
- * Das Pair free_position×free_position bleibt im Registry-CATALOG planned/unreleased.
- * Der Release wird nur im E2E-Server per Test-Fake simuliert
- * (E2E_FREE_POSITION_PAIR_RELEASED=1, nur mit APP_ENV=testing + E2E_SERVER=1).
+ * Nach NATIVE-5 ist free_position×free_position im Registry-CATALOG released/v1.
+ * Kein Test-Fake mehr nötig.
  */
 const root = path.dirname(fileURLToPath(import.meta.url));
 const e2eDb = path.resolve(
@@ -38,8 +37,6 @@ const e2eEnv = {
     DB_DATABASE: e2eDb,
     DB_URL: '',
     OA_TKP_WIZARD_CAPABILITY: 'false',
-    // Test-only Registry-Fake (nicht CATALOG): free_position×free_position released/v1.
-    E2E_FREE_POSITION_PAIR_RELEASED: '1',
 };
 
 export default defineConfig({

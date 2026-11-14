@@ -143,14 +143,21 @@ class PoCalcTkp1d4dWireReleasedBookabilityTest extends TestCase
     }
 
     #[Test]
-    public function native_ad_and_non_oa_null_kind_stay_unbookable_after_release(): void
+    public function native_ad_stays_unbookable_for_tkp_but_free_position_and_null_kind_orphan_stays_unbookable_after_release(): void
     {
         $this->seed(InitialCatalogMatCoreSeeder::class);
         $this->simulateRegistryRelease();
         $bookability = app(AdvertisingMediumLiveBookability::class);
 
+        // NATIVE-5: native_ad ist Free Position (released/v1), bleibt aber OUT für TKP.
         $native = AdvertisingMedium::query()->where('code', 'native_ad')->firstOrFail();
         $this->assertFalse($bookability->evaluate($native, 'tkp')->isBookableForNewPositions);
+        $this->assertFalse(OaTkpCoreMedia::contains('native_ad'));
+
+        $free = $bookability->evaluate($native, 'free_position');
+        $this->assertTrue($free->isBookableForNewPositions);
+        $this->assertSame('free_position', $free->engineProfileKey);
+        $this->assertSame('v1', $free->algorithmVersion);
 
         $orphan = AdvertisingMedium::factory()->create([
             'code' => 'wire_null_kind_orphan',

@@ -2,13 +2,14 @@
 
 | Feld | Wert |
 |---|---|
-| Status | **NATIVE-1 Foundation + NATIVE-2 Writer/HTTP/Persistenz implementiert** – Native-Ad weiterhin **nicht** operativ buchbar; Pair **nicht** released (CATALOG `planned`) |
-| Stand | 13. November 2026 (NATIVE-2 Writer/HTTP/Persistenz; Base NATIVE-1 `4a2ba72`) |
+| Status | **NATIVE-5 implementiert** – Free Position **released/v1**, Native-Ad Free-Position-Zuordnung + Podcast-Rule im Code/Migrationspfad; **operativer Release noch nicht abgeschlossen** (Merge + Post-Merge-CI + `dispo_mat_core`-Datenmigration ausstehend) |
+| Stand | 14. November 2026 (NATIVE-5; Base Security `89cda03`) |
 | Slice | `PO-OA-NATIVE-1` / `NATIVE-1` |
 | Branch | `feat/free-position-native-1-foundation` |
 | Base | `8005d2f670b909084d526f1e81471e936bd277bd` (`main` nach #235 PO-STD-V2) |
 | Worktree | `dispo-wt-free-position-native-1` |
-| Explizit nicht | Bookability, Wizard UI, Podcast-Rule, Registry-Release, Migration, Deploy, `dispo_mat_core`-Write |
+| Explizit nicht (vor operativem Abschluss) | Deploy, `dispo_mat_core`-Write vor Merge, Budget, Standardangebote, OA-TKP für Native-Ad |
+| NATIVE-5 Branch | `feat/free-position-native-5-release` (Worktree `dispo-wt-free-position-native-5`) |
 | NATIVE-2 Branch | `feat/free-position-native-2-writer` (Worktree `dispo-wt-free-position-native-2`) |
 | NATIVE-3 Branch | `feat/free-position-native-3-ui` (Worktree `dispo-wt-free-position-native-3`, Base `5a1358f`) |
 | NATIVE-4 Branch | `feat/free-position-native-4-dispo` (Worktree `dispo-wt-free-position-native-4`, Base `6fe81e3`) |
@@ -221,20 +222,22 @@ Anpassungsbedarf (Code):
 - Snapshot: `media_gross`, Rabatte, AE, `nn_invest`, `pricing_settlement_mode=normal`,
   `length_seconds=0`, Freeze-Triple, Medium/Inventar
 
-### J – Podcast-Rule (Daten, später)
+### J – Podcast-Rule (NATIVE-5)
 
 ```text
 Inventar: inv_more_kombi_podcast (MORE-Kombi Podcast)
 Medium:   native_ad
 is_active: true
 planning_responsibility_key: redaktion
+default_length_seconds: NULL   # längenneutral; keine 30-s-Vorgabe
 ```
 
-4 bestehende Rules unverändert.  
-MORE-Kombi Online Audio: bewusst **keine** Rule / nicht buchbar.  
-Nur über `InventoryMediumRule` – kein Engine-Hardcode.
+Position: `CalculationPosition.length_seconds = 0` (technisch, nicht preisbildend).
+Keine UI-Länge. `advertising_media.default_length_seconds` bleibt historisch 30 und wird vom Free-Position-Pfad nicht verwendet.
 
-**In diesem Slice: Rule nicht anlegen.**
+4 bestehende Rules unverändert.
+MORE-Kombi Online Audio: bewusst **keine** Rule / nicht buchbar.
+Nur über `InventoryMediumRule` – kein Engine-Hardcode.
 
 ---
 

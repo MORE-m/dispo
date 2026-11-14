@@ -3,19 +3,18 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * NATIVE-3 Free-Position-Wizard-Smoke: Freie Preisposition im Kalkulationswizard.
- * Isolierte SQLite, Port 8079. Kein DB_DATABASE=dispo_mat_core. retries=0.
+ * NATIVE-3 Free-Position-Wizard-Smoke: Freie Preisposition im Kalkulations-Wizard.
+ * Isolierte SQLite, Port 8080. Kein DB_DATABASE=dispo_mat_core. retries=0.
  *
- * Das Pair free_position×free_position bleibt im Registry-CATALOG planned/unreleased.
- * Der Release wird nur im E2E-Server per Test-Fake simuliert
- * (E2E_FREE_POSITION_PAIR_RELEASED=1, nur mit APP_ENV=testing + E2E_SERVER=1).
+ * Nach NATIVE-5 ist free_position×free_position im Registry-CATALOG released/v1.
+ * Kein Test-Fake mehr nötig.
  */
 const root = path.dirname(fileURLToPath(import.meta.url));
 const e2eDb = path.resolve(
     root,
     'database/e2e-po-free-position-native-3.sqlite',
 );
-const e2ePort = process.env.E2E_PO_FREE_POSITION_NATIVE_3_PORT ?? '8079';
+const e2ePort = process.env.E2E_PO_FREE_POSITION_NATIVE_3_PORT ?? '8080';
 const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
 if (
@@ -38,8 +37,6 @@ const e2eEnv = {
     DB_DATABASE: e2eDb,
     DB_URL: '',
     OA_TKP_WIZARD_CAPABILITY: 'false',
-    // Test-only Registry-Fake (nicht CATALOG): free_position×free_position released/v1.
-    E2E_FREE_POSITION_PAIR_RELEASED: '1',
 };
 
 export default defineConfig({
