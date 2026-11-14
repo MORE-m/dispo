@@ -24,7 +24,8 @@ class ImportMoreSpotkalkulationMatCoreCommand extends Command
 
     public function handle(MoreSpotkalkulationMatCoreImporter $importer): int
     {
-        $confirm = (string) $this->option('confirm-database');
+        $confirmOption = $this->option('confirm-database');
+        $confirm = is_string($confirmOption) ? $confirmOption : '';
         $current = (string) config('database.connections.'.config('database.default').'.database');
 
         if ($confirm === '' || $confirm !== $current) {
@@ -44,7 +45,8 @@ class ImportMoreSpotkalkulationMatCoreCommand extends Command
             return self::FAILURE;
         }
 
-        $actorEmail = (string) $this->option('actor-email');
+        $actorEmailOption = $this->option('actor-email');
+        $actorEmail = is_string($actorEmailOption) ? $actorEmailOption : '';
         $actor = User::query()->where('email', $actorEmail)->first();
         if ($actor === null) {
             $this->error('Audit-Benutzer nicht gefunden: '.$actorEmail);
