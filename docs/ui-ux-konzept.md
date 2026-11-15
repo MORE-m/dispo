@@ -122,9 +122,12 @@ Mehrere Sender- und Kombipositionen in einer Kalkulation sind der Normalfall
 
 ### Mit Budget planen
 
+**V1 (PO-OA-BUDGET-V2, 15.11.2026):** ausschließlich Spot-Budgetpfad.
+OA-TKP-, Free-Position-/Native-Ad- und Mixed-Budget = **V2**; Guards fail-closed.
+
 1. Zielbudget N/N, Sender/Kombis, erlaubte Preiszeiträume, Spotlänge,
    Rabatte der Werbeelemente, Auftragsrabatte, AE-Checkbox und Verteilungslogik vorgeben.
-2. Das System erzeugt einen neuen Vorschlag (gleich verteilen oder Spotanzahl
+2. Das System erzeugt einen neuen Spot-Vorschlag (gleich verteilen oder Spotanzahl
    maximieren). Kein bestehendes Senderverhältnis (`BUD-005`).
 3. Rest oder Überschreitung ausweisen (`BUD-007`).
 4. Explizite Übernahme oder Verwerfen (`BUD-008`).

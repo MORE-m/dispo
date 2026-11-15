@@ -128,7 +128,7 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 
 1.  Vertrieb legt eine Kalkulation mit Kunde, optionaler Agentur und mindestens einer Werbemittelposition an. Die optionale Übernahme aus einem veröffentlichten Standardangebot (`STD-004`, `STD-005`) ist **V2** (PO-STD-V2, 12.11.2026); sie ist kein verpflichtender V1-Bestandteil.
 
-2.  Das System berechnet Listenpreise, Aufschläge, Rabatte, AE, N/N-Invest und Payfaktoren; Sonderfreigaben werden erkannt. Optional erzeugt der Pfad „Mit Budget planen“ Mengenvorschläge, die erst nach expliziter Übernahme gelten (`BUD-008`).
+2.  Das System berechnet Listenpreise, Aufschläge, Rabatte, AE, N/N-Invest und Payfaktoren; Sonderfreigaben werden erkannt. Optional erzeugt der Pfad „Mit Budget planen“ Mengenvorschläge für den **Spot-Budgetpfad**, die erst nach expliziter Übernahme gelten (`BUD-008`; OA-/Free-Position-/Mixed-Budget = **V2**, PO-OA-BUDGET-V2).
 
 3.  Vertrieb wählt Kalkulationspositionen aus und erzeugt daraus einen nummerierten Dispoauftrag als Snapshot.
 
@@ -154,7 +154,7 @@ Dieses Dokument beschreibt den verbindlichen fachlichen Sollzustand für V1. Es 
 | Dokumente           | Interne Kalkulationsübersicht, Dispoauftrag und Reports           | Kundenangebot und Kundenportal bei späterem Bedarf           |
 | Rechnung per Ende   | Monate mehrfach wählbar, keine Betragsaufteilung                  | Betragsaufteilung nach Monaten                               |
 | Vertretung          | Keine Abwesenheits-/Vertreterregel                                | Delegation und Abwesenheitslogik                             |
-| Budgetplanung       | Deterministische Mengenvorschläge ohne Reichweite/KI (`BUD-009`)  | Reichweiten- oder KI-Optimierung                             |
+| Budgetplanung       | **Spot-Budgetpfad** „Mit Budget planen“ (`BUD-001`–`BUD-009`). OA-TKP-, Free-Position-/Native-Ad- und Mixed-Budget = **V2** (PO-OA-BUDGET-V2, 15.11.2026). Guards fail-closed. | OA-Budget, Free-Position-Budget, Mixed Spot+OA, Reichweiten-/KI-Optimierung |
 | Standardangebote    | **Kein verpflichtender V1-Produktumfang** (PO-STD-V2, 12.11.2026). Bereits vorhandenes technisches Fundament bleibt im Repository; keine weitere fachliche Fertigstellung in V1. | Vollständiger, medienübergreifend freigegebener Produktumfang (`STD-001`–`STD-009`); kein Kundenangebot (`SCP-001`) |
 | Audio               | Abspielen/Download, Länge manuell prüfen                          | Automatische Audiolängenprüfung                              |
 | Weitere Teams       | Disposition/Projektmanagement koordiniert zentral                 | Direkte Zugänge für OAP, PDM, Redaktion, Moderatoren, Events |
@@ -385,23 +385,33 @@ Basispreise derselben Stunde vorliegen:
 
 ## 8.4 Budget-Assistent
 
+> **PO-OA-BUDGET-V2 (15.11.2026):** Der Planungsweg „Mit Budget planen“ unterstützt
+> in V1 ausschließlich den bestehenden Spot-Budgetpfad.
+> Online-Audio-TKP, Free Position / Native-Ad sowie medienübergreifende
+> Budgetoptimierung gehören vollständig zu V2.
+> Bestehende Guards bleiben der gewünschte V1-Vertrag (fail-closed, keine
+> technische Schuld): `OaTkpHttpReleaseGuard::assertBudgetNotTkp()`,
+> `FreePositionHttpReleaseGuard::assertBudgetNotFreePosition()`.
+> `BUD-001`–`BUD-009` beziehen sich in V1 auf den Spot-Budgetpfad und werden
+> nicht gelöscht.
+
 Der Budget-Assistent ist eine optionale Hilfe in der Kundenkalkulation. Er erzeugt deterministische Mengenvorschläge, ändert aber nichts ohne explizite Übernahme.
 
-**BUD-001** Ein Zielbudget ist optional. Wird es gesetzt, muss es ein numerisches EUR-Feld mit Validierung sein; ein unstrukturiertes Textfeld ist unzulässig.
+**BUD-001** Ein Zielbudget ist optional. Wird es gesetzt, muss es ein numerisches EUR-Feld mit Validierung sein; ein unstrukturiertes Textfeld ist unzulässig. (V1: Spot-Budgetpfad.)
 
-**BUD-002** Das Zielbudget in V1 ist N/N-Invest. Beim Pfad „Selbst planen“ dient es nur dem Vergleich mit dem aktuellen N/N-Invest. Beim Pfad „Mit Budget planen“ ist es die Vorgabe für den Vorschlag.
+**BUD-002** Das Zielbudget in V1 ist N/N-Invest. Beim Pfad „Selbst planen“ dient es nur dem Vergleich mit dem aktuellen N/N-Invest. Beim Pfad „Mit Budget planen“ ist es die Vorgabe für den Vorschlag. (V1: Spot-Budgetpfad.)
 
-**BUD-003** Der Vorschlag berücksichtigt die ausgewählten Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und den zusätzlichen Auftragsrabatt.
+**BUD-003** Der Vorschlag berücksichtigt die ausgewählten Sender/Kombis, Preisstunden, Spotlängen, Positionsrabatte, AE und den zusätzlichen Auftragsrabatt. (V1: Spot-Budgetpfad.)
 
-**BUD-004** Vorschläge sind deterministisch, nachvollziehbar und immer editierbar.
+**BUD-004** Vorschläge sind deterministisch, nachvollziehbar und immer editierbar. (V1: Spot-Budgetpfad.)
 
-**BUD-005** Der Pfad „Mit Budget planen“ erzeugt einen neuen Vorschlag. Ein „bestehendes Senderverhältnis“ wird nicht verwendet, weil keine manuelle Vorplanung vorausgesetzt wird.
+**BUD-005** Der Pfad „Mit Budget planen“ erzeugt einen neuen Vorschlag. Ein „bestehendes Senderverhältnis“ wird nicht verwendet, weil keine manuelle Vorplanung vorausgesetzt wird. (V1: Spot-Budgetpfad.)
 
 **BUD-006** V1-Verteilungslogiken: Budget je ausgewähltem Sender/Kombi gleich verteilen; ganzzahlige Spotanzahl innerhalb der gewählten Preisstunden maximieren.
 
 **BUD-007** Spotmengen im Vorschlag sind ganzzahlig. Ein Rest unter dem Zielbudget oder eine geringfügige Überschreitung durch Ganzzahligkeit wird transparent ausgewiesen.
 
-**BUD-008** Der Vorschlag verändert die Kalkulation nicht automatisch. Erst eine explizite Übernahme schreibt die Mengen in die Positionen; danach bleiben sie frei editierbar.
+**BUD-008** Der Vorschlag verändert die Kalkulation nicht automatisch. Erst eine explizite Übernahme schreibt die Mengen in die Positionen; danach bleiben sie frei editierbar. (V1: Spot-Budgetpfad.)
 
 **BUD-009** V1 behauptet keine Reichweiten- oder KI-Optimierung. Belastbare Reichweiten- oder Leistungsdaten sind nicht Teil der Berechnungsgrundlage.
 
@@ -530,6 +540,13 @@ SWF verwendet dieselben drei Bedienmodelle wie Spots, jedoch ohne Spotlängenind
 # 11. Online Audio und Podcast
 
 ## 11.1 TKP-Modell
+
+> **PO-OA-BUDGET-V2 (15.11.2026):** OA-Budget / „Mit Budget planen“ = **V2**.
+> Kein offener V1-Blocker. Nicht mit `OA-001`–`OA-004` vermischen.
+> OA Normal-TKP und OA Festpreis bleiben davon unberührt.
+> V1-Vertrag fail-closed: `OaTkpHttpReleaseGuard::assertBudgetNotTkp()`;
+> Free Position analog `FreePositionHttpReleaseGuard::assertBudgetNotFreePosition()`.
+> Dok: `docs/entscheidungen/PO-OA-BUDGET-V2.md`.
 
 | **Wert**             | **Definition**                                                          |
 |----------------------|-------------------------------------------------------------------------|
@@ -1084,9 +1101,9 @@ Die folgenden Szenarien bilden die Mindestabnahme. Zusätzlich sind Unit-, Integ
 | AT-22  | Berechtigung          | Dispo ändert Rabatt                             | Blockiert; Rückfrage an Vertrieb erforderlich                               |
 | AT-23  | Mehrsender-Kalkulation | 10 Spot Classic Radio Hamburg, 5 ROCK ANTENNE Hamburg, unterschiedliche Längen/Stunden/Rabatte | Eine Kalkulation; Live-Gesamtsumme; jede Position separat editierbar (`CAL-001`, `CAL-005`) |
 | AT-24  | Spotlänge Classic     | Standardlänge vorbelegt, dann auf abweichende Sekunden ändern | Feld sichtbar und frei editierbar; Preis und Dispo-Snapshot nutzen die tatsächliche Länge (`SPT-015`) |
-| AT-25  | Budget Mehrsender     | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Vorschlag ohne bestehendes Senderverhältnis; editierbar (`BUD-003`–`BUD-006`) |
-| AT-26  | Budgetrest            | Zielbudget, das sich nicht ganzzahlig aufteilen lässt | Ganzzahlige Mengen; Rest oder Überschreitung transparent ausgewiesen (`BUD-007`) |
-| AT-27  | Budget-Übernahme      | Vorschlag anzeigen, nicht übernehmen, dann explizit übernehmen | Ohne Übernahme unveränderte Positionen; nach Übernahme Mengen übernommen und weiter editierbar (`BUD-008`) |
+| AT-25  | Budget Mehrsender     | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Spot-Vorschlag ohne bestehendes Senderverhältnis; editierbar (`BUD-003`–`BUD-006`). V1 Spot-only (PO-OA-BUDGET-V2) |
+| AT-26  | Budgetrest            | Zielbudget, das sich nicht ganzzahlig aufteilen lässt | Ganzzahlige Spotmengen; Rest oder Überschreitung transparent ausgewiesen (`BUD-007`). V1 Spot-only |
+| AT-27  | Budget-Übernahme      | Vorschlag anzeigen, nicht übernehmen, dann explizit übernehmen | Ohne Übernahme unveränderte Positionen; nach Übernahme Mengen übernommen und weiter editierbar (`BUD-008`). V1 Spot-only; OA-TKP/Free Position Budget fail-closed = V1-Vertrag |
 | AT-28  | Standardangebot übernehmen | Veröffentlichung, Vertrieb übernimmt, ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert (`STD-004`, `STD-005`). **Regression** für vorhandene Funktionalität; vollständiger Produktumfang = **V2** (PO-STD-V2) |
 | AT-29  | Dispo aus Vorlage     | Dispoauftrag direkt am Standardangebot          | Aktion unzulässig; Dispo nur aus Kundenkalkulation (`STD-007`, `DSP-007`). **Regression**; vollständiger Produktumfang = **V2** |
 | AT-30  | Rolle Produktmanagement | Nutzer nur Produktmanagement                    | Standardangebote erlaubt; Kundenkalkulationen und Dispoaufträge ohne Extra-Recht verweigert (`AUTH-006`, `AUTH-007`). **Regression**; vollständiger Produktumfang = **V2** |

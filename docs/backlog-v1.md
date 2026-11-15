@@ -463,17 +463,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`; Readiness
   `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
 - **V1 offen:**
-  - Native-Ad
-  - Budget
+  - *(kein OA-Budget-Rest; Spot-Budget = V1 IN)*
 - **Future:**
   - Plattform / OA-005/006
   - optionale interne Kosten-/Margenabbildung der 15 EUR
 - **V2:**
   - Standardangebote (PO-STD-V2, 12.11.2026; kein OA-V1-Blocker)
+  - OA-Budget / Free-Position-Budget / Mixed Spot+OA Budget (PO-OA-BUDGET-V2, 15.11.2026; kein V1-Blocker)
 - Kein D4d-Release-Gate mehr offen.
-- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis erreicht; Rest priorisiert):** TKP,
+- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis + NATIVE-5 erreicht; Rest priorisiert):** TKP,
   Targeting; Mengen ohne V1-Plattformauswahl; Future OA-005/006 separat;
-  Festpreis (OA-003) erledigt; Native-Ad/Budget = V1 offen; Plattform Future;
+  Festpreis (OA-003) erledigt; Native-Ad operativ (NATIVE-5); V1-Budget = Spot-only;
+  OA-/Free-/Mixed-Budget = **V2** (PO-OA-BUDGET-V2); Plattform Future;
   Standardangebote = V2
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
@@ -530,13 +531,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-03 – Budget-Assistent
 
 - **Phase:** 7
-- **Status:** offen
-- **Anforderungen:** `BUD-001` bis `BUD-009`
+- **Status:** **V1 Spot-only erledigt** (UX-GATE-B / Spot Classic); OA-/Free-/Mixed-Budget = **V2** (PO-OA-BUDGET-V2, 15.11.2026)
+- **Anforderungen:** `BUD-001` bis `BUD-009` (V1-Bezug: Spot-Budgetpfad)
 - **Abhängigkeiten:** BL-P7-01, BL-P4-02, UX-GATE-B
-- **Ergebnis:** optionales EUR-Zielbudget N/N, V1-Logiken gleich verteilen / Spotanzahl maximieren, Rest/Überschreitung, explizite Übernahme
-- **Akzeptanz:** `AT-25` bis `AT-27`; kein automatisches Schreiben; keine Reichweiten-/KI-Behauptung
-- **Hinweis:** Der Slice UX-GATE-B enthält die V1-Logiken bereits für Spot Classic; dieses Paket bleibt für die vollständige Assistenten-UI späterer Elemente.
-- **Tests:** Pest Determinismus Mehrsender-Vorschlag, Restausweis, Übernahme vs. Verwerfen
+- **Ergebnis V1:** optionales EUR-Zielbudget N/N, Spot-Logiken gleich verteilen / Spotanzahl maximieren, Rest/Überschreitung, explizite Übernahme
+- **V2 (kein V1-Blocker):** OA-Budgetvorschläge, Impressions aus Zielbudget, Verteilung über OA-Elemente, Mixed Spot+OA, OA+Targetings/Rabatte/AE, Fingerprint/Stale/Apply/Concurrency/E2E/UI
+- **Akzeptanz:** `AT-25` bis `AT-27` (Spot); OA-TKP/Free-Position Budget-Propose/-Apply fail-closed = gewünschter V1-Vertrag
+- **Hinweis:** Keine weitere OA-/Free-Position-Budget-Implementierung in V1; Guards unverändert als gewünschter V1-Vertrag (`OaTkpHttpReleaseGuard::assertBudgetNotTkp()`, `FreePositionHttpReleaseGuard::assertBudgetNotFreePosition()`), analog PO-STD-V2 (Fundament bleibt, keine Rückmigration/Löschung, keine V1-Produktisierung).
+- **Tests:** Pest Determinismus Mehrsender-Vorschlag, Restausweis, Übernahme vs. Verwerfen; Negativtests OA-TKP/Free Position bleiben
 
 ## Phase 8 – Dispoauftrag und Statusworkflow
 

@@ -1,6 +1,21 @@
 # Fortschritt V1
 
-Stand: 15. November 2026 – **PO-OA-NATIVE-1 / NATIVE-5 operativ abgeschlossen
+Stand: 15. November 2026 – **PO-OA-BUDGET-V2.**
+
+Online-Audio-Budgetplanung vollständig auf V2 verschoben.
+V1-Budget bleibt Spot-only.
+
+Bestehende OA-/Free-Position-Budget-Guards bleiben unverändert fail-closed.
+Keine Runtime-Änderung, keine Migration, kein DB-Write.
+Kein Deploy. `dispo_mat_core` unberührt.
+
+V1-Vertrag: Spot-Budgetplanung = IN; OA-TKP Budget, Free Position / Native-Ad
+Budget, Mixed Spot+OA Budget = V2. `BUD-001`–`BUD-009` beziehen sich in V1 auf
+den Spot-Budgetpfad. Kein V1-Blocker mehr für OA-Budget.
+Dok: `docs/entscheidungen/PO-OA-BUDGET-V2.md`, `docs/anforderungskatalog.md`
+(§3, §8.4, §11), `docs/backlog-v1.md`, `docs/blocker-und-entscheidungslog.md`.
+
+Stand davor: 15. November 2026 – **PO-OA-NATIVE-1 / NATIVE-5 operativ abgeschlossen
 (Merge #245 `b972cf1`, Post-Merge-CI `43651608337` success, kontrollierte
 Datenmigration auf `dispo_mat_core`).** Registry
 `free_position×free_position` = **released/v1**. Native-Ad Override
@@ -83,11 +98,13 @@ Implementierung) bleibt im Repository erhalten; keine Löschung, keine
 Rückmigration, keine Datenlöschung. Bestehende fail-closed-Grenzen bleiben
 (u. a. Online Audio / OA-TKP in Standardangeboten = OUT). Standardangebote sind
 kein V1-Blocker mehr und erscheinen nicht mehr in V1-Priorisierungen.
-**OA-V1-Rest danach:** Native-Ad, Budgetplanung; Future: interne Kosten/Marge,
-Plattform OA-005/006; V2: Standardangebote. Docs-only; keine Runtime-/DB-
-Mutation. Dok: `docs/anforderungskatalog.md` (§3, §8.5), `docs/backlog-v1.md`,
+**OA-V1-Rest danach (historisch vor NATIVE-5 / PO-OA-BUDGET-V2):** Native-Ad,
+Budgetplanung; Future: interne Kosten/Marge, Plattform OA-005/006; V2:
+Standardangebote. Docs-only; keine Runtime-/DB-Mutation. Dok:
+`docs/anforderungskatalog.md` (§3, §8.5), `docs/backlog-v1.md`,
 `docs/blocker-und-entscheidungslog.md`, `docs/test-und-abnahmekatalog.md`,
-`docs/ux-ui-gate.md`.
+`docs/ux-ui-gate.md`. **Nachzug 15.11.2026:** Native-Ad operativ (NATIVE-5);
+OA-Budget = **V2** (PO-OA-BUDGET-V2); V1-Budget = Spot-only.
 
 Stand davor: 12. November 2026 – **PO-CALC-TKP-OA003 ABGESCHLOSSEN.** OA-003
 Festpreis ist im bestehenden OA-TKP-v1-Vertrag **released**. Kette gemergt:
@@ -113,10 +130,12 @@ Deploy.** E2E-Isolation: `APP_ENV=testing`, SQLite, `DB_URL=''`,
 `dispo_mat_core` unberührt. Dev-DB read-only Sanity: `2026.1` active 41 Items
 (genau 1 active 2026), `2027.1` active 41 Items (genau 1 active 2027), Midroll
 80/20, keine unerwartete OA-Preismutation.
-**Weiter (nach PO-STD-V2 korrigiert):** V1 offen: `native_ad`, Budget.
-Future: Plattform-UI/-wahl, OA-005/006 Allocation, interne 15-EUR-Kosten-/
-Margenabbildung. **V2:** Standardangebote (kein V1-OUT/Blocker mehr).
+**Weiter (nach PO-STD-V2 / PO-OA-BUDGET-V2 korrigiert):** V1 Spot-Budget bleibt
+IN; OA-/Free-/Mixed-Budget = **V2** (kein V1-Blocker). Native-Ad operativ
+(NATIVE-5). Future: Plattform-UI/-wahl, OA-005/006 Allocation, interne
+15-EUR-Kosten-/Margenabbildung. **V2:** Standardangebote; OA-Budget.
 Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
+`docs/entscheidungen/PO-OA-BUDGET-V2.md`,
 `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`,
 `docs/readiness/PO-CALC-TKP-OA003-4-E2E-2026-11-12.md`.
 

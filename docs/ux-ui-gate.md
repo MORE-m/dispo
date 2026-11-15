@@ -172,11 +172,13 @@ und Konditionen legt der Benutzer fest. Die Gesamtspotzahl ergibt sich aus
 den Zeiträumen. Ein optionales Zielbudget N/N dient nur als Vergleich mit dem
 aktuellen N/N-Invest.
 
-**Mit Budget planen:** Zuerst Zielbudget N/N, Sender/Kombis, erlaubte
-Preiszeiträume, Spotlänge je Spot-Classic-Werbeelement, Rabatte der
-Werbeelemente, Auftragsrabatte, AE-Checkbox und Verteilungslogik. Danach
-erzeugt das System einen **neuen** Vorschlag. Es gibt kein „bestehendes
-Senderverhältnis“, weil keine manuelle Vorplanung vorausgesetzt wird.
+**Mit Budget planen:** V1 ausschließlich Spot Classic (PO-OA-BUDGET-V2,
+15.11.2026); OA-TKP-/Free-Position-/Mixed-Budget = **V2**, Guards fail-closed.
+Zuerst Zielbudget N/N, Sender/Kombis, erlaubte Preiszeiträume, Spotlänge je
+Spot-Classic-Werbeelement, Rabatte der Werbeelemente, Auftragsrabatte,
+AE-Checkbox und Verteilungslogik. Danach erzeugt das System einen **neuen**
+Spot-Vorschlag. Es gibt kein „bestehendes Senderverhältnis“, weil keine
+manuelle Vorplanung vorausgesetzt wird.
 
 V1-Verteilungslogiken:
 
