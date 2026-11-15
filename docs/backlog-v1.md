@@ -202,7 +202,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P2-02 – Oberkategorien, Werbemittel, Kombinationstabelle
 
 - **Phase:** 2
-- **Status:** teilweise (`ADV-001a`…`ADV-001c4b`; **`BL-P2-02a`** Admin/Freeze PR **#108**; **`BL-P2-02b`** Matrix-Import PR **#109** (~201 aktive Regeln); **`BL-P2-02c`** Initialkatalog PR **#110** (14 Inventare / 42 Werbemittel); MAT-003-Vollabnahme und Hinweistexte weiter offen; ADV-001 Defaults weiter offen; Matrix-Zulässigkeit ≠ Kalkulierbarkeit)
+- **Status:** teilweise – Admin/Matrix/Initialkatalog erledigt; Rest = Daten-/Abnahme-/Defaults (PO-V1-CLOSURE-1). Runtime-/Admin-Fundament da; SWF/OA-TKP/Free Position später freigeschaltet (nicht pauschal „Methoden fehlen“).
 - **Anforderungen:** `ADV-001` bis `ADV-003`, `MAT-001` bis `MAT-003`
 - **Abhängigkeiten:** BL-P2-01 (für Inventar-Admin; ADV-001a/b/c1 braucht BL-P2-01 nicht)
 - **Ergebnis:** Katalog und Whitelist mit Buchungskennzeichen, Einplanung, Hinweisen, Filtern
@@ -220,28 +220,25 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   (~201 aktive Regeln); **Merge PR #109**.
 - **BL-P2-02c erledigt (Initialkatalog):** 14 Inventare / 42 Werbemittel laut
   PO-MAT-CORE-CATALOG-1; Reihenfolge Katalog → Matrix; explizite Seeder; **Merge PR #110**.
-- **Weiter offen in BL-P2-02:** MAT-003-Vollabnahme; Hinweistexte; ADV-001 Defaults;
-  Nicht-Spot-Methoden/Engines.
+- **Weiter offen in BL-P2-02:** MAT-003-Vollabnahme (Abnahme-/Daten-Track, kein
+  fehlender Spot-Code); Hinweistexte/Komfort; ADV-001 Defaults soweit noch nicht
+  gesetzt. Bereits freigeschaltete Nicht-Spot-Engines (SWF, OA-TKP, Free Position)
+  nicht erneut als fehlend führen.
 
 ### BL-P2-03 – Kunden, Agenturen, Kontakte
 
 - **Phase:** 2
-- **Status:** teilweise (`BL-P2-03a` Salesforce-CSV / Meridian-Nachtrag)
+- **Status:** teilweise – operativer CRM-Pfad da; Rest kein pauschaler Tag-1-Blocker
+  (PO-V1-CLOSURE-1; Deploy → Phase 11/Betrieb)
 - **Anforderungen:** `CRM-001` bis `CRM-003` (Slice); `CRM-004` Kontakte **offen**
 - **Abhängigkeiten:** BL-P1-02
 - **Ergebnis:** Stammdatenpflege inkl. Meridian-Nummer
 - **Akzeptanz:** Rechnungsempfänger nur Kunde oder Agentur modellierbar
 - **Tests:** Feature/Unit + E2E Port 8060 (`playwright.blp203a.config.ts`)
-- **Slice `BL-P2-03a`:** manueller CSV-Import, Versionen, vorläufige Accounts,
-  Domain+Typ-Zuordnung (D1), Calc/Dispo-Anbindung, Meridian-Nachtrag (PO-BLP203-1 A1…H1+D1);
-  lokal in `dispo_mat_core` eingerichtet/abgenommen (Import-ID 2).
-- **CRM-Wizard-Picker (I1):** verständliche Kunden-/Agenturauswahl, Freitext→automatisch
-  vorläufiger Account beim Speichern, Bestandsschutz historischer Freitext-Calcs,
-  klarer Rechnungsempfänger; E2E Port 8064 in CI (`main`, PR #136).
-- **Stammdaten-Textsuche + Prüflisten-Labels (Audit P3):** Index-Suche + Pagination;
-  verständliche Labels in Prüfliste/Konflikt; E2E Port **8066** (Draft-PR).
-  **Weiter offen:** Kontakte (`CRM-004`), API, E-Mail-Ingest, XLSX, Deploy;
-  `BL-P2-03` bleibt teilweise.
+- **Umgesetzt:** Salesforce CSV, Meridian, vorläufige Accounts, Kunden-/Agenturpicker,
+  Rechnungsempfänger, Stammdaten-Textsuche (gemergter Stand); lokal eingerichtet.
+- **Weiter offen (V1-Rest / Folgeslice, kein Tag-1-Blocker):** Kontakte (`CRM-004`),
+  API, E-Mail-Ingest, XLSX. Deploy separat Phase 11.
 
 ## Phase 3 – Versionen, dynamische Felder und Snapshots
 
@@ -265,29 +262,18 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P3-02 – Snapshot-Fundament
 
 - **Phase:** 3
-- **Status:** teilweise (DF-1/DF-2 + DF-3.1 AT-14 Admin + DF-3.2a/b Custom-Text + DF-3.3a2α VER-002-Quellengraph)
-- **Anforderungen:** `VER-001` bis `VER-007`
+- **Status:** **V1 Snapshot-Kern erledigt** (DF-1…DF-3-RULE-C; PO-V1-CLOSURE-1).
+  Außerhalb: `ADV-002` SystemFieldSetting; Standardoffer-Snapshot-Teil = V2.
+- **Anforderungen:** `VER-001` bis `VER-007` (V1 Calc/Dispo-Pfad)
 - **Abhängigkeiten:** BL-P3-01
 - **Ergebnis:** unveränderbare Konfigurations- und Positionssnapshots
 - **Akzeptanz:** Adminänderung ändert alte Vorgänge nicht; muss vor produktiver Kalkulation stehen
 - **Tests:** AT-14-Vorstufe; Mutation historischer Snapshots schlägt fehl
-- **DF-1 erledigt:** unveränderlicher Config-Snapshot an Kalkulationen inkl.
-  Legacy-Backfill (`VER-002`, `VER-007`); dynamische Kopf-/Positionswerte.
-  **DF-2:** Dispo-Compose-Snapshot (`VER-004`) inkl. `source_configuration_snapshot_id`,
-  Dispo-Wertetabellen, Draft-Texte, Legacy ohne erfundene Dyn-Werte.
-  **DF-3.1:** Admin-Activate ändert historische Snapshots nicht (AT-14).
-  **DF-3.2a:** Custom-Header in neuen Snapshots nach Activate; Historie unverändert.
-  **DF-3.2b:** Position-Custom in Snapshots; Calc-Origin über Source-Snapshot;
-  Historie unverändert.
-  **DF-3.3a2α:** `VER-002`-Quellengraph (`configuration_snapshot_sources` inkl.
-  eingefrorener Quellfelder/-regeln), Property-Provenance je Snapshot-Definition,
-  `format_version` als Generationsmarker mit fail-closed Lesepfad,
-  `schema_fingerprint` + 409 bei Drift, Dispo-Revision klont Snapshot statt neu
-  aufzulösen. **DF-3 nicht abgeschlossen.**
-  **DF-3.3a2β (`main`, PR #25):** `VER-003` Positions-Effektiv-Snapshots,
-  Kategorie-/Werbemittelquellen im Quellengraph, historischer Kontext.
-  **DF-3.3b:** Assignment-Admin-UI (keine Schemaänderung).
-  **DF-3-REST / RULE-A–C:** Optionen und Regel-Editor erledigt; Dyn-Feld-Pfad abgeschlossen.
+- **Beleg:** DF-1 Config-Snapshot (`VER-002`/`VER-007`); DF-2 Dispo-Compose (`VER-004`);
+  DF-3.1 AT-14; DF-3.2a/b Custom; DF-3.3a2α Quellengraph; DF-3.3a2β `VER-003`;
+  DF-3.3b Assignments; DF-3-REST/RULE-A–C abgeschlossen.
+  Kein belegbarer offener VER-001–007-Rest für den aktuellen V1-Calc/Dispo-Scope
+  außer `ADV-002` (außerhalb) und STD-Snapshot (V2).
 
 ## Phase 4 – Preislisten und Spotkalkulation
 
@@ -308,7 +294,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P4-02 – Spot Durchschnitt, Planer, Index, Komponenten
 
 - **Phase:** 4
-- **Status:** teilweise (`BL-P4-02a`–`02e` auf `main`, PR #56–#61; **SPT-008 Dateiexport** umgesetzt + manuell abgenommen, PR #68; **Inventarauswahl einklappbar** PR **#112**; Rest offen: Abbinder/SPT-013, operative Blockplanung; REP-007 Dispo-PDF = Phase 10)
+- **Status:** Spot-Kern **erledigt**; Rest klassifiziert (PO-V1-CLOSURE-1): Abbinder/Blockplanung = V1-Rest/kein Tag-1; REP-007 = Stufe 4; MAT-003-Vollabnahme = Abnahme-Track
 - **Priorisierung (PO-GOLIVE-CUT-1-DEC):** **PO-SPOT-SURCHARGE-1** auf `main` (PR #160, Erst/Letzt +30 %); **PO-SPOT-SINGLE-1** auf `main` (PR **#161**, Single +50 %, MAT-003 5/3). Promo nicht still in denselben Slice ziehen.
 - **Anforderungen:** `CAL-001` bis `CAL-005`, `SPT-001` bis `SPT-016`
 - **Abhängigkeiten:** BL-P4-01
@@ -320,7 +306,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis SPT-008 Export (PR #68, Merge `4d245a6a…`, manuell abgenommen):** interner XLSX-Spotplanungs-Export aus Dispo-Snapshots mit zwei Blättern (`Spotverteilung` = Calendar aus `planner_entries_snapshot`, `Planungsvorschlag` = unverbindliche Average-Vorgaben aus `time_ranges_snapshot`); keine künstliche Datum-/Stundenverteilung; keine kaufmännischen Spalten; Audit nur bei Erfolg; E2E Port **8033**
 - **Ergebnis Inventar-UI (PR #112, `012e125…`; Post-Merge-CI `36924662513` grün inkl. Inventar-Smoke):** nach erfolgreicher Inventarwahl klappen übrige Kacheln ein; „Anderes Inventar wählen“ klappt auf; Inventare ohne kalkulierbares Medium nicht wählbar; a11y/`motion-reduce`
 - **Ergebnis PO-SPOT-SINGLE-1 (`main`, PR #161):** `spot_single` × `spot_classic` +50 %; MAT-003 (5 erlaubt / 3 ausgeschlossen); Average/Calendar; fail-closed; Snapshots; Produktion OUT; SPT-010 Hinweis nur für Single
-- **Offen (Rest von BL-P4-02):** Abbinder (SPT-013); operative Blockplanung; REP-007 Dispo-PDF in Phase 10 (Interim-Nachweis laut CUT-1-DEC: Dispo-Detail + SPT-008); MAT-003-Hinweistexte/Vollabnahme separat
+- **Umgesetzt (Spot-Kern):** Average, Calendar, Festpreis-Settlement, Hauptspot+Allonge,
+  Tandem, Tridem, Erst-/Letztplatzierung, Single, SPT-008 XLSX, Inventar-UI.
+- **Offen (nicht gleichwertige Kernblocker):**
+  - **SPT-013 Abbinder:** V1-Rest / bewusst zurückgestellt; kein Tag-1-Blocker nach CUT
+  - **operative Blockplanung:** V1-Rest; kein Tag-1-Blocker nach aktuellem CUT
+  - **REP-007:** Stufe 4; Tag-1-Interim = Dispo-Detail + SPT-008
+  - **MAT-003:** implementierte Kombinationen (Single) ≠ Vollabnahme/Datenprüfung
+    (Abnahme-Track)
 - **Akzeptanz:** `AT-01` bis `AT-04`, `AT-23`, `AT-24` (02c: AT-04 abgenommen; 02d: Festpreis-Abschluss Spot Classic; SPT-008 manuell abgenommen)
 - **Tests 02a:** `PriceListPinOnMethodChangeTest` (+ MySQL), `SpotClassicAverageAcceptanceHardeningTest`
 - **Tests 02b:** `CalendarCalculationTest`, `SpotClassicCalendarCalculationTest`, `BlP402bWithOriginRetentionCompatTest`; Playwright `playwright.blp402b.config.ts` (Port 8022)
@@ -328,7 +321,7 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Tests 02d:** `SpotClassicFixedPriceSettlementTest` (+ MySQL); Vitest `pricing-settlement.test.ts`, `pricing-settlement-section.test.tsx`; Playwright `playwright.blp402d.config.ts` (Port 8026)
 - **Tests 02e:** `TandemTridemCalculationTest`, `ComponentProfileValidatorTest`, `SpotClassicTandemTridemTest` (+ MySQL); Vitest `spot-components.test.ts`; Playwright `playwright.blp402e.config.ts` (Port 8028)
 - **Tests SPT-008:** `SpotDistributionExportBuilderTest`, `SpotDistributionExportFeatureTest` (+ MySQL), Vitest `dispo-order-spot-distribution-export.test.tsx`, Playwright `playwright.spt008.config.ts` / `test:e2e:spt008` (Port **8033**)
-- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten. Gesamtblock bleibt für Abbinder (SPT-013) und operative Blockplanung teilweise offen.
+- **Hinweis:** Mehrsender-Spot-Classic, Längenfeld und Live-Summe sind im Slice UX-GATE-B enthalten.
 ### BL-P4-03 – Standardangebote
 
 - **Phase:** 4 / **V2** (PO-STD-V2, 12.11.2026)
@@ -365,44 +358,38 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P5-01 – SWF ohne Spotlängenindex
 
 - **Phase:** 5
-- **Status:** teilweise (Teilscope **`BL-P5-01a`** Trailer auf `main` PR #129 + lokal eingerichtet;
-  **PO-ALLONGE-1** auf `main` PR #142 + lokal eingerichtet;
-  **PO-SWF-PROMO-1** auf `main` PR #163 (Promo × Average); Paket nicht erledigt; Deploy offen)
-- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Promo gemergt; weitere SWF → Stufe 3 / separate Readiness;
-  **PO-USER-ADMIN-1** auf `main` (PR **#164**); Stufe-2-Rest weiter offen
+- **Status:** **Stufe-1-Kern umgesetzt**; Rest = Stufe 3 / separate Readiness
+  (PO-V1-CLOSURE-1; kein Tag-1-Blocker für Gesamt-`SWF-001–008`)
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Trailer/Allonge/Promo = Stufe 1;
+  weitere SWF → Stufe 3; Deploy offen
 - **Anforderungen:** `SWF-001` bis `SWF-008`, `ADM-003`
 - **Abhängigkeiten:** BL-P4-02, UX-GATE-C
-- **Ergebnis (Ziel):** SWF Durchschnitt/Planer/Festpreis; CityLife als Variante über Admin-Daten
-- **BL-P5-01a (auf `main`, PR #129):** Trailer × Average, inventarübergreifend (Matrix: RH/ROCK/OLDIE/CARAVAN);
-  Preview→Save→Reload→Dispo; **A1** + **B1** akzeptiert; eigene Berechnungsart `swf_trailer`;
-  fail-closed je Inventar bis Länge/Aufschlag gepflegt; initiale Admin-Werte **20 s / 30 %** alle vier
-  (kein Auto-Seed; lokal gepflegt); Spotlisten 2026 lokal 72/72 geprüft; ohne Calendar/Festpreis/CityLife/weitere SWF;
-  Merge ≠ Deploy; Dok
-  `docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`,
-  `docs/readiness/BL-P5-01a-swf-trailer-average-2026-10-07.md`,
-  `docs/readiness/BL-P5-01a-swf-trailer-average-data-2026-10-07.md`,
-  `docs/entscheidungen/PO-BLP501A-1-datenlieferung.md`
-- **PO-ALLONGE-1 (`main` PR #142; lokal eingerichtet 15.10.):** Allonge × Durchschnitt, dieselben
-  vier Sender; Bestätigung `swf_allonge_confirmed_at` nur durch Detail-Speichern;
-  lokale Startwerte 10 s / 30 %; `BL-P5-01` bleibt teilweise; Dok
+- **Operativer Stufe-1-Kern umgesetzt:**
+  - Trailer (`BL-P5-01a`, PR #129) + lokal eingerichtet
+  - Allonge (PO-ALLONGE-1, PR #142) + lokal eingerichtet
+  - Promo/Moderation (PO-SWF-PROMO-1, PR #163)
+- **Contest:** Code auf `main` (PO-SWF-CONTEST-1, PR #165); **nicht** nachträglich als
+  Stufe-1-Pflicht umklassifiziert (CUT: weitere SWF → Stufe 3 / Readiness).
+- **Rest:** weitere SWF / CityLife / Calendar×SWF / Festpreis×SWF = Stufe 3 /
+  separate PO-Readiness; kein Tag-1-Blocker; keine neuen Medien in diesem Slice.
+- **Dok:** `docs/entscheidungen/PO-BLP501A-1-swf-trailer-average.md`,
   `docs/entscheidungen/PO-ALLONGE-1-kombinationspflege.md`,
-  `docs/readiness/PO-ALLONGE-1-swf-allonge-2026-10-14.md`,
-  `docs/readiness/PO-ALLONGE-1-lokale-einrichtung-2026-10-15.md`
-- **PO-SWF-PROMO-1 (`main` PR #163):** Promo/Moderation × Average, Profil `swf_promo`,
-  Initial 20 s / +50 %, vier Matrix-Inventare, kein Confirm-Feld, Calendar/Settlement/Produktion OUT;
-  `BL-P5-01` bleibt teilweise; Dok `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`
-- **PO-USER-ADMIN-1 (`main`, PR #164):** minimale Benutzer-Admin-UI; siehe Readiness
-  `docs/readiness/PO-USER-ADMIN-1-auftrag-2026-10-19.md`. Kein Deploy.
+  `docs/readiness/PO-SWF-PROMO-1-auftrag-2026-10-19.md`,
+  `docs/readiness/PO-SWF-CONTEST-1-auftrag-2026-10-19.md`
 - **Akzeptanz:** `AT-05`; Aufschläge nicht hardcodiert
-- **Tests (Ziel):** Pest Formel ohne Index; gruppierte Zeitschienen abweichend von Spot Classic (`SPT-016`)
+- **Tests:** Pest Formel ohne Index; Registry `swf_trailer|allonge|promo|contest`
 
 ### BL-P5-02 – Produktion/Sonstiges
 
 - **Phase:** 5
-- **Status:** teilweise (`BL-P5-02a` Spotproduktion@Spot Classic Average; PO-BLP502-1)
+- **Status:** teilweise – Spotproduktion@Average umgesetzt; Rest = **V1-Rest / kein Tag-1-Blocker**
+  gemäß CUT-Priorisierung (PO-V1-CLOSURE-1)
 - **Anforderungen:** `PRO-001` bis `PRO-007` (02a: Spotproduktion gebunden; Sonstiges/Überschreibung offen)
 - **Abhängigkeiten:** `BL-P5-02a` formal unabhängig von `BL-P5-01` (B1); Rest offen
-- **Ergebnis 02a:** Admin-Produktionspreise, Zusatzzeilen, Freeze, Dispo-S; **keine** Preisüberschreibung; auf `main` PR #131; operative Preise lokal `dispo_mat_core`
+- **Umgesetzt:** Spotproduktion @ Spot Classic Average; Admin-Produktionspreise;
+  Zusatzzeilen; Freeze; Dispo-Snapshot/Kennzeichen S; auf `main` PR #131; lokale Preise
+- **Offen:** Sonstiges / freie Produktionspreisposition; Preisüberschreibung + Sonderfreigabe;
+  weitere PRO-Typen/Träger. Nicht als vollständig erledigt markieren.
 - **Akzeptanz:** `AT-11` teilweise
 - **Tests:** Pest Menge 0, S-Zeile, Pin/Rebind, Sales-Manipulation abgelehnt; Browser Port 8057
 
@@ -424,11 +411,13 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P6-01 – Online Audio TKP
 
 - **Phase:** 6
-- **Status:** teilweise (Normal-TKP V1 released; **OA-003 Festpreis
-  ABGESCHLOSSEN** 12.11.2026; Online Audio nicht „fertig“)
+- **Status:** **V1 abgeschlossen**; Future-/V2-Reste separat (PO-V1-CLOSURE-1).
+  Nicht behaupten: Online Audio für alle zukünftigen Produktumfänge abgeschlossen.
 - **Anforderungen:** `OA-001` bis `OA-009`
 - **Abhängigkeiten:** BL-P4-01
-- **Umgesetzt (nicht „Online Audio fertig“):** OA-TKP-Unterbau der gemergten
+- **V1 abgeschlossen:** Normal-TKP released/v1; OA-003 Festpreis released;
+  fünf OA-Core-Medien; Native-Ad / Free Position operativ released (NATIVE-5).
+- **Umgesetzt (historischer Unterbau):** OA-TKP-Unterbau der gemergten
   1D-/D3-/D4c-Slices (Stammdaten, Engine/Writer hinter Registry-Gate, Dispo-Pfad,
   Import-CLI, Effective-Minimum, Admin für Preislisten/Targetings/Plattformen)
   sowie **4j-1** Platform×Medium-Regelmodell (PR **#204**, Merge
@@ -462,20 +451,16 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
   Migration, kein Deploy. Dok: `docs/entscheidungen/PO-CALC-TKP-OA003-fixed-price.md`,
   `docs/readiness/PO-CALC-TKP-OA003-CLOSE-2026-11-12.md`; Readiness
   `docs/readiness/PO-CALC-TKP-OA003-fixed-price-readiness-2026-11-11.md`.
-- **V1 offen:**
-  - *(kein OA-Budget-Rest; Spot-Budget = V1 IN)*
+- **V1 offen:** *(keine OA-V1-Feature-Reste; Spot-Budget = V1 IN)*
 - **Future:**
-  - Plattform / OA-005/006
+  - OA-005/006 Plattformwahl
   - optionale interne Kosten-/Margenabbildung der 15 EUR
 - **V2:**
   - Standardangebote (PO-STD-V2, 12.11.2026; kein OA-V1-Blocker)
   - OA-Budget / Free-Position-Budget / Mixed Spot+OA Budget (PO-OA-BUDGET-V2, 15.11.2026; kein V1-Blocker)
 - Kein D4d-Release-Gate mehr offen.
-- **Ergebnis (Normal-TKP V1 + OA-003 Festpreis + NATIVE-5 erreicht; Rest priorisiert):** TKP,
-  Targeting; Mengen ohne V1-Plattformauswahl; Future OA-005/006 separat;
-  Festpreis (OA-003) erledigt; Native-Ad operativ (NATIVE-5); V1-Budget = Spot-only;
-  OA-/Free-/Mixed-Budget = **V2** (PO-OA-BUDGET-V2); Plattform Future;
-  Standardangebote = V2
+- **Ergebnis:** V1-Online-Audio-Scope erreicht (Normal-TKP + OA-003 + Native/Free);
+  Future OA-005/006; V2 Budget/STD. Kein Tag-1-OA-Feature-Blocker.
 - **Akzeptanz:** `AT-08` (Plattformteil Future), `AT-09` (Speichern vs. Übergabe)
 - **Tests:** Pest Mindest-TKP gegen Basis-TKP; 4j-1:
   `PoCalcTkp1d4c4j1PlatformMediumRulesTest`
@@ -483,24 +468,37 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P6-02 – Social Media und Events
 
 - **Phase:** 6
-- **Status:** offen
+- **Status:** fachlich **offen**; Einordnung = **Stufe 3** / kein Tag-1-Blocker
+  (PO-GOLIVE-CUT-1-DEC; PO-V1-CLOSURE-1). Nicht nach V2 verschoben (keine PO dafür).
 - **Anforderungen:** `SOC-001` bis `SOC-006`, `EVT-001` bis `EVT-003`
 - **Abhängigkeiten:** BL-P3-01, BL-P6-01
 - **Ergebnis:** Pakete, Influencer-Unterpositionen, Booster, Event-Feldsets
 - **Akzeptanz:** `AT-10`; Initialpreise nur als Admin-Daten
 - **Tests:** Pest Medien/Booster-Trennung, kein initialer Rabatt/AE
+- **Hinweis:** Keine Runtime-Arbeit in Closure-1.
 
 ## Phase 7 – Rabatt, AE, Festpreis und Sonderfreigaben
 
 ### BL-P7-01 – Kommerzielle Berechnung
 
 - **Phase:** 7
-- **Status:** offen
+- **Status:** **teilweise** – Kern `COM-001`–`COM-009` umgesetzt; Rest `COM-010` /
+  `COM-011` (PO-V1-CLOSURE-1). Historischer Status „offen“ war falsch.
 - **Anforderungen:** `COM-001` bis `COM-011`
 - **Abhängigkeiten:** BL-P4-02, BL-P6-01
-- **Ergebnis:** konsekutiver Rabatt, AE-Hierarchie, Festpreis, drei Payfaktoren
+- **Umgesetzt:** konsekutive Rabatte, Rabattgrenzen, Admin discountable/AE-fähig,
+  AE 15 %-Toggle, AE nach Rabatt, Festpreis-Settlement Spot+OA (COM-001–009).
+  Belege u. a. `CommercialPricingCalculator`, `LayeredDiscountTest`,
+  `FixedPriceSettlementTest` / OA-Festpreis-Tests.
+- **COM-010 Rest (offen):** aggregierte Ausweise
+  Payfaktor ohne Online Audio / Payfaktor Online Audio / Gesamt-Payfaktor.
+  Positionsbezogene Payfaktoren sind bereits vorhanden. Später eigener Readiness-Slice.
+- **COM-011 Rest (teilweise):** Division durch 0 wird technisch bereits vermieden
+  (Payfaktor `null`). Vollständiger Fachvertrag „nicht berechenbar“ /
+  kaufmännische Übergabe-Prüfung noch zu klären – **kein** fertiger
+  Implementierungsauftrag in diesem Closure; später eigener Readiness-Slice.
 - **Akzeptanz:** `AT-06`, `AT-07`; Division durch 0 bei Mediabrutto 0 verhindert
-- **Tests:** Zahlenbeispiel 10 %+10 % = 19 %
+- **Tests:** Zahlenbeispiel 10 %+10 % = 19 %; LayeredDiscount-/Engine-Tests
 
 ### BL-P7-02a – CC-Archiv-Invalidierung (PO-AT13-CC-1)
 
@@ -519,12 +517,17 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P7-02 – Sonderfreigabe und Invalidierung
 
 - **Phase:** 7
-- **Status:** **teilweise umgesetzt** (September 2026): Auslöser + Vier-Augen-Entscheidung + Nachbesserung im Dispo-Freigabe-Slice; **CC-Archiv-Invalidierung** über **BL-P7-02a / PO-AT13-CC-1** (**erledigt**, PR #106); Rest weiter offen
+- **Status:** **teilweise** – Freigabe-Kern + CC-Archiv erledigt; AT-13-Rest =
+  **PO-Klärung erforderlich** (PO-V1-CLOSURE-1). Kein automatischer Implementierungsauftrag.
 - **Anforderungen:** `APR-001` bis `APR-004`, `AUTH-004`, `AUTH-005`
 - **Abhängigkeiten:** BL-P7-01, BL-P1-03, BL-P1-04
 - **Ergebnis (Slice):** Freigabeart regulär/special als Snapshot; Rollenmatrix; Ersteller-Ausschluss; abgelehnter Auftrag bleibt terminaler Snapshot, Nachbesserung über neuen Entwurf
-- **Offen:** weitere Invalidierungsauslöser (AT-13 Rest), Rückzug, AUTH-005 als zwei getrennte Ereignisse
-- **AT-13 Teil:** siehe **BL-P7-02a / PO-AT13-CC-1** (CC-Archiv bei `at_disposition`, gemergt). Weitere Invalidierungsauslöser offen.
+- **Umgesetzt AT-13-Teil:** CC-Archiv @ `at_disposition` → draft → voller Freigabezyklus
+  (BL-P7-02a / PO-AT13-CC-1, PR #106)
+- **Offen:** weitere Invalidierungsauslöser, ggf. Rückzug, AUTH-005 Dual-Protokoll
+  (CUT Stufe 2: kein AUTH-005-Ausbau). Scope-Konflikt Katalog §15.2 vs. enge PO-Freigabe:
+  Closure legt **keine** neue Regel fest, dass Preis-/Rabatt-/AE-Änderung zwingend
+  invalidiert. Späterer PO-Slice entscheidet.
 - **Akzeptanz:** `AT-12` (Vorstufe); `AT-13` teilweise über 02a
 - **Tests:** Pest Feature-/Unit-/Concurrency-Tests, Vitest, Playwright (nach Gate)
 
@@ -583,7 +586,9 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P8-01c / DSP-DCP-001 – Abgeleiteter Kampagnenzeitraum (Dispo)
 
 - **Phase:** 8
-- **Status:** **umgesetzt / gemergt** (September 2026, PR **#69**, Merge `7f0ea7b…` auf `main`); **manuelle Abnahme laut PR-Body und verfügbarer Repo-Dokumentation noch offen**
+- **Status:** **Runtime umgesetzt / gemergt** (PR **#69**, `7f0ea7b…`); Kategorie
+  **Abnahme** – manueller Abnahmebeleg offen/ungeklärt (kein fehlendes Feature;
+  PO-V1-CLOSURE-1)
 - **Kennung:** **`DSP-DCP-001`** (kein Ersatz für `campaign_period`)
 - **Anforderungen:** ergänzt `DSP-002`/`DSP-003` (Freeze aus gewählten Positionen); Calc-Origin `campaign_period` unverändert
 - **Abhängigkeiten:** BL-P8-01, DF-1/DF-2 Periodenfelder, BL-P4-02b Planner-Snapshot
@@ -887,16 +892,14 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P9-02 – Kommentare und Nachrichten
 
 - **Phase:** 9
-- **Status:** teilweise (02a–**02e** auf `main`); Submit-/Invalidierungsmails/In-App **offen**
+- **Status:** teilweise – Kern 02a–**02e** auf `main`; Rest = **Stufe 4 / kein Tag-1-Blocker**
+  (PO-GOLIVE-CUT-1-DEC; PO-V1-CLOSURE-1). Nicht als vollständig erledigt markieren.
 - **Anforderungen:** `CMT-001` bis `CMT-003`, `NOT-001`, `NOT-002`
 - **Abhängigkeiten:** BL-P1-05 (für Notifications), BL-P8-02
 - **Ergebnis (Ziel):** append-only Kommentare, Rückfrage-Ereignisse, E-Mail-Queue mit Protokoll
-- **Erledigt in 02a:** CMT-001/CMT-002 allgemeine Kommentare; CMT-003 weiter über 02b
-- **Erledigt in 02b (`main`, PR #101):** Ask/Answer → Outbox-Enqueue inkl. Suppress-Audit
-- **Erledigt in 02c (`main`, PR #103):** Ask/Answer-Outbox → SMTP über DB-Queue (ohne Admin-UI)
-- **Erledigt in 02d (`main`, PR #121):** Freigabe erteilt/abgelehnt → Outbox+SMTP
-- **Erledigt in 02e (`main`, PR #122):** Admin-Outbox-/Suppress-Sicht (PO-NOT002-ADMIN-1)
-- **Offen:** Submit-Mail, Invalidierungsmails, weitere Status-Ereignis-Mails, In-App
+- **Erledigt:** allgemeine Kommentare; Ask/Answer → Outbox + SMTP; Approve/Reject →
+  Outbox+SMTP; Admin-Outbox
+- **Offen (Stufe 4):** Submit-Mail, Invalidierungs-Mail, weitere Status-Mails, In-App
 - **Akzeptanz (Rest):** Submit/Invalidierung/In-App weiter offen (Admin-Sicht NOT-002 auf `main`)
 - **Tests:** Pest Kommentare (02a); Outbox Ask/Answer (02b); Delivery (02c); Freigabe-Outbox (02d);
   Admin-Outbox (02e)
@@ -906,7 +909,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P10-01 – Listen und Reports
 
 - **Phase:** 10
-- **Status:** offen
+- **Status:** offen – Einordnung **Stufe 4 / kein Tag-1-Blocker** (PO-GOLIVE-CUT-1-DEC;
+  PO-V1-CLOSURE-1). Requirements nicht gelöscht.
 - **Anforderungen:** `REP-001` bis `REP-004`
 - **Abhängigkeiten:** BL-P8-02
 - **Ergebnis:** Suche, Filter, Sortierung, Spalten, Umsatzdimensionen; Listen auch für Standardangebote
@@ -916,9 +920,10 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P10-02 – PDF, Excel, CSV
 
 - **Phase:** 10
-- **Status:** offen
-- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Dispo-PDF (`REP-007`) = Stufe 4. Tag-1-Interim-Nachweis =
-  Dispo-Detailseite + SPT-008 Spotverteilung-XLSX (bereits umgesetzt). Kapitel-27-PDF-Layouts bleiben Liefergegenstand.
+- **Status:** offen – **Stufe 4 / kein Tag-1-Blocker**
+- **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Dispo-PDF (`REP-007`) = Stufe 4. Tag-1-Interim =
+  Dispo-Detailseite + SPT-008 Spotverteilung-XLSX (bereits umgesetzt). Kapitel-27-PDF-Layouts
+  bleiben Liefergegenstand.
 - **Anforderungen:** `REP-005` bis `REP-007`, `AUD-002`
 - **Abhängigkeiten:** BL-P10-01, BL-P9-01
 - **Ergebnis:** interne PDFs (Dompdf/Blade), Excel/CSV, Download-Audit
@@ -930,7 +935,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 ### BL-P11-01 – Abnahme und Betrieb
 
 - **Phase:** 11
-- **Status:** blockiert
+- **Status:** **blockiert** – **echter Go-live-/Betriebsblocker**, kein normaler Feature-Slice
+  (PO-V1-CLOSURE-1)
 - **Priorisierung (PO-GOLIVE-CUT-1-DEC):** Stufe 2 bereitet Produktivbetrieb und fachliche E2E-Abnahme vor
   (Preis-/Katalogvalidierung, minimale Benutzer-Admin-UI, Interim-Nachweis). Deploy bleibt an Kap. 27 / ADR-003 gebunden.
 - **Anforderungen:** `AT-01` bis `AT-31`, Kapitel 24, Kapitel 27
@@ -938,4 +944,8 @@ headless aus Phase 0; die App-Shell gilt nach UX-GATE-A als verbindliche Hülle.
 - **Ergebnis:** Berechtigungs-/Negativtests, Performance, Backup-Restore, Browser, Initialimport, Monitoring
 - **Akzeptanz:** gesamter Abnahmekatalog
 - **Tests:** vollständiger AT-Katalog, Restore-Übung
-- **Blocker:** Initialkataloge und Speedit-Betriebsparameter (Kapitel 27, ADR-003) fehlen noch als Liefergegenstände; Umsetzung der vorherigen Phasen ist nicht blockiert
+- **Offen / unverifiziert (kein Beleg als erledigt):** Domain/HTTPS, SMTP, SSH, PHP/CLI/Extensions,
+  MySQL, Cron, Queue, Storage, Backup/Restore, Monitoring/Logging, Limits, Produktiv-`.env`,
+  Kapitel-27-Liefergegenstände, Produktivdaten, Deploy
+- **Blocker:** Speedit-Betriebsparameter (Kapitel 27, ADR-003) und Produktivabnahme fehlen als
+  Liefer-/Verifikationsgegenstände; Feature-Umsetzung vorheriger Phasen ist davon getrennt
