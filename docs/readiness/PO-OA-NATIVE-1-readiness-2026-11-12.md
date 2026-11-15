@@ -2,8 +2,8 @@
 
 | Feld | Wert |
 |---|---|
-| Status | **NATIVE-5 implementiert** – Free Position **released/v1**, Native-Ad Free-Position-Zuordnung + Podcast-Rule im Code/Migrationspfad; **operativer Release noch nicht abgeschlossen** (Merge + Post-Merge-CI + `dispo_mat_core`-Datenmigration ausstehend) |
-| Stand | 14. November 2026 (NATIVE-5; Base Security `89cda03`) |
+| Status | **NATIVE-5 operativ abgeschlossen** – Free Position **released/v1**, Native-Ad Free-Position + Podcast-Rule auf `dispo_mat_core` migriert (Merge #245 `b972cf1`, Post-Merge-CI `43651608337`, Backup `local-backups/po-oa-native-5-20261115-011335/`); **kein Deploy** |
+| Stand | 15. November 2026 (NATIVE-5 operativ; Merge `b972cf1`) |
 | Slice | `PO-OA-NATIVE-1` / `NATIVE-1` |
 | Branch | `feat/free-position-native-1-foundation` |
 | Base | `8005d2f670b909084d526f1e81471e936bd277bd` (`main` nach #235 PO-STD-V2) |

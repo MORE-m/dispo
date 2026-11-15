@@ -1,20 +1,16 @@
 # Fortschritt V1
 
-Stand: 14. November 2026 – **PO-OA-NATIVE-1 / NATIVE-5 implementiert
-(Free Position released/v1, Native-Ad Free-Position-Zuordnung, Podcast-Rule;
-operativer Release erst nach Merge + Post-Merge-CI + kontrollierter
-`dispo_mat_core`-Datenmigration abgeschlossen).** Registry
-`free_position×free_position` = **released/v1**. Datenmigration
-`2026_11_14_180000_po_oa_native_5_release.php` (Schema-Migration = NEIN):
-Native-Ad Override `free_position`, Assignment Profil `free_position`,
-Podcast-Rule `inv_more_kombi_podcast×native_ad` (active/`redaktion`);
-vier historische Rules unberührt; MORE-Kombi Online Audio × Native-Ad OUT.
-InitialCatalog/Bootstrapper denselben Vertrag. Buchbarkeit nur über
-`InventoryMediumRule`. OA-TKP-Preislisten unverändert (41/41); Native weiter
-nicht OA-TKP-fähig. Kein Fake im NATIVE-5-Smoke
-(`playwright.po-free-position-native-5.config.ts`, Port 8080). **Kein**
-`dispo_mat_core`-Write vor Merge, kein Deploy, kein Budget, keine
-Standardangebote. Zuvor: **PO-OA-NATIVE-1 / NATIVE-4 Dispo/Freeze
+Stand: 15. November 2026 – **PO-OA-NATIVE-1 / NATIVE-5 operativ abgeschlossen
+(Merge #245 `b972cf1`, Post-Merge-CI `43651608337` success, kontrollierte
+Datenmigration auf `dispo_mat_core`).** Registry
+`free_position×free_position` = **released/v1**. Native-Ad Override
+`free_position`, Assignment Profil `free_position`; Podcast-Rule
+`inv_more_kombi_podcast×native_ad` (active/`redaktion`,
+`default_length_seconds=NULL`; Position `length_seconds=0`); fünf aktive
+Native-Ad-Rules; MORE-Kombi Online Audio × Native-Ad OUT; OA-Preislisten
+2026.1/2027.1 weiterhin 41/41. Backup
+`local-backups/po-oa-native-5-20261115-011335/` (nicht in Git). **Kein Deploy**,
+kein Budget, keine Standardangebote. Zuvor: **PO-OA-NATIVE-1 / NATIVE-4 Dispo/Freeze
 implementiert (Free Position weiter planned/unreleased, Podcast OUT).**
 `DispoPositionMethodClassifier` kennt `KIND_FREE_POSITION` (AND-only:
 `engine_profile_key=free_position` ∧ `calculation_method_key=free_position` ∧

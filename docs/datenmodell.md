@@ -362,7 +362,8 @@ Unterobjekte werden typbezogen normalisiert:
   Position persistiert `length_seconds=0`); MORE-Kombi Online Audio × Native-Ad
   OUT. Native-Ad ist Free-Position-buchbar, bleibt aber OUT aus OA-TKP
   (CoreMedia/Resolver/Import/Completeness/Targeting/Platform). Operativer
-  DB-Stand auf `dispo_mat_core` erst nach Merge + Migration.
+  DB-Stand auf `dispo_mat_core` nach Merge #245 + Datenmigration gesetzt
+  (Podcast-Rule `default_length_seconds=NULL`).
 - **PO-OA-NATIVE-1 / NATIVE-1:** `CalculationKind::FreePosition` (`free_position`);
   Rechenkern `FreePositionEngine`: User-`free_price` → `media_gross` →
   `CommercialPricingCalculator` (Rabatte → AE → N/N). Settlement `normal`,
