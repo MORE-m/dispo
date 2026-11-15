@@ -513,17 +513,29 @@ test_VER_005_new_fieldset_version_does_not_mutate_existing_snapshot
 
 ## Definition der Fachabnahme
 
+> **PO-V1-CLOSURE-1 / PO-GOLIVE-CUT-1-DEC:** Tag-1 richtet sich nach der
+> operativen Stufenpriorisierung, nicht nach dem vollständigen Katalogumfang.
+> STD = V2/Regression; OA-Budget = V2; Reports/PDF = Stufe 4 (Interim:
+> Dispo-Detail + SPT-008); Social/Events = Stufe 3; manuelle Abnahme ≠
+> fehlender Runtime-Code; Betrieb (BL-P11-01) separat.
+
 V1 ist fachlich abnahmefähig, wenn:
 
 - die V1-relevanten Mindestfälle erfolgreich sind (`AT-01`–`AT-27` sowie übrige
   nicht-STD-Fälle); `AT-28`–`AT-31` sind **Regression** für vorhandene
   Standardoffer-Funktionalität, nicht Voraussetzung für einen vollständigen
   V1-Produktumfang Standardangebote (**V2**, PO-STD-V2),
-- alle V1-MUSS-Anforderungen tracebar abgedeckt sind (`STD-*` = V2),
+- alle **operativ freigegebenen** V1-MUSS-Anforderungen des Tag-1-Scopes
+  tracebar abgedeckt sind (`STD-*` = V2; OA-Budget = V2; Social/Events =
+  Stufe 3; REP-PDF = Stufe 4),
 - keine offenen Fehler der Schwere kritisch/hoch bestehen,
-- Preislisten- und Kombinationsinitialdaten abgenommen wurden,
-- PDF-/Excel-/CSV-Exporte anhand freigegebener Muster geprüft sind,
-- Wiederherstellung und Berechtigungsmatrix getestet wurden.
+- Preislisten- und Kombinationsinitialdaten für den operativen Tag-1-Katalog
+  abgenommen wurden (Vollkatalog/MAT-003-Vollabnahme = Abnahme-Track),
+- Tag-1-Interim-Exporte geprüft sind (Dispo-Detail + SPT-008); vollständige
+  PDF-/Excel-/CSV-Muster = Stufe 4 / Kap. 27,
+- Wiederherstellung und Berechtigungsmatrix getestet wurden (Betrieb BL-P11-01),
+- offene manuelle Abnahmen (z. B. DSP-DCP-001) als Abnahme-Track geführt werden,
+  nicht als fehlende Features.
 
 V1 prüft **nicht**, dass eine Kombi in enthaltene Sender aufgelöst wird.
 Eine Kombi erscheint in Kalkulation, Dispoauftrag und Dispo-PDF als

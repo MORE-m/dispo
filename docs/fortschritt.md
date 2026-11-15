@@ -1,6 +1,25 @@
 # Fortschritt V1
 
-Stand: 15. November 2026 – **PO-OA-BUDGET-V2.**
+Stand: 15. November 2026 – **PO-V1-CLOSURE-1.**
+
+V1-Backlogstatus gegen released Capabilities konsolidiert (Docs-only).
+Historische Status-Schulden bereinigt; keine neue Fachscope-Entscheidung außer
+bereits bestehenden PO-Entscheidungen.
+
+**Kernkorrekturen:** BL-P6-01 = V1 abgeschlossen (Future/V2 separat);
+BL-P7-01 = teilweise (COM-001–009 da; Rest COM-010/011); BL-P5-01 Stufe-1-Kern
+umgesetzt; BL-P4-02 Spot-Kern erledigt / Rest klassifiziert; AT-13-Rest =
+PO-Klärung; Notifications-Rest = Stufe 4; Social/Events = Stufe 3; Reports =
+Stufe 4; BL-P11-01 = echter Betriebsblocker.
+
+**Nach Closure Priorisierung:** P1 Betriebs-Readiness → P2 Katalog-/Preisdaten-
+Abnahme → P3 COM-010/011 Readiness + AT-13-PO-Klärung → P4 Stufe-3-Entscheidungen.
+Keine Runtime-Änderung, keine Migration, kein DB-Write, kein Deploy.
+Dok: `docs/entscheidungen/PO-V1-CLOSURE-1-backlog-status.md`,
+`docs/backlog-v1.md`, `docs/blocker-und-entscheidungslog.md`,
+`docs/test-und-abnahmekatalog.md`.
+
+Stand davor: 15. November 2026 – **PO-OA-BUDGET-V2.**
 
 Online-Audio-Budgetplanung vollständig auf V2 verschoben.
 V1-Budget bleibt Spot-only.
