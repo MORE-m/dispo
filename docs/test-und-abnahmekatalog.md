@@ -251,8 +251,9 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
   Registry `free_position×free_position` = released/v1; Datenmigration Native-Ad
   Free-Position + Podcast-Rule; MORE-Kombi Online Audio OUT; Browser-Smoke
   `po-free-position-native-5.spec.ts` (Port 8080, kein Fake); operativ auf
-  `dispo_mat_core` nach Merge #245 + Migration (15.11.2026). **V1 offen:** Budget.
-  **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2).
+  `dispo_mat_core` nach Merge #245 + Migration (15.11.2026). **V1 Budget:** Spot-only
+  (PO-OA-BUDGET-V2). **Future:** Plattform / OA-005/006. **V2:** Standardangebote
+  (PO-STD-V2); OA-/Free-/Mixed-Budget (PO-OA-BUDGET-V2).
   Historische Go/No-Go/OA004-DEC bleiben Beleg. Dok:
   `docs/readiness/PO-OA-NATIVE-1-readiness-2026-11-12.md`,
   `docs/readiness/PO-CALC-TKP-1D4d-E2E-readiness-2026-11-10.md`,
@@ -451,7 +452,7 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-06 | COM-001–COM-004 | 10 % und danach 5 % Positionsrabatt, optional 10 % Auftrag | 14,5 % bzw. 23,05 % effektiv; Grenze gegen kumulierten Nachlass; keine Addition zu 15 % |
 | AT-07 | COM-005–COM-008 | 15 % AE mit AE-fähigen und nicht AE-fähigen Zeilen | AE nach Rabatt ausschließlich auf AE-fähiger Basis |
 | AT-08 | OA-005–OA-009 | Zwei Plattformen, Pre-/In-Stream und Targeting | Detailmengen ergeben Gesamtmenge; Targeting additiv; Invest korrekt (**V1 / 4j-KORR:** Plattformteil = Future; Abnahme ohne Plattformauswahl nach KORR-3/4) |
-| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). **OA-003 ABGESCHLOSSEN (12.11.2026):** PO-Vertrag; OA003-1 Settlement/Approval (#230); OA003-2 Backend Preview/Save/Reload/Dispo (#231); OA003-3 Wizard-UI + Vitest (#232; Preisabschluss, Festpreis-N/N, Sonderfreigabe-Hinweis); OA003-4 Browser-Smoke (#233; Festpreis 5.000 → final 50, DMP-Referenz 10.500 ohne +25/+15, Under-Min mit beiden Reasons, Fixed→Normal) gemergt, Post-Merge-CI `43220059401` success. E2E isoliert (`APP_ENV=testing`, SQLite, Port 8078, Guard; `dispo_mat_core` unberührt). **NATIVE-1:** Free-Position-Foundation (Unit A–G); Native-Ad noch nicht buchbar. **V1 offen:** Native-Ad Wiring/Bookability, Budget. **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2); fail-closed OA-TKP in Standardangeboten bleibt |
+| AT-09 | OA-001–OA-003 | Unter effektivem Mindest-TKP (D4c-4b: Final-TKP gegen Grundminimum plus Targeting-Mindestaufschläge); OA-003 Festpreis zusätzlich immer Sonderfreigabe | Speichern möglich; Sonderfreigabe vor Disposition. Normal-TKP V1 released (D4d). **OA-003 ABGESCHLOSSEN (12.11.2026).** **NATIVE-5** operativ (15.11.2026). **V1 Budget:** Spot-only; OA-Budget = **V2** (PO-OA-BUDGET-V2, kein V1-Blocker). **Future:** Plattform / OA-005/006. **V2:** Standardangebote (PO-STD-V2); OA-/Free-/Mixed-Budget; fail-closed OA-TKP in Standardangeboten und Budget bleibt |
 | AT-10 | SOC-001–SOC-006 | Paket aus Story, Reel und Booster | Unterpositionen und Medien-/Boostertrennung; initial kein Rabatt/AE |
 | AT-11 | PRO-001–PRO-007 | Produktion mit Menge 0, regulär und Sonstiges | Preislistenbezug; reguläre Überschreibung nur mit Begründung/Freigabe |
 | AT-12 | AUTH-004, AUTH-005 | Ersteller versucht eigene Freigabe | Server blockiert; andere berechtigte Person kann freigeben |
@@ -467,15 +468,19 @@ Zusätzlich zu `AT-21` (Import) gelten für den Lifecycle-Slice:
 | AT-22 | AUTH-001, STA-003 | Disposition versucht Rabatt zu ändern | Server blockiert; Rückfrage an Vertrieb bleibt möglich |
 | AT-23 | CAL-001, CAL-005 | 10 Spot Classic Radio Hamburg und 5 ROCK ANTENNE Hamburg, abweichende Längen/Stunden/Rabatte | Eine Kalkulation; Live-Gesamtsumme; Positionen separat editierbar |
 | AT-24 | SPT-015 | Standardlänge vorbelegt, dann abweichende Sekunden | Feld sichtbar und frei; Preis und Dispo-Snapshot nutzen die tatsächliche Länge |
-| AT-25 | BUD-003–BUD-006 | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Mehrsender-Vorschlag ohne bestehendes Senderverhältnis; editierbar |
-| AT-26 | BUD-007 | Zielbudget, das sich nicht ganzzahlig teilt | Ganzzahlige Mengen; Rest oder Überschreitung transparent |
-| AT-27 | BUD-008 | Vorschlag anzeigen, verwerfen, dann explizit übernehmen | Ohne Übernahme unverändert; nach Übernahme Mengen gesetzt und weiter editierbar |
+| AT-25 | BUD-003–BUD-006 | Zielbudget N/N, zwei Sender, gleich verteilen | Deterministischer Spot-Mehrsender-Vorschlag ohne bestehendes Senderverhältnis; editierbar. V1 Spot-only (PO-OA-BUDGET-V2) |
+| AT-26 | BUD-007 | Zielbudget, das sich nicht ganzzahlig teilt | Ganzzahlige Spotmengen; Rest oder Überschreitung transparent. V1 Spot-only |
+| AT-27 | BUD-008 | Vorschlag anzeigen, verwerfen, dann explizit übernehmen | Ohne Übernahme unverändert; nach Übernahme Mengen gesetzt und weiter editierbar. OA-TKP/Free-Position Budget fail-closed = V1-Vertrag |
 | AT-28 | STD-004, STD-005 | Veröffentlichung, Vertrieb übernimmt und ändert Mengen | Eigenständige Kundenkalkulation; Standardangebot unverändert. **Regression** vorhandener Stand; vollständiger Produktumfang = **V2** (PO-STD-V2) |
 | AT-29 | STD-007, DSP-007 | Dispoauftrag direkt am Standardangebot | Serverseitig unzulässig; nur aus Kundenkalkulation. **Regression**; vollständiger Produktumfang = **V2** |
 | AT-30 | AUTH-006, AUTH-007 | Nutzer nur Produktmanagement | Standardangebote erlaubt; Kundenkalkulationen/Dispo ohne Extra-Recht verweigert. **Regression**; vollständiger Produktumfang = **V2** |
 | AT-31 | STD-002, STD-008 | Entwurf veröffentlichen, archivieren | Status, Autor, Veröffentlichungszeitpunkt und Audit vollständig. **Regression**; vollständiger Produktumfang = **V2** |
 
 ## Pflichtklassen für Negativtests
+
+**PO-OA-BUDGET-V2 (15.11.2026):** Die bestehenden Negativtests
+Budget-Propose/-Apply mit OA-TKP bzw. Free Position (fail-closed) sind der
+gewünschte V1-Vertrag und keine temporären Blocker-Tests.
 
 - Zugriff ohne Anmeldung,
 - Rolle ohne Berechtigung,
