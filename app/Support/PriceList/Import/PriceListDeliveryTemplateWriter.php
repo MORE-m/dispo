@@ -30,6 +30,9 @@ final class PriceListDeliveryTemplateWriter
             ->get(['id', 'name', 'code', 'sort', 'is_active']);
     }
 
+    /**
+     * @param  Collection<int, Inventory>|null  $inventories
+     */
     public function buildSpreadsheet(?Collection $inventories = null): Spreadsheet
     {
         $inventories ??= $this->eligibleInventories();
@@ -56,6 +59,9 @@ final class PriceListDeliveryTemplateWriter
         return $spreadsheet;
     }
 
+    /**
+     * @param  Collection<int, Inventory>|null  $inventories
+     */
     public function download(?Collection $inventories = null): StreamedResponse
     {
         $spreadsheet = $this->buildSpreadsheet($inventories);

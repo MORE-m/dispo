@@ -536,7 +536,8 @@ final class PriceListImportService
             return [];
         }
 
-        return PriceList::query()
+        /** @var list<array{inventory_id: int, inventory_name: string|null, id: int, name: string, version: string, status: string, status_label: string}> $rows */
+        $rows = PriceList::query()
             ->with('inventory:id,name')
             ->whereIn('inventory_id', $inventoryIds)
             ->where('year', $year)
@@ -550,11 +551,13 @@ final class PriceListImportService
                 'id' => (int) $list->id,
                 'name' => (string) $list->name,
                 'version' => (string) $list->version,
-                'status' => $list->status->value,
+                'status' => (string) $list->status->value,
                 'status_label' => $list->status->label(),
             ])
             ->values()
             ->all();
+
+        return $rows;
     }
 
     /**

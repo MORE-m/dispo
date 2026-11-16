@@ -160,7 +160,7 @@ final class PriceListDeliveryWorkbookParser
 
                 continue;
             }
-            if ($hourParsed === 'invalid' || $hourParsed < 0 || $hourParsed > 23) {
+            if ($hourParsed === 'invalid' || ! is_int($hourParsed) || $hourParsed < 0 || $hourParsed > 23) {
                 $issues[] = $this->issue(
                     'error',
                     'hour_invalid',
@@ -172,11 +172,13 @@ final class PriceListDeliveryWorkbookParser
 
                 continue;
             }
-            if (isset($seenHours[$hourParsed])) {
+
+            $hour = $hourParsed;
+            if (isset($seenHours[$hour])) {
                 $issues[] = $this->issue(
                     'error',
                     'hour_duplicate',
-                    'Doppelte Stunde '.PriceListDeliveryWorkbookContract::hourLabel($hourParsed).'.',
+                    'Doppelte Stunde '.PriceListDeliveryWorkbookContract::hourLabel($hour).'.',
                     $title,
                     $row,
                     'A',
@@ -184,12 +186,12 @@ final class PriceListDeliveryWorkbookParser
 
                 continue;
             }
-            if ($expectedHour !== null && $hourParsed !== $expectedHour) {
+            if ($expectedHour !== null && $hour !== $expectedHour) {
                 $issues[] = $this->issue(
                     'error',
                     'hour_sequence_invalid',
                     'Erwartet wurde '.PriceListDeliveryWorkbookContract::hourLabel($expectedHour)
-                        .', gefunden wurde '.PriceListDeliveryWorkbookContract::hourLabel($hourParsed).'.',
+                        .', gefunden wurde '.PriceListDeliveryWorkbookContract::hourLabel($hour).'.',
                     $title,
                     $row,
                     'A',
@@ -197,7 +199,7 @@ final class PriceListDeliveryWorkbookParser
 
                 continue;
             }
-            $seenHours[$hourParsed] = true;
+            $seenHours[$hour] = true;
 
             foreach (PriceListDeliveryWorkbookContract::PRICE_COLUMNS as $columnIndex => $dayGroup) {
                 if (count($rows) >= PriceListImportLimits::MAX_DATA_ROWS) {
@@ -244,7 +246,7 @@ final class PriceListDeliveryWorkbookParser
 
                 $rows[] = [
                     'inventory_raw' => $title,
-                    'hour_raw' => $hourParsed,
+                    'hour_raw' => $hour,
                     'day_group_raw' => $dayGroup,
                     'second_price_raw' => $raw,
                     'year_raw' => null,
