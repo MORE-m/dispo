@@ -5,6 +5,7 @@ import PageHeader from '@/components/heading-page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
+    formatImportIssueLocation,
     importConfirmEnabled,
     importIssuesBySeverity,
     type ImportPreview,
@@ -38,11 +39,14 @@ export default function PriceListImportPage({
     currentYear,
     urls,
     contractNote,
+    templateInventoryCount,
 }: {
     currentYear: number;
-    urls: { upload: string; index: string };
+    urls: { upload: string; index: string; template: string };
     contractNote: string;
     limits: { max_bytes: number; extensions: string[] };
+    templateInventoryCount?: number;
+    contractVersion?: string;
 }) {
     const [year, setYear] = useState(String(currentYear));
     const [file, setFile] = useState<File | null>(null);
@@ -174,6 +178,20 @@ export default function PriceListImportPage({
                     {contractNote}
                 </p>
 
+                <div className="flex flex-wrap gap-3">
+                    <Button variant="outline" asChild>
+                        <a
+                            href={urls.template}
+                            data-test="price-list-import-template"
+                        >
+                            Leeres Excel-Template herunterladen
+                            {typeof templateInventoryCount === 'number'
+                                ? ` (${templateInventoryCount})`
+                                : ''}
+                        </a>
+                    </Button>
+                </div>
+
                 <div
                     className="max-w-xl space-y-4 rounded-xl border p-4"
                     data-test="price-list-import-form"
@@ -235,13 +253,99 @@ export default function PriceListImportPage({
                             <p className="font-mono text-xs break-all">
                                 Prüfsumme: {importMeta.checksum_sha256}
                             </p>
-                            <p>
-                                Jahr {importMeta.year} · gültige Zeilen{' '}
-                                {preview.valid_row_count} · Fehler{' '}
+                            <p data-test="price-list-import-preview-year">
+                                Preislistenjahr {importMeta.year} · gültige
+                                Preise {preview.valid_row_count} · Fehler{' '}
                                 {preview.error_count} · Warnungen{' '}
                                 {preview.warning_count}
                             </p>
+                            {preview.notes?.drafts_only ? (
+                                <p
+                                    className="text-muted-foreground mt-2"
+                                    data-test="price-list-import-drafts-note"
+                                >
+                                    {preview.notes.drafts_only}
+                                </p>
+                            ) : null}
                         </div>
+
+                        {preview.inventories &&
+                        preview.inventories.length > 0 ? (
+                            <div
+                                className="overflow-x-auto rounded-xl border"
+                                data-test="price-list-import-coverage"
+                            >
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-muted/40">
+                                        <tr>
+                                            <th className="px-2 py-2">
+                                                Inventar
+                                            </th>
+                                            <th className="px-2 py-2">Ist</th>
+                                            <th className="px-2 py-2">Soll</th>
+                                            <th className="px-2 py-2">
+                                                Fehlend
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {preview.inventories.map(
+                                            (inventory) => (
+                                                <tr
+                                                    key={inventory.id}
+                                                    className="border-t"
+                                                >
+                                                    <td className="px-2 py-1">
+                                                        {inventory.name} (
+                                                        {inventory.code})
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {inventory.item_count}
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {
+                                                            inventory.expected_item_count
+                                                        }
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {
+                                                            inventory.missing_item_count
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            ),
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : null}
+
+                        {preview.existing_price_lists &&
+                        preview.existing_price_lists.length > 0 ? (
+                            <div
+                                className="rounded-xl border p-4 text-sm"
+                                data-test="price-list-import-existing"
+                            >
+                                <h2 className="mb-2 font-medium">
+                                    Bestehende Preislisten {importMeta.year}
+                                </h2>
+                                <p className="text-muted-foreground mb-2">
+                                    Bleiben unverändert; der Import legt
+                                    zusätzliche Entwürfe an.
+                                </p>
+                                <ul className="space-y-1">
+                                    {preview.existing_price_lists.map(
+                                        (list) => (
+                                            <li key={list.id}>
+                                                {list.inventory_name} ·{' '}
+                                                {list.name} · v{list.version} ·{' '}
+                                                {list.status_label}
+                                            </li>
+                                        ),
+                                    )}
+                                </ul>
+                            </div>
+                        ) : null}
 
                         {errors.length > 0 ? (
                             <div
@@ -252,12 +356,7 @@ export default function PriceListImportPage({
                                 <ul className="space-y-1 text-sm">
                                     {errors.map((issue, index) => (
                                         <li key={`${issue.code}-${index}`}>
-                                            {issue.sheet
-                                                ? `${issue.sheet} `
-                                                : ''}
-                                            {issue.row
-                                                ? `Z.${issue.row}: `
-                                                : ''}
+                                            {formatImportIssueLocation(issue)}
                                             {issue.message}
                                         </li>
                                     ))}
@@ -266,11 +365,15 @@ export default function PriceListImportPage({
                         ) : null}
 
                         {warnings.length > 0 ? (
-                            <div className="rounded-xl border p-4 text-sm">
+                            <div
+                                className="rounded-xl border p-4 text-sm"
+                                data-test="price-list-import-warnings"
+                            >
                                 <h2 className="mb-2 font-medium">Warnungen</h2>
                                 <ul className="space-y-1">
                                     {warnings.map((issue, index) => (
                                         <li key={`${issue.code}-${index}`}>
+                                            {formatImportIssueLocation(issue)}
                                             {issue.message}
                                         </li>
                                     ))}

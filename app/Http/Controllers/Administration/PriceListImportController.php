@@ -5,36 +5,53 @@ namespace App\Http\Controllers\Administration;
 use App\Http\Controllers\Controller;
 use App\Models\PriceListImport;
 use App\Services\PriceList\Import\PriceListImportService;
+use App\Support\PriceList\Import\PriceListDeliveryTemplateWriter;
+use App\Support\PriceList\Import\PriceListDeliveryWorkbookContract;
 use App\Support\PriceList\PriceListCalendar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * BL-P4-01b: Excel-Import für Spot-Stundenpreislisten (ohne Auto-Aktivierung).
+ * Preisanlieferung XLSX v1: Template-Download + Wide-Format-Parser.
  */
 class PriceListImportController extends Controller
 {
-    public function create(): Response
+    public function create(PriceListDeliveryTemplateWriter $templates): Response
     {
         $this->authorize('access-administration');
+
+        $eligible = $templates->eligibleInventories();
 
         return Inertia::render('administration/price-lists/import', [
             'currentYear' => PriceListCalendar::currentYear(),
             'urls' => [
                 'upload' => route('administration.price-lists.import.upload'),
+                'template' => route('administration.price-lists.import.template'),
                 'index' => route('administration.price-lists.index'),
             ],
             'limits' => [
                 'max_bytes' => 50 * 1024 * 1024,
                 'extensions' => ['xlsx', 'xls'],
             ],
-            'contractNote' => 'Kanonischer V1-Vertrag: Spalten inventory_code (oder inventory), hour, day_group, second_price; optional year. '
-                .'Alternativ Blattname = Inventarcode/-name/Alias und Spalten hour, day_group, second_price. '
-                .'Aliase: „radio ffn“ → ffn Hamburg Plus, „BOLLERWAGEN“ → RADIO BOLLERWAGEN DAB+ Hamburg. '
-                .'PO-PRI-HOURS-1: fehlende Tagesgruppen sind erlaubt. Keine Auto-Aktivierung.',
+            'templateInventoryCount' => $eligible->count(),
+            'contractVersion' => PriceListDeliveryWorkbookContract::VERSION,
+            'contractNote' => 'Bevorzugtes Format: Preisanlieferung XLSX v'.PriceListDeliveryWorkbookContract::VERSION
+                .' (ein Blatt je Inventar; Spalten Uhrzeit / Mo–Fr €/1 Sek / Samstag €/1 Sek / Sonntag €/1 Sek; Stunden 00:00–23:00). '
+                .'Jahr nur im Dialog. Leere Preise ≠ 0 (PO-PRI-HOURS-1). Import erzeugt nur Entwürfe. '
+                .'Weiterhin: kanonische Flachdatei und MORE-Spotkalkulation-Adapter. '
+                .'Aliase: „radio ffn“ → ffn Hamburg Plus, „BOLLERWAGEN“ → RADIO BOLLERWAGEN DAB+ Hamburg.',
         ]);
+    }
+
+    public function downloadTemplate(PriceListDeliveryTemplateWriter $templates): StreamedResponse
+    {
+        $this->authorize('access-administration');
+
+        return $templates->download();
     }
 
     public function upload(Request $request, PriceListImportService $imports): JsonResponse

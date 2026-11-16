@@ -272,6 +272,8 @@ Route::middleware(['auth'])->group(function () {
             ->name('administration.price-lists.index');
         Route::get('administration/preislisten/import', [PriceListImportController::class, 'create'])
             ->name('administration.price-lists.import');
+        Route::get('administration/preislisten/import/template', [PriceListImportController::class, 'downloadTemplate'])
+            ->name('administration.price-lists.import.template');
         Route::post('administration/preislisten/import', [PriceListImportController::class, 'upload'])
             ->name('administration.price-lists.import.upload');
         Route::post('administration/preislisten/import/{priceListImport}/pruefen', [PriceListImportController::class, 'validateImport'])

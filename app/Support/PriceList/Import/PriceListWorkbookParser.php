@@ -60,8 +60,10 @@ final class PriceListWorkbookParser
                 ];
             }
 
-            $reader->setReadDataOnly(true);
-            $reader->setReadEmptyCells(false);
+            // Delivery-Format braucht Zellenwerte inkl. leerer Preiszellen und Formeltypen.
+            $deliveryCandidate = strtolower($extension) === 'xlsx';
+            $reader->setReadDataOnly(! $deliveryCandidate);
+            $reader->setReadEmptyCells($deliveryCandidate);
             $reader->setReadFilter(new PriceListImportReadFilter(
                 PriceListImportLimits::MAX_ROWS_PER_SHEET,
                 PriceListImportLimits::MAX_COLUMNS,
@@ -74,6 +76,21 @@ final class PriceListWorkbookParser
             }
 
             return $this->fatal('corrupt', 'Die Datei ist beschädigt oder kein gültiges Excel-Workbook.');
+        }
+
+        if (
+            strtolower($extension) === 'xlsx'
+            && PriceListDeliveryWorkbookParser::looksLikeDeliverySpreadsheet($spreadsheet)
+        ) {
+            $delivery = (new PriceListDeliveryWorkbookParser)->extract($spreadsheet);
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
+            return [
+                'sheet_count' => $delivery['sheet_count'],
+                'issues' => $delivery['issues'],
+                'rows' => $delivery['rows'],
+            ];
         }
 
         $issues = [];
