@@ -4,6 +4,7 @@ namespace App\Services\PriceList\Import;
 
 use App\Enums\DayGroup;
 use App\Enums\PriceListImportStatus;
+use App\Enums\PriceListStatus;
 use App\Exceptions\PriceListAdminConflictException;
 use App\Models\Inventory;
 use App\Models\PriceList;
@@ -13,6 +14,7 @@ use App\Services\Advertising\Admin\CatalogImpactPreviewService;
 use App\Services\Audit\AuditLogger;
 use App\Services\PriceList\Admin\PriceListAdminWriter;
 use App\Support\PriceList\Import\InventoryAliasResolver;
+use App\Support\PriceList\Import\PriceListDeliveryWorkbookContract;
 use App\Support\PriceList\Import\PriceListImportLimits;
 use App\Support\PriceList\Import\PriceListWorkbookParser;
 use App\Support\PriceList\PriceListItemContract;
@@ -466,16 +468,26 @@ final class PriceListImportService
         foreach ($draftBuckets as $bucket) {
             /** @var Inventory $inventory */
             $inventory = $bucket['inventory'];
+            $itemCount = count($bucket['items']);
+            $expected = PriceListDeliveryWorkbookContract::EXPECTED_BASE_CELLS_PER_INVENTORY;
             $drafts[] = [
                 'inventory_id' => (int) $inventory->id,
                 'inventory_code' => (string) $inventory->code,
                 'inventory_name' => (string) $inventory->name,
                 'name' => 'Import '.$import->year.' '.$inventory->code,
                 'items' => $bucket['items'],
+                'item_count' => $itemCount,
+                'expected_item_count' => $expected,
+                'missing_item_count' => max(0, $expected - $itemCount),
             ];
         }
 
         usort($drafts, fn (array $a, array $b): int => $a['inventory_id'] <=> $b['inventory_id']);
+
+        $existingPriceLists = $this->existingPriceListsForYear(
+            array_map(fn (array $d): int => (int) $d['inventory_id'], $drafts),
+            (int) $import->year,
+        );
 
         $body = [
             'entity' => 'price_list_import',
@@ -489,12 +501,21 @@ final class PriceListImportService
             'valid_row_count' => count($previewRows),
             'error_count' => $errorCount,
             'warning_count' => $warningCount,
+            'expected_item_count_per_inventory' => PriceListDeliveryWorkbookContract::EXPECTED_BASE_CELLS_PER_INVENTORY,
             'inventories' => array_map(fn (array $d): array => [
                 'id' => $d['inventory_id'],
                 'code' => $d['inventory_code'],
                 'name' => $d['inventory_name'],
-                'item_count' => count($d['items']),
+                'item_count' => $d['item_count'],
+                'expected_item_count' => $d['expected_item_count'],
+                'missing_item_count' => $d['missing_item_count'],
             ], $drafts),
+            'existing_price_lists' => $existingPriceLists,
+            'notes' => [
+                'drafts_only' => 'Es werden nur neue Entwürfe erzeugt. Bestehende aktive Preislisten bleiben unverändert, bis ein Entwurf manuell aktiviert wird.',
+                'year_source' => 'Das Preislistenjahr kommt ausschließlich aus dem Importdialog, nicht aus der Excel-Datei.',
+                'sparse_prices' => 'Leere Preiszellen werden nicht als 0 importiert (PO-PRI-HOURS-1). Fehlende Basispreise sind nicht buchbar.',
+            ],
             'rows' => $previewRows,
             'issues' => $issues,
             'drafts' => $drafts,
@@ -503,6 +524,37 @@ final class PriceListImportService
         $body['fingerprint'] = $this->fingerprints->fingerprint($body);
 
         return $body;
+    }
+
+    /**
+     * @param  list<int>  $inventoryIds
+     * @return list<array{inventory_id: int, inventory_name: string|null, id: int, name: string, version: string, status: string, status_label: string}>
+     */
+    private function existingPriceListsForYear(array $inventoryIds, int $year): array
+    {
+        if ($inventoryIds === []) {
+            return [];
+        }
+
+        return PriceList::query()
+            ->with('inventory:id,name')
+            ->whereIn('inventory_id', $inventoryIds)
+            ->where('year', $year)
+            ->whereIn('status', [PriceListStatus::Active, PriceListStatus::Draft])
+            ->orderBy('inventory_id')
+            ->orderBy('id')
+            ->get(['id', 'inventory_id', 'name', 'version', 'status', 'year'])
+            ->map(fn (PriceList $list): array => [
+                'inventory_id' => (int) $list->inventory_id,
+                'inventory_name' => $list->inventory?->name,
+                'id' => (int) $list->id,
+                'name' => (string) $list->name,
+                'version' => (string) $list->version,
+                'status' => $list->status->value,
+                'status_label' => $list->status->label(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

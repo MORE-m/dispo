@@ -1,3 +1,17 @@
+# Import-Vorlagen
+
+## Spot-Stundenpreislisten (Preisanlieferung XLSX v1)
+
+| Datei | Zweck |
+|---|---|
+| `Template_Preisanlieferung.xlsx` | Strukturelle Referenz (Vier-Spalten-Format) |
+| `preisanlieferung-xlsx-v1.md` | Verbindlicher Contract / fachliche Regeln |
+
+Operativer Download: Administration → Preislisten → Excel-Import →
+„Leeres Excel-Template herunterladen“.
+
+---
+
 # OA-TKP Import-Vorlagen (PO-CALC-TKP-1D4c-1 / D4c-3)
 
 Nur Felddefinitionen und leere Matrizen bzw. Abnahmestatus. **Keine erfundenen Fachwerte.**

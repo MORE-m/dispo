@@ -41,6 +41,18 @@ function makeXlsx(mode: 'valid' | 'invalid' | 'sparse'): string {
 }
 
 test.describe.serial('BL-P4-01b Preislisten-Import', () => {
+    test('Template-Download liefert XLSX', async ({ page }) => {
+        await login(page, 'admin@example.com');
+        await page.goto('/administration/preislisten/import');
+        await expect(
+            page.getByRole('heading', { name: 'Excel-Import' }),
+        ).toBeVisible();
+        const downloadPromise = page.waitForEvent('download');
+        await page.locator('[data-test="price-list-import-template"]').click();
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toMatch(/\.xlsx$/i);
+    });
+
     test('gültige XLSX → Preview → Confirm → Draft', async ({ page }) => {
         await login(page, 'admin@example.com');
         const file = makeXlsx('valid');
@@ -94,7 +106,7 @@ test.describe.serial('BL-P4-01b Preislisten-Import', () => {
         await page.locator('[data-test="price-list-import-validate"]').click();
         await expect(
             page.locator('[data-test="price-list-import-preview"]'),
-        ).toContainText(/gültige Zeilen 1/i, { timeout: 30_000 });
+        ).toContainText(/gültige Preise 1/i, { timeout: 30_000 });
         await page.locator('[data-test="price-list-import-confirm"]').click();
         await expect(
             page.locator('[data-test="price-list-import-result"]'),

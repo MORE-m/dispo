@@ -1395,6 +1395,18 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | MORE-Produktiv-Workbook-Mapping | **offen** (Lieferdaten/Adapter; macht 01c nicht unvollständig) |
 | `BL-P4-01` insgesamt | **erledigt** |
 
+## Preisanlieferung XLSX v1 – Template-Download + Wide-Import (November 2026)
+
+| Teil | Status |
+|------|--------|
+| Shared Contract `PriceListDeliveryWorkbookContract` (v1) | **umgesetzt** |
+| Parser Vier-Spalten-Format (Uhrzeit / Mo–Fr / Sa / So €/1 Sek) | **umgesetzt** |
+| Template-Download aktiver klassischer Inventare | **umgesetzt** |
+| Preview: Coverage Ist/Soll, bestehende Listen, Draft-Hinweis | **umgesetzt** |
+| MORE-Adapter + kanonische Flachdatei unverändert kompatibel | **umgesetzt** |
+| Keine Auto-Aktivierung; Jahr nur im Dialog; Sparse ≠ 0 | **umgesetzt** |
+| Docs: `docs/readiness/import-templates/preisanlieferung-xlsx-v1.md` | **umgesetzt** |
+
 ## BL-P4-01b – Preislisten-Excel-Import (September 2026)
 
 | Teil | Status |
@@ -1408,7 +1420,7 @@ Basis **`average`** oder **`calendar`**. Der Registry-Eintrag **`fixed_price`** 
 | Upload temp→Archiv, Confirm-Audit in derselben Transaktion | **umgesetzt** |
 | PO-PRI-HOURS-1 sparse Stunden im Import | **umgesetzt** |
 | E2E isoliert: `playwright.blp401b.config.ts` (Port 8018) | **umgesetzt** |
-| MORE-Produktiv-Workbook-Mapping | **offen** (Beispieldatei) |
+| MORE-Produktiv-Workbook-Mapping | **offen** (Beispieldatei; UI bevorzugt Preisanlieferung v1) |
 | Wizard-Jahreswahl | **BL-P4-01c** |
 | `BL-P4-01` insgesamt | **erledigt** (nach 01c) |
 

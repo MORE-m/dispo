@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+    formatImportIssueLocation,
     importConfirmEnabled,
     importIssuesBySeverity,
     type ImportIssue,
@@ -48,5 +49,28 @@ describe('price-list-import helpers', () => {
         ];
         expect(importIssuesBySeverity(issues, 'error')).toHaveLength(1);
         expect(importIssuesBySeverity(issues, 'warning')).toHaveLength(1);
+    });
+
+    it('formatiert Blatt/Zeile/Spalte für Fehlermeldungen', () => {
+        expect(
+            formatImportIssueLocation({
+                severity: 'error',
+                code: 'x',
+                message: 'm',
+                sheet: 'Radio Hamburg',
+                row: 5,
+                column: 'B',
+            }),
+        ).toBe('Radio Hamburg · Z.5 · Sp.B: ');
+        expect(
+            formatImportIssueLocation({
+                severity: 'warning',
+                code: 'y',
+                message: 'm',
+                sheet: null,
+                row: null,
+                column: null,
+            }),
+        ).toBe('');
     });
 });
