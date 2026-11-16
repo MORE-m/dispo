@@ -289,30 +289,32 @@ export default function PriceListImportPage({
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {preview.inventories.map((inventory) => (
-                                            <tr
-                                                key={inventory.id}
-                                                className="border-t"
-                                            >
-                                                <td className="px-2 py-1">
-                                                    {inventory.name} (
-                                                    {inventory.code})
-                                                </td>
-                                                <td className="px-2 py-1 font-mono">
-                                                    {inventory.item_count}
-                                                </td>
-                                                <td className="px-2 py-1 font-mono">
-                                                    {
-                                                        inventory.expected_item_count
-                                                    }
-                                                </td>
-                                                <td className="px-2 py-1 font-mono">
-                                                    {
-                                                        inventory.missing_item_count
-                                                    }
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {preview.inventories.map(
+                                            (inventory) => (
+                                                <tr
+                                                    key={inventory.id}
+                                                    className="border-t"
+                                                >
+                                                    <td className="px-2 py-1">
+                                                        {inventory.name} (
+                                                        {inventory.code})
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {inventory.item_count}
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {
+                                                            inventory.expected_item_count
+                                                        }
+                                                    </td>
+                                                    <td className="px-2 py-1 font-mono">
+                                                        {
+                                                            inventory.missing_item_count
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            ),
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
